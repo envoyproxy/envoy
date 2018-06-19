@@ -20,7 +20,7 @@ api_proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/api/v2/core:address",
-        "//envoy/api/v2/core:base",
+        "//envoy/api/v2/core:health_check",
         "//envoy/type:percent",
     ],
 )

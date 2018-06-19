@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.admin.v2alpha;
 
-import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/address.proto";
+import "envoy/api/v2/core/health_check.proto";
 import "envoy/type/percent.proto";
 
 // [#protodoc-title: Clusters]
@@ -20,33 +20,38 @@ message ClusterStatus {
   // Name of the cluster.
   string name = 1;
 
-  // General outlier statistics if installed for this cluster.
-  OutlierInfo outlier_info = 2;
-
   // Denotes whether this cluster was added via API or configured statically.
-  bool added_via_api = 3;
+  bool added_via_api = 2;
+
+  // The success rate threshold used in the last interval. The threshold is used to eject hosts
+  // based on their success rate. See 
+  // :ref:`Cluster outlier detection <arch_overview_outlier_detection>` statistics
+  //
+  // Note: this field may be omitted in any of the three following cases:
+  // 1. There were not enough hosts with enough request volume to proceed with success rate based outlier ejection.
+  // 2. The threshold is computed to be < 0 because a negative value implies that there was no threshold for that
+  // interval.
+  // 3. Outlier detection is not enabled for this cluster.
+  envoy.type.Percent success_rate_ejection_threshold = 3;
 
   // Mapping from host address to the host's current status.
   repeated HostStatus host_statuses = 4;
 }
 
-// :ref:`Cluster outlier detection <arch_overview_outlier_detection>` statistics.  The omission of
-// any statistic denotes that there was not enough data to compute it.
-message OutlierInfo {
-  // The average success rate of the hosts in the Detector for the last aggregation interval.
-  //
-  // Note: the message will be omitted if there were not enough hosts with enough request volume to
-  // proceed with success rate based outlier ejection.
-  envoy.type.Percent success_rate_average = 1;
+// Note: this will be moved before merging.
+//
+// Proto representation of an Envoy Counter or Gauge value.
+message SimpleMetric {
+  enum Type {
+    COUNTER = 0;
+    GAUGE = 1;
+  }
 
-  // The success rate threshold used in the last interval. The threshold is used to eject hosts
-  // based on their success rate.
-  //
-  // Note: the message will be omitted if there were not enough hosts with enough request volume to
-  // proceed with success rate based outlier ejection. Since this value can technically be negative
-  // due to the way that it's computed, negative values will also be represented by the absence of
-  // this field because a negative value implies that there was no threshold for that interval.
-  envoy.type.Percent success_rate_ejection_threshold = 2;
+  // Type of metric represented.
+  Type type = 1;
+
+  // Current metric value.
+  uint64 value = 2;
 }
 
 // Current state of a particular host.
@@ -55,39 +60,28 @@ message HostStatus {
   envoy.api.v2.core.Address address = 1;
 
   // Mapping from the name of the statistic to the current value.
-  map<string, int64> stats = 2;
+  map<string, SimpleMetric> stats = 2;
 
   // The host's current health status.
   HostHealthStatus health_status = 3;
-
-  // Configured load balancing weight for this host.
-  uint64 weight = 4;
-
-  // Configured locality for the host.
-  envoy.api.v2.core.Locality locality = 5;
-
-  // Denotes whether this is configured as a canary host or not.
-  bool canary = 6;
 
   // Request success rate for this host over the last calculated interval.
   //
   // Note: the message will not be present if host did not have enough request volume to calculate
   // success rate or the cluster did not have enough hosts to run through success rate outlier
   // ejection.
-  envoy.type.Percent success_rate = 7;
+  envoy.type.Percent success_rate = 4;
 }
 
 // Health status for a host.
 message HostHealthStatus {
-  // The host is currently marked as healthy.
-  bool healthy = 1;
-
   // The host is currently failing active health checks.
-  bool failed_active_health_check = 2;
+  bool failed_active_health_check = 1;
 
   // The host is currently considered an outlier and has been ejected.
-  bool failed_outlier_check = 3;
+  bool failed_outlier_check = 2;
 
-  // The host is currently marked as unhealthy by EDS.
-  bool failed_eds_health_check = 4;
+  // Health status as reported by EDS. Note: only HEALTHY and UNHEALTHY are currently supported here.
+  // TODO(mrice32): pipe through remaining EDS health status possibilities.
+  envoy.api.v2.core.HealthStatus eds_health_status = 3;
 }
