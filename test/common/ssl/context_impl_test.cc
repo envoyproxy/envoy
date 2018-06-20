@@ -184,6 +184,7 @@ public:
   }
 
   static void loadConfigV2(envoy::api::v2::auth::DownstreamTlsContext& cfg) {
+    Server::MockInstance server;
     // Must add a certificate for the config to be considered valid.
     envoy::api::v2::auth::TlsCertificate* server_cert =
         cfg.mutable_common_tls_context()->add_tls_certificates();
@@ -198,6 +199,7 @@ public:
   }
 
   static void loadConfigJson(const std::string& json) {
+    Server::MockInstance server;
     Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
     Secret::MockSecretManager secret_manager;
     ServerContextConfigImpl cfg(*loader, server.secretManager());
