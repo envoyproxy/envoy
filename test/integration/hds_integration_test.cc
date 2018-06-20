@@ -14,20 +14,10 @@
 namespace Envoy {
 namespace {
 
-class HDSIntegrationTest : public HttpIntegrationTest,
+class HdsIntegrationTest : public HttpIntegrationTest,
                            public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  HDSIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
-    // We rely on some fairly specific load balancing picks in this test, so
-    // determinizie the schedule.
-    setDeterministic();
-  }
-
-  void addEndpoint(envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoints,
-                   uint32_t index, uint32_t& num_endpoints) {
-    setUpstreamAddress(index + 1, *locality_lb_endpoints.add_lb_endpoints());
-    ++num_endpoints;
-  }
+  HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   // Used as args to updateClusterLocalityAssignment().
   struct LocalityAssignment {
@@ -80,7 +70,7 @@ public:
     }
   }
 
-  void waitForHDSStream() {
+  void waitForHdsStream() {
     fake_hds_connection_ = hds_upstream_->waitForHttpConnection(*dispatcher_);
     hds_stream_ = fake_hds_connection_->waitForNewStream(*dispatcher_);
   }
@@ -102,7 +92,7 @@ public:
     }
   }
 
-  void cleanupHDSConnection() {
+  void cleanupHdsConnection() {
     if (fake_hds_connection_ != nullptr) {
       fake_hds_connection_->close();
       fake_hds_connection_->waitForDisconnect();
@@ -125,12 +115,12 @@ public:
   const uint64_t response_size_ = 512;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersions, HDSIntegrationTest,
+INSTANTIATE_TEST_CASE_P(IpVersions, HdsIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
 // Test connectivity of Envoy and the Server
-TEST_P(HDSIntegrationTest, Simple) {
+TEST_P(HdsIntegrationTest, Simple) {
   initialize();
   envoy::service::discovery::v2::HealthCheckRequest envoy_msg;
   envoy::service::discovery::v2::HealthCheckRequest envoy_msg_2;
@@ -156,7 +146,7 @@ TEST_P(HDSIntegrationTest, Simple) {
   EXPECT_EQ(1, test_server_->counter("hds_reporter.requests")->value());
   EXPECT_EQ(2, test_server_->counter("hds_reporter.responses")->value());
 
-  cleanupHDSConnection();
+  cleanupHdsConnection();
 }
 
 } // namespace
