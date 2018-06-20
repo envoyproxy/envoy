@@ -226,8 +226,10 @@ private:
     Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
 
     template <class StatType>
-    using MakeStatFn = std::shared_ptr<StatType> (StatDataAllocator::*)(
-        const std::string& name, std::string&& tag_extracted_name, std::vector<Tag>&& tags);
+    using MakeStatFn =
+        std::function<std::shared_ptr<StatType>(StatDataAllocator&, const std::string& name,
+                                                std::string&& tag_extracted_name,
+                                                std::vector<Tag>&& tags)>;
 
     /**
      * Makes a stat either by looking it up in the central cache,
