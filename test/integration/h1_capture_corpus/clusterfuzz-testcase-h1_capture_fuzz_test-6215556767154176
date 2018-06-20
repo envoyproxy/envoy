@@ -1,0 +1,104 @@
+events {
+  downstream_send_bytes: "POST /test/long/url HTTP/1.1\r\nhost: host\r\nx-lyft-user-id: 123\r\nx-fovwarded-for: 10.0.0.1\r\ntransfer-encoding: chunked\r\n\r\n400\r\naaaaaevents {\n  upaaaaaaaaa"
+}
+events {
+  downstream_send_bytes: ""
+}
+events {
+  downstream_send_bytes: "H"
+}
+events {
+}
+events {
+  downstream_send_bytes: ")"
+}
+events {
+  upstream_recv_bytes {
+  }
+}
+events {
+  downstream_send_bytes: "@"
+}
+events {
+}
+events {
+}
+events {
+  downstream_send_bytes: "a"
+}
+events {
+  downstream_send_bytes: "H"
+}
+events {
+  downstream_send_bytes: "B"
+}
+events {
+  downstream_send_bytes: "%"
+}
+events {
+  downstream_send_bytes: "POST /test/long/url HTTP/1.1\r\nhost: host\r\nx-lyft-user-id: 123\r\nr: 10.0.0.1\r\ntransfer-encoding: ahunked\r\n\r\n400\r\naaaaaaaaaaaaaaaaaaaaaaaKaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaTaaaaaaaaa{aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\377\377\377\177aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaSaaaaaaaaaaaaaaaaaaaaaRaaaaaaaaaaaaaaaaaaaaaaaaa\033\033\033\033\033\033\033\033\033\033\033\033\033\033\033\033\033aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaqaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa?aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r\n0\r\n\r\n"
+}
+events {
+  downstream_send_bytes: ""
+}
+events {
+  downstream_send_bytes: "POST /test/long/url HTTP/1.1\r\nhsto: host\r\nx-lyft-user-id: 123\r\nx-forwchunkedinK: chunked\r\n\r\n"
+}
+events {
+  downstream_send_bytes: ""
+}
+events {
+}
+events {
+  downstream_send_bytes: "@"
+}
+events {
+  downstream_send_bytes: "H"
+}
+events {
+  downstream_send_bytes: "*"
+}
+events {
+  downstream_send_bytes: "\377\377\377\022"
+}
+events {
+  downstream_send_bytes: "UUUUUU"
+}
+events {
+}
+events {
+  downstream_send_bytes: "*\000"
+}
+events {
+  upstream_send_bytes: ""
+}
+events {
+}
+events {
+  upstream_recv_bytes {
+  }
+}
+events {
+  downstream_send_bytes: "0"
+}
+events {
+  downstream_send_bytes: ""
+}
+events {
+  downstream_recv_bytes {
+  }
+}
+events {
+  downstream_send_bytes: "POST /test/long/url HThunked\r\n\r\n400\r\naaaaaevents {\n  upaaaaaaaaa"
+}
+events {
+}
+events {
+  downstream_send_bytes: "H"
+}
+events {
+}
+events {
+}
+events {
+}

@@ -74,8 +74,8 @@ TEST(RequestInfoImplTest, BytesTest) {
   const uint64_t bytes_sent = 7;
   const uint64_t bytes_received = 12;
 
-  request_info.bytes_sent_ = bytes_sent;
-  request_info.bytes_received_ = bytes_received;
+  request_info.addBytesSent(bytes_sent);
+  request_info.addBytesReceived(bytes_received);
 
   EXPECT_EQ(bytes_sent, request_info.bytesSent());
   EXPECT_EQ(bytes_received, request_info.bytesReceived());

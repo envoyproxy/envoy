@@ -1,7 +1,7 @@
 #include "extensions/grpc_credentials/file_based_metadata/config.h"
 
 #include "envoy/api/v2/core/grpc_service.pb.h"
-#include "envoy/config/grpc_credentials/v2alpha/file_based_metadata.pb.validate.h"
+#include "envoy/config/grpc_credential/v2alpha/file_based_metadata.pb.validate.h"
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/registry/registry.h"
 
@@ -20,7 +20,7 @@ FileBasedMetadataGrpcCredentialsFactory::getChannelCredentials(
     const envoy::api::v2::core::GrpcService& grpc_service_config) {
   const auto& google_grpc = grpc_service_config.google_grpc();
   std::shared_ptr<grpc::ChannelCredentials> creds =
-      defaultSslChannelCredentials(grpc_service_config, false);
+      Grpc::CredsUtility::defaultSslChannelCredentials(grpc_service_config);
   std::shared_ptr<grpc::CallCredentials> call_creds = nullptr;
   for (const auto& credential : google_grpc.call_credentials()) {
     switch (credential.credential_specifier_case()) {
@@ -31,7 +31,7 @@ FileBasedMetadataGrpcCredentialsFactory::getChannelCredentials(
             Envoy::Config::Utility::translateToFactoryConfig(
                 credential.from_plugin(), file_based_metadata_credentials_factory);
         const auto& file_based_metadata_config = Envoy::MessageUtil::downcastAndValidate<
-            const envoy::config::grpc_credentials::v2alpha::FileBasedMetadataConfig&>(
+            const envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig&>(
             *file_based_metadata_config_message);
         std::shared_ptr<grpc::CallCredentials> new_call_creds = grpc::MetadataCredentialsFromPlugin(
             std::make_unique<FileBasedMetadataAuthenticator>(file_based_metadata_config));

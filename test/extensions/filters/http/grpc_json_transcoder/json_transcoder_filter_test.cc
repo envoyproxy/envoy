@@ -336,6 +336,137 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(response_trailers));
 }
 
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithPackageServiceMethodPath) {
+  Http::TestHeaderMapImpl request_headers{
+      {"content-type", "application/json"},
+      {":method", "POST"},
+      {":path", "/bookstore.Bookstore/CreateShelfWithPackageServiceAndMethod"}};
+
+  EXPECT_CALL(decoder_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/bookstore.Bookstore/CreateShelfWithPackageServiceAndMethod",
+            request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("/bookstore.Bookstore/CreateShelfWithPackageServiceAndMethod",
+            request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+
+  Buffer::OwnedImpl request_data{"{\"theme\": \"Children\"}"};
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  decoder.decode(request_data, frames);
+
+  EXPECT_EQ(1, frames.size());
+
+  bookstore::CreateShelfRequest expected_request;
+  expected_request.mutable_shelf()->set_theme("Children");
+
+  bookstore::CreateShelfRequest request;
+  request.ParseFromString(TestUtility::bufferToString(*frames[0].data_));
+
+  EXPECT_EQ(expected_request.ByteSize(), frames[0].length_);
+  EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
+
+  Http::TestHeaderMapImpl continue_headers{{":status", "000"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_.encode100ContinueHeaders(continue_headers));
+
+  Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                           {":status", "200"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ("application/json", response_headers.get_("content-type"));
+
+  bookstore::Shelf response;
+  response.set_id(20);
+  response.set_theme("Children");
+
+  auto response_data = Grpc::Common::serializeBody(response);
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
+            filter_.encodeData(*response_data, false));
+
+  std::string response_json = TestUtility::bufferToString(*response_data);
+
+  EXPECT_EQ("{\"id\":\"20\",\"theme\":\"Children\"}", response_json);
+
+  Http::TestHeaderMapImpl response_trailers{{"grpc-status", "0"}, {"grpc-message", ""}};
+
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(response_trailers));
+}
+
+TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
+  Http::TestHeaderMapImpl request_headers{
+      {"content-type", "application/grpc"},
+      {":method", "POST"},
+      {":path", "/bookstore.Bookstore/CreateShelfWithPackageServiceAndMethod"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/bookstore.Bookstore/CreateShelfWithPackageServiceAndMethod",
+            request_headers.get_(":path"));
+
+  bookstore::CreateShelfRequest request;
+  request.mutable_shelf()->set_theme("Children");
+
+  Buffer::InstancePtr request_data = Grpc::Common::serializeBody(request);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(*request_data, true));
+
+  Grpc::Decoder decoder;
+  std::vector<Grpc::Frame> frames;
+  decoder.decode(*request_data, frames);
+
+  EXPECT_EQ(1, frames.size());
+
+  bookstore::CreateShelfRequest expected_request;
+  expected_request.mutable_shelf()->set_theme("Children");
+
+  bookstore::CreateShelfRequest forwarded_request;
+  forwarded_request.ParseFromString(TestUtility::bufferToString(*frames[0].data_));
+
+  EXPECT_EQ(expected_request.ByteSize(), frames[0].length_);
+  EXPECT_TRUE(MessageDifferencer::Equals(expected_request, forwarded_request));
+
+  Http::TestHeaderMapImpl continue_headers{{":status", "000"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_.encode100ContinueHeaders(continue_headers));
+
+  Http::TestHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                           {":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ("application/grpc", response_headers.get_("content-type"));
+
+  bookstore::Shelf expected_response;
+  expected_response.set_id(20);
+  expected_response.set_theme("Children");
+
+  bookstore::Shelf response;
+  response.set_id(20);
+  response.set_theme("Children");
+
+  Buffer::InstancePtr response_data = Grpc::Common::serializeBody(response);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(*response_data, true));
+
+  frames.clear();
+  decoder.decode(*response_data, frames);
+
+  EXPECT_EQ(1, frames.size());
+
+  bookstore::Shelf forwarded_response;
+  forwarded_response.ParseFromString(TestUtility::bufferToString(*frames[0].data_));
+
+  EXPECT_EQ(expected_response.ByteSize(), frames[0].length_);
+  EXPECT_TRUE(MessageDifferencer::Equals(expected_response, forwarded_response));
+
+  Http::TestHeaderMapImpl response_trailers{{"grpc-status", "0"}, {"grpc-message", ""}};
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(response_trailers));
+}
+
 class GrpcJsonTranscoderFilterSkipRecalculatingTest : public GrpcJsonTranscoderFilterTest {
 public:
   GrpcJsonTranscoderFilterSkipRecalculatingTest() : GrpcJsonTranscoderFilterTest(true) {}

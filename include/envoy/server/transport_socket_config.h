@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/network/transport_socket.h"
+#include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
 
 #include "common/protobuf/protobuf.h"
@@ -19,7 +20,7 @@ public:
   virtual ~TransportSocketFactoryContext() {}
 
   /**
-   * @return Ssl::ContextManager& the SSL context manager
+   * @return Ssl::ContextManager& the SSL context manager.
    */
   virtual Ssl::ContextManager& sslContextManager() PURE;
 
@@ -27,6 +28,11 @@ public:
    * @return Stats::Scope& the transport socket's stats scope.
    */
   virtual Stats::Scope& statsScope() const PURE;
+
+  /**
+   * Return the instance of secret manager.
+   */
+  virtual Secret::SecretManager& secretManager() PURE;
 };
 
 class TransportSocketConfigFactory {

@@ -309,13 +309,17 @@ public:
     return vhost_.virtualClusterFromEntries(headers);
   }
   std::chrono::milliseconds timeout() const override { return timeout_; }
+  absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
+    return max_grpc_timeout_;
+  }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
   bool useWebSocket() const override { return websocket_config_ != nullptr; }
-  Http::WebSocketProxyPtr createWebSocketProxy(
-      Http::HeaderMap& request_headers, const RequestInfo::RequestInfo& request_info,
-      Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
-      Network::ReadFilterCallbacks* read_callbacks) const override;
+  Http::WebSocketProxyPtr
+  createWebSocketProxy(Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
+                       Http::WebSocketProxyCallbacks& callbacks,
+                       Upstream::ClusterManager& cluster_manager,
+                       Network::ReadFilterCallbacks* read_callbacks) const override;
   const std::multimap<std::string, std::string>& opaqueConfig() const override {
     return opaque_config_;
   }
@@ -342,6 +346,14 @@ protected:
   bool include_vh_rate_limits_;
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
+
+  /**
+   * returns the correct path rewrite string for this route.
+   */
+  const std::string& getPathRewrite() const {
+    return (isRedirect()) ? prefix_rewrite_redirect_ : prefix_rewrite_;
+  }
+
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path,
                           bool insert_envoy_original_path) const;
   const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
@@ -381,6 +393,9 @@ private:
     const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
     const ShadowPolicy& shadowPolicy() const override { return parent_->shadowPolicy(); }
     std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
+    absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
+      return parent_->maxGrpcTimeout();
+    }
     const MetadataMatchCriteria* metadataMatchCriteria() const override {
       return parent_->metadataMatchCriteria();
     }
@@ -396,10 +411,11 @@ private:
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
     bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
     bool useWebSocket() const override { return parent_->useWebSocket(); }
-    Http::WebSocketProxyPtr createWebSocketProxy(
-        Http::HeaderMap& request_headers, const RequestInfo::RequestInfo& request_info,
-        Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
-        Network::ReadFilterCallbacks* read_callbacks) const override {
+    Http::WebSocketProxyPtr
+    createWebSocketProxy(Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
+                         Http::WebSocketProxyCallbacks& callbacks,
+                         Upstream::ClusterManager& cluster_manager,
+                         Network::ReadFilterCallbacks* read_callbacks) const override {
       return parent_->createWebSocketProxy(request_headers, request_info, callbacks,
                                            cluster_manager, read_callbacks);
     }
@@ -494,6 +510,7 @@ private:
   const Http::LowerCaseString cluster_header_name_;
   const Http::Code cluster_not_found_response_code_;
   const std::chrono::milliseconds timeout_;
+  const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
   const absl::optional<RuntimeData> runtime_;
   Runtime::Loader& loader_;
   const std::string host_redirect_;
@@ -532,11 +549,6 @@ public:
   PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                        Server::Configuration::FactoryContext& factory_context);
 
-  // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const RequestInfo::RequestInfo& request_info,
-                              bool insert_envoy_original_path) const override;
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return prefix_; }
   PathMatchType matchType() const override { return PathMatchType::Prefix; }
@@ -559,11 +571,6 @@ public:
   PathRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                      Server::Configuration::FactoryContext& factory_context);
 
-  // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const RequestInfo::RequestInfo& request_info,
-                              bool insert_envoy_original_path) const override;
-
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return path_; }
   PathMatchType matchType() const override { return PathMatchType::Exact; }
@@ -585,11 +592,6 @@ class RegexRouteEntryImpl : public RouteEntryImplBase {
 public:
   RegexRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
                       Server::Configuration::FactoryContext& factory_context);
-
-  // Router::RouteEntry
-  void finalizeRequestHeaders(Http::HeaderMap& headers,
-                              const RequestInfo::RequestInfo& request_info,
-                              bool insert_envoy_original_path) const override;
 
   // Router::PathMatchCriterion
   const std::string& matcher() const override { return regex_str_; }

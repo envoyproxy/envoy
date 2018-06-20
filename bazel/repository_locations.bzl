@@ -5,8 +5,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
-        # Do not upgrade further until https://github.com/abseil/abseil-cpp/issues/118 is fixed.
-        commit = "26b789f9a53d086c8b8c9c2668efb251e37861cd",  # 2018-05-04
+        commit = "92020a042c0cd46979db9f6f0cb32783dc07765e",  # 2018-06-08
         remote = "https://github.com/abseil/abseil-cpp",
     ),
     com_github_bombela_backward = dict(
@@ -52,15 +51,21 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/opentracing/opentracing-cpp",
     ),
     com_lightstep_tracer_cpp = dict(
-        commit = "4ea8bda9aed08ad45d6db2a030a1464e8d9b783f",
-        remote = "https://github.com/lightstep/lightstep-tracer-cpp", # v0.7.0
+        commit = "ae6a6bba65f8c4d438a6a3ac855751ca8f52e1dc",
+        remote = "https://github.com/lightstep/lightstep-tracer-cpp", # v0.7.1
     ),
     lightstep_vendored_googleapis = dict(
         commit = "d6f78d948c53f3b400bb46996eb3084359914f9b",
         remote = "https://github.com/google/googleapis",
     ),
+    com_github_google_jwt_verify = dict(
+        commit = "4eb9e96485b71e00d43acc7207501caafb085b4a",
+        remote = "https://github.com/google/jwt_verify_lib",
+    ),
     com_github_nodejs_http_parser = dict(
-        commit = "54f55a2f02a823e5f5c87abe853bb76d1170718d",  # v2.8.1
+        # 2018-05-30 snapshot to pick up a performance fix, nodejs/http-parser PR 422
+        # TODO(brian-pane): Upgrade to the next http-parser release once it's available
+        commit = "cf69c8eda9fe79e4682598a7b3d39338dea319a3",
         remote = "https://github.com/nodejs/http-parser",
     ),
     com_github_pallets_jinja = dict(

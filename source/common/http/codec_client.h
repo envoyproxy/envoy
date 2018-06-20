@@ -106,6 +106,8 @@ public:
 
   bool remoteClosed() const { return remote_closed_; }
 
+  Type type() const { return type_; }
+
 protected:
   /**
    * Create a codec client and connect to a remote host/port.

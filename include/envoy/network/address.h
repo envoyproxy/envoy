@@ -128,7 +128,8 @@ public:
    * Bind a socket to this address. The socket should have been created with a call to socket() on
    * an Instance of the same address family.
    * @param fd supplies the platform socket handle.
-   * @return the platform error code.
+   * @return 0 for success and -1 for failure. The error code associated with a failure will
+   * be accessible in a plaform dependent fashion (e.g. errno for Unix platforms).
    */
   virtual int bind(int fd) const PURE;
 
@@ -136,7 +137,8 @@ public:
    * Connect a socket to this address. The socket should have been created with a call to socket()
    * on this object.
    * @param fd supplies the platform socket handle.
-   * @return the platform error code.
+   * @return 0 for success and -1 for failure. The error code associated with a failure will
+   * be accessible in a plaform dependent fashion (e.g. errno for Unix platforms).
    */
   virtual int connect(int fd) const PURE;
 
@@ -148,7 +150,8 @@ public:
   /**
    * Create a socket for this address.
    * @param type supplies the socket type to create.
-   * @return the platform error code.
+   * @return 0 for success and -1 for failure. The error code associated with a failure will
+   * be accessible in a plaform dependent fashion (e.g. errno for Unix platforms).
    */
   virtual int socket(SocketType type) const PURE;
 

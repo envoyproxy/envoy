@@ -305,7 +305,7 @@ message CorsPolicy {
   google.protobuf.BoolValue enabled = 7;
 }
 
-// [#comment:next free field: 23]
+// [#comment:next free field: 24]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -353,7 +353,9 @@ message RouteAction {
 
   // Indicates that during forwarding, the matched prefix (or path) should be
   // swapped with this value. This option allows application URLs to be rooted
-  // at a different path from those exposed at the reverse proxy layer.
+  // at a different path from those exposed at the reverse proxy layer. The router filter will
+  // place the original path before rewrite into the :ref:`x-envoy-original-path
+  // <config_http_filters_router_x-envoy-original-path>` header.
   //
   // .. attention::
   //
@@ -522,6 +524,10 @@ message RouteAction {
       // not present. If the TTL is present and zero, the generated cookie will
       // be a session cookie.
       google.protobuf.Duration ttl = 2 [(gogoproto.stdduration) = true];
+
+      // The name of the path for the cookie. If no path is specified here, no path
+      // will be set for the cookie.
+      string path = 3;
     }
 
     message ConnectionProperties {
@@ -603,6 +609,18 @@ message RouteAction {
   CorsPolicy cors = 17;
 
   reserved 21;
+
+  // If present, and the request is a gRPC request, use the
+  // `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_,
+  // or its default value (infinity) instead of
+  // :ref:`timeout <envoy_api_field_route.RouteAction.timeout>`, but limit the applied timeout
+  // to the maximum value specified here. If configured as 0, the maximum allowed timeout for
+  // gRPC requests is infinity. If not configured at all, the `grpc-timeout` header is not used
+  // and gRPC requests time out like any other requests using
+  // :ref:`timeout <envoy_api_field_route.RouteAction.timeout>` or its default.
+  // This can be used to prevent unexpected upstream request timeouts due to potentially long
+  // time gaps between gRPC request and response in gRPC streaming mode.
+  google.protobuf.Duration max_grpc_timeout = 23 [(gogoproto.stdduration) = true];
 }
 
 message RedirectAction {
@@ -933,9 +951,25 @@ message HeaderMatcher {
     // If specified, header match will be be performed based on whether the header is in the
     // request.
     bool present_match = 7;
+
+    // If specified, header match will be performed based on the prefix of the header value.
+    // Note: empty prefix is not allowed, please use present_match instead.
+    //
+    // Examples:
+    //
+    // * The prefix *abcd* matches the value *abcdxyz*, but not for *abcxyz*.
+    string prefix_match = 9 [(validate.rules).string.min_bytes = 1];
+
+    // If specified, header match will be performed based on the suffix of the header value.
+    // Note: empty suffix is not allowed, please use present_match instead.
+    //
+    // Examples:
+    //
+    // * The suffix *abcd* matches the value *xyzabcd*, but not for *xyzbcd*.
+    string suffix_match = 10 [(validate.rules).string.min_bytes = 1];
   }
 
-  // If specified, the match result will be inverted before before checking. Defaults to false.
+  // If specified, the match result will be inverted before checking. Defaults to false.
   //
   // Examples:
   //

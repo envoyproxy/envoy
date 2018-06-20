@@ -49,13 +49,13 @@ void LightStepDriver::LightStepTransporter::Send(const Protobuf::Message& reques
   active_callback_ = &callback;
   active_response_ = &response;
 
-  Http::MessagePtr message =
-      Grpc::Common::prepareHeaders(driver_.cluster()->name(), lightstep::CollectorServiceFullName(),
-                                   lightstep::CollectorMethodName());
-  message->body() = Grpc::Common::serializeBody(request);
-
   const uint64_t timeout =
       driver_.runtime().snapshot().getInteger("tracing.lightstep.request_timeout", 5000U);
+  Http::MessagePtr message = Grpc::Common::prepareHeaders(
+      driver_.cluster()->name(), lightstep::CollectorServiceFullName(),
+      lightstep::CollectorMethodName(), absl::optional<std::chrono::milliseconds>(timeout));
+  message->body() = Grpc::Common::serializeBody(request);
+
   active_request_ = driver_.clusterManager()
                         .httpAsyncClientForCluster(driver_.cluster()->name())
                         .send(std::move(message), *this, std::chrono::milliseconds(timeout));

@@ -83,6 +83,9 @@ message HealthCheck {
     // Specifies a list of HTTP headers that should be added to each request that is sent to the
     // health checked cluster.
     repeated core.HeaderValueOption request_headers_to_add = 6;
+
+    // If set, health checks will be made using http/2.
+    bool use_http2 = 7;
   }
 
   message TcpHealthCheck {

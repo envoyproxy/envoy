@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/secret/secret_manager.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/empty_string.h"
@@ -90,6 +91,8 @@ public:
     private:
       std::unordered_multimap<std::string, HostSharedPtr> map_;
     };
+
+    Network::Address::InstanceConstSharedPtr requestOverrideHost(LoadBalancerContext* context);
 
     PrioritySet& priority_set_;                // Thread local priority set.
     std::weak_ptr<OriginalDstCluster> parent_; // Primary cluster managed by the main thread.

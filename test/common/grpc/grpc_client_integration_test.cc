@@ -355,7 +355,12 @@ public:
     fake_stream.waitForHeadersComplete();
     Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
     if (access_token_value_ != "") {
-      EXPECT_EQ("Bearer " + access_token_value_, stream_headers.get_("authorization"));
+      if (access_token_value_2_ == "") {
+        EXPECT_EQ("Bearer " + access_token_value_, stream_headers.get_("authorization"));
+      } else {
+        EXPECT_EQ("Bearer " + access_token_value_ + ",Bearer " + access_token_value_2_,
+                  stream_headers.get_("authorization"));
+      }
     }
   }
 

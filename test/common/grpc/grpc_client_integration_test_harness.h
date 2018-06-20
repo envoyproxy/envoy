@@ -7,9 +7,11 @@
 #include "common/ssl/context_config_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
+#include "test/common/grpc/utility.h"
 #include "test/integration/fake_upstream.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
@@ -224,6 +226,7 @@ public:
     if (fake_connection_) {
       fake_connection_->close();
       fake_connection_->waitForDisconnect();
+      fake_connection_.reset();
     }
   }
 
@@ -371,6 +374,7 @@ public:
     return stream;
   }
 
+  std::unique_ptr<FakeUpstream> fake_upstream_;
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
@@ -378,7 +382,6 @@ public:
   DispatcherHelper dispatcher_helper_{dispatcher_};
   Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();
   Stats::ScopeSharedPtr stats_scope_{stats_store_};
-  std::unique_ptr<FakeUpstream> fake_upstream_;
   TestMetadata service_wide_initial_metadata_;
 #ifdef ENVOY_GOOGLE_GRPC
   std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;
@@ -416,6 +419,7 @@ public:
   void TearDown() override {
     // Reset some state in the superclass before we destruct context_manager_ in our destructor, it
     // doesn't like dangling contexts at destruction.
+    GrpcClientIntegrationTest::TearDown();
     fake_upstream_.reset();
     client_connection_.reset();
     mock_cluster_info_->transport_socket_factory_.reset();
@@ -423,16 +427,7 @@ public:
 
   virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
-    auto* google_grpc = config.mutable_google_grpc();
-    auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();
-    ssl_creds->mutable_root_certs()->set_filename(
-        TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-    if (use_client_cert_) {
-      ssl_creds->mutable_private_key()->set_filename(
-          TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
-      ssl_creds->mutable_cert_chain()->set_filename(
-          TestEnvironment::runfilesPath("test/config/integration/certs/clientcert.pem"));
-    }
+    TestUtility::setTestSslGoogleGrpcConfig(config, use_client_cert_);
     return config;
   }
 
@@ -449,7 +444,7 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     }
-    Ssl::ClientContextConfigImpl cfg(tls_context);
+    Ssl::ClientContextConfigImpl cfg(tls_context, secret_manager_);
 
     mock_cluster_info_->transport_socket_factory_ =
         std::make_unique<Ssl::ClientSslSocketFactory>(cfg, context_manager_, *stats_store_);
@@ -478,7 +473,8 @@ public:
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     }
-    Ssl::ServerContextConfigImpl cfg(tls_context);
+
+    Ssl::ServerContextConfigImpl cfg(tls_context, secret_manager_);
 
     static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return std::make_unique<Ssl::ServerSslSocketFactory>(
@@ -486,6 +482,7 @@ public:
   }
 
   bool use_client_cert_{};
+  Secret::MockSecretManager secret_manager_;
   Ssl::ContextManagerImpl context_manager_{runtime_};
 };
 
