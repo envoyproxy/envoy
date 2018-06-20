@@ -364,7 +364,7 @@ public:
   // contained in the incoming data string. Unlike many of Envoy waitFor functions,
   // it does not expect an exact match, simply the presence of data_to_wait_for.
   static ValidatorFunction waitForInexactMatch(const char* data_to_wait_for) {
-    return [&](const std::string& data) -> bool {
+    return [data_to_wait_for](const std::string& data) -> bool {
       return data.find(data_to_wait_for) != std::string::npos;
     };
   }
