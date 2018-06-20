@@ -15,10 +15,10 @@ public:
 
   /**
    * Calculate hash code of ConfigSource. To identify the same ConfigSource, calculate the hash
-   * code from the ConfigSource
+   * code from the ConfigSource.
    *
-   * @param  config_source envoy::api::v2::core::ConfigSource
-   * @return hash code
+   * @param  config_source envoy::api::v2::core::ConfigSource.
+   * @return hash code.
    */
   static std::string configSourceHash(const envoy::api::v2::core::ConfigSource& config_source) {
     std::string jsonstr;

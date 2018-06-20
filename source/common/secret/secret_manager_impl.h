@@ -26,7 +26,7 @@ public:
 
 private:
   Server::Instance& server_;
-  // map hash code of SDS config source and SdsApi object
+  // map hash code of SDS config source and SdsApi object.
   std::unordered_map<std::string, SdsApiPtr> sds_apis_;
   mutable std::shared_timed_mutex sds_api_mutex_;
 
