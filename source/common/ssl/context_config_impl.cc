@@ -21,7 +21,7 @@ namespace {
 std::string readSdsSecretName(const envoy::api::v2::auth::CommonTlsContext& config) {
   return (!config.tls_certificate_sds_secret_configs().empty())
              ? config.tls_certificate_sds_secret_configs()[0].name()
-             : "";
+             : EMPTY_STRING;
 }
 
 std::string readConfigSourceHash(const envoy::api::v2::auth::CommonTlsContext& config,
@@ -31,12 +31,12 @@ std::string readConfigSourceHash(const envoy::api::v2::auth::CommonTlsContext& c
              ? secret_manager.addOrUpdateSdsService(
                    config.tls_certificate_sds_secret_configs()[0].sds_config(),
                    config.tls_certificate_sds_secret_configs()[0].name())
-             : "";
+             : EMPTY_STRING;
 }
 
 std::string readConfig(
     const envoy::api::v2::auth::CommonTlsContext& config, Secret::SecretManager& secret_manager,
-    const std::string config_source_hash, const std::string secret_name,
+    const std::string& config_source_hash, const std::string& secret_name,
     const std::function<std::string(const envoy::api::v2::auth::TlsCertificate& tls_certificate)>&
         read_inline_config,
     const std::function<std::string(const Ssl::TlsCertificateConfig* secret)>&
@@ -45,9 +45,6 @@ std::string readConfig(
     return read_inline_config(config.tls_certificates()[0]);
   } else if (!config.tls_certificate_sds_secret_configs().empty()) {
     const auto secret = secret_manager.findTlsCertificate(config_source_hash, secret_name);
-    if (!secret) {
-      throw EnvoyException(fmt::format("Static secret is not defined: {}", secret_name));
-    }
     if (!secret) {
       if (config_source_hash.empty()) {
         throw EnvoyException(

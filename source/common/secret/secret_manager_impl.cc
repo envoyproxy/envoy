@@ -40,11 +40,13 @@ std::string SecretManagerImpl::addOrUpdateSdsService(
   std::unique_lock<std::shared_timed_mutex> lhs(sds_api_mutex_);
 
   auto hash = SecretManagerUtil::configSourceHash(sds_config_source);
-  if (sds_apis_.find(hash) != sds_apis_.end()) {
+  std::string sds_apis_key = hash + config_name;
+  if (sds_apis_.find(sds_apis_key) != sds_apis_.end()) {
     return hash;
   }
 
-  sds_apis_[hash] = std::move(std::make_unique<SdsApi>(server_, sds_config_source, config_name));
+  sds_apis_[sds_apis_key] =
+      std::move(std::make_unique<SdsApi>(server_, sds_config_source, hash, config_name));
 
   return hash;
 }

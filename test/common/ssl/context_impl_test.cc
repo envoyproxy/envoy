@@ -484,7 +484,7 @@ tls_certificate:
 
   EXPECT_THROW_WITH_MESSAGE(
       ClientContextConfigImpl client_context_config(tls_context, server.secretManager()),
-      EnvoyException, "Static secret is not defined: missing");
+      EnvoyException, "Unknown static secret:  : missing");
 }
 
 // Multiple TLS certificates are not yet supported, but one is expected for

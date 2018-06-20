@@ -13,6 +13,7 @@
 #include "envoy/ssl/context_manager.h"
 
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/common/utility.h"
 #include "common/config/lds_json.h"
 #include "common/config/utility.h"
@@ -50,7 +51,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
   ENVOY_LOG(info, "loading {} static secret(s)", secrets.size());
   for (ssize_t i = 0; i < secrets.size(); i++) {
     ENVOY_LOG(debug, "static secret #{}: {}", i, secrets[i].name());
-    server.secretManager().addOrUpdateSecret("", secrets[i]);
+    server.secretManager().addOrUpdateSecret(EMPTY_STRING, secrets[i]);
   }
 
   cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(

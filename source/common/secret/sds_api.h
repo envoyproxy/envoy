@@ -16,7 +16,7 @@ namespace Secret {
 class SdsApi : public Init::Target, Config::SubscriptionCallbacks<envoy::api::v2::auth::Secret> {
 public:
   SdsApi(Server::Instance& server, const envoy::api::v2::core::ConfigSource& sds_config,
-         std::string sds_config_name);
+         std::string sds_config_hash, std::string sds_config_name);
 
   // Init::Target
   void initialize(std::function<void()> callback) override;
