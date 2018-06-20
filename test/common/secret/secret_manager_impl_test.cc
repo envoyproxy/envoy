@@ -16,7 +16,19 @@ namespace Envoy {
 namespace Secret {
 namespace {
 
-class MockServer : public Server::MockInstance {};
+class MockServer : public Server::MockInstance {
+public:
+  Init::Manager& initManager() { return initmanager_; }
+
+private:
+  class InitManager : public Init::Manager {
+  public:
+    void initialize(std::function<void()> callback);
+    void registerTarget(Init::Target&) override {}
+  };
+
+  InitManager initmanager_;
+};
 
 class SecretManagerImplTest : public testing::Test {};
 
@@ -68,7 +80,7 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
 
   MessageUtil::loadFromYaml(yaml, secret_config);
 
-  Server::MockInstance server;
+  MockServer server;
 
   std::string config_source_hash =
       server.secretManager().addOrUpdateSdsService(config_source, "abc_config");
@@ -100,7 +112,7 @@ session_ticket_keys:
 
   MessageUtil::loadFromYaml(yaml, secret_config);
 
-  Server::MockInstance server;
+  MockServer server;
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(server));
 
   std::string config_source_hash =

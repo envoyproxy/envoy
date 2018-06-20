@@ -329,9 +329,9 @@ TEST_F(ConfigurationImplTest, StaticSecretRead) {
   name: "abc.com"
   tls_certificate:
     certificate_chain:
-      filename: "test/common/ssl/test_data/selfsigned_cert.pem"
+      filename: "test/config/integration/certs/cacert.pem"
     private_key:
-      filename: "test/common/ssl/test_data/selfsigned_key.pem"
+      filename: "test/config/integration/certs/cakey.pem"
   )EOF";
 
   MessageUtil::loadFromYaml(yaml, *secret_config);
@@ -343,13 +343,11 @@ TEST_F(ConfigurationImplTest, StaticSecretRead) {
 
   ASSERT_NE(secret, nullptr);
 
-  EXPECT_EQ(
-      TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_cert.pem"),
-      secret->certificateChain());
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest("test/config/integration/certs/cacert.pem"),
+            secret->certificateChain());
 
-  EXPECT_EQ(
-      TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_key.pem"),
-      secret->privateKey());
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest("test/config/integration/certs/cakey.pem"),
+            secret->privateKey());
 }
 
 } // namespace Configuration
