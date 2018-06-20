@@ -16,11 +16,9 @@ namespace Envoy {
 namespace Secret {
 namespace {
 
-class MockServer : public Server::MockInstance {
-};
+class MockServer : public Server::MockInstance {};
 
-class SecretManagerImplTest : public testing::Test {
-};
+class SecretManagerImplTest : public testing::Test {};
 
 TEST_F(SecretManagerImplTest, SecretLoadSuccess) {
   envoy::api::v2::auth::Secret secret_config;
