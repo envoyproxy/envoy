@@ -5,12 +5,12 @@ option go_package = "v2";
 
 import "validate/validate.proto";
 
-// [#protodoc-title: Header-To-Metadata Fitlter]
+// [#protodoc-title: Header-To-Metadata Filter]
 //
 // The configuration for transforming headers into metadata. This is useful
 // for matching load balancer subsets, logging, etc.
 //
-// :ref:`configuration overview <config_http_filters_header_to_metadata>`.
+// Header to Metadata :ref:`configuration overview <config_http_filters_header_to_metadata>`.
 
 message Config {
   enum ValueType {
