@@ -3,11 +3,55 @@ syntax = "proto3";
 package envoy.extensions.filters.network.thrift_proxy.v2alpha1;
 option go_package = "v2";
 
+import "envoy/extensions/filters/network/thrift_proxy/v2alpha1/route.proto";
+
 import "validate/validate.proto";
+import "gogoproto/gogo.proto";
 
 // [#protodoc-title: Extensions Thrift Proxy]
 // Thrift Proxy filter configuration.
+// [#comment:next free field: 5]
 message ThriftProxy {
+  enum TransportType {
+    option (gogoproto.goproto_enum_prefix) = false;
+
+    // For every new connection, the Thrift proxy will determine which transport to use.
+    AUTO_TRANSPORT = 0;
+
+    // The Thrift proxy will assume the client is using the Thrift framed transport.
+    FRAMED = 1;
+
+    // The Thrift proxy will assume the client is using the Thrift unframed transport.
+    UNFRAMED = 2;
+  }
+
+  // Supplies the type of transport that the Thrift proxy should use. Defaults to `AUTO_TRANSPORT`.
+  TransportType transport = 2 [(validate.rules).enum.defined_only = true];
+
+  enum ProtocolType {
+    option (gogoproto.goproto_enum_prefix) = false;
+
+    // For every new connection, the Thrift proxy will determine which protocol to use.
+    // N.B. The older, non-strict binary protocol is not included in automatic protocol
+    // detection.
+    AUTO_PROTOCOL = 0;
+
+    // The Thrift proxy will assume the client is using the Thrift binary protocol.
+    BINARY = 1;
+
+    // The Thrift proxy will assume the client is using the Thrift non-strict binary protocol.
+    LAX_BINARY = 2;
+
+    // The Thrift proxy will assume the client is using the Thrift compact protocol.
+    COMPACT = 3;
+  }
+
+  // Supplies the type of protocol that the Thrift proxy should use. Defaults to `AUTO_PROTOCOL`.
+  ProtocolType protocol = 3 [(validate.rules).enum.defined_only = true];
+
   // The human readable prefix to use when emitting statistics.
   string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
+
+  // The route table for the connection manager is static and is specified in this property.
+  RouteConfiguration route_config = 4;
 }

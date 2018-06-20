@@ -3,10 +3,13 @@
 #include "envoy/tcp/conn_pool.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
+
+using testing::NiceMock;
 
 namespace Envoy {
 namespace Tcp {
@@ -28,6 +31,19 @@ public:
 
   // Tcp::ConnectionPool::UpstreamCallbacks
   MOCK_METHOD2(onUpstreamData, void(Buffer::Instance& data, bool end_stream));
+};
+
+class MockConnectionData : public ConnectionData {
+public:
+  MockConnectionData();
+  ~MockConnectionData();
+
+  // Tcp::ConnectionPool::ConnectionData
+  MOCK_METHOD0(connection, Network::ClientConnection&());
+  MOCK_METHOD1(addUpstreamCallbacks, void(ConnectionPool::UpstreamCallbacks&));
+  MOCK_METHOD0(release, void());
+
+  NiceMock<Network::MockClientConnection> connection_;
 };
 
 class MockInstance : public Instance {

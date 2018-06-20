@@ -1,7 +1,8 @@
 #include "mocks.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Tcp {
@@ -12,6 +13,11 @@ MockCancellable::~MockCancellable() {}
 
 MockUpstreamCallbacks::MockUpstreamCallbacks() {}
 MockUpstreamCallbacks::~MockUpstreamCallbacks() {}
+
+MockConnectionData::MockConnectionData() {
+  ON_CALL(*this, connection()).WillByDefault(ReturnRef(connection_));
+}
+MockConnectionData::~MockConnectionData() {}
 
 MockInstance::MockInstance() {}
 MockInstance::~MockInstance() {}
