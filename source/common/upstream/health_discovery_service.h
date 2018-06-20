@@ -24,15 +24,15 @@ namespace Upstream {
 /**
  * Struct definition for all load reporter stats. @see stats_macros.h
  */
-struct HDSReporterStats {
+struct HdsDelegateStats {
   ALL_HDS_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-class HDSReporter
+class HdsDelegate
     : Grpc::TypedAsyncStreamCallbacks<envoy::service::discovery::v2::HealthCheckSpecifier>,
       Logger::Loggable<Logger::Id::upstream> {
 public:
-  HDSReporter(const envoy::api::v2::core::Node& node, Stats::Scope& scope,
+  HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& scope,
               Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher);
 
   // Grpc::TypedAsyncStreamCallbacks
@@ -52,7 +52,7 @@ private:
   void sendHealthCheckRequest();
   void handleFailure();
 
-  HDSReporterStats stats_;
+  HdsDelegateStats stats_;
   Grpc::AsyncClientPtr async_client_;
   Grpc::AsyncStream* stream_{};
   const Protobuf::MethodDescriptor& service_method_;
@@ -63,7 +63,7 @@ private:
   std::vector<std::string> clusters_;
 };
 
-typedef std::unique_ptr<HDSReporter> HDSReporterPtr;
+typedef std::unique_ptr<HdsDelegate> HdsDelegatePtr;
 
 } // namespace Upstream
 } // namespace Envoy
