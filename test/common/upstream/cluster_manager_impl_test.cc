@@ -197,17 +197,18 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
   create(parseBootstrapFromV2Yaml(yaml));
   checkConfigDump(R"EOF(
 static_clusters:
-  - name: http12_cluster
-    connect_timeout: 0.250s
-    lb_policy: ROUND_ROBIN
-    http2_protocol_options: {}
-    http_protocol_options: {}
-    protocol_selection: USE_DOWNSTREAM_PROTOCOL
+  - cluster:
+      name: http12_cluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      http2_protocol_options: {}
+      http_protocol_options: {}
+      protocol_selection: USE_DOWNSTREAM_PROTOCOL
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
 dynamic_active_clusters:
 dynamic_warming_clusters:
-last_updated:
-  seconds: 1234567891
-  nanos: 234000000
 )EOF");
 }
 
@@ -728,27 +729,39 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   checkConfigDump(R"EOF(
 version_info: version3
 static_clusters:
-  - name: "cds_cluster"
-    connect_timeout: 0.25s
-    hosts:
-    - socket_address:
-        address: "127.0.0.1"
-        port_value: 11001
-    dns_lookup_family: V4_ONLY
-  - name: "fake_cluster"
-    connect_timeout: 0.25s
-    hosts:
-    - socket_address:
-        address: "127.0.0.1"
-        port_value: 11001
-    dns_lookup_family: V4_ONLY
-  - name: "fake_cluster2"
-    connect_timeout: 0.25s
-    hosts:
-    - socket_address:
-        address: "127.0.0.1"
-        port_value: 11001
-    dns_lookup_family: V4_ONLY
+  - cluster:
+      name: "cds_cluster"
+      connect_timeout: 0.25s
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      dns_lookup_family: V4_ONLY
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+  - cluster:
+      name: "fake_cluster"
+      connect_timeout: 0.25s
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      dns_lookup_family: V4_ONLY
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+  - cluster:
+      name: "fake_cluster2"
+      connect_timeout: 0.25s
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      dns_lookup_family: V4_ONLY
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
 dynamic_active_clusters:
   - version_info: "version1"
     cluster:
@@ -787,9 +800,6 @@ dynamic_active_clusters:
       seconds: 1234567891
       nanos: 234000000
 dynamic_warming_clusters:
-last_updated:
-  seconds: 1234567891
-  nanos: 234000000
 )EOF");
 
   EXPECT_CALL(*cluster3, initialize(_));
@@ -903,9 +913,6 @@ dynamic_warming_clusters:
     last_updated:
       seconds: 1234567891
       nanos: 234000000
-last_updated:
-  seconds: 1234567891
-  nanos: 234000000
 )EOF");
 
   EXPECT_TRUE(cluster_manager_->removeCluster("fake_cluster"));

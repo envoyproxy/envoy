@@ -352,7 +352,6 @@ private:
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateGauges();
 
-  SystemTime cluster_config_update_time_;
   ClusterManagerFactory& factory_;
   Runtime::Loader& runtime_;
   Stats::Store& stats_;

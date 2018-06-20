@@ -409,18 +409,19 @@ TEST_F(ListenerManagerImplTest, UpdateRemoveNotModifiableListener) {
   checkStats(1, 0, 0, 0, 1, 0);
   checkConfigDump(R"EOF(
 static_listeners:
-  name: "foo"
-  address:
-    socket_address:
-      address: "127.0.0.1"
-      port_value: 1234
-  filter_chains: {}
+  listener:
+    name: "foo"
+    address:
+      socket_address:
+        address: "127.0.0.1"
+        port_value: 1234
+    filter_chains: {}
+  last_updated:
+    seconds: 1001001001
+    nanos: 1000000
 dynamic_active_listeners:
 dynamic_warming_listeners:
 dynamic_draining_listeners:
-last_updated:
-  seconds: 1001001001
-  nanos: 1000000
 )EOF");
 
   // Update foo listener. Should be blocked.
@@ -462,7 +463,6 @@ static_listeners:
 dynamic_active_listeners:
 dynamic_warming_listeners:
 dynamic_draining_listeners:
-last_updated: { }
 )EOF");
 
   // Add foo listener.
@@ -498,9 +498,6 @@ dynamic_active_listeners:
     nanos: 1000000
 dynamic_warming_listeners:
 dynamic_draining_listeners:
-last_updated:
-  seconds: 1001001001
-  nanos: 1000000
 )EOF");
 
   // Update duplicate should be a NOP.
@@ -545,9 +542,6 @@ dynamic_active_listeners:
     nanos: 2000000
 dynamic_warming_listeners:
 dynamic_draining_listeners:
-last_updated:
-  seconds: 2002002002
-  nanos: 2000000
 )EOF");
 
   // Start workers.
@@ -604,9 +598,6 @@ dynamic_draining_listeners:
   last_updated:
     seconds: 2002002002
     nanos: 2000000
-last_updated:
-  seconds: 3003003003
-  nanos: 3000000
 )EOF");
 
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -698,9 +689,6 @@ dynamic_warming_listeners:
       seconds: 5005005005
       nanos: 5000000
 dynamic_draining_listeners:
-last_updated:
-  seconds: 5005005005
-  nanos: 5000000
 )EOF");
 
   // Update a duplicate baz that is currently warming.

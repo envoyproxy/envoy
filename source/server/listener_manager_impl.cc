@@ -465,7 +465,6 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
       config_tracker_entry_(server.admin().getConfigTracker().add(
           "listeners", [this] { return dumpListenerConfigs(); })) {
 
-  listener_config_update_time_ = system_time_source_.currentTime();
   for (uint32_t i = 0; i < std::max(1U, server.options().concurrency()); i++) {
     workers_.emplace_back(worker_factory.createWorker());
   }
@@ -474,13 +473,13 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
 ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::ListenersConfigDump>();
 
-  TimestampUtil::systemClockToTimestamp(listener_config_update_time_,
-                                        *(config_dump->mutable_last_updated()));
-
   config_dump->set_version_info(lds_api_ != nullptr ? lds_api_->versionInfo() : "");
   for (const auto& listener : active_listeners_) {
     if (listener->blockRemove()) {
-      config_dump->mutable_static_listeners()->Add()->MergeFrom(listener->config());
+      auto& static_listener = *config_dump->mutable_static_listeners()->Add();
+      static_listener.mutable_listener()->MergeFrom(listener->config());
+      TimestampUtil::systemClockToTimestamp(listener->last_updated_,
+                                            *(static_listener.mutable_last_updated()));
     } else {
       auto& dynamic_listener = *config_dump->mutable_dynamic_active_listeners()->Add();
       dynamic_listener.set_version_info(listener->versionInfo());
@@ -517,7 +516,6 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config,
                                               const std::string& version_info, bool modifiable) {
-  listener_config_update_time_ = system_time_source_.currentTime();
   std::string name;
   if (!config.name().empty()) {
     name = config.name();
