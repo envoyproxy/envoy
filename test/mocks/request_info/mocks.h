@@ -15,7 +15,9 @@ public:
   ~MockRequestInfo();
 
   // RequestInfo::RequestInfo
+  MOCK_CONST_METHOD0(currentResponseFlags, uint64_t());
   MOCK_METHOD1(setResponseFlag, void(ResponseFlag response_flag));
+  MOCK_CONST_METHOD1(intersectResponseFlags, bool(uint64_t));
   MOCK_METHOD1(onUpstreamHostSelected, void(Upstream::HostDescriptionConstSharedPtr host));
   MOCK_CONST_METHOD0(startTime, SystemTime());
   MOCK_CONST_METHOD0(startTimeMonotonic, MonotonicTime());

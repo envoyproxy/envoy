@@ -72,7 +72,7 @@ FilterFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLogFi
   case envoy::config::filter::accesslog::v2::AccessLogFilter::kHeaderFilter:
     return FilterPtr{new HeaderFilter(config.header_filter())};
   case envoy::config::filter::accesslog::v2::AccessLogFilter::kResponseFlagFilter:
-    MessageUtil::validate(config);
+    //MessageUtil::validate(config);
     return FilterPtr{new ResponseFlagFilter(config.response_flag_filter())};
   default:
     NOT_REACHED;
@@ -182,12 +182,15 @@ bool HeaderFilter::evaluate(const RequestInfo::RequestInfo&,
 
 ResponseFlagFilter::ResponseFlagFilter(
     const envoy::config::filter::accesslog::v2::ResponseFlagFilter& config) {
-  if (config.flags_size() > 0) {
-    info_.setResponseFlag(RequestInfo::ResponseFlagUtils::toResponseFlag("LH"));
+  for (int i = 0; i < config.flags_size(); i++) {
+    info_.setResponseFlag(RequestInfo::ResponseFlagUtils::toResponseFlag(config.flags(i)));
   }
 }
 
 bool ResponseFlagFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
+  if (info_.getResponseFlag()) {
+    return info_.intersectResponseFlags(info.currentResponseFlags());
+  }
   return info.getResponseFlag();
 }
 

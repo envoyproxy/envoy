@@ -59,10 +59,21 @@ public:
   virtual ~RequestInfo() {}
 
   /**
+   * @return the current state of the response flags.
+   */
+  virtual uint64_t currentResponseFlags() const PURE;
+
+  /**
    * @param response_flag the response flag. Each filter can set independent response flags. The
    * flags are accumulated.
    */
   virtual void setResponseFlag(ResponseFlag response_flag) PURE;
+
+  /**
+   * @param response_flags the response_flags to intersect with.
+   * @return true if the intersection of the response_flags argument and the currently set response flags is non-empty.
+   */
+  virtual bool intersectResponseFlags(uint64_t response_flags) const PURE;
 
   /**
    * @param host the selected upstream host for the request.
