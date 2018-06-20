@@ -39,7 +39,7 @@ std::string readConfig(
     const std::string& config_source_hash, const std::string& secret_name,
     const std::function<std::string(const envoy::api::v2::auth::TlsCertificate& tls_certificate)>&
         read_inline_config,
-    const std::function<std::string(const Ssl::TlsCertificateConfig* secret)>&
+    const std::function<std::string(const Ssl::TlsCertificateConfig& secret)>&
         read_managed_secret) {
   if (!config.tls_certificates().empty()) {
     return read_inline_config(config.tls_certificates()[0]);
@@ -53,7 +53,7 @@ std::string readConfig(
         return EMPTY_STRING;
       }
     }
-    return read_managed_secret(secret);
+    return read_managed_secret(*secret);
   } else {
     return EMPTY_STRING;
   }
