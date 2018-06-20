@@ -25,10 +25,10 @@ public:
   Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
 
-  void testSetSocketOptionSuccess(Socket::Option& socket_option,
-                                  Network::SocketOptionName option_name, int option_val,
-                                  const std::set<Socket::SocketState>& when) {
-    for (Socket::SocketState state : when) {
+  void testSetSocketOptionSuccess(
+      Socket::Option& socket_option, Network::SocketOptionName option_name, int option_val,
+      const std::set<envoy::api::v2::core::SocketOption::SocketState>& when) {
+    for (auto state : when) {
       if (option_name.has_value()) {
         EXPECT_CALL(os_sys_calls_, setsockopt_(_, option_name.value().first,
                                                option_name.value().second, _, sizeof(int)))
@@ -42,16 +42,18 @@ public:
       }
     }
 
-    // The set of SocketState for which this option should not be set. Initialize to all
-    // the states, and remove states that are passed in.
-    std::list<Socket::SocketState> unset_socketstates{
-        Socket::SocketState::PreBind,
-        Socket::SocketState::PostBind,
-        Socket::SocketState::Listening,
+    // The set of SocketOption::SocketState for which this option should not be set.
+    // Initialize to all the states, and remove states that are passed in.
+    std::list<envoy::api::v2::core::SocketOption::SocketState> unset_socketstates{
+        envoy::api::v2::core::SocketOption::STATE_PREBIND,
+        envoy::api::v2::core::SocketOption::STATE_BOUND,
+        envoy::api::v2::core::SocketOption::STATE_LISTENING,
     };
     unset_socketstates.remove_if(
-        [&](Socket::SocketState state) -> bool { return when.find(state) != when.end(); });
-    for (Socket::SocketState state : unset_socketstates) {
+        [&](envoy::api::v2::core::SocketOption::SocketState state) -> bool {
+          return when.find(state) != when.end();
+        });
+    for (auto state : unset_socketstates) {
       EXPECT_CALL(os_sys_calls_, setsockopt_(_, _, _, _, _)).Times(0);
       EXPECT_TRUE(socket_option.setOption(socket_, state));
     }

@@ -1821,13 +1821,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
     createFilterFactoryFromProto(const Protobuf::Message&,
                                  Configuration::ListenerFactoryContext& context) override {
       auto option = std::make_unique<Network::MockSocketOption>();
-      EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind))
+      EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
           .WillOnce(Return(true));
-      EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PostBind))
-          .WillOnce(Invoke([](Network::Socket& socket, Network::Socket::SocketState) -> bool {
-            fd = socket.fd();
-            return true;
-          }));
+      EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))
+          .WillOnce(Invoke(
+              [](Network::Socket& socket, envoy::api::v2::core::SocketOption::SocketState) -> bool {
+                fd = socket.fd();
+                return true;
+              }));
       context.addListenSocketOption(std::move(option));
       return [](Network::ListenerFilterManager& filter_manager) -> void {
         filter_manager.addAcceptFilter(std::make_unique<OriginalDstTestFilter>());
@@ -1896,7 +1897,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
     createFilterFactoryFromProto(const Protobuf::Message&,
                                  Configuration::ListenerFactoryContext& context) override {
       auto option = std::make_unique<Network::MockSocketOption>();
-      EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind))
+      EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
           .WillOnce(Return(false));
       context.addListenSocketOption(std::move(option));
       return [](Network::ListenerFilterManager& filter_manager) -> void {
@@ -1985,8 +1986,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
                                 bool) -> Network::SocketSharedPtr {
           EXPECT_NE(options.get(), nullptr);
           EXPECT_EQ(options->size(), 2);
-          EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                                    Network::Socket::SocketState::PreBind));
+          EXPECT_TRUE(
+              Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                            envoy::api::v2::core::SocketOption::STATE_PREBIND));
           return listener_factory_.socket_;
         }));
     // Expecting the socket option to bet set twice, once pre-bind, once post-bind.
@@ -2035,8 +2037,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
                                 bool) -> Network::SocketSharedPtr {
           EXPECT_NE(options.get(), nullptr);
           EXPECT_EQ(options->size(), 1);
-          EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                                    Network::Socket::SocketState::PreBind));
+          EXPECT_TRUE(
+              Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                            envoy::api::v2::core::SocketOption::STATE_PREBIND));
           return listener_factory_.socket_;
         }));
     EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_IP_FREEBIND.value().first,

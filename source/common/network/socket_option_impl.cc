@@ -10,7 +10,8 @@ namespace Envoy {
 namespace Network {
 
 // Socket::Option
-bool SocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) const {
+bool SocketOptionImpl::setOption(Socket& socket,
+                                 envoy::api::v2::core::SocketOption::SocketState state) const {
   if (in_state_ == state) {
     const int error = SocketOptionImpl::setSocketOption(socket, optname_, value_);
     if (error != 0) {
