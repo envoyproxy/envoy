@@ -173,8 +173,6 @@ public:
   getStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,
                                Server::Configuration::FactoryContext& factory_context) override;
 
-  SystemTime routes_config_update_time;
-
 private:
   ProtobufTypes::MessagePtr dumpRouteConfigs();
 

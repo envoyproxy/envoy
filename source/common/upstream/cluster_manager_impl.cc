@@ -180,8 +180,6 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
       system_time_source_(system_time_source) {
 
-  cluster_config_update_time_ = system_time_source_.currentTime();
-
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
@@ -345,7 +343,6 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
                                             const std::string& version_info) {
-  cluster_config_update_time_ = system_time_source_.currentTime();
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration. We check
   // both the warming clusters and the active clusters to see if we need an update or the update
@@ -631,14 +628,14 @@ ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&
 ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::ClustersConfigDump>();
 
-  TimestampUtil::systemClockToTimestamp(cluster_config_update_time_,
-                                        *(config_dump->mutable_last_updated()));
-
   config_dump->set_version_info(cds_api_ != nullptr ? cds_api_->versionInfo() : "");
   for (const auto& active_cluster_pair : active_clusters_) {
     const auto& cluster = *active_cluster_pair.second;
     if (!cluster.added_via_api_) {
-      config_dump->mutable_static_clusters()->Add()->MergeFrom(cluster.cluster_config_);
+      auto& static_cluster = *config_dump->mutable_static_clusters()->Add();
+      static_cluster.mutable_cluster()->MergeFrom(cluster.cluster_config_);
+      TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
+                                            *(static_cluster.mutable_last_updated()));
     } else {
       auto& dynamic_cluster = *config_dump->mutable_dynamic_active_clusters()->Add();
       dynamic_cluster.set_version_info(cluster.version_info_);

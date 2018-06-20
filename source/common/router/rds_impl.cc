@@ -97,8 +97,6 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
 void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources,
                                                 const std::string& version_info) {
   last_updated_ = factory_context_.systemTimeSource().currentTime();
-  route_config_provider_manager_.routes_config_update_time =
-      factory_context_.systemTimeSource().currentTime();
 
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing RouteConfiguration for {} in onConfigUpdate()", route_config_name_);
@@ -231,9 +229,6 @@ RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getStaticRouteConfi
 ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::RoutesConfigDump>();
 
-  TimestampUtil::systemClockToTimestamp(routes_config_update_time,
-                                        *(config_dump->mutable_last_updated()));
-
   for (const auto& provider : getRdsRouteConfigProviders()) {
     auto config_info = provider->configInfo();
     if (config_info) {
@@ -247,8 +242,11 @@ ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
 
   for (const auto& provider : getStaticRouteConfigProviders()) {
     ASSERT(provider->configInfo());
-    config_dump->mutable_static_route_configs()->Add()->MergeFrom(
-        provider->configInfo().value().config_);
+
+    auto* static_config = config_dump->mutable_static_route_configs()->Add();
+    static_config->mutable_route_config()->MergeFrom(provider->configInfo().value().config_);
+    TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
+                                          *(static_config->mutable_last_updated()));
   }
 
   return ProtobufTypes::MessagePtr{std::move(config_dump)};

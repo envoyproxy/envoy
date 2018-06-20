@@ -118,7 +118,6 @@ public:
   Instance& server_;
   SystemTimeSource& system_time_source_;
   ListenerComponentFactory& factory_;
-  SystemTime listener_config_update_time_;
 
 private:
   typedef std::list<ListenerImplPtr> ListenerList;
