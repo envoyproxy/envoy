@@ -39,5 +39,7 @@ private:
   std::string sds_config_name_;
 };
 
+typedef std::unique_ptr<SdsApi> SdsApiPtr;
+
 } // namespace Secret
 } // namespace Envoy

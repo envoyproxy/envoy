@@ -27,7 +27,7 @@ public:
 private:
   Server::Instance& server_;
   // map hash code of SDS config source and SdsApi object
-  std::unordered_map<std::string, std::unique_ptr<SdsApi>> sds_apis_;
+  std::unordered_map<std::string, SdsApiPtr> sds_apis_;
   mutable std::shared_timed_mutex sds_api_mutex_;
 
   // Manages pairs of name and Ssl::TlsCertificateConfig grouped by SDS config source hash.
