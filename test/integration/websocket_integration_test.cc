@@ -18,6 +18,11 @@
 using testing::MatchesRegex;
 
 namespace Envoy {
+namespace {
+
+bool headersRead(const std::string& data) { return data.find("\r\n\r\n") != std::string::npos; }
+
+} // namespace
 
 INSTANTIATE_TEST_CASE_P(IpVersions, WebsocketIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -79,7 +84,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   tcp_client->write(upgrade_req_str_);
   test_server_->waitForCounterGe("tcp.websocket.downstream_cx_total", 1);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  const std::string data = fake_upstream_connection->waitForData("\r\n\r\n", false);
+  const std::string data = fake_upstream_connection->waitForData(&headersRead);
   validateInitialUpstreamData(data);
 
   // Accept websocket upgrade request
@@ -90,14 +95,14 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   // Standard TCP proxy semantics post upgrade
   tcp_client->write("hello");
 
-  fake_upstream_connection->waitForData("hello", false);
+  fake_upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("hello"));
   fake_upstream_connection->write("world");
   tcp_client->waitForData("world", false);
   tcp_client->write("bye!");
 
   // downstream disconnect
   tcp_client->close();
-  std::string final_data = fake_upstream_connection->waitForData("bye", false);
+  fake_upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("bye"));
   fake_upstream_connection->waitForDisconnect();
 
   validateFinalDownstreamData(tcp_client->data(), upgrade_resp_str_ + "world");
@@ -115,7 +120,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   tcp_client->write(upgrade_req_str_);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   ASSERT_TRUE(fake_upstream_connection != nullptr);
-  const std::string data = fake_upstream_connection->waitForData("\r\n\r\n", false);
+  const std::string data = fake_upstream_connection->waitForData(&headersRead);
   validateInitialUpstreamData(data);
 
   // Accept websocket upgrade request
@@ -126,7 +131,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   // Standard TCP proxy semantics post upgrade
   tcp_client->write("hello");
 
-  fake_upstream_connection->waitForData("hello", false);
+  fake_upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("hello"));
 
   fake_upstream_connection->write("world");
   // upstream disconnect
@@ -158,7 +163,8 @@ TEST_P(WebsocketIntegrationTest, EarlyData) {
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
 
   // Wait for both the upgrade, and the early data.
-  const std::string data = fake_upstream_connection->waitForData(early_data_req_str.c_str(), false);
+  const std::string data = fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch(early_data_req_str.c_str()));
   // We expect to find the early data on the upstream side
   EXPECT_TRUE(StringUtil::endsWith(data, early_data_req_str));
   // Accept websocket upgrade request
@@ -191,7 +197,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
   // The size of headers received by the destination is 228 bytes.
   tcp_client->write(upgrade_req_str_);
   fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  const std::string data = fake_upstream_connection->waitForData("\r\n\r\n", false);
+  const std::string data = fake_upstream_connection->waitForData(&headersRead);
   validateInitialUpstreamData(data);
 
   // Accept websocket upgrade request

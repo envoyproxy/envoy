@@ -407,10 +407,10 @@ std::string FakeRawConnection::waitForData(uint64_t num_bytes) {
   return data_;
 }
 
-std::string FakeRawConnection::waitForData(const char* data, bool exact_match) {
+std::string
+FakeRawConnection::waitForData(const std::function<bool(const std::string&)>& data_validator) {
   Thread::LockGuard lock(lock_);
-  while ((exact_match && data_ != data) ||
-         (!exact_match && data_.find(data) == std::string::npos)) {
+  while (!data_validator(data_)) {
     ENVOY_LOG(debug, "waiting for data");
     connection_event_.wait(lock_); // Safe since CondVar::wait won't throw.
   }
