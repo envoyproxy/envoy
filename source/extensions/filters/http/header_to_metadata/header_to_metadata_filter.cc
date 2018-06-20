@@ -27,13 +27,13 @@ Config::Config(const envoy::config::filter::http::header_to_metadata::v2::Config
   }
 }
 
-bool Config::configToVector(const ProtobufRepeatedRule& protoRules, HeaderToMetadataRules& vector) {
-  if (protoRules.size() == 0) {
+bool Config::configToVector(const ProtobufRepeatedRule& proto_rules, HeaderToMetadataRules& vector) {
+  if (proto_rules.size() == 0) {
     ENVOY_LOG(debug, "no rules provided");
     return false;
   }
 
-  for (const auto& entry : protoRules) {
+  for (const auto& entry : proto_rules) {
     std::pair<Http::LowerCaseString, Rule> rule = {Http::LowerCaseString(entry.header()), entry};
 
     // Rule must have at least one of the `on_header_*` fields set.
@@ -79,7 +79,7 @@ void HeaderToMetadataFilter::setEncoderFilterCallbacks(
   encoder_callbacks_ = &callbacks;
 }
 
-bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& metaNamespace,
+bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta_namespace,
                                          const std::string& key, const std::string& value,
                                          ValueType type) const {
   ProtobufWkt::Value val;
@@ -115,13 +115,13 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
   }
 
   // Have we seen this namespace before?
-  auto namespaceIter = map.find(metaNamespace);
-  if (namespaceIter == map.end()) {
-    map[metaNamespace] = ProtobufWkt::Struct();
-    namespaceIter = map.find(metaNamespace);
+  auto namespace_iter = map.find(meta_namespace);
+  if (namespace_iter == map.end()) {
+    map[meta_namespace] = ProtobufWkt::Struct();
+    namespace_iter = map.find(meta_namespace);
   }
 
-  auto& keyval = namespaceIter->second;
+  auto& keyval = namespace_iter->second;
   (*keyval.mutable_fields())[key] = val;
 
   return true;
@@ -134,7 +134,7 @@ const std::string& HeaderToMetadataFilter::decideNamespace(const std::string& ns
 void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
                                                    const HeaderToMetadataRules& rules,
                                                    Http::StreamFilterCallbacks& callbacks) {
-  StructMap structsByNamespace;
+  StructMap structs_by_namespace;
 
   for (const auto& rulePair : rules) {
     const auto& header = rulePair.first;
@@ -149,7 +149,7 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
 
       if (!value.empty()) {
         const auto& nspace = decideNamespace(keyval.metadata_namespace());
-        addMetadata(structsByNamespace, nspace, keyval.key(), value, keyval.type());
+        addMetadata(structs_by_namespace, nspace, keyval.key(), value, keyval.type());
       } else {
         ENVOY_LOG(debug, "value is empty, not adding metadata");
       }
@@ -163,7 +163,7 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
 
       if (!keyval.value().empty()) {
         const auto& nspace = decideNamespace(keyval.metadata_namespace());
-        addMetadata(structsByNamespace, nspace, keyval.key(), keyval.value(), keyval.type());
+        addMetadata(structs_by_namespace, nspace, keyval.key(), keyval.value(), keyval.type());
       } else {
         ENVOY_LOG(debug, "value is empty, not adding metadata");
       }
@@ -171,8 +171,8 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
   }
 
   // Any matching rules?
-  if (structsByNamespace.size() > 0) {
-    for (auto const& entry : structsByNamespace) {
+  if (structs_by_namespace.size() > 0) {
+    for (auto const& entry : structs_by_namespace) {
       callbacks.requestInfo().setDynamicMetadata(entry.first, entry.second);
     }
   }
