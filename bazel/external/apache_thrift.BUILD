@@ -17,4 +17,5 @@ py_library(
     name = "apache_thrift",
     srcs = [":thrift_files"],
     visibility = ["//visibility:public"],
+    deps = ["@six_archive//:six"],
 )
