@@ -22,6 +22,13 @@ service Bookstore {
       body: "shelf"
     };
   }
+  // Creates a new shelf in the bookstore via a mapped package.service.method as its HTTP path.
+  rpc CreateShelfWithPackageServiceAndMethod(CreateShelfRequest) returns (Shelf) {
+    option (google.api.http) = {
+      post: "/bookstore.Bookstore/CreateShelfWithPackageServiceAndMethod"
+      body: "shelf"
+    };
+  }
   // Creates multiple shelves with one streaming call
   rpc BulkCreateShelf(stream CreateShelfRequest) returns (stream Shelf) {
     option (google.api.http) = {
