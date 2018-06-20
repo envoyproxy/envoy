@@ -3,9 +3,9 @@
 #include <string>
 
 #include "envoy/api/v2/core/base.pb.h"
-#include "envoy/type/matchers/metadata.pb.h"
-#include "envoy/type/matchers/number.pb.h"
-#include "envoy/type/matchers/string.pb.h"
+#include "envoy/type/matcher/metadata.pb.h"
+#include "envoy/type/matcher/number.pb.h"
+#include "envoy/type/matcher/string.pb.h"
 
 #include "common/common/utility.h"
 
@@ -60,7 +60,7 @@ public:
 
 private:
   const envoy::type::matcher::MetadataMatcher matcher_;
-  const std::vector<std::string> path_;
+  std::vector<std::string> path_;
 
   bool null_matcher_{false};
   bool bool_matcher_allow_true_{false};

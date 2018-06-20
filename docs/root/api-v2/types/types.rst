@@ -7,6 +7,6 @@ Types
 
   ../type/percent.proto
   ../type/range.proto
-  ../type/matchers/metadata.proto
-  ../type/matchers/number.proto
-  ../type/matchers/string.proto
+  ../type/matcher/metadata.proto
+  ../type/matcher/number.proto
+  ../type/matcher/string.proto

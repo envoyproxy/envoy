@@ -225,7 +225,7 @@ TEST(MetadataMatcher, MetadataMatcher) {
 
   envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("rbac");
-  matcher.add_path("label");
+  matcher.add_path()->set_key("label");
 
   matcher.add_values()->mutable_string_match()->set_exact("test");
   checkMatcher(MetadataMatcher(matcher), false, conn, header, metadata);

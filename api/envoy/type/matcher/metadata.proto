@@ -3,8 +3,8 @@ syntax = "proto3";
 package envoy.type.matcher;
 option go_package = "matcher";
 
-import "envoy/type/matchers/string.proto";
-import "envoy/type/matchers/number.proto";
+import "envoy/type/matcher/string.proto";
+import "envoy/type/matcher/number.proto";
 
 import "validate/validate.proto";
 
@@ -17,16 +17,30 @@ import "validate/validate.proto";
 // An example use of MetadataMatcher is specifying additional metadata in envoy.filters.http.rbac to
 // enforce access control based on dynamic metadata in a request.
 message MetadataMatcher {
+  // Specifies the segment in a path to retrieve value from Metadata.
+  // Note: Array is not supported for now and will result a not match directly.
+  message PathSegment {
+    oneof segment {
+      option (validate.required) = true;
+
+      // If specified, use the key to retrieve the value in a Struct.
+      string key = 1 [(validate.rules).string.min_bytes = 1];
+    }
+  }
+
   // Specifies the value to match. Only primitive value is supported. For non-primitive value, the
   // result is always not matched.
   message Value {
+    // NullMatch is an empty message to specify a null value.
+    message NullMatch {
+    }
+
     // Specifies how to match a value. Only have effect on primitive value.
     oneof match_pattern {
       option (validate.required) = true;
 
-      // If specified, it's matched if and only if the target value is a NullValue and this field is
-      // also set to true.
-      bool null_match = 1;
+      // If specified, it's matched if and only if the target value is a NullValue.
+      NullMatch null_match = 1;
 
       // If specified, it's matched if and only if the target value is a double value and is matched
       // to this field.
@@ -50,9 +64,8 @@ message MetadataMatcher {
   // Required. The filter name to retrieve the Struct from the Metadata.
   string filter = 1 [(validate.rules).string.min_bytes = 1];
 
-  // Required. The multi-key path to retrieve the Value from the Struct.
-  // Note: Array is not supported and will result a not match discarding any specified values.
-  repeated string path = 2 [(validate.rules).repeated .min_items = 1];
+  // Required. The path to retrieve the Value from the Struct.
+  repeated PathSegment path = 2 [(validate.rules).repeated .min_items = 1];
 
   // Required. A set of values to match. The MetadataMatcher is matched if at least one value is
   // matched, in other words, it's matched with OR semantics.

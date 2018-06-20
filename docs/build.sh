@@ -107,9 +107,9 @@ PROTO_RST="
   /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/external_auth.proto.rst
   /envoy/type/percent/envoy/type/percent.proto.rst
   /envoy/type/range/envoy/type/range.proto.rst
-  /envoy/type/matchers/metadata/envoy/type/matchers/metadata.proto.rst
-  /envoy/type/matchers/number/envoy/type/matchers/number.proto.rst
-  /envoy/type/matchers/string/envoy/type/matchers/string.proto.rst
+  /envoy/type/matcher/metadata/envoy/type/matcher/metadata.proto.rst
+  /envoy/type/matcher/number/envoy/type/matcher/number.proto.rst
+  /envoy/type/matcher/string/envoy/type/matcher/string.proto.rst
 "
 
 # Dump all the generated RST so they can be added to PROTO_RST easily.

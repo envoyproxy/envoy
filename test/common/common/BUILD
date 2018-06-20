@@ -79,9 +79,9 @@ envoy_cc_test(
         "//source/common/config:metadata_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",
-        "@envoy_api//envoy/type/matchers:metadata_cc",
-        "@envoy_api//envoy/type/matchers:number_cc",
-        "@envoy_api//envoy/type/matchers:string_cc",
+        "@envoy_api//envoy/type/matcher:metadata_cc",
+        "@envoy_api//envoy/type/matcher:number_cc",
+        "@envoy_api//envoy/type/matcher:string_cc",
     ],
 )
 

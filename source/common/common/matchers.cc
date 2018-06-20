@@ -37,11 +37,14 @@ bool StringMatcher::match(const std::string& value) const {
 }
 
 MetadataMatcher::MetadataMatcher(const envoy::type::matcher::MetadataMatcher& matcher)
-    : matcher_(matcher), path_(matcher.path().begin(), matcher.path().end()) {
+    : matcher_(matcher) {
+  for (const auto& seg : matcher.path()) {
+    path_.push_back(seg.key());
+  }
   for (const envoy::type::matcher::MetadataMatcher::Value& m : matcher_.values()) {
     switch (m.match_pattern_case()) {
     case envoy::type::matcher::MetadataMatcher_Value::kNullMatch:
-      null_matcher_ |= m.null_match();
+      null_matcher_ = true;
       break;
     case envoy::type::matcher::MetadataMatcher_Value::kDoubleMatch:
       double_matcher_.push_back(DoubleMatcher(m.double_match()));

@@ -1,7 +1,7 @@
 #include "envoy/api/v2/core/base.pb.h"
-#include "envoy/type/matchers/metadata.pb.h"
-#include "envoy/type/matchers/number.pb.h"
-#include "envoy/type/matchers/string.pb.h"
+#include "envoy/type/matcher/metadata.pb.h"
+#include "envoy/type/matcher/number.pb.h"
+#include "envoy/type/matcher/string.pb.h"
 
 #include "common/common/matchers.h"
 #include "common/config/metadata.h"
@@ -22,13 +22,11 @@ TEST(MetadataTest, MatchNullValue) {
 
   envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
-  matcher.add_path("label");
+  matcher.add_path()->set_key("label");
 
   matcher.add_values()->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.add_values()->set_null_match(false);
-  EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.add_values()->set_null_match(true);
+  matcher.add_values()->mutable_null_match();
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 }
 
@@ -41,7 +39,7 @@ TEST(MetadataTest, MatchDoubleValue) {
 
   envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
-  matcher.add_path("label");
+  matcher.add_path()->set_key("label");
 
   matcher.add_values()->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
@@ -77,7 +75,7 @@ TEST(MetadataTest, MatchStringExactValue) {
 
   envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
-  matcher.add_path("label");
+  matcher.add_path()->set_key("label");
 
   matcher.add_values()->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
@@ -94,7 +92,7 @@ TEST(MetadataTest, MatchStringPrefixValue) {
 
   envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
-  matcher.add_path("label");
+  matcher.add_path()->set_key("label");
 
   matcher.add_values()->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
@@ -113,7 +111,7 @@ TEST(MetadataTest, MatchStringSuffixValue) {
 
   envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
-  matcher.add_path("label");
+  matcher.add_path()->set_key("label");
 
   matcher.add_values()->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
@@ -133,7 +131,7 @@ TEST(MetadataTest, MatchBoolValue) {
 
   envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
-  matcher.add_path("label");
+  matcher.add_path()->set_key("label");
 
   matcher.add_values()->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
@@ -152,7 +150,7 @@ TEST(MetadataTest, MatchPresentValue) {
 
   envoy::type::matcher::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
-  matcher.add_path("label");
+  matcher.add_path()->set_key("label");
 
   matcher.add_values()->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
@@ -162,7 +160,7 @@ TEST(MetadataTest, MatchPresentValue) {
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 
   matcher.clear_path();
-  matcher.add_path("unknown");
+  matcher.add_path()->set_key("unknown");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 }
 

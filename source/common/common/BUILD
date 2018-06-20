@@ -121,9 +121,9 @@ envoy_cc_library(
         ":utility_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/type/matchers:metadata_cc",
-        "@envoy_api//envoy/type/matchers:number_cc",
-        "@envoy_api//envoy/type/matchers:string_cc",
+        "@envoy_api//envoy/type/matcher:metadata_cc",
+        "@envoy_api//envoy/type/matcher:number_cc",
+        "@envoy_api//envoy/type/matcher:string_cc",
     ],
 )
 
