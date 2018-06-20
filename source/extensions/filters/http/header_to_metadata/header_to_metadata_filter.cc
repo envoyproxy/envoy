@@ -27,7 +27,8 @@ Config::Config(const envoy::config::filter::http::header_to_metadata::v2::Config
   }
 }
 
-bool Config::configToVector(const ProtobufRepeatedRule& proto_rules, HeaderToMetadataRules& vector) {
+bool Config::configToVector(const ProtobufRepeatedRule& proto_rules,
+                            HeaderToMetadataRules& vector) {
   if (proto_rules.size() == 0) {
     ENVOY_LOG(debug, "no rules provided");
     return false;
