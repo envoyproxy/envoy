@@ -98,8 +98,8 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
           [](const envoy::api::v2::auth::TlsCertificate& tls_certificate) -> std::string {
             return Config::DataSource::read(tls_certificate.certificate_chain(), true);
           },
-          [](const Ssl::TlsCertificateConfig* secret) -> std::string {
-            return secret->certificateChain();
+          [](const Ssl::TlsCertificateConfig& secret) -> std::string {
+            return secret.certificateChain();
           })),
       cert_chain_path_(
           config.tls_certificates().empty()
@@ -110,8 +110,8 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
           [](const envoy::api::v2::auth::TlsCertificate& tls_certificate) -> std::string {
             return Config::DataSource::read(tls_certificate.private_key(), true);
           },
-          [](const Ssl::TlsCertificateConfig* secret) -> std::string {
-            return secret->privateKey();
+          [](const Ssl::TlsCertificateConfig& secret) -> std::string {
+            return secret.privateKey();
           })),
       private_key_path_(
           config.tls_certificates().empty()
