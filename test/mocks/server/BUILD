@@ -13,6 +13,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
+        "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/server:admin_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:drain_manager_interface",
@@ -23,6 +24,7 @@ envoy_cc_mock(
         "//include/envoy/server:options_interface",
         "//include/envoy/server:worker_interface",
         "//include/envoy/ssl:context_manager_interface",
+        "//source/common/secret:secret_manager_impl_lib",
         "//source/common/singleton:manager_impl_lib",
         "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",
@@ -34,6 +36,7 @@ envoy_cc_mock(
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",

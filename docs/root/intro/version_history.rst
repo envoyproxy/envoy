@@ -16,11 +16,11 @@ Version history
 * admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
   version information (if applicable).
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
-* admin: added :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to add or change runtime values
+* admin: added :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to add or change runtime values.
 * admin: mutations must be sent as POSTs, rather than GETs. Mutations include:
   :http:post:`/cpuprofiler`, :http:post:`/healthcheck/fail`, :http:post:`/healthcheck/ok`,
   :http:post:`/logging`, :http:post:`/quitquitquit`, :http:post:`/reset_counters`,
-  :http:post:`/runtime_modify?key1=value1&key2=value2&keyN=valueN`,
+  :http:post:`/runtime_modify?key1=value1&key2=value2&keyN=valueN`.
 * admin: removed `/routes` endpoint; route configs can now be found at the :ref:`/config_dump endpoint <operations_admin_interface_config_dump>`.
 * buffer filter: the buffer filter can be optionally
   :ref:`disabled <envoy_api_field_config.filter.http.buffer.v2.BufferPerRoute.disabled>` or
@@ -28,12 +28,12 @@ Version history
   route-local configuration.
 * cli: added --config-yaml flag to the Envoy binary. When set its value is interpreted as a yaml
   representation of the bootstrap config and overrides --config-path.
-* cluster: Add :ref:`option <envoy_api_field_Cluster.close_connections_on_host_health_failure>`
+* cluster: added :ref:`option <envoy_api_field_Cluster.close_connections_on_host_health_failure>`
   to close tcp_proxy upstream connections when health checks fail.
-* cluster: Add :ref:`option <envoy_api_field_Cluster.drain_connections_on_host_removal>` to drain
+* cluster: added :ref:`option <envoy_api_field_Cluster.drain_connections_on_host_removal>` to drain
   connections from hosts after they are removed from service discovery, regardless of health status.
-* cluster: fixed bug preventing the deletion of all endpoints in a priority
-* debug: added symbolized stack traces (where supported)
+* cluster: fixed bug preventing the deletion of all endpoints in a priority.
+* debug: added symbolized stack traces (where supported).
 * grpc: support added for the full set of :ref:`Google gRPC call credentials
   <envoy_api_msg_core.GrpcService.GoogleGrpc.CallCredentials>`.
 * health check: added ability to set :ref:`additional HTTP headers
@@ -44,12 +44,12 @@ Version history
   <envoy_api_field_core.HealthCheck.unhealthy_edge_interval>`, :ref:`unhealthy to healthy
   <envoy_api_field_core.HealthCheck.healthy_edge_interval>` and for subsequent checks on
   :ref:`unhealthy hosts <envoy_api_field_core.HealthCheck.unhealthy_interval>`.
+* health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
+* health check: health check connections can now be configured to use http/2.
 * health check http filter: added
   :ref:`generic header matching <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.headers>`
   to trigger health check response. Deprecated the
   :ref:`endpoint option <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.endpoint>`.
-* health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
-* health check: health check connections can now be configured to use http/2.
 * http: filters can now optionally support
   :ref:`virtual host <envoy_api_field_route.VirtualHost.per_filter_config>`,
   :ref:`route <envoy_api_field_route.Route.per_filter_config>`, and
@@ -66,7 +66,7 @@ Version history
 * http: added a :ref:`configuration option
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.skip_xff_append>`
   to elide *x-forwarded-for* header modifications.
-* http: fixing a bug in inline headers where addCopy and addViaMove didn't add header values when
+* http: fixed a bug in inline headers where addCopy and addViaMove didn't add header values when
   encountering inline headers with multiple instances.
 * listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
@@ -79,7 +79,7 @@ Version history
   <arch_overview_load_balancing_types_round_robin>` support. The round robin
   scheduler now respects endpoint weights and also has improved fidelity across
   picks.
-* load balancer: :ref:`Locality weighted load balancing
+* load balancer: :ref:`locality weighted load balancing
   <arch_overview_load_balancer_subsets>` is now supported.
 * load balancer: ability to configure zone aware load balancer settings :ref:`through the API
   <envoy_api_field_Cluster.CommonLbConfig.zone_aware_lb_config>`.
@@ -90,7 +90,7 @@ Version history
 * logger: all :ref:`logging levels <operations_admin_interface_logging>` can be configured
   at run-time: trace debug info warning error critical.
 * rbac http filter: a :ref:`role-based access control http filter <config_http_filters_rbac>` has been added.
-* router: The behavior of per-try timeouts have changed in the case where a portion of the response has
+* router: the behavior of per-try timeouts have changed in the case where a portion of the response has
   already been proxied downstream when the timeout occurs. Previously, the response would be reset
   leading to either an HTTP/2 reset or an HTTP/1 closed connection and a partial response. Now, the
   timeout will be ignored and the response will continue to proxy up to the global request timeout.
@@ -115,7 +115,7 @@ Version history
   <envoy_api_field_config.filter.http.router.v2.Router.suppress_envoy_headers>` to disable *x-envoy-*
   header generation.
 * router: added 'unavailable' to the retriable gRPC status codes that can be specified
-  through :ref:`x-envoy-retry-grpc-on <config_http_filters_router_x-envoy-retry-grpc-on>`
+  through :ref:`x-envoy-retry-grpc-on <config_http_filters_router_x-envoy-retry-grpc-on>`.
 * sockets: added :ref:`capture transport socket extension <operations_traffic_capture>` to support
   recording plain text traffic and PCAP generation.
 * sockets: added `IP_FREEBIND` socket option support for :ref:`listeners
@@ -128,7 +128,7 @@ Version history
 * sockets: added `SO_KEEPALIVE` socket option for upstream connections
   :ref:`per cluster <envoy_api_field_Cluster.upstream_connection_options>`.
 * stats: added support for histograms.
-* stats: added :ref:`option to configure the statsd prefix<envoy_api_field_config.metrics.v2.StatsdSink.prefix>`
+* stats: added :ref:`option to configure the statsd prefix<envoy_api_field_config.metrics.v2.StatsdSink.prefix>`.
 * stats: updated stats sink interface to flush through a single call.
 * tls: added support for
   :ref:`verify_certificate_spki <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>`.
@@ -177,7 +177,7 @@ Version history
   based xDS the backing cluster must be statically defined and be of non-EDS type.
 * grpc: the Google gRPC C++ library client is now supported as specified in the :ref:`gRPC services
   overview <arch_overview_grpc_services>` and :ref:`GrpcService <envoy_api_msg_core.GrpcService>`.
-* grpc-json: Added support for :ref:`inline descriptors
+* grpc-json: added support for :ref:`inline descriptors
   <envoy_api_field_config.filter.http.transcoder.v2.GrpcJsonTranscoder.proto_descriptor_bin>`.
 * health check: added :ref:`gRPC health check <envoy_api_field_core.HealthCheck.grpc_health_check>`
   based on `grpc.health.v1.Health <https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto>`_
@@ -189,7 +189,7 @@ Version history
   <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.cluster_min_healthy_percentages>`.
 * health check: added setting for :ref:`no-traffic
   interval<envoy_api_field_core.HealthCheck.no_traffic_interval>`.
-* http : added idle timeout for :ref:`upstream http connections
+* http: added idle timeout for :ref:`upstream http connections
   <envoy_api_field_core.HttpProtocolOptions.idle_timeout>`.
 * http: added support for :ref:`proxying 100-Continue responses
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.proxy_100_continue>`.

@@ -298,6 +298,7 @@ public:
   // Configuration::TransportSocketFactoryContext
   Ssl::ContextManager& sslContextManager() override { return parent_.server_.sslContextManager(); }
   Stats::Scope& statsScope() const override { return *listener_scope_; }
+  Secret::SecretManager& secretManager() override { return parent_.server_.secretManager(); }
 
 private:
   void addFilterChain(const std::vector<std::string>& server_names,

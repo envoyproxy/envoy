@@ -17,6 +17,7 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread/thread.h"
 
+#include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
 
@@ -29,6 +30,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -273,6 +275,8 @@ public:
     return RateLimit::ClientPtr{rateLimitClient_()};
   }
 
+  Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
+
   MOCK_METHOD0(admin, Admin&());
   MOCK_METHOD0(api, Api::Api&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
@@ -305,6 +309,7 @@ public:
   MOCK_METHOD4(adminRequest, void(absl::string_view, const Http::Utility::QueryParams&,
                                   absl::string_view, AdminResponseHandler&));
 
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
   testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
