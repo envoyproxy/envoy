@@ -32,6 +32,16 @@ namespace Envoy {
   return *objectptr;
 
 /**
+ * Declares a pointer-to-member function.
+ */
+#define POINTER_TO_MEMBER_FUNCTION(return_type, class_name, args) return_type(class_name::*) args
+
+/**
+ * Calls a pointer-to-member function.
+ */
+#define CALL_POINTER_TO_MEMBER_FUNCTION(obj, function_name, args) ((obj).*function_name) args
+
+/**
  * Have a generic fall-through for different versions of C++
  */
 #if __cplusplus >= 201703L // C++17 and above

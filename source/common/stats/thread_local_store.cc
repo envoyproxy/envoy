@@ -177,12 +177,13 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   if (!central_ref) {
     std::vector<Tag> tags;
     std::string tag_extracted_name = parent_.getTagsForName(name, tags);
-    std::shared_ptr<StatType> stat =
-        make_stat(parent_.alloc_, name, std::move(tag_extracted_name), std::move(tags));
+    std::shared_ptr<StatType> stat = CALL_POINTER_TO_MEMBER_FUNCTION(
+        parent_.alloc_, make_stat, (name, std::move(tag_extracted_name), std::move(tags)));
     if (stat == nullptr) {
       parent_.num_last_resort_stats_.inc();
       stat =
-          make_stat(parent_.heap_allocator_, name, std::move(tag_extracted_name), std::move(tags));
+          CALL_POINTER_TO_MEMBER_FUNCTION(parent_.heap_allocator_, make_stat,
+                                          (name, std::move(tag_extracted_name), std::move(tags)));
       ASSERT(stat != nullptr);
     }
     central_ref = stat;
@@ -210,13 +211,8 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
         &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].counters_[final_name];
   }
 
-  return safeMakeStat<Counter>(
-      final_name, central_cache_.counters_,
-      [](StatDataAllocator& allocator, const std::string& name, std::string&& tag_extracted_name,
-         std::vector<Tag>&& tags) -> CounterSharedPtr {
-        return allocator.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
-      },
-      tls_ref);
+  return safeMakeStat(final_name, central_cache_.counters_, &StatDataAllocator::makeCounter,
+                      tls_ref);
 }
 
 void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& histogram,
@@ -244,13 +240,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
     tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].gauges_[final_name];
   }
 
-  return safeMakeStat<Gauge>(
-      final_name, central_cache_.gauges_,
-      [](StatDataAllocator& allocator, const std::string& name, std::string&& tag_extracted_name,
-         std::vector<Tag>&& tags) -> GaugeSharedPtr {
-        return allocator.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
-      },
-      tls_ref);
+  return safeMakeStat(final_name, central_cache_.gauges_, &StatDataAllocator::makeGauge, tls_ref);
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
