@@ -117,6 +117,21 @@ TEST_P(GzipIntegrationTest, AcceptanceFullConfigTest) {
 }
 
 /**
+ * Exercises filter when client request contains 'identity' type.
+ */
+TEST_P(GzipIntegrationTest, IdentityAcceptEncoding) {
+  initializeFilter(default_config);
+  doRequestAndNoCompression(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                    {":path", "/test/long/url"},
+                                                    {":scheme", "http"},
+                                                    {":authority", "host"},
+                                                    {"accept-encoding", "identity"}},
+                            Http::TestHeaderMapImpl{{":status", "200"},
+                                                    {"content-length", "128"},
+                                                    {"content-type", "text/plain"}});
+}
+
+/**
  * Exercises filter when client request contains unsupported 'accept-encoding' type.
  */
 TEST_P(GzipIntegrationTest, NotSupportedAcceptEncoding) {
