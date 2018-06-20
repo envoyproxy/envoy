@@ -531,6 +531,9 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
         EXPECT_NE(nullptr, headers.Path());
         EXPECT_EQ(headers.Host()->value().c_str(), host);
         EXPECT_EQ(headers.Path()->value().c_str(), path);
+        EXPECT_TRUE(headers.Scheme());
+        EXPECT_NE(nullptr, headers.Scheme());
+        EXPECT_EQ(headers.Scheme()->value().c_str(), Http::Headers::get().SchemeValues.Http);
       }));
   health_checker_->start();
 
