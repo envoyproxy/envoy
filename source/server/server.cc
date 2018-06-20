@@ -464,17 +464,5 @@ ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
   return config_dump;
 }
 
-void InstanceImpl::adminRequest(absl::string_view path, const Http::Utility::QueryParams& params,
-                                absl::string_view method, AdminResponseHandler& response_handler) {
-  std::string path_copy = std::string(path);
-  std::string method_copy = std::string(method);
-  dispatcher_->post([this, path_copy, params, method_copy, response_handler]() {
-    Http::HeaderMapImpl response_headers;
-    std::string body;
-    Http::Code code = admin_->request(path_copy, params, method_copy, response_headers, body);
-    response_handler(code, response_headers, body);
-  });
-}
-
 } // namespace Server
 } // namespace Envoy

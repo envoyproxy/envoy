@@ -106,21 +106,9 @@ public:
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_.stats_; }
   bool proxy100Continue() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
-
-  /**
-   * Executes an admin request with the specified query params.
-   *
-   * @param path the path of the admin URL.
-   * @param param the query-params passed to the admin request handler.
-   * @param method the HTTP method (POST or GET).
-   * @param response_headers populated the the response headers from executing the request,
-   *     most notably content-type.
-   * @param body populated with the response-body from the admin request.
-   * @return Http::Code The HTTP response code from the admin request.
-   */
   Http::Code request(absl::string_view path, const Http::Utility::QueryParams& params,
                      absl::string_view method, Http::HeaderMap& response_headers,
-                     std::string& body);
+                     std::string& body) override;
 
 private:
   /**

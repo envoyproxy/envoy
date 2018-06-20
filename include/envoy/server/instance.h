@@ -6,7 +6,6 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
-#include "envoy/http/query_params.h"
 #include "envoy/init/init.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/listen_socket.h"
@@ -191,23 +190,6 @@ public:
    * @return the flush interval of stats sinks.
    */
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;
-
-  /**
-   * Defines a callback that is run when an admin request completes..
-   * The first parameter to the function is the response-headers, which
-   * will generally have Content-Type and Status fields.
-   */
-  typedef std::function<void(Http::Code, Http::HeaderMap&, absl::string_view)> AdminResponseHandler;
-
-  /**
-   * Admin requests are generally handled by posting to the 'main' thread, so
-   * a callback must be supplied which will be called when the response is handled.
-   *
-   * @param path The admin request URL path as a string.
-   * @param params map of parameter names and values.
-   */
-  virtual void adminRequest(absl::string_view path, const Http::Utility::QueryParams& params,
-                            absl::string_view method, AdminResponseHandler& response_handler) PURE;
 };
 
 } // namespace Server

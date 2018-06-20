@@ -35,6 +35,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
+#include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
@@ -110,6 +111,10 @@ public:
   MOCK_METHOD1(removeHandler, bool(const std::string& prefix));
   MOCK_METHOD0(socket, Network::Socket&());
   MOCK_METHOD0(getConfigTracker, ConfigTracker&());
+  MOCK_METHOD5(request,
+               Http::Code(absl::string_view path, const Http::Utility::QueryParams& query_params,
+                          absl::string_view method, Http::HeaderMap& response_headers,
+                          std::string& body));
 
   NiceMock<MockConfigTracker> config_tracker_;
 };
@@ -306,8 +311,6 @@ public:
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
-  MOCK_METHOD4(adminRequest, void(absl::string_view, const Http::Utility::QueryParams&,
-                                  absl::string_view, AdminResponseHandler&));
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;

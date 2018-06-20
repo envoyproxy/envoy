@@ -8,7 +8,6 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -245,57 +244,6 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
           std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_)),
       EnvoyException, "unable to read file: ");
-}
-
-TEST_P(ServerInstanceImplTest, AdminGet) {
-  initialize("test/server/node_bootstrap.yaml");
-  const Http::Utility::QueryParams query_params;
-  bool done = false;
-  Instance::AdminResponseHandler callback =
-      [&done](Http::Code code, Http::HeaderMap& response_headers, absl::string_view body) {
-        EXPECT_THAT(std::string(body), HasSubstr("live 0 0 0"));
-        EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-                    HasSubstr("text/plain"));
-        EXPECT_EQ(Http::Code::OK, code);
-        done = true;
-      };
-  server_->adminRequest("/server_info", Http::Utility::QueryParams(), "GET", callback);
-  server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_TRUE(done);
-}
-
-TEST_P(ServerInstanceImplTest, AdminGetJson) {
-  initialize("test/server/node_bootstrap.yaml");
-  bool done = false;
-  Instance::AdminResponseHandler callback =
-      [&done](Http::Code code, Http::HeaderMap& response_headers, absl::string_view body) {
-        EXPECT_THAT(std::string(body), HasSubstr("{\"stats\":["));
-        EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-                    HasSubstr("application/json"));
-        EXPECT_EQ(Http::Code::OK, code);
-        done = true;
-      };
-  server_->adminRequest("/stats", Http::Utility::QueryParams({{"format", "json"}}), "GET",
-                        callback);
-  server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_TRUE(done);
-}
-
-TEST_P(ServerInstanceImplTest, AdminPost) {
-  initialize("test/server/node_bootstrap.yaml");
-  bool done = false;
-  Instance::AdminResponseHandler callback =
-      [&done](Http::Code code, Http::HeaderMap& response_headers, absl::string_view body) {
-        EXPECT_EQ(body, "OK\n");
-        EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-                    HasSubstr("text/plain"));
-        EXPECT_EQ(Http::Code::OK, code);
-        done = true;
-      };
-  server_->adminRequest("/healthcheck/fail", Http::Utility::QueryParams(), "POST", callback);
-  // If we used GET rather than POST, a warning would be logged when we run the dispatcher.
-  EXPECT_NO_LOGS(server_->dispatcher().run(Event::Dispatcher::RunType::NonBlock));
-  EXPECT_TRUE(done);
 }
 
 } // namespace Server
