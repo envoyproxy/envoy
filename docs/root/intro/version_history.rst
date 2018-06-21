@@ -151,6 +151,7 @@ Version history
 * websocket: support configuring
   :ref:`idle_timeout and max_connect_attempts <envoy_api_field_route.RouteAction.websocket_config>`.
 * upstream: added support for host override for a request in :ref:`Original destination host request header <arch_overview_load_balancing_types_original_destination_request_header>`.
+* header to metadata: added :ref:`HTTP Header to Metadata filter<config_http_filters_header_to_metadata>`.
 
 1.6.0 (March 20, 2018)
 ======================
