@@ -60,12 +60,13 @@ def main(cfg, reqhandle, resphandle):
             sys.exit("invalid unix domain socket: {}".format(cfg.addr))
         socket = TSocket.TSocket(unix_socket=cfg.addr)
     else:
-        (host, port) = cfg.addr.split(":")
-        if host == "":
-            host = "localhost"
-        if port == "":
+        try:
+            (host, port) = cfg.addr.rsplit(":", 1)
+            if host == "":
+                host = "localhost"
+            socket = TSocket.TSocket(host=host, port=int(port))
+        except ValueError:
             sys.exit("invalid address: {}".format(cfg.addr))
-        socket = TSocket.TSocket(host=host, port=int(port))
 
     transport = TRecordingTransport(socket, reqhandle, resphandle)
 

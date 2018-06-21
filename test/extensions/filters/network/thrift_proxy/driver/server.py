@@ -95,8 +95,10 @@ def main(cfg):
         if cfg.addr == "":
             sys.exit("invalid listener unix domain socket: {}".format(cfg.addr))
     else:
-        (host, port) = cfg.addr.split(":")
-        if port == "":
+        try:
+            (host, port) = cfg.addr.rsplit(":", 1)
+            port = int(port)
+        except ValueError:
             sys.exit("invalid listener address: {}".format(cfg.addr))
 
     if cfg.response == "success":
@@ -124,7 +126,7 @@ def main(cfg):
     if cfg.unix:
         transport = TSocket.TServerSocket(unix_socket=cfg.addr)
     else:
-        transport = TSocket.TServerSocket(host=host, port=int(port))
+        transport = TSocket.TServerSocket(host=host, port=port)
 
     if cfg.transport == "framed":
         transport_factory = TTransport.TFramedTransportFactory()
