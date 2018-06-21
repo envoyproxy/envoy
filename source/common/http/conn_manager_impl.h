@@ -413,7 +413,7 @@ private:
   void onDrainTimeout();
   void startDrainSequence();
 
-  bool isWebSocketConnection() const { return ws_connection_ != nullptr; }
+  bool isOldStyleWebSocketConnection() const { return ws_connection_ != nullptr; }
 
   enum class DrainState { NotDraining, Draining, Closing };
 
