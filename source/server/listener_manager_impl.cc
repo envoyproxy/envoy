@@ -434,7 +434,6 @@ Init::Manager& ListenerImpl::initManager() {
 
 void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
   ASSERT(!socket_);
-  last_updated_ = systemTimeSource().currentTime();
   socket_ = socket;
   // Server config validation sets nullptr sockets.
   if (socket_ && listen_socket_options_) {

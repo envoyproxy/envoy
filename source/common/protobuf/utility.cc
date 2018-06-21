@@ -211,7 +211,7 @@ uint64_t DurationUtil::durationToSeconds(const ProtobufWkt::Duration& duration) 
 }
 
 void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
-                                           google::protobuf::Timestamp& timestamp) {
+                                           ProtobufWkt::Timestamp& timestamp) {
   // Converts to millisecond-precision Timestamp by explicitly casting to millisecond-precision
   // time_point.
   timestamp.MergeFrom(Protobuf::util::TimeUtil::MillisecondsToTimestamp(
