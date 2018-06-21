@@ -89,6 +89,10 @@ GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitSe
     grpc_service.mutable_envoy_grpc()->set_cluster_name(config.cluster_name());
   }
   async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope, false);
+
+  // TODO(junr03): legacy rate limit is deprecated. Remove this warning after 1.7.0.
+  ENVOY_LOG_MISC(warn, "legacy rate limit client is deprecated, update your service to support "
+                       "the data-plane-api defined rate limit service");
 }
 
 ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout) {
@@ -98,8 +102,6 @@ ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds
         async_client_factory_->create(), timeout,
         "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit");
   }
-  ENVOY_LOG_MISC(warn, "legacy rate limit client is deprecated, update your service to support "
-                       "data-plane-api defined rate limit service");
   return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout,
                                           "pb.lyft.ratelimit.RateLimitService.ShouldRateLimit");
 }
