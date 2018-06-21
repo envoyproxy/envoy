@@ -471,7 +471,6 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
 
 ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::ListenersConfigDump>();
-
   config_dump->set_version_info(lds_api_ != nullptr ? lds_api_->versionInfo() : "");
   for (const auto& listener : active_listeners_) {
     if (listener->blockRemove()) {
