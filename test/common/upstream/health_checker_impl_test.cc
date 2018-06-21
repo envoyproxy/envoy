@@ -525,12 +525,9 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
-        EXPECT_TRUE(headers.Host());
-        EXPECT_TRUE(headers.Path());
-        EXPECT_NE(nullptr, headers.Host());
-        EXPECT_NE(nullptr, headers.Path());
         EXPECT_EQ(headers.Host()->value().c_str(), host);
         EXPECT_EQ(headers.Path()->value().c_str(), path);
+        EXPECT_EQ(headers.Scheme()->value().c_str(), Http::Headers::get().SchemeValues.Http);
       }));
   health_checker_->start();
 
@@ -562,10 +559,6 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
-        EXPECT_TRUE(headers.Host());
-        EXPECT_TRUE(headers.Path());
-        EXPECT_NE(nullptr, headers.Host());
-        EXPECT_NE(nullptr, headers.Path());
         EXPECT_EQ(headers.Host()->value().c_str(), host);
         EXPECT_EQ(headers.Path()->value().c_str(), path);
       }));
@@ -607,14 +600,6 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
-        EXPECT_TRUE(headers.get(headerOk));
-        EXPECT_TRUE(headers.get(headerCool));
-        EXPECT_TRUE(headers.get(headerAwesome));
-
-        EXPECT_NE(nullptr, headers.get(headerOk));
-        EXPECT_NE(nullptr, headers.get(headerCool));
-        EXPECT_NE(nullptr, headers.get(headerAwesome));
-
         EXPECT_EQ(headers.get(headerOk)->value().c_str(), valueOk);
         EXPECT_EQ(headers.get(headerCool)->value().c_str(), valueCool);
         EXPECT_EQ(headers.get(headerAwesome)->value().c_str(), valueAwesome);
@@ -1316,10 +1301,6 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAltPort) {
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
       .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
-        EXPECT_TRUE(headers.Host());
-        EXPECT_TRUE(headers.Path());
-        EXPECT_NE(nullptr, headers.Host());
-        EXPECT_NE(nullptr, headers.Path());
         EXPECT_EQ(headers.Host()->value().c_str(), host);
         EXPECT_EQ(headers.Path()->value().c_str(), path);
       }));

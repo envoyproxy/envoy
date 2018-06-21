@@ -128,7 +128,8 @@ Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data, bool 
   data_.append(TestUtility::bufferToString(data));
   data.drain(data.length());
   read_end_stream_ = end_stream;
-  if ((!data_to_wait_for_.empty() && data_.find(data_to_wait_for_) == 0) || end_stream) {
+  if ((!data_to_wait_for_.empty() && data_.find(data_to_wait_for_) == 0) ||
+      (exact_match_ == false && data_.find(data_to_wait_for_) != std::string::npos) || end_stream) {
     data_to_wait_for_.clear();
     dispatcher_.exit();
   }

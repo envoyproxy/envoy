@@ -72,6 +72,16 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    extension_name = "envoy.filters.network.thrift_proxy",
+    deps = [
+        "//source/extensions/filters/network/thrift_proxy:config",
+        "//test/mocks/server:server_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "decoder_test",
     srcs = ["decoder_test.cc"],
     extension_name = "envoy.filters.network.thrift_proxy",
@@ -80,6 +90,19 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/thrift_proxy:decoder_lib",
         "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "filter_test",
+    srcs = ["filter_test.cc"],
+    extension_name = "envoy.filters.network.thrift_proxy",
+    deps = [
+        ":utility_lib",
+        "//source/common/stats:stats_lib",
+        "//source/extensions/filters/network/thrift_proxy:filter_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/test_common:printers_lib",
     ],
 )
 

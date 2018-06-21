@@ -167,4 +167,4 @@ such as the current time. Instead, mocks such as
 
 * [Python](https://google.github.io/styleguide/pyguide.html)
 * [Bash](https://google.github.io/styleguide/shell.xml)
-* [Bazel](https://github.com/bazelbuild/bazel/blob/master/site/versions/master/docs/skylark/build-style.md)
+* [Bazel](https://bazel.build/versions/master/docs/skylark/build-style.html)
