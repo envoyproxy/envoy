@@ -1,7 +1,7 @@
 Version history
 ---------------
 
-1.7.0 (Pending)
+1.7.0
 ===============
 * access log: added ability to log response trailers.
 * access log: added ability to format START_TIME.
