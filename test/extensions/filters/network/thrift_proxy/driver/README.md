@@ -17,9 +17,9 @@ return successful responses, IDL-defined exceptions, or server
 Envoy's thrift_proxy integration tests use the `generate_fixtures.sh`
 script to create request and response files for various combinations
 of transport, protocol, service multiplexing. In addition, the
-integration tests generate IDL and application exception
-responses. The generated data is used with the Envoy's integration
-test infrastructure to simulate downstream and upstream connections.
+integration tests generate IDL and application exception responses.
+The generated data is used with the Envoy's integration test
+infrastructure to simulate downstream and upstream connections.
 Generated files are used instead of running the client and server
 scripts directly to eliminate the need to select a Thrift upstream
 server port (or determine its self-selected port).
