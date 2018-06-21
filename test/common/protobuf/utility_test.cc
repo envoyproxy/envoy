@@ -220,6 +220,24 @@ TEST(UtilityTest, JsonConvertFail) {
                           "seconds exceeds limit for field:  seconds: -281474976710656\n");
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/3665.
+TEST(UtilityTest, JsonConvertCamelSnake) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  // Make sure we use a field eligible for snake/camel case translation.
+  bootstrap.mutable_cluster_manager()->set_local_cluster_name("foo");
+  ProtobufWkt::Struct json;
+  MessageUtil::jsonConvert(bootstrap, json);
+  // Verify we can round-trip. This didn't cause the #3665 regression, but useful as a sanity check.
+  MessageUtil::loadFromJson(MessageUtil::getJsonStringFromMessage(json, false), bootstrap);
+  // Verify we don't do a camel case conversion.
+  EXPECT_EQ("foo", json.fields()
+                       .at("cluster_manager")
+                       .struct_value()
+                       .fields()
+                       .at("local_cluster_name")
+                       .string_value());
+}
+
 TEST(DurationUtilTest, OutOfRange) {
   {
     ProtobufWkt::Duration duration;

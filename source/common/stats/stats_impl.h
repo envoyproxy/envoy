@@ -306,6 +306,35 @@ private:
 };
 
 /**
+ * Implements a StatDataAllocator that uses RawStatData -- capable of deploying
+ * in a shared memory block without internal pointers.
+ */
+class RawStatDataAllocator : public StatDataAllocator {
+public:
+  // StatDataAllocator
+  CounterSharedPtr makeCounter(const std::string& name, std::string&& tag_extracted_name,
+                               std::vector<Tag>&& tags) override;
+  GaugeSharedPtr makeGauge(const std::string& name, std::string&& tag_extracted_name,
+                           std::vector<Tag>&& tags) override;
+
+  /**
+   * @param name the full name of the stat.
+   * @return RawStatData* a raw stat data block for a given stat name or nullptr if there is no
+   *         more memory available for stats. The allocator should return a reference counted
+   *         data location by name if one already exists with the same name. This is used for
+   *         intra-process scope swapping as well as inter-process hot restart.
+   */
+  virtual RawStatData* alloc(const std::string& name) PURE;
+
+  /**
+   * Free a raw stat data block. The allocator should handle reference counting and only truly
+   * free the block if it is no longer needed.
+   * @param data the data returned by alloc().
+   */
+  virtual void free(RawStatData& data) PURE;
+};
+
+/**
  * Counter implementation that wraps a RawStatData.
  */
 class CounterImpl : public Counter, public MetricImpl {
@@ -463,9 +492,9 @@ private:
 /**
  * A stats cache template that is used by the isolated store.
  */
-template <class Base, class Impl> class IsolatedStatsCache {
+template <class Base> class IsolatedStatsCache {
 public:
-  typedef std::function<Impl*(const std::string& name)> Allocator;
+  typedef std::function<std::shared_ptr<Base>(const std::string& name)> Allocator;
 
   IsolatedStatsCache(Allocator alloc) : alloc_(alloc) {}
 
@@ -475,8 +504,8 @@ public:
       return *stat->second;
     }
 
-    Impl* new_stat = alloc_(name);
-    stats_.emplace(name, std::shared_ptr<Impl>{new_stat});
+    std::shared_ptr<Base> new_stat = alloc_(name);
+    stats_.emplace(name, new_stat);
     return *new_stat;
   }
 
@@ -491,7 +520,7 @@ public:
   }
 
 private:
-  std::unordered_map<std::string, std::shared_ptr<Impl>> stats_;
+  std::unordered_map<std::string, std::shared_ptr<Base>> stats_;
   Allocator alloc_;
 };
 
@@ -501,15 +530,19 @@ private:
 class IsolatedStoreImpl : public Store {
 public:
   IsolatedStoreImpl()
-      : counters_([this](const std::string& name) -> CounterImpl* {
-          return new CounterImpl(*alloc_.alloc(name), alloc_, std::string(name),
-                                 std::vector<Tag>());
+      : counters_([this](const std::string& name) -> CounterSharedPtr {
+          std::string tag_extracted_name = name;
+          std::vector<Tag> tags;
+          return alloc_.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
         }),
-        gauges_([this](const std::string& name) -> GaugeImpl* {
-          return new GaugeImpl(*alloc_.alloc(name), alloc_, std::string(name), std::vector<Tag>());
+        gauges_([this](const std::string& name) -> GaugeSharedPtr {
+          std::string tag_extracted_name = name;
+          std::vector<Tag> tags;
+          return alloc_.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
         }),
-        histograms_([this](const std::string& name) -> HistogramImpl* {
-          return new HistogramImpl(name, *this, std::string(name), std::vector<Tag>());
+        histograms_([this](const std::string& name) -> HistogramSharedPtr {
+          return std::make_shared<HistogramImpl>(name, *this, std::string(name),
+                                                 std::vector<Tag>());
         }) {}
 
   // Stats::Scope
@@ -552,9 +585,9 @@ private:
   };
 
   HeapRawStatDataAllocator alloc_;
-  IsolatedStatsCache<Counter, CounterImpl> counters_;
-  IsolatedStatsCache<Gauge, GaugeImpl> gauges_;
-  IsolatedStatsCache<Histogram, HistogramImpl> histograms_;
+  IsolatedStatsCache<Counter> counters_;
+  IsolatedStatsCache<Gauge> gauges_;
+  IsolatedStatsCache<Histogram> histograms_;
 };
 
 } // namespace Stats

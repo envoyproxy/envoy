@@ -66,6 +66,8 @@ public:
   Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
                               SystemTime start_time) override;
 
+  void setSampled(bool sampled) override;
+
   /**
    * @return a reference to the Zipkin::Span object.
    */

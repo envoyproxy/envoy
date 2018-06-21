@@ -4,12 +4,16 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/v2/core/http_uri.pb.h"
 #include "envoy/api/v2/core/protocol.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/message.h"
 
 #include "common/json/json_loader.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Http {
@@ -171,6 +175,22 @@ public:
    * @return string representation of the protocol.
    */
   static const std::string& getProtocolString(const Protocol p);
+
+  /**
+   * Extract host and path from a URI. The host may contain port.
+   * This function doesn't validate if the URI is valid. It only parses the URI with following
+   * format: scheme://host/path.
+   * @param the input URI string
+   * @param the output host string.
+   * @param the output path string.
+   */
+  static void extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
+                                     absl::string_view& path);
+
+  /**
+   * Prepare headers for a HttpUri.
+   */
+  static MessagePtr prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_uri);
 };
 
 } // namespace Http

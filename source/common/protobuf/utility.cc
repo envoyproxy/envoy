@@ -105,7 +105,8 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
 
 void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
   // TODO(htuch): Consolidate with the inflight cleanups here.
-  Protobuf::util::JsonOptions json_options;
+  Protobuf::util::JsonPrintOptions json_options;
+  json_options.preserve_proto_field_names = true;
   ProtobufTypes::String json;
   const auto status = Protobuf::util::MessageToJsonString(source, &json, json_options);
   if (!status.ok()) {

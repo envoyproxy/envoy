@@ -236,6 +236,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _io_opentracing_cpp()
     _com_lightstep_tracer_cpp()
     _com_github_grpc_grpc()
+    _com_github_google_jwt_verify()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
     _com_google_googletest()
@@ -454,4 +455,12 @@ def _com_github_grpc_grpc():
     native.bind(
       name = "grpc_health_proto",
       actual = "@envoy//bazel:grpc_health_proto",
+    )
+
+def _com_github_google_jwt_verify():
+    _repository_impl("com_github_google_jwt_verify")
+
+    native.bind(
+      name = "jwt_verify_lib",
+      actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
     )

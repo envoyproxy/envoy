@@ -77,8 +77,9 @@ ProtocolState DecoderStateMachine::fieldBegin(Buffer::Instance& buffer) {
 // FieldValue -> FieldEnd (via stack return state)
 ProtocolState DecoderStateMachine::fieldValue(Buffer::Instance& buffer) {
   ASSERT(!stack_.empty());
-  FieldType field_type = stack_.back().elem_type_;
-  return handleValue(buffer, field_type, popReturnState());
+
+  Frame& frame = stack_.back();
+  return handleValue(buffer, frame.elem_type_, frame.return_state_);
 }
 
 // FieldEnd -> FieldBegin
@@ -86,6 +87,8 @@ ProtocolState DecoderStateMachine::fieldEnd(Buffer::Instance& buffer) {
   if (!proto_.readFieldEnd(buffer)) {
     return ProtocolState::WaitForData;
   }
+
+  popReturnState();
 
   return ProtocolState::FieldBegin;
 }

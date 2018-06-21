@@ -255,7 +255,9 @@ public:
    *
    * E.g.,
    *
-   * findToken("hello; world", ";", "HELLO")   . true
+   * caseCompare("hello", "hello")   . true
+   * caseCompare("hello", "HELLO")   . true
+   * caseCompare("hello", "HellO")   . true
    */
   static bool caseCompare(absl::string_view lhs, absl::string_view rhs);
 

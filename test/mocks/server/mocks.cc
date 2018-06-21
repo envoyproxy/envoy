@@ -107,7 +107,8 @@ MockWorker::MockWorker() {
 MockWorker::~MockWorker() {}
 
 MockInstance::MockInstance()
-    : ssl_context_manager_(runtime_loader_), singleton_manager_(new Singleton::ManagerImpl()) {
+    : secret_manager_(new Secret::SecretManagerImpl()), ssl_context_manager_(runtime_loader_),
+      singleton_manager_(new Singleton::ManagerImpl()) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, httpTracer()).WillByDefault(ReturnRef(http_tracer_));
