@@ -304,11 +304,11 @@ TEST_P(AdsIntegrationTest, Basic) {
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   makeSingleRequest();
-  ProtobufWkt::Timestamp first_active_listener_ts_1 =
+  const ProtobufWkt::Timestamp first_active_listener_ts_1 =
       getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
-  ProtobufWkt::Timestamp first_active_cluster_ts_1 =
+  const ProtobufWkt::Timestamp first_active_cluster_ts_1 =
       getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
-  ProtobufWkt::Timestamp first_route_config_ts_1 =
+  const ProtobufWkt::Timestamp first_route_config_ts_1 =
       getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
 
   // Upgrade RDS/CDS/EDS to a newer config, validate we can process a request.
@@ -331,11 +331,11 @@ TEST_P(AdsIntegrationTest, Basic) {
       compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2", {"route_config_0"}));
 
   makeSingleRequest();
-  ProtobufWkt::Timestamp first_active_listener_ts_2 =
+  const ProtobufWkt::Timestamp first_active_listener_ts_2 =
       getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
-  ProtobufWkt::Timestamp first_active_cluster_ts_2 =
+  const ProtobufWkt::Timestamp first_active_cluster_ts_2 =
       getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
-  ProtobufWkt::Timestamp first_route_config_ts_2 =
+  const ProtobufWkt::Timestamp first_route_config_ts_2 =
       getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
 
   // Upgrade LDS/RDS, validate we can process a request.
@@ -358,11 +358,11 @@ TEST_P(AdsIntegrationTest, Basic) {
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
   makeSingleRequest();
-  ProtobufWkt::Timestamp first_active_listener_ts_3 =
+  const ProtobufWkt::Timestamp first_active_listener_ts_3 =
       getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
-  ProtobufWkt::Timestamp first_active_cluster_ts_3 =
+  const ProtobufWkt::Timestamp first_active_cluster_ts_3 =
       getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
-  ProtobufWkt::Timestamp first_route_config_ts_3 =
+  const ProtobufWkt::Timestamp first_route_config_ts_3 =
       getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
 
   // Expect last_updated timestamps to be updated in a predictable way

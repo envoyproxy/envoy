@@ -179,7 +179,6 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
       system_time_source_(system_time_source) {
-
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
@@ -505,7 +504,6 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
 
   cluster_map[cluster_reference.info()->name()] = std::make_unique<ClusterData>(
       cluster, version_info, added_via_api, std::move(new_cluster), system_time_source_);
-
   const auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
 
   // If an LB is thread aware, create it here. The LB is not initialized until cluster pre-init

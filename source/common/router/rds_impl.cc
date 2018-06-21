@@ -242,7 +242,6 @@ ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
 
   for (const auto& provider : getStaticRouteConfigProviders()) {
     ASSERT(provider->configInfo());
-
     auto* static_config = config_dump->mutable_static_route_configs()->Add();
     static_config->mutable_route_config()->MergeFrom(provider->configInfo().value().config_);
     TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
