@@ -22,6 +22,7 @@ api_proto_library(
     visibility = [
         ":friends",
     ],
+    deps = [":base"],
 )
 
 api_go_proto_library(

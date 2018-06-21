@@ -64,7 +64,7 @@ envoy_cc_library(
     hdrs = ["listen_socket.h"],
     deps = [
         "//include/envoy/network:address_interface",
-        "@envoy_api//envoy/api/v2/core:address_cc",
+        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 

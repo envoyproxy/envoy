@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.api.v2.core;
 
+import "envoy/api/v2/core/base.proto";
+
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
@@ -72,40 +74,6 @@ message TcpKeepalive {
   // The number of seconds between keep-alive probes. Default is to use the OS
   // level configuration (unless overridden, Linux defaults to 75s.)
   google.protobuf.UInt32Value keepalive_interval = 3;
-}
-
-// Generic socket option message. This would be used to set socket options that
-// might not exist in upstream kernels or precompiled Envoy binaries.
-message SocketOption {
-  // An optional name to give this socket option
-  // No special meaning is assumed.
-  string readable_name = 1;
-  // Corresponding to the level value passed to setsockopt, such as IPPROTO_TCP
-  int32 level = 2;
-  // The numeric name as passed to setsockopt
-  int32 name = 3;
-  // The setsockopt option value. Integers should be encoded in network byte order.
-  oneof value {
-    option (validate.required) = true;
-
-    // Because many sockopts take an int value.
-    int32 int = 4;
-    // Otherwise it's a byte buffer.
-    bytes buf = 5;
-  }
-  enum SocketState {
-    option (gogoproto.goproto_enum_prefix) = false;
-    // Socket options are applied after socket creation but before binding the socket to a port
-    STATE_PREBIND = 0;
-    // Socket options are applied after binding the socket to a port but before calling listen()
-    STATE_BOUND = 1;
-    // Socket options are applied after calling listen()
-    STATE_LISTENING = 2;
-  }
-  // For listeners the option can only be used on sockets in the given state.
-  // For BindConfig, state is ignored.
-  SocketState state = 6
-      [(validate.rules).message.required = true, (validate.rules).enum.defined_only = true];
 }
 
 message BindConfig {

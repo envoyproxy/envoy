@@ -3,7 +3,7 @@
 #include <memory>
 #include <vector>
 
-#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
