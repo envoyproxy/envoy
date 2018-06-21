@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/secret/secret_manager.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/empty_string.h"

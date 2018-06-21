@@ -13,9 +13,10 @@ A logged warning is expected for each deprecated item that is in deprecation win
   is deprecated, in favor of the proto defined in
   [date-plane-api](https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/ratelimit/v2/rls.proto)
   Prior to 1.8.0, Envoy can use either proto to send client requests to a ratelimit server with the use of the
-  `use_data_plane_proto` boolean flag in the [ratelimit configuration](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/ratelimit/v2/rls.proto). 
+  `use_data_plane_proto` boolean flag in the [ratelimit configuration](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/ratelimit/v2/rls.proto).
+  However, when using the deprecated client a warning is logged.
 
-## Version 1.7.0 (pending)
+## Version 1.7.0
 
 * Admin mutations should be sent as POSTs rather than GETs. HTTP GETs will result in an error
   status code and will not have their intended effect. Prior to 1.7, GETs can be used for

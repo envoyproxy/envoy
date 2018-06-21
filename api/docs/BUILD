@@ -32,6 +32,7 @@ proto_library(
         "//envoy/config/filter/http/ext_authz/v2alpha:ext_authz",
         "//envoy/config/filter/http/fault/v2:fault",
         "//envoy/config/filter/http/gzip/v2:gzip",
+        "//envoy/config/filter/http/header_to_metadata/v2:header_to_metadata",
         "//envoy/config/filter/http/health_check/v2:health_check",
         "//envoy/config/filter/http/ip_tagging/v2:ip_tagging",
         "//envoy/config/filter/http/lua/v2:lua",

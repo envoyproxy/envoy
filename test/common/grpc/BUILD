@@ -82,6 +82,7 @@ envoy_cc_test_library(
     hdrs = ["grpc_client_integration.h"],
     deps = [
         "//source/common/common:assert_lib",
+        "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
     ],
 )

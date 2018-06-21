@@ -120,6 +120,10 @@ void OpenTracingSpan::injectContext(Http::HeaderMap& request_headers) {
   }
 }
 
+void OpenTracingSpan::setSampled(bool sampled) {
+  span_->SetTag(opentracing::ext::sampling_priority, sampled ? 1 : 0);
+}
+
 Tracing::SpanPtr OpenTracingSpan::spawnChild(const Tracing::Config&, const std::string& name,
                                              SystemTime start_time) {
   std::unique_ptr<opentracing::Span> ot_span = span_->tracer().StartSpan(
