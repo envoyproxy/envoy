@@ -158,6 +158,9 @@ message HeaderFilter {
 // A list of the response flags can be found
 // in the access log formatter :ref:`documentation<config_access_log_format_response_flags>`.
 message ResponseFlagFilter {
+  // Only responses with the any of the flags listed in this field will be logged.
+  // This field is optional if it is not specified, then any response flag will pass
+  // the filter check.
   repeated string flags = 1 [(validate.rules).repeated .items.string = {
     in: ["LH", "UH", "UT", "LR", "UR", "UF", "UC", "UO", "NR", "DI", "FI", "RL", "UAEX"]
   }];
