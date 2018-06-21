@@ -320,7 +320,7 @@ public:
    * @param timestamp a pointer to the mutable protobuf member to be written into.
    */
   static void systemClockToTimestamp(const SystemTime system_clock_time,
-                                     google::protobuf::Timestamp& timestamp);
+                                     ProtobufWkt::Timestamp& timestamp);
 };
 
 } // namespace Envoy

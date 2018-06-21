@@ -271,7 +271,6 @@ public:
   };
   SystemTimeSource& systemTimeSource() override { return parent_.system_time_source_; }
   void ensureSocketOptions() {
-    last_updated_ = systemTimeSource().currentTime();
     if (!listen_socket_options_) {
       listen_socket_options_ =
           std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
