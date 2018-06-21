@@ -31,8 +31,9 @@ const char PublicKey[] = R"(
 
 // A good config.
 const char ExampleConfig[] = R"(
-rules:
-  - issuer: https://example.com
+providers:
+  example_provider:
+    issuer: https://example.com
     audiences:
     - example_service
     - http://example_service1
@@ -47,6 +48,9 @@ rules:
         seconds: 600
     forward_payload_header: sec-istio-auth-userinfo
 )";
+
+// The name of provider for above config.
+const char ProviderName[] = "example_provider";
 
 // Payload:
 // {"iss":"https://example.com","sub":"test@example.com","aud":"example_service","exp":2001001001}
