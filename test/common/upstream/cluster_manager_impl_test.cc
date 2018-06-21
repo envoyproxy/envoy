@@ -20,6 +20,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -87,6 +88,8 @@ public:
                                                       local_info, log_manager, admin)};
   }
 
+  Secret::SecretManager& secretManager() override { return secret_manager_; }
+
   MOCK_METHOD8(clusterManagerFromProto_,
                ClusterManager*(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
                                Stats::Store& stats, ThreadLocal::Instance& tls,
@@ -109,6 +112,7 @@ public:
   Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
   NiceMock<Event::MockDispatcher> dispatcher_;
   LocalInfo::MockLocalInfo local_info_;
+  Secret::MockSecretManager secret_manager_;
 };
 
 class ClusterManagerImplTest : public testing::Test {

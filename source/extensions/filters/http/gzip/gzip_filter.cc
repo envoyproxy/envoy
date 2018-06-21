@@ -38,6 +38,7 @@ const std::vector<std::string>& defaultContentEncoding() {
 } // namespace
 
 GzipFilterConfig::GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip,
+                                   const std::string& stats_prefix, Stats::Scope& scope,
                                    Runtime::Loader& runtime)
     : compression_level_(compressionLevelEnum(gzip.compression_level())),
       compression_strategy_(compressionStrategyEnum(gzip.compression_strategy())),
@@ -46,7 +47,8 @@ GzipFilterConfig::GzipFilterConfig(const envoy::config::filter::http::gzip::v2::
       window_bits_(windowBitsUint(gzip.window_bits().value())),
       content_type_values_(contentTypeSet(gzip.content_type())),
       disable_on_etag_header_(gzip.disable_on_etag_header()),
-      remove_accept_encoding_header_(gzip.remove_accept_encoding_header()), runtime_(runtime) {}
+      remove_accept_encoding_header_(gzip.remove_accept_encoding_header()),
+      stats_(generateStats(stats_prefix + "gzip.", scope)), runtime_(runtime) {}
 
 Compressor::ZlibCompressorImpl::CompressionLevel GzipFilterConfig::compressionLevelEnum(
     envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum compression_level) {
@@ -108,6 +110,8 @@ Http::FilterHeadersStatus GzipFilter::decodeHeaders(Http::HeaderMap& headers, bo
     if (config_->removeAcceptEncodingHeader()) {
       headers.removeAcceptEncoding();
     }
+  } else {
+    config_->stats().not_compressed_.inc();
   }
 
   return Http::FilterHeadersStatus::Continue;
@@ -123,16 +127,19 @@ Http::FilterHeadersStatus GzipFilter::encodeHeaders(Http::HeaderMap& headers, bo
     headers.insertContentEncoding().value(Http::Headers::get().ContentEncodingValues.Gzip);
     compressor_.init(config_->compressionLevel(), config_->compressionStrategy(),
                      config_->windowBits(), config_->memoryLevel());
-  } else {
+    config_->stats().compressed_.inc();
+  } else if (!skip_compression_) {
     skip_compression_ = true;
+    config_->stats().not_compressed_.inc();
   }
-
   return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterDataStatus GzipFilter::encodeData(Buffer::Instance& data, bool end_stream) {
   if (!skip_compression_) {
+    config_->stats().total_uncompressed_bytes_.add(data.length());
     compressor_.compress(data, end_stream ? Compressor::State::Finish : Compressor::State::Flush);
+    config_->stats().total_compressed_bytes_.add(data.length());
   }
   return Http::FilterDataStatus::Continue;
 }
@@ -163,19 +170,38 @@ bool GzipFilter::isAcceptEncodingAllowed(Http::HeaderMap& headers) const {
       const auto q_value = StringUtil::trim(StringUtil::cropLeft(token, ";"));
       // If value is the gzip coding, check the qvalue and return.
       if (value == Http::Headers::get().AcceptEncodingValues.Gzip) {
-        return !StringUtil::caseCompare(q_value, ZeroQvalueString);
+        const bool is_gzip = !StringUtil::caseCompare(q_value, ZeroQvalueString);
+        if (is_gzip) {
+          config_->stats().header_gzip_.inc();
+          return true;
+        }
+        config_->stats().header_not_valid_.inc();
+        return false;
       }
-      // If value is the identity coding, just check the qvalue and return.
+      // If value is the identity coding, return false. The data should
+      // not be transformed in this case.
+      // https://www.w3.org/Protocols/rfc2616/rfc2616-sec3.html#sec3.5.
       if (value == Http::Headers::get().AcceptEncodingValues.Identity) {
-        return !StringUtil::caseCompare(q_value, ZeroQvalueString);
+        config_->stats().header_identity_.inc();
+        return false;
       }
+      // Otherwise, check if the header contains the wildcard. If so,
+      // mark as true. Use this as the very last resort, as gzip or
+      // identity is weighted higher. Note that this filter disregards
+      // order/priority at this time.
       if (value == Http::Headers::get().AcceptEncodingValues.Wildcard) {
         is_wildcard = !StringUtil::caseCompare(q_value, ZeroQvalueString);
       }
     }
-    // If neither identity nor gzip codings are present, we return the wildcard.
-    return is_wildcard;
+    // If neither identity nor gzip codings are present, return the result of the wildcard.
+    if (is_wildcard) {
+      config_->stats().header_wildcard_.inc();
+      return true;
+    }
+    config_->stats().header_not_valid_.inc();
+    return false;
   }
+  config_->stats().no_accept_header_.inc();
   // If no accept-encoding header is present, return false.
   return false;
 }
@@ -191,15 +217,24 @@ bool GzipFilter::isContentTypeAllowed(Http::HeaderMap& headers) const {
 }
 
 bool GzipFilter::isEtagAllowed(Http::HeaderMap& headers) const {
-  return !(config_->disableOnEtagHeader() && headers.Etag());
+  const bool is_etag_allowed = !(config_->disableOnEtagHeader() && headers.Etag());
+  if (!is_etag_allowed) {
+    config_->stats().not_compressed_etag_.inc();
+  }
+  return is_etag_allowed;
 }
 
 bool GzipFilter::isMinimumContentLength(Http::HeaderMap& headers) const {
   const Http::HeaderEntry* content_length = headers.ContentLength();
   if (content_length) {
     uint64_t length;
-    return StringUtil::atoul(content_length->value().c_str(), length) &&
-           length >= config_->minimumLength();
+    const bool is_minimum_content_length =
+        StringUtil::atoul(content_length->value().c_str(), length) &&
+        length >= config_->minimumLength();
+    if (!is_minimum_content_length) {
+      config_->stats().content_length_too_small_.inc();
+    }
+    return is_minimum_content_length;
   }
 
   const Http::HeaderEntry* transfer_encoding = headers.TransferEncoding();

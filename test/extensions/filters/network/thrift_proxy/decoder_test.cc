@@ -153,12 +153,18 @@ TEST_P(DecoderStateMachineValueTest, NoFieldValueData) {
       .WillOnce(DoAll(SetArgReferee<1>(std::string("")), SetArgReferee<2>(field_type),
                       SetArgReferee<3>(1), Return(true)));
   expectValue(proto, field_type, false);
+  expectValue(proto, field_type, true);
+  EXPECT_CALL(proto, readFieldEnd(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(proto, readFieldBegin(Ref(buffer), _, _, _)).WillOnce(Return(false));
 
   DecoderStateMachine dsm(proto);
 
   dsm.setCurrentState(ProtocolState::FieldBegin);
   EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
   EXPECT_EQ(dsm.currentState(), ProtocolState::FieldValue);
+
+  EXPECT_EQ(dsm.run(buffer), ProtocolState::WaitForData);
+  EXPECT_EQ(dsm.currentState(), ProtocolState::FieldBegin);
 }
 
 TEST_P(DecoderStateMachineValueTest, FieldValue) {

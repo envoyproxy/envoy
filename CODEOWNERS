@@ -6,3 +6,5 @@
 /*/extensions/filters/network/thrift_proxy @zuercher @brian-pane
 # jwt_authn http filter extension
 /*/extensions/filters/http/jwt_authn @qiwzhang @lizan
+# header_to_metadata extension
+/*/extensions/filters/http/header_to_metadata @rgs1 @zuercher
