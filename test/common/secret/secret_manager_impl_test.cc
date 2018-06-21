@@ -25,12 +25,12 @@ TEST_F(SecretManagerImplTest, SecretLoadSuccess) {
 name: "abc.com"
 tls_certificate:
   certificate_chain:
-    filename: "test/common/ssl/test_data/selfsigned_cert.pem"
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
   private_key:
-    filename: "test/common/ssl/test_data/selfsigned_key.pem"
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
 )EOF";
 
-  MessageUtil::loadFromYaml(yaml, secret_config);
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
 
@@ -40,13 +40,13 @@ tls_certificate:
 
   ASSERT_NE(secret_manager->findTlsCertificate("abc.com"), nullptr);
 
-  EXPECT_EQ(
-      TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_cert.pem"),
-      secret_manager->findTlsCertificate("abc.com")->certificateChain());
+  const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
+            secret_manager->findTlsCertificate("abc.com")->certificateChain());
 
-  EXPECT_EQ(
-      TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_key.pem"),
-      secret_manager->findTlsCertificate("abc.com")->privateKey());
+  const std::string key_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
+            secret_manager->findTlsCertificate("abc.com")->privateKey());
 }
 
 TEST_F(SecretManagerImplTest, NotImplementedException) {
@@ -57,10 +57,10 @@ TEST_F(SecretManagerImplTest, NotImplementedException) {
 name: "abc.com"
 session_ticket_keys:
   keys:
-    - filename: "test/common/ssl/test_data/selfsigned_cert.pem"
+    - filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
 )EOF";
 
-  MessageUtil::loadFromYaml(yaml, secret_config);
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
 
