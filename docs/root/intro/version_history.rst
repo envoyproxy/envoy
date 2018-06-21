@@ -4,8 +4,6 @@ Version history
 1.7.0 (Pending)
 ===============
 
-* ext-authz filter: added support to raw HTTP authorizationg.
-* ext-authz filter: added support to gRPC responses to carry HTTP attributes. 
 * access log: added ability to log response trailers.
 * access log: added ability to format START_TIME.
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
@@ -36,6 +34,8 @@ Version history
   connections from hosts after they are removed from service discovery, regardless of health status.
 * cluster: fixed bug preventing the deletion of all endpoints in a priority
 * debug: added symbolized stack traces (where supported)
+* ext-authz filter: added support to raw HTTP authorization.
+* ext-authz filter: added support to gRPC responses to carry HTTP attributes.
 * grpc: support added for the full set of :ref:`Google gRPC call credentials
   <envoy_api_msg_core.GrpcService.GoogleGrpc.CallCredentials>`.
 * health check: added ability to set :ref:`additional HTTP headers

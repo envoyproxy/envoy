@@ -47,7 +47,7 @@ public:
   Stats::Scope& scope() { return scope_; }
   std::string cluster() { return cluster_name_; }
   Upstream::ClusterManager& cm() { return cm_; }
-  std::vector<Http::LowerCaseString> responseHeadersToRemove() {
+  const std::vector<Http::LowerCaseString>& responseHeadersToRemove() {
     return response_headers_to_remove_;
   }
   bool failureModeAllow() const { return failure_mode_allow_; }

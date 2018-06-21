@@ -29,10 +29,10 @@ message CheckRequest {
   AttributeContext attributes = 1;
 }
 
-// Http attributes for a denied response.
+// HTTP attributes for a denied response.
 message DeniedHttpResponse {
   // This field allows the authorization service to send a HTTP response status
-  // code to the downstream client other that 403 (Forbidden).
+  // code to the downstream client other than 403 (Forbidden).
   envoy.type.HttpStatus status = 1 [(validate.rules).message.required = true];
 
   // This field allows the authorization service to send HTTP response headers
@@ -44,9 +44,9 @@ message DeniedHttpResponse {
   string body = 3;
 }
 
-// Http attributes for an ok response.
+// HTTP attributes for an ok response.
 message OkHttpResponse {
-  // Http entity headers in addition to the original request headers. This allows the authorization 
+  // HTTP entity headers in addition to the original request headers. This allows the authorization 
   // service to append, to add or to override headers from the original request before
   // dispatching it to the upstream. By setting `append` field to `true` in the `HeaderValueOption`,
   // the filter will append the correspondent header value to the matched request header. Note that 

@@ -133,8 +133,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       for (const auto& header : response->headers_to_append) {
         Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
         if (header_to_modify) {
-          header_to_modify->value().append(", ", 2);
-          header_to_modify->value().append(header.second.c_str(), header.second.size());
+          Http::HeaderMapImpl::appendToHeader(header_to_modify->value(), header.second);
           ENVOY_STREAM_LOG(trace, "Ext_authz ok response appended header '{}':'{}'", *callbacks_,
                            header.first.get(), header.second);
         }

@@ -1,8 +1,5 @@
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
-#include "envoy/access_log/access_log.h"
-#include "envoy/ssl/connection.h"
-
 #include "common/common/assert.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/http/headers.h"

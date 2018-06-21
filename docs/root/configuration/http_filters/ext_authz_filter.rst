@@ -38,6 +38,8 @@ A sample filter configuration for a gRPC authorization server:
            envoy_grpc:
              cluster_name: ext-authz
 
+.. code-block:: yaml
+
   clusters:
     - name: ext-authz
       type: static
@@ -58,7 +60,9 @@ A sample filter configuration for a raw HTTP authorization server:
               cluster: ext-authz
               timeout: 0.25s
               failure_mode_allow: false
-
+  
+.. code-block:: yaml
+  
   clusters:
     - name: ext-authz
       connect_timeout: 0.25s
