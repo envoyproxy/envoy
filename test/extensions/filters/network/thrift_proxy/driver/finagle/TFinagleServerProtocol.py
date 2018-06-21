@@ -1,9 +1,11 @@
 from thrift.protocol import TBinaryProtocol
 from gen.twitter.finagle.thrift.ttypes import (RequestHeader, ResponseHeader)
 
+
 class TFinagleServerProtocolFactory(object):
     def getProtocol(self, trans):
         return TFinagleServerProtocol(trans)
+
 
 class TFinagleServerProtocol(TBinaryProtocol.TBinaryProtocol):
     def __init__(self, *args, **kw):
@@ -19,7 +21,7 @@ class TFinagleServerProtocol(TBinaryProtocol.TBinaryProtocol):
 
     def writeMessageBegin(self, *args, **kwargs):
         if self._upgraded:
-            header = ResponseHeader() # .. TODO set some fields
+            header = ResponseHeader()  # .. TODO set some fields
             header.write(self)
         return TBinaryProtocol.TBinaryProtocol.writeMessageBegin(self, *args, **kwargs)
 

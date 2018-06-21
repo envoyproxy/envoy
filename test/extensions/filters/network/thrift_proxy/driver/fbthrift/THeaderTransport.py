@@ -47,6 +47,7 @@ from thrift.transport.TTransport import TTransportException, TTransportBase, CRe
 BINARY_PROTO_ID = 0x80
 COMPACT_PROTO_ID = 0x82
 
+
 # INFO:(zuercher): Copied from:
 # https://github.com/facebook/fbthrift/blob/b090870/thrift/lib/py/protocol/TCompactProtocol.py
 def getVarint(n):
@@ -63,6 +64,7 @@ def getVarint(n):
     else:
         return b''.join(map(chr, out))
 
+
 # INFO:(zuercher): Copied from
 # https://github.com/facebook/fbthrift/blob/b090870/thrift/lib/py/protocol/TCompactProtocol.py
 def readVarint(trans):
@@ -75,6 +77,7 @@ def readVarint(trans):
         if byte >> 7 == 0:
             return result
         shift += 7
+
 
 # Import the snappy module if it is available
 try:

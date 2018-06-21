@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import os
 import argparse
 import logging
 import sys
@@ -17,6 +16,7 @@ from thrift.transport import TSocket
 from thrift.transport import TTransport
 from fbthrift import THeaderTransport
 from finagle import TFinagleServerProcessor, TFinagleServerProtocol
+
 
 class SuccessHandler:
     def ping(self):
@@ -42,6 +42,7 @@ class SuccessHandler:
                 setattr(the_works, field, value)
         return Result(the_works)
 
+
 class IDLExceptionHandler:
     def ping(self):
         print("server: ping()")
@@ -57,6 +58,7 @@ class IDLExceptionHandler:
     def execute(self, param):
         print("server: app error: execute failed")
         raise AppException("execute failed")
+
 
 class ExceptionHandler:
     def ping(self):
@@ -86,6 +88,7 @@ class ExceptionHandler:
             type=Thrift.TApplicationException.INTERNAL_ERROR,
             message="for execute",
         )
+
 
 def main(cfg):
     if cfg.unix:
@@ -119,7 +122,7 @@ def main(cfg):
         processor = TFinagleServerProcessor.TFinagleServerProcessor(processor)
 
     if cfg.unix:
-        transport = TSocket.TServerSocket(unix_socket = cfg.addr)
+        transport = TSocket.TServerSocket(unix_socket=cfg.addr)
     else:
         transport = TSocket.TServerSocket(host=host, port=int(port))
 
@@ -169,7 +172,7 @@ if __name__ == "__main__":
         dest="addr",
         default=":0",
         help="Listener address for server in the form host:port. The host is optional. If --unix" +
-            " is set, the address is the socket name.",
+             " is set, the address is the socket name.",
     )
     parser.add_argument(
         "-m",

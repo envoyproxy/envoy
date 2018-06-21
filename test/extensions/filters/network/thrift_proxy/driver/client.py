@@ -1,21 +1,23 @@
 #!/usr/bin/env python
 
-import os
 import argparse
 import io
 import sys
 
 from generated.example import Example
 from generated.example.ttypes import (
-    Param, Result, TheWorks, AppException
+    Param, TheWorks, AppException
 )
 
 from thrift import Thrift
-from thrift.protocol import TBinaryProtocol, TCompactProtocol, TJSONProtocol, TMultiplexedProtocol
+from thrift.protocol import (
+    TBinaryProtocol, TCompactProtocol, TJSONProtocol, TMultiplexedProtocol
+)
 from thrift.transport import TSocket
 from thrift.transport import TTransport
 from fbthrift import THeaderTransport
 from twitter.common.rpc.finagle.protocol import TFinagleProtocol
+
 
 class TRecordingTransport(TTransport.TTransportBase):
     def __init__(self, underlying, writehandle, readhandle):
@@ -114,20 +116,20 @@ def main(cfg, reqhandle, resphandle):
             print("client: added {0} + {1} = {2}".format(a, b, v))
         elif cfg.method == "execute":
             param = Param(
-                return_fields = cfg.params,
-                the_works = TheWorks(
-                    field_1 = True,
-                    field_2 = 0x7f,
-                    field_3 = 0x7fff,
-                    field_4 = 0x7fffffff,
-                    field_5 = 0x7fffffffffffffff,
-                    field_6 = -1.5,
-                    field_7 = u"string is UTF-8: \U0001f60e",
-                    field_8 = b"binary is bytes: \x80\x7f\x00\x01",
-                    field_9 = { 1: "one", 2: "two", 3: "three" },
-                    field_10 = [ 1, 2, 4, 8 ],
-                    field_11 = set(["a", "b", "c"]),
-                    field_12 = False,
+                return_fields=cfg.params,
+                the_works=TheWorks(
+                    field_1=True,
+                    field_2=0x7f,
+                    field_3=0x7fff,
+                    field_4=0x7fffffff,
+                    field_5=0x7fffffffffffffff,
+                    field_6=-1.5,
+                    field_7=u"string is UTF-8: \U0001f60e",
+                    field_8=b"binary is bytes: \x80\x7f\x00\x01",
+                    field_9={1: "one", 2: "two", 3: "three"},
+                    field_10=[1, 2, 4, 8],
+                    field_11=set(["a", "b", "c"]),
+                    field_12=False,
                 )
             )
 
@@ -173,7 +175,7 @@ if __name__ == "__main__":
         dest="addr",
         required=True,
         help="Target address for requests in the form host:port. The host is optional. If --unix" +
-            " is set, the address is the socket name.",
+             " is set, the address is the socket name.",
     )
     parser.add_argument(
         "-m",
