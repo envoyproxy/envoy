@@ -214,9 +214,14 @@ message DogStatsdSink {
 message HystrixSink {
   // The number of buckets the rolling statistical window is divided into.
   //
-  // Every flush of the sink, statistics are being sampled, and the stream outputs
-  // aggregated data from the last rolling_window time frame, where rolling_window =
-  // stats_flush_interval * num_of_buckets. More detailed explanation can be found in `Hystix wiki
+  // Each time the sink is flushed, all relevant Envoy statistics are sampled and
+  // added to the rolling window (removing the oldest samples in the window
+  // in the process). The sink then outputs the aggregate statistics across the
+  // current rolling window to the event stream(s).
+  //
+  // rolling_window(ms) = stats_flush_interval(ms) * num_of_buckets
+  //
+  // More detailed explanation can be found in `Hystix wiki
   // <https://github.com/Netflix/Hystrix/wiki/Metrics-and-Monitoring#hystrixrollingnumber>`_.
   int64 num_buckets = 1;
 }

@@ -315,22 +315,23 @@ The fields are:
 
 .. http:get:: /hystrix_event_stream
 
-  Starts streaming statistics from envoy in 
+  This endpoint is intended to be used as the stream source for
+  `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
+  a GET to this endpoint will trriger a stream of statistics from envoy in 
   `text/event-stream <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_ 
-  formatted stream for use by 
-  `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_. 
-  Hystrix dashobard is used for monitoring resiliency related metrics.
-
-  To start getting the stream from Envoy in Hystrix dashboard, this endpoint should be specified as 
-  its stream source.
+  format, as expected by the Hystrix dashboard. 
+  
+  If invoked from a browser or a terminal, the response will be shown as a continous stream, 
+  sent in intervals defined by the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` 
+  :ref:`stats_flush_interval <envoy_api_field_config.bootstrap.v2.Bootstrap.stats_flush_interval>`
 
   This handler is enabled only when a Hystrix sink is enabled in the config file as documented
   :ref:`here <envoy_api_msg_config.metrics.v2.HystrixSink>`.
   
-  As Envoy's and Hystrix resiliency mechanisms differ, some of the statistics showed in the dashboard 
+  As Envoy's and Hystrix resiliency mechanisms differ, some of the statistics shown in the dashboard 
   had to be adapted:
   
-  * **Thread pool rejections** - Are generally similar to what's called short circuited in Envoy, 
+  * **Thread pool rejections** - Generally similar to what's called short circuited in Envoy, 
     and counted by *upstream_rq_pending_overflow*, although the term thread pool is not accurate for 
     Envoy. Both in Hystrix and Envoy, the result is rejected requests which are not passed upstream. 
   * **circuit breaker status (closed or open)** - Since in Envoy, a circuit is opened based on the 
