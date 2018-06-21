@@ -51,10 +51,9 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildIpTransparentOptions(
 
 std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
     const Protobuf::RepeatedPtrField<envoy::api::v2::core::SocketOption>& socket_options) {
-  std::unique_ptr<Socket::Options> options = absl::make_unique<Socket::Options>();
-  std::string buf;
+  auto options = absl::make_unique<Socket::Options>();
   for (const auto& socket_option : socket_options) {
-    buf.clear();
+    std::string buf;
     int int_value;
     switch (socket_option.value_case()) {
     case envoy::api::v2::core::SocketOption::kIntValue:
@@ -65,10 +64,11 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildLiteralOptions(
       buf.append(socket_option.buf_value());
       break;
     default:
-      ENVOY_LOG(warn, "Socket option specified with no value: {}", socket_option.DebugString());
+      ENVOY_LOG(warn, "Socket option specified with no or uknown value: {}",
+                socket_option.DebugString());
       continue;
     }
-    options->push_back(std::make_shared<Network::SocketOptionImpl>(
+    options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
         socket_option.state(),
         Network::SocketOptionName(std::make_pair(socket_option.level(), socket_option.name())),
         buf));
