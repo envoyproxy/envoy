@@ -254,7 +254,8 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   }
 
   std::string rolling_map = sink_->printRollingWindows();
-  EXPECT_NE(std::string::npos, rolling_map.find(cluster1_name_ + ".total"));
+  EXPECT_NE(std::string::npos, rolling_map.find(cluster1_name_ + ".total"))
+      << "cluster1_name = " << cluster1_name_;
 
   // Check stream format and data.
   validateResults(TestUtility::bufferToString(buffer), success_step,
@@ -338,8 +339,10 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
 
   std::unordered_map<std::string, std::string> cluster_message_map =
       buildClusterMap(TestUtility::bufferToString(buffer));
-  ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end());
-  ASSERT_NE(cluster_message_map.find(cluster2_name), cluster_message_map.end());
+  ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end())
+      << "cluster1_name = " << cluster1_name_;
+  ASSERT_NE(cluster_message_map.find(cluster2_name), cluster_message_map.end())
+      << "cluster2_name = " << cluster2_name;
 
   // Check stream format and data.
   validateResults(cluster_message_map[cluster1_name_], success_step, error_step, timeout_step, 0, 0,
@@ -354,8 +357,10 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   sink_->flush(source_);
 
   cluster_message_map = buildClusterMap(TestUtility::bufferToString(buffer));
-  ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end());
-  ASSERT_EQ(cluster_message_map.find(cluster2_name), cluster_message_map.end());
+  ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end())
+      << "cluster1_name = " << cluster1_name_;
+  ASSERT_EQ(cluster_message_map.find(cluster2_name), cluster_message_map.end())
+      << "cluster2_name = " << cluster2_name;
 
   // Add cluster again.
   buffer.drain(buffer.length());
@@ -365,8 +370,10 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   sink_->flush(source_);
 
   cluster_message_map = buildClusterMap(TestUtility::bufferToString(buffer));
-  ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end());
-  ASSERT_NE(cluster_message_map.find(cluster2_name), cluster_message_map.end());
+  ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end())
+      << "cluster1_name = " << cluster1_name_;
+  ASSERT_NE(cluster_message_map.find(cluster2_name), cluster_message_map.end())
+      << "cluster2_name = " << cluster2_name;
 
   // Check that old values of test_cluster2 were deleted.
   validateResults(cluster_message_map[cluster2_name], 0, 0, 0, 0, 0, window_size_);
