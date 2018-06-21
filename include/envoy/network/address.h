@@ -150,8 +150,8 @@ public:
   /**
    * Create a socket for this address.
    * @param type supplies the socket type to create.
-   * @return the file descriptor naming the socket for success and -1 for failure. The error 
-   * code associated with a failure will be accessible in a plaform dependent fashion (e.g. 
+   * @return the file descriptor naming the socket for success and -1 for failure. The error
+   * code associated with a failure will be accessible in a plaform dependent fashion (e.g.
    * errno for Unix platforms).
    */
   virtual int socket(SocketType type) const PURE;
