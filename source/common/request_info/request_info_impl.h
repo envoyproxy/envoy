@@ -127,7 +127,9 @@ struct RequestInfoImpl : public RequestInfo {
 
   void setResponseFlag(ResponseFlag response_flag) override { response_flags_ |= response_flag; }
 
-  bool intersectResponseFlags(uint64_t response_flags) const override { return (response_flags_ & response_flags) != 0; }
+  bool intersectResponseFlags(uint64_t response_flags) const override {
+    return (response_flags_ & response_flags) != 0;
+  }
 
   bool getResponseFlag(ResponseFlag flag) const override { return response_flags_ & flag; }
 

@@ -72,7 +72,7 @@ FilterFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLogFi
   case envoy::config::filter::accesslog::v2::AccessLogFilter::kHeaderFilter:
     return FilterPtr{new HeaderFilter(config.header_filter())};
   case envoy::config::filter::accesslog::v2::AccessLogFilter::kResponseFlagFilter:
-    //MessageUtil::validate(config);
+    MessageUtil::validate(config);
     return FilterPtr{new ResponseFlagFilter(config.response_flag_filter())};
   default:
     NOT_REACHED;
@@ -183,7 +183,11 @@ bool HeaderFilter::evaluate(const RequestInfo::RequestInfo&,
 ResponseFlagFilter::ResponseFlagFilter(
     const envoy::config::filter::accesslog::v2::ResponseFlagFilter& config) {
   for (int i = 0; i < config.flags_size(); i++) {
-    info_.setResponseFlag(RequestInfo::ResponseFlagUtils::toResponseFlag(config.flags(i)));
+    absl::optional<RequestInfo::ResponseFlag> response_flag =
+        RequestInfo::ResponseFlagUtils::toResponseFlag(config.flags(i));
+    // The config has been validated. Therefore, every flag in the config will have a mapping.
+    RELEASE_ASSERT(response_flag.has_value());
+    info_.setResponseFlag(response_flag.value());
   }
 }
 

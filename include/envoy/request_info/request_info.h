@@ -71,7 +71,8 @@ public:
 
   /**
    * @param response_flags the response_flags to intersect with.
-   * @return true if the intersection of the response_flags argument and the currently set response flags is non-empty.
+   * @return true if the intersection of the response_flags argument and the currently set response
+   * flags is non-empty.
    */
   virtual bool intersectResponseFlags(uint64_t response_flags) const PURE;
 

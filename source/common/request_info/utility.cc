@@ -88,10 +88,28 @@ const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_in
   return result.empty() ? NONE : result;
 }
 
-ResponseFlag ResponseFlagUtils::toResponseFlag(const std::string&) {
+absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(const std::string& flag) {
   static const std::map<std::string, ResponseFlag> map = {
-      {ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK, ResponseFlag::FailedLocalHealthCheck}};
-  return map.find(ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK)->second;
+      {ResponseFlagUtils::FAILED_LOCAL_HEALTH_CHECK, ResponseFlag::FailedLocalHealthCheck},
+      {ResponseFlagUtils::NO_HEALTHY_UPSTREAM, ResponseFlag::NoHealthyUpstream},
+      {ResponseFlagUtils::UPSTREAM_REQUEST_TIMEOUT, ResponseFlag::UpstreamRequestTimeout},
+      {ResponseFlagUtils::LOCAL_RESET, ResponseFlag::LocalReset},
+      {ResponseFlagUtils::UPSTREAM_REMOTE_RESET, ResponseFlag::UpstreamRemoteReset},
+      {ResponseFlagUtils::UPSTREAM_CONNECTION_FAILURE, ResponseFlag::UpstreamConnectionFailure},
+      {ResponseFlagUtils::UPSTREAM_CONNECTION_TERMINATION,
+       ResponseFlag::UpstreamConnectionTermination},
+      {ResponseFlagUtils::UPSTREAM_OVERFLOW, ResponseFlag::UpstreamOverflow},
+      {ResponseFlagUtils::NO_ROUTE_FOUND, ResponseFlag::NoRouteFound},
+      {ResponseFlagUtils::DELAY_INJECTED, ResponseFlag::DelayInjected},
+      {ResponseFlagUtils::FAULT_INJECTED, ResponseFlag::FaultInjected},
+      {ResponseFlagUtils::RATE_LIMITED, ResponseFlag::RateLimited},
+      {ResponseFlagUtils::UNAUTHORIZED_EXTERNAL_SERVICE, ResponseFlag::UnauthorizedExternalService},
+  };
+  const auto& it = map.find(flag);
+  if (it != map.end()) {
+    return absl::make_optional<ResponseFlag>(it->second);
+  }
+  return absl::nullopt;
 }
 
 const std::string&
