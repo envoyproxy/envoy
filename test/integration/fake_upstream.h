@@ -345,8 +345,12 @@ class FakeRawConnection : Logger::Loggable<Logger::Id::testing>, public FakeConn
 public:
   FakeRawConnection(SharedConnectionWrapper& shared_connection)
       : FakeConnectionBase(shared_connection) {}
+  typedef const std::function<bool(const std::string&)> ValidatorFunction;
 
   std::string waitForData(uint64_t num_bytes);
+  // Wait until data_validator returns true.
+  // example usage: waitForData(FakeRawConnection::waitForInexactMatch("foo"));
+  std::string waitForData(const ValidatorFunction& data_validator);
   void write(const std::string& data, bool end_stream = false);
 
   void initialize() override {
@@ -354,6 +358,15 @@ public:
       connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
     });
     FakeConnectionBase::initialize();
+  }
+
+  // Creates a ValidatorFunction which returns true when data_to_wait_for is
+  // contained in the incoming data string. Unlike many of Envoy waitFor functions,
+  // it does not expect an exact match, simply the presence of data_to_wait_for.
+  static ValidatorFunction waitForInexactMatch(const char* data_to_wait_for) {
+    return [data_to_wait_for](const std::string& data) -> bool {
+      return data.find(data_to_wait_for) != std::string::npos;
+    };
   }
 
 private:
