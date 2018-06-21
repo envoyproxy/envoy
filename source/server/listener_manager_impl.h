@@ -304,6 +304,8 @@ public:
 
   SystemTime last_updated_;
 
+  SystemTime last_updated_;
+
 private:
   void addFilterChain(const std::vector<std::string>& server_names,
                       const std::string& transport_protocol,
