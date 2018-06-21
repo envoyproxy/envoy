@@ -1,6 +1,10 @@
 Version history
 ---------------
 
+1.8.0 (Pending)
+===============
+
+
 1.7.0
 ===============
 * access log: added ability to log response trailers.
