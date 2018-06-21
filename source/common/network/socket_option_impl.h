@@ -85,7 +85,7 @@ typedef absl::optional<std::pair<int, int>> SocketOptionName;
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
   SocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
-                   Network::SocketOptionName optname, int value)  // Yup, int. See setsockopt(2).
+                   Network::SocketOptionName optname, int value) // Yup, int. See setsockopt(2).
       : SocketOptionImpl(in_state, optname,
                          absl::string_view(reinterpret_cast<char*>(&value), sizeof(value))) {}
 
