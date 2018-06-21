@@ -164,7 +164,7 @@ private:
   Event::Dispatcher& dispatcher_;
   std::string data_to_wait_for_;
   std::string data_;
-  bool exact_match_{};
+  bool exact_match_{true};
   bool read_end_stream_{};
 };
 
