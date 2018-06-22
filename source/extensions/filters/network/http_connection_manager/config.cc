@@ -167,7 +167,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     user_agent_ = context_.localInfo().clusterName();
   }
 
-  std::cout << "config.cc config.has_tracing(): " << config.has_tracing();
+  std::cout << "shakti | config.cc config.has_tracing(): " << config.has_tracing() << '\n';
   if (config.has_tracing()) {
     const auto& tracing_config = config.tracing();
 
@@ -201,9 +201,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     tracing_config_.reset(new Http::TracingConnectionManagerConfig(
         {tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
          overall_sampling}));
-
-    std::cout << "config.cc tracing_config pointer: " << tracing_config_;
-    std::cout << "config.cc tracing_config value: " << tracing_config_.get();
   }
 
   if (config.has_idle_timeout()) {

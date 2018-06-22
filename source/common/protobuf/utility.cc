@@ -10,11 +10,13 @@ namespace Envoy {
 namespace ProtobufPercentHelper {
 
 uint64_t checkAndReturnDefault(uint64_t default_value, uint64_t max_value) {
+  std::cout << "shakti | convertPercent - default_value: " << default_value << ", max_value: " << max_value << "\n";
   ASSERT(default_value <= max_value);
   return default_value;
 }
 
 uint64_t convertPercent(double percent, uint64_t max_value) {
+  std::cout << "shakti | convertPercent - percent: " << percent << ", max_value: " << max_value << "\n";
   // Checked by schema.
   ASSERT(percent >= 0.0 && percent <= 100.0);
   return max_value * (percent / 100.0);

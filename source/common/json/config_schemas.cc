@@ -264,6 +264,21 @@ const std::string Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA(R"EOF(
             "type" : "array",
             "uniqueItems": true,
             "items" : {"type" : "string"}
+          },
+          "client_sampling" : {
+            "type" : "number",
+            "minimum" : "0",
+            "maximum" : "100"
+          },
+          "random_sampling" : {
+            "type" : "number",
+            "minimum" : "0",
+            "maximum" : "100"
+          },
+          "overall_sampling" : {
+            "type" : "number",
+            "minimum" : "0",
+            "maximum" : "100"
           }
         },
         "required" : ["operation_name"],
