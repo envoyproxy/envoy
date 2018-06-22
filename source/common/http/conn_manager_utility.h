@@ -37,11 +37,10 @@ public:
                                     const Http::HeaderMap& request_headers, const std::string& via);
 
 private:
-static void mutateTracingRequestHeader(Http::HeaderMap& request_headers,
-                                       Runtime::Loader& runtime,
-                                       ConnectionManagerConfig& config);
+  static void mutateTracingRequestHeader(Http::HeaderMap& request_headers, Runtime::Loader& runtime,
+                                         ConnectionManagerConfig& config);
 
-static void mutateXfccRequestHeader(Http::HeaderMap& request_headers,
+  static void mutateXfccRequestHeader(Http::HeaderMap& request_headers,
                                       Network::Connection& connection,
                                       ConnectionManagerConfig& config);
 };

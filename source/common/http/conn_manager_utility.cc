@@ -206,16 +206,20 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(Http::HeaderMap& reque
   // Do not apply tracing transformations if we are currently tracing.
   if (UuidTraceStatus::NoTrace == UuidUtils::isTraceableUuid(x_request_id)) {
     if (request_headers.ClientTraceId() &&
-      (runtime.snapshot().featureEnabled("tracing.client_enabled", config.tracingConfig()->client_sampling_))) {
+        (runtime.snapshot().featureEnabled("tracing.client_enabled",
+                                           config.tracingConfig()->client_sampling_))) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
     } else if (request_headers.EnvoyForceTrace()) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
-    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", config.tracingConfig()->random_sampling_, result, 10000)) {
+    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling",
+                                                 config.tracingConfig()->random_sampling_, result,
+                                                 10000)) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
     }
   }
 
-  if (!runtime.snapshot().featureEnabled("tracing.global_enabled", config.tracingConfig()->overall_sampling_, result)) {
+  if (!runtime.snapshot().featureEnabled("tracing.global_enabled",
+                                         config.tracingConfig()->overall_sampling_, result)) {
     UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::NoTrace);
   }
 
