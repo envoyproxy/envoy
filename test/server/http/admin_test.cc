@@ -664,22 +664,19 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 
   NiceMock<Upstream::Outlier::MockDetector> outlier_detector;
   ON_CALL(Const(cluster), outlierDetector()).WillByDefault(Return(&outlier_detector));
-  ON_CALL(outlier_detector, successRateAverage()).WillByDefault(Return(5.0));
   ON_CALL(outlier_detector, successRateEjectionThreshold()).WillByDefault(Return(6.0));
-
-  Upstream::ResourceManagerImpl default_resource_manager(cluster.info_->runtime_, "fake_key", 1000,
-                                                         2000, 3000, 4000);
-  Upstream::ResourceManagerImpl high_resource_manager(cluster.info_->runtime_, "fake_key", 5000,
-                                                      6000, 7000, 8000);
-  ON_CALL(*cluster.info_, resourceManager(Upstream::ResourcePriority::Default))
-      .WillByDefault(ReturnRef(default_resource_manager));
-  ON_CALL(*cluster.info_, resourceManager(Upstream::ResourcePriority::High))
-      .WillByDefault(ReturnRef(high_resource_manager));
 
   ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(true));
 
   Upstream::MockHostSet* host_set = cluster.priority_set_.getMockHostSet(0);
   auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+
+  envoy::api::v2::core::Locality locality;
+  locality.set_region("test_region");
+  locality.set_zone("test_zone");
+  locality.set_sub_zone("test_sub_zone");
+  ON_CALL(*host, locality()).WillByDefault(ReturnRef(locality));
+
   host_set->hosts_.emplace_back(host);
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://1.2.3.4:80");
@@ -692,14 +689,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(*host, counters()).WillByDefault(Invoke([&store]() { return store.counters(); }));
 
   ON_CALL(*host, healthy()).WillByDefault(Return(true));
-  ON_CALL(*host, weight()).WillByDefault(Return(30));
 
-  envoy::api::v2::core::Locality locality;
-  locality.set_region("test_region");
-  locality.set_zone("test_zone");
-  locality.set_sub_zone("test_sub_zone");
-  ON_CALL(*host, locality()).WillByDefault(ReturnRef(locality));
-  ON_CALL(*host, canary()).WillByDefault(Return(true));
   ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
 
   Buffer::OwnedImpl response;
@@ -713,13 +703,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
  "cluster_statuses": [
   {
    "name": "fake_cluster",
-   "outlier_info": {
-    "success_rate_average": {
-     "value": 5
-    },
-    "success_rate_ejection_threshold": {
-     "value": 6
-    }
+   "success_rate_ejection_threshold": {
+    "value": 6
    },
    "added_via_api": true,
    "host_statuses": [
@@ -732,19 +717,18 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       }
      },
      "stats": {
-      "test_counter": "10",
-      "test_gauge": "11"
+      "test_counter": {
+       "value": "10",
+       "type": "COUNTER"
+      },
+      "test_gauge": {
+       "value": "11",
+       "type": "GAUGE"
+      },
      },
      "health_status": {
-      "healthy": true
+      "eds_health_status": "HEALTHY"
      },
-     "weight": "30",
-     "locality": {
-      "region": "test_region",
-      "zone": "test_zone",
-      "sub_zone": "test_sub_zone"
-     },
-     "canary": true,
      "success_rate": {
       "value": 43.2
      }

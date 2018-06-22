@@ -254,18 +254,9 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
     cluster_status.set_name(cluster_info->name());
 
     const Upstream::Outlier::Detector* outlier_detector = cluster.outlierDetector();
-    if (outlier_detector != nullptr) {
-      double success_rate_average = outlier_detector->successRateAverage();
-      if (success_rate_average >= 0.0) {
-        cluster_status.mutable_outlier_info()->mutable_success_rate_average()->set_value(
-            success_rate_average);
-      }
-
-      double success_rate_ejection_threshold = outlier_detector->successRateEjectionThreshold();
-      if (success_rate_ejection_threshold >= 0.0) {
-        cluster_status.mutable_outlier_info()->mutable_success_rate_ejection_threshold()->set_value(
-            success_rate_ejection_threshold);
-      }
+    if (outlier_detector != nullptr && outlier_detector->successRateEjectionThreshold() > 0.0) {
+      cluster_status.mutable_success_rate_ejection_threshold()->set_value(
+          outlier_detector->successRateEjectionThreshold());
     }
 
     cluster_status.set_added_via_api(cluster_info->addedViaApi());
@@ -277,27 +268,29 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
                                                    *host_status.mutable_address());
 
         for (const Stats::CounterSharedPtr& counter : host->counters()) {
-          (*host_status.mutable_stats())[counter->name()] = counter->value();
+          auto& metric = (*host_status.mutable_stats())[counter->name()];
+          metric.set_type(envoy::admin::v2alpha::SimpleMetric::COUNTER);
+          metric.set_value(counter->value());
         }
 
         for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
-          (*host_status.mutable_stats())[gauge->name()] = gauge->value();
+          auto& metric = (*host_status.mutable_stats())[gauge->name()];
+          metric.set_type(envoy::admin::v2alpha::SimpleMetric::GAUGE);
+          metric.set_value(gauge->value());
         }
 
         envoy::admin::v2alpha::HostHealthStatus& health_status =
             *host_status.mutable_health_status();
-        health_status.set_healthy(host->healthy());
         health_status.set_failed_active_health_check(
             host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
         health_status.set_failed_outlier_check(
             host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
-        health_status.set_failed_eds_health_check(
-            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH));
-        host_status.set_weight(host->weight());
-        *host_status.mutable_locality() = host->locality();
-        host_status.set_canary(host->canary());
+        health_status.set_eds_health_status(
+            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)
+                ? envoy::api::v2::core::HealthStatus::UNHEALTHY
+                : envoy::api::v2::core::HealthStatus::HEALTHY);
         double success_rate = host->outlierDetector().successRate();
-        if (success_rate >= 0) {
+        if (success_rate >= 0.0) {
           host_status.mutable_success_rate()->set_value(success_rate);
         }
       }
