@@ -176,12 +176,15 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
 }
 
 /**
- * Counter implementation that wraps a RawStatData.
+ * Counter implementation that wraps a StatData.  StatData must have data members:
+ *    int64 value_;
+ *    ....
  */
+template<class StatData>
 class CounterImpl : public Counter, public MetricImpl {
 public:
-  CounterImpl(RawStatData& data, RawStatDataAllocator& alloc, std::string&& tag_extracted_name,
-              std::vector<Tag>&& tags)
+  CounterImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
+              std::string&& tag_extracted_name, std::vector<Tag>&& tags)
       : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
         alloc_(alloc) {}
   ~CounterImpl() { alloc_.free(data_); }
@@ -200,17 +203,18 @@ public:
   uint64_t value() const override { return data_.value_; }
 
 private:
-  RawStatData& data_;
-  RawStatDataAllocator& alloc_;
+  StatData& data_;
+  StatDataAllocatorImpl<StatData>& alloc_;
 };
 
 /**
- * Gauge implementation that wraps a RawStatData.
+ * Gauge implementation that wraps a StatData.
  */
+template<class StatData>
 class GaugeImpl : public Gauge, public MetricImpl {
 public:
-  GaugeImpl(RawStatData& data, RawStatDataAllocator& alloc, std::string&& tag_extracted_name,
-            std::vector<Tag>&& tags)
+  GaugeImpl(RawStatData& data, StatDataAllocatorImpl<StatData>& alloc,
+            std::string&& tag_extracted_name, std::vector<Tag>&& tags)
       : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
         alloc_(alloc) {}
   ~GaugeImpl() { alloc_.free(data_); }
@@ -235,8 +239,8 @@ public:
   bool used() const override { return data_.flags_ & Flags::Used; }
 
 private:
-  RawStatData& data_;
-  RawStatDataAllocator& alloc_;
+  StatData& data_;
+  StatDataAllocatorImpl<StatData>& alloc_;
 };
 
 TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config) {
@@ -427,25 +431,28 @@ void SourceImpl::clearCache() {
   histograms_.reset();
 }
 
-CounterSharedPtr RawStatDataAllocator::makeCounter(const std::string& name,
-                                                   std::string&& tag_extracted_name,
-                                                   std::vector<Tag>&& tags) {
-  RawStatData* data = alloc(name);
+template<class StatData>
+CounterSharedPtr StatDataAllocatorImpl<StatData>::makeCounter(const std::string& name,
+                                                              std::string&& tag_extracted_name,
+                                                              std::vector<Tag>&& tags) {
+  StatData* data = alloc(name);
   if (data == nullptr) {
     return nullptr;
   }
-  return std::make_shared<CounterImpl>(*data, *this, std::move(tag_extracted_name),
-                                       std::move(tags));
+  return std::make_shared<CounterImpl<StatData>>(*data, *this, std::move(tag_extracted_name),
+                                                 std::move(tags));
 }
 
-GaugeSharedPtr RawStatDataAllocator::makeGauge(const std::string& name,
-                                               std::string&& tag_extracted_name,
-                                               std::vector<Tag>&& tags) {
-  RawStatData* data = alloc(name);
+template<class StatData>
+GaugeSharedPtr StatDataAllocatorImpl<StatData>::makeGauge(const std::string& name,
+                                                          std::string&& tag_extracted_name,
+                                                          std::vector<Tag>&& tags) {
+  StatData* data = alloc(name);
   if (data == nullptr) {
     return nullptr;
   }
-  return std::make_shared<GaugeImpl>(*data, *this, std::move(tag_extracted_name), std::move(tags));
+  return std::make_shared<GaugeImpl<StatData>>(*data, *this, std::move(tag_extracted_name),
+                                               std::move(tags));
 }
 
 } // namespace Stats

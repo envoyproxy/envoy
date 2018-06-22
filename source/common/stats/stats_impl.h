@@ -305,12 +305,8 @@ private:
   const std::vector<Tag> tags_;
 };
 
-/**
- * Implements a StatDataAllocator that uses RawStatData -- capable of deploying
- * in a shared memory block without internal pointers.
- */
-template<class StatData>
-class RawStatDataAllocator : public StatDataAllocator {
+template <class StatData>
+class StatDataAllocatorImpl : public StatDataAllocator {
 public:
   // StatDataAllocator
   CounterSharedPtr makeCounter(const std::string& name, std::string&& tag_extracted_name,
@@ -334,6 +330,8 @@ public:
    */
   virtual void free(StatData& data) PURE;
 };
+
+using RawStatDataAllocator = StatDataAllocatorImpl<RawStatData>;
 
 /**
  * Implementation of HistogramStatistics for circllhist.
@@ -399,7 +397,7 @@ private:
  * Implementation of RawStatDataAllocator that uses an unordered set to store
  * RawStatData pointers.
  */
-class HeapRawStatDataAllocator : public RawStatDataAllocator {
+class HeapRawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
 public:
   // RawStatDataAllocator
   ~HeapRawStatDataAllocator() { ASSERT(stats_.empty()); }
