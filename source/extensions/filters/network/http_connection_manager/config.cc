@@ -167,6 +167,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     user_agent_ = context_.localInfo().clusterName();
   }
 
+  std::cout << "config.cc config.has_tracing(): " << config.has_tracing();
   if (config.has_tracing()) {
     const auto& tracing_config = config.tracing();
 
@@ -190,8 +191,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       request_headers_for_tags.push_back(Http::LowerCaseString(header));
     }
 
+    uint64_t client_sampling{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing_config, client_sampling, 100, 100)};
+    uint64_t random_sampling{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing_config, random_sampling, 10000, 10000)};
+    uint64_t overall_sampling{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing_config, overall_sampling, 100, 100)};
+
     tracing_config_.reset(new Http::TracingConnectionManagerConfig(
-        {tracing_operation_name, request_headers_for_tags}));
+        {tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling, overall_sampling}));
+
+    std::cout << "config.cc tracing_config pointer: " << tracing_config_;
+    std::cout << "config.cc tracing_config value: " << tracing_config_.get();
   }
 
   if (config.has_idle_timeout()) {

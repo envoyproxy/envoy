@@ -184,6 +184,17 @@ void FilterJson::translateHttpConnectionManager(
          json_tracing->getStringArray("request_headers_for_tags", true)) {
       tracing->add_request_headers_for_tags(header);
     }
+
+    std::cout << "filter_json tracing: " << tracing;
+    std::cout << "filter_json json_tracing: " << json_tracing;
+
+    tracing->mutable_client_sampling()->set_value(json_tracing->getDouble("client_sampling"));
+    tracing->mutable_random_sampling()->set_value(json_tracing->getDouble("random_sampling"));
+    tracing->mutable_overall_sampling()->set_value(json_tracing->getDouble("overall_sampling"));
+
+//    tracing->set_percent(static_cast<uint64_t>(json_tracing->getInteger("client_sampling"))); // TODO delete
+//    tracing->set_percent(static_cast<uint64_t>(json_tracing->getInteger("random_sampling")));
+//    tracing->set_percent(static_cast<uint64_t>(json_tracing->getInteger("overall_sampling")));
   }
 
   if (json_config.hasObject("http1_settings")) {
