@@ -1,5 +1,6 @@
 #include "test/integration/integration_admin_test.h"
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/fmt.h"
@@ -285,6 +286,18 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(json->getObject("configs")->hasObject("bootstrap"));
   EXPECT_TRUE(json->getObject("configs")->hasObject("clusters"));
   EXPECT_TRUE(json->getObject("configs")->hasObject("listeners"));
+  EXPECT_TRUE(json->getObject("configs")->hasObject("routes"));
+  // Validate we can parse as proto.
+  envoy::admin::v2alpha::ConfigDump config_dump;
+  MessageUtil::loadFromJson(response->body(), config_dump);
+  EXPECT_EQ(1, config_dump.configs().count("bootstrap"));
+  EXPECT_EQ(1, config_dump.configs().count("clusters"));
+  EXPECT_EQ(1, config_dump.configs().count("listeners"));
+  EXPECT_EQ(1, config_dump.configs().count("routes"));
+  // .. and that we can unpack one of the entries.
+  envoy::admin::v2alpha::RoutesConfigDump route_config_dump;
+  config_dump.configs().at("routes").UnpackTo(&route_config_dump);
+  EXPECT_EQ("route_config_0", route_config_dump.static_route_configs(0).name());
 }
 
 TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
