@@ -69,14 +69,20 @@
 * We do releases approximately every 3 months as described in the
   [release cadence documentation](CONTRIBUTING.md#release-cadence).
 * Decide on the somewhat arbitrary time that a release will occur.
+* Take a look at open issues tagged with the current release, by
+  [searching](https://github.com/envoyproxy/envoy/issues) for
+  "is:open is:issue milestone:[current milestone]" and either hold off until
+  they are fixed or bump them to the next milestone.
 * Begin marshalling the ongoing PR flow in this repo. Ask maintainers to hold off merging any
   particularly risky PRs until after the release is tagged. This is because we currently don't use
   release branches and assume that master is RC quality at all times.
 * Do a final check of the [release notes](docs/root/intro/version_history.rst) and make any needed
   corrections.
 * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
-  "1.6.0". Get a review and merge.
-* **Wait for tests to pass on master.**
+  "1.6.0". Also remove the "Pending" tag from the top of the [release notes](docs/root/intro/version_history.rst)
+  and [DEPRECATED.md](DEPRECATED.md). Get a review and merge.
+* **Wait for tests to pass on
+  [master](https://circleci.com/gh/envoyproxy/envoy/tree/master).**
 * Create a [tagged release](https://github.com/envoyproxy/envoy/releases). The release should
   start with "v" and be followed by the version number. E.g., "v1.6.0". **This must match the
   [VERSION](VERSION).**
@@ -88,10 +94,11 @@
 * If possible post on Twitter (either have Matt do it or contact caniszczyk@ on Slack and have the
   Envoy account post).
 * Do a new PR to update [VERSION](VERSION) to the next development release. E.g., "1.7.0-dev". At
-  the same time, also add a new empty section to the [release
-  notes](docs/root/intro/version_history.rst) for the following version. E.g., "1.7.0".
-* Update [DEPRECATED.md](DEPRECATED.md) to remove the '(pending)' comment on the current version,
-  replacing it with the release date. Add a placeholder for the next version.
+  the same time, also add a new empty "pending" section to the [release
+  notes](docs/root/intro/version_history.rst) and to [DEPRECATED.md](DEPRECATED.md) for the
+  following version. E.g., "1.7.0 (pending)".
+* Run the deprecate_versions.py script to file tracking issues for code which
+  can be removed.
 
 ## When does a maintainer lose maintainer status
 
