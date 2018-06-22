@@ -42,7 +42,7 @@ public:
     setUpstreamCount(upstream_endpoints_);
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       // Setup hds and corresponding gRPC cluster.
-      auto* hds_confid = bootstrap.mutable_cluster_manager()->mutable_hds_config();
+      auto* hds_confid = bootstrap.mutable_hds_config();
       hds_confid->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
       hds_confid->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("hds_report");
       auto* hds_cluster = bootstrap.mutable_static_resources()->add_clusters();

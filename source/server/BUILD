@@ -254,6 +254,8 @@ envoy_cc_library(
         ":listener_manager_lib",
         ":test_hooks_lib",
         ":worker_lib",
+        "//source/common/grpc:async_client_manager_lib",
+        "//source/common/upstream:health_discovery_service_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:signal_interface",
         "//include/envoy/event:timer_interface",
