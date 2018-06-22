@@ -297,7 +297,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   // .. and that we can unpack one of the entries.
   envoy::admin::v2alpha::RoutesConfigDump route_config_dump;
   config_dump.configs().at("routes").UnpackTo(&route_config_dump);
-  EXPECT_EQ("route_config_0", route_config_dump.static_route_configs(0).name());
+  EXPECT_EQ("route_config_0", route_config_dump.static_route_configs(0).route_config().name());
 }
 
 TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
