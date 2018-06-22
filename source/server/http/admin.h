@@ -294,8 +294,6 @@ public:
   const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const override;
   const Http::HeaderMap& getRequestHeaders() const override;
 
-  static void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_map);
-
 private:
   /**
    * Called when an admin request has been completely received.

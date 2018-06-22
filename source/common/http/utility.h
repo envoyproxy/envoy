@@ -185,6 +185,11 @@ void extractHostPathFromUri(const absl::string_view& uri, absl::string_view& hos
  */
 MessagePtr prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_uri);
 
+/**
+ * Serialize query-params into a string.
+ */
+std::string queryParamsToString(const QueryParams& query_params);
+
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy

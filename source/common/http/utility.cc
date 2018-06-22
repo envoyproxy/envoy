@@ -377,5 +377,17 @@ MessagePtr Utility::prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_u
   return message;
 }
 
+// TODO(jmarantz): make QueryParams a real class and put this serializer there,
+// along with proper URL escaping of the name and value.
+std::string Utility::queryParamsToString(const QueryParams& params) {
+  std::string out;
+  std::string delim = "?";
+  for (auto p : params) {
+    absl::StrAppend(&out, delim, p.first, "=", p.second);
+    delim = "&";
+  }
+  return out;
+}
+
 } // namespace Http
 } // namespace Envoy
