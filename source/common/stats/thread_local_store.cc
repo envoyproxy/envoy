@@ -12,7 +12,7 @@
 namespace Envoy {
 namespace Stats {
 
-ThreadLocalStoreImpl::ThreadLocalStoreImpl(RawStatDataAllocator& alloc)
+ThreadLocalStoreImpl::ThreadLocalStoreImpl(StatDataAllocator& alloc)
     : alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
       num_last_resort_stats_(default_scope_->counter("stats.overflow")), source_(*this) {}
@@ -155,22 +155,47 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id) {
   }
 }
 
-ThreadLocalStoreImpl::SafeAllocData ThreadLocalStoreImpl::safeAlloc(const std::string& name) {
-  RawStatData* data = alloc_.alloc(name);
-  if (!data) {
-    // If we run out of stat space from the allocator (which can happen if for example allocations
-    // are coming from a fixed shared memory region, we need to deal with this case the best we
-    // can. We must pass back the right allocator so that free() happens on the heap.
-    num_last_resort_stats_.inc();
-    return {*heap_allocator_.alloc(name), heap_allocator_};
-  } else {
-    return {*data, alloc_};
-  }
-}
-
 std::atomic<uint64_t> ThreadLocalStoreImpl::ScopeImpl::next_scope_id_;
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() { parent_.releaseScopeCrossThread(this); }
+
+template <class StatType>
+StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
+    const std::string& name,
+    std::unordered_map<std::string, std::shared_ptr<StatType>>& central_cache_map,
+    MakeStatFn<StatType> make_stat, std::shared_ptr<StatType>* tls_ref) {
+
+  // If we have a valid cache entry, return it.
+  if (tls_ref && *tls_ref) {
+    return **tls_ref;
+  }
+
+  // We must now look in the central store so we must be locked. We grab a reference to the
+  // central store location. It might contain nothing. In this case, we allocate a new stat.
+  Thread::LockGuard lock(parent_.lock_);
+  std::shared_ptr<StatType>& central_ref = central_cache_map[name];
+  if (!central_ref) {
+    std::vector<Tag> tags;
+    std::string tag_extracted_name = parent_.getTagsForName(name, tags);
+    std::shared_ptr<StatType> stat =
+        make_stat(parent_.alloc_, name, std::move(tag_extracted_name), std::move(tags));
+    if (stat == nullptr) {
+      parent_.num_last_resort_stats_.inc();
+      stat =
+          make_stat(parent_.heap_allocator_, name, std::move(tag_extracted_name), std::move(tags));
+      ASSERT(stat != nullptr);
+    }
+    central_ref = stat;
+  }
+
+  // If we have a TLS location to store or allocation into, do it.
+  if (tls_ref) {
+    *tls_ref = central_ref;
+  }
+
+  // Finally we return the reference.
+  return *central_ref;
+}
 
 Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // Determine the final name based on the prefix and the passed name.
@@ -185,30 +210,13 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
         &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].counters_[final_name];
   }
 
-  // If we have a valid cache entry, return it.
-  if (tls_ref && *tls_ref) {
-    return **tls_ref;
-  }
-
-  // We must now look in the central store so we must be locked. We grab a reference to the
-  // central store location. It might contain nothing. In this case, we allocate a new stat.
-  Thread::LockGuard lock(parent_.lock_);
-  CounterSharedPtr& central_ref = central_cache_.counters_[final_name];
-  if (!central_ref) {
-    SafeAllocData alloc = parent_.safeAlloc(final_name);
-    std::vector<Tag> tags;
-    std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
-    central_ref.reset(
-        new CounterImpl(alloc.data_, alloc.free_, std::move(tag_extracted_name), std::move(tags)));
-  }
-
-  // If we have a TLS location to store or allocation into, do it.
-  if (tls_ref) {
-    *tls_ref = central_ref;
-  }
-
-  // Finally we return the reference.
-  return *central_ref;
+  return safeMakeStat<Counter>(
+      final_name, central_cache_.counters_,
+      [](StatDataAllocator& allocator, const std::string& name, std::string&& tag_extracted_name,
+         std::vector<Tag>&& tags) -> CounterSharedPtr {
+        return allocator.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
+      },
+      tls_ref);
 }
 
 void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& histogram,
@@ -236,25 +244,13 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
     tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].gauges_[final_name];
   }
 
-  if (tls_ref && *tls_ref) {
-    return **tls_ref;
-  }
-
-  Thread::LockGuard lock(parent_.lock_);
-  GaugeSharedPtr& central_ref = central_cache_.gauges_[final_name];
-  if (!central_ref) {
-    SafeAllocData alloc = parent_.safeAlloc(final_name);
-    std::vector<Tag> tags;
-    std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
-    central_ref.reset(
-        new GaugeImpl(alloc.data_, alloc.free_, std::move(tag_extracted_name), std::move(tags)));
-  }
-
-  if (tls_ref) {
-    *tls_ref = central_ref;
-  }
-
-  return *central_ref;
+  return safeMakeStat<Gauge>(
+      final_name, central_cache_.gauges_,
+      [](StatDataAllocator& allocator, const std::string& name, std::string&& tag_extracted_name,
+         std::vector<Tag>&& tags) -> GaugeSharedPtr {
+        return allocator.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
+      },
+      tls_ref);
 }
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {

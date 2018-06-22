@@ -101,7 +101,7 @@ public:
   virtual void structBegin(const absl::string_view name) PURE;
 
   /**
-   * Indicates that that start of Thrift protocol struct field was detected.
+   * Indicates that the start of Thrift protocol struct field was detected.
    * @param name the name of the field, if available
    * @param field_type the type of the field
    * @param field_id the field id

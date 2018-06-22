@@ -294,6 +294,8 @@ TEST_P(TcpProxyIntegrationTest, ShutdownWithOpenConnections) {
 }
 
 TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
+  autonomous_upstream_ = true;
+
   enable_half_close_ = false;
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
@@ -310,9 +312,7 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
 
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   tcp_client->waitForDisconnect(true);
-  fake_upstream_connection->waitForDisconnect(true);
 }
 
 TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {

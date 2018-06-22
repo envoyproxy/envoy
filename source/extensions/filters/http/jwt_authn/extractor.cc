@@ -116,19 +116,20 @@ private:
 };
 
 ExtractorImpl::ExtractorImpl(const JwtAuthentication& config) {
-  for (const auto& rule : config.rules()) {
-    for (const auto& header : rule.from_headers()) {
-      addHeaderConfig(rule.issuer(), LowerCaseString(header.name()), header.value_prefix());
+  for (const auto& it : config.providers()) {
+    const auto& provider = it.second;
+    for (const auto& header : provider.from_headers()) {
+      addHeaderConfig(provider.issuer(), LowerCaseString(header.name()), header.value_prefix());
     }
-    for (const std::string& param : rule.from_params()) {
-      addQueryParamConfig(rule.issuer(), param);
+    for (const std::string& param : provider.from_params()) {
+      addQueryParamConfig(provider.issuer(), param);
     }
 
     // If not specified, use default locations.
-    if (rule.from_headers().empty() && rule.from_params().empty()) {
-      addHeaderConfig(rule.issuer(), Http::Headers::get().Authorization,
+    if (provider.from_headers().empty() && provider.from_params().empty()) {
+      addHeaderConfig(provider.issuer(), Http::Headers::get().Authorization,
                       JwtConstValues::get().BearerPrefix);
-      addQueryParamConfig(rule.issuer(), JwtConstValues::get().AccessTokenParam);
+      addQueryParamConfig(provider.issuer(), JwtConstValues::get().AccessTokenParam);
     }
   }
 }

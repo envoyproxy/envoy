@@ -1,9 +1,12 @@
 Version history
 ---------------
 
-1.7.0 (Pending)
+1.8.0 (Pending)
 ===============
 
+
+1.7.0
+===============
 * access log: added ability to log response trailers.
 * access log: added ability to format START_TIME.
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
@@ -36,6 +39,8 @@ Version history
 * debug: added symbolized stack traces (where supported).
 * grpc: support added for the full set of :ref:`Google gRPC call credentials
   <envoy_api_msg_core.GrpcService.GoogleGrpc.CallCredentials>`.
+* gzip filter: added :ref:`stats <gzip-statistics>` to the filter.
+* gzip filter: sending *accept-encoding* header as *identity* no longer compresses the payload.
 * health check: added ability to set :ref:`additional HTTP headers
   <envoy_api_field_core.HealthCheck.HttpHealthCheck.request_headers_to_add>` for HTTP health check.
 * health check: added support for EDS delivered :ref:`endpoint health status
@@ -150,6 +155,7 @@ Version history
 * websocket: support configuring
   :ref:`idle_timeout and max_connect_attempts <envoy_api_field_route.RouteAction.websocket_config>`.
 * upstream: added support for host override for a request in :ref:`Original destination host request header <arch_overview_load_balancing_types_original_destination_request_header>`.
+* header to metadata: added :ref:`HTTP Header to Metadata filter<config_http_filters_header_to_metadata>`.
 
 1.6.0 (March 20, 2018)
 ======================
