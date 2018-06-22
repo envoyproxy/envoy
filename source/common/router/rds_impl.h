@@ -54,10 +54,12 @@ public:
   absl::optional<ConfigInfo> configInfo() const override {
     return ConfigInfo{route_config_proto_, ""};
   }
+  SystemTime lastUpdated() const override { return last_updated_; }
 
 private:
   ConfigConstSharedPtr config_;
   envoy::api::v2::RouteConfiguration route_config_proto_;
+  SystemTime last_updated_;
 };
 
 /**
@@ -106,6 +108,7 @@ public:
       return ConfigInfo{route_config_proto_, config_info_.value().last_config_version_};
     }
   }
+  SystemTime lastUpdated() const override { return last_updated_; }
 
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
@@ -147,6 +150,7 @@ private:
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
   const std::string manager_identifier_;
   envoy::api::v2::RouteConfiguration route_config_proto_;
+  SystemTime last_updated_;
 
   friend class RouteConfigProviderManagerImpl;
 };

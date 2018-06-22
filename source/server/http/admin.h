@@ -128,6 +128,9 @@ private:
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return config_; }
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
+    SystemTime lastUpdated() const override {
+      return ProdSystemTimeSource::instance_.currentTime();
+    }
 
     Router::ConfigConstSharedPtr config_;
   };

@@ -312,6 +312,17 @@ public:
   static uint64_t durationToSeconds(const ProtobufWkt::Duration& duration);
 };
 
+class TimestampUtil {
+public:
+  /**
+   * Writes a time_point<system_clock> (SystemTime) to a protobuf Timestamp, by way of time_t.
+   * @param system_clock_time the time to write
+   * @param timestamp a pointer to the mutable protobuf member to be written into.
+   */
+  static void systemClockToTimestamp(const SystemTime system_clock_time,
+                                     ProtobufWkt::Timestamp& timestamp);
+};
+
 } // namespace Envoy
 
 namespace std {
