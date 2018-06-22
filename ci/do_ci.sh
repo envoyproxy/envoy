@@ -130,12 +130,23 @@ elif [[ "$1" == "bazel.ipv6_tests" ]]; then
   exit 0
 elif [[ "$1" == "bazel.api" ]]; then
   setup_clang_toolchain
+ 
+  cd "${ENVOY_CI_DIR}"
+  cd ../api
+  curl https://github.com/nilslice/protolock/releases/download/0.6.0/protolock.20180621T191216Z.linux-amd64.tgz > protolock.tar.gz
+  tar xzf protolock.tar.gz
+  echo "Check protobuf API compatibilty..."
+  ./protolock status --ignore=v2alpha
+
   cd "${ENVOY_CI_DIR}"
   echo "Building API..."
   bazel --batch build ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//envoy/...
   echo "Testing API..."
   bazel --batch test ${BAZEL_TEST_OPTIONS} -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
     @envoy_api//tools:capture2pcap_test
+
+  protolock status --ignore=v2alpha
+
   exit 0
 elif [[ "$1" == "bazel.coverage" ]]; then
   setup_gcc_toolchain
