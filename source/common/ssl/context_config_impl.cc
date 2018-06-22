@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/ssl/tls_certificate_config.h"
+
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/config/datasource.h"
@@ -16,20 +18,42 @@ namespace Ssl {
 
 namespace {
 
+std::string readSdsSecretName(const envoy::api::v2::auth::CommonTlsContext& config) {
+  return (!config.tls_certificate_sds_secret_configs().empty())
+             ? config.tls_certificate_sds_secret_configs()[0].name()
+             : EMPTY_STRING;
+}
+
+std::string readConfigSourceHash(const envoy::api::v2::auth::CommonTlsContext& config,
+                                 Secret::SecretManager& secret_manager) {
+  return (!config.tls_certificate_sds_secret_configs().empty() &&
+          config.tls_certificate_sds_secret_configs()[0].has_sds_config())
+             ? secret_manager.addOrUpdateSdsService(
+                   config.tls_certificate_sds_secret_configs()[0].sds_config(),
+                   config.tls_certificate_sds_secret_configs()[0].name())
+             : EMPTY_STRING;
+}
+
 std::string readConfig(
     const envoy::api::v2::auth::CommonTlsContext& config, Secret::SecretManager& secret_manager,
+    const std::string& config_source_hash, const std::string& secret_name,
     const std::function<std::string(const envoy::api::v2::auth::TlsCertificate& tls_certificate)>&
         read_inline_config,
-    const std::function<std::string(const Ssl::TlsCertificateConfig& secret)>& read_secret) {
+    const std::function<std::string(const Ssl::TlsCertificateConfig& secret)>&
+        read_managed_secret) {
   if (!config.tls_certificates().empty()) {
     return read_inline_config(config.tls_certificates()[0]);
   } else if (!config.tls_certificate_sds_secret_configs().empty()) {
-    auto name = config.tls_certificate_sds_secret_configs()[0].name();
-    const Ssl::TlsCertificateConfig* secret = secret_manager.findTlsCertificate(name);
+    const auto secret = secret_manager.findTlsCertificate(config_source_hash, secret_name);
     if (!secret) {
-      throw EnvoyException(fmt::format("Static secret is not defined: {}", name));
+      if (config_source_hash.empty()) {
+        throw EnvoyException(
+            fmt::format("Unknown static secret: {} : {}", config_source_hash, secret_name));
+      } else {
+        return EMPTY_STRING;
+      }
     }
-    return read_secret(*secret);
+    return read_managed_secret(*secret);
   } else {
     return EMPTY_STRING;
   }
@@ -55,7 +79,9 @@ const std::string ContextConfigImpl::DEFAULT_ECDH_CURVES = "X25519:P-256";
 
 ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContext& config,
                                      Secret::SecretManager& secret_manager)
-    : alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
+    : secret_manager_(secret_manager), sds_secret_name_(readSdsSecretName(config)),
+      sds_config_source_hash_(readConfigSourceHash(config, secret_manager)),
+      alpn_protocols_(RepeatedPtrUtil::join(config.alpn_protocols(), ",")),
       alt_alpn_protocols_(config.deprecated_v1().alt_alpn_protocols()),
       cipher_suites_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), DEFAULT_CIPHER_SUITES)),
@@ -68,7 +94,7 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
       certificate_revocation_list_path_(
           Config::DataSource::getPath(config.validation_context().crl())),
       cert_chain_(readConfig(
-          config, secret_manager,
+          config, secret_manager, sds_config_source_hash_, sds_secret_name_,
           [](const envoy::api::v2::auth::TlsCertificate& tls_certificate) -> std::string {
             return Config::DataSource::read(tls_certificate.certificate_chain(), true);
           },
@@ -80,7 +106,7 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
               ? ""
               : Config::DataSource::getPath(config.tls_certificates()[0].certificate_chain())),
       private_key_(readConfig(
-          config, secret_manager,
+          config, secret_manager, sds_config_source_hash_, sds_secret_name_,
           [](const envoy::api::v2::auth::TlsCertificate& tls_certificate) -> std::string {
             return Config::DataSource::read(tls_certificate.private_key(), true);
           },
@@ -136,6 +162,32 @@ unsigned ContextConfigImpl::tlsVersionFromProto(
   }
 
   NOT_REACHED;
+}
+
+const std::string& ContextConfigImpl::certChain() const {
+  if (!cert_chain_.empty()) {
+    return cert_chain_;
+  }
+
+  auto secret = secret_manager_.findTlsCertificate(sds_config_source_hash_, sds_secret_name_);
+  if (!secret) {
+    return cert_chain_;
+  }
+
+  return secret->certificateChain();
+}
+
+const std::string& ContextConfigImpl::privateKey() const {
+  if (!private_key_.empty()) {
+    return private_key_;
+  }
+
+  auto secret = secret_manager_.findTlsCertificate(sds_config_source_hash_, sds_secret_name_);
+  if (!secret) {
+    return private_key_;
+  }
+
+  return secret->privateKey();
 }
 
 ClientContextConfigImpl::ClientContextConfigImpl(

@@ -14,8 +14,14 @@ public:
   MockSecretManager();
   ~MockSecretManager();
 
-  MOCK_METHOD1(addOrUpdateSecret, void(const envoy::api::v2::auth::Secret& secret));
-  MOCK_CONST_METHOD1(findTlsCertificate, const Ssl::TlsCertificateConfig*(const std::string& name));
+  MOCK_METHOD2(addOrUpdateSecret, void(const std::string& config_source_hash,
+                                       const envoy::api::v2::auth::Secret& secret));
+  MOCK_CONST_METHOD2(findTlsCertificate,
+                     Ssl::TlsCertificateConfig*(const std::string& config_source_hash,
+                                                const std::string& name));
+  MOCK_METHOD2(addOrUpdateSdsService,
+               std::string(const envoy::api::v2::core::ConfigSource& config_source,
+                           std::string config_name));
 };
 
 } // namespace Secret

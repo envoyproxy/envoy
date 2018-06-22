@@ -9,8 +9,7 @@ namespace Envoy {
 namespace Ssl {
 
 Network::TransportSocketFactoryPtr
-createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& context_manager,
-                                      Secret::SecretManager& secret_manager);
+createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& context_manager);
 
 Network::Address::InstanceConstSharedPtr getSslAddress(const Network::Address::IpVersion& version,
                                                        int port);
