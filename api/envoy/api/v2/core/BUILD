@@ -28,6 +28,7 @@ api_proto_library(
 api_go_proto_library(
     name = "address",
     proto = ":address",
+    deps = [":base_go_proto"],
 )
 
 api_proto_library(
@@ -41,7 +42,6 @@ api_proto_library(
 api_go_proto_library(
     name = "base",
     proto = ":base",
-    deps = [":address_go_proto"],
 )
 
 api_proto_library(
