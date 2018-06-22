@@ -18,12 +18,11 @@
 
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/common/logger_delegates.h"
+#include "common/grpc/async_client_manager_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
-
 #include "common/upstream/health_discovery_service.h"
-#include "common/grpc/async_client_manager_impl.h"
 
 #include "server/http/admin.h"
 #include "server/init_manager_impl.h"
