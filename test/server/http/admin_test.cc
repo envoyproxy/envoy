@@ -650,14 +650,31 @@ TEST_P(AdminInstanceTest, TracingStatsDisabled) {
   }
 }
 
-TEST(PrometheusStatsFormatter, MetricName) {
+class PrometheusStatsFormatterTest : public testing::Test {
+protected:
+  void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
+    std::string tname = std::string(name);
+    counters_.push_back(alloc_.makeCounter(name, std::move(tname), std::move(cluster_tags)));
+  }
+
+  void addGauge(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
+    std::string tname = std::string(name);
+    gauges_.push_back(alloc_.makeGauge(name, std::move(tname), std::move(cluster_tags)));
+  }
+
+  Stats::HeapRawStatDataAllocator alloc_;
+  std::vector<Stats::CounterSharedPtr> counters_;
+  std::vector<Stats::GaugeSharedPtr> gauges_;
+};
+
+TEST_F(PrometheusStatsFormatterTest, MetricName) {
   std::string raw = "vulture.eats-liver";
   std::string expected = "envoy_vulture_eats_liver";
   auto actual = PrometheusStatsFormatter::metricName(raw);
   EXPECT_EQ(expected, actual);
 }
 
-TEST(PrometheusStatsFormatter, FormattedTags) {
+TEST_F(PrometheusStatsFormatterTest, FormattedTags) {
   // If value has - then it should be replaced by _ .
   std::vector<Stats::Tag> tags;
   Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};
@@ -669,120 +686,40 @@ TEST(PrometheusStatsFormatter, FormattedTags) {
   EXPECT_EQ(expected, actual);
 }
 
-TEST(PrometheusStatsFormatter, MetricNameCollison) {
+TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
 
   // Create two counters and two gauges with each pair having the same name,
   // but having different tag names and values.
   //`statsAsPrometheus()` should return two implying it found two unique stat names
 
-  Stats::HeapRawStatDataAllocator alloc;
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-
-  {
-    std::string name = "cluster.test_cluster_1.upstream_cx_total";
-    std::vector<Stats::Tag> cluster_tags;
-    Stats::Tag tag = {"a.tag-name", "a.tag-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
-                                                                     std::move(cluster_tags));
-    counters.push_back(c);
-  }
-
-  {
-    std::string name = "cluster.test_cluster_1.upstream_cx_total";
-    std::vector<Stats::Tag> cluster_tags;
-    Stats::Tag tag = {"another_tag_name", "another_tag-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
-                                                                     std::move(cluster_tags));
-    counters.push_back(c);
-  }
-
-  {
-    std::vector<Stats::Tag> cluster_tags;
-    std::string name = "cluster.test_cluster_2.upstream_cx_total";
-    Stats::Tag tag = {"another_tag_name_3", "another_tag_3-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::GaugeSharedPtr g =
-        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
-    gauges.push_back(g);
-  }
-
-  {
-    std::vector<Stats::Tag> cluster_tags;
-    std::string name = "cluster.test_cluster_2.upstream_cx_total";
-    Stats::Tag tag = {"another_tag_name_4", "another_tag_4-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::GaugeSharedPtr g =
-        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
-    gauges.push_back(g);
-  }
+  addCounter("cluster.test_cluster_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+  addCounter("cluster.test_cluster_1.upstream_cx_total",
+             {{"another_tag_name", "another_tag-value"}});
+  addGauge("cluster.test_cluster_2.upstream_cx_total",
+           {{"another_tag_name_3", "another_tag_3-value"}});
+  addGauge("cluster.test_cluster_2.upstream_cx_total",
+           {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  EXPECT_EQ(2UL, PrometheusStatsFormatter::statsAsPrometheus(counters, gauges, response));
+  EXPECT_EQ(2UL, PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, response));
 }
 
-TEST(PrometheusStatsFormatter, UniqueMetricName) {
+TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
 
   // Create two counters and two gauges, all with unique names.
   // statsAsPrometheus() should return four implying it found
   // four unique stat names.
 
-  Stats::HeapRawStatDataAllocator alloc;
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-
-  {
-    std::string name = "cluster.test_cluster_1.upstream_cx_total";
-    std::vector<Stats::Tag> cluster_tags;
-    Stats::Tag tag = {"a.tag-name", "a.tag-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
-                                                                     std::move(cluster_tags));
-    counters.push_back(c);
-  }
-
-  {
-    std::string name = "cluster.test_cluster_2.upstream_cx_total";
-    std::vector<Stats::Tag> cluster_tags;
-    Stats::Tag tag = {"another_tag_name", "another_tag-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
-                                                                     std::move(cluster_tags));
-    counters.push_back(c);
-  }
-
-  {
-    std::vector<Stats::Tag> cluster_tags;
-    std::string name = "cluster.test_cluster_3.upstream_cx_total";
-    Stats::Tag tag = {"another_tag_name_3", "another_tag_3-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::GaugeSharedPtr g =
-        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
-    gauges.push_back(g);
-  }
-
-  {
-    std::vector<Stats::Tag> cluster_tags;
-    std::string name = "cluster.test_cluster_4.upstream_cx_total";
-    Stats::Tag tag = {"another_tag_name_4", "another_tag_4-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::GaugeSharedPtr g =
-        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
-    gauges.push_back(g);
-  }
+  addCounter("cluster.test_cluster_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+  addCounter("cluster.test_cluster_2.upstream_cx_total",
+             {{"another_tag_name", "another_tag-value"}});
+  addGauge("cluster.test_cluster_3.upstream_cx_total",
+           {{"another_tag_name_3", "another_tag_3-value"}});
+  addGauge("cluster.test_cluster_4.upstream_cx_total",
+           {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  EXPECT_EQ(4UL, PrometheusStatsFormatter::statsAsPrometheus(counters, gauges, response));
+  EXPECT_EQ(4UL, PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, response));
 }
 
 } // namespace Server
