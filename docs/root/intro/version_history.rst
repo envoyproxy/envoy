@@ -1,7 +1,16 @@
 Version history
 ---------------
 
-1.7.0 (Pending)
+1.8.0 (Pending)
+===============
+* ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`. 
+  Lyft's reference implementation of the `ratelimit <https://github.com/lyft/ratelimit>`_ service also supports the data-plane-api proto as of v1.1.0.
+  Envoy can use either proto to send client requests to a ratelimit server with the use of the
+  :ref:`use_data_plane_proto<envoy_api_field_config.ratelimit.v2.RateLimitServiceConfig.use_data_plane_proto>`
+  boolean flag in the ratelimit configuration.
+  Support for the legacy proto :repo:`source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
+
+1.7.0
 ===============
 * access log: added ability to log response trailers.
 * access log: added ability to format START_TIME.
@@ -151,6 +160,7 @@ Version history
 * websocket: support configuring
   :ref:`idle_timeout and max_connect_attempts <envoy_api_field_route.RouteAction.websocket_config>`.
 * upstream: added support for host override for a request in :ref:`Original destination host request header <arch_overview_load_balancing_types_original_destination_request_header>`.
+* header to metadata: added :ref:`HTTP Header to Metadata filter<config_http_filters_header_to_metadata>`.
 
 1.6.0 (March 20, 2018)
 ======================

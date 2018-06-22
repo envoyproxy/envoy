@@ -155,7 +155,9 @@ public:
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin);
+                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                     SystemTimeSource& system_time_source,
+                     MonotonicTimeSource& monotonic_time_source);
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
@@ -299,10 +301,11 @@ private:
 
   struct ClusterData {
     ClusterData(const envoy::api::v2::Cluster& cluster_config, const std::string& version_info,
-                bool added_via_api, ClusterSharedPtr&& cluster)
+                bool added_via_api, ClusterSharedPtr&& cluster,
+                SystemTimeSource& system_time_source)
         : cluster_config_(cluster_config), config_hash_(MessageUtil::hash(cluster_config)),
-          version_info_(version_info), added_via_api_(added_via_api), cluster_(std::move(cluster)) {
-    }
+          version_info_(version_info), added_via_api_(added_via_api), cluster_(std::move(cluster)),
+          last_updated_(system_time_source.currentTime()) {}
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 
@@ -321,6 +324,7 @@ private:
     ClusterSharedPtr cluster_;
     // Optional thread aware LB depending on the LB type. Not all clusters have one.
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
+    SystemTime last_updated_;
   };
 
   struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle {
@@ -368,6 +372,7 @@ private:
   std::string local_cluster_name_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
+  SystemTimeSource& system_time_source_;
 };
 
 } // namespace Upstream

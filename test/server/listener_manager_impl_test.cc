@@ -52,7 +52,8 @@ class ListenerManagerImplTest : public testing::Test {
 public:
   ListenerManagerImplTest() {
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
-    manager_.reset(new ListenerManagerImpl(server_, listener_factory_, worker_factory_));
+    manager_.reset(
+        new ListenerManagerImpl(server_, listener_factory_, worker_factory_, system_time_source_));
   }
 
   /**
@@ -113,6 +114,7 @@ public:
   NiceMock<MockWorkerFactory> worker_factory_;
   std::unique_ptr<ListenerManagerImpl> manager_;
   NiceMock<MockGuardDog> guard_dog_;
+  NiceMock<MockSystemTimeSource> system_time_source_;
 };
 
 class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
@@ -387,6 +389,9 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
 
 // Make sure that a listener that is not modifiable cannot be updated or removed.
 TEST_F(ListenerManagerImplTest, UpdateRemoveNotModifiableListener) {
+  ON_CALL(system_time_source_, currentTime())
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1001001001001))));
+
   InSequence s;
 
   // Add foo listener.
@@ -404,12 +409,16 @@ TEST_F(ListenerManagerImplTest, UpdateRemoveNotModifiableListener) {
   checkStats(1, 0, 0, 0, 1, 0);
   checkConfigDump(R"EOF(
 static_listeners:
-  name: "foo"
-  address:
-    socket_address:
-      address: "127.0.0.1"
-      port_value: 1234
-  filter_chains: {}
+  listener:
+    name: "foo"
+    address:
+      socket_address:
+        address: "127.0.0.1"
+        port_value: 1234
+    filter_chains: {}
+  last_updated:
+    seconds: 1001001001
+    nanos: 1000000
 dynamic_active_listeners:
 dynamic_warming_listeners:
 dynamic_draining_listeners:
@@ -438,6 +447,9 @@ dynamic_draining_listeners:
 }
 
 TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
+  ON_CALL(system_time_source_, currentTime())
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1001001001001))));
+
   InSequence s;
 
   MockLdsApi* lds_api = new MockLdsApi();
@@ -481,6 +493,9 @@ dynamic_active_listeners:
         address: "127.0.0.1"
         port_value: 1234
     filter_chains: {}
+  last_updated:
+    seconds: 1001001001
+    nanos: 1000000
 dynamic_warming_listeners:
 dynamic_draining_listeners:
 )EOF");
@@ -499,6 +514,9 @@ address:
 filter_chains: {}
 per_connection_buffer_limit_bytes: 10
   )EOF";
+
+  ON_CALL(system_time_source_, currentTime())
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(2002002002002))));
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(false);
   EXPECT_CALL(*listener_foo, onDestroy());
@@ -519,6 +537,9 @@ dynamic_active_listeners:
         port_value: 1234
     filter_chains: {}
     per_connection_buffer_limit_bytes: 10
+  last_updated:
+    seconds: 2002002002
+    nanos: 2000000
 dynamic_warming_listeners:
 dynamic_draining_listeners:
 )EOF");
@@ -533,6 +554,9 @@ dynamic_draining_listeners:
   EXPECT_FALSE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
   checkStats(1, 1, 0, 0, 1, 0);
+
+  ON_CALL(system_time_source_, currentTime())
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(3003003003003))));
 
   // Update foo. Should go into warming, have an immediate warming callback, and start immediate
   // removal.
@@ -557,6 +581,9 @@ dynamic_active_listeners:
         address: "127.0.0.1"
         port_value: 1234
     filter_chains: {}
+  last_updated:
+    seconds: 3003003003
+    nanos: 3000000
 dynamic_warming_listeners:
 dynamic_draining_listeners:
   version_info: "version2"
@@ -568,6 +595,9 @@ dynamic_draining_listeners:
         port_value: 1234
     filter_chains: {}
     per_connection_buffer_limit_bytes: 10
+  last_updated:
+    seconds: 2002002002
+    nanos: 2000000
 )EOF");
 
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -576,6 +606,9 @@ dynamic_draining_listeners:
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   worker_->callRemovalCompletion();
   checkStats(1, 2, 0, 0, 1, 0);
+
+  ON_CALL(system_time_source_, currentTime())
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(4004004004004))));
 
   // Add bar listener.
   const std::string listener_bar_yaml = R"EOF(
@@ -595,6 +628,9 @@ filter_chains: {}
   EXPECT_EQ(2UL, manager_->listeners().size());
   worker_->callAddCompletion(true);
   checkStats(2, 2, 0, 0, 2, 0);
+
+  ON_CALL(system_time_source_, currentTime())
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(5005005005005))));
 
   // Add baz listener, this time requiring initializing.
   const std::string listener_baz_yaml = R"EOF(
@@ -626,6 +662,9 @@ dynamic_active_listeners:
           address: "127.0.0.1"
           port_value: 1234
       filter_chains: {}
+    last_updated:
+      seconds: 3003003003
+      nanos: 3000000
   - version_info: "version4"
     listener:
       name: "bar"
@@ -634,6 +673,9 @@ dynamic_active_listeners:
           address: "127.0.0.1"
           port_value: 1235
       filter_chains: {}
+    last_updated:
+      seconds: 4004004004
+      nanos: 4000000
 dynamic_warming_listeners:
   - version_info: "version5"
     listener:
@@ -643,6 +685,9 @@ dynamic_warming_listeners:
           address: "127.0.0.1"
           port_value: 1236
       filter_chains: {}
+    last_updated:
+      seconds: 5005005005
+      nanos: 5000000
 dynamic_draining_listeners:
 )EOF");
 
