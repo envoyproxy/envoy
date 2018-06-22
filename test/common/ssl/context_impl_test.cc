@@ -433,12 +433,12 @@ TEST(ClientContextConfigImplTest, StaticTlsCertificates) {
 name: "abc.com"
 tls_certificate:
   certificate_chain:
-    filename: "test/common/ssl/test_data/selfsigned_cert.pem"
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
   private_key:
-    filename: "test/common/ssl/test_data/selfsigned_key.pem"
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
 )EOF";
 
-  MessageUtil::loadFromYaml(yaml, secret_config);
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
   Server::MockInstance server;
   server.secretManager().addOrUpdateSecret("", secret_config);
@@ -451,12 +451,12 @@ tls_certificate:
 
   ClientContextConfigImpl client_context_config(tls_context, server.secretManager());
 
-  EXPECT_EQ(
-      TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_cert.pem"),
-      client_context_config.certChain());
-  EXPECT_EQ(
-      TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_key.pem"),
-      client_context_config.privateKey());
+  const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
+            client_context_config.certChain());
+  const std::string key_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
+            client_context_config.privateKey());
 }
 
 TEST(ClientContextConfigImplTest, MissingStaticSecretTlsCertificates) {
@@ -466,12 +466,12 @@ TEST(ClientContextConfigImplTest, MissingStaticSecretTlsCertificates) {
 name: "abc.com"
 tls_certificate:
   certificate_chain:
-    filename: "test/common/ssl/test_data/selfsigned_cert.pem"
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
   private_key:
-    filename: "test/common/ssl/test_data/selfsigned_key.pem"
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
 )EOF";
 
-  MessageUtil::loadFromYaml(yaml, secret_config);
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
   Server::MockInstance server;
   server.secretManager().addOrUpdateSecret("", secret_config);

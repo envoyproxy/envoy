@@ -40,12 +40,12 @@ TEST_F(SecretManagerImplTest, SecretLoadSuccess) {
 name: "abc.com"
 tls_certificate:
   certificate_chain:
-    filename: "test/common/ssl/test_data/selfsigned_cert.pem"
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
   private_key:
-    filename: "test/common/ssl/test_data/selfsigned_key.pem"
+    filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
 )EOF";
 
-  MessageUtil::loadFromYaml(yaml, secret_config);
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
   Server::MockInstance server;
 
@@ -108,10 +108,10 @@ TEST_F(SecretManagerImplTest, NotImplementedException) {
 name: "abc.com"
 session_ticket_keys:
   keys:
-    - filename: "test/common/ssl/test_data/selfsigned_cert.pem"
+    - filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
 )EOF";
 
-  MessageUtil::loadFromYaml(yaml, secret_config);
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
   MockServer server;
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl(server));
