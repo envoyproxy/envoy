@@ -131,9 +131,9 @@ struct RequestInfoImpl : public RequestInfo {
     return (response_flags_ & response_flags) != 0;
   }
 
-  bool getResponseFlag(ResponseFlag flag) const override { return response_flags_ & flag; }
+  bool hasResponseFlag(ResponseFlag flag) const override { return response_flags_ & flag; }
 
-  bool getResponseFlag() const override { return response_flags_ != 0; }
+  bool hasResponseFlag() const override { return response_flags_ != 0; }
 
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_host_ = host;

@@ -192,10 +192,10 @@ ResponseFlagFilter::ResponseFlagFilter(
 }
 
 bool ResponseFlagFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
-  if (info_.getResponseFlag()) {
+  if (info_.hasResponseFlag()) {
     return info_.intersectResponseFlags(info.currentResponseFlags());
   }
-  return info.getResponseFlag();
+  return info.hasResponseFlag();
 }
 
 InstanceSharedPtr

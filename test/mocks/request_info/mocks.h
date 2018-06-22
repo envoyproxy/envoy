@@ -45,8 +45,8 @@ public:
   MOCK_CONST_METHOD0(responseCode, absl::optional<uint32_t>());
   MOCK_METHOD1(addBytesSent, void(uint64_t));
   MOCK_CONST_METHOD0(bytesSent, uint64_t());
-  MOCK_CONST_METHOD1(getResponseFlag, bool(ResponseFlag));
-  MOCK_CONST_METHOD0(getResponseFlag, bool());
+  MOCK_CONST_METHOD1(hasResponseFlag, bool(ResponseFlag));
+  MOCK_CONST_METHOD0(hasResponseFlag, bool());
   MOCK_CONST_METHOD0(upstreamHost, Upstream::HostDescriptionConstSharedPtr());
   MOCK_METHOD1(setUpstreamLocalAddress, void(const Network::Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(upstreamLocalAddress, const Network::Address::InstanceConstSharedPtr&());

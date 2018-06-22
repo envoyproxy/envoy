@@ -96,18 +96,18 @@ TEST(RequestInfoImplTest, ResponseFlagTest) {
                                                    RateLimited};
 
   RequestInfoImpl request_info(Http::Protocol::Http2);
-  EXPECT_FALSE(request_info.getResponseFlag());
+  EXPECT_FALSE(request_info.hasResponseFlag());
   EXPECT_EQ(0, request_info.currentResponseFlags());
   EXPECT_FALSE(request_info.intersectResponseFlags(0));
   for (ResponseFlag flag : responseFlags) {
     // Test cumulative setting of response flags.
-    EXPECT_FALSE(request_info.getResponseFlag(flag))
+    EXPECT_FALSE(request_info.hasResponseFlag(flag))
         << fmt::format("Flag: {} was already set", flag);
     request_info.setResponseFlag(flag);
-    EXPECT_TRUE(request_info.getResponseFlag(flag))
+    EXPECT_TRUE(request_info.hasResponseFlag(flag))
         << fmt::format("Flag: {} was expected to be set", flag);
   }
-  EXPECT_TRUE(request_info.getResponseFlag());
+  EXPECT_TRUE(request_info.hasResponseFlag());
   EXPECT_EQ(4095, request_info.currentResponseFlags());
 
   RequestInfoImpl request_info2(Http::Protocol::Http2);

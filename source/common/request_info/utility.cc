@@ -33,55 +33,55 @@ const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_in
 
   static_assert(ResponseFlag::LastFlag == 0x1000, "A flag has been added. Fix this code.");
 
-  if (request_info.getResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
+  if (request_info.hasResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
     appendString(result, FAILED_LOCAL_HEALTH_CHECK);
   }
 
-  if (request_info.getResponseFlag(ResponseFlag::NoHealthyUpstream)) {
+  if (request_info.hasResponseFlag(ResponseFlag::NoHealthyUpstream)) {
     appendString(result, NO_HEALTHY_UPSTREAM);
   }
 
-  if (request_info.getResponseFlag(ResponseFlag::UpstreamRequestTimeout)) {
+  if (request_info.hasResponseFlag(ResponseFlag::UpstreamRequestTimeout)) {
     appendString(result, UPSTREAM_REQUEST_TIMEOUT);
   }
 
-  if (request_info.getResponseFlag(ResponseFlag::LocalReset)) {
+  if (request_info.hasResponseFlag(ResponseFlag::LocalReset)) {
     appendString(result, LOCAL_RESET);
   }
 
-  if (request_info.getResponseFlag(ResponseFlag::UpstreamRemoteReset)) {
+  if (request_info.hasResponseFlag(ResponseFlag::UpstreamRemoteReset)) {
     appendString(result, UPSTREAM_REMOTE_RESET);
   }
 
-  if (request_info.getResponseFlag(ResponseFlag::UpstreamConnectionFailure)) {
+  if (request_info.hasResponseFlag(ResponseFlag::UpstreamConnectionFailure)) {
     appendString(result, UPSTREAM_CONNECTION_FAILURE);
   }
 
-  if (request_info.getResponseFlag(ResponseFlag::UpstreamConnectionTermination)) {
+  if (request_info.hasResponseFlag(ResponseFlag::UpstreamConnectionTermination)) {
     appendString(result, UPSTREAM_CONNECTION_TERMINATION);
   }
 
-  if (request_info.getResponseFlag(ResponseFlag::UpstreamOverflow)) {
+  if (request_info.hasResponseFlag(ResponseFlag::UpstreamOverflow)) {
     appendString(result, UPSTREAM_OVERFLOW);
   }
 
-  if (request_info.getResponseFlag(ResponseFlag::NoRouteFound)) {
+  if (request_info.hasResponseFlag(ResponseFlag::NoRouteFound)) {
     appendString(result, NO_ROUTE_FOUND);
   }
 
-  if (request_info.getResponseFlag(ResponseFlag::DelayInjected)) {
+  if (request_info.hasResponseFlag(ResponseFlag::DelayInjected)) {
     appendString(result, DELAY_INJECTED);
   }
 
-  if (request_info.getResponseFlag(ResponseFlag::FaultInjected)) {
+  if (request_info.hasResponseFlag(ResponseFlag::FaultInjected)) {
     appendString(result, FAULT_INJECTED);
   }
 
-  if (request_info.getResponseFlag(ResponseFlag::RateLimited)) {
+  if (request_info.hasResponseFlag(ResponseFlag::RateLimited)) {
     appendString(result, RATE_LIMITED);
   }
 
-  if (request_info.getResponseFlag(ResponseFlag::UnauthorizedExternalService)) {
+  if (request_info.hasResponseFlag(ResponseFlag::UnauthorizedExternalService)) {
     appendString(result, UNAUTHORIZED_EXTERNAL_SERVICE);
   }
 

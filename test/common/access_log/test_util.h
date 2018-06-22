@@ -32,10 +32,10 @@ public:
   bool intersectResponseFlags(uint64_t response_flags) const override {
     return (response_flags_ & response_flags) != 0;
   }
-  bool getResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) const override {
+  bool hasResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) const override {
     return response_flags_ & response_flag;
   }
-  bool getResponseFlag() const override { return response_flags_ != 0; }
+  bool hasResponseFlag() const override { return response_flags_ != 0; }
   void setResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) override {
     response_flags_ |= response_flag;
   }

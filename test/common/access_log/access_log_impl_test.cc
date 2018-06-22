@@ -794,6 +794,58 @@ config:
   log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 }
 
+TEST_F(AccessLogImplTest, ResponseFlagFilterAllFlagsInPGV) {
+  const std::string yaml = R"EOF(
+name: envoy.file_access_log
+filter:
+  response_flag_filter:
+    flags:
+      - LH
+      - UH
+      - UT
+      - LR
+      - UR
+      - UF
+      - UC
+      - UO
+      - NR
+      - DI
+      - FI
+      - RL
+      - UAEX
+config:
+  path: /dev/null
+  )EOF";
+
+  static_assert(RequestInfo::ResponseFlag::LastFlag == 0x1000,
+                "A flag has been added. Fix this code.");
+
+  std::vector<RequestInfo::ResponseFlag> all_response_flags = {
+      RequestInfo::ResponseFlag::FailedLocalHealthCheck,
+      RequestInfo::ResponseFlag::NoHealthyUpstream,
+      RequestInfo::ResponseFlag::UpstreamRequestTimeout,
+      RequestInfo::ResponseFlag::LocalReset,
+      RequestInfo::ResponseFlag::UpstreamRemoteReset,
+      RequestInfo::ResponseFlag::UpstreamConnectionFailure,
+      RequestInfo::ResponseFlag::UpstreamConnectionTermination,
+      RequestInfo::ResponseFlag::UpstreamOverflow,
+      RequestInfo::ResponseFlag::NoRouteFound,
+      RequestInfo::ResponseFlag::DelayInjected,
+      RequestInfo::ResponseFlag::FaultInjected,
+      RequestInfo::ResponseFlag::RateLimited,
+      RequestInfo::ResponseFlag::UnauthorizedExternalService,
+  };
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
+
+  for (const auto response_flag : all_response_flags) {
+    TestRequestInfo request_info;
+    request_info.setResponseFlag(response_flag);
+    EXPECT_CALL(*file_, write(_));
+    log->log(&request_headers_, &response_headers_, &response_trailers_, request_info);
+  }
+}
+
 TEST_F(AccessLogImplTest, ResponseFlagFilterUnsupportedFlag) {
   const std::string yaml = R"EOF(
 name: envoy.file_access_log

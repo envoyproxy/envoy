@@ -228,12 +228,12 @@ public:
   /**
    * @return whether response flag is set or not.
    */
-  virtual bool getResponseFlag(ResponseFlag response_flag) const PURE;
+  virtual bool hasResponseFlag(ResponseFlag response_flag) const PURE;
 
   /**
    * @return whether any response flag is set or not.
    */
-  virtual bool getResponseFlag() const PURE;
+  virtual bool hasResponseFlag() const PURE;
 
   /**
    * @return upstream host description.
