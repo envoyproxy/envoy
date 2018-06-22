@@ -145,13 +145,11 @@ def checkBuildLine(line, file_path, reportError):
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
-  if '@envoy//bazel:envoy_build_system.bzl' in line:
-    reportError("Use '//bazel:envoy_build_system.bzl' rather than "
-                "'@envoy//bazel:envoy_build_system.bzl'")
+  if '@envoy//' in line:
+    reportError("Superfluous '@envoy//' prefix")
 
 def fixBuildLine(line):
-  line = line.replace('@envoy//bazel:envoy_build_system.bzl',
-                      '//bazel:envoy_build_system.bzl')
+  line = line.replace('@envoy//', '//')
   return line
 
 def fixBuildPath(file_path):

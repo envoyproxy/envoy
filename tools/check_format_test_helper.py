@@ -160,7 +160,7 @@ if __name__ == "__main__":
   errors += checkFileExpectingError("header_order.cc", "header_order.py check failed")
   errors += checkFileExpectingError("license.BUILD", "envoy_build_fixer check failed")
   errors += checkFileExpectingError("bad_envoy_build_sys_ref.BUILD",
-                                    "Use '//bazel:envoy_build_system.bzl' rather than")
+                                    "Superfluous '@envoy//' prefix")
   errors += checkFileExpectingOK("ok_file.cc")
 
   errors += fixFileExpectingFailure("proto.BUILD",
