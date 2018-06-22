@@ -310,6 +310,24 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "websocket_integration_test",
+    srcs = [
+        "websocket_integration_test.cc",
+        "websocket_integration_test.h",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/http:header_map_lib",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/http/cors:config",
+        "//source/extensions/filters/http/dynamo:config",
+        "//source/extensions/filters/http/grpc_http1_bridge:config",
+        "//source/extensions/filters/http/health_check:config",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "echo_integration_test",
     srcs = [
         "echo_integration_test.cc",

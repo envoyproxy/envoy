@@ -363,5 +363,26 @@ void SourceImpl::clearCache() {
   histograms_.reset();
 }
 
+CounterSharedPtr RawStatDataAllocator::makeCounter(const std::string& name,
+                                                   std::string&& tag_extracted_name,
+                                                   std::vector<Tag>&& tags) {
+  RawStatData* data = alloc(name);
+  if (data == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<CounterImpl>(*data, *this, std::move(tag_extracted_name),
+                                       std::move(tags));
+}
+
+GaugeSharedPtr RawStatDataAllocator::makeGauge(const std::string& name,
+                                               std::string&& tag_extracted_name,
+                                               std::vector<Tag>&& tags) {
+  RawStatData* data = alloc(name);
+  if (data == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<GaugeImpl>(*data, *this, std::move(tag_extracted_name), std::move(tags));
+}
+
 } // namespace Stats
 } // namespace Envoy
