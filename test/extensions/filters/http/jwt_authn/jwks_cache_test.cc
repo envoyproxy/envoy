@@ -36,9 +36,9 @@ TEST_F(JwksCacheTest, TestFindByIssuer) {
 
 // Test setRemoteJwks and its expiration
 TEST_F(JwksCacheTest, TestSetRemoteJwks) {
-  auto rule0 = config_.mutable_rules(0);
+  auto& provider0 = (*config_.mutable_providers())[std::string(ProviderName)];
   // Set cache_duration to 1 second to test expiration
-  rule0->mutable_remote_jwks()->mutable_cache_duration()->set_seconds(1);
+  provider0.mutable_remote_jwks()->mutable_cache_duration()->set_seconds(1);
   cache_ = JwksCache::create(config_);
 
   auto jwks = cache_->findByIssuer("https://example.com");
@@ -55,9 +55,9 @@ TEST_F(JwksCacheTest, TestSetRemoteJwks) {
 
 // Test setRemoteJwks and use default cache duration.
 TEST_F(JwksCacheTest, TestSetRemoteJwksWithDefaultCacheDuration) {
-  auto rule0 = config_.mutable_rules(0);
+  auto& provider0 = (*config_.mutable_providers())[std::string(ProviderName)];
   // Clear cache_duration to use default one.
-  rule0->mutable_remote_jwks()->clear_cache_duration();
+  provider0.mutable_remote_jwks()->clear_cache_duration();
   cache_ = JwksCache::create(config_);
 
   auto jwks = cache_->findByIssuer("https://example.com");
@@ -70,9 +70,9 @@ TEST_F(JwksCacheTest, TestSetRemoteJwksWithDefaultCacheDuration) {
 
 // Test a good local jwks
 TEST_F(JwksCacheTest, TestGoodInlineJwks) {
-  auto rule0 = config_.mutable_rules(0);
-  rule0->clear_remote_jwks();
-  auto local_jwks = rule0->mutable_local_jwks();
+  auto& provider0 = (*config_.mutable_providers())[std::string(ProviderName)];
+  provider0.clear_remote_jwks();
+  auto local_jwks = provider0.mutable_local_jwks();
   local_jwks->set_inline_string(PublicKey);
 
   cache_ = JwksCache::create(config_);
@@ -84,9 +84,9 @@ TEST_F(JwksCacheTest, TestGoodInlineJwks) {
 
 // Test a bad local jwks
 TEST_F(JwksCacheTest, TestBadInlineJwks) {
-  auto rule0 = config_.mutable_rules(0);
-  rule0->clear_remote_jwks();
-  auto local_jwks = rule0->mutable_local_jwks();
+  auto& provider0 = (*config_.mutable_providers())[std::string(ProviderName)];
+  provider0.clear_remote_jwks();
+  auto local_jwks = provider0.mutable_local_jwks();
   local_jwks->set_inline_string("BAD-JWKS");
 
   cache_ = JwksCache::create(config_);
