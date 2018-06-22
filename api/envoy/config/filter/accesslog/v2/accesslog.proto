@@ -134,14 +134,14 @@ message RuntimeFilter {
 // Filters are evaluated sequentially and if one of them returns false, the
 // filter returns false immediately.
 message AndFilter {
-  repeated AccessLogFilter filters = 1 [(validate.rules).repeated .min_items = 2];
+  repeated AccessLogFilter filters = 1 [(validate.rules).repeated.min_items = 2];
 }
 
 // Performs a logical “or” operation on the result of each individual filter.
 // Filters are evaluated sequentially and if one of them returns true, the
 // filter returns true immediately.
 message OrFilter {
-  repeated AccessLogFilter filters = 2 [(validate.rules).repeated .min_items = 2];
+  repeated AccessLogFilter filters = 2 [(validate.rules).repeated.min_items = 2];
 }
 
 // Filters requests based on the presence or value of a request header.

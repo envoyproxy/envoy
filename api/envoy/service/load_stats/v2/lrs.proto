@@ -61,7 +61,7 @@ message LoadStatsRequest {
 // [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 message LoadStatsResponse {
   // Clusters to report stats for.
-  repeated string clusters = 1 [(validate.rules).repeated .min_items = 1];
+  repeated string clusters = 1 [(validate.rules).repeated.min_items = 1];
 
   // The interval of time to collect stats. The default is 10 seconds.
   google.protobuf.Duration load_reporting_interval = 2;

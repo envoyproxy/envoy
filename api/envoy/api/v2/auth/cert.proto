@@ -107,7 +107,7 @@ message TlsSessionTicketKeys {
   //   * Keep the session ticket keys at least as secure as your TLS certificate private keys
   //   * Rotate session ticket keys at least daily, and preferably hourly
   //   * Always generate keys using a cryptographically-secure random data source
-  repeated core.DataSource keys = 1 [(validate.rules).repeated .min_items = 1];
+  repeated core.DataSource keys = 1 [(validate.rules).repeated.min_items = 1];
 }
 
 message CertificateValidationContext {
@@ -160,7 +160,7 @@ message CertificateValidationContext {
   //   because SPKI is tied to a private key, so it doesn't change when the certificate
   //   is renewed using the same private key.
   repeated string verify_certificate_spki = 3
-      [(validate.rules).repeated .items.string = {min_bytes: 44, max_bytes: 44}];
+      [(validate.rules).repeated.items.string = {min_bytes: 44, max_bytes: 44}];
 
   // An optional list of hex-encoded SHA-256 hashes. If specified, Envoy will verify that
   // the SHA-256 of the DER-encoded presented certificate matches one of the specified values.
@@ -189,7 +189,7 @@ message CertificateValidationContext {
   // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>` are specified,
   // a hash matching value from either of the lists will result in the certificate being accepted.
   repeated string verify_certificate_hash = 2
-      [(validate.rules).repeated .items.string = {min_bytes: 64, max_bytes: 95}];
+      [(validate.rules).repeated.items.string = {min_bytes: 64, max_bytes: 95}];
 
   // An optional list of Subject Alternative Names. If specified, Envoy will verify that the
   // Subject Alternative Name of the presented certificate matches one of the specified values.
@@ -230,7 +230,7 @@ message CommonTlsContext {
   //
   //   Although this is a list, currently only a single certificate is supported. This will be
   //   relaxed in the future.
-  repeated TlsCertificate tls_certificates = 2 [(validate.rules).repeated .max_items = 1];
+  repeated TlsCertificate tls_certificates = 2 [(validate.rules).repeated.max_items = 1];
 
   // [#not-implemented-hide:]
   repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6;

@@ -47,5 +47,5 @@ message IPTagging {
   // [#comment:TODO(ccaraman): Extend functionality to load IP tags from file system.
   // Tracked by issue https://github.com/envoyproxy/envoy/issues/2695]
   // The set of IP tags for the filter.
-  repeated IPTag ip_tags = 4 [(validate.rules).repeated .min_items = 1];
+  repeated IPTag ip_tags = 4 [(validate.rules).repeated.min_items = 1];
 }

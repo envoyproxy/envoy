@@ -58,5 +58,5 @@ message RateLimitDescriptor {
   }
 
   // Descriptor entries.
-  repeated Entry entries = 1 [(validate.rules).repeated .min_items = 1];
+  repeated Entry entries = 1 [(validate.rules).repeated.min_items = 1];
 }

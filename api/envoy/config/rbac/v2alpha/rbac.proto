@@ -74,12 +74,12 @@ message Policy {
   // Required. The set of permissions that define a role. Each permission is matched with OR
   // semantics. To match all actions for this policy, a single Permission with the `any` field set
   // to true should be used.
-  repeated Permission permissions = 1 [(validate.rules).repeated .min_items = 1];
+  repeated Permission permissions = 1 [(validate.rules).repeated.min_items = 1];
 
   // Required. The set of principals that are assigned/denied the role based on “action”. Each
   // principal is matched with OR semantics. To match all downstreams for this policy, a single
   // Principal with the `any` field set to true should be used.
-  repeated Principal principals = 2 [(validate.rules).repeated .min_items = 1];
+  repeated Principal principals = 2 [(validate.rules).repeated.min_items = 1];
 }
 
 // Permission defines an action (or actions) that a principal can take.
@@ -88,7 +88,7 @@ message Permission {
   // Used in the `and_rules` and `or_rules` fields in the `rule` oneof. Depending on the context,
   // each are applied with the associated behavior.
   message Set {
-    repeated Permission rules = 1 [(validate.rules).repeated .min_items = 1];
+    repeated Permission rules = 1 [(validate.rules).repeated.min_items = 1];
   }
 
   oneof rule {
@@ -120,7 +120,7 @@ message Principal {
   // Used in the `and_ids` and `or_ids` fields in the `identifier` oneof. Depending on the context,
   // each are applied with the associated behavior.
   message Set {
-    repeated Principal ids = 1 [(validate.rules).repeated .min_items = 1];
+    repeated Principal ids = 1 [(validate.rules).repeated.min_items = 1];
   }
 
   // Authentication attributes for a downstream.

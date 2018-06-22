@@ -42,7 +42,7 @@ message VirtualHost {
   //   host/authority header. Only a single virtual host in the entire route
   //   configuration can match on “*”. A domain must be unique across all virtual
   //   hosts or the config will fail to load.
-  repeated string domains = 2 [(validate.rules).repeated .min_items = 1];
+  repeated string domains = 2 [(validate.rules).repeated.min_items = 1];
 
   // The list of routes that will be matched, in order, for incoming requests.
   // The first route that matches will be used.
@@ -208,7 +208,7 @@ message WeightedCluster {
   }
 
   // Specifies one or more upstream clusters associated with the route.
-  repeated ClusterWeight clusters = 1 [(validate.rules).repeated .min_items = 1];
+  repeated ClusterWeight clusters = 1 [(validate.rules).repeated.min_items = 1];
 
   // Specifies the total weight across all clusters. The sum of all cluster weights must equal this
   // value, which must be greater than 0. Defaults to 100.
@@ -837,7 +837,7 @@ message RateLimit {
       // specified headers in the config. A match will happen if all the
       // headers in the config are present in the request with the same values
       // (or based on presence if the value field is not in the config).
-      repeated HeaderMatcher headers = 3 [(validate.rules).repeated .min_items = 1];
+      repeated HeaderMatcher headers = 3 [(validate.rules).repeated.min_items = 1];
     }
 
     oneof action_specifier {
@@ -869,7 +869,7 @@ message RateLimit {
   // cannot append a descriptor entry, no descriptor is generated for the
   // configuration. See :ref:`composing actions
   // <config_http_filters_rate_limit_composing_actions>` for additional documentation.
-  repeated Action actions = 3 [(validate.rules).repeated .min_items = 1];
+  repeated Action actions = 3 [(validate.rules).repeated.min_items = 1];
 }
 
 // .. attention::
