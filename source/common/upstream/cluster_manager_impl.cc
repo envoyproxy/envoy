@@ -303,6 +303,17 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                               main_thread_dispatcher));
   }
 
+<<<<<<< HEAD
+=======
+  if (cm_config.has_hds_config()) {
+    const auto& hds_config = cm_config.hds_config();
+    hds_reporter_.reset(new HdsDelegate(
+        bootstrap.node(), stats,
+        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats)
+            ->create(),
+        main_thread_dispatcher));
+  }
+>>>>>>> refs/remotes/origin/integration_test
 }
 
 ClusterManagerStats ClusterManagerImpl::generateStats(Stats::Scope& scope) {
