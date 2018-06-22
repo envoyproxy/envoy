@@ -55,13 +55,13 @@ tls_certificate:
 
   ASSERT_NE(server.secretManager().findTlsCertificate("", "abc.com"), nullptr);
 
-  EXPECT_EQ(
-      TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_cert.pem"),
-      server.secretManager().findTlsCertificate("", "abc.com")->certificateChain());
+  const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
+            server.secretManager().findTlsCertificate("", "abc.com")->certificateChain());
 
-  EXPECT_EQ(
-      TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_key.pem"),
-      server.secretManager().findTlsCertificate("", "abc.com")->privateKey());
+  const std::string key_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
+            server.secretManager().findTlsCertificate("", "abc.com")->privateKey());
 }
 
 TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
@@ -89,13 +89,14 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
 
   ASSERT_EQ(server.secretManager().findTlsCertificate(config_source_hash, "undefined"), nullptr);
 
+  const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem";
   EXPECT_EQ(
-      TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_cert.pem"),
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
       server.secretManager().findTlsCertificate(config_source_hash, "abc.com")->certificateChain());
 
-  EXPECT_EQ(
-      TestEnvironment::readFileToStringForTest("test/common/ssl/test_data/selfsigned_key.pem"),
-      server.secretManager().findTlsCertificate(config_source_hash, "abc.com")->privateKey());
+  const std::string key_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
+            server.secretManager().findTlsCertificate(config_source_hash, "abc.com")->privateKey());
 }
 
 TEST_F(SecretManagerImplTest, NotImplementedException) {
