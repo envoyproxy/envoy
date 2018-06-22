@@ -7,6 +7,7 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/http_uri.proto";
 import "envoy/api/v2/route/route.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 
 // This message specifies how a JSON Web Token (JWT) can be verified. JWT format is defined
@@ -30,7 +31,7 @@ import "validate/validate.proto";
 //       - seconds: 300
 //
 // [#not-implemented-hide:]
-message JwtRule {
+message JwtProvider {
   // Identifies the principal that issued the JWT. See `here
   //  <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_. Usually a URL or an email address.
   //
@@ -183,44 +184,219 @@ message JwtHeader {
   string value_prefix = 2;
 }
 
+// Specify a required provider with audiences.
+message ProviderWithAudiences {
+  // Specify a required provider name.
+  string provider_name = 1;
+
+  // This field overrides the one specified in the JwtProvider.
+  repeated string audiences = 2;
+}
+
+// This message specifies a Jwt requirement. An empty message means JWT verification is not
+// required. Here are some config examples:
+//
+// .. code-block:: yaml
+//
+//  # Example 1: not required with an empty message
+//
+//  # Example 2: require A
+//  provider_name: "provider-A"
+//
+//  # Example 3: require A or B
+//  requires_any:
+//    requirements:
+//      - provider_name: "provider-A"
+//      - provider_name: "provider-B"
+//
+//  # Example 4: require A and B
+//  requires_all:
+//    requirements:
+//      - provider_name: "provider-A"
+//      - provider_name: "provider-B"
+//
+//  # Example 5: require A and (B or C)
+//  requires_all:
+//    requirements:
+//      - provider_name: "provider-A"
+//      - requires_any:
+//        requirements:
+//          - provider_name: "provider-B"
+//          - provider_name: "provider-C"
+//
+//  # Example 6: require A or (B and C)
+//  requires_any:
+//    requirements:
+//      - provider_name: "provider-A"
+//      - requires_all:
+//        requirements:
+//          - provider_name: "provider-B"
+//          - provider_name: "provider-C"
+//
+message JwtRequirement {
+  oneof requires_type {
+    // Specify a required provider name.
+    string provider_name = 1;
+
+    // Specify a required provider with audiences.
+    ProviderWithAudiences provider_and_audiences = 2;
+
+    // Specify list of JwtRequirement. Their results are OR-ed.
+    // If any one of them passes, the result is passed.
+    JwtRequirementOrList requires_any = 3;
+
+    // Specify list of JwtRequirement. Their results are AND-ed.
+    // All of them must pass, if one of them fails or missing, it fails.
+    JwtRequirementAndList requires_all = 4;
+
+    // The requirement is always satisfied even if JWT is missing or the JWT
+    // verification fails. A typical usage is: this filter is used to only verify
+    // JWTs and pass the verified JWT payloads to another filter, the other filter
+    // will make decision. In this mode, all JWT tokens will be verified.
+    google.protobuf.BoolValue allow_missing_or_failed = 5;
+  }
+}
+
+// This message specifies a list of RequiredProvider.
+// Their results are OR-ed; if any one of them passes, the result is passed
+message JwtRequirementOrList {
+  // Specify a list of JwtRequirement.
+  repeated JwtRequirement requirements = 1 [(validate.rules).repeated .min_items = 2];
+}
+
+// This message specifies a list of RequiredProvider.
+// Their results are AND-ed; all of them must pass, if one of them fails or missing, it fails.
+message JwtRequirementAndList {
+  // Specify a list of JwtRequirement.
+  repeated JwtRequirement requirements = 1 [(validate.rules).repeated .min_items = 2];
+}
+
+// This message specifies a Jwt requirement for a specific Route condition.
+// Example 1:
+//
+// .. code-block:: yaml
+//
+//    - match:
+//         prefix: "/healthz"
+//
+// In above example, "requires" field is empty for /healthz prefix match,
+// it means that requests matching the path prefix don't require JWT authentication.
+//
+// Example 2:
+//
+// .. code-block:: yaml
+//
+//    - match:
+//         prefix: "/"
+//      requires: { provider_name: "provider-A" }
+//
+// In above example, all requests matched the path prefix require jwt authentication
+// from "provider-A".
+message RequirementRule {
+  // The route matching parameter. Only when the match is satisfied, the "requires" field will
+  // apply.
+  //
+  // For example: following match will match all requests.
+  //
+  // .. code-block:: yaml
+  //
+  //    match:
+  //       prefix: "/"
+  //
+  envoy.api.v2.route.RouteMatch match = 1 [(validate.rules).message.required = true];
+
+  // Specify a Jwt Requirement. Please detail comment in message JwtRequirement.
+  JwtRequirement requires = 2;
+}
+
 // This is the Envoy HTTP filter config for JWT authentication.
-// [#not-implemented-hide:]
+//
+// For example:
+//
+// .. code-block:: yaml
+//
+//   providers:
+//      provider1:
+//        issuer: issuer1
+//        audiences:
+//        - audience1
+//        - audience2
+//        remote_jwks:
+//          http_uri:
+//            uri: https://example.com/.well-known/jwks.json
+//            cluster: example_jwks_cluster
+//      provider2:
+//        issuer: issuer2
+//        local_jwks:
+//          inline_string: jwks_string
+//
+//   rules:
+//      # Not jwt verification is required for /health path
+//      - match:
+//          prefix: "/health"
+//
+//      # Jwt verification for provider1 is required for path prefixed with "prefix"
+//      - match:
+//          prefix: "/prefix"
+//        requires:
+//          provider_name: "provider1"
+//
+//      # Jwt verification for either provider1 or provider2 is required for all other requests.
+//      - match:
+//          prefix: "/"
+//        requires:
+//          requires_any:
+//            requirements:
+//              - provider_name: "provider1"
+//              - provider_name: "provider2"
+//
+//// [#not-implemented-hide:]
 message JwtAuthentication {
-  // List of JWT rules to valide.
-  repeated JwtRule rules = 1;
-
-  // If true, the request is allowed if JWT is missing or JWT verification fails.
-  // Default is false, a request without JWT or failed JWT verification is not allowed.
-  bool allow_missing_or_failed = 2;
-
-  // This field lists the patterns allowed to bypass JWT verification. This only applies when
-  // `allow_missing_or_failed_jwt` is false. Under this config, if a request doesn't have JWT, it
-  // will be rejected. But some requests still needed to be forwarded without JWT, such as OPTIONS
-  // for CORS and some health checking paths.
-  //
-  // Examples: bypass all CORS options requests
+  // Map of provider names to JwtProviders.
   //
   // .. code-block:: yaml
   //
-  //   bypass:
-  //   - headers:
-  //     - name: :method
-  //       value: OPTIONS
-  //   - headers:
-  //     - name: :path
-  //       regex_match: /.*
+  //   providers:
+  //     provider1:
+  //        issuer: issuer1
+  //        audiences:
+  //        - audience1
+  //        - audience2
+  //        remote_jwks:
+  //          http_uri:
+  //            uri: https://example.com/.well-known/jwks.json
+  //            cluster: example_jwks_cluster
+  //      provider2:
+  //        issuer: provider2
+  //        local_jwks:
+  //          inline_string: jwks_string
   //
-  // Examples: bypass /healthz check
+  map<string, JwtProvider> providers = 1;
+
+  // Specifies requirements based on the route matches. The first matched requirement will be
+  // applied. If there are overlapped match conditions, please put the most specific match first.
+  //
+  // Examples
   //
   // .. code-block:: yaml
   //
-  //   bypass:
-  //   - headers:
-  //     - name: :method
-  //       value: GET
-  //   - headers:
-  //     - name: :path
-  //       exact_match: /healthz
+  // rules:
+  //   - match: { prefix: "/healthz" }
+  //   - match: { prefix: "/baz" }
+  //     requires:
+  //       provider_name: "provider1"
+  //   - match: { prefix: "/foo" }
+  //     requires:
+  //       requires_any:
+  //         requirements:
+  //           - provider_name: "provider1"
+  //           - provider_name: "provider2"
+  //   - match: { prefix: "/bar" }
+  //     requires:
+  //       requires_all:
+  //         requirements:
+  //           - provider_name: "provider1"
+  //           - provider_name: "provider2"
   //
-  repeated envoy.api.v2.route.RouteMatch bypass = 3;
+  repeated RequirementRule rules = 2;
 }
