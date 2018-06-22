@@ -171,12 +171,6 @@ message ClusterManager {
   // <envoy_api_enum_value_core.ApiConfigSource.ApiType.GRPC>`.
   envoy.api.v2.core.ApiConfigSource load_stats_config = 4;
 
-<<<<<<< HEAD
-=======
-  // Health discovery service config option.
-  // See api/envoy/api/v2/core/health_check.proto
-  envoy.api.v2.core.ApiConfigSource hds_config = 5;
->>>>>>> refs/remotes/origin/integration_test
 }
 
 // Envoy process watchdog configuration. When configured, this monitors for
