@@ -420,7 +420,7 @@ def _com_google_protobuf():
     # see https://groups.google.com/forum/#!topic/bazel-discuss/859ybHQZnuI and
     # https://github.com/bazelbuild/bazel/issues/3219.
     location = REPOSITORY_LOCATIONS["com_google_protobuf"]
-    native.http_archive(name = "com_google_protobuf_cc", **location)
+    git_repository(name = "com_google_protobuf_cc", **location)
     native.bind(
         name = "protobuf",
         actual = "@com_google_protobuf//:protobuf",
