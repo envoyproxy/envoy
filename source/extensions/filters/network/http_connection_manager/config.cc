@@ -167,7 +167,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     user_agent_ = context_.localInfo().clusterName();
   }
 
-  std::cout << "shakti | config.cc config.has_tracing(): " << config.has_tracing() << '\n';
   if (config.has_tracing()) {
     const auto& tracing_config = config.tracing();
 

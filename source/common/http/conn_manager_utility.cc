@@ -185,18 +185,11 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
 void ConnectionManagerUtility::mutateTracingRequestHeader(Http::HeaderMap& request_headers,
                                                           Runtime::Loader& runtime,
                                                           ConnectionManagerConfig& config) {
-  std::cout << "***** mutateTracingRequestHeader start *****\n";
   if (!config.tracingConfig() || !request_headers.RequestId()) {
     return;
   }
-  std::cout << "tracing config: " << config.tracingConfig() << '\n';
 
   std::string x_request_id = request_headers.RequestId()->value().c_str();
-  std::cout << "x_request_id: " << x_request_id << '\n';
-  std::cout << "client_sampling_: " << config.tracingConfig()->client_sampling_ << '\n';
-  std::cout << "random_sampling_: " << config.tracingConfig()->random_sampling_ << '\n';
-  std::cout << "overall_sampling_: " << config.tracingConfig()->overall_sampling_ << '\n';
-
   uint64_t result;
   // Skip if x-request-id is corrupted.
   if (!UuidUtils::uuidModBy(x_request_id, result, 10000)) {
@@ -224,7 +217,6 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(Http::HeaderMap& reque
   }
 
   request_headers.RequestId()->value(x_request_id);
-  std::cout << "***** mutateTracingRequestHeader end *****";
 }
 
 void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_headers,

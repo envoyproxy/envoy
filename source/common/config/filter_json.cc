@@ -185,12 +185,10 @@ void FilterJson::translateHttpConnectionManager(
       tracing->add_request_headers_for_tags(header);
     }
 
-    std::cout << "shakti | filter_json tracing: " << tracing << '\n';
-    std::cout << "shakti | filter_json json_tracing: " << json_tracing << '\n';
-
     tracing->mutable_client_sampling()->set_value(json_tracing->getDouble("client_sampling", 100));
     tracing->mutable_random_sampling()->set_value(json_tracing->getDouble("random_sampling", 100));
-    tracing->mutable_overall_sampling()->set_value(json_tracing->getDouble("overall_sampling", 100));
+    tracing->mutable_overall_sampling()->set_value(
+        json_tracing->getDouble("overall_sampling", 100));
   }
 
   if (json_config.hasObject("http1_settings")) {
