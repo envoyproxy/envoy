@@ -378,6 +378,17 @@ int StreamHandleWrapper::luaRequestInfo(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaConnection(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (connection_wrapper_.get() != nullptr) {
+    connection_wrapper_.pushStack();
+  } else {
+    connection_wrapper_.reset(
+        Filters::Common::Lua::ConnectionWrapper::create(state, callbacks_.connection()), true);
+  }
+  return 1;
+}
+
 int StreamHandleWrapper::luaLogTrace(lua_State* state) {
   const char* message = luaL_checkstring(state, 2);
   filter_.scriptLog(spdlog::level::trace, message);
@@ -423,6 +434,7 @@ FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocat
   lua_state_.registerType<Filters::Common::Lua::DynamicMetadataMapWrapper>();
   lua_state_.registerType<Filters::Common::Lua::DynamicMetadataMapIterator>();
   lua_state_.registerType<Filters::Common::Lua::RequestInfoWrapper>();
+  lua_state_.registerType<Filters::Common::Lua::ConnectionWrapper>();
   lua_state_.registerType<HeaderMapWrapper>();
   lua_state_.registerType<HeaderMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();

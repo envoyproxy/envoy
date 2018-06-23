@@ -136,6 +136,24 @@ int RequestInfoWrapper::luaDynamicMetadata(lua_State* state) {
   return 1;
 }
 
+int RequestInfoWrapper::luaProtocol(lua_State* state) {
+  switch (request_info_.protocol().value()) {
+  case Http::Protocol::Http10:
+    lua_pushstring(state, "HTTP10");
+    break;
+  case Http::Protocol::Http11:
+    lua_pushstring(state, "HTTP11");
+    break;
+  case Http::Protocol::Http2:
+    lua_pushstring(state, "HTTP2");
+    break;
+  default:
+    lua_pushstring(state, "UNKNOWN");
+  }
+
+  return 1;
+}
+
 DynamicMetadataMapIterator::DynamicMetadataMapIterator(DynamicMetadataMapWrapper& parent)
     : parent_{parent}, current_{parent.request_info_.dynamicMetadata().filter_metadata().begin()} {}
 
@@ -180,6 +198,11 @@ int DynamicMetadataMapWrapper::luaPairs(lua_State* state) {
 
   iterator_.reset(DynamicMetadataMapIterator::create(state, *this), true);
   lua_pushcclosure(state, DynamicMetadataMapIterator::static_luaPairsIterator, 1);
+  return 1;
+}
+
+int ConnectionWrapper::luaSecure(lua_State* state) {
+  lua_pushboolean(state, connection_->ssl() != nullptr);
   return 1;
 }
 
