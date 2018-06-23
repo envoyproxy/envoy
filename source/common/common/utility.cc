@@ -24,12 +24,14 @@ namespace Envoy {
 
 namespace {
 
-class SubsecondConstantValues {
+class SpecifierConstantValues {
 public:
-  const std::regex PATTERN{"%([1-9])?f", std::regex::optimize};
+  // This captures three groups: subsecond-specifier, subsecond-specifier width and
+  // second-specifier.
+  const std::regex PATTERN{"(%([1-9])?f)|(%s)", std::regex::optimize};
 };
 
-typedef ConstSingleton<SubsecondConstantValues> SubsecondConstants;
+typedef ConstSingleton<SpecifierConstantValues> SpecifierConstants;
 
 } // namespace
 
@@ -39,8 +41,8 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
     // is 10.
     size_t seconds_length;
 
-    // A container object to hold a strftime'd string, its timestamp (in seconds) and a list
-    // of position offsets for each subsecond specifier found in a format string.
+    // A container object to hold a strftime'd string, its timestamp (in seconds) and a list of
+    // position offsets for each specifier found in a format string.
     struct Formatted {
       // The resulted string after format string is passed to strftime at a given point in time.
       std::string str;
@@ -48,10 +50,10 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
       // A timestamp (in seconds) when this object is created.
       std::chrono::seconds epoch_time_seconds;
 
-      // List of offsets for each subsecond specifier found in a format string. This is needed to
-      // compensate the position of each recorded subsecond specifier due to the possible size
-      // change of the previous segment (after strftime'd).
-      SubsecondOffsets subsecond_offsets;
+      // List of offsets for each specifier found in a format string. This is needed to compensate
+      // the position of each recorded specifier due to the possible size change of the previous
+      // segment (after strftime'd).
+      SpecifierOffsets specifier_offsets;
     };
     // A map is used to keep different formatted format strings at a given second.
     std::unordered_map<std::string, const Formatted> formatted;
@@ -80,8 +82,10 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
 
     // Build a new formatted format string at current time.
     CachedTime::Formatted formatted;
-    formatted.str = fromTimeAndPrepareSubsecondOffsets(current_time, formatted.subsecond_offsets);
-    cached_time.seconds_length = fmt::FormatInt(epoch_time_seconds.count()).str().size();
+    const std::string seconds_str = fmt::FormatInt(epoch_time_seconds.count()).str();
+    formatted.str =
+        fromTimeAndPrepareSpecifierOffsets(current_time, formatted.specifier_offsets, seconds_str);
+    cached_time.seconds_length = seconds_str.size();
 
     // Stamp the formatted string using the current epoch time in seconds, and then cache it in.
     formatted.epoch_time_seconds = epoch_time_seconds;
@@ -89,22 +93,22 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
   }
 
   const auto& formatted = cached_time.formatted.at(format_string_);
-  ASSERT(subseconds_.size() == formatted.subsecond_offsets.size());
+  ASSERT(specifiers_.size() == formatted.specifier_offsets.size());
 
   // Copy the current cached formatted format string, then replace its subseconds part (when it has
   // non-zero width) by correcting its position using prepared subseconds offsets.
   std::string formatted_str = formatted.str;
   const std::string nanoseconds = fmt::FormatInt(epoch_time_ns.count()).str();
-  for (size_t i = 0; i < subseconds_.size(); ++i) {
-    const auto& subsecond = subseconds_.at(i);
+  for (size_t i = 0; i < specifiers_.size(); ++i) {
+    const auto& specifier = specifiers_.at(i);
 
-    // When subsecond.width_ is zero, skip the replacement. This is the last segment or it has no
-    // subsecond specifier.
-    if (subsecond.width_ > 0) {
-      ASSERT(subsecond.position_ + formatted.subsecond_offsets.at(i) < formatted_str.size());
-      formatted_str.replace(subsecond.position_ + formatted.subsecond_offsets.at(i),
-                            subsecond.width_,
-                            nanoseconds.substr(cached_time.seconds_length, subsecond.width_));
+    // When specifier.width_ is zero, skip the replacement. This is the last segment or it has no
+    // specifier.
+    if (specifier.width_ > 0 && !specifier.second_) {
+      ASSERT(specifier.position_ + formatted.specifier_offsets.at(i) < formatted_str.size());
+      formatted_str.replace(specifier.position_ + formatted.specifier_offsets.at(i),
+                            specifier.width_,
+                            nanoseconds.substr(cached_time.seconds_length, specifier.width_));
     }
   }
 
@@ -116,29 +120,37 @@ std::string DateFormatter::parse(const std::string& format_string) {
   std::string new_format_string = format_string;
   std::smatch matched;
   size_t step = 0;
-  while (regex_search(new_format_string, matched, SubsecondConstants::get().PATTERN)) {
-    const std::string& width_specifier = matched[1];
+  while (regex_search(new_format_string, matched, SpecifierConstants::get().PATTERN)) {
+    // The std::smatch matched for (%([1-9])?f)|(%s): [all, subsecond-specifier, subsecond-specifier
+    // width, second-specifier].
+    const std::string& width_specifier = matched[2];
+    const std::string& second_specifier = matched[3];
 
-    // When %f is the specifier, the width value should be 9 (the number of nanosecond digits).
+    // In the template string to be used in runtime substitution, the width is the number of
+    // characters to be replaced.
     const size_t width = width_specifier.empty() ? 9 : width_specifier.at(0) - '0';
-    new_format_string.replace(matched.position(), matched.length(), std::string(width, '?'));
+    new_format_string.replace(matched.position(), matched.length(),
+                              std::string(second_specifier.empty() ? width : 2, '?'));
 
     ASSERT(step < new_format_string.size());
 
     // This records matched position, the width of current subsecond pattern, and also the string
     // segment before the matched position. These values will be used later at data path.
-    SubsecondSpecifier subsecond(matched.position(), width,
-                                 new_format_string.substr(step, matched.position() - step));
-    subseconds_.emplace_back(subsecond);
+    specifiers_.emplace_back(
+        second_specifier.empty()
+            ? Specifier(matched.position(), width,
+                        new_format_string.substr(step, matched.position() - step))
+            : Specifier(matched.position(),
+                        new_format_string.substr(step, matched.position() - step)));
 
-    step = subsecond.position_ + subsecond.width_;
+    step = specifiers_.back().position_ + specifiers_.back().width_;
   }
 
-  // To capture the segment after the last subsecond pattern of a format string by creating a zero
-  // width subsecond. E.g. %3f-this-is-the-last-%s-segment-%Y-until-this.
+  // To capture the segment after the last specifier pattern of a format string by creating a zero
+  // width specifier. E.g. %3f-this-is-the-last-%s-segment-%Y-until-this.
   if (step < new_format_string.size()) {
-    SubsecondSpecifier subsecond(step, 0, new_format_string.substr(step));
-    subseconds_.emplace_back(subsecond);
+    Specifier specifier(step, 0, new_format_string.substr(step));
+    specifiers_.emplace_back(specifier);
   }
 
   return new_format_string;
@@ -154,8 +166,8 @@ std::string DateFormatter::fromTime(time_t time) const {
 }
 
 std::string
-DateFormatter::fromTimeAndPrepareSubsecondOffsets(time_t time,
-                                                  SubsecondOffsets& subsecond_offsets) const {
+DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
+                                                  const std::string& seconds_str) const {
   tm current_tm;
   gmtime_r(&time, &current_tm);
 
@@ -163,16 +175,20 @@ DateFormatter::fromTimeAndPrepareSubsecondOffsets(time_t time,
   std::string formatted;
 
   size_t previous = 0;
-  subsecond_offsets.reserve(subseconds_.size());
-  for (const auto& subsecond : subseconds_) {
+  specifier_offsets.reserve(specifiers_.size());
+  for (const auto& specifier : specifiers_) {
     const size_t formatted_length =
-        strftime(&buf[0], buf.size(), subsecond.segment_.c_str(), &current_tm);
-    absl::StrAppend(&formatted, &buf[0], std::string(subsecond.width_, '?'));
+        strftime(&buf[0], buf.size(), specifier.segment_.c_str(), &current_tm);
+    absl::StrAppend(&formatted, &buf[0],
+                    specifier.second_ ? seconds_str : std::string(specifier.width_, '?'));
 
-    // This computes and saves offset of each subsecond pattern to correct its position after the
+    // This computes and saves offset of each specifier's pattern to correct its position after the
     // previous string segment is formatted. An offset can be a negative value.
-    const int32_t offset = formatted_length - subsecond.segment_.size();
-    subsecond_offsets.emplace_back(previous + offset);
+    //
+    // If the current specifier is a second specifier (%s), it needs to be corrected by 2.
+    const int32_t offset = (formatted_length + (specifier.second_ ? (seconds_str.size() - 2) : 0)) -
+                           specifier.segment_.size();
+    specifier_offsets.emplace_back(previous + offset);
     previous += offset;
   }
 

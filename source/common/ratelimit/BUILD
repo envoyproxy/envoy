@@ -20,9 +20,12 @@ envoy_cc_library(
         "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
         "//source/common/http:headers_lib",
         "//source/common/tracing:http_tracer_lib",
+        "@envoy_api//envoy/api/v2/ratelimit:ratelimit_cc",
         "@envoy_api//envoy/config/ratelimit/v2:rls_cc",
+        "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     ],
 )
 
