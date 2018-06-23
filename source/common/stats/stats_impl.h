@@ -305,8 +305,7 @@ private:
   const std::vector<Tag> tags_;
 };
 
-template <class StatData>
-class StatDataAllocatorImpl : public StatDataAllocator {
+template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
   // StatDataAllocator
   CounterSharedPtr makeCounter(const std::string& name, std::string&& tag_extracted_name,
@@ -394,12 +393,33 @@ private:
 };
 
 /**
- * Implementation of RawStatDataAllocator that uses an unordered set to store
- * RawStatData pointers.
+ * This structure is an alternate backing store for both CounterImpl and GaugeImpl. It is designed
+ * so that it can be allocated efficiently from the heap on demand.
+ */
+struct HeapStatData {
+  HeapStatData(absl::string_view key) : name_(std::string(key)) {}
+
+  /**
+   * Returns the name as a string_view. This is required by BlockMemoryHashSet.
+   */
+  absl::string_view key() const { return name_; }
+
+  std::atomic<uint64_t> value_{0};
+  std::atomic<uint64_t> pending_increment_{0};
+  std::atomic<uint16_t> flags_{0};
+  std::atomic<uint16_t> ref_count_{1};
+  std::atomic<uint32_t> unused_{0};
+  std::string name_;
+};
+
+/**
+ * Implementation of StatDataAllocator that uses an unordered set to store
+ * RawStatData pointers that are allocated on the heap. This is mainly used
+ * for testing to exercise some of the hot-restart code in unit tests.
  */
 class HeapRawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
 public:
-  // RawStatDataAllocator
+  // StatDataAllocator
   ~HeapRawStatDataAllocator() { ASSERT(stats_.empty()); }
   RawStatData* alloc(const std::string& name) override;
   void free(RawStatData& data) override;
@@ -418,6 +438,45 @@ private:
   // An unordered set of RawStatData pointers which keys off the key()
   // field in each object. This necessitates a custom comparator and hasher.
   StringRawDataSet stats_ GUARDED_BY(mutex_);
+  // A mutex is needed here to protect the stats_ object from both alloc() and free() operations.
+  // Although alloc() operations are called under existing locking, free() operations are made from
+  // the destructors of the individual stat objects, which are not protected by locks.
+  Thread::MutexBasicLockable mutex_;
+};
+
+/**
+ * Implementation of StatDataAllocator using a pure heap-based strategy, so that
+ * Envoy implementations that do not require hot-restart can use less memory.
+ */
+class HeapStatDataAllocator : public StatDataAllocatorImpl<HeapStatData> {
+public:
+  // StatDataAllocator
+  ~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
+  HeapStatData* alloc(const std::string& name) override;
+  void free(HeapStatData& data) override;
+
+private:
+  struct HeapStatHash_ {
+    size_t operator()(const HeapStatData* a) const { return HashUtil::xxHash64(a->key()); }
+  };
+  struct HeapStatCompare_ {
+    bool operator()(const HeapStatData* a, const HeapStatData* b) const {
+      return (a->key() == b->key());
+    }
+  };
+
+  // TODO(jmarantz): storing the set of stats as a string-set wastes an
+  // enourmous amount of of memory, because all the stats are composed using the
+  // same set of cluster names and patterns found in
+  // source/common/config/well_known_names.cc. This should eventually be changed to
+  // store a symbol-table of decomposed stat segments (e.g. split on "." to start) and
+  // arrays referencing those segments. The segments can be ref-counted so they
+  // no longer consume memory once deleted.
+  typedef std::unordered_set<HeapStatData*, HeapStatHash_, HeapStatCompare_> StatSet;
+
+  // An unordered set of HeapStatData pointers which keys off the key()
+  // field in each object. This necessitates a custom comparator and hasher.
+  StatSet stats_ GUARDED_BY(mutex_);
   // A mutex is needed here to protect the stats_ object from both alloc() and free() operations.
   // Although alloc() operations are called under existing locking, free() operations are made from
   // the destructors of the individual stat objects, which are not protected by locks.
@@ -519,7 +578,7 @@ private:
     const std::string prefix_;
   };
 
-  HeapRawStatDataAllocator alloc_;
+  HeapStatDataAllocator alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;

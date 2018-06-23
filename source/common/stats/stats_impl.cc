@@ -175,13 +175,57 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   }
 }
 
+void HeapRawStatDataAllocator::free(RawStatData& data) {
+  ASSERT(data.ref_count_ > 0);
+  if (--data.ref_count_ > 0) {
+    return;
+  }
+
+  size_t key_removed;
+  {
+    Thread::LockGuard lock(mutex_);
+    key_removed = stats_.erase(&data);
+  }
+
+  ASSERT(key_removed == 1);
+  ::free(&data);
+}
+
+HeapStatData* HeapStatDataAllocator::alloc(const std::string& name) {
+  auto data = std::make_unique<HeapStatData>(name);
+  Thread::ReleasableLockGuard lock(mutex_);
+  auto ret = stats_.insert(data.get());
+  HeapStatData* existing_data = *ret.first;
+  lock.release();
+
+  if (ret.second) {
+    return data.release();
+  }
+  ++existing_data->ref_count_;
+  return existing_data;
+}
+
+void HeapStatDataAllocator::free(HeapStatData& data) {
+  ASSERT(data.ref_count_ > 0);
+  if (--data.ref_count_ > 0) {
+    return;
+  }
+
+  {
+    Thread::LockGuard lock(mutex_);
+    size_t key_removed = stats_.erase(&data);
+    ASSERT(key_removed == 1);
+  }
+
+  delete &data;
+}
+
 /**
- * Counter implementation that wraps a StatData.  StatData must have data members:
+ * Counter implementation that wraps a StatData. StatData must have data members:
  *    int64 value_;
  *    ....
  */
-template<class StatData>
-class CounterImpl : public Counter, public MetricImpl {
+template <class StatData> class CounterImpl : public Counter, public MetricImpl {
 public:
   CounterImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
               std::string&& tag_extracted_name, std::vector<Tag>&& tags)
@@ -210,10 +254,9 @@ private:
 /**
  * Gauge implementation that wraps a StatData.
  */
-template<class StatData>
-class GaugeImpl : public Gauge, public MetricImpl {
+template <class StatData> class GaugeImpl : public Gauge, public MetricImpl {
 public:
-  GaugeImpl(RawStatData& data, StatDataAllocatorImpl<StatData>& alloc,
+  GaugeImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
             std::string&& tag_extracted_name, std::vector<Tag>&& tags)
       : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
         alloc_(alloc) {}
@@ -341,22 +384,6 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
   return names;
 }
 
-void HeapRawStatDataAllocator::free(RawStatData& data) {
-  ASSERT(data.ref_count_ > 0);
-  if (--data.ref_count_ > 0) {
-    return;
-  }
-
-  size_t key_removed;
-  {
-    Thread::LockGuard lock(mutex_);
-    key_removed = stats_.erase(&data);
-  }
-
-  ASSERT(key_removed == 1);
-  ::free(&data);
-}
-
 void RawStatData::initialize(absl::string_view key) {
   ASSERT(!initialized());
   if (key.size() > Stats::RawStatData::maxNameLength()) {
@@ -431,7 +458,7 @@ void SourceImpl::clearCache() {
   histograms_.reset();
 }
 
-template<class StatData>
+template <class StatData>
 CounterSharedPtr StatDataAllocatorImpl<StatData>::makeCounter(const std::string& name,
                                                               std::string&& tag_extracted_name,
                                                               std::vector<Tag>&& tags) {
@@ -443,7 +470,7 @@ CounterSharedPtr StatDataAllocatorImpl<StatData>::makeCounter(const std::string&
                                                  std::move(tags));
 }
 
-template<class StatData>
+template <class StatData>
 GaugeSharedPtr StatDataAllocatorImpl<StatData>::makeGauge(const std::string& name,
                                                           std::string&& tag_extracted_name,
                                                           std::vector<Tag>&& tags) {

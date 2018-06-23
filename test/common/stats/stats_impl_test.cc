@@ -502,6 +502,23 @@ TEST(RawStatDataTest, HeapAlloc) {
   alloc.free(*stat_3);
 }
 
+// Same test as RawStatDataTest, but with HeapStatData. Reference-counting should work here too.
+TEST(HeapStatDataTest, HeapAlloc) {
+  HeapStatDataAllocator alloc;
+  HeapStatData* stat_1 = alloc.alloc("ref_name");
+  ASSERT_NE(stat_1, nullptr);
+  HeapStatData* stat_2 = alloc.alloc("ref_name");
+  ASSERT_NE(stat_2, nullptr);
+  HeapStatData* stat_3 = alloc.alloc("not_ref_name");
+  ASSERT_NE(stat_3, nullptr);
+  EXPECT_EQ(stat_1, stat_2);
+  EXPECT_NE(stat_1, stat_3);
+  EXPECT_NE(stat_2, stat_3);
+  alloc.free(*stat_1);
+  alloc.free(*stat_2);
+  alloc.free(*stat_3);
+}
+
 TEST(SourceImplTest, Caching) {
   NiceMock<MockStore> store;
   std::vector<CounterSharedPtr> stored_counters;

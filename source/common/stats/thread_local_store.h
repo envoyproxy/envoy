@@ -283,7 +283,7 @@ private:
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
-  HeapRawStatDataAllocator heap_allocator_;
+  HeapStatDataAllocator heap_allocator_;
   SourceImpl source_;
 };
 
