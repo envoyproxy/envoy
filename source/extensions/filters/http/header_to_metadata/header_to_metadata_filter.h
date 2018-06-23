@@ -113,7 +113,7 @@ private:
    */
   void writeHeaderToMetadata(Http::HeaderMap& headers, const HeaderToMetadataRules& rules,
                              Http::StreamFilterCallbacks& callbacks);
-  bool addMetadata(StructMap&, const std::string&, const std::string&, const std::string&,
+  bool addMetadata(StructMap&, const std::string&, const std::string&, absl::string_view,
                    ValueType) const;
   const std::string& decideNamespace(const std::string& nspace) const;
 };
