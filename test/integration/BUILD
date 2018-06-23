@@ -394,6 +394,7 @@ envoy_cc_test(
         "//source/common/ratelimit:ratelimit_proto",
         "//source/extensions/filters/http/ratelimit:config",
         "//test/common/grpc:grpc_client_integration_lib",
+        "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     ],
 )
 
