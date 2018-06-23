@@ -175,6 +175,70 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   }
 }
 
+/**
+ * Counter implementation that wraps a RawStatData.
+ */
+class CounterImpl : public Counter, public MetricImpl {
+public:
+  CounterImpl(RawStatData& data, RawStatDataAllocator& alloc, std::string&& tag_extracted_name,
+              std::vector<Tag>&& tags)
+      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
+        alloc_(alloc) {}
+  ~CounterImpl() { alloc_.free(data_); }
+
+  // Stats::Counter
+  void add(uint64_t amount) override {
+    data_.value_ += amount;
+    data_.pending_increment_ += amount;
+    data_.flags_ |= Flags::Used;
+  }
+
+  void inc() override { add(1); }
+  uint64_t latch() override { return data_.pending_increment_.exchange(0); }
+  void reset() override { data_.value_ = 0; }
+  bool used() const override { return data_.flags_ & Flags::Used; }
+  uint64_t value() const override { return data_.value_; }
+
+private:
+  RawStatData& data_;
+  RawStatDataAllocator& alloc_;
+};
+
+/**
+ * Gauge implementation that wraps a RawStatData.
+ */
+class GaugeImpl : public Gauge, public MetricImpl {
+public:
+  GaugeImpl(RawStatData& data, RawStatDataAllocator& alloc, std::string&& tag_extracted_name,
+            std::vector<Tag>&& tags)
+      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
+        alloc_(alloc) {}
+  ~GaugeImpl() { alloc_.free(data_); }
+
+  // Stats::Gauge
+  virtual void add(uint64_t amount) override {
+    data_.value_ += amount;
+    data_.flags_ |= Flags::Used;
+  }
+  virtual void dec() override { sub(1); }
+  virtual void inc() override { add(1); }
+  virtual void set(uint64_t value) override {
+    data_.value_ = value;
+    data_.flags_ |= Flags::Used;
+  }
+  virtual void sub(uint64_t amount) override {
+    ASSERT(data_.value_ >= amount);
+    ASSERT(used());
+    data_.value_ -= amount;
+  }
+  virtual uint64_t value() const override { return data_.value_; }
+  bool used() const override { return data_.flags_ & Flags::Used; }
+
+private:
+  RawStatData& data_;
+  RawStatDataAllocator& alloc_;
+};
+
 TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config) {
   // To check name conflict.
   reserveResources(config);
