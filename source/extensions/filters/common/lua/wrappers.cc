@@ -165,19 +165,11 @@ int DynamicMetadataMapWrapper::luaGet(lua_State* state) {
 }
 
 int DynamicMetadataMapWrapper::luaSet(lua_State* state) {
+  // TODO(dio): Allow to set dynamic metadata using a table.
   const char* filter_name = luaL_checkstring(state, 2);
-  if (lua_istable(state, 3)) {
-    // TODO(dio): Allow to set other than string. Create a Struct based on this table.
-    luaL_error(state, "not implemented");
-  } else {
-    const absl::string_view key = luaL_checkstring(state, 3);
-    const absl::string_view value = luaL_checkstring(state, 4);
-    if (key.empty() || value.empty()) {
-      luaL_error(state, "cannot set dynamic metadata with empty key or value");
-    }
-    request_info_.setDynamicMetadata(filter_name,
-                                     MessageUtil::keyValueStruct(key.data(), value.data()));
-  }
+  const char* key = luaL_checkstring(state, 3);
+  const char* value = luaL_checkstring(state, 4);
+  request_info_.setDynamicMetadata(filter_name, MessageUtil::keyValueStruct(key, value));
   return 0;
 }
 
