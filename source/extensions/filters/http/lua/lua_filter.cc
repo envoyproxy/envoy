@@ -369,7 +369,7 @@ int StreamHandleWrapper::luaMetadata(lua_State* state) {
 
 int StreamHandleWrapper::luaRequestInfo(lua_State* state) {
   ASSERT(state_ == State::Running);
-  if (metadata_wrapper_.get() != nullptr) {
+  if (request_info_wrapper_.get() != nullptr) {
     request_info_wrapper_.pushStack();
   } else {
     request_info_wrapper_.reset(
