@@ -1,5 +1,6 @@
 #include "extensions/filters/common/lua/wrappers.h"
 
+#include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
@@ -137,20 +138,7 @@ int RequestInfoWrapper::luaDynamicMetadata(lua_State* state) {
 }
 
 int RequestInfoWrapper::luaProtocol(lua_State* state) {
-  switch (request_info_.protocol().value()) {
-  case Http::Protocol::Http10:
-    lua_pushstring(state, "HTTP10");
-    break;
-  case Http::Protocol::Http11:
-    lua_pushstring(state, "HTTP11");
-    break;
-  case Http::Protocol::Http2:
-    lua_pushstring(state, "HTTP2");
-    break;
-  default:
-    lua_pushstring(state, "UNKNOWN");
-  }
-
+  lua_pushstring(state, Http::Utility::getProtocolString(request_info_.protocol().value()).c_str());
   return 1;
 }
 
