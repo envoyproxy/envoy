@@ -53,6 +53,10 @@ public:
   allocateConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
                    ResourcePriority priority, Http::Protocol protocol,
                    const Network::ConnectionSocket::OptionsSharedPtr& options) override;
+  Tcp::ConnectionPool::InstancePtr
+  allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                      ResourcePriority priority,
+                      const Network::ConnectionSocket::OptionsSharedPtr& options) override;
   ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                     Outlier::EventLoggerSharedPtr outlier_event_logger,
                                     bool added_via_api) override;
@@ -179,6 +183,9 @@ public:
                                                          ResourcePriority priority,
                                                          Http::Protocol protocol,
                                                          LoadBalancerContext* context) override;
+  Tcp::ConnectionPool::Instance* tcpConnPoolForCluster(const std::string& cluster,
+                                                       ResourcePriority priority,
+                                                       LoadBalancerContext* context) override;
   Host::CreateConnectionData tcpConnForCluster(const std::string& cluster,
                                                LoadBalancerContext* context) override;
   Http::AsyncClient& httpAsyncClientForCluster(const std::string& cluster) override;
@@ -210,6 +217,13 @@ private:
   struct ThreadLocalClusterManagerImpl : public ThreadLocal::ThreadLocalObject {
     struct ConnPoolsContainer {
       typedef std::map<std::vector<uint8_t>, Http::ConnectionPool::InstancePtr> ConnPools;
+
+      ConnPools pools_;
+      uint64_t drains_remaining_{};
+    };
+
+    struct TcpConnPoolsContainer {
+      typedef std::map<std::vector<uint8_t>, Tcp::ConnectionPool::InstancePtr> ConnPools;
 
       ConnPools pools_;
       uint64_t drains_remaining_{};
@@ -250,6 +264,9 @@ private:
       Http::ConnectionPool::Instance* connPool(ResourcePriority priority, Http::Protocol protocol,
                                                LoadBalancerContext* context);
 
+      Tcp::ConnectionPool::Instance* tcpConnPool(ResourcePriority priority,
+                                                 LoadBalancerContext* context);
+
       // Upstream::ThreadLocalCluster
       const PrioritySet& prioritySet() override { return priority_set_; }
       ClusterInfoConstSharedPtr info() override { return cluster_info_; }
@@ -274,6 +291,7 @@ private:
     ~ThreadLocalClusterManagerImpl();
     void drainConnPools(const HostVector& hosts);
     void drainConnPools(HostSharedPtr old_host, ConnPoolsContainer& container);
+    void drainTcpConnPools(HostSharedPtr old_host, TcpConnPoolsContainer& container);
     void removeTcpConn(const HostConstSharedPtr& host, Network::ClientConnection& connection);
     static void updateClusterMembership(const std::string& name, uint32_t priority,
                                         HostVectorConstSharedPtr hosts,
@@ -292,6 +310,7 @@ private:
     // These maps are owned by the ThreadLocalClusterManagerImpl instead of the ClusterEntry
     // to prevent lifetime/ownership issues when a cluster is dynamically removed.
     std::unordered_map<HostConstSharedPtr, ConnPoolsContainer> host_http_conn_pool_map_;
+    std::unordered_map<HostConstSharedPtr, TcpConnPoolsContainer> host_tcp_conn_pool_map_;
     std::unordered_map<HostConstSharedPtr, TcpConnectionsMap> host_tcp_conn_map_;
 
     std::list<Envoy::Upstream::ClusterUpdateCallbacks*> update_callbacks_;

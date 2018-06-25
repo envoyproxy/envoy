@@ -81,6 +81,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:shadow_writer_lib",
+        "//source/common/tcp:conn_pool_lib",
         "//source/common/upstream:upstream_lib",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2/core:base_cc",
