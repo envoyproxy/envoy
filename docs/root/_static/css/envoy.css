@@ -1,6 +1,6 @@
 @import "theme.css";
 
-/* Splits the line in to multiple lines */
+/* Splits a long line descriptions in tables in to multiple lines */
 .wy-table-responsive table td, .wy-table-responsive table th {
   white-space: normal !important;
 }
