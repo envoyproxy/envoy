@@ -32,7 +32,7 @@ TEST_F(OwnedImplTest, AddBufferFragmentNoCleanup) {
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_F(OwnedImplTest, addBufferFragmentWithCleanup) {
+TEST_F(OwnedImplTest, AddBufferFragmentWithCleanup) {
   char input[] = "hello world";
   BufferFragmentImpl frag(input, 11, [this](const void*, size_t, const BufferFragmentImpl*) {
     release_callback_called_ = true;
@@ -50,7 +50,7 @@ TEST_F(OwnedImplTest, addBufferFragmentWithCleanup) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_F(OwnedImplTest, addBufferFragmentDynamicAllocation) {
+TEST_F(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
   char input_stack[] = "hello world";
   char* input = new char[11];
   std::copy(input_stack, input_stack + 11, input);
@@ -75,7 +75,7 @@ TEST_F(OwnedImplTest, addBufferFragmentDynamicAllocation) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_F(OwnedImplTest, write) {
+TEST_F(OwnedImplTest, Write) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
@@ -113,7 +113,7 @@ TEST_F(OwnedImplTest, write) {
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_F(OwnedImplTest, read) {
+TEST_F(OwnedImplTest, Read) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
@@ -134,7 +134,7 @@ TEST_F(OwnedImplTest, read) {
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_F(OwnedImplTest, toString) {
+TEST_F(OwnedImplTest, ToString) {
   Buffer::OwnedImpl buffer;
   auto append = [&buffer](absl::string_view str) { buffer.add(str.data(), str.size()); };
   append("Hello, ");

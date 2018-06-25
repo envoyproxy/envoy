@@ -1603,58 +1603,62 @@ TEST_F(ClusterManagerInitHelperTest, RemoveClusterWithinInitLoop) {
   init_helper_.onStaticLoadComplete();
 }
 
-// Validate that when freebind is set in the ClusterManager and/or Cluster, we see the socket option
+// Validate that when options are set in the ClusterManager and/or Cluster, we see the socket option
 // propagated to setsockopt(). This is as close to an end-to-end test as we have for this feature,
 // due to the complexity of creating an integration test involving the network stack. We only test
 // the IPv4 case here, as the logic around IPv4/IPv6 handling is tested generically in
 // socket_option_impl_test.cc.
-class FreebindTest : public ClusterManagerImplTest {
+class SockoptsTest : public ClusterManagerImplTest {
 public:
   void initialize(const std::string& yaml) { create(parseBootstrapFromV2Yaml(yaml)); }
 
   void TearDown() override { factory_.tls_.shutdownThread(); }
 
-  void expectSetsockoptFreebind() {
-    if (!ENVOY_SOCKET_IP_FREEBIND.has_value()) {
-      EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
-          .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
-                                  Network::Address::InstanceConstSharedPtr,
-                                  Network::TransportSocketPtr&,
-                                  const Network::ConnectionSocket::OptionsSharedPtr& options)
-                               -> Network::ClientConnection* {
-            EXPECT_NE(nullptr, options.get());
-            EXPECT_EQ(1, options->size());
-            NiceMock<Network::MockConnectionSocket> socket;
-            EXPECT_FALSE((Network::Socket::applyOptions(options, socket,
-                                                        Network::Socket::SocketState::PreBind)));
-            return connection_;
-          }));
-      cluster_manager_->tcpConnForCluster("FreebindCluster", nullptr);
-      return;
-    }
+  // TODO(tschroed): Extend this to support socket state as well.
+  void expectSetsockopts(const std::vector<std::pair<Network::SocketOptionName, int>>& names_vals) {
+
     NiceMock<Api::MockOsSysCalls> os_sys_calls;
     TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    bool expect_success = true;
+    for (const auto& name_val : names_vals) {
+      if (!name_val.first.has_value()) {
+        expect_success = false;
+        continue;
+      }
+      EXPECT_CALL(os_sys_calls, setsockopt_(_, name_val.first.value().first,
+                                            name_val.first.value().second, _, sizeof(int)))
+          .WillOnce(Invoke([&name_val](int, int, int, const void* optval, socklen_t) -> int {
+            EXPECT_EQ(name_val.second, *static_cast<const int*>(optval));
+            return 0;
+          }));
+    }
     EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
-        .WillOnce(
-            Invoke([this](Network::Address::InstanceConstSharedPtr,
-                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
-                          const Network::ConnectionSocket::OptionsSharedPtr& options)
-                       -> Network::ClientConnection* {
-              EXPECT_NE(nullptr, options.get());
-              EXPECT_EQ(1, options->size());
-              NiceMock<Network::MockConnectionSocket> socket;
-              EXPECT_TRUE((Network::Socket::applyOptions(options, socket,
-                                                         Network::Socket::SocketState::PreBind)));
-              return connection_;
-            }));
-    EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_IP_FREEBIND.value().first,
-                                          ENVOY_SOCKET_IP_FREEBIND.value().second, _, sizeof(int)))
-        .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
-          EXPECT_EQ(1, *static_cast<const int*>(optval));
-          return 0;
+        .WillOnce(Invoke([this, &names_vals, expect_success](
+                             Network::Address::InstanceConstSharedPtr,
+                             Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
+                             const Network::ConnectionSocket::OptionsSharedPtr& options)
+                             -> Network::ClientConnection* {
+          EXPECT_NE(nullptr, options.get()) << "Unexpected null options";
+          if (options.get() != nullptr) { // Don't crash the entire test.
+            EXPECT_EQ(names_vals.size(), options->size());
+          }
+          NiceMock<Network::MockConnectionSocket> socket;
+          if (expect_success) {
+            EXPECT_TRUE((Network::Socket::applyOptions(
+                options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
+          } else {
+            EXPECT_FALSE((Network::Socket::applyOptions(
+                options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
+          }
+          return connection_;
         }));
-    auto conn_data = cluster_manager_->tcpConnForCluster("FreebindCluster", nullptr);
-    EXPECT_EQ(connection_, conn_data.connection_.get());
+    cluster_manager_->tcpConnForCluster("SockoptsCluster", nullptr);
+  }
+
+  void expectSetsockoptFreebind() {
+    std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
+        {ENVOY_SOCKET_IP_FREEBIND, 1}};
+    expectSetsockopts(names_vals);
   }
 
   void expectNoSocketOptions() {
@@ -1667,18 +1671,18 @@ public:
               EXPECT_EQ(nullptr, options.get());
               return connection_;
             }));
-    auto conn_data = cluster_manager_->tcpConnForCluster("FreebindCluster", nullptr);
+    auto conn_data = cluster_manager_->tcpConnForCluster("SockoptsCluster", nullptr);
     EXPECT_EQ(connection_, conn_data.connection_.get());
   }
 
   Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
 };
 
-TEST_F(FreebindTest, FreebindUnset) {
+TEST_F(SockoptsTest, SockoptsUnset) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: FreebindCluster
+    - name: SockoptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
@@ -1691,11 +1695,11 @@ TEST_F(FreebindTest, FreebindUnset) {
   expectNoSocketOptions();
 }
 
-TEST_F(FreebindTest, FreebindClusterOnly) {
+TEST_F(SockoptsTest, FreebindClusterOnly) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: FreebindCluster
+    - name: SockoptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
@@ -1710,11 +1714,11 @@ TEST_F(FreebindTest, FreebindClusterOnly) {
   expectSetsockoptFreebind();
 }
 
-TEST_F(FreebindTest, FreebindClusterManagerOnly) {
+TEST_F(SockoptsTest, FreebindClusterManagerOnly) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: FreebindCluster
+    - name: SockoptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
@@ -1730,11 +1734,11 @@ TEST_F(FreebindTest, FreebindClusterManagerOnly) {
   expectSetsockoptFreebind();
 }
 
-TEST_F(FreebindTest, FreebindClusterOverride) {
+TEST_F(SockoptsTest, FreebindClusterOverride) {
   const std::string yaml = R"EOF(
   static_resources:
     clusters:
-    - name: FreebindCluster
+    - name: SockoptsCluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
       type: STATIC
@@ -1750,6 +1754,80 @@ TEST_F(FreebindTest, FreebindClusterOverride) {
   )EOF";
   initialize(yaml);
   expectSetsockoptFreebind();
+}
+
+TEST_F(SockoptsTest, SockoptsClusterOnly) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      upstream_bind_config:
+        socket_options: [
+          { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+          { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+
+  )EOF";
+  initialize(yaml);
+  std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
+      {Network::SocketOptionName({1, 2}), 3}, {Network::SocketOptionName({4, 5}), 6}};
+  expectSetsockopts(names_vals);
+}
+
+TEST_F(SockoptsTest, SockoptsClusterManagerOnly) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+  cluster_manager:
+    upstream_bind_config:
+      socket_options: [
+        { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+        { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
+      {Network::SocketOptionName({1, 2}), 3}, {Network::SocketOptionName({4, 5}), 6}};
+  expectSetsockopts(names_vals);
+}
+
+TEST_F(SockoptsTest, SockoptsClusterOverride) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: SockoptsCluster
+      connect_timeout: 0.250s
+      lb_policy: ROUND_ROBIN
+      type: STATIC
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      upstream_bind_config:
+        socket_options: [
+          { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+          { level: 4, name: 5, int_value: 6, state: STATE_PREBIND }]
+  cluster_manager:
+    upstream_bind_config:
+      socket_options: [{ level: 7, name: 8, int_value: 9, state: STATE_PREBIND }]
+  )EOF";
+  initialize(yaml);
+  std::vector<std::pair<Network::SocketOptionName, int>> names_vals{
+      {Network::SocketOptionName({1, 2}), 3}, {Network::SocketOptionName({4, 5}), 6}};
+  expectSetsockopts(names_vals);
 }
 
 // Validate that when tcp keepalives are set in the Cluster, we see the socket
@@ -1768,18 +1846,18 @@ public:
                                    absl::optional<int> keepalive_interval) {
     if (!ENVOY_SOCKET_SO_KEEPALIVE.has_value()) {
       EXPECT_CALL(factory_.tls_.dispatcher_, createClientConnection_(_, _, _, _))
-          .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
-                                  Network::Address::InstanceConstSharedPtr,
-                                  Network::TransportSocketPtr&,
-                                  const Network::ConnectionSocket::OptionsSharedPtr& options)
-                               -> Network::ClientConnection* {
-            EXPECT_NE(nullptr, options.get());
-            EXPECT_EQ(1, options->size());
-            NiceMock<Network::MockConnectionSocket> socket;
-            EXPECT_FALSE((Network::Socket::applyOptions(options, socket,
-                                                        Network::Socket::SocketState::PreBind)));
-            return connection_;
-          }));
+          .WillOnce(
+              Invoke([this](Network::Address::InstanceConstSharedPtr,
+                            Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&,
+                            const Network::ConnectionSocket::OptionsSharedPtr& options)
+                         -> Network::ClientConnection* {
+                EXPECT_NE(nullptr, options.get());
+                EXPECT_EQ(1, options->size());
+                NiceMock<Network::MockConnectionSocket> socket;
+                EXPECT_FALSE((Network::Socket::applyOptions(
+                    options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
+                return connection_;
+              }));
       cluster_manager_->tcpConnForCluster("TcpKeepaliveCluster", nullptr);
       return;
     }
@@ -1793,8 +1871,8 @@ public:
                        -> Network::ClientConnection* {
               EXPECT_NE(nullptr, options.get());
               NiceMock<Network::MockConnectionSocket> socket;
-              EXPECT_TRUE((Network::Socket::applyOptions(options, socket,
-                                                         Network::Socket::SocketState::PreBind)));
+              EXPECT_TRUE((Network::Socket::applyOptions(
+                  options, socket, envoy::api::v2::core::SocketOption::STATE_PREBIND)));
               return connection_;
             }));
     EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_SO_KEEPALIVE.value().first,

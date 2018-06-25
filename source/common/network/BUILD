@@ -215,6 +215,7 @@ envoy_cc_library(
         ":socket_option_lib",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/common:logger_lib",
+        "@envoy_api//envoy/api/v2/core:address_cc",
     ],
 )
 

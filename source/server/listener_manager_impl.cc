@@ -141,6 +141,11 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         config.tcp_fast_open_queue_length().value()));
   }
 
+  if (config.socket_options().size() > 0) {
+    addListenSocketOptions(
+        Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
+  }
+
   if (!config.listener_filters().empty()) {
     listener_filter_factories_ =
         parent_.factory_.createListenerFilterFactoryList(config.listener_filters(), *this);
@@ -439,7 +444,7 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
   if (socket_ && listen_socket_options_) {
     // 'pre_bind = false' as bind() is never done after this.
     bool ok = Network::Socket::applyOptions(listen_socket_options_, *socket_,
-                                            Network::Socket::SocketState::PostBind);
+                                            envoy::api::v2::core::SocketOption::STATE_BOUND);
     const std::string message =
         fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
     if (!ok) {
@@ -449,7 +454,7 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
       ENVOY_LOG(debug, "{}", message);
     }
 
-    // Add the options to the socket_ so that SocketState::Listening options can be
+    // Add the options to the socket_ so that STATE_LISTENING options can be
     // set in the worker after listen()/evconnlistener_new() is called.
     socket_->addOptions(listen_socket_options_);
   }

@@ -5,9 +5,11 @@
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/network/listen_socket.h"
 
 #include "common/common/logger.h"
+#include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
 
@@ -28,6 +30,8 @@ public:
   static std::unique_ptr<Socket::Options> buildIpFreebindOptions();
   static std::unique_ptr<Socket::Options> buildIpTransparentOptions();
   static std::unique_ptr<Socket::Options> buildTcpFastOpenOptions(uint32_t queue_length);
+  static std::unique_ptr<Socket::Options> buildLiteralOptions(
+      const Protobuf::RepeatedPtrField<envoy::api::v2::core::SocketOption>& socket_options);
 };
 } // namespace Network
 } // namespace Envoy
