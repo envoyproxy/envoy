@@ -98,11 +98,6 @@ public:
     return numBytes(control_->hash_set_options, stats_options);
   }
 
-  /**
-   * Returns the options structure that was used to construct the set.
-   */
-  const BlockMemoryHashSetOptions& hash_set_options() const { return control_->hash_set_options; }
-
   /** Examines the data structures to see if they are sane, assert-failing on any trouble. */
   void sanityCheck() {
     RELEASE_ASSERT(control_->size <= control_->hash_set_options.capacity);
