@@ -863,10 +863,10 @@ TEST_F(ConnectionManagerUtilityTest, SamplingMustNotBeDoneOnClientTraced) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
 
+  // The x_request_id has TRACE_FORCED(a) set in the TRACE_BYTE_POSITION(14) character.
   Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
-  // The input x_request_id has TRACE_FORCED(a) set in the TRACE_BYTE_POSITION(14) character.
   EXPECT_EQ(UuidTraceStatus::Forced,
             UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
 }
