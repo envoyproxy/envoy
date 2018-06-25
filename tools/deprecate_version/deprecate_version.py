@@ -1,5 +1,9 @@
 # Script for automating cleanup PR creation for deprecated features at a given
-# version. Usage:
+# version. This script is generally run via
+#
+# sh tools/deprecate_version/deprecate_version.sh
+#
+# Direct usage (not recomended):
 #
 # python tools/deprecate_version/deprecate_version.py <deprecate for version> <deprecate by version>
 #
@@ -24,7 +28,7 @@ import os
 import re
 import sys
 
-import github  # pip install pygithub
+import github
 from git import Repo
 
 # Tag issues created with these labels.
