@@ -86,6 +86,12 @@ public:
   int write(int fd) override;
   void postProcess() override {}
 
+  /**
+   * Construct a flattened string from a buffer.
+   * @return the flattened string.
+   */
+  std::string toString() const;
+
   Event::Libevent::BufferPtr& buffer() override { return buffer_; }
 
 private:
