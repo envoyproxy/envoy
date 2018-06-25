@@ -688,7 +688,12 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(*host, gauges()).WillByDefault(Invoke([&store]() { return store.gauges(); }));
   ON_CALL(*host, counters()).WillByDefault(Invoke([&store]() { return store.counters(); }));
 
-  ON_CALL(*host, healthy()).WillByDefault(Return(true));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC))
+      .WillByDefault(Return(true));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK))
+      .WillByDefault(Return(true));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH))
+      .WillByDefault(Return(false));
 
   ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
 
@@ -727,7 +732,9 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       },
      },
      "health_status": {
-      "eds_health_status": "HEALTHY"
+      "eds_health_status": "HEALTHY",
+      "failed_active_health_check": true,
+      "failed_outlier_check": true
      },
      "success_rate": {
       "value": 43.2
@@ -743,7 +750,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   MessageUtil::loadFromJson(expected_json, expected_proto);
 
   // Ensure the protos created from each JSON are equivalent.
-  EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equivalent(output_proto, expected_proto));
+  EXPECT_THAT(output_proto, ProtoEq(expected_proto));
 
   // Ensure that the normal text format is used by default.
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters", header_map, response));
