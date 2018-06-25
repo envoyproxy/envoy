@@ -1,53 +1,47 @@
-.. _statistics:
+.. _config_listener_stats:
 
 Statistics
 ==========
 
-A few statistics are emitted to report statistics system behavior:
+Listener
+--------
+
+Every listener has a statistics tree rooted at *listener.<address>.* with the following statistics:
 
 .. csv-table::
-  :header: Name, Type, Description
-  :widths: 1, 1, 2
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
 
-  stats.overflow, Counter, "| Total number of times Envoy cannot allocate a statistic
-  | due to a shortage of shared memory"
+   downstream_cx_total, Counter, Total connections
+   downstream_cx_destroy, Counter, Total destroyed connections
+   downstream_cx_active, Gauge, Total active connections
+   downstream_cx_length_ms, Histogram, Connection length milliseconds
+   no_filter_chain_match, Counter, Total connections that didn't match any filter chain
+   ssl.connection_error, Counter, Total TLS connection errors not including failed certificate verifications
+   ssl.handshake, Counter, Total successful TLS connection handshakes
+   ssl.session_reused, Counter, Total successful TLS session resumptions
+   ssl.no_certificate, Counter, Total successul TLS connections with no client certificate
+   ssl.fail_verify_no_cert, Counter, Total TLS connections that failed because of missing client certificate
+   ssl.fail_verify_error, Counter, Total TLS connections that failed CA verification
+   ssl.fail_verify_san, Counter, Total TLS connections that failed SAN verification
+   ssl.fail_verify_cert_hash, Counter, Total TLS connections that failed certificate pinning verification
+   ssl.cipher.<cipher>, Counter, Total TLS connections that used <cipher>
 
-Server
-------
+Listener manager
+----------------
 
-Server related statistics are rooted at *server.* with following statistics:
-
-.. csv-table::
-  :header: Name, Type, Description
-  :widths: 1, 1, 7
-
-  uptime, Gauge, Current server uptime in seconds
-  memory_allocated, Gauge, "| Current amount of allocated memory in bytes. Total of
-  | both new and old Envoy processes on hot restart." 
-  memory_heap_size, Gauge, "| Current reserved heap size in bytes. New Envoy process
-  | heap size on hot restart." 
-  live, Gauge, "1 if the server is not currently draining, 0 otherwise"
-  parent_connections, Gauge, Total connections of the old Envoy process on hot restart
-  total_connections, Gauge, Total connections of both new and old Envoy processes
-  version, Gauge, "| Integer represented version number based on 
-  | SCM revision"
-  days_until_first_cert_expiring, Gauge, "| Number of days until the next certificate 
-  | being managed will expire"
-  hot_restart_epoch, Gauge, Current hot restart epoch
-
-File system
------------
-
-Statistics related to file system are emitted in the *filesystem.* namespace.
+The listener manager has a statistics tree rooted at *listener_manager.* with the following
+statistics. Any ``:`` character in the stats name is replaced with ``_``.
 
 .. csv-table::
-  :header: Name, Type, Description
-  :widths: 1, 1, 2
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
 
-  write_buffered, Counter, "| Total number of times file data is moved to Envoy's
-  | internal flush buffer"
-  write_completed, Counter, Total number of times a file was written
-  flushed_by_timer, Counter, "| Total number of times internal flush buffers are 
-  | written to a file due to flush timeout"
-  reopen_failed, Counter, Total number of times a file was failed to be opened
-  write_total_buffered, Gauge, Current total size of internal flush buffer in bytes
+   listener_added, Counter, Total listeners added (either via static config or LDS)
+   listener_modified, Counter, Total listeners modified (via LDS)
+   listener_removed, Counter, Total listeners removed (via LDS)
+   listener_create_success, Counter, Total listener objects successfully added to workers
+   listener_create_failure, Counter, Total failed listener object additions to workers
+   total_listeners_warming, Gauge, Number of currently warming listeners
+   total_listeners_active, Gauge, Number of currently active listeners
+   total_listeners_draining, Gauge, Number of currently draining listeners
