@@ -15,6 +15,7 @@
 #include "envoy/config/filter/http/fault/v2/fault.pb.validate.h"
 #include "envoy/config/filter/http/gzip/v2/gzip.pb.validate.h"
 #include "envoy/config/filter/http/health_check/v2/health_check.pb.validate.h"
+#include "envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.pb.validate.h"
 #include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.validate.h"
 #include "envoy/config/filter/http/lua/v2/lua.pb.validate.h"
 #include "envoy/config/filter/http/router/v2/router.pb.validate.h"

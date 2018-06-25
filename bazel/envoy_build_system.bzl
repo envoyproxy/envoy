@@ -383,6 +383,7 @@ def envoy_proto_library(name, srcs = [], deps = [], external_deps = [],
         # Avoid generating .so, we don't need it, can interfere with builds
         # such as OSS-Fuzz.
         linkstatic = 1,
+        alwayslink = 1,
         visibility = ["//visibility:public"],
     )
 

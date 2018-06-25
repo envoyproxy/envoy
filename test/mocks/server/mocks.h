@@ -380,6 +380,7 @@ public:
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
+  MOCK_METHOD0(systemTimeSource, SystemTimeSource&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -395,6 +396,7 @@ public:
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
+  testing::NiceMock<MockSystemTimeSource> system_time_source_;
 };
 
 class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {

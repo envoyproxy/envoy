@@ -42,8 +42,8 @@ public:
     virtual ~JwksData() {}
 
     // Get the cached config: JWT rule.
-    virtual const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRule&
-    getJwtRule() const PURE;
+    virtual const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider&
+    getJwtProvider() const PURE;
 
     // Check if a list of audiences are allowed.
     virtual bool areAudiencesAllowed(const std::vector<std::string>& audiences) const PURE;

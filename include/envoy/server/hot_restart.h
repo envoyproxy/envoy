@@ -94,7 +94,7 @@ public:
   /**
    * @returns an allocator for stats.
    */
-  virtual Stats::RawStatDataAllocator& statsAllocator() PURE;
+  virtual Stats::StatDataAllocator& statsAllocator() PURE;
 };
 
 } // namespace Server

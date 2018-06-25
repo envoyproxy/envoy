@@ -9,6 +9,8 @@
 
 #include "jwt_verify_lib/check_audience.h"
 
+using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
+using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
 using ::google::jwt_verify::Jwks;
 using ::google::jwt_verify::Status;
 
@@ -23,29 +25,26 @@ constexpr int PubkeyCacheExpirationSec = 600;
 
 class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::filter> {
 public:
-  JwksDataImpl(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRule& jwt_rule)
-      : jwt_rule_(jwt_rule) {
+  JwksDataImpl(const JwtProvider& jwt_provider) : jwt_provider_(jwt_provider) {
     std::vector<std::string> audiences;
-    for (const auto& aud : jwt_rule_.audiences()) {
+    for (const auto& aud : jwt_provider_.audiences()) {
       audiences.push_back(aud);
     }
     audiences_ = std::make_unique<::google::jwt_verify::CheckAudience>(audiences);
 
-    const auto inline_jwks = Config::DataSource::read(jwt_rule_.local_jwks(), true);
+    const auto inline_jwks = Config::DataSource::read(jwt_provider_.local_jwks(), true);
     if (!inline_jwks.empty()) {
       const Status status = setKey(inline_jwks,
                                    // inline jwks never expires.
                                    std::chrono::steady_clock::time_point::max());
       if (status != Status::Ok) {
-        ENVOY_LOG(warn, "Invalid inline jwks for issuer: {}, jwks: {}", jwt_rule_.issuer(),
+        ENVOY_LOG(warn, "Invalid inline jwks for issuer: {}, jwks: {}", jwt_provider_.issuer(),
                   inline_jwks);
       }
     }
   }
 
-  const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRule& getJwtRule() const override {
-    return jwt_rule_;
-  }
+  const JwtProvider& getJwtProvider() const override { return jwt_provider_; }
 
   bool areAudiencesAllowed(const std::vector<std::string>& jwt_audiences) const override {
     return audiences_->areAudiencesAllowed(jwt_audiences);
@@ -63,9 +62,9 @@ private:
   // Get the expiration time for a remote Jwks
   std::chrono::steady_clock::time_point getRemoteJwksExpirationTime() const {
     auto expire = std::chrono::steady_clock::now();
-    if (jwt_rule_.has_remote_jwks() && jwt_rule_.remote_jwks().has_cache_duration()) {
+    if (jwt_provider_.has_remote_jwks() && jwt_provider_.remote_jwks().has_cache_duration()) {
       expire += std::chrono::milliseconds(
-          DurationUtil::durationToMilliseconds(jwt_rule_.remote_jwks().cache_duration()));
+          DurationUtil::durationToMilliseconds(jwt_provider_.remote_jwks().cache_duration()));
     } else {
       expire += std::chrono::seconds(PubkeyCacheExpirationSec);
     }
@@ -83,8 +82,8 @@ private:
     return Status::Ok;
   }
 
-  // The jwt rule config.
-  const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRule& jwt_rule_;
+  // The jwt provider config.
+  const JwtProvider& jwt_provider_;
   // Check audience object
   ::google::jwt_verify::CheckAudiencePtr audiences_;
   // The generated jwks object.
@@ -96,10 +95,10 @@ private:
 class JwksCacheImpl : public JwksCache {
 public:
   // Load the config from envoy config.
-  JwksCacheImpl(
-      const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config) {
-    for (const auto& rule : config.rules()) {
-      jwks_data_map_.emplace(rule.issuer(), rule);
+  JwksCacheImpl(const JwtAuthentication& config) {
+    for (const auto& it : config.providers()) {
+      const auto& provider = it.second;
+      jwks_data_map_.emplace(provider.issuer(), provider);
     }
   }
 
