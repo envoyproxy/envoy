@@ -3,6 +3,7 @@
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 
+#include "common/common/utility.h"
 #include "common/common/version.h"
 #include "common/config/bootstrap_json.h"
 #include "common/config/utility.h"
@@ -40,7 +41,7 @@ ValidationInstance::ValidationInstance(Options& options,
       api_(new Api::ValidationImpl(options.fileFlushIntervalMsec())),
       dispatcher_(api_->allocateDispatcher()), singleton_manager_(new Singleton::ManagerImpl()),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store),
-      listener_manager_(*this, *this, *this) {
+      listener_manager_(*this, *this, *this, ProdSystemTimeSource::instance_) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {

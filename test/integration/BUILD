@@ -187,6 +187,7 @@ envoy_cc_test(
         "//include/envoy/http:header_map_interface",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
+        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
     ],
 )
 
@@ -393,6 +394,7 @@ envoy_cc_test(
         "//source/common/ratelimit:ratelimit_proto",
         "//source/extensions/filters/http/ratelimit:config",
         "//test/common/grpc:grpc_client_integration_lib",
+        "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     ],
 )
 

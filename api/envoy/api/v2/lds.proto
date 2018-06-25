@@ -144,6 +144,10 @@ message Listener {
   // nor disabled.
   google.protobuf.BoolValue freebind = 11;
 
+  // Additional socket options that may not be present in Envoy source code or
+  // precompiled binaries.
+  repeated core.SocketOption socket_options = 13;
+
   // Whether the listener should accept TCP Fast Open (TFO) connections.
   // When this flag is set to a value greater than 0, the option TCP_FASTOPEN is enabled on
   // the socket, with a queue length of the specified size

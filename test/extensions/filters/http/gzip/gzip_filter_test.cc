@@ -6,6 +6,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -61,7 +62,7 @@ protected:
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     envoy::config::filter::http::gzip::v2::Gzip gzip;
     MessageUtil::loadFromJson(json, gzip);
-    config_.reset(new GzipFilterConfig(gzip, runtime_));
+    config_.reset(new GzipFilterConfig(gzip, "test.", stats_, runtime_));
     filter_.reset(new GzipFilter(config_));
   }
 
@@ -70,6 +71,8 @@ protected:
     const std::string uncompressed_str{TestUtility::bufferToString(decompressed_data_)};
     ASSERT_EQ(expected_str_.length(), uncompressed_str.length());
     EXPECT_EQ(expected_str_, uncompressed_str);
+    EXPECT_EQ(expected_str_.length(), stats_.counter("test.gzip.total_uncompressed_bytes").value());
+    EXPECT_EQ(data_.length(), stats_.counter("test.gzip.total_compressed_bytes").value());
   }
 
   void feedBuffer(uint64_t size) {
@@ -96,6 +99,7 @@ protected:
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, true));
     verifyCompressedData();
     drainBuffer();
+    EXPECT_EQ(1U, stats_.counter("test.gzip.compressed").value());
   }
 
   void doResponseNoCompression(Http::TestHeaderMapImpl&& headers) {
@@ -110,6 +114,7 @@ protected:
     EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(data_, false));
     Http::TestHeaderMapImpl trailers;
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(trailers));
+    EXPECT_EQ(1, stats_.counter("test.gzip.not_compressed").value());
   }
 
   GzipFilterConfigSharedPtr config_;
@@ -118,6 +123,7 @@ protected:
   Decompressor::ZlibDecompressorImpl decompressor_;
   Buffer::OwnedImpl decompressed_data_;
   std::string expected_str_;
+  Stats::IsolatedStoreImpl stats_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
 
@@ -131,7 +137,6 @@ TEST_F(GzipFilterTest, RuntimeDisabled) {
 
 // Default config values.
 TEST_F(GzipFilterTest, DefaultConfigValues) {
-
   EXPECT_EQ(5, config_->memoryLevel());
   EXPECT_EQ(30, config_->minimumLength());
   EXPECT_EQ(28, config_->windowBits());
@@ -190,87 +195,113 @@ TEST_F(GzipFilterTest, isAcceptEncodingAllowed) {
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip, br"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(1, stats_.counter("test.gzip.header_gzip").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip;q=1.0, *;q=0.5"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(2, stats_.counter("test.gzip.header_gzip").value());
   }
   {
     Http::TestHeaderMapImpl headers = {
         {"accept-encoding", "\tdeflate\t, gzip\t ; q\t =\t 1.0,\t * ;q=0.5\n"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(3, stats_.counter("test.gzip.header_gzip").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate,gzip;q=1.0,*;q=0"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(4, stats_.counter("test.gzip.header_gzip").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip;q=0.2, br;q=1"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(5, stats_.counter("test.gzip.header_gzip").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "*"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(1, stats_.counter("test.gzip.header_wildcard").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "*;q=1"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(2, stats_.counter("test.gzip.header_wildcard").value());
   }
   {
+    // gzip header is not valid due to q=0.
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "gzip;q=0,*;q=1"}};
     EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(5, stats_.counter("test.gzip.header_gzip").value());
+    EXPECT_EQ(1, stats_.counter("test.gzip.header_not_valid").value());
   }
   {
     Http::TestHeaderMapImpl headers = {};
     EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(1, stats_.counter("test.gzip.no_accept_header").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity, *;q=0"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(1, stats_.counter("test.gzip.header_identity").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=0.5, *;q=0"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(2, stats_.counter("test.gzip.header_identity").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=0, *;q=0"}};
     EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(3, stats_.counter("test.gzip.header_identity").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "xyz;q=1, br;q=0.2, *"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(3, stats_.counter("test.gzip.header_wildcard").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "xyz;q=1, br;q=0.2, *;q=0"}};
     EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(3, stats_.counter("test.gzip.header_wildcard").value());
+    EXPECT_EQ(2, stats_.counter("test.gzip.header_not_valid").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "xyz;q=1, br;q=0.2"}};
     EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(3, stats_.counter("test.gzip.header_not_valid").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(4, stats_.counter("test.gzip.header_identity").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=1"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(5, stats_.counter("test.gzip.header_identity").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity;q=0"}};
     EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(6, stats_.counter("test.gzip.header_identity").value());
   }
   {
+    // Test that we return identity and ignore the invalid wildcard.
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity, *;q=0"}};
-    EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(7, stats_.counter("test.gzip.header_identity").value());
+    EXPECT_EQ(3, stats_.counter("test.gzip.header_not_valid").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "deflate, gzip;Q=.5, br"}};
     EXPECT_TRUE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(6, stats_.counter("test.gzip.header_gzip").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"accept-encoding", "identity;Q=0"}};
     EXPECT_FALSE(isAcceptEncodingAllowed(headers));
+    EXPECT_EQ(8, stats_.counter("test.gzip.header_identity").value());
   }
 }
 
@@ -335,6 +366,7 @@ TEST_F(GzipFilterTest, ContentLengthCompression) {
 
 // Verifies isContentTypeAllowed function.
 TEST_F(GzipFilterTest, isContentTypeAllowed) {
+
   {
     Http::TestHeaderMapImpl headers = {{"content-type", "text/html"}};
     EXPECT_TRUE(isContentTypeAllowed(headers));
@@ -470,28 +502,34 @@ TEST_F(GzipFilterTest, isEtagAllowed) {
   {
     Http::TestHeaderMapImpl headers = {{"etag", R"EOF(W/"686897696a7c876b7e")EOF"}};
     EXPECT_TRUE(isEtagAllowed(headers));
+    EXPECT_EQ(0, stats_.counter("test.gzip.not_compressed_etag").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"etag", "686897696a7c876b7e"}};
     EXPECT_TRUE(isEtagAllowed(headers));
+    EXPECT_EQ(0, stats_.counter("test.gzip.not_compressed_etag").value());
   }
   {
     Http::TestHeaderMapImpl headers = {};
     EXPECT_TRUE(isEtagAllowed(headers));
+    EXPECT_EQ(0, stats_.counter("test.gzip.not_compressed_etag").value());
   }
 
   setUpFilter(R"EOF({ "disable_on_etag_header": true })EOF");
   {
     Http::TestHeaderMapImpl headers = {{"etag", R"EOF(W/"686897696a7c876b7e")EOF"}};
     EXPECT_FALSE(isEtagAllowed(headers));
+    EXPECT_EQ(1, stats_.counter("test.gzip.not_compressed_etag").value());
   }
   {
     Http::TestHeaderMapImpl headers = {{"etag", "686897696a7c876b7e"}};
     EXPECT_FALSE(isEtagAllowed(headers));
+    EXPECT_EQ(2, stats_.counter("test.gzip.not_compressed_etag").value());
   }
   {
     Http::TestHeaderMapImpl headers = {};
     EXPECT_TRUE(isEtagAllowed(headers));
+    EXPECT_EQ(2, stats_.counter("test.gzip.not_compressed_etag").value());
   }
 }
 
@@ -501,6 +539,7 @@ TEST_F(GzipFilterTest, EtagNoCompression) {
   doRequest({{":method", "get"}, {"accept-encoding", "gzip"}}, true);
   doResponseNoCompression(
       {{":method", "get"}, {"content-length", "256"}, {"etag", R"EOF(W/"686897696a7c876b7e")EOF"}});
+  EXPECT_EQ(1, stats_.counter("test.gzip.not_compressed_etag").value());
 }
 
 // Verifies that compression is skipped when etag header is NOT allowed.

@@ -33,3 +33,14 @@ envoy_cc_binary(
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
+
+envoy_cc_binary(
+    name = "v1_to_bootstrap",
+    srcs = ["v1_to_bootstrap.cc"],
+    deps = [
+        "//source/common/config:bootstrap_json_lib",
+        "//source/common/json:json_loader_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+    ],
+)

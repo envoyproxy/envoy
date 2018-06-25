@@ -540,7 +540,8 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
                      std::move(transport_socket), false) {
-  if (!Network::Socket::applyOptions(options, *socket_, Socket::SocketState::PreBind)) {
+  if (!Network::Socket::applyOptions(options, *socket_,
+                                     envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
     // Set a special error state to ensure asynchronous close to give the owner of the
     // ConnectionImpl a chance to add callbacks and detect the "disconnect".
     immediate_error_event_ = ConnectionEvent::LocalClose;
