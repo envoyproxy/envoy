@@ -42,7 +42,8 @@ RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
 StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     const envoy::api::v2::RouteConfiguration& config,
     Server::Configuration::FactoryContext& factory_context)
-    : config_(new ConfigImpl(config, factory_context, true)), route_config_proto_{config} {}
+    : config_(new ConfigImpl(config, factory_context, true)), route_config_proto_{config},
+      last_updated_(factory_context.systemTimeSource().currentTime()) {}
 
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
 // initialization needs to be fixed.
@@ -55,7 +56,8 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
       stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
-      manager_identifier_(manager_identifier) {
+      manager_identifier_(manager_identifier),
+      last_updated_(factory_context.systemTimeSource().currentTime()) {
   ::Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
 
   ConfigConstSharedPtr initial_config(new NullConfigImpl());
@@ -94,6 +96,8 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
 
 void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources,
                                                 const std::string& version_info) {
+  last_updated_ = factory_context_.systemTimeSource().currentTime();
+
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing RouteConfiguration for {} in onConfigUpdate()", route_config_name_);
     stats_.update_empty_.inc();
@@ -231,13 +235,17 @@ ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
       dynamic_config->set_version_info(config_info.value().version_);
       dynamic_config->mutable_route_config()->MergeFrom(config_info.value().config_);
+      TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
+                                            *(dynamic_config->mutable_last_updated()));
     }
   }
 
   for (const auto& provider : getStaticRouteConfigProviders()) {
     ASSERT(provider->configInfo());
-    config_dump->mutable_static_route_configs()->Add()->MergeFrom(
-        provider->configInfo().value().config_);
+    auto* static_config = config_dump->mutable_static_route_configs()->Add();
+    static_config->mutable_route_config()->MergeFrom(provider->configInfo().value().config_);
+    TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
+                                          *(static_config->mutable_last_updated()));
   }
 
   return ProtobufTypes::MessagePtr{std::move(config_dump)};

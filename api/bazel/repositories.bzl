@@ -3,7 +3,7 @@ GOGOPROTO_SHA = "1adfc126b41513cc696b209667c8656ea7aac67c" # v1.0.0
 PROMETHEUS_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c" # Nov 17, 2017
 OPENCENSUS_SHA = "ab82e5fdec8267dc2a726544b10af97675970847" # May 23, 2018
 
-PGV_GIT_SHA = "9f600c2cd2d7031fdc8e25e1c9f5ad81c8cab4fe"
+PGV_GIT_SHA = "345b6b478ef955ad31382955d21fb504e95f38c7"
 
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 

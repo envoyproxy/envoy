@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/ratelimit/ratelimit.pb.h"
+
 #include "common/common/assert.h"
 #include "common/http/headers.h"
 
@@ -12,9 +14,9 @@ namespace Envoy {
 namespace RateLimit {
 
 GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
-                               const absl::optional<std::chrono::milliseconds>& timeout)
-    : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "pb.lyft.ratelimit.RateLimitService.ShouldRateLimit")),
+                               const absl::optional<std::chrono::milliseconds>& timeout,
+                               const std::string& method_name)
+    : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method_name)),
       async_client_(std::move(async_client)), timeout_(timeout) {}
 
 GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
@@ -25,14 +27,15 @@ void GrpcClientImpl::cancel() {
   callbacks_ = nullptr;
 }
 
-void GrpcClientImpl::createRequest(pb::lyft::ratelimit::RateLimitRequest& request,
+void GrpcClientImpl::createRequest(envoy::service::ratelimit::v2::RateLimitRequest& request,
                                    const std::string& domain,
                                    const std::vector<Descriptor>& descriptors) {
   request.set_domain(domain);
   for (const Descriptor& descriptor : descriptors) {
-    pb::lyft::ratelimit::RateLimitDescriptor* new_descriptor = request.add_descriptors();
+    envoy::api::v2::ratelimit::RateLimitDescriptor* new_descriptor = request.add_descriptors();
     for (const DescriptorEntry& entry : descriptor.entries_) {
-      pb::lyft::ratelimit::RateLimitDescriptor::Entry* new_entry = new_descriptor->add_entries();
+      envoy::api::v2::ratelimit::RateLimitDescriptor::Entry* new_entry =
+          new_descriptor->add_entries();
       new_entry->set_key(entry.key_);
       new_entry->set_value(entry.value_);
     }
@@ -44,17 +47,19 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
-  pb::lyft::ratelimit::RateLimitRequest request;
+  envoy::service::ratelimit::v2::RateLimitRequest request;
   createRequest(request, domain, descriptors);
 
   request_ = async_client_->send(service_method_, request, *this, parent_span, timeout_);
 }
 
-void GrpcClientImpl::onSuccess(std::unique_ptr<pb::lyft::ratelimit::RateLimitResponse>&& response,
-                               Tracing::Span& span) {
+void GrpcClientImpl::onSuccess(
+    std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse>&& response,
+    Tracing::Span& span) {
   LimitStatus status = LimitStatus::OK;
-  ASSERT(response->overall_code() != pb::lyft::ratelimit::RateLimitResponse_Code_UNKNOWN);
-  if (response->overall_code() == pb::lyft::ratelimit::RateLimitResponse_Code_OVER_LIMIT) {
+  ASSERT(response->overall_code() != envoy::service::ratelimit::v2::RateLimitResponse_Code_UNKNOWN);
+  if (response->overall_code() ==
+      envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT) {
     status = LimitStatus::OverLimit;
     span.setTag(Constants::get().TraceStatus, Constants::get().TraceOverLimit);
   } else {
@@ -74,7 +79,8 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
 
 GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitServiceConfig& config,
                                  Grpc::AsyncClientManager& async_client_manager,
-                                 Stats::Scope& scope) {
+                                 Stats::Scope& scope)
+    : use_data_plane_proto_(config.use_data_plane_proto()) {
   envoy::api::v2::core::GrpcService grpc_service;
   grpc_service.MergeFrom(config.grpc_service());
   // TODO(htuch): cluster_name is deprecated, remove after 1.6.0.
@@ -83,10 +89,23 @@ GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitSe
     grpc_service.mutable_envoy_grpc()->set_cluster_name(config.cluster_name());
   }
   async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope, false);
+
+  // TODO(junr03): legacy rate limit is deprecated. Remove this warning after 1.8.0.
+  if (!use_data_plane_proto_) {
+    ENVOY_LOG_MISC(warn, "legacy rate limit client is deprecated, update your service to support "
+                         "the data-plane-api defined rate limit service");
+  }
 }
 
 ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout) {
-  return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout);
+  // TODO(junr03): legacy rate limit is deprecated. Remove support for the lyft proto after 1.8.0.
+  if (use_data_plane_proto_) {
+    return std::make_unique<GrpcClientImpl>(
+        async_client_factory_->create(), timeout,
+        "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit");
+  }
+  return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout,
+                                          "pb.lyft.ratelimit.RateLimitService.ShouldRateLimit");
 }
 
 } // namespace RateLimit

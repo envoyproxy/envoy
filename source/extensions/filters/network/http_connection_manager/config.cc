@@ -190,8 +190,16 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       request_headers_for_tags.push_back(Http::LowerCaseString(header));
     }
 
+    uint64_t client_sampling{
+        PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing_config, client_sampling, 100, 100)};
+    uint64_t random_sampling{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+        tracing_config, random_sampling, 10000, 10000)};
+    uint64_t overall_sampling{
+        PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing_config, overall_sampling, 100, 100)};
+
     tracing_config_.reset(new Http::TracingConnectionManagerConfig(
-        {tracing_operation_name, request_headers_for_tags}));
+        {tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
+         overall_sampling}));
   }
 
   if (config.has_idle_timeout()) {

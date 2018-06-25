@@ -15,6 +15,7 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/secret/secret_manager.h"
 #include "envoy/server/admin.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/thread_local_cluster.h"
@@ -56,6 +57,8 @@ public:
 };
 
 typedef std::unique_ptr<ClusterUpdateCallbacksHandle> ClusterUpdateCallbacksHandlePtr;
+
+class ClusterManagerFactory;
 
 /**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
@@ -188,6 +191,8 @@ public:
    */
   virtual ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
+
+  virtual ClusterManagerFactory& clusterManagerFactory() PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;
@@ -257,6 +262,11 @@ public:
   virtual CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                               const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                               ClusterManager& cm) PURE;
+
+  /**
+   * Returns the secret manager.
+   */
+  virtual Secret::SecretManager& secretManager() PURE;
 };
 
 } // namespace Upstream

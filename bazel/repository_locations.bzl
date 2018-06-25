@@ -58,6 +58,10 @@ REPOSITORY_LOCATIONS = dict(
         commit = "d6f78d948c53f3b400bb46996eb3084359914f9b",
         remote = "https://github.com/google/googleapis",
     ),
+    com_github_google_jwt_verify = dict(
+        commit = "4eb9e96485b71e00d43acc7207501caafb085b4a",
+        remote = "https://github.com/google/jwt_verify_lib",
+    ),
     com_github_nodejs_http_parser = dict(
         # 2018-05-30 snapshot to pick up a performance fix, nodejs/http-parser PR 422
         # TODO(brian-pane): Upgrade to the next http-parser release once it's available
@@ -81,9 +85,12 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/googletest",
     ),
     com_google_protobuf = dict(
-        sha256 = "826425182ee43990731217b917c5c3ea7190cfda141af4869e6d4ad9085a740f",
-        strip_prefix = "protobuf-3.5.1",
-        urls = ["https://github.com/google/protobuf/archive/v3.5.1.tar.gz"],
+        # TODO(htuch): Switch back to released versions for protobuf when a release > 3.6.0 happens
+        # that includes:
+        # - https://github.com/google/protobuf/commit/f35669b8d3f46f7f1236bd21f14d744bba251e60
+        # - https://github.com/google/protobuf/commit/6a4fec616ec4b20f54d5fb530808b855cb664390
+        commit = "6a4fec616ec4b20f54d5fb530808b855cb664390",
+        remote = "https://github.com/google/protobuf",
     ),
     grpc_httpjson_transcoding = dict(
         commit = "05a15e4ecd0244a981fdf0348a76658def62fa9c",  # 2018-05-30

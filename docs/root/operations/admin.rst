@@ -118,6 +118,10 @@ modify different aspects of the server:
   messages. See the :ref:`response definition <envoy_api_msg_admin.v2alpha.ConfigDump>` for more
   information.
 
+.. warning::
+  The underlying proto is marked v2alpha and hence its contents, including the JSON representation,
+  are not guaranteed to be stable.
+
 .. http:post:: /cpuprofiler
 
   Enable or disable the CPU profiler. Requires compiling with gperftools.

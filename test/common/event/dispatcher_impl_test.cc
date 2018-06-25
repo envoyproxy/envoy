@@ -96,6 +96,45 @@ TEST_F(DispatcherImplTest, Post) {
   }
 }
 
+// Ensure that there is no deadlock related to calling a posted callback, or
+// destructing a closure when finished calling it.
+TEST_F(DispatcherImplTest, RunPostCallbacksLocking) {
+  class PostOnDestruct {
+  public:
+    PostOnDestruct(Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
+    ~PostOnDestruct() {
+      dispatcher_.post([]() {});
+    }
+    void method() {}
+    Dispatcher& dispatcher_;
+  };
+
+  {
+    // Block dispatcher first to ensure that both posted events below are handled
+    // by a single call to runPostCallbacks().
+    //
+    // This also ensures that the post_lock_ is not held while callbacks are called,
+    // or else this would deadlock.
+    Thread::LockGuard lock(mu_);
+    dispatcher_->post([this]() { Thread::LockGuard lock(mu_); });
+
+    auto post_on_destruct = std::make_shared<PostOnDestruct>(*dispatcher_);
+    dispatcher_->post([=]() { post_on_destruct->method(); });
+    dispatcher_->post([this]() {
+      {
+        Thread::LockGuard lock(mu_);
+        work_finished_ = true;
+      }
+      cv_.notifyOne();
+    });
+  }
+
+  Thread::LockGuard lock(mu_);
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
+}
+
 TEST_F(DispatcherImplTest, Timer) {
   TimerPtr timer;
   dispatcher_->post([this, &timer]() {

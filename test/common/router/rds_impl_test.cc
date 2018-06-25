@@ -68,6 +68,7 @@ public:
   Http::MockAsyncClientRequest request_;
   Http::AsyncClient::Callbacks* callbacks_{};
   Event::MockTimer* interval_timer_{};
+  NiceMock<MockSystemTimeSource> system_time_source_;
 };
 
 class RdsImplTest : public RdsTestBase {
@@ -367,6 +368,7 @@ public:
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
     Upstream::MockCluster cluster;
     cluster_map.emplace("foo_cluster", cluster);
+    ON_CALL(factory_context_, systemTimeSource()).WillByDefault(ReturnRef(system_time_source_));
     EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
@@ -401,7 +403,7 @@ TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
 
-  // No routes at all.
+  // No routes at all, no last_updated timestamp
   envoy::admin::v2alpha::RoutesConfigDump expected_route_config_dump;
   MessageUtil::loadFromYaml(R"EOF(
 static_route_configs:
@@ -420,6 +422,10 @@ virtual_hosts:
         route: { cluster: baz }
 )EOF";
 
+  EXPECT_CALL(system_time_source_, currentTime())
+      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
+  EXPECT_CALL(factory_context_, systemTimeSource()).WillRepeatedly(ReturnRef(system_time_source_));
+
   // Only static route.
   RouteConfigProviderSharedPtr static_config =
       route_config_provider_manager_->getStaticRouteConfigProvider(
@@ -430,13 +436,17 @@ virtual_hosts:
           *message_ptr);
   MessageUtil::loadFromYaml(R"EOF(
 static_route_configs:
-  - name: foo
-    virtual_hosts:
-      - name: bar
-        domains: ["*"]
-        routes:
-          - match: { prefix: "/" }
-            route: { cluster: baz }
+  - route_config:
+      name: foo
+      virtual_hosts:
+        - name: bar
+          domains: ["*"]
+          routes:
+            - match: { prefix: "/" }
+              route: { cluster: baz }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
 dynamic_route_configs:
 )EOF",
                             expected_route_config_dump);
@@ -464,18 +474,25 @@ dynamic_route_configs:
           *message_ptr);
   MessageUtil::loadFromYaml(R"EOF(
 static_route_configs:
-  - name: foo
-    virtual_hosts:
-      - name: bar
-        domains: ["*"]
-        routes:
-          - match: { prefix: "/" }
-            route: { cluster: baz }
+  - route_config:
+      name: foo
+      virtual_hosts:
+        - name: bar
+          domains: ["*"]
+          routes:
+            - match: { prefix: "/" }
+              route: { cluster: baz }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
 dynamic_route_configs:
   - version_info: "hash_15ed54077da94d8b"
     route_config:
       name: foo_route_config
       virtual_hosts:
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
 )EOF",
                             expected_route_config_dump);
   EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump3.DebugString());

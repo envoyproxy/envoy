@@ -55,6 +55,7 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
+      secret_manager_(new Secret::SecretManagerImpl()),
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false) {
 
@@ -206,6 +207,7 @@ void InstanceImpl::initialize(Options& options,
 
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options);
+  bootstrap_config_update_time_ = ProdSystemTimeSource::instance_.currentTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
@@ -246,8 +248,8 @@ void InstanceImpl::initialize(Options& options,
   loadServerFlags(initial_config.flagsPath());
 
   // Workers get created first so they register for thread local updates.
-  listener_manager_.reset(
-      new ListenerManagerImpl(*this, listener_component_factory_, worker_factory_));
+  listener_manager_.reset(new ListenerManagerImpl(
+      *this, listener_component_factory_, worker_factory_, ProdSystemTimeSource::instance_));
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -265,7 +267,7 @@ void InstanceImpl::initialize(Options& options,
 
   cluster_manager_factory_.reset(new Upstream::ProdClusterManagerFactory(
       runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(), dispatcher(),
-      localInfo()));
+      localInfo(), secretManager()));
 
   // Now the configuration gets parsed. The configuration may start setting thread local data
   // per above. See MainImpl::initialize() for why we do this pointer dance.
@@ -460,6 +462,8 @@ void InstanceImpl::shutdownAdmin() {
 ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::BootstrapConfigDump>();
   config_dump->mutable_bootstrap()->MergeFrom(bootstrap_);
+  TimestampUtil::systemClockToTimestamp(bootstrap_config_update_time_,
+                                        *(config_dump->mutable_last_updated()));
   return config_dump;
 }
 

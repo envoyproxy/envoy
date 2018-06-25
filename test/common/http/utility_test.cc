@@ -343,5 +343,52 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
   Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
 }
 
+TEST(HttpUtility, TestExtractHostPathFromUri) {
+  absl::string_view host, path;
+
+  // FQDN
+  Utility::extractHostPathFromUri("scheme://dns.name/x/y/z", host, path);
+  EXPECT_EQ(host, "dns.name");
+  EXPECT_EQ(path, "/x/y/z");
+
+  // Just the host part
+  Utility::extractHostPathFromUri("dns.name", host, path);
+  EXPECT_EQ(host, "dns.name");
+  EXPECT_EQ(path, "/");
+
+  // Just host and path
+  Utility::extractHostPathFromUri("dns.name/x/y/z", host, path);
+  EXPECT_EQ(host, "dns.name");
+  EXPECT_EQ(path, "/x/y/z");
+
+  // Just the path
+  Utility::extractHostPathFromUri("/x/y/z", host, path);
+  EXPECT_EQ(host, "");
+  EXPECT_EQ(path, "/x/y/z");
+
+  // Some invalid URI
+  Utility::extractHostPathFromUri("scheme://adf-scheme://adf", host, path);
+  EXPECT_EQ(host, "adf-scheme:");
+  EXPECT_EQ(path, "//adf");
+
+  Utility::extractHostPathFromUri("://", host, path);
+  EXPECT_EQ(host, "");
+  EXPECT_EQ(path, "/");
+
+  Utility::extractHostPathFromUri("/:/adsf", host, path);
+  EXPECT_EQ(host, "");
+  EXPECT_EQ(path, "/:/adsf");
+}
+
+TEST(HttpUtility, TestPrepareHeaders) {
+  envoy::api::v2::core::HttpUri http_uri;
+  http_uri.set_uri("scheme://dns.name/x/y/z");
+
+  Http::MessagePtr message = Utility::prepareHeaders(http_uri);
+
+  EXPECT_STREQ("/x/y/z", message->headers().Path()->value().c_str());
+  EXPECT_STREQ("dns.name", message->headers().Host()->value().c_str());
+}
+
 } // namespace Http
 } // namespace Envoy

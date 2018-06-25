@@ -1,3 +1,4 @@
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
@@ -19,6 +20,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
@@ -62,6 +64,9 @@ public:
   AdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
 
   void TearDown() override {
+    ads_connection_->close();
+    ads_connection_->waitForDisconnect();
+    ads_connection_.reset();
     test_server_.reset();
     fake_upstreams_.clear();
   }
@@ -81,7 +86,7 @@ public:
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
     tls_cert->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
-    Ssl::ServerContextConfigImpl cfg(tls_context);
+    Ssl::ServerContextConfigImpl cfg(tls_context, secret_manager_);
 
     static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return std::make_unique<Ssl::ServerSslSocketFactory>(
@@ -239,6 +244,25 @@ public:
     }
   }
 
+  envoy::admin::v2alpha::ClustersConfigDump getClustersConfigDump() {
+    auto message_ptr =
+        test_server_->server().admin().getConfigTracker().getCallbacksMap().at("clusters")();
+    return dynamic_cast<const envoy::admin::v2alpha::ClustersConfigDump&>(*message_ptr);
+  }
+
+  envoy::admin::v2alpha::ListenersConfigDump getListenersConfigDump() {
+    auto message_ptr =
+        test_server_->server().admin().getConfigTracker().getCallbacksMap().at("listeners")();
+    return dynamic_cast<const envoy::admin::v2alpha::ListenersConfigDump&>(*message_ptr);
+  }
+
+  envoy::admin::v2alpha::RoutesConfigDump getRoutesConfigDump() {
+    auto message_ptr =
+        test_server_->server().admin().getConfigTracker().getCallbacksMap().at("routes")();
+    return dynamic_cast<const envoy::admin::v2alpha::RoutesConfigDump&>(*message_ptr);
+  }
+
+  Secret::MockSecretManager secret_manager_;
   Runtime::MockLoader runtime_;
   Ssl::ContextManagerImpl context_manager_{runtime_};
   FakeHttpConnectionPtr ads_connection_;
@@ -280,6 +304,12 @@ TEST_P(AdsIntegrationTest, Basic) {
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
   makeSingleRequest();
+  const ProtobufWkt::Timestamp first_active_listener_ts_1 =
+      getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
+  const ProtobufWkt::Timestamp first_active_cluster_ts_1 =
+      getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
+  const ProtobufWkt::Timestamp first_route_config_ts_1 =
+      getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
 
   // Upgrade RDS/CDS/EDS to a newer config, validate we can process a request.
   sendDiscoveryResponse<envoy::api::v2::Cluster>(
@@ -301,6 +331,12 @@ TEST_P(AdsIntegrationTest, Basic) {
       compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "2", {"route_config_0"}));
 
   makeSingleRequest();
+  const ProtobufWkt::Timestamp first_active_listener_ts_2 =
+      getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
+  const ProtobufWkt::Timestamp first_active_cluster_ts_2 =
+      getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
+  const ProtobufWkt::Timestamp first_route_config_ts_2 =
+      getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
 
   // Upgrade LDS/RDS, validate we can process a request.
   sendDiscoveryResponse<envoy::api::v2::Listener>(Config::TypeUrl::get().Listener,
@@ -322,6 +358,23 @@ TEST_P(AdsIntegrationTest, Basic) {
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
   makeSingleRequest();
+  const ProtobufWkt::Timestamp first_active_listener_ts_3 =
+      getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
+  const ProtobufWkt::Timestamp first_active_cluster_ts_3 =
+      getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
+  const ProtobufWkt::Timestamp first_route_config_ts_3 =
+      getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
+
+  // Expect last_updated timestamps to be updated in a predictable way
+  // For the listener configs in this example, 1 == 2 < 3.
+  EXPECT_EQ(first_active_listener_ts_2, first_active_listener_ts_1);
+  EXPECT_GT(first_active_listener_ts_3, first_active_listener_ts_2);
+  // For the cluster configs in this example, 1 < 2 == 3.
+  EXPECT_GT(first_active_cluster_ts_2, first_active_cluster_ts_1);
+  EXPECT_EQ(first_active_cluster_ts_3, first_active_cluster_ts_2);
+  // For the route configs in this example, 1 < 2 < 3.
+  EXPECT_GT(first_route_config_ts_2, first_route_config_ts_1);
+  EXPECT_GT(first_route_config_ts_3, first_route_config_ts_2);
 }
 
 // Validate that we can recover from failures.
@@ -399,6 +452,9 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
 
   void TearDown() override {
+    ads_connection_->close();
+    ads_connection_->waitForDisconnect();
+    ads_connection_.reset();
     test_server_.reset();
     fake_upstreams_.clear();
   }
@@ -444,6 +500,9 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
 
   void TearDown() override {
+    ads_connection_->close();
+    ads_connection_->waitForDisconnect();
+    ads_connection_.reset();
     test_server_.reset();
     fake_upstreams_.clear();
   }

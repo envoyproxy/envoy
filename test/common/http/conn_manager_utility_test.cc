@@ -69,7 +69,7 @@ public:
   ConnectionManagerUtilityTest() {
     ON_CALL(config_, userAgent()).WillByDefault(ReturnRef(user_agent_));
 
-    tracing_config_ = {Tracing::OperationName::Ingress, {}};
+    tracing_config_ = {Tracing::OperationName::Ingress, {}, 100, 10000, 100};
     ON_CALL(config_, tracingConfig()).WillByDefault(Return(&tracing_config_));
 
     ON_CALL(config_, via()).WillByDefault(ReturnRef(via_));
@@ -840,6 +840,122 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsAlwaysForwardClientCert) {
   EXPECT_TRUE(headers.has("x-forwarded-client-cert"));
   EXPECT_EQ("By=test://foo.com/fe;SAN=test://bar.com/be;URI=test://bar.com/be",
             headers.get_("x-forwarded-client-cert"));
+}
+
+// Sampling, global on.
+TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+      .WillOnce(Return(true));
+
+  Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  callMutateRequestHeaders(request_headers, Protocol::Http2);
+
+  EXPECT_EQ(UuidTraceStatus::Sampled,
+            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+}
+
+// Sampling must not be done on client traced.
+TEST_F(ConnectionManagerUtilityTest, SamplingMustNotBeDoneOnClientTraced) {
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
+      .Times(0);
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+      .WillOnce(Return(true));
+
+  // The x_request_id has TRACE_FORCED(a) set in the TRACE_BYTE_POSITION(14) character.
+  Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}};
+  callMutateRequestHeaders(request_headers, Protocol::Http2);
+
+  EXPECT_EQ(UuidTraceStatus::Forced,
+            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+}
+
+// Sampling, global off.
+TEST_F(ConnectionManagerUtilityTest, NoTraceWhenSamplingSetButGlobalNotSet) {
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+      .WillOnce(Return(false));
+
+  Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  callMutateRequestHeaders(request_headers, Protocol::Http2);
+
+  EXPECT_EQ(UuidTraceStatus::NoTrace,
+            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+}
+
+// Client, client enabled, global on.
+TEST_F(ConnectionManagerUtilityTest, ClientSamplingWhenGlobalSet) {
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
+      .WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+      .WillOnce(Return(true));
+
+  Http::TestHeaderMapImpl request_headers{
+      {"x-client-trace-id", "f4dca0a9-12c7-4307-8002-969403baf480"},
+      {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  callMutateRequestHeaders(request_headers, Protocol::Http2);
+
+  EXPECT_EQ(UuidTraceStatus::Client,
+            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+}
+
+// Client, client disabled, global on.
+TEST_F(ConnectionManagerUtilityTest, NoTraceWhenClientSamplingNotSetAndGlobalSet) {
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
+      .WillOnce(Return(false));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+      .WillOnce(Return(true));
+
+  Http::TestHeaderMapImpl request_headers{
+      {"x-client-trace-id", "f4dca0a9-12c7-4307-8002-969403baf480"},
+      {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
+  callMutateRequestHeaders(request_headers, Protocol::Http2);
+
+  EXPECT_EQ(UuidTraceStatus::NoTrace,
+            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+}
+
+// Forced, global on.
+TEST_F(ConnectionManagerUtilityTest, ForcedTracedWhenGlobalSet) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  // Internal request, make traceable.
+  TestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"},
+                            {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"},
+                            {"x-envoy-force-trace", "true"}};
+  EXPECT_CALL(random_, uuid()).Times(0);
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+      .WillOnce(Return(true));
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(UuidTraceStatus::Forced, UuidUtils::isTraceableUuid(headers.get_("x-request-id")));
+}
+
+// Forced, global off.
+TEST_F(ConnectionManagerUtilityTest, NoTraceWhenForcedTracedButGlobalNotSet) {
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  // Internal request, make traceable.
+  TestHeaderMapImpl headers{{"x-forwarded-for", "10.0.0.1"},
+                            {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"},
+                            {"x-envoy-force-trace", "true"}};
+  EXPECT_CALL(random_, uuid()).Times(0);
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+      .WillOnce(Return(false));
+
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(UuidTraceStatus::NoTrace, UuidUtils::isTraceableUuid(headers.get_("x-request-id")));
+}
+
+// Forced, global on, broken uuid.
+TEST_F(ConnectionManagerUtilityTest, NoTraceOnBrokenUuid) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-force-trace", "true"}, {"x-request-id", "bb"}};
+  callMutateRequestHeaders(request_headers, Protocol::Http2);
+
+  EXPECT_EQ(UuidTraceStatus::NoTrace,
+            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
 }
 
 } // namespace Http

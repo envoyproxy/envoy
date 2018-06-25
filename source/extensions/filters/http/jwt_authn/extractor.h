@@ -15,10 +15,12 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 /**
- * JwtLocation stores following info:
- * *  extracted JWT string,
- * *  the location where the JWT is extracted from,
- * *  list of issuers specified the location.
+ * JwtLocation stores following token infomation:
+ *
+ * * extracted token string,
+ * * the location where the JWT is extracted from,
+ * * list of issuers specified the location.
+ *
  */
 class JwtLocation {
 public:
@@ -36,21 +38,15 @@ public:
 
 typedef std::unique_ptr<const JwtLocation> JwtLocationConstPtr;
 
+class Extractor;
+typedef std::unique_ptr<const Extractor> ExtractorConstPtr;
+
 /**
  * Extracts JWT from locations specified in the config.
  *
- * The rules of JWT extraction:
- * * Each issuer can specify its locations at headers and query parameters.
- *
- * * If an issuer doesn't specify any locations, following default locations are
- * used:
- *      header:  Authorization: Bear <token>
- *      query parameter: ?access_token=<token>
- *
-
  * Usage example:
  *
- *  auto extractor = createExtractor(config);
+ *  auto extractor = Extractor::create(config);
  *  auto tokens = extractor->extract(headers);
  *  for (token : tokens) {
  *     Jwt jwt;
@@ -63,6 +59,7 @@ typedef std::unique_ptr<const JwtLocation> JwtLocationConstPtr;
  *        token->removeJwt(headers);
  *     }
  *  }
+ *
  */
 class Extractor {
 public:
@@ -74,17 +71,15 @@ public:
    * @return list of extracted Jwt location info.
    */
   virtual std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers) const PURE;
+
+  /**
+   * Create an instance of Extractor for a given config.
+   * @param the JwtAuthentication config.
+   * @return the extractor object.
+   */
+  static ExtractorConstPtr
+  create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config);
 };
-
-typedef std::unique_ptr<const Extractor> ExtractorConstPtr;
-
-/**
- * Create an instance of Extractor for a given config.
- * @param the JwtAuthentication config.
- * @return the extractor object.
- */
-ExtractorConstPtr
-createExtractor(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config);
 
 } // namespace JwtAuthn
 } // namespace HttpFilters
