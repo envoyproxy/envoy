@@ -55,6 +55,7 @@ envoy_cc_library(
     hdrs = ["cluster_manager_impl.h"],
     deps = [
         ":cds_api_lib",
+        ":health_discovery_service_lib",
         ":load_balancer_lib",
         ":load_stats_reporter_lib",
         ":ring_hash_lb_lib",
@@ -156,6 +157,20 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/grpc:async_client_lib",
         "@envoy_api//envoy/service/load_stats/v2:lrs_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "health_discovery_service_lib",
+    srcs = ["health_discovery_service.cc"],
+    hdrs = ["health_discovery_service.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/stats:stats_macros",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/grpc:async_client_lib",
+        "@envoy_api//envoy/service/discovery/v2:hds_cc",
     ],
 )
 

@@ -22,6 +22,8 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/upstream/health_discovery_service.h"
+
 namespace Envoy {
 namespace Server {
 
