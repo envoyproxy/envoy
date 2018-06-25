@@ -145,11 +145,11 @@ def checkBuildLine(line, file_path, reportError):
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
-  if envoy_build_rule_check and '@envoy//' in line:
+  if ENVOY_BUILD_RULE_CHECK and '@envoy//' in line:
     reportError("Superfluous '@envoy//' prefix")
 
 def fixBuildLine(line):
-  if envoy_build_rule_check:
+  if ENVOY_BUILD_RULE_CHECK:
     line = line.replace('@envoy//', '//')
   return line
 
@@ -294,13 +294,17 @@ if __name__ == "__main__":
   parser.add_argument('-j', '--num-workers', type=int, default=multiprocessing.cpu_count(),
                       help="number of worker processes to use; defaults to one per core.")
   parser.add_argument('--api-prefix', type=str, default='./api/', help="path of the API tree")
-  parser.add_argument('--envoy_build_rule_check', type=bool, default=True,
-                      help="Whether to check for @envoy// in a build rule.")
+  parser.add_argument('--skip_envoy_build_rule_check', action='store_true',
+                      help="Skip checking for '@envoy//' prefix in build rules.")
   args = parser.parse_args()
 
   operation_type = args.operation_type
   target_path = args.target_path
-  envoy_build_rule_check = args.envoy_build_rule_check
+
+  ENVOY_BUILD_RULE_CHECK = True
+  if args.skip_envoy_build_rule_check:
+    ENVOY_BUILD_RULE_CHECK = False
+
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
 
