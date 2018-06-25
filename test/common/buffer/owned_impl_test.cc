@@ -4,6 +4,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -136,10 +137,17 @@ TEST_F(OwnedImplTest, Read) {
 
 TEST_F(OwnedImplTest, ToString) {
   Buffer::OwnedImpl buffer;
+  EXPECT_EQ("", buffer.toString());
   auto append = [&buffer](absl::string_view str) { buffer.add(str.data(), str.size()); };
   append("Hello, ");
+  EXPECT_EQ("Hello, ", buffer.toString());
   append("world!");
   EXPECT_EQ("Hello, world!", buffer.toString());
+
+  // From debug inspection, I find that a second fragment is created at >1000 bytes.
+  std::string long_string(5000, 'A');
+  append(long_string);
+  EXPECT_EQ(absl::StrCat("Hello, world!" + long_string), buffer.toString());
 }
 
 } // namespace
