@@ -91,8 +91,13 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithRemovedHeader) {
   const std::string empty_body{};
   const auto authz_response =
       TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers);
-  const auto check_response_headers = TestCommon::makeHeaderValueOption(
-      {{":status", "200", false}, {"bar", "foo", false}, {"foobar", "foo", false}});
+  const auto check_response_headers =
+      TestCommon::makeHeaderValueOption({{":status", "200", false},
+                                         {":path", "/bar", false},
+                                         {":method", "post", false},
+                                         {"content-length", "post", false},
+                                         {"bar", "foo", false},
+                                         {"foobar", "foo", false}});
   auto message_response = TestCommon::makeMessageResponse(check_response_headers);
 
   envoy::service::auth::v2alpha::CheckRequest request;
