@@ -7,7 +7,7 @@ namespace Upstream {
 
 HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& scope,
                          Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher)
-    : stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_reporter."))},
+    : stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_delegate."))},
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")) {

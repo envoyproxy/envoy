@@ -19,19 +19,6 @@ class HdsIntegrationTest : public HttpIntegrationTest,
 public:
   HdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
-  // Used as args to updateClusterLocalityAssignment().
-  struct LocalityAssignment {
-    LocalityAssignment() : LocalityAssignment({}, 0) {}
-    LocalityAssignment(const std::vector<uint32_t>& endpoints) : LocalityAssignment(endpoints, 0) {}
-    LocalityAssignment(const std::vector<uint32_t>& endpoints, uint32_t weight)
-        : endpoints_(endpoints), weight_(weight) {}
-
-    // service_upstream_ indices for endpoints in the cluster.
-    const std::vector<uint32_t> endpoints_;
-    // If non-zero, locality level weighting.
-    const uint32_t weight_{};
-  };
-
   void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
     hds_upstream_ = fake_upstreams_.back().get();
@@ -50,12 +37,6 @@ public:
       hds_cluster->mutable_circuit_breakers()->Clear();
       hds_cluster->set_name("hds_report");
       hds_cluster->mutable_http2_protocol_options();
-      // Put ourselves in a locality that will be used in
-      // updateClusterLoadAssignment()
-      auto* locality = bootstrap.mutable_node()->mutable_locality();
-      locality->set_region("some_region");
-      locality->set_zone("zone_name");
-      locality->set_sub_zone(sub_zone_);
       // Switch predefined cluster_0 to EDS filesystem sourcing.
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       cluster_0->mutable_hosts()->Clear();
@@ -81,7 +62,7 @@ public:
 
     hds_stream_->sendGrpcMessage(server_health_check_specifier);
     // Wait until the request has been received by Envoy.
-    test_server_->waitForCounterGe("hds_reporter.requests", ++hds_requests_);
+    test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
   }
 
   void cleanupUpstreamConnection() {
@@ -109,7 +90,6 @@ public:
   FakeUpstream* service_upstream_[upstream_endpoints_]{};
   uint32_t hds_requests_{};
   EdsHelper eds_helper_;
-  bool locality_weighted_lb_{};
 
   const uint64_t request_size_ = 1024;
   const uint64_t response_size_ = 512;
@@ -132,19 +112,19 @@ TEST_P(HdsIntegrationTest, Simple) {
   hds_stream_ = fake_hds_connection_->waitForNewStream(*dispatcher_);
   hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg);
 
-  EXPECT_EQ(0, test_server_->counter("hds_reporter.requests")->value());
-  EXPECT_EQ(1, test_server_->counter("hds_reporter.responses")->value());
+  EXPECT_EQ(0, test_server_->counter("hds_delegate.requests")->value());
+  EXPECT_EQ(1, test_server_->counter("hds_delegate.responses")->value());
 
   // Send a message to Envoy, and wait until it's received
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier);
-  test_server_->waitForCounterGe("hds_reporter.requests", ++hds_requests_);
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
   // Wait for Envoy to reply
   hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_2);
 
-  EXPECT_EQ(1, test_server_->counter("hds_reporter.requests")->value());
-  EXPECT_EQ(2, test_server_->counter("hds_reporter.responses")->value());
+  EXPECT_EQ(1, test_server_->counter("hds_delegate.requests")->value());
+  EXPECT_EQ(2, test_server_->counter("hds_delegate.responses")->value());
 
   cleanupHdsConnection();
 }

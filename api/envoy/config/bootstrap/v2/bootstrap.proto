@@ -87,7 +87,7 @@ message Bootstrap {
   ClusterManager cluster_manager = 4;
 
   // Health discovery service config option.
-  // See api/envoy/api/v2/core/health_check.proto
+  // (:ref:`core.ApiConfigSource <envoy_api_msg_core.ApiConfigSource>`)
   envoy.api.v2.core.ApiConfigSource hds_config = 14;
 
   // Optional file system path to search for startup flag files.
