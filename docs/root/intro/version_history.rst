@@ -9,6 +9,8 @@ Version history
   :ref:`use_data_plane_proto<envoy_api_field_config.ratelimit.v2.RateLimitServiceConfig.use_data_plane_proto>`
   boolean flag in the ratelimit configuration.
   Support for the legacy proto :repo:`source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
+* http: added support for :ref:`sampling parameters
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
 
 1.7.0
 ===============
