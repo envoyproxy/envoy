@@ -85,7 +85,12 @@ public:
   ssize_t search(const void* data, uint64_t size, size_t start) const override;
   int write(int fd) override;
   void postProcess() override {}
-  std::string toString() const override;
+
+  /**
+   * Construct a flattened string from a buffer.
+   * @return the flattened string.
+   */
+  std::string toString() const;
 
   Event::Libevent::BufferPtr& buffer() override { return buffer_; }
 
