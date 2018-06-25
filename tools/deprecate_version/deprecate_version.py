@@ -1,11 +1,11 @@
 # Script for automating cleanup PR creation for deprecated features at a given
 # version. Usage:
 #
-# tools/deprecate_version.py <deprecate for version> <deprecate by version>
+# python tools/deprecate_version/deprecate_version.py <deprecate for version> <deprecate by version>
 #
 # e.g
 #
-# tools/deprecate_version.py 1.6.0 1.7.0
+#  python tools/deprecate_version/deprecate_version.py 1.6.0 1.7.0
 #
 # A GitHub access token must be set in GH_ACCESS_TOKEN. To create one, go to
 # Settings -> Developer settings -> Personal access tokens in GitHub and create
@@ -24,7 +24,7 @@ import os
 import re
 import sys
 
-import github
+import github  # pip install pygithub
 from git import Repo
 
 # Tag issues created with these labels.
