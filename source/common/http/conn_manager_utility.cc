@@ -199,8 +199,8 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(Http::HeaderMap& reque
   // Do not apply tracing transformations if we are currently tracing.
   if (UuidTraceStatus::NoTrace == UuidUtils::isTraceableUuid(x_request_id)) {
     if (request_headers.ClientTraceId() &&
-        (runtime.snapshot().featureEnabled("tracing.client_enabled",
-                                           config.tracingConfig()->client_sampling_))) {
+        runtime.snapshot().featureEnabled("tracing.client_enabled",
+                                          config.tracingConfig()->client_sampling_)) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
     } else if (request_headers.EnvoyForceTrace()) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);

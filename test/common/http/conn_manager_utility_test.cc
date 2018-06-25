@@ -866,6 +866,7 @@ TEST_F(ConnectionManagerUtilityTest, SamplingMustNotBeDoneOnClientTraced) {
   Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}};
   callMutateRequestHeaders(request_headers, Protocol::Http2);
 
+  // The input x_request_id has TRACE_FORCED(a) set in the TRACE_BYTE_POSITION(14) character.
   EXPECT_EQ(UuidTraceStatus::Forced,
             UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
 }
@@ -945,6 +946,7 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenForcedTracedButGlobalNotSet) {
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
             callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(UuidTraceStatus::NoTrace, UuidUtils::isTraceableUuid(headers.get_("x-request-id")));
 }
 
 // Forced, global on, broken uuid.
