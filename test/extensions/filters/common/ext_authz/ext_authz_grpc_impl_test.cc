@@ -60,8 +60,33 @@ public:
 
 // Test the client when an ok response is received.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
-  auto check_response = TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus::Ok);
-  auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
+  auto check_response = std::make_unique<envoy::service::auth::v2alpha::CheckResponse>();
+  auto status = check_response->mutable_status();
+  status->set_code(Grpc::Status::GrpcStatus::Ok);
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::OK;
+
+  envoy::service::auth::v2alpha::CheckRequest request;
+  expectCallSend(request);
+  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+
+  Http::HeaderMapImpl headers;
+  client_.onCreateInitialMetadata(headers);
+
+  EXPECT_CALL(span_, setTag("ext_authz_status", "ext_authz_ok"));
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzResponseNoAttributes(authz_response))));
+  client_.onSuccess(std::move(check_response), span_);
+}
+
+// Test the client when an ok response is received.
+TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithAllAtributes) {
+  const std::string empty_body{};
+  const auto expected_headers = TestCommon::makeHeaderValueOption({{"foo", "bar", false}});
+  auto check_response = TestCommon::makeCheckResponse(
+      Grpc::Status::GrpcStatus::Ok, envoy::type::StatusCode::OK, empty_body, expected_headers);
+  auto authz_response =
+      TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers);
 
   envoy::service::auth::v2alpha::CheckRequest request;
   expectCallSend(request);
@@ -78,9 +103,11 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
 
 // Test the client when a denied response is received.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationDenied) {
-  auto check_response = TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus::PermissionDenied,
-                                                      envoy::type::StatusCode::Forbidden);
-  auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::Denied, Http::Code::Forbidden);
+  auto check_response = std::make_unique<envoy::service::auth::v2alpha::CheckResponse>();
+  auto status = check_response->mutable_status();
+  status->set_code(Grpc::Status::GrpcStatus::PermissionDenied);
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::Denied;
 
   envoy::service::auth::v2alpha::CheckRequest request;
   expectCallSend(request);
@@ -90,13 +117,13 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDenied) {
   client_.onCreateInitialMetadata(headers);
   EXPECT_EQ(nullptr, headers.RequestId());
   EXPECT_CALL(span_, setTag("ext_authz_status", "ext_authz_unauthorized"));
-  EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
+  EXPECT_CALL(request_callbacks_, onComplete_(WhenDynamicCastTo<ResponsePtr&>(
+                                      AuthzResponseNoAttributes(authz_response))));
 
   client_.onSuccess(std::move(check_response), span_);
 }
 
-// Test the client when an OK response with additional HTTP attributes is received.
+// Test the client when a denied response with additional HTTP attributes is received.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   const std::string expected_body{"test"};
   const auto expected_headers = TestCommon::makeHeaderValueOption({{"foo", "bar", false}});

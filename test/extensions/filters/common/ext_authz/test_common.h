@@ -16,7 +16,17 @@ namespace ExtAuthz {
 
 MATCHER_P(AuthzErrorResponse, status, "") { return arg->status == status; }
 
+MATCHER_P(AuthzResponseNoAttributes, response, "") {
+  if (arg->status != response.status) {
+    return false;
+  }
+  return true;
+}
+
 MATCHER_P(AuthzDeniedResponse, response, "") {
+  if (arg->status != response.status) {
+    return false;
+  }
   if (arg->status_code != response.status_code) {
     return false;
   }
