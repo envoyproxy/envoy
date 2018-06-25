@@ -141,6 +141,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
        parent_.host_value_.empty() ? parent_.cluster_.info()->name() : parent_.host_value_},
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
+  Router::FilterUtility::setUpstreamScheme(request_headers, *parent_.cluster_.info());
 
   parent_.request_headers_parser_->evaluateHeaders(request_headers, REQUEST_INFO);
   request_encoder_->encodeHeaders(request_headers, true);
@@ -462,7 +463,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
 
   auto headers_message = Grpc::Common::prepareHeaders(
       parent_.cluster_.info()->name(), parent_.service_method_.service()->full_name(),
-      parent_.service_method_.name());
+      parent_.service_method_.name(), absl::nullopt);
   headers_message->headers().insertUserAgent().value().setReference(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
   Router::FilterUtility::setUpstreamScheme(headers_message->headers(), *parent_.cluster_.info());

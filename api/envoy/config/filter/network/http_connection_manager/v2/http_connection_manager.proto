@@ -298,6 +298,7 @@ message HttpFilter {
   // * :ref:`envoy.grpc_json_transcoder <config_http_filters_grpc_json_transcoder>`
   // * :ref:`envoy.grpc_web <config_http_filters_grpc_web>`
   // * :ref:`envoy.health_check <config_http_filters_health_check>`
+  // * :ref:`envoy.header_to_metadata <config_http_filters_header_to_metadata>`
   // * :ref:`envoy.ip_tagging <config_http_filters_ip_tagging>`
   // * :ref:`envoy.lua <config_http_filters_lua>`
   // * :ref:`envoy.rate_limit <config_http_filters_rate_limit>`

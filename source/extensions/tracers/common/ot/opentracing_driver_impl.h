@@ -37,6 +37,7 @@ public:
   void injectContext(Http::HeaderMap& request_headers) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
+  void setSampled(bool) override;
 
 private:
   OpenTracingDriver& driver_;

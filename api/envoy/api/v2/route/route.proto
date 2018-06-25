@@ -305,7 +305,7 @@ message CorsPolicy {
   google.protobuf.BoolValue enabled = 7;
 }
 
-// [#comment:next free field: 23]
+// [#comment:next free field: 24]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -609,6 +609,18 @@ message RouteAction {
   CorsPolicy cors = 17;
 
   reserved 21;
+
+  // If present, and the request is a gRPC request, use the
+  // `grpc-timeout header <https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>`_,
+  // or its default value (infinity) instead of
+  // :ref:`timeout <envoy_api_field_route.RouteAction.timeout>`, but limit the applied timeout
+  // to the maximum value specified here. If configured as 0, the maximum allowed timeout for
+  // gRPC requests is infinity. If not configured at all, the `grpc-timeout` header is not used
+  // and gRPC requests time out like any other requests using
+  // :ref:`timeout <envoy_api_field_route.RouteAction.timeout>` or its default.
+  // This can be used to prevent unexpected upstream request timeouts due to potentially long
+  // time gaps between gRPC request and response in gRPC streaming mode.
+  google.protobuf.Duration max_grpc_timeout = 23 [(gogoproto.stdduration) = true];
 }
 
 message RedirectAction {

@@ -31,6 +31,7 @@ public:
   MOCK_METHOD2(setTag, void(const std::string& name, const std::string& value));
   MOCK_METHOD0(finishSpan, void());
   MOCK_METHOD1(injectContext, void(Http::HeaderMap& request_headers));
+  MOCK_METHOD1(setSampled, void(const bool sampled));
 
   SpanPtr spawnChild(const Config& config, const std::string& name,
                      SystemTime start_time) override {

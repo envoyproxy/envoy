@@ -38,6 +38,12 @@ Http::FilterHeadersStatus HealthCheckFilter::decodeHeaders(Http::HeaderMap& head
     health_check_request_ = true;
     callbacks_->requestInfo().healthCheck(true);
 
+    // Set the 'sampled' status for the span to false. This overrides
+    // any previous sampling decision associated with the trace instance,
+    // resulting in this span (and any subsequent child spans) not being
+    // reported to the backend tracing system.
+    callbacks_->activeSpan().setSampled(false);
+
     // If we are not in pass through mode, we always handle. Otherwise, we handle if the server is
     // in the failed state or if we are using caching and we should use the cached response.
     if (!pass_through_mode_ || context_.healthCheckFailed() ||

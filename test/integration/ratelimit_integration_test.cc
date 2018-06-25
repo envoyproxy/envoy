@@ -1,8 +1,8 @@
+#include "envoy/service/ratelimit/v2/rls.pb.h"
+
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
-
-#include "source/common/ratelimit/ratelimit.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -12,8 +12,21 @@
 namespace Envoy {
 namespace {
 
+// TODO(junr03): legacy rate limit is deprecated. Go back to having only one
+// GrpcClientIntegrationParamTest after 1.7.0.
+class RatelimitGrpcClientIntegrationParamTest
+    : public Grpc::BaseGrpcClientIntegrationParamTest,
+      public testing::TestWithParam<
+          std::tuple<Network::Address::IpVersion, Grpc::ClientType, bool>> {
+public:
+  ~RatelimitGrpcClientIntegrationParamTest() {}
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
+  bool useDataPlaneProto() const { return std::get<2>(GetParam()); }
+};
+
 class RatelimitIntegrationTest : public HttpIntegrationTest,
-                                 public Grpc::GrpcClientIntegrationParamTest {
+                                 public RatelimitGrpcClientIntegrationParamTest {
 public:
   RatelimitIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
@@ -45,6 +58,9 @@ public:
                                  ->add_rate_limits();
           rate_limit->add_actions()->mutable_destination_cluster();
         });
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      bootstrap.mutable_rate_limit_service()->set_use_data_plane_proto(useDataPlaneProto());
+    });
     HttpIntegrationTest::initialize();
   }
 
@@ -60,15 +76,20 @@ public:
   void waitForRatelimitRequest() {
     fake_ratelimit_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
     ratelimit_request_ = fake_ratelimit_connection_->waitForNewStream(*dispatcher_);
-    pb::lyft::ratelimit::RateLimitRequest request_msg;
+    envoy::service::ratelimit::v2::RateLimitRequest request_msg;
     ratelimit_request_->waitForGrpcMessage(*dispatcher_, request_msg);
     ratelimit_request_->waitForEndStream(*dispatcher_);
     EXPECT_STREQ("POST", ratelimit_request_->headers().Method()->value().c_str());
-    EXPECT_STREQ("/pb.lyft.ratelimit.RateLimitService/ShouldRateLimit",
-                 ratelimit_request_->headers().Path()->value().c_str());
+    if (useDataPlaneProto()) {
+      EXPECT_STREQ("/envoy.service.ratelimit.v2.RateLimitService/ShouldRateLimit",
+                   ratelimit_request_->headers().Path()->value().c_str());
+    } else {
+      EXPECT_STREQ("/pb.lyft.ratelimit.RateLimitService/ShouldRateLimit",
+                   ratelimit_request_->headers().Path()->value().c_str());
+    }
     EXPECT_STREQ("application/grpc", ratelimit_request_->headers().ContentType()->value().c_str());
 
-    pb::lyft::ratelimit::RateLimitRequest expected_request_msg;
+    envoy::service::ratelimit::v2::RateLimitRequest expected_request_msg;
     expected_request_msg.set_domain("some_domain");
     auto* entry = expected_request_msg.add_descriptors()->add_entries();
     entry->set_key("destination_cluster");
@@ -100,9 +121,9 @@ public:
                  response_->headers().Status()->value().c_str());
   }
 
-  void sendRateLimitResponse(pb::lyft::ratelimit::RateLimitResponse_Code code) {
+  void sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code code) {
     ratelimit_request_->startGrpcStream();
-    pb::lyft::ratelimit::RateLimitResponse response_msg;
+    envoy::service::ratelimit::v2::RateLimitResponse response_msg;
     response_msg.set_overall_code(code);
     ratelimit_request_->sendGrpcMessage(response_msg);
     ratelimit_request_->finishGrpcStream(Grpc::Status::Ok);
@@ -129,12 +150,12 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, RatelimitIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+                        RATELIMIT_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(RatelimitIntegrationTest, Ok) {
   initiateClientConnection();
   waitForRatelimitRequest();
-  sendRateLimitResponse(pb::lyft::ratelimit::RateLimitResponse_Code_OK);
+  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK);
   waitForSuccessfulUpstreamResponse();
   cleanup();
 
@@ -146,7 +167,7 @@ TEST_P(RatelimitIntegrationTest, Ok) {
 TEST_P(RatelimitIntegrationTest, OverLimit) {
   initiateClientConnection();
   waitForRatelimitRequest();
-  sendRateLimitResponse(pb::lyft::ratelimit::RateLimitResponse_Code_OVER_LIMIT);
+  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT);
   waitForFailedUpstreamResponse(429);
   cleanup();
 

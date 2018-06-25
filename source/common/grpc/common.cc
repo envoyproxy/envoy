@@ -146,9 +146,72 @@ Buffer::InstancePtr Common::serializeBody(const Protobuf::Message& message) {
   return body;
 }
 
+std::chrono::milliseconds Common::getGrpcTimeout(Http::HeaderMap& request_headers) {
+  std::chrono::milliseconds timeout(0);
+  Http::HeaderEntry* header_grpc_timeout_entry = request_headers.GrpcTimeout();
+  if (header_grpc_timeout_entry) {
+    uint64_t grpc_timeout;
+    const char* unit =
+        StringUtil::strtoul(header_grpc_timeout_entry->value().c_str(), grpc_timeout);
+    if (unit != nullptr && *unit != '\0') {
+      switch (*unit) {
+      case 'H':
+        timeout = std::chrono::hours(grpc_timeout);
+        break;
+      case 'M':
+        timeout = std::chrono::minutes(grpc_timeout);
+        break;
+      case 'S':
+        timeout = std::chrono::seconds(grpc_timeout);
+        break;
+      case 'm':
+        timeout = std::chrono::milliseconds(grpc_timeout);
+        break;
+      case 'u':
+        timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::microseconds(grpc_timeout));
+        if (timeout < std::chrono::microseconds(grpc_timeout)) {
+          timeout++;
+        }
+        break;
+      case 'n':
+        timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::nanoseconds(grpc_timeout));
+        if (timeout < std::chrono::nanoseconds(grpc_timeout)) {
+          timeout++;
+        }
+        break;
+      }
+    }
+  }
+  return timeout;
+}
+
+void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::HeaderString& value) {
+  uint64_t time = timeout.count();
+  static const char units[] = "mSMH";
+  const char* unit = units; // start with milliseconds
+  static constexpr size_t MAX_GRPC_TIMEOUT_VALUE = 99999999;
+  if (time > MAX_GRPC_TIMEOUT_VALUE) {
+    time /= 1000; // Convert from milliseconds to seconds
+    unit++;
+  }
+  while (time > MAX_GRPC_TIMEOUT_VALUE) {
+    if (*unit == 'H') {
+      time = MAX_GRPC_TIMEOUT_VALUE; // No bigger unit available, clip to max 8 digit hours.
+    } else {
+      time /= 60; // Convert from seconds to minutes to hours
+      unit++;
+    }
+  }
+  value.setInteger(time);
+  value.append(unit, 1);
+}
+
 Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
                                         const std::string& service_full_name,
-                                        const std::string& method_name) {
+                                        const std::string& method_name,
+                                        const absl::optional<std::chrono::milliseconds>& timeout) {
   Http::MessagePtr message(new Http::RequestMessageImpl());
   message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
   message->headers().insertPath().value().append("/", 1);
@@ -157,9 +220,14 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
   message->headers().insertPath().value().append("/", 1);
   message->headers().insertPath().value().append(method_name.c_str(), method_name.size());
   message->headers().insertHost().value(upstream_cluster);
+  // According to https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md TE should appear
+  // before Timeout and ContentType.
+  message->headers().insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
+  if (timeout) {
+    toGrpcTimeout(timeout.value(), message->headers().insertGrpcTimeout().value());
+  }
   message->headers().insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Grpc);
-  message->headers().insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
 
   return message;
 }

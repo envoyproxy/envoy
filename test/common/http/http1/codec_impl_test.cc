@@ -722,6 +722,43 @@ TEST_F(Http1ClientConnectionImplTest, WatermarkTest) {
       ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/3589. Upstream sends multiple
+// responses to the same request. The request causes the write buffer to go above high
+// watermark. When the 2nd response is received, we throw a premature response exception, and the
+// caller attempts to close the connection. This causes the network connection to attempt to write
+// pending data, even in the no flush scenario, which can cause us to go below low watermark
+// which then raises callbacks for a stream that no longer exists.
+TEST_F(Http1ClientConnectionImplTest, HighwatermarkMultipleResponses) {
+  initialize();
+
+  InSequence s;
+
+  NiceMock<Http::MockStreamDecoder> response_decoder;
+  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
+  Http::MockStreamCallbacks stream_callbacks;
+  request_encoder.getStream().addCallbacks(stream_callbacks);
+
+  TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  // Fake a call from the underlying Network::Connection and verify the stream is notified.
+  EXPECT_CALL(stream_callbacks, onAboveWriteBufferHighWatermark());
+  static_cast<ClientConnection*>(codec_.get())
+      ->onUnderlyingConnectionAboveWriteBufferHighWatermark();
+
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+  codec_->dispatch(response);
+
+  Buffer::OwnedImpl response2("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n");
+  EXPECT_THROW(codec_->dispatch(response2), PrematureResponseException);
+
+  // Fake a call for going below the low watermark. Make sure no stream callbacks get called.
+  EXPECT_CALL(stream_callbacks, onBelowWriteBufferLowWatermark()).Times(0);
+  static_cast<ClientConnection*>(codec_.get())
+      ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
+}
+
 // For issue #1421 regression test that Envoy's HTTP parser applies header limits early.
 TEST_F(Http1ServerConnectionImplTest, TestCodecHeaderLimits) {
   initialize();

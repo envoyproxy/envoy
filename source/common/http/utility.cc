@@ -16,11 +16,11 @@
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/http/message_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/str_cat.h"
-#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Http {
@@ -292,7 +292,7 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   }
 
   absl::string_view xff_string(xff_header->value().c_str(), xff_header->value().size());
-  static const std::string seperator(", ");
+  static const std::string seperator(",");
   // Ignore the last num_to_skip addresses at the end of XFF.
   for (uint32_t i = 0; i < num_to_skip; i++) {
     std::string::size_type last_comma = xff_string.rfind(seperator);
@@ -307,6 +307,10 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   if (last_comma != std::string::npos && last_comma + seperator.size() < xff_string.size()) {
     xff_string = xff_string.substr(last_comma + seperator.size());
   }
+
+  // Ignore the whitespace, since they are allowed in HTTP lists (see RFC7239#section-7.1).
+  xff_string = StringUtil::ltrim(xff_string);
+  xff_string = StringUtil::rtrim(xff_string);
 
   try {
     // This technically requires a copy because inet_pton takes a null terminated string. In
@@ -332,6 +336,45 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
   }
 
   NOT_REACHED;
+}
+
+void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
+                                     absl::string_view& path) {
+  /**
+   *  URI RFC: https://www.ietf.org/rfc/rfc2396.txt
+   *
+   *  Example:
+   *  uri  = "https://example.com:8443/certs"
+   *  pos:          ^
+   *  host_pos:       ^
+   *  path_pos:                       ^
+   *  host = "example.com:8443"
+   *  path = "/certs"
+   */
+  const auto pos = uri.find("://");
+  // Start position of the host
+  const auto host_pos = (pos == std::string::npos) ? 0 : pos + 3;
+  // Start position of the path
+  const auto path_pos = uri.find("/", host_pos);
+  if (path_pos == std::string::npos) {
+    // If uri doesn't have "/", the whole string is treated as host.
+    host = uri.substr(host_pos);
+    path = "/";
+  } else {
+    host = uri.substr(host_pos, path_pos - host_pos);
+    path = uri.substr(path_pos);
+  }
+}
+
+MessagePtr Utility::prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_uri) {
+  absl::string_view host, path;
+  extractHostPathFromUri(http_uri.uri(), host, path);
+
+  MessagePtr message(new RequestMessageImpl());
+  message->headers().insertPath().value(path.data(), path.size());
+  message->headers().insertHost().value(host.data(), host.size());
+
+  return message;
 }
 
 } // namespace Http

@@ -58,6 +58,24 @@ public:
   static std::string getGrpcMessage(const Http::HeaderMap& trailers);
 
   /**
+   * Parse gRPC header 'grpc-timeout' value to a duration in milliseconds.
+   * @param request_headers the header map from which to extract the value of 'grpc-timeout' header.
+   *        If this header is missing the timeout corresponds to infinity. The header is encoded in
+   *        maximum of 8 decimal digits and a char for the unit.
+   * @return std::chrono::milliseconds the duration in milliseconds. A zero value corresponding to
+   *         infinity is returned if 'grpc-timeout' is missing or malformed.
+   */
+  static std::chrono::milliseconds getGrpcTimeout(Http::HeaderMap& request_headers);
+
+  /**
+   * Encode 'timeout' into 'grpc-timeout' format.
+   * @param timeout the duration in std::chrono::milliseconds.
+   * @param value the HeaderString onto which format the timeout in 'grpc-timeout' format, upto
+   *        8 decimal digits and a letter indicating the unit.
+   */
+  static void toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::HeaderString& value);
+
+  /**
    * Charge a success/failure stat to a cluster/service/method.
    * @param cluster supplies the target cluster.
    * @param protocol supplies the downstream protocol in use, either gRPC or gRPC-Web.
@@ -111,7 +129,8 @@ public:
    */
   static Http::MessagePtr prepareHeaders(const std::string& upstream_cluster,
                                          const std::string& service_full_name,
-                                         const std::string& method_name);
+                                         const std::string& method_name,
+                                         const absl::optional<std::chrono::milliseconds>& timeout);
 
   /**
    * Basic validation of gRPC response, @throws Grpc::Exception in case of non successful response.

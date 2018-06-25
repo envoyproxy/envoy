@@ -178,6 +178,39 @@ TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048); }
 
 TEST_P(Http2IntegrationTest, TrailersGiantBody) { testTrailers(1024 * 1024, 1024 * 1024); }
 
+TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        auto* route = virtual_host->mutable_routes(0);
+        route->mutable_route()->mutable_max_grpc_timeout()->set_seconds(60 * 60);
+      });
+  initialize();
+
+  // Envoy will close some number of connections when request times out.
+  // Make sure they don't cause assertion failures when we ignore them.
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // With upstream request timeout Envoy should send a gRPC-Status "DEADLINE EXCEEDED".
+  // TODO: Properly map request timeout to "DEADLINE EXCEEDED" instead of "SERVICE UNAVAILABLE".
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestHeaderMapImpl{{":method", "POST"},
+                              {":path", "/test/long/url"},
+                              {":scheme", "http"},
+                              {":authority", "host"},
+                              {"te", "trailers"},
+                              {"grpc-timeout", "1S"}, // 1 Second
+                              {"content-type", "application/grpc"}});
+  response->waitForEndStream();
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_NE(response->headers().GrpcStatus(), nullptr);
+  EXPECT_STREQ("14", response->headers().GrpcStatus()->value().c_str()); // Service Unavailable
+  EXPECT_LT(0, test_server_->counter("cluster.cluster_0.upstream_rq_timeout")->value());
+}
+
 // Tests idle timeout behaviour with single request and validates that idle timer kicks in
 // after given timeout.
 TEST_P(Http2IntegrationTest, IdleTimoutBasic) { testIdleTimeoutBasic(); }

@@ -92,6 +92,7 @@ public:
 TEST_F(HealthCheckFilterNoPassThroughTest, OkOrFailed) {
   EXPECT_CALL(context_, healthCheckFailed()).Times(0);
   EXPECT_CALL(callbacks_.request_info_, healthCheck(true));
+  EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 }
@@ -192,6 +193,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, ComputedHealth) {
 TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
   EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_.request_info_, healthCheck(true));
+  EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   Http::TestHeaderMapImpl health_check_response{{":status", "503"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&health_check_response), true))
       .Times(1)
@@ -215,6 +217,7 @@ TEST_F(HealthCheckFilterNoPassThroughTest, HealthCheckFailedCallbackCalled) {
 TEST_F(HealthCheckFilterPassThroughTest, Ok) {
   EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
   EXPECT_CALL(callbacks_.request_info_, healthCheck(true));
+  EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
@@ -227,6 +230,7 @@ TEST_F(HealthCheckFilterPassThroughTest, Ok) {
 TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
   EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(false));
   EXPECT_CALL(callbacks_.request_info_, healthCheck(true));
+  EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, _)).Times(0);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
 
@@ -244,6 +248,7 @@ TEST_F(HealthCheckFilterPassThroughTest, OkWithContinue) {
 TEST_F(HealthCheckFilterPassThroughTest, Failed) {
   EXPECT_CALL(context_, healthCheckFailed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_.request_info_, healthCheck(true));
+  EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 }
@@ -258,6 +263,7 @@ TEST_F(HealthCheckFilterPassThroughTest, NotHcRequest) {
 TEST_F(HealthCheckFilterCachingTest, CachedServiceUnavailableCallbackCalled) {
   EXPECT_CALL(context_, healthCheckFailed()).WillRepeatedly(Return(false));
   EXPECT_CALL(callbacks_.request_info_, healthCheck(true));
+  EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   cache_manager_->setCachedResponseCode(Http::Code::ServiceUnavailable);
 
   Http::TestHeaderMapImpl health_check_response{{":status", "503"}};
@@ -278,6 +284,7 @@ TEST_F(HealthCheckFilterCachingTest, CachedServiceUnavailableCallbackCalled) {
 TEST_F(HealthCheckFilterCachingTest, CachedOkCallbackNotCalled) {
   EXPECT_CALL(context_, healthCheckFailed()).WillRepeatedly(Return(false));
   EXPECT_CALL(callbacks_.request_info_, healthCheck(true));
+  EXPECT_CALL(callbacks_.active_span_, setSampled(false));
   cache_manager_->setCachedResponseCode(Http::Code::OK);
 
   Http::TestHeaderMapImpl health_check_response{{":status", "200"}};
@@ -294,6 +301,7 @@ TEST_F(HealthCheckFilterCachingTest, CachedOkCallbackNotCalled) {
 
 TEST_F(HealthCheckFilterCachingTest, All) {
   EXPECT_CALL(callbacks_.request_info_, healthCheck(true)).Times(3);
+  EXPECT_CALL(callbacks_.active_span_, setSampled(false)).Times(3);
 
   // Verify that the first request goes through.
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, true));

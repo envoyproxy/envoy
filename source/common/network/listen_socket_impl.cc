@@ -30,7 +30,8 @@ void ListenSocketImpl::doBind() {
 }
 
 void ListenSocketImpl::setListenSocketOptions(const Network::Socket::OptionsSharedPtr& options) {
-  if (!Network::Socket::applyOptions(options, *this, Socket::SocketState::PreBind)) {
+  if (!Network::Socket::applyOptions(options, *this,
+                                     envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
     throw EnvoyException("ListenSocket: Setting socket options failed");
   }
 }

@@ -408,25 +408,38 @@ typedef std::unique_ptr<StoreRoot> StoreRootPtr;
 struct RawStatData;
 
 /**
- * Abstract interface for allocating a RawStatData.
+ * Abstract interface for allocating statistics. Implementations can
+ * be created utilizing a single fixed-size block suitable for
+ * shared-memory, or in the heap, allowing for pointers and sharing of
+ * substrings, with an opportunity for reduced memory consumption.
  */
-class RawStatDataAllocator {
+class StatDataAllocator {
 public:
-  virtual ~RawStatDataAllocator() {}
+  virtual ~StatDataAllocator() {}
 
   /**
-   * @return RawStatData* a raw stat data block for a given stat name or nullptr if there is no
-   *         more memory available for stats. The allocator should return a reference counted
-   *         data location by name if one already exists with the same name. This is used for
-   *         intra-process scope swapping as well as inter-process hot restart.
+   * @param name the full name of the stat.
+   * @param tag_extracted_name the name of the stat with tag-values stripped out.
+   * @param tags the extracted tag values.
+   * @return CounterSharedPtr a counter, or nullptr if allocation failed, in which case
+   *     tag_extracted_name and tags are not moved.
    */
-  virtual RawStatData* alloc(const std::string& name) PURE;
+  virtual CounterSharedPtr makeCounter(const std::string& name, std::string&& tag_extracted_name,
+                                       std::vector<Tag>&& tags) PURE;
 
   /**
-   * Free a raw stat data block. The allocator should handle reference counting and only truly
-   * free the block if it is no longer needed.
+   * @param name the full name of the stat.
+   * @param tag_extracted_name the name of the stat with tag-values stripped out.
+   * @param tags the extracted tag values.
+   * @return GaugeSharedPtr a gauge, or nullptr if allocation failed, in which case
+   *     tag_extracted_name and tags are not moved.
    */
-  virtual void free(RawStatData& data) PURE;
+  virtual GaugeSharedPtr makeGauge(const std::string& name, std::string&& tag_extracted_name,
+                                   std::vector<Tag>&& tags) PURE;
+
+  // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At
+  // the moment, histograms don't fit the same pattern of counters and gaugaes
+  // as they are not actually created in the context of a stats allocator.
 };
 
 } // namespace Stats
