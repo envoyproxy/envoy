@@ -85,8 +85,8 @@ Http::MessagePtr TestCommon::makeMessageResponse(const HeaderValueOptionVector& 
   Http::MessagePtr response(
       new Http::ResponseMessageImpl(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{}}));
   for (auto& header : headers) {
-    response->headers().setReferenceKey(Http::LowerCaseString(header.header().key()),
-                                        header.header().value());
+    response->headers().addCopy(Http::LowerCaseString(header.header().key()),
+                                header.header().value());
   }
   response->body().reset(new Buffer::OwnedImpl(body));
   return response;

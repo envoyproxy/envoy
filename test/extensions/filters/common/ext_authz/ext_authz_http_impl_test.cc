@@ -91,19 +91,19 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithRemovedHeader) {
   const auto check_response_headers =
       TestCommon::makeHeaderValueOption({{":status", "200", false}, {"bar", "foo", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
+  auto response = TestCommon::makeMessageResponse(check_response_headers);
 
   envoy::service::auth::v2alpha::CheckRequest request;
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
 
-  client_.onSuccess(TestCommon::makeMessageResponse(check_response_headers));
+  client_.onSuccess(std::move(response));
 }
 
 // Test the client when a denied response is received.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "403", false}});
-  ;
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::Denied, Http::Code::Forbidden, "", expected_headers);
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
