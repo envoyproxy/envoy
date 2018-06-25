@@ -268,7 +268,7 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
   response_headers.insertConnection().value().setReference(
       Http::Headers::get().ConnectionValues.Close);
   response_headers.insertAccessControlAllowHeaders().value().setReference(
-      Http::Headers::get().AccessControlAllowHeadersValue.AllowHeadersHystrix);
+      AccessControlAllowHeadersValue.AllowHeadersHystrix);
   response_headers.insertAccessControlAllowOrigin().value().setReference(
       Http::Headers::get().AccessControlAllowOriginValue.All);
   response_headers.insertNoChunks().value().setReference("0");

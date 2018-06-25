@@ -99,26 +99,6 @@ class HystrixSinkTest : public testing::Test {
 public:
   HystrixSinkTest() { sink_.reset(new HystrixSink(server_, window_size_)); }
 
-  // Return the value corresponding to key in an event stream.
-  absl::string_view getStreamField(absl::string_view data_message, absl::string_view key) {
-    absl::string_view::size_type key_pos = data_message.find(key);
-    EXPECT_NE(absl::string_view::npos, key_pos);
-    absl::string_view trim_data_before_Key = data_message.substr(key_pos);
-    key_pos = trim_data_before_Key.find(" ");
-    EXPECT_NE(absl::string_view::npos, key_pos);
-    absl::string_view trim_data_after_value = trim_data_before_Key.substr(key_pos + 1);
-    key_pos = trim_data_after_value.find(",");
-    EXPECT_NE(absl::string_view::npos, key_pos);
-    absl::string_view actual = trim_data_after_value.substr(0, key_pos);
-    return actual;
-  }
-
-  // Return a string without quotes.
-  absl::string_view getStringStreamField(absl::string_view data_message, absl::string_view key) {
-    absl::string_view value = getStreamField(data_message, key);
-    return value.substr(1, value.length() - 2);
-  }
-
   Buffer::OwnedImpl createClusterAndCallbacks() {
     // Set cluster.
     cluster_map_.emplace(cluster1_name_, cluster1_.cluster_);
@@ -182,35 +162,47 @@ public:
   void validateResults(const std::string& data_message, uint64_t success_step, uint64_t error_step,
                        uint64_t timeout_step, uint64_t timeout_retry_step, uint64_t rejected_step,
                        uint64_t window_size) {
-    EXPECT_EQ(getStreamField(data_message, "rollingCountSemaphoreRejected"),
-              std::to_string(window_size * rejected_step));
-    EXPECT_EQ(getStreamField(data_message, "rollingCountSuccess"),
-              std::to_string(window_size * success_step));
-    EXPECT_EQ(getStreamField(data_message, "rollingCountTimeout"),
-              std::to_string(window_size * (timeout_step + timeout_retry_step)));
-    EXPECT_EQ(getStreamField(data_message, "errorCount"),
-              std::to_string(window_size *
-                             (error_step - timeout_step))); // Note that on regular operation,
-    // 5xx and timeout are raised together, so timeouts are reduced from 5xx count
+    // Convert to json object.
+    Json::ObjectSharedPtr json_data_message = Json::Factory::loadFromString(data_message);
+    EXPECT_EQ(json_data_message->getInteger("rollingCountSemaphoreRejected"),
+              (window_size * rejected_step))
+        << "window_size=" << window_size << ", rejected_step=" << rejected_step;
+    EXPECT_EQ(json_data_message->getInteger("rollingCountSuccess"), (window_size * success_step))
+        << "window_size=" << window_size << ", success_step=" << success_step;
+    EXPECT_EQ(json_data_message->getInteger("rollingCountTimeout"),
+              (window_size * (timeout_step + timeout_retry_step)))
+        << "window_size=" << window_size << ", timeout_step=" << timeout_step
+        << ", timeout_retry_step=" << timeout_retry_step;
+    EXPECT_EQ(json_data_message->getInteger("errorCount"),
+              (window_size * (error_step - timeout_step)))
+        << "window_size=" << window_size << ", error_step=" << error_step
+        << ", timeout_step=" << timeout_step;
     uint64_t total = error_step + success_step + rejected_step + timeout_retry_step;
-    EXPECT_EQ(getStreamField(data_message, "requestCount"), std::to_string(window_size * total));
+    EXPECT_EQ(json_data_message->getInteger("requestCount"), (window_size * total))
+        << "window_size=" << window_size << ", total=" << total;
+
     if (total != 0) {
-      EXPECT_EQ(
-          getStreamField(data_message, "errorPercentage"),
-          std::to_string(static_cast<uint64_t>(
-              100 * (static_cast<double>(total - success_step) / static_cast<double>(total)))));
+      EXPECT_EQ(json_data_message->getInteger("errorPercentage"),
+                (static_cast<uint64_t>(100 * (static_cast<double>(total - success_step) /
+                                              static_cast<double>(total)))))
+          << "total=" << total << ", success_step=" << success_step;
+
     } else {
-      EXPECT_EQ(getStreamField(data_message, "errorPercentage"), "0");
+      EXPECT_EQ(json_data_message->getInteger("errorPercentage"), 0);
     }
   }
 
   std::unordered_map<std::string, std::string> buildClusterMap(absl::string_view data_message) {
     std::unordered_map<std::string, std::string> cluster_message_map;
     std::vector<std::string> messages =
-        absl::StrSplit(data_message, "data:", absl::SkipWhitespace());
+        absl::StrSplit(data_message, "data: ", absl::SkipWhitespace());
     for (auto message : messages) {
-      if (absl::StrContains(getStreamField(message, "type"), "HystrixCommand")) {
-        std::string cluster_name(getStringStreamField(message, "name"));
+      // Arrange message to remove ":" that comes from the keepalive sync.
+      absl::RemoveExtraAsciiWhitespace(&message);
+      std::string clear_message(absl::StripSuffix(message, ":"));
+      Json::ObjectSharedPtr json_message = Json::Factory::loadFromString(clear_message);
+      if (absl::StrContains(json_message->getString("type"), "HystrixCommand")) {
+        std::string cluster_name(json_message->getString("name"));
         cluster_message_map[cluster_name] = message;
       }
     }
@@ -222,7 +214,7 @@ public:
   const std::string cluster1_name_{"test_cluster1"};
   ClusterTestInfo cluster1_{cluster1_name_};
 
-  // second cluster for "end and remove cluaster" tests
+  // Second cluster for "end and remove cluster" tests.
   const std::string cluster2_name_{"test_cluster2"};
   ClusterTestInfo cluster2_{cluster2_name_};
 
@@ -241,8 +233,9 @@ TEST_F(HystrixSinkTest, EmptyFlush) {
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
   sink_->flush(source_);
-  std::string data_message = TestUtility::bufferToString(buffer);
-  validateResults(data_message, 0, 0, 0, 0, 0, window_size_);
+  std::unordered_map<std::string, std::string> cluster_message_map =
+      buildClusterMap(TestUtility::bufferToString(buffer));
+  validateResults(cluster_message_map[cluster1_name_], 0, 0, 0, 0, 0, window_size_);
 }
 
 TEST_F(HystrixSinkTest, BasicFlow) {
@@ -254,7 +247,7 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   // Only success traffic, check randomly increasing traffic
   // Later in the test we'll "shortcut" by constant traffic
   uint64_t traffic_counter = 0;
-  ;
+
   sink_->flush(source_); // init window with 0
   for (uint64_t i = 0; i < (window_size_ - 1); i++) {
     buffer.drain(buffer.length());
@@ -263,18 +256,21 @@ TEST_F(HystrixSinkTest, BasicFlow) {
     sink_->flush(source_);
   }
 
-  EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "rollingCountSuccess"),
-            std::to_string(traffic_counter));
-  EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "requestCount"),
-            std::to_string(traffic_counter));
-  EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "errorCount"), "0");
-  EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "errorPercentage"), "0");
+  std::unordered_map<std::string, std::string> cluster_message_map =
+      buildClusterMap(TestUtility::bufferToString(buffer));
 
-  // Check mixed traffic
+  Json::ObjectSharedPtr json_buffer =
+      Json::Factory::loadFromString(cluster_message_map[cluster1_name_]);
+  EXPECT_EQ(json_buffer->getInteger("rollingCountSuccess"), traffic_counter);
+  EXPECT_EQ(json_buffer->getInteger("requestCount"), traffic_counter);
+  EXPECT_EQ(json_buffer->getInteger("errorCount"), 0);
+  EXPECT_EQ(json_buffer->getInteger("errorPercentage"), 0);
+
+  // Check mixed traffic.
   // Values are unimportant - they represent traffic statistics, and for the purpose of the test any
   // arbitrary number will do. Only restriction is that errors >= timeouts, since in Envoy timeouts
-  // are counted as errors and therefore the code that prepares the stream for the dashboard reduces
-  // number of timeouts from total number of errors.
+  // are counted as errors and therefore the code that prepares the stream for the dashboard deducts
+  // the number of timeouts from total number of errors.
   const uint64_t success_step = 13;
   const uint64_t error_4xx_step = 12;
   const uint64_t error_4xx_retry_step = 11;
@@ -296,8 +292,10 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   EXPECT_NE(std::string::npos, rolling_map.find(cluster1_name_ + ".total"))
       << "cluster1_name = " << cluster1_name_;
 
+  cluster_message_map = buildClusterMap(TestUtility::bufferToString(buffer));
+
   // Check stream format and data.
-  validateResults(TestUtility::bufferToString(buffer), success_step,
+  validateResults(cluster_message_map[cluster1_name_], success_step,
                   error_4xx_step + error_4xx_retry_step + error_5xx_step + error_5xx_retry_step,
                   timeout_step, timeout_retry_step, rejected_step, window_size_);
 
@@ -305,7 +303,8 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   buffer.drain(buffer.length());
   sink_->resetRollingWindow();
   sink_->flush(source_);
-  validateResults(TestUtility::bufferToString(buffer), 0, 0, 0, 0, 0, window_size_);
+  cluster_message_map = buildClusterMap(TestUtility::bufferToString(buffer));
+  validateResults(cluster_message_map[cluster1_name_], 0, 0, 0, 0, 0, window_size_);
 }
 
 //
@@ -328,9 +327,12 @@ TEST_F(HystrixSinkTest, Disconnect) {
     sink_->flush(source_);
   }
 
-  EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "rollingCountSuccess"),
-            std::to_string(success_step * window_size_));
   EXPECT_NE(buffer.length(), 0);
+  std::unordered_map<std::string, std::string> cluster_message_map =
+      buildClusterMap(TestUtility::bufferToString(buffer));
+  Json::ObjectSharedPtr json_buffer =
+      Json::Factory::loadFromString(cluster_message_map[cluster1_name_]);
+  EXPECT_EQ(json_buffer->getInteger("rollingCountSuccess"), (success_step * window_size_));
 
   // Disconnect.
   buffer.drain(buffer.length());
@@ -343,8 +345,10 @@ TEST_F(HystrixSinkTest, Disconnect) {
   sink_->registerConnection(&callbacks_);
   ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return(success_step));
   sink_->flush(source_);
-  EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "rollingCountSuccess"), "0");
   EXPECT_NE(buffer.length(), 0);
+  cluster_message_map = buildClusterMap(TestUtility::bufferToString(buffer));
+  json_buffer = Json::Factory::loadFromString(cluster_message_map[cluster1_name_]);
+  EXPECT_EQ(json_buffer->getInteger("rollingCountSuccess"), 0);
 }
 
 TEST_F(HystrixSinkTest, AddCluster) {

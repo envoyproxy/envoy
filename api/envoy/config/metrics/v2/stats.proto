@@ -21,7 +21,7 @@ message StatsSink {
   // * :ref:`envoy.statsd <envoy_api_msg_config.metrics.v2.StatsdSink>`
   // * :ref:`envoy.dog_statsd <envoy_api_msg_config.metrics.v2.DogStatsdSink>`
   // * :ref:`envoy.metrics_service <envoy_api_msg_config.metrics.v2.MetricsServiceConfig>`
-  // * :ref:`envoy.hystrix <envoy_api_msg_config.metrics.v2.HystrixSink>`
+  // * :ref:`envoy.stat_sinks.hystrix <envoy_api_msg_config.metrics.v2.HystrixSink>`
   //
   // Sinks optionally support tagged/multiple dimensional metrics.
   string name = 1;
@@ -202,7 +202,7 @@ message DogStatsdSink {
   reserved 2;
 }
 
-// Stats configuration proto schema for built-in *envoy.hystrix* sink.
+// Stats configuration proto schema for built-in *envoy.stat_sinks.hystrix* sink.
 // The sink emits stats in `text/event-stream
 // <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_
 // formatted stream for use by `Hystrix dashboard

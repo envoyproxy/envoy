@@ -16,6 +16,10 @@ namespace Hystrix {
 typedef std::vector<uint64_t> RollingWindow;
 typedef std::map<const std::string, RollingWindow> RollingStatsMap;
 
+struct {
+  const std::string AllowHeadersHystrix{"Accept, Cache-Control, X-Requested-With, Last-Event-ID"};
+} AccessControlAllowHeadersValue;
+
 struct ClusterStatsCache {
   ClusterStatsCache(const std::string& cluster_name);
 
@@ -46,6 +50,7 @@ public:
    * Register a new connection.
    */
   void registerConnection(Http::StreamDecoderFilterCallbacks* callbacks_to_register);
+
   /**
    * Remove registered connection.
    */

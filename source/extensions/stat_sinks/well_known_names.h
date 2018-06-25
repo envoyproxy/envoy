@@ -19,7 +19,7 @@ public:
   // MetricsService sink
   const std::string METRICS_SERVICE = "envoy.metrics_service";
   // Hystrix sink
-  const std::string HYSTRIX = "envoy.hystrix";
+  const std::string HYSTRIX = "envoy.stat_sinks.hystrix";
 };
 
 typedef ConstSingleton<StatsSinkNameValues> StatsSinkNames;
