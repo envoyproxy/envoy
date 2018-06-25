@@ -73,6 +73,7 @@ envoy_cc_test(
         "//source/common/stats:stats_lib",
         "//source/server:hot_restart_lib",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:logging_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )

@@ -5,6 +5,7 @@
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/strings/match.h"
@@ -92,6 +93,32 @@ TEST_F(HotRestartImplTest, versionString) {
         << "Version changes when max-obj-name-length changes";
     // TearDown is called automatically at end of test.
   }
+}
+
+TEST_F(HotRestartImplTest, RawTruncate) {
+  setup();
+
+  const std::string long_string(Stats::RawStatData::maxNameLength() + 1, 'A');
+  Stats::RawStatData* stat{};
+  EXPECT_LOG_CONTAINS("warning", "is too long with", stat = hot_restart_->alloc(long_string));
+  hot_restart_->free(*stat);
+}
+
+TEST_F(HotRestartImplTest, RawAlloc) {
+  setup();
+
+  Stats::RawStatData* stat_1 = hot_restart_->alloc("ref_name");
+  ASSERT_NE(stat_1, nullptr);
+  Stats::RawStatData* stat_2 = hot_restart_->alloc("ref_name");
+  ASSERT_NE(stat_2, nullptr);
+  Stats::RawStatData* stat_3 = hot_restart_->alloc("not_ref_name");
+  ASSERT_NE(stat_3, nullptr);
+  EXPECT_EQ(stat_1, stat_2);
+  EXPECT_NE(stat_1, stat_3);
+  EXPECT_NE(stat_2, stat_3);
+  hot_restart_->free(*stat_1);
+  hot_restart_->free(*stat_2);
+  hot_restart_->free(*stat_3);
 }
 
 TEST_F(HotRestartImplTest, crossAlloc) {

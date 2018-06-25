@@ -91,7 +91,7 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   Thread::MutexBasicLockable lock;
 
   ThreadLocal::InstanceImpl tls;
-  Stats::HeapRawStatDataAllocator stats_allocator;
+  Stats::HeapStatDataAllocator stats_allocator;
   Stats::ThreadLocalStoreImpl stats_store(stats_allocator);
   stat_store_ = &stats_store;
   Runtime::RandomGeneratorPtr random_generator;

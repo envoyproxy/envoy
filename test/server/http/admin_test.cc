@@ -662,7 +662,7 @@ protected:
     gauges_.push_back(alloc_.makeGauge(name, std::move(tname), std::move(cluster_tags)));
   }
 
-  Stats::HeapRawStatDataAllocator alloc_;
+  Stats::HeapStatDataAllocator alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;
 };

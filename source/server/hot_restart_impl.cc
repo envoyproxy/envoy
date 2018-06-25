@@ -115,7 +115,9 @@ std::string SharedMemory::version(uint64_t max_num_stats, uint64_t max_stat_name
 }
 
 HotRestartImpl::HotRestartImpl(Options& options)
-    : options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())),
+    : Stats::RawStatDataAllocator(options.maxObjNameLength() +
+                                  Stats::RawStatData::maxStatSuffixLength()),
+      options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())),
       shmem_(SharedMemory::initialize(RawStatDataSet::numBytes(stats_set_options_), options)),
       log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
       stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
@@ -142,7 +144,7 @@ HotRestartImpl::HotRestartImpl(Options& options)
 Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
   Thread::LockGuard lock(stat_lock_);
-  absl::string_view key = name;
+  absl::string_view key = truncateStatName(name);
   if (key.size() > Stats::RawStatData::maxNameLength()) {
     key.remove_suffix(key.size() - Stats::RawStatData::maxNameLength());
   }

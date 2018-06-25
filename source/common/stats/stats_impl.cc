@@ -152,47 +152,10 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
   return false;
 }
 
-RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
-  RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
-  data->initialize(name);
-
-  // Because the RawStatData object is initialized with and contains a truncated
-  // version of the std::string name, storing the stats in a map would require
-  // storing the name twice. Performing a lookup on the set is similarly
-  // expensive to performing a map lookup, since both require copying a truncated version of the
-  // string before doing the hash lookup.
-  Thread::ReleasableLockGuard lock(mutex_);
-  auto ret = stats_.insert(data);
-  RawStatData* existing_data = *ret.first;
-  lock.release();
-
-  if (!ret.second) {
-    ::free(data);
-    ++existing_data->ref_count_;
-    return existing_data;
-  } else {
-    return data;
-  }
-}
-
-void HeapRawStatDataAllocator::free(RawStatData& data) {
-  ASSERT(data.ref_count_ > 0);
-  if (--data.ref_count_ > 0) {
-    return;
-  }
-
-  size_t key_removed;
-  {
-    Thread::LockGuard lock(mutex_);
-    key_removed = stats_.erase(&data);
-  }
-
-  ASSERT(key_removed == 1);
-  ::free(&data);
-}
+HeapStatData::HeapStatData(absl::string_view key) : name_(key.data(), key.size()) {}
 
 HeapStatData* HeapStatDataAllocator::alloc(const std::string& name) {
-  auto data = std::make_unique<HeapStatData>(name);
+  auto data = std::make_unique<HeapStatData>(truncateStatName(name));
   Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data.get());
   HeapStatData* existing_data = *ret.first;
@@ -384,14 +347,21 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
   return names;
 }
 
-void RawStatData::initialize(absl::string_view key) {
-  ASSERT(!initialized());
-  if (key.size() > Stats::RawStatData::maxNameLength()) {
+template <class StatData>
+absl::string_view StatDataAllocatorImpl<StatData>::truncateStatName(absl::string_view key) {
+  if ((max_width_ != UNLIMITED_WIDTH) && (key.size() > max_width_)) {
     ENVOY_LOG_MISC(
         warn,
         "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
-        key.size(), Stats::RawStatData::maxNameLength());
+        key.size(), max_width_);
+    return absl::string_view(key.data(), max_width_);
   }
+  return key;
+}
+
+
+void RawStatData::initialize(absl::string_view key) {
+  ASSERT(!initialized());
   ref_count_ = 1;
 
   // key is not necessarily nul-terminated, but we want to make sure name_ is.
@@ -481,6 +451,9 @@ GaugeSharedPtr StatDataAllocatorImpl<StatData>::makeGauge(const std::string& nam
   return std::make_shared<GaugeImpl<StatData>>(*data, *this, std::move(tag_extracted_name),
                                                std::move(tags));
 }
+
+template class StatDataAllocatorImpl<HeapStatData>;
+template class StatDataAllocatorImpl<RawStatData>;
 
 } // namespace Stats
 } // namespace Envoy

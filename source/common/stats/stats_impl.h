@@ -307,6 +307,11 @@ private:
 
 template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
+  static const uint64_t UNLIMITED_WIDTH = 0;
+
+  StatDataAllocatorImpl() : max_width_(UNLIMITED_WIDTH) {}
+  explicit StatDataAllocatorImpl(uint64_t max_width) : max_width_(max_width) {}
+
   // StatDataAllocator
   CounterSharedPtr makeCounter(const std::string& name, std::string&& tag_extracted_name,
                                std::vector<Tag>&& tags) override;
@@ -328,6 +333,11 @@ public:
    * @param data the data returned by alloc().
    */
   virtual void free(StatData& data) PURE;
+
+  absl::string_view truncateStatName(absl::string_view stat_name);
+
+private:
+  const uint64_t max_width_;
 };
 
 using RawStatDataAllocator = StatDataAllocatorImpl<RawStatData>;
@@ -397,7 +407,7 @@ private:
  * so that it can be allocated efficiently from the heap on demand.
  */
 struct HeapStatData {
-  HeapStatData(absl::string_view key) : name_(std::string(key)) {}
+  explicit HeapStatData(absl::string_view key);
 
   /**
    * Returns the name as a string_view. This is required by BlockMemoryHashSet.
@@ -413,45 +423,16 @@ struct HeapStatData {
 };
 
 /**
- * Implementation of StatDataAllocator that uses an unordered set to store
- * RawStatData pointers that are allocated on the heap. This is mainly used
- * for testing to exercise some of the hot-restart code in unit tests.
- */
-class HeapRawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
-public:
-  // StatDataAllocator
-  ~HeapRawStatDataAllocator() { ASSERT(stats_.empty()); }
-  RawStatData* alloc(const std::string& name) override;
-  void free(RawStatData& data) override;
-
-private:
-  struct RawStatDataHash_ {
-    size_t operator()(const RawStatData* a) const { return HashUtil::xxHash64(a->key()); }
-  };
-  struct RawStatDataCompare_ {
-    bool operator()(const RawStatData* a, const RawStatData* b) const {
-      return (a->key() == b->key());
-    }
-  };
-  typedef std::unordered_set<RawStatData*, RawStatDataHash_, RawStatDataCompare_> StringRawDataSet;
-
-  // An unordered set of RawStatData pointers which keys off the key()
-  // field in each object. This necessitates a custom comparator and hasher.
-  StringRawDataSet stats_ GUARDED_BY(mutex_);
-  // A mutex is needed here to protect the stats_ object from both alloc() and free() operations.
-  // Although alloc() operations are called under existing locking, free() operations are made from
-  // the destructors of the individual stat objects, which are not protected by locks.
-  Thread::MutexBasicLockable mutex_;
-};
-
-/**
  * Implementation of StatDataAllocator using a pure heap-based strategy, so that
  * Envoy implementations that do not require hot-restart can use less memory.
  */
 class HeapStatDataAllocator : public StatDataAllocatorImpl<HeapStatData> {
 public:
-  // StatDataAllocator
+  explicit HeapStatDataAllocator(uint64_t max_width) : StatDataAllocatorImpl(max_width) {}
+  HeapStatDataAllocator() {}
   ~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
+
+  // StatDataAllocator
   HeapStatData* alloc(const std::string& name) override;
   void free(HeapStatData& data) override;
 

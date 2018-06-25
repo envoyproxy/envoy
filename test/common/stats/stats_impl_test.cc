@@ -478,32 +478,17 @@ TEST(TagProducerTest, CheckConstructor) {
 }
 
 // Validate truncation behavior of RawStatData.
+// Note: a similar test using RawStatData* is in test/server/hot_restart_impl_test.cc.
 TEST(RawStatDataTest, Truncate) {
-  HeapRawStatDataAllocator alloc;
+  HeapStatDataAllocator alloc(RawStatData::maxNameLength());
   const std::string long_string(RawStatData::maxNameLength() + 1, 'A');
-  RawStatData* stat{};
+  HeapStatData* stat{};
   EXPECT_LOG_CONTAINS("warning", "is too long with", stat = alloc.alloc(long_string));
   alloc.free(*stat);
 }
 
+// Note: a similar test using RawStatData* is in test/server/hot_restart_impl_test.cc.
 TEST(RawStatDataTest, HeapAlloc) {
-  HeapRawStatDataAllocator alloc;
-  RawStatData* stat_1 = alloc.alloc("ref_name");
-  ASSERT_NE(stat_1, nullptr);
-  RawStatData* stat_2 = alloc.alloc("ref_name");
-  ASSERT_NE(stat_2, nullptr);
-  RawStatData* stat_3 = alloc.alloc("not_ref_name");
-  ASSERT_NE(stat_3, nullptr);
-  EXPECT_EQ(stat_1, stat_2);
-  EXPECT_NE(stat_1, stat_3);
-  EXPECT_NE(stat_2, stat_3);
-  alloc.free(*stat_1);
-  alloc.free(*stat_2);
-  alloc.free(*stat_3);
-}
-
-// Same test as RawStatDataTest, but with HeapStatData. Reference-counting should work here too.
-TEST(HeapStatDataTest, HeapAlloc) {
   HeapStatDataAllocator alloc;
   HeapStatData* stat_1 = alloc.alloc("ref_name");
   ASSERT_NE(stat_1, nullptr);
