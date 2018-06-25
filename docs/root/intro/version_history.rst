@@ -3,6 +3,7 @@ Version history
 
 1.8.0 (Pending)
 ===============
+* http: response filters not applied to early error paths such as http_parser generated 400s.
 * ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`. 
   Lyft's reference implementation of the `ratelimit <https://github.com/lyft/ratelimit>`_ service also supports the data-plane-api proto as of v1.1.0.
   Envoy can use either proto to send client requests to a ratelimit server with the use of the
@@ -78,7 +79,6 @@ Version history
   to elide *x-forwarded-for* header modifications.
 * http: fixed a bug in inline headers where addCopy and addViaMove didn't add header values when
   encountering inline headers with multiple instances.
-  http: response filters not applied to early error paths such as http_parser generated 400s.
 * listeners: added :ref:`tcp_fast_open_queue_length <envoy_api_field_Listener.tcp_fast_open_queue_length>` option.
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
   :ref:`application_protocols <envoy_api_field_listener.FilterChainMatch.application_protocols>`
