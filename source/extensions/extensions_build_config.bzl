@@ -90,5 +90,7 @@ EXTENSIONS = {
     # Transport sockets
     #
 
+    # TODO(lizan): switch to config target once a transport socket exists
+    "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:tsi_handshaker",
     "envoy.transport_sockets.capture":                  "//source/extensions/transport_sockets/capture:config",
 }

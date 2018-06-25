@@ -141,6 +141,11 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         config.tcp_fast_open_queue_length().value()));
   }
 
+  if (config.socket_options().size() > 0) {
+    addListenSocketOptions(
+        Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
+  }
+
   if (!config.listener_filters().empty()) {
     listener_filter_factories_ =
         parent_.factory_.createListenerFilterFactoryList(config.listener_filters(), *this);
@@ -410,6 +415,7 @@ void ListenerImpl::debugLog(const std::string& message) {
 }
 
 void ListenerImpl::initialize() {
+  last_updated_ = systemTimeSource().currentTime();
   // If workers have already started, we shift from using the global init manager to using a local
   // per listener init manager. See ~ListenerImpl() for why we gate the onListenerWarmed() call
   // with initialize_canceled_.
@@ -438,7 +444,7 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
   if (socket_ && listen_socket_options_) {
     // 'pre_bind = false' as bind() is never done after this.
     bool ok = Network::Socket::applyOptions(listen_socket_options_, *socket_,
-                                            Network::Socket::SocketState::PostBind);
+                                            envoy::api::v2::core::SocketOption::STATE_BOUND);
     const std::string message =
         fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
     if (!ok) {
@@ -448,7 +454,7 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
       ENVOY_LOG(debug, "{}", message);
     }
 
-    // Add the options to the socket_ so that SocketState::Listening options can be
+    // Add the options to the socket_ so that STATE_LISTENING options can be
     // set in the worker after listen()/evconnlistener_new() is called.
     socket_->addOptions(listen_socket_options_);
   }
@@ -456,8 +462,10 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
 
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
-                                         WorkerFactory& worker_factory)
-    : server_(server), factory_(listener_factory), stats_(generateStats(server.stats())),
+                                         WorkerFactory& worker_factory,
+                                         SystemTimeSource& system_time_source)
+    : server_(server), system_time_source_(system_time_source), factory_(listener_factory),
+      stats_(generateStats(server.stats())),
       config_tracker_entry_(server.admin().getConfigTracker().add(
           "listeners", [this] { return dumpListenerConfigs(); })) {
   for (uint32_t i = 0; i < std::max(1U, server.options().concurrency()); i++) {
@@ -470,11 +478,16 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
   config_dump->set_version_info(lds_api_ != nullptr ? lds_api_->versionInfo() : "");
   for (const auto& listener : active_listeners_) {
     if (listener->blockRemove()) {
-      config_dump->mutable_static_listeners()->Add()->MergeFrom(listener->config());
+      auto& static_listener = *config_dump->mutable_static_listeners()->Add();
+      static_listener.mutable_listener()->MergeFrom(listener->config());
+      TimestampUtil::systemClockToTimestamp(listener->last_updated_,
+                                            *(static_listener.mutable_last_updated()));
     } else {
       auto& dynamic_listener = *config_dump->mutable_dynamic_active_listeners()->Add();
       dynamic_listener.set_version_info(listener->versionInfo());
       dynamic_listener.mutable_listener()->MergeFrom(listener->config());
+      TimestampUtil::systemClockToTimestamp(listener->last_updated_,
+                                            *(dynamic_listener.mutable_last_updated()));
     }
   }
 
@@ -482,12 +495,16 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
     auto& dynamic_listener = *config_dump->mutable_dynamic_warming_listeners()->Add();
     dynamic_listener.set_version_info(listener->versionInfo());
     dynamic_listener.mutable_listener()->MergeFrom(listener->config());
+    TimestampUtil::systemClockToTimestamp(listener->last_updated_,
+                                          *(dynamic_listener.mutable_last_updated()));
   }
 
   for (const auto& listener : draining_listeners_) {
     auto& dynamic_listener = *config_dump->mutable_dynamic_draining_listeners()->Add();
     dynamic_listener.set_version_info(listener.listener_->versionInfo());
     dynamic_listener.mutable_listener()->MergeFrom(listener.listener_->config());
+    TimestampUtil::systemClockToTimestamp(listener.listener_->last_updated_,
+                                          *(dynamic_listener.mutable_last_updated()));
   }
 
   return config_dump;

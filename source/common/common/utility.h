@@ -50,19 +50,24 @@ public:
 private:
   std::string parse(const std::string& format_string);
 
-  typedef std::vector<int32_t> SubsecondOffsets;
-  std::string fromTimeAndPrepareSubsecondOffsets(time_t time,
-                                                 SubsecondOffsets& subsecond_offsets) const;
+  typedef std::vector<int32_t> SpecifierOffsets;
+  std::string fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
+                                                 const std::string& seconds_str) const;
 
-  // A container to hold a subsecond specifier (%f, %Nf) found in a format string.
-  struct SubsecondSpecifier {
-    SubsecondSpecifier(const size_t position, const size_t width, const std::string& segment)
-        : position_(position), width_(width), segment_(segment) {}
+  // A container to hold a specifiers (%f, %Nf, %s) found in a format string.
+  struct Specifier {
+    // To build a subsecond-specifier.
+    Specifier(const size_t position, const size_t width, const std::string& segment)
+        : position_(position), width_(width), segment_(segment), second_(false) {}
 
-    // The position/index of a subsecond specifier in a format string.
+    // To build a second-specifier (%s), the number of characters to be replaced is always 2.
+    Specifier(const size_t position, const std::string& segment)
+        : position_(position), width_(2), segment_(segment), second_(true) {}
+
+    // The position/index of a specifier in a format string.
     const size_t position_;
 
-    // The width of a subsecond specifier, e.g. given %3f, the width is 3. If %f is set as the
+    // The width of a specifier, e.g. given %3f, the width is 3. If %f is set as the
     // specifier, the width value should be 9 (the number of nanosecond digits).
     const size_t width_;
 
@@ -70,10 +75,14 @@ private:
     // segment may include strftime accepted specifiers. E.g. given "%3f-this-i%s-a-segment-%4f",
     // the current specifier is "%4f" and the segment is "-this-i%s-a-segment-".
     const std::string segment_;
+
+    // As an indication that this specifier is a %s (expect to be replaced by seconds since the
+    // epoch).
+    const bool second_;
   };
 
-  // This holds all subsecond specifiers found in a given format string.
-  std::vector<SubsecondSpecifier> subseconds_;
+  // This holds all specifiers found in a given format string.
+  std::vector<Specifier> specifiers_;
 
   const std::string format_string_;
 };

@@ -5,6 +5,7 @@
 
 #include "extensions/filters/http/well_known_names.h"
 
+#include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -81,7 +82,7 @@ void HeaderToMetadataFilter::setEncoderFilterCallbacks(
 }
 
 bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta_namespace,
-                                         const std::string& key, const std::string& value,
+                                         const std::string& key, absl::string_view value,
                                          ValueType type) const {
   ProtobufWkt::Value val;
 
@@ -100,16 +101,18 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
   // Sane enough, add the key/value.
   switch (type) {
   case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_STRING:
-    val.set_string_value(value);
+    val.set_string_value(ProtobufTypes::String(value));
     break;
-  case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_NUMBER:
-    try {
-      val.set_number_value(std::stod(value));
-    } catch (...) {
+  case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_NUMBER: {
+    double dval;
+    if (absl::SimpleAtod(StringUtil::trim(value), &dval)) {
+      val.set_number_value(dval);
+    } else {
       ENVOY_LOG(debug, "value to number conversion failed");
       return false;
     }
     break;
+  }
   default:
     ENVOY_LOG(debug, "unknown value type");
     return false;
@@ -144,9 +147,8 @@ void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,
 
     if (header_entry != nullptr && rule.has_on_header_present()) {
       const auto& keyval = rule.on_header_present();
-      const auto& value = keyval.value().empty()
-                              ? std::string(header_entry->value().getStringView())
-                              : keyval.value();
+      absl::string_view value =
+          keyval.value().empty() ? header_entry->value().getStringView() : keyval.value();
 
       if (!value.empty()) {
         const auto& nspace = decideNamespace(keyval.metadata_namespace());

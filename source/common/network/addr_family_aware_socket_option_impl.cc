@@ -10,12 +10,14 @@
 namespace Envoy {
 namespace Network {
 
-bool AddrFamilyAwareSocketOptionImpl::setOption(Socket& socket, Socket::SocketState state) const {
+bool AddrFamilyAwareSocketOptionImpl::setOption(
+    Socket& socket, envoy::api::v2::core::SocketOption::SocketState state) const {
   return setIpSocketOption(socket, state, ipv4_option_, ipv6_option_);
 }
 
 bool AddrFamilyAwareSocketOptionImpl::setIpSocketOption(
-    Socket& socket, Socket::SocketState state, const std::unique_ptr<SocketOptionImpl>& ipv4_option,
+    Socket& socket, envoy::api::v2::core::SocketOption::SocketState state,
+    const std::unique_ptr<SocketOptionImpl>& ipv4_option,
     const std::unique_ptr<SocketOptionImpl>& ipv6_option) {
   // If this isn't IP, we're out of luck.
   Address::InstanceConstSharedPtr address;

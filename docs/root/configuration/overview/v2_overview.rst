@@ -288,6 +288,17 @@ The management server could respond to EDS requests with:
               address: 127.0.0.2
               port_value: 1234
 
+Upgrading from v1 configuration
+-------------------------------
+
+While new v2 bootstrap JSON/YAML can be written, it might be expedient to upgrade an existing
+:ref:`v1 JSON/YAML configuration <config_overview_v1>` to v2. To do this (in an Envoy source tree),
+you can run:
+
+.. code-block:: console
+
+  bazel run //tools:v1_to_bootstrap <path to v1 JSON/YAML configuration file>
+
 Management server
 -----------------
 

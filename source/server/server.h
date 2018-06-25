@@ -217,6 +217,7 @@ private:
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
   envoy::config::bootstrap::v2::Bootstrap bootstrap_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
+  SystemTime bootstrap_config_update_time_;
 };
 
 } // namespace Server
