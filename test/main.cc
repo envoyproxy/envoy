@@ -14,6 +14,9 @@ const char* __asan_default_options() {
 // The main entry point (and the rest of this file) should have no logic in it,
 // this allows overriding by site specific versions of main.cc.
 int main(int argc, char** argv) {
+#ifndef __APPLE__
+  absl::InitializeSymbolizer(argv[0]);
+#endif
 #ifdef ENVOY_HANDLE_SIGNALS
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
   Envoy::SignalAction handle_sigs;

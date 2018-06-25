@@ -10,6 +10,11 @@
  * after setting up command line options.
  */
 int main(int argc, char** argv) {
+#ifndef __APPLE__
+  // absl::Symbolize mostly works without this, but this improves corner case
+  // handling, such as running in a chroot jail.
+  absl::InitializeSymbolizer(argv[0]);
+#endif
   std::unique_ptr<Envoy::MainCommon> main_common;
 
   // Initialize the server's main context under a try/catch loop and simply return EXIT_FAILURE
