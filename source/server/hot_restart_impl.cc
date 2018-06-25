@@ -169,7 +169,7 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
   if (--data.ref_count_ > 0) {
     return;
   }
-  bool key_removed = stats_set_->remove(data.keyGivenStatsOptions(options_.statsOptions()));
+  bool key_removed = stats_set_->remove(data.key());
   ASSERT(key_removed);
   memset(static_cast<void*>(&data), 0,
          Stats::RawStatData::sizeGivenStatsOptions(options_.statsOptions()));

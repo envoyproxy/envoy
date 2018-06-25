@@ -33,8 +33,20 @@ namespace Stats {
 class StatsOptions {
 public:
   virtual ~StatsOptions() {}
+
+  /**
+   * The max allowed length of a complete stat name, including suffix.
+   */
   virtual size_t maxNameLength() const PURE;
+
+  /**
+   * The max allowed length of the object part of a stat name.
+   */
   virtual size_t maxObjNameLength() const PURE;
+
+  /**
+   * The max allowed length of a stat suffix.
+   */
   virtual size_t maxStatSuffixLength() const PURE;
 };
 

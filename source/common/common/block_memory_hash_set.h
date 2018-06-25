@@ -121,7 +121,7 @@ public:
            (cell_index != Sentinal) && (num_values <= control_->size); cell_index = next) {
         RELEASE_ASSERT(cell_index < control_->hash_set_options.capacity);
         Cell& cell = getCell(cell_index);
-        absl::string_view key = cell.value.keyGivenStatsOptions(stats_options_);
+        absl::string_view key = cell.value.key();
         RELEASE_ASSERT(computeSlot(key) == slot);
         next = cell.next_cell_index;
         ++num_values;
@@ -186,7 +186,7 @@ public:
     for (uint32_t* cptr = &slots_[slot]; *cptr != Sentinal; cptr = next) {
       const uint32_t cell_index = *cptr;
       Cell& cell = getCell(cell_index);
-      if (cell.value.keyGivenStatsOptions(stats_options_) == key) {
+      if (cell.value.key() == key) {
         // Splice current cell out of slot-chain.
         *cptr = cell.next_cell_index;
 
@@ -213,7 +213,7 @@ public:
     const uint32_t slot = computeSlot(key);
     for (uint32_t c = slots_[slot]; c != Sentinal; c = getCell(c).next_cell_index) {
       Cell& cell = getCell(c);
-      if (cell.value.keyGivenStatsOptions(stats_options_) == key) {
+      if (cell.value.key() == key) {
         return &cell.value;
       }
     }

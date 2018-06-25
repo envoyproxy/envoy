@@ -61,8 +61,8 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     Logger::Registry::initialize(options_.logLevel(), options_.logFormat(), log_lock);
 
-    stats_store_.reset(
-        new Stats::ThreadLocalStoreImpl(options_.statsOptions(), restarter_->statsAllocator()));
+    stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
+                                                                 restarter_->statsAllocator());
     server_.reset(new Server::InstanceImpl(
         options_, local_address, default_test_hooks_, *restarter_, *stats_store_, access_log_lock,
         component_factory_, std::make_unique<Runtime::RandomGeneratorImpl>(), *tls_));

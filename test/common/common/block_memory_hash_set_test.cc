@@ -21,10 +21,7 @@ class BlockMemoryHashSetTest : public testing::Test {
 protected:
   // TestValue that doesn't define a hash.
   struct TestValueBase {
-    absl::string_view keyGivenStatsOptions(const Stats::StatsOptions& stats_options) const {
-      (void)stats_options;
-      return name;
-    }
+    absl::string_view key() const { return name; }
     void safeInitialize(absl::string_view key, const Stats::StatsOptions& stats_options) {
       uint64_t xfer = std::min(stats_options.maxNameLength(), key.size());
       memcpy(name, key.data(), xfer);
@@ -76,7 +73,7 @@ protected:
     for (uint32_t i = 0; i < hs.control_->hash_set_options.num_slots; ++i) {
       ret += fmt::format("slot {}:", i);
       for (uint32_t j = hs.slots_[i]; j != sentinal; j = hs.getCell(j).next_cell_index) {
-        ret += " " + std::string(hs.getCell(j).value.keyGivenStatsOptions(stats_options_));
+        ret += " " + std::string(hs.getCell(j).value.key());
       }
       ret += "\n";
     }

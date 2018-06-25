@@ -183,7 +183,8 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     if (stat == nullptr) {
       parent_.num_last_resort_stats_.inc();
       stat =
-          make_stat(parent_.heap_allocator_, name, std::move(tag_extracted_name), std::move(tags));
+          make_stat(parent_.heap_allocator_, name.substr(0, parent_.statsOptions().maxNameLength()),
+                    std::move(tag_extracted_name), std::move(tags));
       ASSERT(stat != nullptr);
     }
     central_ref = stat;

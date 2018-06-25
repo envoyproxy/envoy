@@ -245,13 +245,6 @@ struct RawStatData {
    */
   absl::string_view key() const { return absl::string_view(name_); }
 
-  /**
-   * Returns the name as a string_view. This is required by BlockMemoryHashSet.
-   */
-  absl::string_view keyGivenStatsOptions(const StatsOptions& stats_options) const {
-    return absl::string_view(name_, strnlen(name_, stats_options.maxNameLength()));
-  }
-
   std::atomic<uint64_t> value_;
   std::atomic<uint64_t> pending_increment_;
   std::atomic<uint16_t> flags_;
