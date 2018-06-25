@@ -99,6 +99,14 @@ public:
   static uint64_t getResponseStatus(const HeaderMap& headers);
 
   /**
+   * Determine whether these headers are a valid Upgrade request or response.
+   * This function returns true if the following HTTP headers and values are present:
+   * - Connection: Upgrade
+   * - Upgrade: [any value]
+   */
+  static bool isUpgrade(const HeaderMap& headers);
+
+  /**
    * Determine whether this is a WebSocket Upgrade request.
    * This function returns true if the following HTTP headers and values are present:
    * - Connection: Upgrade

@@ -23,9 +23,9 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     ConnectionManagerConfig& config, const Router::Config& route_config,
     Runtime::RandomGenerator& random, Runtime::Loader& runtime,
     const LocalInfo::LocalInfo& local_info) {
-  // If this is a WebSocket Upgrade request, do not remove the Connection and Upgrade headers,
+  // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
-  if (protocol == Protocol::Http11 && Utility::isWebSocketUpgradeRequest(request_headers)) {
+  if (protocol == Protocol::Http11 && Utility::isUpgrade(request_headers)) {
     // The current WebSocket implementation re-uses the HTTP1 codec to send upgrade headers to
     // the upstream host. This adds the "transfer-encoding: chunked" request header if the stream
     // has not ended and content-length does not exist. In HTTP1.1, if transfer-encoding and
@@ -303,8 +303,22 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,
                                                      const Http::HeaderMap& request_headers,
                                                      const std::string& via) {
-  response_headers.removeConnection();
-  response_headers.removeTransferEncoding();
+  if (Utility::isUpgrade(request_headers) && Utility::isUpgrade(response_headers)) {
+    // As in mutateRequestHeaders, for WebSocket responses do not strip connection or and
+    // do explicitly set a 0 content length. They also retain the existing transfer-encoding.
+    //
+    // Unlike mutateRequestHeaders we do not explicitly check protocol because
+    // if we're proxying an upgrade response we've already passed the protocol
+    // checks.
+    const bool no_body =
+        (!response_headers.TransferEncoding() && !response_headers.ContentLength());
+    if (no_body) {
+      response_headers.insertContentLength().value(uint64_t(0));
+    }
+  } else {
+    response_headers.removeConnection();
+    response_headers.removeTransferEncoding();
+  }
 
   if (request_headers.EnvoyForceTrace() && request_headers.RequestId()) {
     response_headers.insertRequestId().value(*request_headers.RequestId());
