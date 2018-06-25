@@ -145,11 +145,11 @@ def checkBuildLine(line, file_path, reportError):
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
-  if ENVOY_BUILD_RULE_CHECK and '@envoy//' in line:
+  if envoy_build_rule_check and '@envoy//' in line:
     reportError("Superfluous '@envoy//' prefix")
 
 def fixBuildLine(line):
-  if ENVOY_BUILD_RULE_CHECK:
+  if envoy_build_rule_check:
     line = line.replace('@envoy//', '//')
   return line
 
@@ -300,9 +300,7 @@ if __name__ == "__main__":
 
   operation_type = args.operation_type
   target_path = args.target_path
-
-  ENVOY_BUILD_RULE_CHECK = not args.skip_envoy_build_rule_check
-
+  envoy_build_rule_check = not args.skip_envoy_build_rule_check
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
 
