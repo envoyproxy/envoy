@@ -301,9 +301,7 @@ if __name__ == "__main__":
   operation_type = args.operation_type
   target_path = args.target_path
 
-  ENVOY_BUILD_RULE_CHECK = True
-  if args.skip_envoy_build_rule_check:
-    ENVOY_BUILD_RULE_CHECK = False
+  ENVOY_BUILD_RULE_CHECK = not args.skip_envoy_build_rule_check
 
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
