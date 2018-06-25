@@ -29,6 +29,6 @@ service AggregatedDiscoveryService {
   }
 
   rpc IncrementalAggregatedResources(stream envoy.api.v2.IncrementalDiscoveryRequest)
-    returns (stream envoy.api.v2.IncrementalDiscoveryResponse) {
+      returns (stream envoy.api.v2.IncrementalDiscoveryResponse) {
   }
 }
