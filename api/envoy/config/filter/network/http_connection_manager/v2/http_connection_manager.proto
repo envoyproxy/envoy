@@ -279,7 +279,7 @@ message HttpConnectionManager {
   //
   //    The current implementation of upgrade headers does not handle
   //    multi-valued upgrade headers. Support for multi-valued headers may be
-  //    added in future if needed.
+  //    added in the future if needed.
   message UpgradeConfig {
     // The case-insensitive name of this upgrade, e.g. "websocket".
     // For each upgrade type present in upgrade_configs, requests with
@@ -289,7 +289,7 @@ message HttpConnectionManager {
     // If present, this represents the filter chain which will be created for
     // this type of upgrade. If no filters are present, the filter chain for
     // HTTP connections will be used for this upgrade type.
-    repeated HttpFilter filters = 5;
+    repeated HttpFilter filters = 2;
   };
   // [#not-implemented-hide:]
   repeated UpgradeConfig upgrade_configs = 23;

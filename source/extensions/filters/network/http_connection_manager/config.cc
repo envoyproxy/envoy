@@ -342,11 +342,6 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
   return false;
 }
 
-bool HttpConnectionManagerConfig::upgradeSupported(absl::string_view upgrade_type) const {
-  return findUpgradeCaseInsensitive(upgrade_filter_factories_, upgrade_type) !=
-         upgrade_filter_factories_.end();
-}
-
 const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
   return *context_.localInfo().address();
 }

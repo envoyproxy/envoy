@@ -407,14 +407,18 @@ TEST_F(FilterChainTest, createUpgradeFilterChain) {
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_);
 
-  EXPECT_TRUE(config.upgradeSupported("webSocket"));
-  EXPECT_FALSE(config.upgradeSupported("foo"));
-
-  EXPECT_TRUE(config.upgradeSupported("Websocket"));
   Http::MockFilterChainFactoryCallbacks callbacks;
-  EXPECT_CALL(callbacks, addStreamFilter(_));        // Dynamo
-  EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
-  config.createUpgradeFilterChain("WEBSOCKET", callbacks);
+  {
+    EXPECT_CALL(callbacks, addStreamFilter(_));        // Dynamo
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", callbacks));
+  }
+
+  {
+    EXPECT_CALL(callbacks, addStreamFilter(_)).Times(0);
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(0);
+    EXPECT_FALSE(config.createUpgradeFilterChain("foo", callbacks));
+  }
 }
 
 TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
@@ -437,9 +441,6 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
   HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
                                      route_config_provider_manager_);
 
-  EXPECT_TRUE(config.upgradeSupported("websocket"));
-  EXPECT_TRUE(config.upgradeSupported("foo"));
-
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
     EXPECT_CALL(callbacks, addStreamFilter(_));        // Dynamo
@@ -450,14 +451,14 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
     EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
-    config.createUpgradeFilterChain("websocket", callbacks);
+    EXPECT_TRUE(config.createUpgradeFilterChain("websocket", callbacks));
   }
 
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
     EXPECT_CALL(callbacks, addStreamDecoderFilter(_));   // Router
     EXPECT_CALL(callbacks, addStreamFilter(_)).Times(2); // Dynamo
-    config.createUpgradeFilterChain("Foo", callbacks);
+    EXPECT_TRUE(config.createUpgradeFilterChain("Foo", callbacks));
   }
 }
 

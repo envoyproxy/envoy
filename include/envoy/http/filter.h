@@ -543,16 +543,10 @@ public:
    * @param upgrade supplies the upgrade header from downstream
    * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
    *                  FilterChainFactoryCallbacks.
+   * @return true if upgrades of this type are allowed and the filter chain has been created.
    */
   virtual bool createUpgradeFilterChain(absl::string_view upgrade,
                                         FilterChainFactoryCallbacks& callbacks) PURE;
-
-  /**
-   * Called to determine if this type of upgrade is supported.
-   * @param the upgrade type requested.
-   * @return true if upgrades of this type are allowed, false otherwise.
-   */
-  virtual bool upgradeSupported(absl::string_view upgrade) const PURE;
 };
 
 } // namespace Http

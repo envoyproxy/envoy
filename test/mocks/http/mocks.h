@@ -166,7 +166,6 @@ public:
   MOCK_METHOD1(createFilterChain, void(FilterChainFactoryCallbacks& callbacks));
   MOCK_METHOD2(createUpgradeFilterChain,
                bool(absl::string_view upgrade_type, FilterChainFactoryCallbacks& callbacks));
-  MOCK_CONST_METHOD1(upgradeSupported, bool(absl::string_view upgrade_type));
 };
 
 class MockStreamFilterCallbacksBase {

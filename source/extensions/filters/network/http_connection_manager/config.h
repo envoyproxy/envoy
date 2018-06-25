@@ -77,7 +77,6 @@ public:
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
   bool createUpgradeFilterChain(absl::string_view upgrade_type,
                                 Http::FilterChainFactoryCallbacks& callbacks) override;
-  bool upgradeSupported(absl::string_view upgrade_type) const override;
 
   // Http::ConnectionManagerConfig
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
