@@ -359,7 +359,6 @@ absl::string_view StatDataAllocatorImpl<StatData>::truncateStatName(absl::string
   return key;
 }
 
-
 void RawStatData::initialize(absl::string_view key) {
   ASSERT(!initialized());
   ref_count_ = 1;
