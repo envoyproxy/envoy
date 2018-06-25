@@ -147,6 +147,38 @@ public:
     ON_CALL(cluster_manager_, clusters()).WillByDefault(Return(cluster_map_));
   }
 
+  void addSecondClusterHelper(Buffer::OwnedImpl& buffer) {
+    buffer.drain(buffer.length());
+    cluster2_.setCountersToZero();
+    addClusterToMap(cluster2_name_, cluster2_.cluster_);
+  }
+
+  std::unordered_map<std::string, std::string>
+  addSecondClusterAndSendDataHelper(Buffer::OwnedImpl& buffer, const uint64_t success_step,
+                                    const uint64_t error_step, const uint64_t timeout_step,
+                                    const uint64_t success_step2, const uint64_t error_step2,
+                                    const uint64_t timeout_step2) {
+
+    // Add new cluster.
+    addSecondClusterHelper(buffer);
+
+    // Generate data to both clusters.
+    for (uint64_t i = 0; i < (window_size_ + 1); i++) {
+      buffer.drain(buffer.length());
+      cluster1_.setCounterReturnValues(i, success_step, error_step, 0, 0, 0, timeout_step, 0, 0);
+      cluster2_.setCounterReturnValues(i, success_step2, error_step2, 0, 0, 0, timeout_step2, 0, 0);
+      sink_->flush(source_);
+    }
+
+    return buildClusterMap(TestUtility::bufferToString(buffer));
+  }
+
+  void removeSecondClusterHelper(Buffer::OwnedImpl& buffer) {
+    buffer.drain(buffer.length());
+    removeClusterFromMap(cluster2_name_);
+    sink_->flush(source_);
+  }
+
   void validateResults(const std::string& data_message, uint64_t success_step, uint64_t error_step,
                        uint64_t timeout_step, uint64_t timeout_retry_step, uint64_t rejected_step,
                        uint64_t window_size) {
@@ -189,6 +221,10 @@ public:
   uint64_t window_size_ = rand_.random() % 10 + 5; // Arbitrary reasonable number.
   const std::string cluster1_name_{"test_cluster1"};
   ClusterTestInfo cluster1_{cluster1_name_};
+
+  // second cluster for "end and remove cluaster" tests
+  const std::string cluster2_name_{"test_cluster2"};
+  ClusterTestInfo cluster2_{cluster2_name_};
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Server::MockInstance> server_;
@@ -234,8 +270,11 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "errorCount"), "0");
   EXPECT_EQ(getStreamField(TestUtility::bufferToString(buffer), "errorPercentage"), "0");
 
-  // check mixed traffic
-  // Arbitrary values for testing. Make sure error > timeout.
+  // Check mixed traffic
+  // Values are unimportant - they represent traffic statistics, and for the purpose of the test any
+  // arbitrary number will do. Only restriction is that errors >= timeouts, since in Envoy timeouts
+  // are counted as errors and therefore the code that prepares the stream for the dashboard reduces
+  // number of timeouts from total number of errors.
   const uint64_t success_step = 13;
   const uint64_t error_4xx_step = 12;
   const uint64_t error_4xx_retry_step = 11;
@@ -308,8 +347,10 @@ TEST_F(HystrixSinkTest, Disconnect) {
   EXPECT_NE(buffer.length(), 0);
 }
 
-TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
+TEST_F(HystrixSinkTest, AddCluster) {
   InSequence s;
+  // Register callback to sink.
+  sink_->registerConnection(&callbacks_);
 
   // Arbitrary values for testing. Make sure error > timeout.
   const uint64_t success_step = 6;
@@ -320,63 +361,71 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   const uint64_t error_step2 = 33;
   const uint64_t timeout_step2 = 22;
 
-  // Register callback to sink.
-  sink_->registerConnection(&callbacks_);
   Buffer::OwnedImpl buffer = createClusterAndCallbacks();
 
-  // Add new cluster.
-  const std::string cluster2_name{"test_cluster2"};
-  ClusterTestInfo cluster2(cluster2_name);
-  addClusterToMap(cluster2_name, cluster2.cluster_);
-
-  // Generate data to both clusters.
-  for (uint64_t i = 0; i < (window_size_ + 1); i++) {
-    buffer.drain(buffer.length());
-    cluster1_.setCounterReturnValues(i, success_step, error_step, 0, 0, 0, timeout_step, 0, 0);
-    cluster2.setCounterReturnValues(i, success_step2, error_step2, 0, 0, 0, timeout_step2, 0, 0);
-    sink_->flush(source_);
-  }
-
+  // Add cluster and "run" some traffic.
   std::unordered_map<std::string, std::string> cluster_message_map =
-      buildClusterMap(TestUtility::bufferToString(buffer));
+      addSecondClusterAndSendDataHelper(buffer, success_step, error_step, timeout_step,
+                                        success_step2, error_step2, timeout_step2);
+
+  // Expect that add worked.
   ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end())
       << "cluster1_name = " << cluster1_name_;
-  ASSERT_NE(cluster_message_map.find(cluster2_name), cluster_message_map.end())
-      << "cluster2_name = " << cluster2_name;
+  ASSERT_NE(cluster_message_map.find(cluster2_name_), cluster_message_map.end())
+      << "cluster2_name = " << cluster2_name_;
 
   // Check stream format and data.
   validateResults(cluster_message_map[cluster1_name_], success_step, error_step, timeout_step, 0, 0,
                   window_size_);
-  validateResults(cluster_message_map[cluster2_name], success_step2, error_step2, timeout_step2, 0,
+  validateResults(cluster_message_map[cluster2_name_], success_step2, error_step2, timeout_step2, 0,
                   0, window_size_);
+}
 
-  buffer.drain(buffer.length());
+TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
+  InSequence s;
+  // Register callback to sink.
+  sink_->registerConnection(&callbacks_);
 
-  // Remove cluster
-  removeClusterFromMap(cluster2_name);
+  // Arbitrary values for testing. Make sure error > timeout.
+  const uint64_t success_step = 436;
+  const uint64_t error_step = 547;
+  const uint64_t timeout_step = 156;
+
+  const uint64_t success_step2 = 309;
+  const uint64_t error_step2 = 934;
+  const uint64_t timeout_step2 = 212;
+
+  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
+
+  // Add cluster and "run" some traffic.
+  addSecondClusterAndSendDataHelper(buffer, success_step, error_step, timeout_step, success_step2,
+                                    error_step2, timeout_step2);
+
+  // Remove cluster and flush data to sink.
+  removeSecondClusterHelper(buffer);
+
+  // Check that removed worked.
+  std::unordered_map<std::string, std::string> cluster_message_map =
+      buildClusterMap(TestUtility::bufferToString(buffer));
+  ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end())
+      << "cluster1_name = " << cluster1_name_;
+  ASSERT_EQ(cluster_message_map.find(cluster2_name_), cluster_message_map.end())
+      << "cluster2_name = " << cluster2_name_;
+
+  // Add cluster again and flush data to sink.
+  addSecondClusterHelper(buffer);
+
   sink_->flush(source_);
 
+  // Check that add worked.
   cluster_message_map = buildClusterMap(TestUtility::bufferToString(buffer));
   ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end())
       << "cluster1_name = " << cluster1_name_;
-  ASSERT_EQ(cluster_message_map.find(cluster2_name), cluster_message_map.end())
-      << "cluster2_name = " << cluster2_name;
-
-  // Add cluster again.
-  buffer.drain(buffer.length());
-  cluster2.setCountersToZero();
-  addClusterToMap(cluster2_name, cluster2.cluster_);
-
-  sink_->flush(source_);
-
-  cluster_message_map = buildClusterMap(TestUtility::bufferToString(buffer));
-  ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end())
-      << "cluster1_name = " << cluster1_name_;
-  ASSERT_NE(cluster_message_map.find(cluster2_name), cluster_message_map.end())
-      << "cluster2_name = " << cluster2_name;
+  ASSERT_NE(cluster_message_map.find(cluster2_name_), cluster_message_map.end())
+      << "cluster2_name = " << cluster2_name_;
 
   // Check that old values of test_cluster2 were deleted.
-  validateResults(cluster_message_map[cluster2_name], 0, 0, 0, 0, 0, window_size_);
+  validateResults(cluster_message_map[cluster2_name_], 0, 0, 0, 0, 0, window_size_);
 }
 } // namespace Hystrix
 } // namespace StatSinks
