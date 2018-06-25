@@ -1,6 +1,17 @@
 licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_package")
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
+    "envoy_cc_test",
+    "envoy_cc_test_library",
+    "envoy_package",
+    "envoy_select_hot_restart",
+)
+load(
+    "//source/extensions:all_extensions.bzl",
+    "envoy_all_extensions",
+)
 
 envoy_package()
 
@@ -70,4 +81,21 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
     ],
+)
+
+envoy_cc_fuzz_test(
+    name = "config_fuzz_test",
+    srcs = ["config_fuzz_test.cc"],
+    corpus = "config_corpus",
+    deps = [
+        "//source/common/thread_local:thread_local_lib",
+        "//source/server:server_lib",
+        "//test/integration:integration_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//source/server:configuration_lib",
+        "//source/server/config_validation:server_lib",
+        "//source/server:options_lib",
+        "//test/test_common:environment_lib",
+    ] + envoy_all_extensions(),
 )
