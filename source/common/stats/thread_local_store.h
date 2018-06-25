@@ -163,7 +163,7 @@ public:
  */
 class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
-  ThreadLocalStoreImpl(RawStatDataAllocator& alloc);
+  ThreadLocalStoreImpl(StatDataAllocator& alloc);
   ~ThreadLocalStoreImpl();
 
   // Stats::Scope
@@ -225,6 +225,29 @@ private:
     Histogram& histogram(const std::string& name) override;
     Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
 
+    template <class StatType>
+    using MakeStatFn =
+        std::function<std::shared_ptr<StatType>(StatDataAllocator&, const std::string& name,
+                                                std::string&& tag_extracted_name,
+                                                std::vector<Tag>&& tags)>;
+
+    /**
+     * Makes a stat either by looking it up in the central cache,
+     * generating it from the the parent allocator, or as a last
+     * result, creating it with the heap allocator.
+     *
+     * @param name the full name of the stat (not tag extracted).
+     * @param central_cache_map a map from name to the desired object in the central cache.
+     * @param make_stat a function to generate the stat object, called if it's not in cache.
+     * @param tls_ref possibly null reference to a cache entry for this stat, which will be
+     *     used if non-empty, or filled in if empty (and non-null).
+     */
+    template <class StatType>
+    StatType&
+    safeMakeStat(const std::string& name,
+                 std::unordered_map<std::string, std::shared_ptr<StatType>>& central_cache_map,
+                 MakeStatFn<StatType> make_stat, std::shared_ptr<StatType>* tls_ref);
+
     static std::atomic<uint64_t> next_scope_id_;
 
     const uint64_t scope_id_;
@@ -244,18 +267,12 @@ private:
     std::unordered_map<uint64_t, TlsCacheEntry> scope_cache_;
   };
 
-  struct SafeAllocData {
-    RawStatData& data_;
-    RawStatDataAllocator& free_;
-  };
-
   std::string getTagsForName(const std::string& name, std::vector<Tag>& tags) const;
   void clearScopeFromCaches(uint64_t scope_id);
   void releaseScopeCrossThread(ScopeImpl* scope);
-  SafeAllocData safeAlloc(const std::string& name);
   void mergeInternal(PostMergeCb mergeCb);
 
-  RawStatDataAllocator& alloc_;
+  StatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
   mutable Thread::MutexBasicLockable lock_;

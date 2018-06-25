@@ -97,7 +97,7 @@ struct ListenerManagerStats {
 class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
 public:
   ListenerManagerImpl(Instance& server, ListenerComponentFactory& listener_factory,
-                      WorkerFactory& worker_factory);
+                      WorkerFactory& worker_factory, SystemTimeSource& system_time_source);
 
   void onListenerWarmed(ListenerImpl& listener);
 
@@ -116,6 +116,7 @@ public:
   void stopWorkers() override;
 
   Instance& server_;
+  SystemTimeSource& system_time_source_;
   ListenerComponentFactory& factory_;
 
 private:
@@ -268,6 +269,7 @@ public:
   const envoy::api::v2::core::Metadata& listenerMetadata() const override {
     return config_.metadata();
   };
+  SystemTimeSource& systemTimeSource() override { return parent_.system_time_source_; }
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
       listen_socket_options_ =
@@ -299,6 +301,8 @@ public:
   Ssl::ContextManager& sslContextManager() override { return parent_.server_.sslContextManager(); }
   Stats::Scope& statsScope() const override { return *listener_scope_; }
   Secret::SecretManager& secretManager() override { return parent_.server_.secretManager(); }
+
+  SystemTime last_updated_;
 
 private:
   void addFilterChain(const std::vector<std::string>& server_names,

@@ -94,6 +94,15 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
         cluster_options,
         Network::SocketOptionFactory::buildTcpKeepaliveOptions(parseTcpKeepaliveConfig(config)));
   }
+  // Cluster socket_options trump cluster manager wide.
+  if (bind_config.socket_options().size() + config.upstream_bind_config().socket_options().size() >
+      0) {
+    auto socket_options = config.upstream_bind_config().socket_options().size() > 0
+                              ? config.upstream_bind_config().socket_options()
+                              : bind_config.socket_options();
+    Network::Socket::appendOptions(
+        cluster_options, Network::SocketOptionFactory::buildLiteralOptions(socket_options));
+  }
   if (cluster_options->empty()) {
     return nullptr;
   }

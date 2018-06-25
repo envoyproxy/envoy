@@ -46,6 +46,8 @@ public:
   const std::string RBAC = "envoy.filters.http.rbac";
   // JWT authentication filter
   const std::string JWT_AUTHN = "envoy.filters.http.jwt_authn";
+  // Header to metadata filter
+  const std::string HEADER_TO_METADATA = "envoy.filters.http.header_to_metadata";
 
   // Converts names from v1 to v2
   const Config::V1Converter v1_converter_;
@@ -53,8 +55,8 @@ public:
   // NOTE: Do not add any new filters to this list. All future filters are v2 only.
   HttpFilterNameValues()
       : v1_converter_({BUFFER, CORS, DYNAMO, FAULT, GRPC_HTTP1_BRIDGE, GRPC_JSON_TRANSCODER,
-                       GRPC_WEB, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER, LUA,
-                       EXT_AUTHORIZATION}) {}
+                       GRPC_WEB, HEADER_TO_METADATA, HEALTH_CHECK, IP_TAGGING, RATE_LIMIT, ROUTER,
+                       LUA, EXT_AUTHORIZATION}) {}
 };
 
 typedef ConstSingleton<HttpFilterNameValues> HttpFilterNames;

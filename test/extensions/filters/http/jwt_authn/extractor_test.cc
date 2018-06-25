@@ -18,24 +18,30 @@ namespace JwtAuthn {
 namespace {
 
 const char ExampleConfig[] = R"(
-rules:
-  - issuer: issuer1
-  - issuer: issuer2
+providers:
+  provider1:
+    issuer: issuer1
+  provider2:
+    issuer: issuer2
     from_headers:
       - name: token-header
-  - issuer: issuer3
+  provider3:
+    issuer: issuer3
     from_params:
       - token_param
-  - issuer: issuer4
+  provider4:
+    issuer: issuer4
     from_headers:
       - name: token-header
     from_params:
       - token_param
-  - issuer: issuer5
+  provider5:
+    issuer: issuer5
     from_headers:
       - name: prefix-header
         value_prefix: AAA
-  - issuer: issuer6
+  provider6:
+    issuer: issuer6
     from_headers:
       - name: prefix-header
         value_prefix: AAABBB

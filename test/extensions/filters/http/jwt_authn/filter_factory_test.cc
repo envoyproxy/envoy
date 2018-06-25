@@ -9,6 +9,7 @@
 #include "gtest/gtest.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
+using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
 using testing::Invoke;
 using testing::_;
 
@@ -30,22 +31,11 @@ TEST(HttpJwtAuthnFilterFactoryTest, GoodRemoteJwks) {
   cb(filter_callback);
 }
 
-TEST(HttpJwtAuthnFilterFactoryTest, InvalidIssuerProto) {
-  FilterFactory factory;
-  JwtAuthentication proto_config;
-  // Add an empty rule with empty issuer
-  proto_config.add_rules();
-
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context),
-               ProtoValidationException);
-}
-
 TEST(HttpJwtAuthnFilterFactoryTest, GoodLocalJwks) {
   JwtAuthentication proto_config;
-  auto rule = proto_config.add_rules();
-  rule->set_issuer("issuer");
-  rule->mutable_local_jwks()->set_inline_string(PublicKey);
+  auto& provider = (*proto_config.mutable_providers())["provider"];
+  provider.set_issuer("issuer");
+  provider.mutable_local_jwks()->set_inline_string(PublicKey);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterFactory factory;
@@ -57,9 +47,9 @@ TEST(HttpJwtAuthnFilterFactoryTest, GoodLocalJwks) {
 
 TEST(HttpJwtAuthnFilterFactoryTest, BadLocalJwks) {
   JwtAuthentication proto_config;
-  auto rule = proto_config.add_rules();
-  rule->set_issuer("issuer");
-  rule->mutable_local_jwks()->set_inline_string("A bad jwks");
+  auto& provider = (*proto_config.mutable_providers())["provider"];
+  provider.set_issuer("issuer");
+  provider.mutable_local_jwks()->set_inline_string("A bad jwks");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterFactory factory;
