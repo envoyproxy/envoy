@@ -17,7 +17,7 @@ bool DoubleMatcher::match(double value) const {
   case envoy::type::matcher::DoubleMatcher::kExact:
     return matcher_.exact() == value;
   default:
-    return false;
+    NOT_REACHED;
   };
 }
 
@@ -32,7 +32,7 @@ bool StringMatcher::match(const std::string& value) const {
   case envoy::type::matcher::StringMatcher::kRegex:
     return std::regex_match(value, regex_);
   default:
-    return false;
+    NOT_REACHED;
   }
 }
 
@@ -63,7 +63,7 @@ MetadataMatcher::MetadataMatcher(const envoy::type::matcher::MetadataMatcher& ma
       present_matcher_ |= m.present_match();
       break;
     default:
-      break;
+      NOT_REACHED;
     }
   }
 }
@@ -93,8 +93,12 @@ bool MetadataMatcher::match(const envoy::api::v2::core::Metadata& metadata) cons
   case ProtobufWkt::Value::kBoolValue:
     return (bool_matcher_allow_true_ && value.bool_value()) ||
            (bool_matcher_allow_false_ && !value.bool_value());
-  default:
+  case ProtobufWkt::Value::kListValue:
+  case ProtobufWkt::Value::kStructValue:
+  case ProtobufWkt::Value::KIND_NOT_SET:
     return false;
+  default:
+    NOT_REACHED;
   }
 }
 

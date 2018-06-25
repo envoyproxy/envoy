@@ -113,7 +113,7 @@ message Permission {
     // A port number that describes the destination port connecting to.
     uint32 destination_port = 6 [(validate.rules).uint32.lte = 65535];
 
-    // A metadata that describes additional information about the action.
+    // Metadata that describes additional information about the action.
     envoy.type.matcher.MetadataMatcher metadata = 7;
   }
 }
@@ -155,7 +155,7 @@ message Principal {
     // A header (or psuedo-header such as :path or :method) on the incoming HTTP request.
     envoy.api.v2.route.HeaderMatcher header = 6;
 
-    // A metadata that describes additional information about the principal.
+    // Metadata that describes additional information about the principal.
     envoy.type.matcher.MetadataMatcher metadata = 7;
   }
 }

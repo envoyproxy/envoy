@@ -14,11 +14,64 @@ import "validate/validate.proto";
 // :ref:`Metadata <envoy_api_msg_core.Metadata>`. It uses `filter` and `path` to retrieve the value
 // from the Metadata and then check if it's matched to one of the specified values.
 //
+// For example, for the following Metadata:
+//
+// .. code-block:: yaml
+//
+//    filter_metadata:
+//      envoy.filters.http.rbac:
+//        fields:
+//          a:
+//            struct_value:
+//              fields:
+//                b:
+//                  struct_value:
+//                    fields:
+//                      c:
+//                        string_value: pro
+//                t:
+//                  list_value:
+//                    values:
+//                      - string_value: m
+//                      - string_value: n
+//
+// The following MetadataMatcher is matched as the path [a, b, c] will retrieve a string value "pro"
+// from the Metadata which is matched to the prefix match specified in values.
+//
+// .. code-block:: yaml
+//
+//    filter: envoy.filters.http.rbac
+//    path:
+//    - key: a
+//    - key: b
+//    - key: c
+//    values:
+//    - string_match:
+//        exact: ex
+//    - string_match:
+//        prefix: pr
+//
+// The following MetadataMatcher is not matched as the path [a, t] is pointing to a list value in
+// the Metadata which is not supported for now.
+//
+// .. code-block:: yaml
+//
+//    filter: envoy.filters.http.rbac
+//    path:
+//    - key: a
+//    - key: t
+//    values:
+//    - string_match:
+//        exact: m
+//
 // An example use of MetadataMatcher is specifying additional metadata in envoy.filters.http.rbac to
-// enforce access control based on dynamic metadata in a request.
+// enforce access control based on dynamic metadata in a request. See :ref:`Permission
+// <envoy_api_msg_config.rbac.v2alpha.Permission>` and :ref:`Principal
+// <envoy_api_msg_config.rbac.v2alpha.Principal>`.
 message MetadataMatcher {
   // Specifies the segment in a path to retrieve value from Metadata.
-  // Note: Array is not supported for now and will result a not match directly.
+  // Note: Currently it's not supported to retrieve a value from a list in Metadata. This means it
+  // will always be not matched if the associated value of the key is a list.
   message PathSegment {
     oneof segment {
       option (validate.required) = true;
@@ -28,30 +81,30 @@ message MetadataMatcher {
     }
   }
 
-  // Specifies the value to match. Only primitive value is supported. For non-primitive value, the
+  // Specifies the value to match. Only primitive value are supported. For non-primitive values, the
   // result is always not matched.
   message Value {
     // NullMatch is an empty message to specify a null value.
     message NullMatch {
     }
 
-    // Specifies how to match a value. Only have effect on primitive value.
+    // Specifies how to match a value.
     oneof match_pattern {
       option (validate.required) = true;
 
-      // If specified, it's matched if and only if the target value is a NullValue.
+      // If specified, a match occurs if and only if the target value is a NullValue.
       NullMatch null_match = 1;
 
-      // If specified, it's matched if and only if the target value is a double value and is matched
-      // to this field.
+      // If specified, a match occurs if and only if the target value is a double value and is
+      // matched to this field.
       DoubleMatcher double_match = 2;
 
-      // If specified, it's matched if and only if the target value is a string value and is matched
-      // to this field.
+      // If specified, a match occurs if and only if the target value is a string value and is
+      // matched to this field.
       StringMatcher string_match = 3;
 
-      // If specified, it's matched if and only if the target value is a bool value and is equal to
-      // this field.
+      // If specified, a match occurs if and only if the target value is a bool value and is equal
+      // to this field.
       bool bool_match = 4;
 
       // If specified, value match will be performed based on whether the path is referring to a
@@ -61,13 +114,13 @@ message MetadataMatcher {
     }
   }
 
-  // Required. The filter name to retrieve the Struct from the Metadata.
+  // The filter name to retrieve the Struct from the Metadata.
   string filter = 1 [(validate.rules).string.min_bytes = 1];
 
-  // Required. The path to retrieve the Value from the Struct.
+  // The path to retrieve the Value from the Struct.
   repeated PathSegment path = 2 [(validate.rules).repeated .min_items = 1];
 
-  // Required. A set of values to match. The MetadataMatcher is matched if at least one value is
-  // matched, in other words, it's matched with OR semantics.
+  // A set of values to match. The MetadataMatcher is matched if at least one value is
+  // matched, in other words, a match occurs with OR semantics.
   repeated Value values = 3 [(validate.rules).repeated .min_items = 1];
 }
