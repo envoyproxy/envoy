@@ -3,7 +3,7 @@ licenses(["notice"])  # Apache 2
 # Public docs: docs/root/configuration/http_filters/header_to_metadata_filter.rst
 
 load(
-    "@envoy//bazel:envoy_build_system.bzl",
+    "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_package",
 )
