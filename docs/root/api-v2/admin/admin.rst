@@ -7,3 +7,4 @@ Admin
 
   ../admin/v2alpha/config_dump.proto
   ../admin/v2alpha/clusters.proto
+  ../admin/v2alpha/metrics.proto
