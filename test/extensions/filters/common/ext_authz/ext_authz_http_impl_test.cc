@@ -73,11 +73,11 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
   const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
 
-  envoy::service::auth::v2alpha::CheckRequest request;
+  envoy::service::auth::v2alpha::CheckRequest request{};
   auto mutable_headers =
-      *(request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers());
-  mutable_headers[std::string{"path"}] = std::string{"foo"};
-
+      request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
+  (*mutable_headers)[std::string{":path"}] = std::string{"foo"};
+  (*mutable_headers)[std::string{"foo"}] = std::string{"bar"};
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
@@ -87,18 +87,20 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
 
 // Test that the client removes certain response headers.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithRemovedHeader) {
-  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
-  const auto check_response_headers =
-      TestCommon::makeHeaderValueOption({{":status", "200", false}, {"bar", "foo", false}});
-  auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
-  auto response = TestCommon::makeMessageResponse(check_response_headers);
+  const auto expected_headers = TestCommon::makeHeaderValueOption({{"foobar", "foo", false}});
+  const std::string empty_body{};
+  const auto authz_response =
+      TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers);
+  const auto check_response_headers = TestCommon::makeHeaderValueOption(
+      {{":status", "200", false}, {"bar", "foo", false}, {"foobar", "foo", false}});
+  auto message_response = TestCommon::makeMessageResponse(check_response_headers);
 
   envoy::service::auth::v2alpha::CheckRequest request;
   client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
 
-  client_.onSuccess(std::move(response));
+  client_.onSuccess(std::move(message_response));
 }
 
 // Test the client when a denied response is received.

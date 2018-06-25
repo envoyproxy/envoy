@@ -45,6 +45,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
 
   Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>(*getZeroContentLengthHeader());
   for (const auto& header : request.attributes().request().http().headers()) {
+
     const Http::LowerCaseString key{header.first};
     if (key == Http::Headers::get().Path && !path_prefix_.empty()) {
       std::string value;
