@@ -99,7 +99,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationDenied) {
 // Test the client when an OK response with additional HTTP attributes is received.
 TEST_F(ExtAuthzGrpcClientTest, AuthorizationDeniedWithAllAttributes) {
   const std::string expected_body{"test"};
-  const auto expected_headers = TestCommon::makeHeaderValueOption("foo", "bar", false);
+  const auto expected_headers = TestCommon::makeHeaderValueOption({{"foo", "bar", false}});
   auto check_response = TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus::PermissionDenied,
                                                       envoy::type::StatusCode::Unauthorized,
                                                       expected_body, expected_headers);

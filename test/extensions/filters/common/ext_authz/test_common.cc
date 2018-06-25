@@ -67,14 +67,17 @@ Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_cod
   return authz_response;
 }
 
-HeaderValueOptionVector TestCommon::makeHeaderValueOption(std::string&& key, std::string&& value,
-                                                          bool append) {
-  envoy::api::v2::core::HeaderValueOption header_value_option;
-  auto* mutable_header = header_value_option.mutable_header();
-  mutable_header->set_key(key);
-  mutable_header->set_value(value);
-  header_value_option.mutable_append()->set_value(append);
-  return HeaderValueOptionVector{header_value_option};
+HeaderValueOptionVector TestCommon::makeHeaderValueOption(KeyValueOptionVector&& headers) {
+  HeaderValueOptionVector header_option_vector{};
+  for (auto header : headers) {
+    envoy::api::v2::core::HeaderValueOption header_value_option;
+    auto* mutable_header = header_value_option.mutable_header();
+    mutable_header->set_key(header.key);
+    mutable_header->set_value(header.value);
+    header_value_option.mutable_append()->set_value(header.append);
+    header_option_vector.push_back(header_value_option);
+  }
+  return header_option_vector;
 }
 
 Http::MessagePtr TestCommon::makeMessageResponse(const HeaderValueOptionVector& headers,

@@ -35,9 +35,9 @@ class ExtAuthzHttpClientTest : public testing::Test {
 public:
   ExtAuthzHttpClientTest()
       : cluster_name_{"foo"}, cluster_manager_{}, timeout_{}, path_prefix_{"/bar"},
-        response_headers_to_remove_{}, async_client_{}, async_request_{&async_client_},
-        client_(cluster_name_, cluster_manager_, timeout_, path_prefix_,
-                response_headers_to_remove_) {
+        response_headers_to_remove_{Http::LowerCaseString{"bar"}}, async_client_{},
+        async_request_{&async_client_}, client_(cluster_name_, cluster_manager_, timeout_,
+                                                path_prefix_, response_headers_to_remove_) {
     ON_CALL(cluster_manager_, httpAsyncClientForCluster(cluster_name_))
         .WillByDefault(ReturnRef(async_client_));
   }
@@ -55,21 +55,55 @@ public:
 
 // Test the client when an ok response is received.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
-  const auto expected_headers = TestCommon::makeHeaderValueOption(":status", "200", false);
+  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
+  const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
+  auto check_response = TestCommon::makeMessageResponse(expected_headers);
+  envoy::service::auth::v2alpha::CheckRequest request;
+
+  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+
+  client_.onSuccess(std::move(check_response));
+}
+
+// Test the client when an request contains path to be re-written and ok response is received.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
+  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
 
   envoy::service::auth::v2alpha::CheckRequest request;
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+  auto mutable_headers =
+      *(request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers());
+  mutable_headers[std::string{"path"}] = std::string{"foo"};
 
+  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+
   client_.onSuccess(std::move(check_response));
+}
+
+// Test that the client removes certain response headers.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithRemovedHeader) {
+  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
+  const auto check_response_headers =
+      TestCommon::makeHeaderValueOption({{":status", "200", false}, {"bar", "foo", false}});
+  const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
+
+  envoy::service::auth::v2alpha::CheckRequest request;
+  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+
+  client_.onSuccess(TestCommon::makeMessageResponse(check_response_headers));
 }
 
 // Test the client when a denied response is received.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
-  const auto expected_headers = TestCommon::makeHeaderValueOption(":status", "403", false);
+  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "403", false}});
+  ;
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::Denied, Http::Code::Forbidden, "", expected_headers);
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
@@ -83,10 +117,10 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   client_.onSuccess(std::move(check_response));
 }
 
-// Test the client when an OK response with additional HTTP attributes is received.
+// Test the client when a denied response is received and it contains additional HTTP attributes.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
   const auto expected_body = std::string{"test"};
-  const auto expected_headers = TestCommon::makeHeaderValueOption(":status", "401", false);
+  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "401", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::Denied, Http::Code::Unauthorized, expected_body, expected_headers);
   auto check_response = TestCommon::makeMessageResponse(expected_headers, expected_body);

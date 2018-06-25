@@ -59,6 +59,13 @@ MATCHER_P(AuthzOkResponse, response, "") {
   return true;
 }
 
+struct KeyValueOption {
+  std::string key;
+  std::string value;
+  bool append;
+};
+
+typedef std::vector<KeyValueOption> KeyValueOptionVector;
 typedef std::vector<envoy::api::v2::core::HeaderValueOption> HeaderValueOptionVector;
 typedef std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse> CheckResponsePtr;
 
@@ -78,8 +85,7 @@ public:
                     const std::string& body = std::string{},
                     const HeaderValueOptionVector& headers = HeaderValueOptionVector{});
 
-  static HeaderValueOptionVector makeHeaderValueOption(std::string&& key, std::string&& value,
-                                                       bool append);
+  static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 };
 
 } // namespace ExtAuthz
