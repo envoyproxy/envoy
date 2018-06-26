@@ -165,7 +165,7 @@ public:
     cell.next_cell_index = slots_[slot];
     slots_[slot] = cell_index;
     value = &cell.value;
-    value->safeInitialize(key, stats_options_);
+    value->truncateAndInit(key, stats_options_);
     ++control_->size;
     return ValueCreatedPair(value, true);
   }

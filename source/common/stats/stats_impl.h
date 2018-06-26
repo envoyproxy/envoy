@@ -228,7 +228,7 @@ struct RawStatData {
    * a refcount of 1, and all other values zero. Required by the BlockMemoryHashSet. StatsOptions is
    * used to truncate key inline, if necessary.
    */
-  void safeInitialize(absl::string_view key, const StatsOptions& stats_options);
+  void truncateAndInit(absl::string_view key, const StatsOptions& stats_options);
 
   /**
    * Returns a hash of the key. This is required by BlockMemoryHashSet.

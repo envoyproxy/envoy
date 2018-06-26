@@ -340,7 +340,7 @@ void RawStatData::initialize(absl::string_view key) {
   name_[xfer_size] = '\0';
 }
 
-void RawStatData::safeInitialize(absl::string_view key, const StatsOptions& stats_options) {
+void RawStatData::truncateAndInit(absl::string_view key, const StatsOptions& stats_options) {
   ASSERT(!initialized());
   if (key.size() > stats_options.maxNameLength()) {
     ENVOY_LOG_MISC(

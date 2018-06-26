@@ -494,7 +494,7 @@ TEST(RawStatDataTest, HeapAlloc) {
 }
 
 TEST(RawStatDataTest, Truncate) {
-  // RawStatData::safeInitialize(absl::string_view key, const StatsOptions& stats_options) will
+  // RawStatData::truncateAndInit(absl::string_view key, const StatsOptions& stats_options) will
   // truncate and log to ENVOY_LOG_MISC if given a key longer than the allowed
   // stats_options.maxNameLength(). This mechanism is also tested in HotRestartImplTest.truncateKey.
   Stats::StatsOptionsImpl stats_options;
@@ -502,7 +502,7 @@ TEST(RawStatDataTest, Truncate) {
   RawStatData* stat =
       static_cast<RawStatData*>(::calloc(RawStatData::sizeGivenStatsOptions(stats_options), 1));
   EXPECT_LOG_CONTAINS("warning", "is too long with",
-                      stat->safeInitialize(long_string, stats_options));
+                      stat->truncateAndInit(long_string, stats_options));
   ::free(stat);
 }
 

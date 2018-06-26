@@ -22,7 +22,7 @@ protected:
   // TestValue that doesn't define a hash.
   struct TestValueBase {
     absl::string_view key() const { return name; }
-    void safeInitialize(absl::string_view key, const Stats::StatsOptions& stats_options) {
+    void truncateAndInit(absl::string_view key, const Stats::StatsOptions& stats_options) {
       uint64_t xfer = std::min(stats_options.maxNameLength(), key.size());
       memcpy(name, key.data(), xfer);
       name[xfer] = '\0';
