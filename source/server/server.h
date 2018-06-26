@@ -18,9 +18,11 @@
 
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/common/logger_delegates.h"
+#include "common/grpc/async_client_manager_impl.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
+#include "common/upstream/health_discovery_service.h"
 
 #include "server/http/admin.h"
 #include "server/init_manager_impl.h"
@@ -218,6 +220,8 @@ private:
   envoy::config::bootstrap::v2::Bootstrap bootstrap_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTime bootstrap_config_update_time_;
+  Grpc::AsyncClientManagerPtr async_client_manager_;
+  Upstream::HdsDelegatePtr hds_delegate_;
 };
 
 } // namespace Server
