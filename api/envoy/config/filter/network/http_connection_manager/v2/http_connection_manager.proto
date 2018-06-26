@@ -19,7 +19,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 23]
+// [#comment:next free field: 24]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -267,6 +267,29 @@ message HttpConnectionManager {
   // <config_http_conn_man_runtime_represent_ipv4_remote_address_as_ipv4_mapped_ipv6>` for runtime
   // control.
   bool represent_ipv4_remote_address_as_ipv4_mapped_ipv6 = 20;
+
+  // [#not-implemented-hide:]
+  // The configuration for HTTP upgrades.
+  // For each upgrade type desired, an UpgradeConfig must be added.
+  //
+  // .. warning::
+  //
+  //    The current implementation of upgrade headers does not handle
+  //    multi-valued upgrade headers. Support for multi-valued headers may be
+  //    added in the future if needed.
+  message UpgradeConfig {
+    // The case-insensitive name of this upgrade, e.g. "websocket".
+    // For each upgrade type present in upgrade_configs, requests with
+    // Upgrade: [upgrade_type]
+    // will be proxied upstream.
+    string upgrade_type = 1;
+    // If present, this represents the filter chain which will be created for
+    // this type of upgrade. If no filters are present, the filter chain for
+    // HTTP connections will be used for this upgrade type.
+    repeated HttpFilter filters = 2;
+  };
+  // [#not-implemented-hide:]
+  repeated UpgradeConfig upgrade_configs = 23;
 }
 
 message Rds {

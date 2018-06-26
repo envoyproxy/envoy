@@ -20,6 +20,7 @@ envoy_extension_cc_test(
         "//source/common/config:filter_json_lib",
         "//source/common/event:dispatcher_lib",
         "//source/extensions/filters/http/dynamo:config",
+        "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
