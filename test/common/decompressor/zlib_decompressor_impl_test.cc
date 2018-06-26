@@ -28,7 +28,7 @@ protected:
     std::string original_text{};
     for (uint64_t i = 0; i < 30; ++i) {
       TestUtility::feedBufferWithRandomCharacters(buffer, default_input_size * i, i);
-      original_text.append(TestUtility::bufferToString(buffer));
+      original_text.append(buffer.toString());
       compressor.compress(buffer, Compressor::State::Flush);
       accumulation_buffer.add(buffer);
       drainBuffer(buffer);
@@ -45,7 +45,7 @@ protected:
     decompressor.init(window_bits);
 
     decompressor.decompress(accumulation_buffer, buffer);
-    std::string decompressed_text{TestUtility::bufferToString(buffer)};
+    std::string decompressed_text{buffer.toString()};
 
     ASSERT_EQ(compressor.checksum(), decompressor.checksum());
     ASSERT_EQ(original_text.length(), decompressed_text.length());
@@ -122,7 +122,7 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
   std::string original_text{};
   for (uint64_t i = 0; i < 20; ++i) {
     TestUtility::feedBufferWithRandomCharacters(buffer, default_input_size * i, i);
-    original_text.append(TestUtility::bufferToString(buffer));
+    original_text.append(buffer.toString());
     compressor.compress(buffer, Compressor::State::Flush);
     accumulation_buffer.add(buffer);
     drainBuffer(buffer);
@@ -142,7 +142,7 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
   decompressor.init(gzip_window_bits);
 
   decompressor.decompress(accumulation_buffer, buffer);
-  std::string decompressed_text{TestUtility::bufferToString(buffer)};
+  std::string decompressed_text{buffer.toString()};
 
   ASSERT_EQ(compressor.checksum(), decompressor.checksum());
   ASSERT_EQ(original_text.length(), decompressed_text.length());
@@ -162,7 +162,7 @@ TEST_F(ZlibDecompressorImplTest, DecompressWithSmallOutputBuffer) {
   std::string original_text{};
   for (uint64_t i = 0; i < 20; ++i) {
     TestUtility::feedBufferWithRandomCharacters(buffer, default_input_size * i, i);
-    original_text.append(TestUtility::bufferToString(buffer));
+    original_text.append(buffer.toString());
     compressor.compress(buffer, Compressor::State::Flush);
     accumulation_buffer.add(buffer);
     drainBuffer(buffer);
@@ -182,7 +182,7 @@ TEST_F(ZlibDecompressorImplTest, DecompressWithSmallOutputBuffer) {
   decompressor.init(gzip_window_bits);
 
   decompressor.decompress(accumulation_buffer, buffer);
-  std::string decompressed_text{TestUtility::bufferToString(buffer)};
+  std::string decompressed_text{buffer.toString()};
 
   ASSERT_EQ(compressor.checksum(), decompressor.checksum());
   ASSERT_EQ(original_text.length(), decompressed_text.length());
@@ -244,7 +244,7 @@ TEST_F(ZlibDecompressorImplTest, CompressDecompressOfMultipleSlices) {
   ASSERT_EQ(0, buffer.length());
 
   decompressor.decompress(accumulation_buffer, buffer);
-  std::string decompressed_text{TestUtility::bufferToString(buffer)};
+  std::string decompressed_text{buffer.toString()};
 
   ASSERT_EQ(compressor.checksum(), decompressor.checksum());
   ASSERT_EQ(original_text.length(), decompressed_text.length());

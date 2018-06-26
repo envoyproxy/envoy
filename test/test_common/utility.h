@@ -99,16 +99,6 @@ public:
   static bool buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs);
 
   /**
-   * Convert a buffer to a string.
-   * @param buffer supplies the buffer to convert.
-   * @return std::string the converted string.
-   */
-  static std::string bufferToString(const Buffer::OwnedImpl& buffer) {
-    // TODO(jmarantz): remove this indirection and update all ~53 call sites.
-    return buffer.toString();
-  }
-
-  /**
    * Feed a buffer with random characters.
    * @param buffer supplies the buffer to be fed.
    * @param n_char number of characters that should be added to the supplied buffer.

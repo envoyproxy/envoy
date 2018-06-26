@@ -382,7 +382,7 @@ void BaseIntegrationTest::sendRawHttpAndWaitForResponse(int port, const char* ra
   RawConnectionDriver connection(
       port, buffer,
       [&](Network::ClientConnection& client, const Buffer::Instance& data) -> void {
-        response->append(TestUtility::bufferToString(data));
+        response->append(data.toString());
         if (disconnect_after_headers_complete && response->find("\r\n\r\n") != std::string::npos) {
           client.close(Network::ConnectionCloseType::NoFlush);
         }
