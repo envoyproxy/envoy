@@ -304,12 +304,10 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
                                                      const Http::HeaderMap& request_headers,
                                                      const std::string& via) {
   if (Utility::isUpgrade(request_headers) && Utility::isUpgrade(response_headers)) {
-    // As in mutateRequestHeaders, for WebSocket responses do not strip connection or and
-    // do explicitly set a 0 content length. They also retain the existing transfer-encoding.
+    // As in mutateRequestHeaders, Upgrade responses have special handling.
     //
-    // Unlike mutateRequestHeaders we do not explicitly check protocol because
-    // if we're proxying an upgrade response we've already passed the protocol
-    // checks.
+    // Unlike mutateRequestHeaders there is no explicit protocol check. If Envoy is proxying an
+    // upgrade response it has already passed the protocol checks.
     const bool no_body =
         (!response_headers.TransferEncoding() && !response_headers.ContentLength());
     if (no_body) {
