@@ -31,13 +31,14 @@ public:
       // Setup hds and corresponding gRPC cluster.
       auto* hds_confid = bootstrap.mutable_hds_config();
       hds_confid->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
-      hds_confid->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("hds_report");
+      hds_confid->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("hds_delegate");
       auto* hds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       hds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       hds_cluster->mutable_circuit_breakers()->Clear();
-      hds_cluster->set_name("hds_report");
+      hds_cluster->set_name("hds_delegate");
       hds_cluster->mutable_http2_protocol_options();
       // Switch predefined cluster_0 to EDS filesystem sourcing.
+      // TODO(lilika): Remove eds dependency
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       cluster_0->mutable_hosts()->Clear();
       cluster_0->set_type(envoy::api::v2::Cluster::EDS);
@@ -90,9 +91,6 @@ public:
   FakeUpstream* service_upstream_[upstream_endpoints_]{};
   uint32_t hds_requests_{};
   EdsHelper eds_helper_;
-
-  const uint64_t request_size_ = 1024;
-  const uint64_t response_size_ = 512;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, HdsIntegrationTest,
