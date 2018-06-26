@@ -162,8 +162,14 @@ void DispatcherImpl::run(RunType type) {
 }
 
 void DispatcherImpl::runPostCallbacks() {
-  std::function<void()> callback;
   while (true) {
+    // It is important that this declaration is inside the body of the loop so that the callback is
+    // destructed while post_lock_ is not held. If callback is declared outside the loop and reused
+    // for each iteration, the previous iteration's callback is destructed when callback is
+    // re-assigned, which happens while holding the lock. This can lead to a deadlock (via
+    // recursive mutex acquisition) if destroying the callback runs a destructor, which through some
+    // callstack calls post() on this dispatcher.
+    std::function<void()> callback;
     {
       Thread::LockGuard lock(post_lock_);
       if (post_callbacks_.empty()) {

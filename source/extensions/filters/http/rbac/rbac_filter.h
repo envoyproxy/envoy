@@ -19,7 +19,9 @@ namespace RBACFilter {
 // clang-format off
 #define ALL_RBAC_FILTER_STATS(COUNTER)                                                             \
   COUNTER(allowed)                                                                                 \
-  COUNTER(denied)
+  COUNTER(denied)                                                                                  \
+  COUNTER(shadow_allowed)                                                                          \
+  COUNTER(shadow_denied)
 // clang-format on
 
 /**
@@ -27,6 +29,23 @@ namespace RBACFilter {
  */
 struct RoleBasedAccessControlFilterStats {
   ALL_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+enum class EnforcementMode { Enforced, Shadow };
+
+class RoleBasedAccessControlRouteSpecificFilterConfig : public Router::RouteSpecificFilterConfig {
+public:
+  RoleBasedAccessControlRouteSpecificFilterConfig(
+      const envoy::config::filter::http::rbac::v2::RBACPerRoute& per_route_config);
+
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
+  engine(EnforcementMode mode) const {
+    return mode == EnforcementMode::Enforced ? engine_ : shadow_engine_;
+  }
+
+private:
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
 };
 
 /**
@@ -40,12 +59,19 @@ public:
 
   RoleBasedAccessControlFilterStats& stats() { return stats_; }
 
-  const Filters::Common::RBAC::RoleBasedAccessControlEngine&
-  engine(const Router::RouteConstSharedPtr route) const;
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
+  engine(const Router::RouteConstSharedPtr route, EnforcementMode mode) const;
 
 private:
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
+  engine(EnforcementMode mode) const {
+    return mode == EnforcementMode::Enforced ? engine_ : shadow_engine_;
+  }
+
   RoleBasedAccessControlFilterStats stats_;
-  const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl engine_;
+
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
 };
 
 typedef std::shared_ptr<RoleBasedAccessControlFilterConfig>

@@ -41,6 +41,7 @@ public:
   const LowerCaseString EnvoyInternalRequest{"x-envoy-internal"};
   const LowerCaseString EnvoyIpTags{"x-envoy-ip-tags"};
   const LowerCaseString EnvoyMaxRetries{"x-envoy-max-retries"};
+  const LowerCaseString EnvoyOriginalDstHost{"x-envoy-original-dst-host"};
   const LowerCaseString EnvoyOriginalPath{"x-envoy-original-path"};
   const LowerCaseString EnvoyOverloaded{"x-envoy-overloaded"};
   const LowerCaseString EnvoyRetryOn{"x-envoy-retry-on"};
@@ -63,6 +64,7 @@ public:
   const LowerCaseString ForwardedProto{"x-forwarded-proto"};
   const LowerCaseString GrpcMessage{"grpc-message"};
   const LowerCaseString GrpcStatus{"grpc-status"};
+  const LowerCaseString GrpcTimeout{"grpc-timeout"};
   const LowerCaseString GrpcAcceptEncoding{"grpc-accept-encoding"};
   const LowerCaseString Host{":authority"};
   const LowerCaseString HostLegacy{"host"};

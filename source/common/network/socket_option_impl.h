@@ -84,23 +84,31 @@ typedef absl::optional<std::pair<int, int>> SocketOptionName;
 
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
-  SocketOptionImpl(Socket::SocketState in_state, Network::SocketOptionName optname, int value)
+  SocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
+                   Network::SocketOptionName optname, int value) // Yup, int. See setsockopt(2).
+      : SocketOptionImpl(in_state, optname,
+                         absl::string_view(reinterpret_cast<char*>(&value), sizeof(value))) {}
+
+  SocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
+                   Network::SocketOptionName optname, absl::string_view value)
       : in_state_(in_state), optname_(optname), value_(value) {}
 
   // Socket::Option
-  bool setOption(Socket& socket, Socket::SocketState state) const override;
+  bool setOption(Socket& socket,
+                 envoy::api::v2::core::SocketOption::SocketState state) const override;
 
   // The common socket options don't require a hash key.
   void hashKey(std::vector<uint8_t>&) const override {}
 
   bool isSupported() const;
 
-  static int setSocketOption(Socket& socket, Network::SocketOptionName optname, int value);
+  static int setSocketOption(Socket& socket, Network::SocketOptionName optname,
+                             absl::string_view value);
 
 private:
-  const Socket::SocketState in_state_;
+  const envoy::api::v2::core::SocketOption::SocketState in_state_;
   const Network::SocketOptionName optname_;
-  const int value_;
+  const std::string value_;
 };
 
 } // namespace Network

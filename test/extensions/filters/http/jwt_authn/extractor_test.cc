@@ -18,24 +18,30 @@ namespace JwtAuthn {
 namespace {
 
 const char ExampleConfig[] = R"(
-rules:
-  - issuer: issuer1
-  - issuer: issuer2
+providers:
+  provider1:
+    issuer: issuer1
+  provider2:
+    issuer: issuer2
     from_headers:
       - name: token-header
-  - issuer: issuer3
+  provider3:
+    issuer: issuer3
     from_params:
       - token_param
-  - issuer: issuer4
+  provider4:
+    issuer: issuer4
     from_headers:
       - name: token-header
     from_params:
       - token_param
-  - issuer: issuer5
+  provider5:
+    issuer: issuer5
     from_headers:
       - name: prefix-header
         value_prefix: AAA
-  - issuer: issuer6
+  provider6:
+    issuer: issuer6
     from_headers:
       - name: prefix-header
         value_prefix: AAABBB
@@ -45,7 +51,7 @@ class ExtractorTest : public ::testing::Test {
 public:
   void SetUp() {
     MessageUtil::loadFromYaml(ExampleConfig, config_);
-    extractor_ = createExtractor(config_);
+    extractor_ = Extractor::create(config_);
   }
 
   JwtAuthentication config_;
@@ -111,6 +117,8 @@ TEST_F(ExtractorTest, TestDefaultParamLocation) {
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer4"));
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer5"));
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("unknown_issuer"));
+
+  tokens[0]->removeJwt(headers);
 }
 
 // Test extracting token from the custom header: "token-header"
@@ -178,6 +186,8 @@ TEST_F(ExtractorTest, TestCustomParamToken) {
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer2"));
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("issuer5"));
   EXPECT_FALSE(tokens[0]->isIssuerSpecified("unknown_issuer"));
+
+  tokens[0]->removeJwt(headers);
 }
 
 // Test extracting multiple tokens.

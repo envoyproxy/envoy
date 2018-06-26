@@ -227,6 +227,7 @@ public:
   MOCK_CONST_METHOD0(retryPolicy, const RetryPolicy&());
   MOCK_CONST_METHOD0(shadowPolicy, const ShadowPolicy&());
   MOCK_CONST_METHOD0(timeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(maxGrpcTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD1(virtualCluster, const VirtualCluster*(const Http::HeaderMap& headers));
   MOCK_CONST_METHOD0(virtualHostName, const std::string&());
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
@@ -234,7 +235,7 @@ public:
   MOCK_CONST_METHOD0(useWebSocket, bool());
   MOCK_CONST_METHOD5(createWebSocketProxy,
                      Http::WebSocketProxyPtr(Http::HeaderMap& request_headers,
-                                             const RequestInfo::RequestInfo& request_info,
+                                             RequestInfo::RequestInfo& request_info,
                                              Http::WebSocketProxyCallbacks& callbacks,
                                              Upstream::ClusterManager& cluster_manager,
                                              Network::ReadFilterCallbacks* read_callbacks));

@@ -8,6 +8,7 @@ import "envoy/api/v2/rds.proto";
 import "envoy/config/bootstrap/v2/bootstrap.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
 
 import "gogoproto/gogo.proto";
 
@@ -35,6 +36,9 @@ message ConfigDump {
 // configuration for another Envoy.
 message BootstrapConfigDump {
   envoy.config.bootstrap.v2.Bootstrap bootstrap = 1 [(gogoproto.nullable) = false];
+
+  // The timestamp when the BootstrapConfig was last updated.
+  google.protobuf.Timestamp last_updated = 2;
 }
 
 // Envoy's listener manager fills this message with all currently known listeners. Listener
@@ -46,6 +50,15 @@ message ListenersConfigDump {
   // will be "".
   string version_info = 1;
 
+  // Describes a statically loaded cluster.
+  message StaticListener {
+    // The listener config.
+    envoy.api.v2.Listener listener = 1;
+
+    // The timestamp when the Listener was last updated.
+    google.protobuf.Timestamp last_updated = 2;
+  }
+
   // Describes a dynamically loaded cluster via the LDS API.
   message DynamicListener {
     // This is the per-resource version information. This version is currently taken from the
@@ -56,10 +69,13 @@ message ListenersConfigDump {
 
     // The listener config.
     envoy.api.v2.Listener listener = 2;
+
+    // The timestamp when the Listener was last updated.
+    google.protobuf.Timestamp last_updated = 3;
   }
 
   // The statically loaded listener configs.
-  repeated envoy.api.v2.Listener static_listeners = 2 [(gogoproto.nullable) = false];
+  repeated StaticListener static_listeners = 2 [(gogoproto.nullable) = false];
 
   // The dynamically loaded active listeners. These are listeners that are available to service
   // data plane traffic.
@@ -87,6 +103,15 @@ message ClustersConfigDump {
   // will be "".
   string version_info = 1;
 
+  // Describes a statically loaded cluster.
+  message StaticCluster {
+    // The cluster config.
+    envoy.api.v2.Cluster cluster = 1;
+
+    // The timestamp when the Cluster was last updated.
+    google.protobuf.Timestamp last_updated = 2;
+  }
+
   // Describes a dynamically loaded cluster via the CDS API.
   message DynamicCluster {
     // This is the per-resource version information. This version is currently taken from the
@@ -97,10 +122,13 @@ message ClustersConfigDump {
 
     // The cluster config.
     envoy.api.v2.Cluster cluster = 2;
+
+    // The timestamp when the Cluster was last updated.
+    google.protobuf.Timestamp last_updated = 3;
   }
 
   // The statically loaded cluster configs.
-  repeated envoy.api.v2.Cluster static_clusters = 2 [(gogoproto.nullable) = false];
+  repeated StaticCluster static_clusters = 2 [(gogoproto.nullable) = false];
 
   // The dynamically loaded active clusters. These are clusters that are available to service
   // data plane traffic.
@@ -119,6 +147,14 @@ message ClustersConfigDump {
 // to recreate an Envoy configuration by populating all routes as static routes or by returning them
 // in RDS responses.
 message RoutesConfigDump {
+  message StaticRouteConfig {
+    // The route config.
+    envoy.api.v2.RouteConfiguration route_config = 1;
+
+    // The timestamp when the Route was last updated.
+    google.protobuf.Timestamp last_updated = 2;
+  }
+
   message DynamicRouteConfig {
     // This is the per-resource version information. This version is currently taken from the
     // :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` field at the time that
@@ -127,10 +163,13 @@ message RoutesConfigDump {
 
     // The route config.
     envoy.api.v2.RouteConfiguration route_config = 2;
+
+    // The timestamp when the Route was last updated.
+    google.protobuf.Timestamp last_updated = 3;
   }
 
   // The statically loaded route configs.
-  repeated envoy.api.v2.RouteConfiguration static_route_configs = 2 [(gogoproto.nullable) = false];
+  repeated StaticRouteConfig static_route_configs = 2 [(gogoproto.nullable) = false];
 
   // The dynamically loaded route configs.
   repeated DynamicRouteConfig dynamic_route_configs = 3 [(gogoproto.nullable) = false];

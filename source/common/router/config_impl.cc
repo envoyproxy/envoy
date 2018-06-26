@@ -255,6 +255,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
+      max_grpc_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), max_grpc_timeout)),
       runtime_(loadRuntimeData(route.match())), loader_(factory_context.runtime()),
       host_redirect_(route.redirect().host_redirect()),
       path_redirect_(route.redirect().path_redirect()),
@@ -353,7 +354,7 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
 Http::WebSocketProxyPtr RouteEntryImplBase::createWebSocketProxy(
-    Http::HeaderMap& request_headers, const RequestInfo::RequestInfo& request_info,
+    Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
     Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
     Network::ReadFilterCallbacks* read_callbacks) const {
   return std::make_unique<Http::WebSocket::WsHandlerImpl>(request_headers, request_info, *this,

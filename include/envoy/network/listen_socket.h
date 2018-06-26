@@ -3,6 +3,7 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
@@ -33,15 +34,6 @@ public:
    */
   virtual void close() PURE;
 
-  enum class SocketState {
-    // Socket options are applied after socket creation but before binding the socket to a port
-    PreBind,
-    // Socket options are applied after binding the socket to a port but before calling listen()
-    PostBind,
-    // Socket options are applied after calling listen()
-    Listening,
-  };
-
   /**
    * Visitor class for setting socket options.
    */
@@ -55,7 +47,8 @@ public:
      *        set for some particular state of the socket.
      * @return true if succeeded, false otherwise.
      */
-    virtual bool setOption(Socket& socket, SocketState state) const PURE;
+    virtual bool setOption(Socket& socket,
+                           envoy::api::v2::core::SocketOption::SocketState state) const PURE;
 
     /**
      * @param vector of bytes to which the option should append hash key data that will be used
@@ -73,7 +66,8 @@ public:
     return to;
   }
 
-  static bool applyOptions(const OptionsSharedPtr& options, Socket& socket, SocketState state) {
+  static bool applyOptions(const OptionsSharedPtr& options, Socket& socket,
+                           envoy::api::v2::core::SocketOption::SocketState state) {
     if (options == nullptr) {
       return true;
     }

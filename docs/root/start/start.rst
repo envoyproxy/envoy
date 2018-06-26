@@ -110,7 +110,7 @@ You can refer to the :ref:`Command line options <operations_cli>`.
 
 Build the Docker image that runs your configuration using::
 
-  $ docker build -t envoy:v1
+  $ docker build -t envoy:v1 .
 
 And now you can execute it with::
 

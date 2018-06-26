@@ -34,6 +34,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/ssl:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:cds_cc",
@@ -186,6 +187,7 @@ envoy_cc_test(
         "//include/envoy/http:header_map_interface",
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
+        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
     ],
 )
 
@@ -299,6 +301,25 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
+        "//source/extensions/access_loggers/file:config",
+        "//source/extensions/filters/http/cors:config",
+        "//source/extensions/filters/http/dynamo:config",
+        "//source/extensions/filters/http/grpc_http1_bridge:config",
+        "//source/extensions/filters/http/health_check:config",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
+    name = "websocket_integration_test",
+    srcs = [
+        "websocket_integration_test.cc",
+        "websocket_integration_test.h",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/http:header_map_lib",
+        "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/http/cors:config",
         "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/filters/http/grpc_http1_bridge:config",
@@ -373,6 +394,7 @@ envoy_cc_test(
         "//source/common/ratelimit:ratelimit_proto",
         "//source/extensions/filters/http/ratelimit:config",
         "//test/common/grpc:grpc_client_integration_lib",
+        "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     ],
 )
 
@@ -402,6 +424,7 @@ envoy_cc_test(
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/transport_sockets/ssl:config",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
         "@envoy_api//envoy/data/tap/v2alpha:capture_cc",
@@ -424,6 +447,7 @@ envoy_cc_test(
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
     ],
 )
@@ -470,6 +494,7 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/transport_sockets/ssl:config",
+        "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
     ],
 )
