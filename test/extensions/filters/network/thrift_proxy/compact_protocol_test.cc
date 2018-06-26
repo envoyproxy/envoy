@@ -336,7 +336,7 @@ TEST(CompactProtocolTest, ReadFieldBegin) {
     EXPECT_EQ(buffer.length(), 6);
   }
 
-  // Long-form field header, field id out of range
+  // Long-form field header, field id > 32767
   {
     Buffer::OwnedImpl buffer;
     std::string name = "-";
@@ -344,14 +344,32 @@ TEST(CompactProtocolTest, ReadFieldBegin) {
     int16_t field_id = 1;
 
     addInt8(buffer, 0x05);
-    addSeq(buffer, {0xFE, 0xFF, 0x7F}); // zigzag(0x1FFFFE) = 0xFFFFF
+    addSeq(buffer, {0x80, 0x80, 0x04}); // zigzag(0x10000) = 0x8000
 
     EXPECT_THROW_WITH_MESSAGE(proto.readFieldBegin(buffer, name, field_type, field_id),
-                              EnvoyException, "invalid compact protocol field id 1048575");
+                              EnvoyException, "invalid compact protocol field id 32768");
     EXPECT_EQ(name, "-");
     EXPECT_EQ(field_type, FieldType::String);
     EXPECT_EQ(field_id, 1);
     EXPECT_EQ(buffer.length(), 4);
+  }
+
+  // Long-form field header, field id < 0
+  {
+    Buffer::OwnedImpl buffer;
+    std::string name = "-";
+    FieldType field_type = FieldType::String;
+    int16_t field_id = 1;
+
+    addInt8(buffer, 0x05);
+    addSeq(buffer, {0x01}); // zigzag(1) = -1
+
+    EXPECT_THROW_WITH_MESSAGE(proto.readFieldBegin(buffer, name, field_type, field_id),
+                              EnvoyException, "invalid compact protocol field id -1");
+    EXPECT_EQ(name, "-");
+    EXPECT_EQ(field_type, FieldType::String);
+    EXPECT_EQ(field_id, 1);
+    EXPECT_EQ(buffer.length(), 2);
   }
 
   // Unknown compact protocol field type
@@ -962,7 +980,7 @@ TEST(CompactProtocolTest, ReadString) {
     Buffer::OwnedImpl buffer;
     std::string value = "-";
 
-    addInt8(buffer, 0x8); // zigzag(8) = 4
+    addInt8(buffer, 0x4);
 
     EXPECT_FALSE(proto.readString(buffer, value));
     EXPECT_EQ(value, "-");
@@ -974,12 +992,12 @@ TEST(CompactProtocolTest, ReadString) {
     Buffer::OwnedImpl buffer;
     std::string value = "-";
 
-    addInt8(buffer, 0x01); // zigzag(1) = -1
+    addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF, 0x1F}); // -1
 
     EXPECT_THROW_WITH_MESSAGE(proto.readString(buffer, value), EnvoyException,
                               "negative compact protocol string/binary length -1");
     EXPECT_EQ(value, "-");
-    EXPECT_EQ(buffer.length(), 1);
+    EXPECT_EQ(buffer.length(), 5);
   }
 
   // empty string
@@ -999,7 +1017,7 @@ TEST(CompactProtocolTest, ReadString) {
     Buffer::OwnedImpl buffer;
     std::string value = "-";
 
-    addInt8(buffer, 0x0C); // zigzag(0x0C) = 0x06
+    addInt8(buffer, 0x06);
     addString(buffer, "string");
 
     EXPECT_TRUE(proto.readString(buffer, value));
@@ -1015,7 +1033,7 @@ TEST(CompactProtocolTest, ReadBinary) {
   Buffer::OwnedImpl buffer;
   std::string value = "-";
 
-  addInt8(buffer, 0x0C); // zigzag(0x0C) = 0x06
+  addInt8(buffer, 0x06);
   addString(buffer, "string");
 
   EXPECT_TRUE(proto.readBinary(buffer, value));
