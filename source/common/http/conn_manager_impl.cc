@@ -105,7 +105,7 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
     if (codec_->protocol() == Protocol::Http2) {
       stats_.named_.downstream_cx_http2_active_.dec();
     } else {
-      if (isWebSocketConnection()) {
+      if (isOldStyleWebSocketConnection()) {
         stats_.named_.downstream_cx_websocket_active_.dec();
       } else {
         stats_.named_.downstream_cx_http1_active_.dec();
@@ -203,7 +203,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
   // will still be processed as a normal HTTP/1.1 request, where Envoy will
   // detect the WebSocket upgrade and establish a connection to the
   // upstream.
-  if (isWebSocketConnection()) {
+  if (isOldStyleWebSocketConnection()) {
     return ws_connection_->onData(data, end_stream);
   }
 
@@ -253,7 +253,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       }
 
       if (!streams_.empty() && streams_.front()->state_.remote_complete_ &&
-          !isWebSocketConnection()) {
+          !isOldStyleWebSocketConnection()) {
         read_callbacks_->connection().readDisable(true);
       }
     }
@@ -554,10 +554,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // should return 404. The current returns no response if there is no router filter.
   if (protocol == Protocol::Http11 && cached_route_.value()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
-    const bool websocket_allowed = (route_entry != nullptr) && route_entry->useWebSocket();
+    const bool old_style_websocket =
+        (route_entry != nullptr) && route_entry->useOldStyleWebSocket();
     const bool websocket_requested = Utility::isWebSocketUpgradeRequest(*request_headers_);
 
-    if (websocket_requested && websocket_allowed) {
+    if (websocket_requested && old_style_websocket) {
       ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
 
       connection_manager_.ws_connection_ = route_entry->createWebSocketProxy(
@@ -689,7 +690,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
 
   // If the initial websocket upgrade request had an HTTP body
   // let's send this up
-  if (connection_manager_.isWebSocketConnection()) {
+  if (connection_manager_.isOldStyleWebSocketConnection()) {
     if (data.length() > 0) {
       connection_manager_.ws_connection_->onData(data, false);
     }

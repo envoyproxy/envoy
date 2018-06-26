@@ -203,7 +203,7 @@ public:
   }
 
   void configureRouteForWebsocket(Router::MockRouteEntry& route_entry) {
-    ON_CALL(route_entry, useWebSocket()).WillByDefault(Return(true));
+    ON_CALL(route_entry, useOldStyleWebSocket()).WillByDefault(Return(true));
     ON_CALL(route_entry, createWebSocketProxy(_, _, _, _, _))
         .WillByDefault(Invoke([this, &route_entry](Http::HeaderMap& request_headers,
                                                    RequestInfo::RequestInfo& request_info,
