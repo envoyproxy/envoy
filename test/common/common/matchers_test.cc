@@ -24,9 +24,9 @@ TEST(MetadataTest, MatchNullValue) {
   matcher.set_filter("envoy.filter.b");
   matcher.add_path()->set_key("label");
 
-  matcher.add_values()->mutable_string_match()->set_exact("test");
+  matcher.mutable_value()->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.add_values()->mutable_null_match();
+  matcher.mutable_value()->mutable_null_match();
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 }
 
@@ -41,26 +41,24 @@ TEST(MetadataTest, MatchDoubleValue) {
   matcher.set_filter("envoy.filter.b");
   matcher.add_path()->set_key("label");
 
-  matcher.add_values()->mutable_string_match()->set_exact("test");
+  matcher.mutable_value()->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.add_values()->mutable_double_match()->set_exact(1);
+  matcher.mutable_value()->mutable_double_match()->set_exact(1);
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.add_values()->mutable_double_match()->set_exact(9);
+  matcher.mutable_value()->mutable_double_match()->set_exact(9);
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 
-  matcher.clear_values();
-  EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  auto r = matcher.add_values()->mutable_double_match()->mutable_range();
+  auto r = matcher.mutable_value()->mutable_double_match()->mutable_range();
   r->set_start(9.1);
   r->set_end(10);
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 
-  r = matcher.add_values()->mutable_double_match()->mutable_range();
+  r = matcher.mutable_value()->mutable_double_match()->mutable_range();
   r->set_start(8.9);
   r->set_end(9);
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 
-  r = matcher.add_values()->mutable_double_match()->mutable_range();
+  r = matcher.mutable_value()->mutable_double_match()->mutable_range();
   r->set_start(9);
   r->set_end(9.1);
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
@@ -77,9 +75,9 @@ TEST(MetadataTest, MatchStringExactValue) {
   matcher.set_filter("envoy.filter.b");
   matcher.add_path()->set_key("label");
 
-  matcher.add_values()->mutable_string_match()->set_exact("test");
+  matcher.mutable_value()->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.add_values()->mutable_string_match()->set_exact("prod");
+  matcher.mutable_value()->mutable_string_match()->set_exact("prod");
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 }
 
@@ -94,11 +92,11 @@ TEST(MetadataTest, MatchStringPrefixValue) {
   matcher.set_filter("envoy.filter.b");
   matcher.add_path()->set_key("label");
 
-  matcher.add_values()->mutable_string_match()->set_exact("test");
+  matcher.mutable_value()->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.add_values()->mutable_string_match()->set_prefix("prodx");
+  matcher.mutable_value()->mutable_string_match()->set_prefix("prodx");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.add_values()->mutable_string_match()->set_prefix("prod");
+  matcher.mutable_value()->mutable_string_match()->set_prefix("prod");
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 }
 
@@ -113,11 +111,11 @@ TEST(MetadataTest, MatchStringSuffixValue) {
   matcher.set_filter("envoy.filter.b");
   matcher.add_path()->set_key("label");
 
-  matcher.add_values()->mutable_string_match()->set_exact("test");
+  matcher.mutable_value()->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.add_values()->mutable_string_match()->set_suffix("prodx");
+  matcher.mutable_value()->mutable_string_match()->set_suffix("prodx");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.add_values()->mutable_string_match()->set_suffix("prod");
+  matcher.mutable_value()->mutable_string_match()->set_suffix("prod");
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
   ;
 }
@@ -133,11 +131,11 @@ TEST(MetadataTest, MatchBoolValue) {
   matcher.set_filter("envoy.filter.b");
   matcher.add_path()->set_key("label");
 
-  matcher.add_values()->mutable_string_match()->set_exact("test");
+  matcher.mutable_value()->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.add_values()->set_bool_match(false);
+  matcher.mutable_value()->set_bool_match(false);
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.add_values()->set_bool_match(true);
+  matcher.mutable_value()->set_bool_match(true);
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 }
 
@@ -152,11 +150,11 @@ TEST(MetadataTest, MatchPresentValue) {
   matcher.set_filter("envoy.filter.b");
   matcher.add_path()->set_key("label");
 
-  matcher.add_values()->mutable_string_match()->set_exact("test");
+  matcher.mutable_value()->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.add_values()->set_present_match(false);
+  matcher.mutable_value()->set_present_match(false);
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.add_values()->set_present_match(true);
+  matcher.mutable_value()->set_present_match(true);
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 
   matcher.clear_path();

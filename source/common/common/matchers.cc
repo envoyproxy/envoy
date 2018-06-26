@@ -41,30 +41,25 @@ MetadataMatcher::MetadataMatcher(const envoy::type::matcher::MetadataMatcher& ma
   for (const auto& seg : matcher.path()) {
     path_.push_back(seg.key());
   }
-  for (const envoy::type::matcher::MetadataMatcher::Value& m : matcher_.values()) {
-    switch (m.match_pattern_case()) {
-    case envoy::type::matcher::MetadataMatcher_Value::kNullMatch:
-      null_matcher_ = true;
-      break;
-    case envoy::type::matcher::MetadataMatcher_Value::kDoubleMatch:
-      double_matcher_.push_back(DoubleMatcher(m.double_match()));
-      break;
-    case envoy::type::matcher::MetadataMatcher_Value::kStringMatch:
-      string_matcher_.push_back(StringMatcher(m.string_match()));
-      break;
-    case envoy::type::matcher::MetadataMatcher_Value::kBoolMatch:
-      if (m.bool_match()) {
-        bool_matcher_allow_true_ = true;
-      } else {
-        bool_matcher_allow_false_ = true;
-      }
-      break;
-    case envoy::type::matcher::MetadataMatcher_Value::kPresentMatch:
-      present_matcher_ |= m.present_match();
-      break;
-    default:
-      NOT_REACHED;
-    }
+  const auto& v = matcher_.value();
+  switch (v.match_pattern_case()) {
+  case envoy::type::matcher::MetadataMatcher_Value::kNullMatch:
+    null_matcher_ = true;
+    break;
+  case envoy::type::matcher::MetadataMatcher_Value::kDoubleMatch:
+    double_matcher_.emplace(v.double_match());
+    break;
+  case envoy::type::matcher::MetadataMatcher_Value::kStringMatch:
+    string_matcher_.emplace(v.string_match());
+    break;
+  case envoy::type::matcher::MetadataMatcher_Value::kBoolMatch:
+    bool_matcher_.emplace(v.bool_match());
+    break;
+  case envoy::type::matcher::MetadataMatcher_Value::kPresentMatch:
+    present_matcher_ = v.present_match();
+    break;
+  default:
+    NOT_REACHED;
   }
 }
 
@@ -77,22 +72,11 @@ bool MetadataMatcher::match(const envoy::api::v2::core::Metadata& metadata) cons
   case ProtobufWkt::Value::kNullValue:
     return null_matcher_;
   case ProtobufWkt::Value::kNumberValue:
-    for (const auto& m : double_matcher_) {
-      if (m.match(value.number_value())) {
-        return true;
-      }
-    }
-    return false;
+    return double_matcher_.has_value() && double_matcher_->match(value.number_value());
   case ProtobufWkt::Value::kStringValue:
-    for (const auto& m : string_matcher_) {
-      if (m.match(value.string_value())) {
-        return true;
-      }
-    }
-    return false;
+    return string_matcher_.has_value() && string_matcher_->match(value.string_value());
   case ProtobufWkt::Value::kBoolValue:
-    return (bool_matcher_allow_true_ && value.bool_value()) ||
-           (bool_matcher_allow_false_ && !value.bool_value());
+    return (bool_matcher_.has_value() && *bool_matcher_ == value.bool_value());
   case ProtobufWkt::Value::kListValue:
   case ProtobufWkt::Value::kStructValue:
   case ProtobufWkt::Value::KIND_NOT_SET:

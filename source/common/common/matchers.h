@@ -9,6 +9,8 @@
 
 #include "common/common/utility.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Matchers {
 
@@ -63,12 +65,11 @@ private:
   std::vector<std::string> path_;
 
   bool null_matcher_{false};
-  bool bool_matcher_allow_true_{false};
-  bool bool_matcher_allow_false_{false};
+  absl::optional<bool> bool_matcher_;
   bool present_matcher_{false};
 
-  std::vector<DoubleMatcher> double_matcher_;
-  std::vector<StringMatcher> string_matcher_;
+  absl::optional<DoubleMatcher> double_matcher_;
+  absl::optional<StringMatcher> string_matcher_;
 };
 
 } // namespace Matchers

@@ -117,6 +117,7 @@ envoy_cc_library(
     name = "matchers_lib",
     srcs = ["matchers.cc"],
     hdrs = ["matchers.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         ":utility_lib",
         "//source/common/config:metadata_lib",
