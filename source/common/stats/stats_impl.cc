@@ -40,7 +40,7 @@ bool regexStartsWithDot(absl::string_view regex) {
 // Normally the compiler would do this, but because name_ is a flexible-array-length
 // element, the compiler can't. RawStatData is put into an array in HotRestartImpl, so
 // it's important that each element starts on the required alignment for the type.
-uint64_t RawStatData::sizeGivenName(const std::string& name) {
+uint64_t RawStatData::sizeGivenName(const absl::string_view name) {
   return roundUpMultipleNaturalAlignment(sizeof(RawStatData) + name.size() + 1);
 }
 

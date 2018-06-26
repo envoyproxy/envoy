@@ -207,7 +207,7 @@ struct RawStatData {
    * and padding for alignment. Required for the HeapRawStatDataAllocator, which does not truncate
    * at a maximum stat name length.
    */
-  static uint64_t sizeGivenName(const std::string& name);
+  static uint64_t sizeGivenName(const absl::string_view name);
 
   /**
    * Returns the size of this struct, accounting for the length of name_
