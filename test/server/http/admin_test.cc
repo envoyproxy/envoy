@@ -24,6 +24,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -648,6 +649,38 @@ TEST_P(AdminInstanceTest, TracingStatsDisabled) {
   for (Stats::CounterSharedPtr counter : server_.stats().counters()) {
     EXPECT_NE(counter->name(), name) << "Unexpected tracing stat found in server stats: " << name;
   }
+}
+
+TEST_P(AdminInstanceTest, GetRequest) {
+  Http::HeaderMapImpl response_headers;
+  std::string body;
+  EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", Http::Utility::QueryParams(), "GET",
+                                           response_headers, body));
+  EXPECT_TRUE(absl::StartsWith(body, "envoy ")) << body;
+  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+              HasSubstr("text/plain"));
+}
+
+TEST_P(AdminInstanceTest, GetRequestJson) {
+  Http::HeaderMapImpl response_headers;
+  std::string body;
+  EXPECT_EQ(Http::Code::OK,
+            admin_.request("/stats", Http::Utility::QueryParams({{"format", "json"}}), "GET",
+                           response_headers, body));
+  EXPECT_THAT(body, HasSubstr("{\"stats\":["));
+  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+              HasSubstr("application/json"));
+}
+
+TEST_P(AdminInstanceTest, PostRequest) {
+  Http::HeaderMapImpl response_headers;
+  std::string body;
+  EXPECT_NO_LOGS(
+      EXPECT_EQ(Http::Code::OK, admin_.request("/healthcheck/fail", Http::Utility::QueryParams(),
+                                               "POST", response_headers, body)));
+  EXPECT_EQ(body, "OK\n");
+  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+              HasSubstr("text/plain"));
 }
 
 class PrometheusStatsFormatterTest : public testing::Test {
