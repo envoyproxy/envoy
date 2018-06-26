@@ -27,6 +27,7 @@ envoy_cc_library(
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/http:query_params_interface",
         "//include/envoy/network:listen_socket_interface",
     ],
 )
@@ -92,6 +93,7 @@ envoy_cc_library(
         ":options_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
+        "//include/envoy/http:query_params_interface",
         "//include/envoy/init:init_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/ratelimit:ratelimit_interface",

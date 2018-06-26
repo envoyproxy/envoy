@@ -4,6 +4,7 @@
 #include "test/mocks/api/mocks.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -32,7 +33,7 @@ TEST_F(OwnedImplTest, AddBufferFragmentNoCleanup) {
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_F(OwnedImplTest, addBufferFragmentWithCleanup) {
+TEST_F(OwnedImplTest, AddBufferFragmentWithCleanup) {
   char input[] = "hello world";
   BufferFragmentImpl frag(input, 11, [this](const void*, size_t, const BufferFragmentImpl*) {
     release_callback_called_ = true;
@@ -50,7 +51,7 @@ TEST_F(OwnedImplTest, addBufferFragmentWithCleanup) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_F(OwnedImplTest, addBufferFragmentDynamicAllocation) {
+TEST_F(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
   char input_stack[] = "hello world";
   char* input = new char[11];
   std::copy(input_stack, input_stack + 11, input);
@@ -75,7 +76,7 @@ TEST_F(OwnedImplTest, addBufferFragmentDynamicAllocation) {
   EXPECT_TRUE(release_callback_called_);
 }
 
-TEST_F(OwnedImplTest, write) {
+TEST_F(OwnedImplTest, Write) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
@@ -113,7 +114,7 @@ TEST_F(OwnedImplTest, write) {
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST_F(OwnedImplTest, read) {
+TEST_F(OwnedImplTest, Read) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
@@ -132,6 +133,21 @@ TEST_F(OwnedImplTest, read) {
   rc = buffer.read(-1, 0);
   EXPECT_EQ(0, rc);
   EXPECT_EQ(0, buffer.length());
+}
+
+TEST_F(OwnedImplTest, ToString) {
+  Buffer::OwnedImpl buffer;
+  EXPECT_EQ("", buffer.toString());
+  auto append = [&buffer](absl::string_view str) { buffer.add(str.data(), str.size()); };
+  append("Hello, ");
+  EXPECT_EQ("Hello, ", buffer.toString());
+  append("world!");
+  EXPECT_EQ("Hello, world!", buffer.toString());
+
+  // From debug inspection, I find that a second fragment is created at >1000 bytes.
+  std::string long_string(5000, 'A');
+  append(long_string);
+  EXPECT_EQ(absl::StrCat("Hello, world!" + long_string), buffer.toString());
 }
 
 } // namespace
