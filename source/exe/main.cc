@@ -1,5 +1,7 @@
 #include "exe/main_common.h"
 
+#include "absl/debugging/symbolize.h"
+
 // NOLINT(namespace-envoy)
 
 /**

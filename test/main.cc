@@ -2,6 +2,8 @@
 #include "test/test_common/environment.h"
 #include "test/test_runner.h"
 
+#include "absl/debugging/symbolize.h"
+
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "exe/signal_action.h"
 #endif
