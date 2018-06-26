@@ -164,49 +164,49 @@ private:
 
 class ListenerManagerImplWithRealFiltersTestIPv6 : public ListenerManagerImplTest {
 public:
-    ListenerManagerImplWithRealFiltersTestIPv6() {
-      // Use real filter loading by default.
-      ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
-              .WillByDefault(Invoke(
-                      [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-                         Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
-                          return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
-                                                                                               context);
-                      }));
-      ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
-              .WillByDefault(Invoke(
-                      [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
-                         Configuration::ListenerFactoryContext& context)
-                              -> std::vector<Network::ListenerFilterFactoryCb> {
-                          return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
-                                                                                                context);
-                      }));
-      socket_.reset(new NiceMock<Network::MockConnectionSocket>());
-    }
+  ListenerManagerImplWithRealFiltersTestIPv6() {
+    // Use real filter loading by default.
+    ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
+        .WillByDefault(Invoke(
+            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
+               Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
+              return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
+                                                                                   context);
+            }));
+    ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
+        .WillByDefault(Invoke(
+            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+               Configuration::ListenerFactoryContext& context)
+                -> std::vector<Network::ListenerFilterFactoryCb> {
+              return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
+                                                                                    context);
+            }));
+    socket_.reset(new NiceMock<Network::MockConnectionSocket>());
+  }
 
-    const Network::FilterChain*
-    findFilterChain(const std::string& server_name, bool expect_server_name_match,
-                    const std::string& transport_protocol, bool expect_transport_protocol_match,
-                    const std::vector<std::string>& application_protocols) {
-      EXPECT_CALL(*socket_, requestedServerName()).WillOnce(Return(absl::string_view(server_name)));
-      if (expect_server_name_match) {
-        EXPECT_CALL(*socket_, detectedTransportProtocol())
-                .WillOnce(Return(absl::string_view(transport_protocol)));
-        if (expect_transport_protocol_match) {
-          EXPECT_CALL(*socket_, requestedApplicationProtocols())
-                  .WillOnce(ReturnRef(application_protocols));
-        } else {
-          EXPECT_CALL(*socket_, requestedApplicationProtocols()).Times(0);
-        }
+  const Network::FilterChain*
+  findFilterChain(const std::string& server_name, bool expect_server_name_match,
+                  const std::string& transport_protocol, bool expect_transport_protocol_match,
+                  const std::vector<std::string>& application_protocols) {
+    EXPECT_CALL(*socket_, requestedServerName()).WillOnce(Return(absl::string_view(server_name)));
+    if (expect_server_name_match) {
+      EXPECT_CALL(*socket_, detectedTransportProtocol())
+          .WillOnce(Return(absl::string_view(transport_protocol)));
+      if (expect_transport_protocol_match) {
+        EXPECT_CALL(*socket_, requestedApplicationProtocols())
+            .WillOnce(ReturnRef(application_protocols));
       } else {
-        EXPECT_CALL(*socket_, detectedTransportProtocol()).Times(0);
         EXPECT_CALL(*socket_, requestedApplicationProtocols()).Times(0);
       }
-      return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_);
+    } else {
+      EXPECT_CALL(*socket_, detectedTransportProtocol()).Times(0);
+      EXPECT_CALL(*socket_, requestedApplicationProtocols()).Times(0);
     }
+    return manager_->listeners().back().get().filterChainManager().findFilterChain(*socket_);
+  }
 
 private:
-    std::unique_ptr<Network::MockConnectionSocket> socket_;
+  std::unique_ptr<Network::MockConnectionSocket> socket_;
 };
 
 class MockLdsApi : public LdsApi {
@@ -1946,7 +1946,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
   EXPECT_EQ(0U, manager_->listeners().size());
 }
 
-class OriginalDstTestFilterIPv6 : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
+class OriginalDstTestFilterIPv6
+    : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
   Network::Address::InstanceConstSharedPtr getOriginalDst(int) override {
     return Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv6Instance("::0002", 2345)};
