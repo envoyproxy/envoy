@@ -360,6 +360,8 @@ private:
 
     // Possibly increases buffer_limit_ to the value of limit.
     void setBufferLimit(uint32_t limit);
+    // Set up the Encoder/Decoder filter chain.
+    void createFilterChain();
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
