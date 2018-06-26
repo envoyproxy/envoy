@@ -3,6 +3,8 @@ Version history
 
 1.8.0 (Pending)
 ===============
+* admin: added :http:get:`/hystrix_event_stream` as an endpoint for monitoring envoy's statistics 
+  through `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
 * ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`.
   Lyft's reference implementation of the `ratelimit <https://github.com/lyft/ratelimit>`_ service also supports the data-plane-api proto as of v1.1.0.
   Envoy can use either proto to send client requests to a ratelimit server with the use of the
@@ -11,8 +13,6 @@ Version history
   Support for the legacy proto :repo:`source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
 * tracing: added support for configuration of :ref:`tracing sampling
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
-* admin: added :http:get:`/hystrix_event_stream` as an endpoint for monitoring envoy's statistics 
-  through `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
 
 1.7.0
 ===============
