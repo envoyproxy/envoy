@@ -183,5 +183,22 @@ OwnedImpl::OwnedImpl(const Instance& data) : OwnedImpl() { add(data); }
 
 OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, size); }
 
+std::string OwnedImpl::toString() const {
+  uint64_t num_slices = getRawSlices(nullptr, 0);
+  RawSlice slices[num_slices];
+  getRawSlices(slices, num_slices);
+  size_t len = 0;
+  for (RawSlice& slice : slices) {
+    len += slice.len_;
+  }
+  std::string output;
+  output.reserve(len);
+  for (RawSlice& slice : slices) {
+    output.append(static_cast<const char*>(slice.mem_), slice.len_);
+  }
+
+  return output;
+}
+
 } // namespace Buffer
 } // namespace Envoy

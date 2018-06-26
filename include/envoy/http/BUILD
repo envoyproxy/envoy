@@ -83,3 +83,8 @@ envoy_cc_library(
     name = "protocol_interface",
     hdrs = ["protocol.h"],
 )
+
+envoy_cc_library(
+    name = "query_params_interface",
+    hdrs = ["query_params.h"],
+)

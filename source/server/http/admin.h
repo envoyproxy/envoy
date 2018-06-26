@@ -106,6 +106,9 @@ public:
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_.stats_; }
   bool proxy100Continue() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
+  Http::Code request(absl::string_view path, const Http::Utility::QueryParams& params,
+                     absl::string_view method, Http::HeaderMap& response_headers,
+                     std::string& body) override;
 
 private:
   /**
