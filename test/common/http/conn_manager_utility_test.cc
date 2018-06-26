@@ -568,8 +568,7 @@ TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketRes
   EXPECT_TRUE(Utility::isUpgrade(response_headers));
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
 
-  EXPECT_EQ(3UL, response_headers.size()) << response_headers;
-  EXPECT_EQ("foo", response_headers.get_("transfer-encoding"));
+  EXPECT_EQ(2UL, response_headers.size()) << response_headers;
   EXPECT_EQ("upgrade", response_headers.get_("connection"));
   EXPECT_EQ("bar", response_headers.get_("upgrade"));
 }

@@ -45,6 +45,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   request_headers.removeEnvoyInternalRequest();
   request_headers.removeKeepAlive();
   request_headers.removeProxyConnection();
+  // TODO(alyssawilk) handle this with current and new websocket here and below.
   request_headers.removeTransferEncoding();
 
   // If we are "using remote address" this means that we create/append to XFF with our immediate
@@ -315,8 +316,8 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
     }
   } else {
     response_headers.removeConnection();
-    response_headers.removeTransferEncoding();
   }
+  response_headers.removeTransferEncoding();
 
   if (request_headers.EnvoyForceTrace() && request_headers.RequestId()) {
     response_headers.insertRequestId().value(*request_headers.RequestId());
