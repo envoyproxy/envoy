@@ -64,7 +64,7 @@ public:
     // TODO(htuch): Less fragile signal that this is failure vs. reject.
     if (e == nullptr) {
       stats_.update_failure_.inc();
-      ENVOY_LOG(warn, "gRPC update for {} failed", type_url_);
+      ENVOY_LOG(debug, "gRPC update for {} failed", type_url_);
     } else {
       stats_.update_rejected_.inc();
       ENVOY_LOG(warn, "gRPC config for {} rejected: {}", type_url_, e->what());
