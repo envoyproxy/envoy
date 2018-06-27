@@ -160,6 +160,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "health_discovery_service_lib",
+    srcs = ["health_discovery_service.cc"],
+    hdrs = ["health_discovery_service.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/grpc:async_client_lib",
+        "@envoy_api//envoy/service/discovery/v2:hds_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "locality_lib",
     hdrs = ["locality.h"],
     deps = [

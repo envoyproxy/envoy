@@ -314,7 +314,7 @@ public:
   }
   const VirtualHost& virtualHost() const override { return vhost_; }
   bool autoHostRewrite() const override { return auto_host_rewrite_; }
-  bool useWebSocket() const override { return websocket_config_ != nullptr; }
+  bool useOldStyleWebSocket() const override { return websocket_config_ != nullptr; }
   Http::WebSocketProxyPtr
   createWebSocketProxy(Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
                        Http::WebSocketProxyCallbacks& callbacks,
@@ -410,7 +410,7 @@ private:
 
     const VirtualHost& virtualHost() const override { return parent_->virtualHost(); }
     bool autoHostRewrite() const override { return parent_->autoHostRewrite(); }
-    bool useWebSocket() const override { return parent_->useWebSocket(); }
+    bool useOldStyleWebSocket() const override { return parent_->useOldStyleWebSocket(); }
     Http::WebSocketProxyPtr
     createWebSocketProxy(Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
                          Http::WebSocketProxyCallbacks& callbacks,

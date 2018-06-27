@@ -428,7 +428,7 @@ Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& da
                                                             bool end_stream) {
   Thread::LockGuard lock(parent_.lock_);
   ENVOY_LOG(debug, "got {} bytes", data.length());
-  parent_.data_.append(TestUtility::bufferToString(data));
+  parent_.data_.append(data.toString());
   parent_.half_closed_ = end_stream;
   data.drain(data.length());
   parent_.connection_event_.notifyOne();

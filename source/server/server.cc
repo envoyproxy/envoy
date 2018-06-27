@@ -281,6 +281,17 @@ void InstanceImpl::initialize(Options& options,
     listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config());
   }
 
+  if (bootstrap_.has_hds_config()) {
+    const auto& hds_config = bootstrap_.hds_config();
+    async_client_manager_ =
+        std::make_unique<Grpc::AsyncClientManagerImpl>(clusterManager(), thread_local_);
+    hds_delegate_.reset(new Upstream::HdsDelegate(
+        bootstrap_.node(), stats(),
+        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
+            ->create(),
+        dispatcher()));
+  }
+
   for (Stats::SinkPtr& sink : main_config->statsSinks()) {
     stats_store_.addSink(*sink);
   }

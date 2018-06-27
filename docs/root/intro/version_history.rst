@@ -3,12 +3,15 @@ Version history
 
 1.8.0 (Pending)
 ===============
-* ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`. 
+* http: response filters not applied to early error paths such as http_parser generated 400s.
+* ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`.
   Lyft's reference implementation of the `ratelimit <https://github.com/lyft/ratelimit>`_ service also supports the data-plane-api proto as of v1.1.0.
   Envoy can use either proto to send client requests to a ratelimit server with the use of the
   :ref:`use_data_plane_proto<envoy_api_field_config.ratelimit.v2.RateLimitServiceConfig.use_data_plane_proto>`
   boolean flag in the ratelimit configuration.
   Support for the legacy proto :repo:`source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
+* tracing: added support for configuration of :ref:`tracing sampling
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
 
 1.7.0
 ===============
@@ -23,6 +26,8 @@ Version history
 * access log: improved WebSocket logging.
 * admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
   version information (if applicable).
+* admin: added :http:get:`/clusters?format=json` for outputing a JSON-serialized proto detailing
+  the current status of all clusters.
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
 * admin: added :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to add or change runtime values.
 * admin: mutations must be sent as POSTs, rather than GETs. Mutations include:

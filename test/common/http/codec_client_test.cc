@@ -354,7 +354,7 @@ TEST_P(CodecNetworkTest, SendData) {
   Buffer::OwnedImpl data(full_data);
   upstream_connection_->write(data, false);
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
-    EXPECT_EQ(full_data, TestUtility::bufferToString(data));
+    EXPECT_EQ(full_data, data.toString());
     dispatcher_->exit();
   }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
@@ -375,12 +375,9 @@ TEST_P(CodecNetworkTest, SendHeadersAndClose) {
   upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2)
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> void {
-        EXPECT_EQ(full_data, TestUtility::bufferToString(data));
-      }))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> void {
-        EXPECT_EQ("", TestUtility::bufferToString(data));
-      }));
+      .WillOnce(
+          Invoke([&](Buffer::Instance& data) -> void { EXPECT_EQ(full_data, data.toString()); }))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> void { EXPECT_EQ("", data.toString()); }));
   // Because the headers are not complete, the disconnect will reset the stream.
   // Note even if the final \r\n were appended to the header data, enough of the
   // codec state is mocked out that the data would not be framed and the stream
@@ -411,12 +408,9 @@ TEST_P(CodecNetworkTest, SendHeadersAndCloseUnderReadDisable) {
 
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(2)
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> void {
-        EXPECT_EQ(full_data, TestUtility::bufferToString(data));
-      }))
-      .WillOnce(Invoke([&](Buffer::Instance& data) -> void {
-        EXPECT_EQ("", TestUtility::bufferToString(data));
-      }));
+      .WillOnce(
+          Invoke([&](Buffer::Instance& data) -> void { EXPECT_EQ(full_data, data.toString()); }))
+      .WillOnce(Invoke([&](Buffer::Instance& data) -> void { EXPECT_EQ("", data.toString()); }));
   EXPECT_CALL(inner_encoder_.stream_, resetStream(_)).WillOnce(InvokeWithoutArgs([&]() -> void {
     for (auto callbacks : inner_encoder_.stream_.callbacks_) {
       callbacks->onResetStream(StreamResetReason::RemoteReset);

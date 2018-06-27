@@ -52,7 +52,7 @@ TEST_P(EchoIntegrationTest, Hello) {
   RawConnectionDriver connection(
       lookupPort("listener_0"), buffer,
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
-        response.append(TestUtility::bufferToString(data));
+        response.append(data.toString());
         connection.close();
       },
       version_);
@@ -101,7 +101,7 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
   RawConnectionDriver connection(
       new_listener_port, buffer,
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
-        response.append(TestUtility::bufferToString(data));
+        response.append(data.toString());
         connection.close();
       },
       version_);

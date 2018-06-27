@@ -390,5 +390,12 @@ TEST(HttpUtility, TestPrepareHeaders) {
   EXPECT_STREQ("dns.name", message->headers().Host()->value().c_str());
 }
 
+TEST(HttpUtility, QueryParamsToString) {
+  EXPECT_EQ("", Utility::queryParamsToString(Utility::QueryParams({})));
+  EXPECT_EQ("?a=1", Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}})));
+  EXPECT_EQ("?a=1&b=2",
+            Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}, {"b", "2"}})));
+}
+
 } // namespace Http
 } // namespace Envoy

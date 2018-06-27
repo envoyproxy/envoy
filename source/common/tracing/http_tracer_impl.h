@@ -80,11 +80,6 @@ public:
                             const Http::HeaderMap& request_headers);
 
   /**
-   * Mutate request headers if request needs to be traced.
-   */
-  static void mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime);
-
-  /**
    * 1) Fill in span tags based on the response headers.
    * 2) Finish active span.
    */

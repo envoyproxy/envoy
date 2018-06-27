@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <list>
+#include <map>
 #include <string>
 
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
@@ -74,6 +75,8 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
+  bool createUpgradeFilterChain(absl::string_view upgrade_type,
+                                Http::FilterChainFactoryCallbacks& callbacks) override;
 
   // Http::ConnectionManagerConfig
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
@@ -107,10 +110,15 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
 
 private:
+  typedef std::list<Http::FilterFactoryCb> FilterFactoriesList;
   enum class CodecType { HTTP1, HTTP2, AUTO };
+  void processFilter(
+      const envoy::config::filter::network::http_connection_manager::v2::HttpFilter& proto_config,
+      int i, absl::string_view prefix, FilterFactoriesList& filter_factories);
 
   Server::Configuration::FactoryContext& context_;
-  std::list<Http::FilterFactoryCb> filter_factories_;
+  FilterFactoriesList filter_factories_;
+  std::map<std::string, std::unique_ptr<FilterFactoriesList>> upgrade_filter_factories_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;

@@ -294,13 +294,13 @@ if __name__ == "__main__":
   parser.add_argument('-j', '--num-workers', type=int, default=multiprocessing.cpu_count(),
                       help="number of worker processes to use; defaults to one per core.")
   parser.add_argument('--api-prefix', type=str, default='./api/', help="path of the API tree")
-  parser.add_argument('--envoy_build_rule_check', type=bool, default=True,
-                      help="Whether to check for @envoy// in a build rule.")
+  parser.add_argument('--skip_envoy_build_rule_check', action='store_true',
+                      help="Skip checking for '@envoy//' prefix in build rules.")
   args = parser.parse_args()
 
   operation_type = args.operation_type
   target_path = args.target_path
-  envoy_build_rule_check = args.envoy_build_rule_check
+  envoy_build_rule_check = not args.skip_envoy_build_rule_check
   if args.add_excluded_prefixes:
     EXCLUDED_PREFIXES += tuple(args.add_excluded_prefixes)
 
