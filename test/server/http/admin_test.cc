@@ -701,7 +701,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json", header_map, response));
-  std::string output_json = TestUtility::bufferToString(response);
+  std::string output_json = response.toString();
   envoy::admin::v2alpha::Clusters output_proto;
   MessageUtil::loadFromJson(output_json, output_proto);
 
@@ -755,7 +755,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 
   // Ensure that the normal text format is used by default.
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters", header_map, response));
-  std::string text_output = TestUtility::bufferToString(response);
+  std::string text_output = response.toString();
   envoy::admin::v2alpha::Clusters failed_conversion_proto;
   EXPECT_THROW(MessageUtil::loadFromJson(text_output, failed_conversion_proto), EnvoyException);
 }

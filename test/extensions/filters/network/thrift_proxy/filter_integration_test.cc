@@ -171,16 +171,16 @@ TEST_P(ThriftFilterIntegrationTest, Success) {
   initializeCall(CallResult::Success);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(TestUtility::bufferToString(request_bytes_));
+  tcp_client->write(request_bytes_.toString());
 
   FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   Buffer::OwnedImpl upstream_request(
       fake_upstream_connection->waitForData(request_bytes_.length()));
   EXPECT_TRUE(TestUtility::buffersEqual(upstream_request, request_bytes_));
 
-  fake_upstream_connection->write(TestUtility::bufferToString(response_bytes_));
+  fake_upstream_connection->write(response_bytes_.toString());
 
-  tcp_client->waitForData(TestUtility::bufferToString(response_bytes_));
+  tcp_client->waitForData(response_bytes_.toString());
   tcp_client->close();
   fake_upstream_connection->waitForDisconnect();
 
@@ -196,16 +196,16 @@ TEST_P(ThriftFilterIntegrationTest, IDLException) {
   initializeCall(CallResult::IDLException);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(TestUtility::bufferToString(request_bytes_));
+  tcp_client->write(request_bytes_.toString());
 
   FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   Buffer::OwnedImpl upstream_request(
       fake_upstream_connection->waitForData(request_bytes_.length()));
   EXPECT_TRUE(TestUtility::buffersEqual(upstream_request, request_bytes_));
 
-  fake_upstream_connection->write(TestUtility::bufferToString(response_bytes_));
+  fake_upstream_connection->write(response_bytes_.toString());
 
-  tcp_client->waitForData(TestUtility::bufferToString(response_bytes_));
+  tcp_client->waitForData(response_bytes_.toString());
   tcp_client->close();
   fake_upstream_connection->waitForDisconnect();
 
@@ -221,16 +221,16 @@ TEST_P(ThriftFilterIntegrationTest, Exception) {
   initializeCall(CallResult::Exception);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(TestUtility::bufferToString(request_bytes_));
+  tcp_client->write(request_bytes_.toString());
 
   FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   Buffer::OwnedImpl upstream_request(
       fake_upstream_connection->waitForData(request_bytes_.length()));
   EXPECT_TRUE(TestUtility::buffersEqual(upstream_request, request_bytes_));
 
-  fake_upstream_connection->write(TestUtility::bufferToString(response_bytes_));
+  fake_upstream_connection->write(response_bytes_.toString());
 
-  tcp_client->waitForData(TestUtility::bufferToString(response_bytes_));
+  tcp_client->waitForData(response_bytes_.toString());
   tcp_client->close();
   fake_upstream_connection->waitForDisconnect();
 
@@ -246,7 +246,7 @@ TEST_P(ThriftFilterIntegrationTest, Oneway) {
   initializeOneway();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  tcp_client->write(TestUtility::bufferToString(request_bytes_));
+  tcp_client->write(request_bytes_.toString());
 
   FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
   Buffer::OwnedImpl upstream_request(
