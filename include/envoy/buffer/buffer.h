@@ -165,7 +165,7 @@ public:
   virtual ssize_t search(const void* data, uint64_t size, size_t start) const PURE;
 
   /**
-   * Construct a flattened string from a buffer.
+   * Constructs a flattened string from a buffer.
    * @return the flattened string.
    */
   virtual std::string toString() const PURE;
