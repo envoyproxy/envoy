@@ -4,6 +4,8 @@ package envoy.service.auth.v2alpha;
 option go_package = "v2alpha";
 option java_generic_services = true;
 
+import "envoy/api/v2/core/base.proto";
+import "envoy/type/http_status.proto";
 import "envoy/service/auth/v2alpha/attribute_context.proto";
 
 import "google/rpc/status.proto";
@@ -27,21 +29,45 @@ message CheckRequest {
   AttributeContext attributes = 1;
 }
 
+// HTTP attributes for a denied response.
+message DeniedHttpResponse {
+  // This field allows the authorization service to send a HTTP response status
+  // code to the downstream client other than 403 (Forbidden).
+  envoy.type.HttpStatus status = 1 [(validate.rules).message.required = true];
+
+  // This field allows the authorization service to send HTTP response headers
+  // to the the downstream client.
+  repeated envoy.api.v2.core.HeaderValueOption headers = 2;
+  
+  // This field allows the authorization service to send a response body data
+  // to the the downstream client.
+  string body = 3;
+}
+
+// HTTP attributes for an ok response.
+message OkHttpResponse {
+  // HTTP entity headers in addition to the original request headers. This allows the authorization 
+  // service to append, to add or to override headers from the original request before
+  // dispatching it to the upstream. By setting `append` field to `true` in the `HeaderValueOption`,
+  // the filter will append the correspondent header value to the matched request header. Note that 
+  // by Leaving `append` as false, the filter will either add a new header, or override an existing
+  // one if there is a match.
+  repeated envoy.api.v2.core.HeaderValueOption headers = 2;
+}
+
+// Intended for gRPC and Network Authorization servers `only`.
 message CheckResponse {
   // Status `OK` allows the request. Any other status indicates the request should be denied.
   google.rpc.Status status = 1;
 
-  // An optional message that contains HTTP response attributes. This message is
+  // An message that contains HTTP response attributes. This message is
   // used when the authorization service needs to send custom responses to the
   // downstream client or, to modify/add request headers being dispatched to the upstream.
-  message HttpResponse {
-    // Http status code.
-    uint32 status_code = 1 [(validate.rules).uint32 = {gte: 100, lt: 600}];
-
-    // Http entity headers.
-    map<string, string> headers = 2;
-
-    // Http entity body.
-    string body = 3;
+  oneof http_response {
+    // Supplies http attributes for a denied response.
+    DeniedHttpResponse denied_response = 2;
+    
+    // Supplies http attributes for an ok response.
+    OkHttpResponse ok_response = 3;
   }
 }

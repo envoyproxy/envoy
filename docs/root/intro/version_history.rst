@@ -45,8 +45,10 @@ Version history
   to close tcp_proxy upstream connections when health checks fail.
 * cluster: added :ref:`option <envoy_api_field_Cluster.drain_connections_on_host_removal>` to drain
   connections from hosts after they are removed from service discovery, regardless of health status.
-* cluster: fixed bug preventing the deletion of all endpoints in a priority.
-* debug: added symbolized stack traces (where supported).
+* cluster: fixed bug preventing the deletion of all endpoints in a priority
+* debug: added symbolized stack traces (where supported)
+* ext-authz filter: added support to raw HTTP authorization.
+* ext-authz filter: added support to gRPC responses to carry HTTP attributes.
 * grpc: support added for the full set of :ref:`Google gRPC call credentials
   <envoy_api_msg_core.GrpcService.GoogleGrpc.CallCredentials>`.
 * gzip filter: added :ref:`stats <gzip-statistics>` to the filter.
