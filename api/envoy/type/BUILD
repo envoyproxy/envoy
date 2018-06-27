@@ -34,14 +34,3 @@ api_go_proto_library(
     name = "range",
     proto = ":range",
 )
-
-api_proto_library(
-    name = "string_match",
-    srcs = ["string_match.proto"],
-    visibility = ["//visibility:public"],
-)
-
-api_go_proto_library(
-    name = "string_match",
-    proto = ":string_match",
-)

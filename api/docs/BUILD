@@ -67,5 +67,8 @@ proto_library(
         "//envoy/service/metrics/v2:metrics_service",
         "//envoy/type:percent",
         "//envoy/type:range",
+        "//envoy/type/matcher:metadata",
+        "//envoy/type/matcher:number",
+        "//envoy/type/matcher:string",
     ],
 )

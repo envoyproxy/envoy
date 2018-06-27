@@ -68,7 +68,8 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>& shadow_engine =
       config_->engine(callbacks_->route(), EnforcementMode::Shadow);
   if (shadow_engine.has_value()) {
-    if (shadow_engine->allowed(*callbacks_->connection(), headers)) {
+    if (shadow_engine->allowed(*callbacks_->connection(), headers,
+                               callbacks_->requestInfo().dynamicMetadata())) {
       config_->stats().shadow_allowed_.inc();
     } else {
       config_->stats().shadow_denied_.inc();
@@ -78,7 +79,8 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>& engine =
       config_->engine(callbacks_->route(), EnforcementMode::Enforced);
   if (engine.has_value()) {
-    if (engine->allowed(*callbacks_->connection(), headers)) {
+    if (engine->allowed(*callbacks_->connection(), headers,
+                        callbacks_->requestInfo().dynamicMetadata())) {
       config_->stats().allowed_.inc();
       return Http::FilterHeadersStatus::Continue;
     } else {
