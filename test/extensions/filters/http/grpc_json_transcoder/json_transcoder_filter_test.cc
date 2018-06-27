@@ -302,7 +302,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   expected_request.mutable_shelf()->set_theme("Children");
 
   bookstore::CreateShelfRequest request;
-  request.ParseFromString(TestUtility::bufferToString(*frames[0].data_));
+  request.ParseFromString(frames[0].data_->toString());
 
   EXPECT_EQ(expected_request.ByteSize(), frames[0].length_);
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
@@ -327,7 +327,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_.encodeData(*response_data, false));
 
-  std::string response_json = TestUtility::bufferToString(*response_data);
+  std::string response_json = response_data->toString();
 
   EXPECT_EQ("{\"id\":\"20\",\"theme\":\"Children\"}", response_json);
 
@@ -366,7 +366,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithPackageServiceMetho
   expected_request.mutable_shelf()->set_theme("Children");
 
   bookstore::CreateShelfRequest request;
-  request.ParseFromString(TestUtility::bufferToString(*frames[0].data_));
+  request.ParseFromString(frames[0].data_->toString());
 
   EXPECT_EQ(expected_request.ByteSize(), frames[0].length_);
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, request));
@@ -391,7 +391,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPostWithPackageServiceMetho
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_.encodeData(*response_data, false));
 
-  std::string response_json = TestUtility::bufferToString(*response_data);
+  std::string response_json = response_data->toString();
 
   EXPECT_EQ("{\"id\":\"20\",\"theme\":\"Children\"}", response_json);
 
@@ -427,7 +427,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
   expected_request.mutable_shelf()->set_theme("Children");
 
   bookstore::CreateShelfRequest forwarded_request;
-  forwarded_request.ParseFromString(TestUtility::bufferToString(*frames[0].data_));
+  forwarded_request.ParseFromString(frames[0].data_->toString());
 
   EXPECT_EQ(expected_request.ByteSize(), frames[0].length_);
   EXPECT_TRUE(MessageDifferencer::Equals(expected_request, forwarded_request));
@@ -458,7 +458,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, ForwardUnaryPostGrpc) {
   EXPECT_EQ(1, frames.size());
 
   bookstore::Shelf forwarded_response;
-  forwarded_response.ParseFromString(TestUtility::bufferToString(*frames[0].data_));
+  forwarded_response.ParseFromString(frames[0].data_->toString());
 
   EXPECT_EQ(expected_response.ByteSize(), frames[0].length_);
   EXPECT_TRUE(MessageDifferencer::Equals(expected_response, forwarded_response));
@@ -594,7 +594,7 @@ TEST_P(GrpcJsonTranscoderFilterPrintTest, PrintOptions) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_->encodeData(*response_data, false));
 
-  std::string response_json = TestUtility::bufferToString(*response_data);
+  std::string response_json = response_data->toString();
   EXPECT_EQ(GetParam().expected_response_, response_json);
 }
 

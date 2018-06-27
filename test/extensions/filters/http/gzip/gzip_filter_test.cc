@@ -68,7 +68,7 @@ protected:
 
   void verifyCompressedData() {
     decompressor_.decompress(data_, decompressed_data_);
-    const std::string uncompressed_str{TestUtility::bufferToString(decompressed_data_)};
+    const std::string uncompressed_str{decompressed_data_.toString()};
     ASSERT_EQ(expected_str_.length(), uncompressed_str.length());
     EXPECT_EQ(expected_str_, uncompressed_str);
     EXPECT_EQ(expected_str_.length(), stats_.counter("test.gzip.total_uncompressed_bytes").value());
@@ -77,7 +77,7 @@ protected:
 
   void feedBuffer(uint64_t size) {
     TestUtility::feedBufferWithRandomCharacters(data_, size);
-    expected_str_ += TestUtility::bufferToString(data_);
+    expected_str_ += data_.toString();
   }
 
   void drainBuffer() {

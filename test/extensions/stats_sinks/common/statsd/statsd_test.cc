@@ -118,7 +118,7 @@ TEST_F(TcpStatsdSinkTest, BufferReallocate) {
         for (int i = 0; i < 2000; i++) {
           compare += "envoy.test_counter:1|c\n";
         }
-        EXPECT_EQ(compare, TestUtility::bufferToString(buffer));
+        EXPECT_EQ(compare, buffer.toString());
       }));
   sink_->flush(source_);
 }

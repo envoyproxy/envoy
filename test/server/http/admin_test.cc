@@ -549,7 +549,7 @@ TEST_P(AdminInstanceTest, ConfigDump) {
 }
 )EOF";
   EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
-  std::string output = TestUtility::bufferToString(response);
+  std::string output = response.toString();
   EXPECT_EQ(expected_json, output);
 }
 
@@ -616,7 +616,7 @@ TEST_P(AdminInstanceTest, Runtime) {
   EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
   EXPECT_EQ(Http::Code::OK, getCallback("/runtime", header_map, response));
-  EXPECT_EQ(expected_json, TestUtility::bufferToString(response));
+  EXPECT_EQ(expected_json, response.toString());
 }
 
 TEST_P(AdminInstanceTest, RuntimeModify) {
@@ -633,7 +633,7 @@ TEST_P(AdminInstanceTest, RuntimeModify) {
   EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
   EXPECT_EQ(Http::Code::OK,
             getCallback("/runtime_modify?foo=bar&x=42&nothing=", header_map, response));
-  EXPECT_EQ("OK\n", TestUtility::bufferToString(response));
+  EXPECT_EQ("OK\n", response.toString());
 }
 
 TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
@@ -641,7 +641,7 @@ TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
   Buffer::OwnedImpl response;
 
   EXPECT_EQ(Http::Code::BadRequest, getCallback("/runtime_modify", header_map, response));
-  EXPECT_TRUE(absl::StartsWith(TestUtility::bufferToString(response), "usage:"));
+  EXPECT_TRUE(absl::StartsWith(response.toString(), "usage:"));
 }
 
 TEST_P(AdminInstanceTest, TracingStatsDisabled) {
