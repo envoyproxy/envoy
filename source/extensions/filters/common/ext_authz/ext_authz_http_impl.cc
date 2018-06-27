@@ -12,13 +12,12 @@ namespace Common {
 namespace ExtAuthz {
 
 namespace {
-
+  
 const Http::HeaderMap* getZeroContentLengthHeader() {
   static const Http::HeaderMap* header_map =
       new Http::HeaderMapImpl{{Http::Headers::get().ContentLength, std::to_string(0)}};
   return header_map;
 }
-
 } // namespace
 
 RawHttpClientImpl::RawHttpClientImpl(
