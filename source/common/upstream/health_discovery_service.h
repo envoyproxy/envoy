@@ -2,10 +2,13 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
+#include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/upstream/upstream.h"
 
 #include "common/common/logger.h"
 #include "common/grpc/async_client_impl.h"
+#include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -60,6 +63,37 @@ private:
   envoy::service::discovery::v2::HealthCheckRequest health_check_request_;
   std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier> health_check_message_;
   std::vector<std::string> clusters_;
+};
+
+/**
+ * Implementation of Upstream::Cluster for hds clusters (clusters that are used
+ * by HdsDelegates
+ */
+
+class HdsCluster : public Cluster, Logger::Loggable<Logger::Id::upstream> {
+public:
+  void setHealthChecker(const HealthCheckerSharedPtr& health_checker);
+
+  static ClusterSharedPtr create();
+
+  InitializePhase initializePhase() const override { return InitializePhase::Primary; }
+  PrioritySet& prioritySet() override { return priority_set_; }
+  const PrioritySet& prioritySet() const override { return priority_set_; }
+
+  void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
+
+  HealthChecker* healthChecker() override { return health_checker_.get(); }
+  ClusterInfoConstSharedPtr info() const override { return info_; }
+  Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
+  const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
+  void initialize(std::function<void()> callback) override;
+
+protected:
+  HdsCluster();
+  ClusterInfoConstSharedPtr info_;
+  PrioritySetImpl priority_set_;
+  HealthCheckerSharedPtr health_checker_;
+  Outlier::DetectorSharedPtr outlier_detector_;
 };
 
 typedef std::unique_ptr<HdsDelegate> HdsDelegatePtr;

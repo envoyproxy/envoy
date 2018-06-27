@@ -60,6 +60,7 @@ void HdsDelegate::onReceiveMessage(
   stats_.requests_.inc();
   stream_->sendMessage(health_check_request_, false);
   stats_.responses_.inc();
+  // Create Healthcheck
 }
 
 void HdsDelegate::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
@@ -71,6 +72,22 @@ void HdsDelegate::onRemoteClose(Grpc::Status::GrpcStatus status, const std::stri
   response_timer_->disableTimer();
   stream_ = nullptr;
   handleFailure();
+}
+
+HdsCluster::HdsCluster() { NOT_IMPLEMENTED; }
+
+ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED; }
+
+void HdsCluster::setHealthChecker(const HealthCheckerSharedPtr& health_checker) {
+  if (health_checker) {
+    ENVOY_LOG(debug, "There is a health_checker");
+  }
+}
+
+void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector) {
+  if (outlier_detector) {
+    ENVOY_LOG(debug, "There is an outlier detector");
+  }
 }
 
 } // namespace Upstream
