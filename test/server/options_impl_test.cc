@@ -69,7 +69,7 @@ TEST(OptionsImplTest, All) {
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
-  EXPECT_TRUE(options->v2ConfigOnly());
+  EXPECT_FALSE(options->v2ConfigOnly());
   EXPECT_EQ("path", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v6, options->localAddressIpVersion());
   EXPECT_EQ(1U, options->restartEpoch());
@@ -91,7 +91,7 @@ TEST(OptionsImplTest, All) {
 TEST(OptionsImplTest, SetAll) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
   bool v2_config_only = options->v2ConfigOnly();
-  bool hot_restart_disabled = options->v2ConfigOnly();
+  bool hot_restart_disabled = options->hotRestartDisabled();
   options->setBaseId(109876);
   options->setConcurrency(42);
   options->setConfigPath("foo");

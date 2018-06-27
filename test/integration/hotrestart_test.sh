@@ -92,11 +92,11 @@ if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "al
   || [[ "${ENVOY_IP_TEST_VERSIONS}" == "v4only" ]]; then
   HOT_RESTART_JSON_V4="${TEST_TMPDIR}"/hot_restart_v4.json
   echo building ${HOT_RESTART_JSON_V4} ...
-  cat "${TEST_RUNDIR}"/test/config/integration/server.json |
+  cat "${TEST_RUNDIR}"/test/config/integration/server_v2.json |
     sed -e "s#{{ upstream_. }}#0#g" | \
     sed -e "s#{{ test_rundir }}#$TEST_RUNDIR#" | \
     sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
-    sed -e "s#{{ dns_lookup_family }}#v4_only#" | \
+    sed -e "s#{{ dns_lookup_family }}#V4_ONLY#" | \
     cat > "${HOT_RESTART_JSON_V4}"
   JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_V4}")
 fi
@@ -104,10 +104,10 @@ fi
 if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "all" ]] \
   || [[ "${ENVOY_IP_TEST_VERSIONS}" == "v6only" ]]; then
   HOT_RESTART_JSON_V6="${TEST_TMPDIR}"/hot_restart_v6.json
-  cat "${TEST_RUNDIR}"/test/config/integration/server.json |
+  cat "${TEST_RUNDIR}"/test/config/integration/server_v2.json |
     sed -e "s#{{ upstream_. }}#0#g" | \
     sed -e "s#{{ test_rundir }}#$TEST_RUNDIR#" | \
-    sed -e "s#{{ ip_loopback_address }}#[::1]#" | \
+    sed -e "s#{{ ip_loopback_address }}#::1#" | \
     sed -e "s#{{ dns_lookup_family }}#v6_only#" | \
     cat > "${HOT_RESTART_JSON_V6}"
   JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_V6}")
@@ -117,7 +117,7 @@ fi
 # upstreams to avoid too much wild sedding.
 HOT_RESTART_JSON_UDS="${TEST_TMPDIR}"/hot_restart_uds.json
 SOCKET_DIR="$(mktemp -d /tmp/envoy_test_hotrestart.XXXXXX)"
-cat "${TEST_RUNDIR}"/test/config/integration/server_unix_listener.json |
+cat "${TEST_RUNDIR}"/test/config/integration/server_unix_listener_v2.json |
   sed -e "s#{{ socket_dir }}#${SOCKET_DIR}#" | \
   sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
   cat > "${HOT_RESTART_JSON_UDS}"

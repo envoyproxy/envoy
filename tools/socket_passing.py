@@ -27,7 +27,7 @@ def GenerateNewConfig(original_json, admin_address, updated_json):
     # allows us to diff the original config file and the updated config file
     # output from this script to check for any changes.
     parsed_json = json.load(original_json_file, object_pairs_hook=OrderedDict)
-  original_listeners = parsed_json['listeners']
+  original_listeners = parsed_json['static_resources']['listeners']
 
   sys.stdout.write('Admin address is ' + admin_address + '\n')
   try:
@@ -45,9 +45,13 @@ def GenerateNewConfig(original_json, admin_address, updated_json):
       return False
     for discovered, original in zip(discovered_listeners, original_listeners):
       if discovered.startswith('/'):
-        original['address'] = 'unix://' + discovered
+        original['address']['pipe']['path'] = discovered
       else:
-        original['address'] = 'tcp://' + discovered
+        addr, _, port = discovered.rpartition(':')
+        if addr[0] == '[':
+          addr = addr[1:-1]  # strip [] from ipv6 address.
+        original['address']['socket_address']['address'] = addr
+        original['address']['socket_address']['port_value'] = int(port)
     with open(updated_json, 'w') as outfile:
       json.dump(OrderedDict(parsed_json), outfile, indent=2, separators=(',',':'))
   finally:
