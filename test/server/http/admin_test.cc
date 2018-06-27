@@ -7,6 +7,8 @@
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
 #include "common/profiler/profiler.h"
+#include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 #include "common/stats/stats_impl.h"
 #include "common/stats/thread_local_store.h"
 
@@ -29,6 +31,9 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
+using testing::Return;
+using testing::ReturnPointee;
+using testing::ReturnRef;
 using testing::_;
 
 namespace Envoy {
@@ -649,6 +654,110 @@ TEST_P(AdminInstanceTest, TracingStatsDisabled) {
   for (Stats::CounterSharedPtr counter : server_.stats().counters()) {
     EXPECT_NE(counter->name(), name) << "Unexpected tracing stat found in server stats: " << name;
   }
+}
+
+TEST_P(AdminInstanceTest, ClustersJson) {
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
+
+  NiceMock<Upstream::MockCluster> cluster;
+  cluster_map.emplace(cluster.info_->name_, cluster);
+
+  NiceMock<Upstream::Outlier::MockDetector> outlier_detector;
+  ON_CALL(Const(cluster), outlierDetector()).WillByDefault(Return(&outlier_detector));
+  ON_CALL(outlier_detector, successRateEjectionThreshold()).WillByDefault(Return(6.0));
+
+  ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(true));
+
+  Upstream::MockHostSet* host_set = cluster.priority_set_.getMockHostSet(0);
+  auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+
+  envoy::api::v2::core::Locality locality;
+  locality.set_region("test_region");
+  locality.set_zone("test_zone");
+  locality.set_sub_zone("test_sub_zone");
+  ON_CALL(*host, locality()).WillByDefault(ReturnRef(locality));
+
+  host_set->hosts_.emplace_back(host);
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://1.2.3.4:80");
+  ON_CALL(*host, address()).WillByDefault(Return(address));
+
+  Stats::IsolatedStoreImpl store;
+  store.counter("test_counter").add(10);
+  store.gauge("test_gauge").set(11);
+  ON_CALL(*host, gauges()).WillByDefault(Invoke([&store]() { return store.gauges(); }));
+  ON_CALL(*host, counters()).WillByDefault(Invoke([&store]() { return store.counters(); }));
+
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC))
+      .WillByDefault(Return(true));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK))
+      .WillByDefault(Return(true));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH))
+      .WillByDefault(Return(false));
+
+  ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
+
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json", header_map, response));
+  std::string output_json = TestUtility::bufferToString(response);
+  envoy::admin::v2alpha::Clusters output_proto;
+  MessageUtil::loadFromJson(output_json, output_proto);
+
+  const std::string expected_json = R"EOF({
+ "cluster_statuses": [
+  {
+   "name": "fake_cluster",
+   "success_rate_ejection_threshold": {
+    "value": 6
+   },
+   "added_via_api": true,
+   "host_statuses": [
+    {
+     "address": {
+      "socket_address": {
+       "protocol": "TCP",
+       "address": "1.2.3.4",
+       "port_value": 80
+      }
+     },
+     "stats": {
+      "test_counter": {
+       "value": "10",
+       "type": "COUNTER"
+      },
+      "test_gauge": {
+       "value": "11",
+       "type": "GAUGE"
+      },
+     },
+     "health_status": {
+      "eds_health_status": "HEALTHY",
+      "failed_active_health_check": true,
+      "failed_outlier_check": true
+     },
+     "success_rate": {
+      "value": 43.2
+     }
+    }
+   ]
+  }
+ ]
+}
+)EOF";
+
+  envoy::admin::v2alpha::Clusters expected_proto;
+  MessageUtil::loadFromJson(expected_json, expected_proto);
+
+  // Ensure the protos created from each JSON are equivalent.
+  EXPECT_THAT(output_proto, ProtoEq(expected_proto));
+
+  // Ensure that the normal text format is used by default.
+  EXPECT_EQ(Http::Code::OK, getCallback("/clusters", header_map, response));
+  std::string text_output = TestUtility::bufferToString(response);
+  envoy::admin::v2alpha::Clusters failed_conversion_proto;
+  EXPECT_THROW(MessageUtil::loadFromJson(text_output, failed_conversion_proto), EnvoyException);
 }
 
 TEST_P(AdminInstanceTest, GetRequest) {

@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
@@ -34,6 +35,7 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/json/json_loader.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/utility.h"
 #include "common/profiler/profiler.h"
 #include "common/router/config_impl.h"
 #include "common/stats/stats_impl.h"
@@ -258,8 +260,62 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
                            resource_manager.retries().max()));
 }
 
-Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
-                                      Buffer::Instance& response, AdminStream&) {
+void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
+  envoy::admin::v2alpha::Clusters clusters;
+  for (auto& cluster_pair : server_.clusterManager().clusters()) {
+    const Upstream::Cluster& cluster = cluster_pair.second.get();
+    Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
+
+    envoy::admin::v2alpha::ClusterStatus& cluster_status = *clusters.add_cluster_statuses();
+    cluster_status.set_name(cluster_info->name());
+
+    const Upstream::Outlier::Detector* outlier_detector = cluster.outlierDetector();
+    if (outlier_detector != nullptr && outlier_detector->successRateEjectionThreshold() > 0.0) {
+      cluster_status.mutable_success_rate_ejection_threshold()->set_value(
+          outlier_detector->successRateEjectionThreshold());
+    }
+
+    cluster_status.set_added_via_api(cluster_info->addedViaApi());
+
+    for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+      for (auto& host : host_set->hosts()) {
+        envoy::admin::v2alpha::HostStatus& host_status = *cluster_status.add_host_statuses();
+        Network::Utility::addressToProtobufAddress(*host->address(),
+                                                   *host_status.mutable_address());
+
+        for (const Stats::CounterSharedPtr& counter : host->counters()) {
+          auto& metric = (*host_status.mutable_stats())[counter->name()];
+          metric.set_type(envoy::admin::v2alpha::SimpleMetric::COUNTER);
+          metric.set_value(counter->value());
+        }
+
+        for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
+          auto& metric = (*host_status.mutable_stats())[gauge->name()];
+          metric.set_type(envoy::admin::v2alpha::SimpleMetric::GAUGE);
+          metric.set_value(gauge->value());
+        }
+
+        envoy::admin::v2alpha::HostHealthStatus& health_status =
+            *host_status.mutable_health_status();
+        health_status.set_failed_active_health_check(
+            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
+        health_status.set_failed_outlier_check(
+            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
+        health_status.set_eds_health_status(
+            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)
+                ? envoy::api::v2::core::HealthStatus::UNHEALTHY
+                : envoy::api::v2::core::HealthStatus::HEALTHY);
+        double success_rate = host->outlierDetector().successRate();
+        if (success_rate >= 0.0) {
+          host_status.mutable_success_rate()->set_value(success_rate);
+        }
+      }
+    }
+  }
+  response.add(MessageUtil::getJsonStringFromMessage(clusters, true)); // pretty-print
+}
+
+void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
   for (auto& cluster : server_.clusterManager().clusters()) {
     addOutlierInfo(cluster.second.get().info()->name(), cluster.second.get().outlierDetector(),
                    response);
@@ -308,6 +364,20 @@ Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
                                  host->outlierDetector().successRate()));
       }
     }
+  }
+}
+
+Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& response_headers,
+                                      Buffer::Instance& response, AdminStream&) {
+  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  auto it = query_params.find("format");
+
+  if (it != query_params.end() && it->second == "json") {
+    writeClustersAsJson(response);
+    response_headers.insertContentType().value().setReference(
+        Http::Headers::get().ContentTypeValues.Json);
+  } else {
+    writeClustersAsText(response);
   }
 
   return Http::Code::OK;

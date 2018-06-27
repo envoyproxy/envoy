@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -149,11 +150,18 @@ private:
    * @return TRUE if level change succeeded, FALSE otherwise.
    */
   bool changeLogLevel(const Http::Utility::QueryParams& params);
+
+  /**
+   * Helper methods for the /clusters url handler.
+   */
   void addCircuitSettings(const std::string& cluster_name, const std::string& priority_str,
                           Upstream::ResourceManager& resource_manager, Buffer::Instance& response);
   void addOutlierInfo(const std::string& cluster_name,
                       const Upstream::Outlier::Detector* outlier_detector,
                       Buffer::Instance& response);
+  void writeClustersAsJson(Buffer::Instance& response);
+  void writeClustersAsText(Buffer::Instance& response);
+
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                                  bool show_all, bool pretty_print = false);

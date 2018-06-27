@@ -26,6 +26,8 @@ Version history
 * access log: improved WebSocket logging.
 * admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
   version information (if applicable).
+* admin: added :http:get:`/clusters?format=json` for outputing a JSON-serialized proto detailing
+  the current status of all clusters.
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
 * admin: added :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to add or change runtime values.
 * admin: mutations must be sent as POSTs, rather than GETs. Mutations include:

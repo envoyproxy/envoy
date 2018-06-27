@@ -144,12 +144,10 @@ public:
    *
    * @param lhs proto on LHS.
    * @param rhs proto on RHS.
-   * @return bool indicating whether the protos are equal. Type name and string serialization are
-   *         used for equality testing.
+   * @return bool indicating whether the protos are equal.
    */
   static bool protoEqual(const Protobuf::Message& lhs, const Protobuf::Message& rhs) {
-    return lhs.GetTypeName() == rhs.GetTypeName() &&
-           lhs.SerializeAsString() == rhs.SerializeAsString();
+    return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
   }
 
   /**
