@@ -1,4 +1,4 @@
-load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_cc_mock")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_test", "envoy_cc_test_library", "envoy_cc_mock")
 load("@envoy_build_config//:extensions_build_config.bzl", "EXTENSIONS")
 
 # All extension tests should use this version of envoy_cc_test(). It allows compiling out
@@ -11,6 +11,14 @@ def envoy_extension_cc_test(name,
         return
 
     envoy_cc_test(name, **kwargs)
+
+def envoy_extension_cc_test_library(name,
+                                    extension_name,
+                                    **kwargs):
+    if not extension_name in EXTENSIONS:
+        return
+
+    envoy_cc_test_library(name, **kwargs)
 
 def envoy_extension_cc_mock(name,
                             extension_name,

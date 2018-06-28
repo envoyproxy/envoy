@@ -140,7 +140,7 @@ bool CompactProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& 
       return false;
     }
 
-    if (id <= 0 || id > INT16_MAX) {
+    if (id < 0 || id > INT16_MAX) {
       throw EnvoyException(fmt::format("invalid compact protocol field id {}", id));
     }
 
@@ -390,7 +390,7 @@ bool CompactProtocolImpl::readString(Buffer::Instance& buffer, std::string& valu
   }
 
   int len_size;
-  int32_t str_len = BufferHelper::peekZigZagI32(buffer, 0, len_size);
+  int32_t str_len = BufferHelper::peekVarIntI32(buffer, 0, len_size);
   if (len_size < 0) {
     return false;
   }

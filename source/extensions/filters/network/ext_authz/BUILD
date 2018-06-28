@@ -22,8 +22,8 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/tracing:http_tracer_lib",
+        "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_interface",
-        "//source/extensions/filters/common/ext_authz:ext_authz_lib",
         "@envoy_api//envoy/config/filter/network/ext_authz/v2:ext_authz_cc",
     ],
 )

@@ -110,6 +110,11 @@ modify different aspects of the server:
 
     */failed_outlier_check*: The host has failed an outlier detection check.
 
+.. http:get:: /clusters?format=json
+  
+  Dump the */clusters* output in a JSON-serialized proto. See the
+  :ref:`definition <envoy_api_msg_admin.v2alpha.Clusters>` for more information.
+
 .. _operations_admin_interface_config_dump:
 
 .. http:get:: /config_dump

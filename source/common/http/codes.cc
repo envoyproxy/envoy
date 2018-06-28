@@ -130,6 +130,7 @@ const char* CodeUtility::toString(Code code) {
   switch (code) {
   // 1xx
   case Code::Continue:                      return "Continue";
+  case Code::SwitchingProtocols:            return "Switching Protocols";
 
   // 2xx
   case Code::OK:                            return "OK";

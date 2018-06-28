@@ -131,7 +131,7 @@ TEST_P(Http2IntegrationTest, BadMagic) {
   RawConnectionDriver connection(
       lookupPort("http"), buffer,
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
-        response.append(TestUtility::bufferToString(data));
+        response.append(data.toString());
       },
       version_);
 
@@ -146,7 +146,7 @@ TEST_P(Http2IntegrationTest, BadFrame) {
   RawConnectionDriver connection(
       lookupPort("http"), buffer,
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
-        response.append(TestUtility::bufferToString(data));
+        response.append(data.toString());
       },
       version_);
 

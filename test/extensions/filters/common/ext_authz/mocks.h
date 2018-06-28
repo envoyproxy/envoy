@@ -25,6 +25,16 @@ public:
                            Tracing::Span& parent_span));
 };
 
+class MockRequestCallbacks : public RequestCallbacks {
+public:
+  MockRequestCallbacks();
+  ~MockRequestCallbacks();
+
+  void onComplete(ResponsePtr&& response) override { onComplete_(response); }
+
+  MOCK_METHOD1(onComplete_, void(ResponsePtr& response));
+};
+
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters

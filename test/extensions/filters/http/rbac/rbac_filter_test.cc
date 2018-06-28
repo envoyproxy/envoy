@@ -102,7 +102,7 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
   NiceMock<Filters::Common::RBAC::MockEngine> engine{route_config.rbac().rules()};
   NiceMock<MockRoleBasedAccessControlRouteSpecificFilterConfig> per_route_config_{route_config};
 
-  EXPECT_CALL(engine, allowed(_, _)).WillRepeatedly(Return(true));
+  EXPECT_CALL(engine, allowed(_, _, _)).WillRepeatedly(Return(true));
   EXPECT_CALL(per_route_config_, engine()).WillRepeatedly(ReturnRef(engine));
 
   EXPECT_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().RBAC))
