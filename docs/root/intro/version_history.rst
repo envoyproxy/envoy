@@ -3,6 +3,8 @@ Version history
 
 1.8.0 (Pending)
 ===============
+* access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>` to filter based on the presence of Envoy response flags. 
+  to filter logs based on request headers.
 * admin: added :http:get:`/hystrix_event_stream` as an endpoint for monitoring envoy's statistics 
   through `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
 * http: response filters not applied to early error paths such as http_parser generated 400s.
@@ -22,8 +24,6 @@ Version history
 * access log: added DYNAMIC_METADATA :ref:`access log formatter <config_access_log_format>`.
 * access log: added :ref:`HeaderFilter <envoy_api_msg_config.filter.accesslog.v2.HeaderFilter>`
   to filter logs based on request headers
-* access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>` to filter based on the presence of Envoy response flags. 
-  to filter logs based on request headers.
 * access log: added `%([1-9])?f` as one of START_TIME specifiers to render subseconds.
 * access log: gRPC Access Log Service (ALS) support added for :ref:`HTTP access logs
   <envoy_api_msg_config.accesslog.v2.HttpGrpcAccessLogConfig>`.
