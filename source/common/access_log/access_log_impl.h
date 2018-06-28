@@ -178,7 +178,7 @@ public:
                 const Http::HeaderMap& request_headers) override;
 
 private:
-  RequestInfo::RequestInfoImpl info_;
+  uint64_t configured_flags_{};
 };
 
 /**

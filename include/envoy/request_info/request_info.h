@@ -59,11 +59,6 @@ public:
   virtual ~RequestInfo() {}
 
   /**
-   * @return the current state of the response flags.
-   */
-  virtual uint64_t currentResponseFlags() const PURE;
-
-  /**
    * @param response_flag the response flag. Each filter can set independent response flags. The
    * flags are accumulated.
    */

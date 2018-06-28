@@ -123,8 +123,6 @@ struct RequestInfoImpl : public RequestInfo {
 
   uint64_t bytesSent() const override { return bytes_sent_; }
 
-  uint64_t currentResponseFlags() const override { return response_flags_; }
-
   void setResponseFlag(ResponseFlag response_flag) override { response_flags_ |= response_flag; }
 
   bool intersectResponseFlags(uint64_t response_flags) const override {

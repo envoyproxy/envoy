@@ -28,7 +28,6 @@ public:
   absl::optional<uint32_t> responseCode() const override { return response_code_; }
   void addBytesSent(uint64_t) override { NOT_IMPLEMENTED; }
   uint64_t bytesSent() const override { return 2; }
-  uint64_t currentResponseFlags() const override { return response_flags_; }
   bool intersectResponseFlags(uint64_t response_flags) const override {
     return (response_flags_ & response_flags) != 0;
   }

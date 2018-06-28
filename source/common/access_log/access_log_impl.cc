@@ -186,14 +186,14 @@ ResponseFlagFilter::ResponseFlagFilter(
     absl::optional<RequestInfo::ResponseFlag> response_flag =
         RequestInfo::ResponseFlagUtils::toResponseFlag(config.flags(i));
     // The config has been validated. Therefore, every flag in the config will have a mapping.
-    RELEASE_ASSERT(response_flag.has_value());
-    info_.setResponseFlag(response_flag.value());
+    ASSERT(response_flag.has_value());
+    configured_flags_ |= response_flag.value();
   }
 }
 
 bool ResponseFlagFilter::evaluate(const RequestInfo::RequestInfo& info, const Http::HeaderMap&) {
-  if (info_.hasResponseFlag()) {
-    return info_.intersectResponseFlags(info.currentResponseFlags());
+  if (configured_flags_ != 0) {
+    return info.intersectResponseFlags(configured_flags_);
   }
   return info.hasResponseFlag();
 }
