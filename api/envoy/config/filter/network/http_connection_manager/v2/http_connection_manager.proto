@@ -221,9 +221,7 @@ message HttpConnectionManager {
     // Whether to forward the subject of the client cert. Defaults to false.
     google.protobuf.BoolValue subject = 1;
 
-    // Whether to forward the URI type Subject Alternative Name of the client cert. Defaults to
-    // false. This field is deprecated, use URI field instead.
-    google.protobuf.BoolValue san = 2 [deprecated = true];
+    reserved 2; // san deprecated by uri
 
     // Whether to forward the entire client cert in URL encoded PEM format. This will appear in the
     // XFCC header comma separated from other values with the value Cert="PEM".

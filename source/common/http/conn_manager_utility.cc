@@ -238,7 +238,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
     return;
   }
 
-  // TODO(myidpt): Handle the special characters in By and SAN fields.
+  // TODO(myidpt): Handle the special characters in By and URI fields.
   // TODO: Optimize client_cert_details based on perf analysis (direct string appending may be more
   // preferable).
   std::vector<std::string> client_cert_details;
@@ -268,12 +268,8 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
         client_cert_details.push_back("Subject=\"" + connection.ssl()->subjectPeerCertificate() +
                                       "\"");
         break;
-      case Http::ClientCertDetailsType::SAN:
-        // Currently, we only support a single SAN field with URI type.
-        // The "SAN" key still exists even if the SAN is empty.
-        client_cert_details.push_back("SAN=" + connection.ssl()->uriSanPeerCertificate());
-        break;
       case Http::ClientCertDetailsType::URI:
+        // The "URI" key still exists even if the URI is empty.
         client_cert_details.push_back("URI=" + connection.ssl()->uriSanPeerCertificate());
         break;
       case Http::ClientCertDetailsType::DNS: {

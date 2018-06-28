@@ -169,9 +169,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, subject, false)) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
   }
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, san, false)) {
-    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::SAN);
-  }
   if (set_current_client_cert_details.uri()) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::URI);
   }
