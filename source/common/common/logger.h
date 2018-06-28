@@ -26,9 +26,9 @@ namespace Logger {
   FUNCTION(client)               \
   FUNCTION(config)               \
   FUNCTION(connection)           \
-  FUNCTION(misc)                 \
   FUNCTION(file)                 \
   FUNCTION(filter)               \
+  FUNCTION(grpc)                 \
   FUNCTION(hc)                   \
   FUNCTION(health_checker)       \
   FUNCTION(http)                 \
@@ -36,17 +36,18 @@ namespace Logger {
   FUNCTION(hystrix)              \
   FUNCTION(lua)                  \
   FUNCTION(main)                 \
+  FUNCTION(misc)                 \
   FUNCTION(mongo)                \
   FUNCTION(pool)                 \
+  FUNCTION(rbac)                 \
   FUNCTION(redis)                \
   FUNCTION(router)               \
   FUNCTION(runtime)              \
-  FUNCTION(testing)              \
-  FUNCTION(tracing)              \
-  FUNCTION(upstream)             \
-  FUNCTION(grpc)                 \
   FUNCTION(stats)                \
-  FUNCTION(thrift)
+  FUNCTION(testing)              \
+  FUNCTION(thrift)               \
+  FUNCTION(tracing)              \
+  FUNCTION(upstream)
 
 enum class Id {
   ALL_LOGGER_IDS(GENERATE_ENUM)
