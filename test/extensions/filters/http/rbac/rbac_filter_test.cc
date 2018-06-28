@@ -46,11 +46,11 @@ public:
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
-  void setDestinationPort(uint16_t port, int times = 2) {
+  void setDestinationPort(uint16_t port, int at_most_times = 3) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
     auto& expect = EXPECT_CALL(connection_, localAddress());
-    if (times > 0) {
-      expect.Times(times);
+    if (at_most_times > 0) {
+      expect.Times(testing::AtMost(at_most_times));
     }
     expect.WillRepeatedly(ReturnRef(address_));
   }
