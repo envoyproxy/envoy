@@ -7,6 +7,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/common/pure.h"
 
