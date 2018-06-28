@@ -23,7 +23,7 @@ public:
   virtual const std::string& privateKey() const PURE;
 };
 
-typedef std::unique_ptr<TlsCertificateConfig> TlsCertificateConfigPtr;
+typedef std::shared_ptr<TlsCertificateConfig> TlsCertificateConfigSharedPtr;
 
 } // namespace Ssl
 } // namespace Envoy

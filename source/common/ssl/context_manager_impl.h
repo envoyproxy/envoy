@@ -27,12 +27,12 @@ public:
    * admin purposes. When a caller frees a context it will tell us to release it also from the list
    * of contexts.
    */
-  void releaseContext(Context* context);
+  void releaseContext(Context* context) override;
 
   // Ssl::ContextManager
-  Ssl::ClientContextPtr createSslClientContext(Stats::Scope& scope,
-                                               const ClientContextConfig& config) override;
-  Ssl::ServerContextPtr
+  Ssl::ClientContextSharedPtr createSslClientContext(Stats::Scope& scope,
+                                                     const ClientContextConfig& config) override;
+  Ssl::ServerContextSharedPtr
   createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
                          const std::vector<std::string>& server_names) override;
   size_t daysUntilFirstCertExpires() const override;

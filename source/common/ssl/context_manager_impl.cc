@@ -20,18 +20,27 @@ void ContextManagerImpl::releaseContext(Context* context) {
   contexts_.remove(context);
 }
 
-ClientContextPtr ContextManagerImpl::createSslClientContext(Stats::Scope& scope,
-                                                            const ClientContextConfig& config) {
-  ClientContextPtr context(new ClientContextImpl(*this, scope, config));
+ClientContextSharedPtr
+ContextManagerImpl::createSslClientContext(Stats::Scope& scope, const ClientContextConfig& config) {
+  if (!config.isValid()) {
+    return nullptr;
+  }
+
+  ClientContextSharedPtr context(new ClientContextImpl(*this, scope, config));
   std::unique_lock<std::shared_timed_mutex> lock(contexts_lock_);
   contexts_.emplace_back(context.get());
   return context;
 }
 
-ServerContextPtr
+ServerContextSharedPtr
 ContextManagerImpl::createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
                                            const std::vector<std::string>& server_names) {
-  ServerContextPtr context(new ServerContextImpl(*this, scope, config, server_names, runtime_));
+  if (!config.isValid()) {
+    return nullptr;
+  }
+
+  ServerContextSharedPtr context(
+      new ServerContextImpl(*this, scope, config, server_names, runtime_));
   std::unique_lock<std::shared_timed_mutex> lock(contexts_lock_);
   contexts_.emplace_back(context.get());
   return context;
