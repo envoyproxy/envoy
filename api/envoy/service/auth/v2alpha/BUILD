@@ -20,5 +20,7 @@ api_proto_library(
     has_services = 1,
     deps = [
         ":attribute_context",
+        "//envoy/api/v2/core:base",
+        "//envoy/type:http_status",
     ],
 )

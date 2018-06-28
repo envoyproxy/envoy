@@ -7,6 +7,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/common/pure.h"
 
@@ -281,6 +282,7 @@ private:
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(LastModified)                                                                        \
   HEADER_FUNC(Method)                                                                              \
+  HEADER_FUNC(NoChunks)                                                                            \
   HEADER_FUNC(Origin)                                                                              \
   HEADER_FUNC(OtSpanContext)                                                                       \
   HEADER_FUNC(Path)                                                                                \
@@ -497,6 +499,11 @@ public:
 };
 
 typedef std::unique_ptr<HeaderMap> HeaderMapPtr;
+
+/**
+ * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.
+ */
+typedef std::vector<std::pair<LowerCaseString, std::string>> HeaderVector;
 
 } // namespace Http
 } // namespace Envoy

@@ -50,6 +50,7 @@ public:
   uint64_t reserve(uint64_t, Buffer::RawSlice*, uint64_t) override { NOT_IMPLEMENTED; }
   ssize_t search(const void*, uint64_t, size_t) const override { NOT_IMPLEMENTED; }
   int write(int) override { NOT_IMPLEMENTED; }
+  std::string toString() const override { NOT_IMPLEMENTED; }
 
 private:
   Buffer::Instance& underlying_;

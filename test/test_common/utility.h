@@ -12,6 +12,7 @@
 #include "envoy/network/address.h"
 #include "envoy/stats/stats.h"
 
+#include "common/buffer/buffer_impl.h"
 #include "common/common/c_smart_ptr.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
@@ -98,13 +99,6 @@ public:
   static bool buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs);
 
   /**
-   * Convert a buffer to a string.
-   * @param buffer supplies the buffer to convert.
-   * @return std::string the converted string.
-   */
-  static std::string bufferToString(const Buffer::Instance& buffer);
-
-  /**
    * Feed a buffer with random characters.
    * @param buffer supplies the buffer to be fed.
    * @param n_char number of characters that should be added to the supplied buffer.
@@ -150,12 +144,10 @@ public:
    *
    * @param lhs proto on LHS.
    * @param rhs proto on RHS.
-   * @return bool indicating whether the protos are equal. Type name and string serialization are
-   *         used for equality testing.
+   * @return bool indicating whether the protos are equal.
    */
   static bool protoEqual(const Protobuf::Message& lhs, const Protobuf::Message& rhs) {
-    return lhs.GetTypeName() == rhs.GetTypeName() &&
-           lhs.SerializeAsString() == rhs.SerializeAsString();
+    return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
   }
 
   /**

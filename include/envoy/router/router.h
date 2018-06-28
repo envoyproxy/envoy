@@ -493,8 +493,11 @@ public:
 
   /**
    * @return bool true if this route should use WebSockets.
+   * Per https://github.com/envoyproxy/envoy/issues/3301 this is the "old style"
+   * websocket" where headers are proxied upstream unchanged, and the websocket
+   * is handed off to a tcp proxy session.
    */
-  virtual bool useWebSocket() const PURE;
+  virtual bool useOldStyleWebSocket() const PURE;
 
   /**
    * Create an instance of a WebSocketProxy, using the configuration in this route.

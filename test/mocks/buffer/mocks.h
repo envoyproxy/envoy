@@ -99,19 +99,20 @@ MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {
 }
 
 MATCHER_P(BufferStringEqual, rhs, rhs) {
-  *result_listener << "\"" << TestUtility::bufferToString(arg) << "\"";
+  *result_listener << "\"" << arg.toString() << "\"";
 
   Buffer::OwnedImpl buffer(rhs);
   return TestUtility::buffersEqual(arg, buffer);
 }
 
 ACTION_P(AddBufferToString, target_string) {
-  target_string->append(TestUtility::bufferToString(arg0));
+  auto bufferToString = [](const Buffer::OwnedImpl& buf) -> std::string { return buf.toString(); };
+  target_string->append(bufferToString(arg0));
   arg0.drain(arg0.length());
 }
 
 ACTION_P(AddBufferToStringWithoutDraining, target_string) {
-  target_string->append(TestUtility::bufferToString(arg0));
+  target_string->append(arg0.toString());
 }
 
 } // namespace Envoy

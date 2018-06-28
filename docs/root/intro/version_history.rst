@@ -3,6 +3,9 @@ Version history
 
 1.8.0 (Pending)
 ===============
+* admin: added :http:get:`/hystrix_event_stream` as an endpoint for monitoring envoy's statistics 
+  through `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
+* http: response filters not applied to early error paths such as http_parser generated 400s.
 * ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`.
   Lyft's reference implementation of the `ratelimit <https://github.com/lyft/ratelimit>`_ service also supports the data-plane-api proto as of v1.1.0.
   Envoy can use either proto to send client requests to a ratelimit server with the use of the
@@ -27,6 +30,8 @@ Version history
 * access log: improved WebSocket logging.
 * admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
   version information (if applicable).
+* admin: added :http:get:`/clusters?format=json` for outputing a JSON-serialized proto detailing
+  the current status of all clusters.
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
 * admin: added :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to add or change runtime values.
 * admin: mutations must be sent as POSTs, rather than GETs. Mutations include:
@@ -44,8 +49,10 @@ Version history
   to close tcp_proxy upstream connections when health checks fail.
 * cluster: added :ref:`option <envoy_api_field_Cluster.drain_connections_on_host_removal>` to drain
   connections from hosts after they are removed from service discovery, regardless of health status.
-* cluster: fixed bug preventing the deletion of all endpoints in a priority.
-* debug: added symbolized stack traces (where supported).
+* cluster: fixed bug preventing the deletion of all endpoints in a priority
+* debug: added symbolized stack traces (where supported)
+* ext-authz filter: added support to raw HTTP authorization.
+* ext-authz filter: added support to gRPC responses to carry HTTP attributes.
 * grpc: support added for the full set of :ref:`Google gRPC call credentials
   <envoy_api_msg_core.GrpcService.GoogleGrpc.CallCredentials>`.
 * gzip filter: added :ref:`stats <gzip-statistics>` to the filter.

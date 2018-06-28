@@ -3,6 +3,17 @@ load("//bazel:api_build_system.bzl", "api_go_proto_library", "api_proto_library"
 licenses(["notice"])  # Apache 2
 
 api_proto_library(
+    name = "http_status",
+    srcs = ["http_status.proto"],
+    visibility = ["//visibility:public"],
+)
+
+api_go_proto_library(
+    name = "http_status",
+    proto = ":http_status",
+)
+
+api_proto_library(
     name = "percent",
     srcs = ["percent.proto"],
     visibility = ["//visibility:public"],
@@ -22,15 +33,4 @@ api_proto_library(
 api_go_proto_library(
     name = "range",
     proto = ":range",
-)
-
-api_proto_library(
-    name = "string_match",
-    srcs = ["string_match.proto"],
-    visibility = ["//visibility:public"],
-)
-
-api_go_proto_library(
-    name = "string_match",
-    proto = ":string_match",
 )

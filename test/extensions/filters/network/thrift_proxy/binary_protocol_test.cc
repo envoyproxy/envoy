@@ -224,7 +224,7 @@ TEST(BinaryProtocolTest, ReadFieldBegin) {
     EXPECT_EQ(field_id, 1);
   }
 
-  // Non-terminal field
+  // Non-stop field
   {
     Buffer::OwnedImpl buffer;
     std::string name = "-";
@@ -240,6 +240,24 @@ TEST(BinaryProtocolTest, ReadFieldBegin) {
     EXPECT_EQ(field_type, FieldType::I32);
     EXPECT_EQ(field_id, 99);
     EXPECT_EQ(buffer.length(), 0);
+  }
+
+  // field id < 0
+  {
+    Buffer::OwnedImpl buffer;
+    std::string name = "-";
+    FieldType field_type = FieldType::String;
+    int16_t field_id = 1;
+
+    addInt8(buffer, FieldType::I32);
+    addInt16(buffer, -1);
+
+    EXPECT_THROW_WITH_MESSAGE(proto.readFieldBegin(buffer, name, field_type, field_id),
+                              EnvoyException, "invalid binary protocol field id -1");
+    EXPECT_EQ(name, "-");
+    EXPECT_EQ(field_type, FieldType::String);
+    EXPECT_EQ(field_id, 1);
+    EXPECT_EQ(buffer.length(), 3);
   }
 }
 

@@ -141,6 +141,22 @@ def _python_deps():
         name = "jinja2",
         actual = "@com_github_pallets_jinja//:jinja2",
     )
+    _repository_impl(
+        name = "com_github_apache_thrift",
+        build_file = "@envoy//bazel/external:apache_thrift.BUILD",
+    )
+    _repository_impl(
+        name = "com_github_twitter_common_lang",
+        build_file = "@envoy//bazel/external:twitter_common_lang.BUILD",
+    )
+    _repository_impl(
+        name = "com_github_twitter_common_rpc",
+        build_file = "@envoy//bazel/external:twitter_common_rpc.BUILD",
+    )
+    _repository_impl(
+        name = "com_github_twitter_common_finagle_thrift",
+        build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
+    )
 
 # Bazel native C++ dependencies. For the depedencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
