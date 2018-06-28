@@ -15,8 +15,9 @@ using Envoy::Network::PostIoAction;
 namespace Envoy {
 namespace Ssl {
 
-SslSocket::SslSocket(Context& ctx, InitialState state)
-    : ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
+SslSocket::SslSocket(ContextSharedPtr ctx, InitialState state)
+  //  : ctx_owner_(ctx), ctx_(dynamic_cast<Ssl::ContextImpl&>(*ctx)), ssl_(ctx_.newSsl()) {
+  : ctx_(dynamic_cast<Ssl::ContextImpl&>(*ctx)), ssl_(ctx_.newSsl()) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(ssl_.get());
   } else {
@@ -388,7 +389,7 @@ ClientSslSocketFactory::ClientSslSocketFactory(const ClientContextConfig& config
     : ssl_ctx_(manager.createSslClientContext(stats_scope, config)) {}
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() const {
-  return std::make_unique<Ssl::SslSocket>(*ssl_ctx_, Ssl::InitialState::Client);
+  return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Client);
 }
 
 bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
@@ -400,7 +401,7 @@ ServerSslSocketFactory::ServerSslSocketFactory(const ServerContextConfig& config
     : ssl_ctx_(manager.createSslServerContext(stats_scope, config, server_names)) {}
 
 Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() const {
-  return std::make_unique<Ssl::SslSocket>(*ssl_ctx_, Ssl::InitialState::Server);
+  return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Server);
 }
 
 bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }

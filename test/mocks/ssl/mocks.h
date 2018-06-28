@@ -21,14 +21,14 @@ public:
   MockContextManager();
   ~MockContextManager();
 
-  ClientContextPtr createSslClientContext(Stats::Scope& scope,
+  ClientContextSharedPtr createSslClientContext(Stats::Scope& scope,
                                           const ClientContextConfig& config) override {
-    return ClientContextPtr{createSslClientContext_(scope, config)};
+    return ClientContextSharedPtr{createSslClientContext_(scope, config)};
   }
 
-  ServerContextPtr createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
+  ServerContextSharedPtr createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
                                           const std::vector<std::string>& server_names) override {
-    return ServerContextPtr{createSslServerContext_(scope, config, server_names)};
+    return ServerContextSharedPtr{createSslServerContext_(scope, config, server_names)};
   }
 
   MOCK_METHOD2(createSslClientContext_,
