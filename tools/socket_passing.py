@@ -15,19 +15,18 @@ import json
 import os.path
 import sys
 import time
+import yaml
 
 # Seconds to wait for the admin address output file to appear. The script exits
 # with failure if the file is not found.
 ADMIN_FILE_TIMEOUT_SECS = 20
 
-def GenerateNewConfig(original_json, admin_address, updated_json):
+def GenerateNewConfig(original_yaml, admin_address, updated_json):
   # Get original listener addresses
-  with open(original_json, 'r') as original_json_file:
-    # Import original config file in order to get a deterministic output. This
-    # allows us to diff the original config file and the updated config file
-    # output from this script to check for any changes.
-    parsed_json = json.load(original_json_file, object_pairs_hook=OrderedDict)
-  original_listeners = parsed_json['static_resources']['listeners']
+  with open(original_yaml, 'r') as original_json_file:
+    # Import original config file.
+    parsed_yaml = yaml.load(original_json_file)
+  original_listeners = parsed_yaml['static_resources']['listeners']
 
   sys.stdout.write('Admin address is ' + admin_address + '\n')
   try:
@@ -53,7 +52,7 @@ def GenerateNewConfig(original_json, admin_address, updated_json):
         original['address']['socket_address']['address'] = addr
         original['address']['socket_address']['port_value'] = int(port)
     with open(updated_json, 'w') as outfile:
-      json.dump(OrderedDict(parsed_json), outfile, indent=2, separators=(',',':'))
+      json.dump(OrderedDict(parsed_yaml), outfile, indent=2, separators=(',',':'))
   finally:
     admin_conn.close()
 
