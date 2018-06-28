@@ -46,13 +46,9 @@ public:
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
-  void setDestinationPort(uint16_t port, int at_most_times = 3) {
+  void setDestinationPort(uint16_t port) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
-    auto& expect = EXPECT_CALL(connection_, localAddress());
-    if (at_most_times > 0) {
-      expect.Times(testing::AtMost(at_most_times));
-    }
-    expect.WillRepeatedly(ReturnRef(address_));
+    ON_CALL(connection_, localAddress()).WillByDefault(ReturnRef(address_));
   }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
@@ -94,7 +90,7 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
-  setDestinationPort(456, 0);
+  setDestinationPort(456);
 
   envoy::config::filter::http::rbac::v2::RBACPerRoute route_config;
   route_config.mutable_rbac()->mutable_rules()->set_action(

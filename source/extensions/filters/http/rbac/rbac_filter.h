@@ -83,7 +83,7 @@ typedef std::shared_ptr<RoleBasedAccessControlFilterConfig>
  * A filter that provides role-based access control authorization for HTTP requests.
  */
 class RoleBasedAccessControlFilter : public Http::StreamDecoderFilter,
-                                     public Logger::Loggable<Logger::Id::filter> {
+                                     public Logger::Loggable<Logger::Id::rbac> {
 public:
   RoleBasedAccessControlFilter(RoleBasedAccessControlFilterConfigSharedPtr config)
       : config_(config) {}
