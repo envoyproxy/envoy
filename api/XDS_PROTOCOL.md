@@ -298,27 +298,29 @@ Incremental xDS is separate xDS endpoint available for ADS that allows:
     all 100k clusters when a single cluster is modified, the management server
     only needs to deliver the single cluster that changed.
 
-An xDS Incremental session is always in the context of a gRPC bidirectional
+An xDS incremental session is always in the context of a gRPC bidirectional
 stream. This allows the xDS server to keep track of the state of xDS clients
 connected to it. There is no REST version of Incremental xDS.
 
-In Incremental xDS the nonce field is required and used to pair
-IncrementalDiscoveryResponse to a IncrementalDiscoveryRequest ACK or NACK.
+In incremental xDS the nonce field is required and used to pair a
+[`IncrementalDiscoveryResponse`]](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#discoveryrequest)
+to a [`IncrementalDiscoveryRequest`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#discoveryrequest)
+ACK or NACK.
 Optionaly, a response message level system_version_info is present for
 debugging purposes only.
 
-IncrementalDiscoveryRequest can be sent in 3 situations:
+`IncrementalDiscoveryRequest` can be sent in 3 situations:
   1. Initial message in a xDS bidirectional gRPC stream.
-  2. As a ACK or NACK response to a previous IncrementalDiscoveryResponse.
-     In this case the response_nonce is set to the nonce value in the Response.
-     ACK or NACK is determined by the absence or presence of error_detail.
-  3. Spontaneous IncrementalDiscoveryRequest from the client.
+  2. As an ACK or NACK response to a previous `IncrementalDiscoveryResponse`.
+     In this case the `response_nonce` is set to the nonce value in the Response.
+     ACK or NACK is determined by the absence or presence of `error_detail`.
+  3. Spontaneous `IncrementalDiscoveryRequest` from the client.
      This can be done to dynamically add or remove elements from the tracked
-     resource_names set. In this case response_nonce must be omitted.
+     `resource_names` set. In this case `response_nonce` must be omitted.
 
-In this first example the client connects as receive a first update that it ACKs.
-The second update fails and the client NACKs the update. Later the xDS client
-spontaneously requests the "wc" resource.
+In this first example the client connects and receive a first update that it
+ACKs. The second update fails and the client NACKs the update. Later the xDS
+client spontaneously requests the "wc" resource.
 
 ![Incremental session example](diagrams/incremental.svg)
 
@@ -327,7 +329,7 @@ to avoid resending them over the network.
 
 ![Incremental reconnect example](diagrams/incremental-reconnect.svg)
 
-The Incremental xDS method may be added to CDS and RDS in the future.
+The incremental xDS method may be added to CDS and RDS in the future.
 
 ## REST-JSON polling subscriptions
 
