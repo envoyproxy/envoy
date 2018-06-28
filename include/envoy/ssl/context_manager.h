@@ -20,7 +20,7 @@ public:
    * Builds a ClientContext from a ClientContextConfig.
    */
   virtual ClientContextSharedPtr createSslClientContext(Stats::Scope& scope,
-                                                  const ClientContextConfig& config) PURE;
+                                                        const ClientContextConfig& config) PURE;
 
   /**
    * Builds a ServerContext from a ServerContextConfig.
@@ -28,6 +28,11 @@ public:
   virtual ServerContextSharedPtr
   createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
                          const std::vector<std::string>& server_names) PURE;
+
+  /**
+   * Remove a context from the manager.
+   */
+  virtual void removeContext(Context* context) PURE;
 
   /**
    * @return the number of days until the next certificate being managed will expire.

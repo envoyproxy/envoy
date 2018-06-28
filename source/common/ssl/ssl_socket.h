@@ -58,8 +58,7 @@ private:
   std::vector<std::string> getDnsSansFromCertificate(X509* cert);
 
   Network::TransportSocketCallbacks* callbacks_{};
-  ContextSharedPtr ctx_owner_;
-  ContextImpl& ctx_;
+  ContextSharedPtr ctx_;
   bssl::UniquePtr<SSL> ssl_;
   bool handshake_complete_{};
   bool shutdown_sent_{};
@@ -72,10 +71,13 @@ class ClientSslSocketFactory : public Network::TransportSocketFactory {
 public:
   ClientSslSocketFactory(const ClientContextConfig& config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope);
+  ~ClientSslSocketFactory();
+
   Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
 
 private:
+  Ssl::ContextManager& manager_;
   ClientContextSharedPtr ssl_ctx_;
 };
 
@@ -83,10 +85,13 @@ class ServerSslSocketFactory : public Network::TransportSocketFactory {
 public:
   ServerSslSocketFactory(const ServerContextConfig& config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope, const std::vector<std::string>& server_names);
+  ~ServerSslSocketFactory();
+
   Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
 
 private:
+  Ssl::ContextManager& manager_;
   ServerContextSharedPtr ssl_ctx_;
 };
 

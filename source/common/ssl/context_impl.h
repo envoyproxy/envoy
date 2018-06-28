@@ -76,7 +76,7 @@ public:
 
 protected:
   ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, const ContextConfig& config);
-  ~ContextImpl() { parent_.releaseContext(this); }
+  ~ContextImpl() { parent_.removeContext(this); }
 
   /**
    * The global SSL-library index used for storing a pointer to the context
