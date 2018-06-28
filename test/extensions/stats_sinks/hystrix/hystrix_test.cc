@@ -9,7 +9,6 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/utility.h"
 
 #include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
@@ -150,7 +149,7 @@ public:
       sink_->flush(source_);
     }
 
-    return buildClusterMap(TestUtility::bufferToString(buffer));
+    return buildClusterMap(buffer.toString());
   }
 
   void removeSecondClusterHelper(Buffer::OwnedImpl& buffer) {
@@ -234,7 +233,7 @@ TEST_F(HystrixSinkTest, EmptyFlush) {
   sink_->registerConnection(&callbacks_);
   sink_->flush(source_);
   std::unordered_map<std::string, std::string> cluster_message_map =
-      buildClusterMap(TestUtility::bufferToString(buffer));
+      buildClusterMap(buffer.toString());
   validateResults(cluster_message_map[cluster1_name_], 0, 0, 0, 0, 0, window_size_);
 }
 
@@ -257,7 +256,7 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   }
 
   std::unordered_map<std::string, std::string> cluster_message_map =
-      buildClusterMap(TestUtility::bufferToString(buffer));
+      buildClusterMap(buffer.toString());
 
   Json::ObjectSharedPtr json_buffer =
       Json::Factory::loadFromString(cluster_message_map[cluster1_name_]);
@@ -292,7 +291,7 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   EXPECT_NE(std::string::npos, rolling_map.find(cluster1_name_ + ".total"))
       << "cluster1_name = " << cluster1_name_;
 
-  cluster_message_map = buildClusterMap(TestUtility::bufferToString(buffer));
+  cluster_message_map = buildClusterMap(buffer.toString());
 
   // Check stream format and data.
   validateResults(cluster_message_map[cluster1_name_], success_step,
@@ -303,7 +302,7 @@ TEST_F(HystrixSinkTest, BasicFlow) {
   buffer.drain(buffer.length());
   sink_->resetRollingWindow();
   sink_->flush(source_);
-  cluster_message_map = buildClusterMap(TestUtility::bufferToString(buffer));
+  cluster_message_map = buildClusterMap(buffer.toString());
   validateResults(cluster_message_map[cluster1_name_], 0, 0, 0, 0, 0, window_size_);
 }
 
@@ -329,7 +328,7 @@ TEST_F(HystrixSinkTest, Disconnect) {
 
   EXPECT_NE(buffer.length(), 0);
   std::unordered_map<std::string, std::string> cluster_message_map =
-      buildClusterMap(TestUtility::bufferToString(buffer));
+      buildClusterMap(buffer.toString());
   Json::ObjectSharedPtr json_buffer =
       Json::Factory::loadFromString(cluster_message_map[cluster1_name_]);
   EXPECT_EQ(json_buffer->getInteger("rollingCountSuccess"), (success_step * window_size_));
@@ -346,7 +345,7 @@ TEST_F(HystrixSinkTest, Disconnect) {
   ON_CALL(cluster1_.success_counter_, value()).WillByDefault(Return(success_step));
   sink_->flush(source_);
   EXPECT_NE(buffer.length(), 0);
-  cluster_message_map = buildClusterMap(TestUtility::bufferToString(buffer));
+  cluster_message_map = buildClusterMap(buffer.toString());
   json_buffer = Json::Factory::loadFromString(cluster_message_map[cluster1_name_]);
   EXPECT_EQ(json_buffer->getInteger("rollingCountSuccess"), 0);
 }
@@ -410,7 +409,7 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
 
   // Check that removed worked.
   std::unordered_map<std::string, std::string> cluster_message_map =
-      buildClusterMap(TestUtility::bufferToString(buffer));
+      buildClusterMap(buffer.toString());
   ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end())
       << "cluster1_name = " << cluster1_name_;
   ASSERT_EQ(cluster_message_map.find(cluster2_name_), cluster_message_map.end())
@@ -422,7 +421,7 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   sink_->flush(source_);
 
   // Check that add worked.
-  cluster_message_map = buildClusterMap(TestUtility::bufferToString(buffer));
+  cluster_message_map = buildClusterMap(buffer.toString());
   ASSERT_NE(cluster_message_map.find(cluster1_name_), cluster_message_map.end())
       << "cluster1_name = " << cluster1_name_;
   ASSERT_NE(cluster_message_map.find(cluster2_name_), cluster_message_map.end())
