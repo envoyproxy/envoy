@@ -77,6 +77,7 @@ public:
   struct TestConnection {
     Network::MockClientConnection* connection_;
     Event::MockTimer* connect_timer_;
+    Network::ReadFilterSharedPtr filter_;
   };
 
   void expectConnCreate() {
@@ -87,6 +88,10 @@ public:
 
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_conn.connection_));
+    EXPECT_CALL(*test_conn.connection_, addReadFilter(_))
+        .WillOnce(Invoke(
+            [&](Network::ReadFilterSharedPtr filter) -> void { test_conn.filter_ = filter; }));
+    EXPECT_CALL(*test_conn.connection_, connect());
     EXPECT_CALL(*test_conn.connect_timer_, enableTimer(_));
   }
 
@@ -299,6 +304,45 @@ TEST_F(TcpConnPoolImplTest, VerifyBufferLimits) {
 
   EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
   conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(TcpConnPoolImplTest, UpstreamCallbacks) {
+  Buffer::OwnedImpl buffer;
+
+  InSequence s;
+  ConnectionPool::MockUpstreamCallbacks callbacks;
+
+  // Create connection, set UpstreamCallbacks
+  ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
+  c1.callbacks_.conn_data_->addUpstreamCallbacks(callbacks);
+
+  // Expect invocation when connection's ReadFilter::onData is invoked
+  EXPECT_CALL(callbacks, onUpstreamData(_, _));
+  EXPECT_EQ(Network::FilterStatus::StopIteration,
+            conn_pool_.test_conns_[0].filter_->onData(buffer, false));
+
+  // Shutdown normally.
+  EXPECT_CALL(conn_pool_, onConnReleasedForTest());
+  c1.releaseConn();
+
+  EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
+  conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(TcpConnPoolImplTest, NoUpstreamCallbacks) {
+  Buffer::OwnedImpl buffer;
+
+  InSequence s;
+
+  // Create connection.
+  ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
+
+  // Trigger connection's ReadFilter::onData -- connection pool closes connection.
+  EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
+  EXPECT_EQ(Network::FilterStatus::StopIteration,
+            conn_pool_.test_conns_[0].filter_->onData(buffer, false));
   dispatcher_.clearDeferredDeleteList();
 }
 

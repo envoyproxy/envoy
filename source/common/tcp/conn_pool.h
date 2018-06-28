@@ -1,14 +1,19 @@
 #pragma once
 
+#include <list>
+#include <memory>
+
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/filter.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/network/filter_impl.h"
 
 namespace Envoy {
 namespace Tcp {
@@ -35,13 +40,27 @@ protected:
 
     // ConnectionPool::ConnectionData
     Network::ClientConnection& connection() override;
+    void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callbacks) override;
     void release() override;
 
     ActiveConn& parent_;
+    ConnectionPool::UpstreamCallbacks* callbacks_{};
     bool released_{false};
   };
 
   typedef std::unique_ptr<ConnectionWrapper> ConnectionWrapperPtr;
+
+  struct ConnReadFilter : public Network::ReadFilterBaseImpl {
+    ConnReadFilter(ActiveConn& parent) : parent_(parent) {}
+
+    // Network::ReadFilter
+    Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) {
+      parent_.onUpstreamData(data, end_stream);
+      return Network::FilterStatus::StopIteration;
+    }
+
+    ActiveConn& parent_;
+  };
 
   struct ActiveConn : LinkedObject<ActiveConn>,
                       public Network::ConnectionCallbacks,
@@ -50,6 +69,7 @@ protected:
     ~ActiveConn();
 
     void onConnectTimeout();
+    void onUpstreamData(Buffer::Instance& data, bool end_stream);
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {

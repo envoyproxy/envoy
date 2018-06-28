@@ -249,8 +249,15 @@ ConnPoolImpl::ConnectionWrapper::~ConnectionWrapper() {
 
 Network::ClientConnection& ConnPoolImpl::ConnectionWrapper::connection() { return *parent_.conn_; }
 
+void ConnPoolImpl::ConnectionWrapper::addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& cb) {
+  ASSERT(!released_);
+  callbacks_ = &cb;
+}
+
 void ConnPoolImpl::ConnectionWrapper::release() {
+  ASSERT(!released_);
   released_ = true;
+  callbacks_ = nullptr;
   parent_.parent_.onConnReleased(parent_);
 }
 
@@ -281,7 +288,12 @@ ConnPoolImpl::ActiveConn::ActiveConn(ConnPoolImpl& parent)
 
   conn_ = std::move(data.connection_);
 
+  conn_->detectEarlyCloseWhenReadDisabled(false);
   conn_->addConnectionCallbacks(*this);
+  conn_->addReadFilter(Network::ReadFilterSharedPtr{new ConnReadFilter(*this)});
+
+  ENVOY_CONN_LOG(debug, "connecting", *conn_);
+  conn_->connect();
 
   parent_.host_->cluster().stats().upstream_cx_total_.inc();
   parent_.host_->cluster().stats().upstream_cx_active_.inc();
@@ -314,6 +326,17 @@ void ConnPoolImpl::ActiveConn::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", *conn_);
   parent_.host_->cluster().stats().upstream_cx_connect_timeout_.inc();
   conn_->close(Network::ConnectionCloseType::NoFlush);
+}
+
+void ConnPoolImpl::ActiveConn::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+  if (wrapper_ != nullptr && wrapper_->callbacks_ != nullptr) {
+    // Delegate to the connection owner.
+    wrapper_->callbacks_->onUpstreamData(data, end_stream);
+  } else {
+    // Unexpected data from upstream, close down the connection.
+    ENVOY_CONN_LOG(debug, "unexpected data from upstream, closing connection", *conn_);
+    conn_->close(Network::ConnectionCloseType::NoFlush);
+  }
 }
 
 } // namespace Tcp

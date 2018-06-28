@@ -21,6 +21,15 @@ public:
   MOCK_METHOD0(cancel, void());
 };
 
+class MockUpstreamCallbacks : public UpstreamCallbacks {
+public:
+  MockUpstreamCallbacks();
+  ~MockUpstreamCallbacks();
+
+  // Tcp::ConnectionPool::UpstreamCallbacks
+  MOCK_METHOD2(onUpstreamData, void(Buffer::Instance& data, bool end_stream));
+};
+
 class MockInstance : public Instance {
 public:
   MockInstance();

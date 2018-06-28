@@ -13,6 +13,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
+        "//include/envoy/buffer:buffer_interface",
         "//include/envoy/tcp:conn_pool_interface",
         "//test/mocks/upstream:host_mocks",
     ],

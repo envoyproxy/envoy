@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 
+#include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/upstream/upstream.h"
@@ -34,6 +35,25 @@ enum class PoolFailureReason {
   ConnectionFailure
 };
 
+/*
+ * UpstreamCallbacks for connection pool upstream connection callbacks.
+ */
+class UpstreamCallbacks {
+public:
+  virtual ~UpstreamCallbacks() {}
+
+  /*
+   * Invoked when data is delivered from the upstream connection while the connection is owned by a
+   * ConnectionPool::Instance caller.
+   * @param data supplies data from the upstream
+   * @param end_stream whether the data is the last data frame
+   */
+  virtual void onUpstreamData(Buffer::Instance& data, bool end_stream) PURE;
+};
+
+/*
+ * ConnectionData wraps a ClientConnection allocated to a caller.
+ */
 class ConnectionData {
 public:
   virtual ~ConnectionData() {}
@@ -42,6 +62,14 @@ public:
    * @return the ClientConnection for the connection.
    */
   virtual Network::ClientConnection& connection() PURE;
+
+  /**
+   * Sets the ConnectionPool::UpstreamCallbacks for the connection. If no callback is attached,
+   * data from the upstream will cause the connection to be closed. Callbacks cease when the
+   * connection is released.
+   * @param callback the UpstreamCallbacks to invoke for upstream data
+   */
+  virtual void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callback) PURE;
 
   /**
    * Release the connection after use. The connection should be closed first only if it is

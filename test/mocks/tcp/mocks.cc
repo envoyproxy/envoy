@@ -10,6 +10,9 @@ namespace ConnectionPool {
 MockCancellable::MockCancellable() {}
 MockCancellable::~MockCancellable() {}
 
+MockUpstreamCallbacks::MockUpstreamCallbacks() {}
+MockUpstreamCallbacks::~MockUpstreamCallbacks() {}
+
 MockInstance::MockInstance() {}
 MockInstance::~MockInstance() {}
 

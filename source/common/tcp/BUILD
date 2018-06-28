@@ -24,6 +24,7 @@ envoy_cc_library(
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:linked_object",
         "//source/common/common:utility_lib",
+        "//source/common/network:filter_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_lib",
     ],
