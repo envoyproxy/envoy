@@ -1,4 +1,4 @@
-load("//bazel:api_build_system.bzl", "api_go_grpc_library", "api_go_proto_library", "api_proto_library")
+load("//bazel:api_build_system.bzl", "api_go_grpc_library", "api_go_proto_library", "api_proto_library_internal")
 
 licenses(["notice"])  # Apache 2
 
@@ -16,7 +16,7 @@ package_group(
     ],
 )
 
-api_proto_library(
+api_proto_library_internal(
     name = "address",
     srcs = ["address.proto"],
     visibility = [
@@ -31,7 +31,7 @@ api_go_proto_library(
     deps = [":base_go_proto"],
 )
 
-api_proto_library(
+api_proto_library_internal(
     name = "base",
     srcs = ["base.proto"],
     visibility = [
@@ -44,7 +44,7 @@ api_go_proto_library(
     proto = ":base",
 )
 
-api_proto_library(
+api_proto_library_internal(
     name = "health_check",
     srcs = ["health_check.proto"],
     visibility = [
@@ -59,7 +59,7 @@ api_go_proto_library(
     deps = [":base_go_proto"],
 )
 
-api_proto_library(
+api_proto_library_internal(
     name = "config_source",
     srcs = ["config_source.proto"],
     visibility = [
@@ -85,7 +85,7 @@ api_go_proto_library(
     proto = ":http_uri",
 )
 
-api_proto_library(
+api_proto_library_internal(
     name = "http_uri",
     srcs = ["http_uri.proto"],
     visibility = [
@@ -93,7 +93,7 @@ api_proto_library(
     ],
 )
 
-api_proto_library(
+api_proto_library_internal(
     name = "grpc_service",
     srcs = ["grpc_service.proto"],
     visibility = [
@@ -108,7 +108,7 @@ api_go_proto_library(
     deps = [":base_go_proto"],
 )
 
-api_proto_library(
+api_proto_library_internal(
     name = "protocol",
     srcs = ["protocol.proto"],
     visibility = [

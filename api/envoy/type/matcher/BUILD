@@ -1,8 +1,8 @@
-load("//bazel:api_build_system.bzl", "api_go_proto_library", "api_proto_library")
+load("//bazel:api_build_system.bzl", "api_go_proto_library", "api_proto_library_internal")
 
 licenses(["notice"])  # Apache 2
 
-api_proto_library(
+api_proto_library_internal(
     name = "metadata",
     srcs = ["metadata.proto"],
     visibility = ["//visibility:public"],
@@ -21,7 +21,7 @@ api_go_proto_library(
     ],
 )
 
-api_proto_library(
+api_proto_library_internal(
     name = "number",
     srcs = ["number.proto"],
     visibility = ["//visibility:public"],
@@ -38,7 +38,7 @@ api_go_proto_library(
     ],
 )
 
-api_proto_library(
+api_proto_library_internal(
     name = "string",
     srcs = ["string.proto"],
     visibility = ["//visibility:public"],

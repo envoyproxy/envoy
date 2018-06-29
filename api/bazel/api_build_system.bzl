@@ -74,6 +74,17 @@ def api_go_grpc_library(name, proto, deps = []):
         ]
     )
 
+# This is api_proto_library plus some logic internal to //envoy/api.
+def api_proto_library_internal(visibility = ["//visibility:private"], **kwargs):
+    # //envoy/docs/build.sh needs visibility in order to generate documents.
+    if visibility == ["//visibility:private"]:
+      visibility = ["//docs"]
+    elif visibility != ["//visibility:public"]:
+      visibility = visibility + ["//docs"]
+
+    api_proto_library(visibility=visibility, **kwargs)
+
+
 # TODO(htuch): has_services is currently ignored but will in future support
 # gRPC stub generation.
 # TODO(htuch): Automatically generate go_proto_library and go_grpc_library
@@ -85,11 +96,6 @@ def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], de
     # cc_proto_library (or some Bazel aspect that works on proto_library) when
     # it can play well with the PGV plugin and (2) other language support that
     # can make use of native proto_library.
-
-    if visibility == ["//visibility:private"]:
-      visibility = ["//docs"]
-    elif visibility != ["//visibility:public"]:
-      visibility = visibility + ["//docs"]
 
     native.proto_library(
         name = name,
