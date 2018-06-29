@@ -30,8 +30,8 @@ public:
 typedef std::unique_ptr<BackOffStrategy> BackOffStrategyPtr;
 
 /**
- * Implementation of BackOffStrategy that increases the back off period for each retry attempt. 
- * When the interval has reached the max interval, it is no longer increased.
+ * Implementation of BackOffStrategy that increases the back off period for each retry attempt. When
+ * the interval has reached the max interval, it is no longer increased.
  */
 class ExponentialBackOffStrategy : public BackOffStrategy {
 
