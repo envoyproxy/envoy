@@ -30,7 +30,7 @@ Health check event logging
 --------------------------
 
 A per-healthchecker log of ejection and addition events can optionally be produced by Envoy by
-specifying a log file path in `the HealthCheckConfig <envoy_api_field_core.HealthCheck.event_log_path>`.
+specifying a log file path in `the HealthCheck config <envoy_api_field_core.HealthCheck.event_log_path>`.
 The log is structured as JSON dumps of `HealthCheckEvent messages <envoy_api_msg_core.HealthCheckEvent>`.
 
 Passive health checking
