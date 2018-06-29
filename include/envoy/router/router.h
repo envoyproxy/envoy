@@ -81,8 +81,10 @@ public:
    * example prefix rewriting for redirects etc. This should only be called ONCE
    * immediately prior to redirecting.
    * @param headers supplies the request headers, which may be modified during this call.
+   * @param insert_envoy_original_path insert x-envoy-original-path header?
    */
-  virtual void rewritePathHeader(Http::HeaderMap& headers) const PURE;
+  virtual void rewritePathHeader(Http::HeaderMap& headers,
+                                 bool insert_envoy_original_path) const PURE;
 };
 
 /**
@@ -142,6 +144,7 @@ public:
   static const uint32_t RETRY_ON_GRPC_CANCELLED          = 0x20;
   static const uint32_t RETRY_ON_GRPC_DEADLINE_EXCEEDED  = 0x40;
   static const uint32_t RETRY_ON_GRPC_RESOURCE_EXHAUSTED = 0x80;
+  static const uint32_t RETRY_ON_GRPC_UNAVAILABLE        = 0x100;
   // clang-format on
 
   virtual ~RetryPolicy() {}
@@ -303,10 +306,12 @@ public:
   /**
    * A callback used for requesting that a cookie be set with the given lifetime.
    * @param key the name of the cookie to be set
+   * @param path the path of the cookie, or the empty string if no path should be set.
    * @param ttl the lifetime of the cookie
    * @return std::string the opaque value of the cookie that will be set
    */
-  typedef std::function<std::string(const std::string& key, std::chrono::seconds ttl)>
+  typedef std::function<std::string(const std::string& key, const std::string& path,
+                                    std::chrono::seconds ttl)>
       AddCookieCallback;
 
   /**
@@ -424,9 +429,11 @@ public:
    * immediately prior to forwarding. It is done this way vs. copying for performance reasons.
    * @param headers supplies the request headers, which may be modified during this call.
    * @param request_info holds additional information about the request.
+   * @param insert_envoy_original_path insert x-envoy-original-path header if path rewritten?
    */
   virtual void finalizeRequestHeaders(Http::HeaderMap& headers,
-                                      const RequestInfo::RequestInfo& request_info) const PURE;
+                                      const RequestInfo::RequestInfo& request_info,
+                                      bool insert_envoy_original_path) const PURE;
 
   /**
    * @return const HashPolicy* the optional hash policy for the route.
@@ -461,6 +468,13 @@ public:
   virtual std::chrono::milliseconds timeout() const PURE;
 
   /**
+   * @return absl::optional<std::chrono::milliseconds> the maximum allowed timeout value derived
+   * from 'grpc-timeout' header of a gRPC request. Non-present value disables use of 'grpc-timeout'
+   * header, while 0 represents infinity.
+   */
+  virtual absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const PURE;
+
+  /**
    * Determine whether a specific request path belongs to a virtual cluster for use in stats, etc.
    * @param headers supplies the request headers.
    * @return the virtual cluster or nullptr if there is no match.
@@ -479,8 +493,11 @@ public:
 
   /**
    * @return bool true if this route should use WebSockets.
+   * Per https://github.com/envoyproxy/envoy/issues/3301 this is the "old style"
+   * websocket" where headers are proxied upstream unchanged, and the websocket
+   * is handed off to a tcp proxy session.
    */
-  virtual bool useWebSocket() const PURE;
+  virtual bool useOldStyleWebSocket() const PURE;
 
   /**
    * Create an instance of a WebSocketProxy, using the configuration in this route.
@@ -490,10 +507,11 @@ public:
    * @return WebSocketProxyPtr An instance of a WebSocketProxy with the configuration specified
    *         in this route.
    */
-  virtual Http::WebSocketProxyPtr createWebSocketProxy(
-      Http::HeaderMap& request_headers, const RequestInfo::RequestInfo& request_info,
-      Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
-      Network::ReadFilterCallbacks* read_callbacks) const PURE;
+  virtual Http::WebSocketProxyPtr
+  createWebSocketProxy(Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
+                       Http::WebSocketProxyCallbacks& callbacks,
+                       Upstream::ClusterManager& cluster_manager,
+                       Network::ReadFilterCallbacks* read_callbacks) const PURE;
 
   /**
    * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when

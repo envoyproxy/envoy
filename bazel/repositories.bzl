@@ -141,6 +141,22 @@ def _python_deps():
         name = "jinja2",
         actual = "@com_github_pallets_jinja//:jinja2",
     )
+    _repository_impl(
+        name = "com_github_apache_thrift",
+        build_file = "@envoy//bazel/external:apache_thrift.BUILD",
+    )
+    _repository_impl(
+        name = "com_github_twitter_common_lang",
+        build_file = "@envoy//bazel/external:twitter_common_lang.BUILD",
+    )
+    _repository_impl(
+        name = "com_github_twitter_common_rpc",
+        build_file = "@envoy//bazel/external:twitter_common_rpc.BUILD",
+    )
+    _repository_impl(
+        name = "com_github_twitter_common_finagle_thrift",
+        build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
+    )
 
 # Bazel native C++ dependencies. For the depedencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
@@ -236,6 +252,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _io_opentracing_cpp()
     _com_lightstep_tracer_cpp()
     _com_github_grpc_grpc()
+    _com_github_google_jwt_verify()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
     _com_google_googletest()
@@ -407,6 +424,10 @@ def _com_google_absl():
         name = "abseil_synchronization",
         actual = "@com_google_absl//absl/synchronization:synchronization",
     )
+    native.bind(
+        name = "abseil_symbolize",
+        actual = "@com_google_absl//absl/debugging:symbolize",
+    )
 
 def _com_google_protobuf():
     _repository_impl("com_google_protobuf")
@@ -415,7 +436,7 @@ def _com_google_protobuf():
     # see https://groups.google.com/forum/#!topic/bazel-discuss/859ybHQZnuI and
     # https://github.com/bazelbuild/bazel/issues/3219.
     location = REPOSITORY_LOCATIONS["com_google_protobuf"]
-    native.http_archive(name = "com_google_protobuf_cc", **location)
+    git_repository(name = "com_google_protobuf_cc", **location)
     native.bind(
         name = "protobuf",
         actual = "@com_google_protobuf//:protobuf",
@@ -450,4 +471,12 @@ def _com_github_grpc_grpc():
     native.bind(
       name = "grpc_health_proto",
       actual = "@envoy//bazel:grpc_health_proto",
+    )
+
+def _com_github_google_jwt_verify():
+    _repository_impl("com_github_google_jwt_verify")
+
+    native.bind(
+      name = "jwt_verify_lib",
+      actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
     )

@@ -59,8 +59,7 @@ Apple LLVM version 9.1.0 (clang-902.0.30).
 3. Install Golang on your machine. This is required as part of building [BoringSSL](https://boringssl.googlesource.com/boringssl/+/HEAD/BUILDING.md)
 and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
 4. `go get github.com/bazelbuild/buildtools/buildifier` to install buildifier
-5. `bazel fetch //source/...` to fetch and build all external dependencies. This may take some time.
-6. `bazel build //source/exe:envoy-static` from the Envoy source directory.
+5. `bazel build //source/exe:envoy-static` from the Envoy source directory.
 
 ## Building Bazel with the CI Docker image
 
@@ -160,11 +159,13 @@ bazel test //test/common/http:async_client_impl_test --strategy=TestRunner=stand
 # Stack trace symbol resolution
 
 Envoy can produce backtraces on demand and from assertions and other fatal
-actions like segfaults. The stack traces written in the log or to stderr contain
-addresses rather than resolved symbols. The `tools/stack_decode.py` script exists
-to process the output and do symbol resolution to make the stack traces useful. Any
-log lines not relevant to the backtrace capability are passed through the script unchanged
-(it acts like a filter).
+actions like segfaults. Where supported, stack traces will contain resolved
+symbols, though not include line numbers. On systems where absl::Symbolization is
+not supported, the stack traces written in the log or to stderr contain addresses rather
+than resolved symbols. The `tools/stack_decode.py` script exists to process the output
+and do symbol resolution including line numbers, to make the stack traces useful.
+Any log lines not relevant to the backtrace capability
+are passed through the script unchanged (it acts like a filter).
 
 The script runs in one of two modes. If passed no arguments it anticipates
 Envoy (or test) output on stdin. You can postprocess a log or pipe the output of

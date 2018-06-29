@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <list>
+#include <map>
 #include <string>
 
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
@@ -74,6 +75,8 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
+  bool createUpgradeFilterChain(absl::string_view upgrade_type,
+                                Http::FilterChainFactoryCallbacks& callbacks) override;
 
   // Http::ConnectionManagerConfig
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
@@ -91,6 +94,8 @@ public:
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
   uint32_t xffNumTrustedHops() const override { return xff_num_trusted_hops_; }
+  bool skipXffAppend() const override { return skip_xff_append_; }
+  const std::string& via() const override { return via_; }
   Http::ForwardClientCertType forwardClientCert() override { return forward_client_cert_; }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
@@ -105,16 +110,23 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
 
 private:
+  typedef std::list<Http::FilterFactoryCb> FilterFactoriesList;
   enum class CodecType { HTTP1, HTTP2, AUTO };
+  void processFilter(
+      const envoy::config::filter::network::http_connection_manager::v2::HttpFilter& proto_config,
+      int i, absl::string_view prefix, FilterFactoriesList& filter_factories);
 
   Server::Configuration::FactoryContext& context_;
-  std::list<Http::FilterFactoryCb> filter_factories_;
+  FilterFactoriesList filter_factories_;
+  std::map<std::string, std::unique_ptr<FilterFactoriesList>> upgrade_filter_factories_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   const std::string stats_prefix_;
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   const bool use_remote_address_{};
   const uint32_t xff_num_trusted_hops_;
+  const bool skip_xff_append_;
+  const std::string via_;
   Http::ForwardClientCertType forward_client_cert_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Router::RouteConfigProviderManager& route_config_provider_manager_;

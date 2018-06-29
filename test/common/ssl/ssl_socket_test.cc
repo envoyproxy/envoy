@@ -20,6 +20,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
@@ -51,9 +52,10 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
               const Network::Address::IpVersion version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
+  Secret::MockSecretManager secret_manager;
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader, secret_manager);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, manager, stats_store,
                                                         std::vector<std::string>{});
@@ -66,7 +68,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader, secret_manager);
   Ssl::ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -143,6 +145,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
                              const Network::Address::IpVersion version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
+  Secret::MockSecretManager secret_manager;
   ContextManagerImpl manager(runtime);
   std::string new_session = EMPTY_STRING;
 
@@ -151,7 +154,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   const auto& filter_chain = server_proto.filter_chains(0);
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
-  Ssl::ServerContextConfigImpl server_ctx_config(filter_chain.tls_context());
+  Ssl::ServerContextConfigImpl server_ctx_config(filter_chain.tls_context(), secret_manager);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, manager, stats_store,
                                                         server_names);
 
@@ -162,7 +165,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
-  ClientContextConfigImpl client_ctx_config(client_ctx_proto);
+  ClientContextConfigImpl client_ctx_config(client_ctx_proto, secret_manager);
   ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
   ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
@@ -252,6 +255,32 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   }
 
   return new_session;
+}
+
+// Configure the listener with unittest{cert,key}.pem and ca_cert.pem.
+// Configure the client with expired_san_uri_{cert,key}.pem
+void configureServerAndExpiredClientCertificate(envoy::api::v2::Listener& listener,
+                                                envoy::api::v2::auth::UpstreamTlsContext& client) {
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/common/ssl/test_data/expired_san_uri_key.pem"));
 }
 
 } // namespace
@@ -678,6 +707,96 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerification) {
            GetParam());
 }
 
+// By default, expired certificates are not permitted.
+TEST_P(SslSocketTest, FailedClientCertificateDefaultExpirationVerification) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::auth::UpstreamTlsContext client;
+
+  configureServerAndExpiredClientCertificate(listener, client);
+
+  testUtilV2(listener, client, "", false, "", "", "spiffe://lyft.com/test-team", "",
+             "ssl.fail_verify_error", 1, GetParam());
+}
+
+// Expired certificates will not be accepted when explicitly disallowed via
+// allow_expired_certificate.
+TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::auth::UpstreamTlsContext client;
+
+  configureServerAndExpiredClientCertificate(listener, client);
+
+  listener.mutable_filter_chains(0)
+      ->mutable_tls_context()
+      ->mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->set_allow_expired_certificate(false);
+
+  testUtilV2(listener, client, "", false, "", "", "spiffe://lyft.com/test-team", "",
+             "ssl.fail_verify_error", 1, GetParam());
+}
+
+// Expired certificates will be accepted when explicitly allowed via allow_expired_certificate.
+TEST_P(SslSocketTest, ClientCertificateExpirationAllowedVerification) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::auth::UpstreamTlsContext client;
+
+  configureServerAndExpiredClientCertificate(listener, client);
+
+  listener.mutable_filter_chains(0)
+      ->mutable_tls_context()
+      ->mutable_common_tls_context()
+      ->mutable_validation_context()
+      ->set_allow_expired_certificate(true);
+
+  testUtilV2(listener, client, "", true, "", "", "spiffe://lyft.com/test-team", "", "ssl.handshake",
+             2, GetParam());
+}
+
+// Allow expired certificates, but add a certificate hash requirement so it still fails.
+TEST_P(SslSocketTest, FailedClientCertAllowExpiredBadHashVerification) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::auth::UpstreamTlsContext client;
+
+  configureServerAndExpiredClientCertificate(listener, client);
+
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      listener.mutable_filter_chains(0)
+          ->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+
+  server_validation_ctx->set_allow_expired_certificate(true);
+  server_validation_ctx->add_verify_certificate_hash(
+      "0000000000000000000000000000000000000000000000000000000000000000");
+
+  testUtilV2(listener, client, "", false, "", "", "spiffe://lyft.com/test-team", "",
+             "ssl.fail_verify_cert_hash", 1, GetParam());
+}
+
+// Allow expired certificatess, but use the wrong CA so it should fail still.
+TEST_P(SslSocketTest, FailedClientCertAllowServerExpiredWrongCAVerification) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::auth::UpstreamTlsContext client;
+
+  configureServerAndExpiredClientCertificate(listener, client);
+
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      listener.mutable_filter_chains(0)
+          ->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+
+  server_validation_ctx->set_allow_expired_certificate(true);
+
+  // This fake CA was not used to sign the client's certificate.
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/fake_ca_cert.pem"));
+
+  testUtilV2(listener, client, "", false, "", "", "spiffe://lyft.com/test-team", "",
+             "ssl.fail_verify_error", 1, GetParam());
+}
+
 TEST_P(SslSocketTest, ClientCertificateHashVerification) {
   std::string client_ctx_json = R"EOF(
   {
@@ -691,6 +810,26 @@ TEST_P(SslSocketTest, ClientCertificateHashVerification) {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
     "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
+    "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json, "", "spiffe://lyft.com/test-team", "", "", "", "",
+           "ssl.handshake", true, GetParam());
+}
+
+TEST_P(SslSocketTest, ClientCertificateHashVerificationNoCA) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
   }
   )EOF";
@@ -731,9 +870,55 @@ TEST_P(SslSocketTest, ClientCertificateHashListVerification) {
   testUtilV2(listener, client, "", true, "",
              "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
              "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+
+  // Works even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
 }
 
-TEST_P(SslSocketTest, FailedClientAuthHashVerificationNoClientCert) {
+TEST_P(SslSocketTest, ClientCertificateHashListVerificationNoCA) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->add_verify_certificate_hash(
+      "0000000000000000000000000000000000000000000000000000000000000000");
+  server_validation_ctx->add_verify_certificate_hash(
+      "df6ff72fe9116521268f6f2dd4966f51df479883fe7037b39f75916ac3049d1a");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
+
+  // ssl.handshake logged by both: client & server.
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+
+  // Works even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+}
+
+TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoClientCertificate) {
   std::string client_ctx_json = "{}";
 
   std::string server_ctx_json = R"EOF(
@@ -741,7 +926,7 @@ TEST_P(SslSocketTest, FailedClientAuthHashVerificationNoClientCert) {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
     "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "verify_certificate_hash": "7B:0C:3F:0D:97:0E:FC:16:70:11:7A:0C:35:75:54:6B:17:AB:CF:20:D8:AA:A0:ED:87:08:0F:FB:60:4C:40:77"
+    "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
   }
   )EOF";
 
@@ -749,7 +934,22 @@ TEST_P(SslSocketTest, FailedClientAuthHashVerificationNoClientCert) {
            false, GetParam());
 }
 
-TEST_P(SslSocketTest, FailedClientAuthHashVerification) {
+TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCANoClientCertificate) {
+  std::string client_ctx_json = "{}";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "", "ssl.fail_verify_no_cert",
+           false, GetParam());
+}
+
+TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongClientCertificate) {
   std::string client_ctx_json = R"EOF(
   {
     "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
@@ -762,12 +962,543 @@ TEST_P(SslSocketTest, FailedClientAuthHashVerification) {
     "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
     "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
     "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
-    "verify_certificate_hash": "7B:0C:3F:0D:97:0E:FC:16:70:11:7A:0C:35:75:54:6B:17:AB:CF:20:D8:AA:A0:ED:87:08:0F:FB:60:4C:40:77"
+    "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
   }
   )EOF";
 
   testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "", "ssl.fail_verify_cert_hash",
            false, GetParam());
+}
+
+TEST_P(SslSocketTest, FailedClientCertificateHashVerificationNoCAWrongClientCertificate) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "", "ssl.fail_verify_cert_hash",
+           false, GetParam());
+}
+
+TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongCA) {
+  std::string client_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"
+  }
+  )EOF";
+
+  std::string server_ctx_json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_tmpdir }}/unittestcert.pem",
+    "private_key_file": "{{ test_tmpdir }}/unittestkey.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/fake_ca_cert.pem",
+    "verify_certificate_hash": "DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A"
+  }
+  )EOF";
+
+  testUtil(client_ctx_json, server_ctx_json, "", "", "", "", "", "", "ssl.fail_verify_error", false,
+           GetParam());
+}
+
+TEST_P(SslSocketTest, ClientCertificateSpkiVerification) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+  server_validation_ctx->add_verify_certificate_spki(
+      "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
+
+  // ssl.handshake logged by both: client & server.
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+
+  // Works even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+}
+
+TEST_P(SslSocketTest, ClientCertificateSpkiVerificationNoCA) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->add_verify_certificate_spki(
+      "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
+
+  // ssl.handshake logged by both: client & server.
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+
+  // Works even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+}
+
+TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoClientCertificate) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+  server_validation_ctx->add_verify_certificate_spki(
+      "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
+}
+
+TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCANoClientCertificate) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->add_verify_certificate_spki(
+      "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
+}
+
+TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongClientCertificate) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+  server_validation_ctx->add_verify_certificate_spki(
+      "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"));
+
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
+             GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
+             GetParam());
+}
+
+TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCAWrongClientCertificate) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->add_verify_certificate_spki(
+      "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"));
+
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
+             GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
+             GetParam());
+}
+
+TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongCA) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/fake_ca_cert.pem"));
+  server_validation_ctx->add_verify_certificate_spki(
+      "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
+
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_error", 1, GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_error", 1, GetParam());
+}
+
+TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerification) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+  server_validation_ctx->add_verify_certificate_hash(
+      "0000000000000000000000000000000000000000000000000000000000000000");
+  server_validation_ctx->add_verify_certificate_spki(
+      "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
+
+  // ssl.handshake logged by both: client & server.
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+
+  // Works even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+}
+
+TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerificationNoCA) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->add_verify_certificate_hash(
+      "0000000000000000000000000000000000000000000000000000000000000000");
+  server_validation_ctx->add_verify_certificate_spki(
+      "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
+
+  // ssl.handshake logged by both: client & server.
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+
+  // Works even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "",
+             "1406294e80c818158697d65d2aaca16748ff132442ab0e2f28bc1109f1d47a2e",
+             "spiffe://lyft.com/test-team", "", "ssl.handshake", 2, GetParam());
+}
+
+TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoClientCertificate) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+  server_validation_ctx->add_verify_certificate_hash(
+      "0000000000000000000000000000000000000000000000000000000000000000");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
+}
+
+TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCANoClientCertificate) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->add_verify_certificate_hash(
+      "0000000000000000000000000000000000000000000000000000000000000000");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_no_cert", 1, GetParam());
+}
+
+TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongClientCertificate) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem"));
+  server_validation_ctx->add_verify_certificate_hash(
+      "0000000000000000000000000000000000000000000000000000000000000000");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"));
+
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
+             GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
+             GetParam());
+}
+
+TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCAWrongClientCertificate) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->add_verify_certificate_hash(
+      "0000000000000000000000000000000000000000000000000000000000000000");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/no_san_key.pem"));
+
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
+             GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_cert_hash", 1,
+             GetParam());
+}
+
+TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongCA) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
+      filter_chain->mutable_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_validation_context();
+  server_validation_ctx->mutable_trusted_ca()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/fake_ca_cert.pem"));
+  server_validation_ctx->add_verify_certificate_hash(
+      "0000000000000000000000000000000000000000000000000000000000000000");
+  server_validation_ctx->add_verify_certificate_spki(
+      "NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=");
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::api::v2::auth::TlsCertificate* client_cert =
+      client.mutable_common_tls_context()->add_tls_certificates();
+  client_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem"));
+  client_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem"));
+
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_error", 1, GetParam());
+
+  // Fails even with client renegotiation.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", false, "", "", "", "", "ssl.fail_verify_error", 1, GetParam());
 }
 
 // Make sure that we do not flush code and do an immediate close if we have not completed the
@@ -785,7 +1516,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader, secret_manager_);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, manager, stats_store,
                                                         std::vector<std::string>{});
@@ -843,7 +1574,7 @@ TEST_P(SslSocketTest, HalfClose) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader, secret_manager_);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, manager, stats_store,
                                                         std::vector<std::string>{});
@@ -864,7 +1595,7 @@ TEST_P(SslSocketTest, HalfClose) {
   )EOF";
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader, secret_manager_);
   ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -916,6 +1647,7 @@ TEST_P(SslSocketTest, HalfClose) {
 TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
+  Secret::MockSecretManager secret_manager;
 
   std::string server_ctx_json = R"EOF(
   {
@@ -926,7 +1658,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader, secret_manager);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, manager, stats_store,
                                                         std::vector<std::string>{});
@@ -946,7 +1678,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   )EOF";
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader, secret_manager);
   ClientSslSocketFactory ssl_socket_factory(client_ctx_config, manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -1003,12 +1735,13 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
                                  const Network::Address::IpVersion ip_version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
+  Secret::MockSecretManager secret_manager;
   ContextManagerImpl manager(runtime);
 
   Json::ObjectSharedPtr server_ctx_loader1 = TestEnvironment::jsonLoadFromString(server_ctx_json1);
   Json::ObjectSharedPtr server_ctx_loader2 = TestEnvironment::jsonLoadFromString(server_ctx_json2);
-  ServerContextConfigImpl server_ctx_config1(*server_ctx_loader1);
-  ServerContextConfigImpl server_ctx_config2(*server_ctx_loader2);
+  ServerContextConfigImpl server_ctx_config1(*server_ctx_loader1, secret_manager);
+  ServerContextConfigImpl server_ctx_config2(*server_ctx_loader2, secret_manager);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory1(server_ctx_config1, manager, stats_store,
                                                          server_names1);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory2(server_ctx_config2, manager, stats_store,
@@ -1025,7 +1758,7 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
   Network::ListenerPtr listener2 = dispatcher.createListener(socket2, callbacks, true, false);
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader, secret_manager);
   ClientSslSocketFactory ssl_socket_factory(client_ctx_config, manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket1.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -1365,9 +2098,9 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader, secret_manager_);
   Json::ObjectSharedPtr server2_ctx_loader = TestEnvironment::jsonLoadFromString(server2_ctx_json);
-  ServerContextConfigImpl server2_ctx_config(*server2_ctx_loader);
+  ServerContextConfigImpl server2_ctx_config(*server2_ctx_loader, secret_manager_);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, manager, stats_store,
                                                         std::vector<std::string>{});
@@ -1392,7 +2125,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   )EOF";
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  ClientContextConfigImpl client_ctx_config(*client_ctx_loader);
+  ClientContextConfigImpl client_ctx_config(*client_ctx_loader, secret_manager_);
   ClientSslSocketFactory ssl_socket_factory(client_ctx_config, manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -1478,7 +2211,7 @@ TEST_P(SslSocketTest, SslError) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  ServerContextConfigImpl server_ctx_config(*server_ctx_loader);
+  ServerContextConfigImpl server_ctx_config(*server_ctx_loader, secret_manager_);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(server_ctx_config, manager, stats_store,
                                                         std::vector<std::string>{});
@@ -1541,6 +2274,13 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   // Connection using defaults (client & server) succeeds, negotiating TLSv1.2.
   // ssl.handshake logged by both: client & server.
   testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "ssl.handshake", 2, GetParam());
+
+  // Connection using defaults (client & server) succeeds, negotiating TLSv1.2,
+  // even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "TLSv1.2", "", "", "", "ssl.handshake", 2, GetParam());
+  client.set_allow_renegotiation(false);
 
   // Connection using TLSv1.0 (client) and defaults (server) succeeds.
   // ssl.handshake logged by both: client & server.
@@ -1622,6 +2362,13 @@ TEST_P(SslSocketTest, ALPN) {
   // ssl.handshake logged by both: client & server.
   testUtilV2(listener, client, "", true, "", "", "", "", "ssl.handshake", 2, GetParam());
 
+  // Connection using defaults (client & server) succeeds, no ALPN is negotiated,
+  // even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "", "", "", "", "ssl.handshake", 2, GetParam());
+  client.set_allow_renegotiation(false);
+
   // Client connects without ALPN to a server with "test" ALPN, no ALPN is negotiated.
   server_ctx->add_alpn_protocols("test");
   testUtilV2(listener, client, "", true, "", "", "", "", "ssl.handshake", 2, GetParam());
@@ -1640,7 +2387,18 @@ TEST_P(SslSocketTest, ALPN) {
   client_ctx->clear_alpn_protocols();
   server_ctx->clear_alpn_protocols();
 
-  // Client connects with "test" ALPN to a server with "test2" ALPN, "test" ALPN is negotiated.
+  // Client connects with "test" ALPN to a server with "test" ALPN, "test" ALPN is negotiated,
+  // even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  client_ctx->add_alpn_protocols("test");
+  server_ctx->add_alpn_protocols("test");
+  testUtilV2(listener, client, "", true, "", "", "", "test", "ssl.handshake", 2, GetParam());
+  client.set_allow_renegotiation(false);
+  client_ctx->clear_alpn_protocols();
+  server_ctx->clear_alpn_protocols();
+
+  // Client connects with "test" ALPN to a server with "test2" ALPN, no ALPN is negotiated.
   // ssl.handshake logged by both: client & server.
   client_ctx->add_alpn_protocols("test");
   server_ctx->add_alpn_protocols("test2");
@@ -1668,6 +2426,12 @@ TEST_P(SslSocketTest, CipherSuites) {
   // Connection using defaults (client & server) succeeds.
   // ssl.handshake logged by both: client & server.
   testUtilV2(listener, client, "", true, "", "", "", "", "ssl.handshake", 2, GetParam());
+
+  // Connection using defaults (client & server) succeeds, even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "", "", "", "", "ssl.handshake", 2, GetParam());
+  client.set_allow_renegotiation(false);
 
   // Client connects with one of the supported cipher suites, connection succeeds.
   // ssl.handshake logged by both: client & server.
@@ -1705,6 +2469,12 @@ TEST_P(SslSocketTest, EcdhCurves) {
   // Connection using defaults (client & server) succeeds.
   // ssl.handshake logged by both: client & server.
   testUtilV2(listener, client, "", true, "", "", "", "", "ssl.handshake", 2, GetParam());
+
+  // Connection using defaults (client & server) succeeds, even with client renegotiation.
+  // ssl.handshake logged by both: client & server.
+  client.set_allow_renegotiation(true);
+  testUtilV2(listener, client, "", true, "", "", "", "", "ssl.handshake", 2, GetParam());
+  client.set_allow_renegotiation(false);
 
   // Client connects with one of the supported ECDH curves, connection succeeds.
   // ssl.handshake logged by both: client & server.
@@ -1763,7 +2533,7 @@ class SslReadBufferLimitTest : public SslCertsTest,
 public:
   void initialize() {
     server_ctx_loader_ = TestEnvironment::jsonLoadFromString(server_ctx_json_);
-    server_ctx_config_.reset(new ServerContextConfigImpl(*server_ctx_loader_));
+    server_ctx_config_.reset(new ServerContextConfigImpl(*server_ctx_loader_, secret_manager_));
     manager_.reset(new ContextManagerImpl(runtime_));
     server_ssl_socket_factory_.reset(new ServerSslSocketFactory(
         *server_ctx_config_, *manager_, stats_store_, std::vector<std::string>{}));
@@ -1771,7 +2541,7 @@ public:
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
     client_ctx_loader_ = TestEnvironment::jsonLoadFromString(client_ctx_json_);
-    client_ctx_config_.reset(new ClientContextConfigImpl(*client_ctx_loader_));
+    client_ctx_config_.reset(new ClientContextConfigImpl(*client_ctx_loader_, secret_manager_));
 
     client_ssl_socket_factory_.reset(
         new ClientSslSocketFactory(*client_ctx_config_, *manager_, stats_store_));

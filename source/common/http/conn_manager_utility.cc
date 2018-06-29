@@ -68,10 +68,12 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     if (final_remote_address == nullptr) {
       final_remote_address = connection.remoteAddress();
     }
-    if (Network::Utility::isLoopbackAddress(*connection.remoteAddress())) {
-      Utility::appendXff(request_headers, config.localAddress());
-    } else {
-      Utility::appendXff(request_headers, *connection.remoteAddress());
+    if (!config.skipXffAppend()) {
+      if (Network::Utility::isLoopbackAddress(*connection.remoteAddress())) {
+        Utility::appendXff(request_headers, config.localAddress());
+      } else {
+        Utility::appendXff(request_headers, *connection.remoteAddress());
+      }
     }
     request_headers.insertForwardedProto().value().setReference(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
@@ -149,9 +151,14 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
       user_agent_header.value().setReference(config.userAgent().value());
     }
 
+    // TODO(htuch): should this be under the config.userAgent() condition or in the outer scope?
     if (!local_info.nodeName().empty()) {
       request_headers.insertEnvoyDownstreamServiceNode().value(local_info.nodeName());
     }
+  }
+
+  if (!config.via().empty()) {
+    Utility::appendVia(request_headers, config.via());
   }
 
   // If we are an external request, AND we are "using remote address" (see above), we set
@@ -169,12 +176,47 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     request_headers.insertRequestId().value(uuid);
   }
 
-  if (config.tracingConfig()) {
-    Tracing::HttpTracerUtility::mutateHeaders(request_headers, runtime);
-  }
+  mutateTracingRequestHeader(request_headers, runtime, config);
   mutateXfccRequestHeader(request_headers, connection, config);
 
   return final_remote_address;
+}
+
+void ConnectionManagerUtility::mutateTracingRequestHeader(Http::HeaderMap& request_headers,
+                                                          Runtime::Loader& runtime,
+                                                          ConnectionManagerConfig& config) {
+  if (!config.tracingConfig() || !request_headers.RequestId()) {
+    return;
+  }
+
+  std::string x_request_id = request_headers.RequestId()->value().c_str();
+  uint64_t result;
+  // Skip if x-request-id is corrupted.
+  if (!UuidUtils::uuidModBy(x_request_id, result, 10000)) {
+    return;
+  }
+
+  // Do not apply tracing transformations if we are currently tracing.
+  if (UuidTraceStatus::NoTrace == UuidUtils::isTraceableUuid(x_request_id)) {
+    if (request_headers.ClientTraceId() &&
+        runtime.snapshot().featureEnabled("tracing.client_enabled",
+                                          config.tracingConfig()->client_sampling_)) {
+      UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
+    } else if (request_headers.EnvoyForceTrace()) {
+      UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
+    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling",
+                                                 config.tracingConfig()->random_sampling_, result,
+                                                 10000)) {
+      UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
+    }
+  }
+
+  if (!runtime.snapshot().featureEnabled("tracing.global_enabled",
+                                         config.tracingConfig()->overall_sampling_, result)) {
+    UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::NoTrace);
+  }
+
+  request_headers.RequestId()->value(x_request_id);
 }
 
 void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_headers,
@@ -196,7 +238,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
     return;
   }
 
-  // TODO(myidpt): Handle the special characters in By and SAN fields.
+  // TODO(myidpt): Handle the special characters in By and URI fields.
   // TODO: Optimize client_cert_details based on perf analysis (direct string appending may be more
   // preferable).
   std::vector<std::string> client_cert_details;
@@ -226,12 +268,8 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
         client_cert_details.push_back("Subject=\"" + connection.ssl()->subjectPeerCertificate() +
                                       "\"");
         break;
-      case Http::ClientCertDetailsType::SAN:
-        // Currently, we only support a single SAN field with URI type.
-        // The "SAN" key still exists even if the SAN is empty.
-        client_cert_details.push_back("SAN=" + connection.ssl()->uriSanPeerCertificate());
-        break;
       case Http::ClientCertDetailsType::URI:
+        // The "URI" key still exists even if the URI is empty.
         client_cert_details.push_back("URI=" + connection.ssl()->uriSanPeerCertificate());
         break;
       case Http::ClientCertDetailsType::DNS: {
@@ -249,8 +287,8 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
 
   const std::string client_cert_details_str = absl::StrJoin(client_cert_details, ";");
   if (config.forwardClientCert() == Http::ForwardClientCertType::AppendForward) {
-    Utility::appendToHeader(request_headers.insertForwardedClientCert().value(),
-                            client_cert_details_str);
+    HeaderMapImpl::appendToHeader(request_headers.insertForwardedClientCert().value(),
+                                  client_cert_details_str);
   } else if (config.forwardClientCert() == Http::ForwardClientCertType::SanitizeSet) {
     request_headers.insertForwardedClientCert().value(client_cert_details_str);
   } else {
@@ -259,12 +297,17 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,
-                                                     const Http::HeaderMap& request_headers) {
+                                                     const Http::HeaderMap& request_headers,
+                                                     const std::string& via) {
   response_headers.removeConnection();
   response_headers.removeTransferEncoding();
 
   if (request_headers.EnvoyForceTrace() && request_headers.RequestId()) {
     response_headers.insertRequestId().value(*request_headers.RequestId());
+  }
+
+  if (!via.empty()) {
+    Utility::appendVia(response_headers, via);
   }
 }
 

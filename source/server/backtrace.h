@@ -4,6 +4,8 @@
 
 #include "common/common/logger.h"
 
+#include "absl/debugging/symbolize.h"
+
 namespace Envoy {
 #define BACKTRACE_LOG()                                                                            \
   do {                                                                                             \
@@ -84,14 +86,17 @@ public:
 #ifdef __APPLE__
     // The stack_decode.py script uses addr2line which isn't readily available and doesn't seem to
     // work when installed.
-    ENVOY_LOG(critical, "Backtrace obj<{}> thr<{}>:", obj_name, thread_id);
+    ENVOY_LOG(critical, "Backtrace thr<{}> obj<{}>:", thread_id, obj_name);
 #else
-    ENVOY_LOG(critical, "Backtrace obj<{}> thr<{}> (use tools/stack_decode.py):", obj_name,
-              thread_id);
+    char out[200];
+    ENVOY_LOG(critical,
+              "Backtrace thr<{}> obj<{}> (If unsymbolized, use tools/stack_decode.py):", thread_id,
+              obj_name);
 #endif
 
     // Backtrace gets tagged by ASAN when we try the object name resolution for the last
     // frame on stack, so skip the last one. It has no useful info anyway.
+
     for (unsigned int i = 0; i < stack_trace_.size() - 1; ++i) {
       backward::ResolvedTrace trace = resolver.resolve(stack_trace_[i]);
       if (trace.object_filename != obj_name) {
@@ -101,10 +106,16 @@ public:
 
 #ifdef __APPLE__
       // In the absence of stack_decode.py, print the function name.
-      ENVOY_LOG(critical, "thr<{}> #{} {}: {}", thread_id, stack_trace_[i].idx,
-                stack_trace_[i].addr, trace.object_function);
+      ENVOY_LOG(critical, "thr<{}> #{} {} {}", thread_id, stack_trace_[i].idx, stack_trace_[i].addr,
+                trace.object_function);
 #else
-      ENVOY_LOG(critical, "thr<{}> #{} {}", thread_id, stack_trace_[i].idx, stack_trace_[i].addr);
+      if (absl::Symbolize(stack_trace_[i].addr, out, sizeof(out))) {
+        ENVOY_LOG(critical, "thr<{}> #{} {} {}", thread_id, stack_trace_[i].idx,
+                  stack_trace_[i].addr, out);
+      } else {
+        ENVOY_LOG(critical, "thr<{}> #{} {} (unknown)", thread_id, stack_trace_[i].idx,
+                  stack_trace_[i].addr);
+      }
 #endif
     }
     ENVOY_LOG(critical, "end backtrace thread {}", stack_trace_.thread_id());

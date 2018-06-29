@@ -360,6 +360,8 @@ private:
 
     // Possibly increases buffer_limit_ to the value of limit.
     void setBufferLimit(uint32_t limit);
+    // Set up the Encoder/Decoder filter chain.
+    void createFilterChain();
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
@@ -413,7 +415,7 @@ private:
   void onDrainTimeout();
   void startDrainSequence();
 
-  bool isWebSocketConnection() const { return ws_connection_ != nullptr; }
+  bool isOldStyleWebSocketConnection() const { return ws_connection_ != nullptr; }
 
   enum class DrainState { NotDraining, Draining, Closing };
 

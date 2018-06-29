@@ -36,7 +36,8 @@ public:
   MOCK_CONST_METHOD2(finalizeResponseHeaders,
                      void(Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info));
   MOCK_CONST_METHOD1(newPath, std::string(const Http::HeaderMap& headers));
-  MOCK_CONST_METHOD1(rewritePathHeader, void(Http::HeaderMap& headers));
+  MOCK_CONST_METHOD2(rewritePathHeader,
+                     void(Http::HeaderMap& headers, bool insert_envoy_original_path));
   MOCK_CONST_METHOD0(responseCode, Http::Code());
   MOCK_CONST_METHOD0(responseBody, const std::string&());
 };
@@ -214,8 +215,9 @@ public:
   // Router::Config
   MOCK_CONST_METHOD0(clusterName, const std::string&());
   MOCK_CONST_METHOD0(clusterNotFoundResponseCode, Http::Code());
-  MOCK_CONST_METHOD2(finalizeRequestHeaders,
-                     void(Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info));
+  MOCK_CONST_METHOD3(finalizeRequestHeaders,
+                     void(Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info,
+                          bool insert_envoy_original_path));
   MOCK_CONST_METHOD2(finalizeResponseHeaders,
                      void(Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info));
   MOCK_CONST_METHOD0(hashPolicy, const HashPolicy*());
@@ -225,14 +227,15 @@ public:
   MOCK_CONST_METHOD0(retryPolicy, const RetryPolicy&());
   MOCK_CONST_METHOD0(shadowPolicy, const ShadowPolicy&());
   MOCK_CONST_METHOD0(timeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(maxGrpcTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD1(virtualCluster, const VirtualCluster*(const Http::HeaderMap& headers));
   MOCK_CONST_METHOD0(virtualHostName, const std::string&());
   MOCK_CONST_METHOD0(virtualHost, const VirtualHost&());
   MOCK_CONST_METHOD0(autoHostRewrite, bool());
-  MOCK_CONST_METHOD0(useWebSocket, bool());
+  MOCK_CONST_METHOD0(useOldStyleWebSocket, bool());
   MOCK_CONST_METHOD5(createWebSocketProxy,
                      Http::WebSocketProxyPtr(Http::HeaderMap& request_headers,
-                                             const RequestInfo::RequestInfo& request_info,
+                                             RequestInfo::RequestInfo& request_info,
                                              Http::WebSocketProxyCallbacks& callbacks,
                                              Upstream::ClusterManager& cluster_manager,
                                              Network::ReadFilterCallbacks* read_callbacks));

@@ -80,6 +80,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "@envoy_api//envoy/type:http_status_cc",
     ],
 )
 
@@ -239,9 +240,11 @@ envoy_cc_library(
         ":exception_lib",
         ":header_map_lib",
         ":headers_lib",
+        ":message_lib",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/http:query_params_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -251,6 +254,7 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/core:http_uri_cc",
         "@envoy_api//envoy/api/v2/core:protocol_cc",
     ],
 )

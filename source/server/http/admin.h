@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -17,6 +18,7 @@
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
+#include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
 #include "common/http/conn_manager_impl.h"
@@ -74,6 +76,9 @@ public:
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
+  bool createUpgradeFilterChain(absl::string_view, Http::FilterChainFactoryCallbacks&) override {
+    return false;
+  }
 
   // Http::ConnectionManagerConfig
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
@@ -91,6 +96,8 @@ public:
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return true; }
   uint32_t xffNumTrustedHops() const override { return 0; }
+  bool skipXffAppend() const override { return false; }
+  const std::string& via() const override { return EMPTY_STRING; }
   Http::ForwardClientCertType forwardClientCert() override {
     return Http::ForwardClientCertType::Sanitize;
   }
@@ -103,6 +110,9 @@ public:
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_.stats_; }
   bool proxy100Continue() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
+  Http::Code request(absl::string_view path, const Http::Utility::QueryParams& params,
+                     absl::string_view method, Http::HeaderMap& response_headers,
+                     std::string& body) override;
 
 private:
   /**
@@ -125,6 +135,9 @@ private:
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return config_; }
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
+    SystemTime lastUpdated() const override {
+      return ProdSystemTimeSource::instance_.currentTime();
+    }
 
     Router::ConfigConstSharedPtr config_;
   };
@@ -137,11 +150,18 @@ private:
    * @return TRUE if level change succeeded, FALSE otherwise.
    */
   bool changeLogLevel(const Http::Utility::QueryParams& params);
+
+  /**
+   * Helper methods for the /clusters url handler.
+   */
   void addCircuitSettings(const std::string& cluster_name, const std::string& priority_str,
                           Upstream::ResourceManager& resource_manager, Buffer::Instance& response);
   void addOutlierInfo(const std::string& cluster_name,
                       const Upstream::Outlier::Detector* outlier_detector,
                       Buffer::Instance& response);
+  void writeClustersAsJson(Buffer::Instance& response);
+  void writeClustersAsText(Buffer::Instance& response);
+
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                                  bool show_all, bool pretty_print = false);
@@ -285,7 +305,7 @@ public:
   // AdminStream
   void setEndStreamOnComplete(bool end_stream) override { end_stream_on_complete_ = end_stream; }
   void addOnDestroyCallback(std::function<void()> cb) override;
-  const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const override;
+  Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const override;
   const Http::HeaderMap& getRequestHeaders() const override;
 
 private:

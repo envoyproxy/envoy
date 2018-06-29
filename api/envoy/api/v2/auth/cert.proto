@@ -117,6 +117,8 @@ message CertificateValidationContext {
   // verified. By default, a client certificate is optional, unless one of the additional
   // options (:ref:`require_client_certificate
   // <envoy_api_field_auth.DownstreamTlsContext.require_client_certificate>`,
+  // :ref:`verify_certificate_spki
+  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>`,
   // :ref:`verify_certificate_hash
   // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`, or
   // :ref:`verify_subject_alt_name
@@ -126,6 +128,39 @@ message CertificateValidationContext {
   // See :ref:`the TLS overview <arch_overview_ssl_enabling_verification>` for a list of common
   // system CA locations.
   core.DataSource trusted_ca = 1;
+
+  // An optional list of base64-encoded SHA-256 hashes. If specified, Envoy will verify that the
+  // SHA-256 of the DER-encoded Subject Public Key Information (SPKI) of the presented certificate
+  // matches one of the specified values.
+  //
+  // A base64-encoded SHA-256 of the Subject Public Key Information (SPKI) of the certificate
+  // can be generated with the following command:
+  //
+  // .. code-block:: bash
+  //
+  //   $ openssl x509 -in path/to/client.crt -noout -pubkey \
+  //     | openssl pkey -pubin -outform DER \
+  //     | openssl dgst -sha256 -binary \
+  //     | openssl enc -base64
+  //   NvqYIYSbgK2vCJpQhObf77vv+bQWtc5ek5RIOwPiC9A=
+  //
+  // This is the format used in HTTP Public Key Pinning.
+  //
+  // When both:
+  // :ref:`verify_certificate_hash
+  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>` and
+  // :ref:`verify_certificate_spki
+  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>` are specified,
+  // a hash matching value from either of the lists will result in the certificate being accepted.
+  //
+  // .. attention::
+  //
+  //   This option is preferred over :ref:`verify_certificate_hash
+  //   <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>`,
+  //   because SPKI is tied to a private key, so it doesn't change when the certificate
+  //   is renewed using the same private key.
+  repeated string verify_certificate_spki = 3
+      [(validate.rules).repeated .items.string = {min_bytes: 44, max_bytes: 44}];
 
   // An optional list of hex-encoded SHA-256 hashes. If specified, Envoy will verify that
   // the SHA-256 of the DER-encoded presented certificate matches one of the specified values.
@@ -146,17 +181,24 @@ message CertificateValidationContext {
   //   DF:6F:F7:2F:E9:11:65:21:26:8F:6F:2D:D4:96:6F:51:DF:47:98:83:FE:70:37:B3:9F:75:91:6A:C3:04:9D:1A
   //
   // Both of those formats are acceptable.
+  //
+  // When both:
+  // :ref:`verify_certificate_hash
+  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_hash>` and
+  // :ref:`verify_certificate_spki
+  // <envoy_api_field_auth.CertificateValidationContext.verify_certificate_spki>` are specified,
+  // a hash matching value from either of the lists will result in the certificate being accepted.
   repeated string verify_certificate_hash = 2
       [(validate.rules).repeated .items.string = {min_bytes: 64, max_bytes: 95}];
 
-  // If specified, Envoy will verify (pin) base64-encoded SHA-256 hash of
-  // the Subject Public Key Information (SPKI) of the presented certificate.
-  // This is the same format as used in HTTP Public Key Pinning.
-  // [#not-implemented-hide:]
-  repeated string verify_spki_sha256 = 3;
-
   // An optional list of Subject Alternative Names. If specified, Envoy will verify that the
   // Subject Alternative Name of the presented certificate matches one of the specified values.
+  //
+  // .. attention::
+  //
+  //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
+  //   therefore this option must be used together with :ref:`trusted_ca
+  //   <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
   repeated string verify_subject_alt_name = 4;
 
   // [#not-implemented-hide:] Must present a signed time-stamped OCSP response.
@@ -171,6 +213,9 @@ message CertificateValidationContext {
   // certificate has not been revoked by this CRL. If this DataSource contains
   // multiple CRLs, all of them will be used.
   core.DataSource crl = 7;
+
+  // If specified, Envoy will not reject expired certificates.
+  bool allow_expired_certificate = 8;
 }
 
 // TLS context shared by both client and server TLS contexts.
@@ -226,6 +271,13 @@ message UpstreamTlsContext {
 
   // SNI string to use when creating TLS backend connections.
   string sni = 2 [(validate.rules).string.max_bytes = 255];
+
+  // If true, server-initiated TLS renegotiation will be allowed.
+  //
+  // .. attention::
+  //
+  //   TLS renegotiation is considered insecure and shouldn't be used unless absolutely necessary.
+  bool allow_renegotiation = 3;
 }
 
 message DownstreamTlsContext {

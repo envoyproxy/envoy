@@ -26,6 +26,13 @@ envoy_cc_fuzz_test(
     deps = ["//source/common/common:base64_lib"],
 )
 
+envoy_cc_fuzz_test(
+    name = "utility_fuzz_test",
+    srcs = ["utility_fuzz_test.cc"],
+    corpus = "utility_corpus",
+    deps = ["//source/common/common:utility_lib"],
+)
+
 envoy_cc_test(
     name = "cleanup_test",
     srcs = ["cleanup_test.cc"],
@@ -61,6 +68,20 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "matchers_test",
+    srcs = ["matchers_test.cc"],
+    deps = [
+        "//source/common/common:matchers_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/type/matcher:metadata_cc",
+        "@envoy_api//envoy/type/matcher:number_cc",
+        "@envoy_api//envoy/type/matcher:string_cc",
     ],
 )
 

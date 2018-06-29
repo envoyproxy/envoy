@@ -22,4 +22,4 @@ for FILE in $*; do
 done
 
 # tar is having issues with -C for some reason so just cd into OUT_DIR.
-(cd "$OUT_DIR"; tar -cvf example_configs.tar *.json *.yaml certs/*.pem)
+(cd "$OUT_DIR"; tar -hcvf example_configs.tar *.json *.yaml certs/*.pem)

@@ -1,8 +1,8 @@
 #!/bin/bash -e
 
 # buildifier
-curl --location --output /usr/local/bin/buildifier https://github.com/bazelbuild/buildtools/releases/download/0.11.1/buildifier \
-  && echo 'd7d41def74991a34dfd2ac8a73804ff11c514c024a901f64ab07f45a3cf0cfef  /usr/local/bin/buildifier' | sha256sum --check \
+curl --location --output /usr/local/bin/buildifier https://github.com/bazelbuild/buildtools/releases/download/0.12.0/buildifier \
+  && echo '7a77601630e493e4d6cbe4dfabb48e0e9a32ff372d84233527180cfc11d49496  /usr/local/bin/buildifier' | sha256sum --check \
   && chmod +x /usr/local/bin/buildifier
 
 # GCC for everything.

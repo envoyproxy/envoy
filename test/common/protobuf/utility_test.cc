@@ -220,6 +220,24 @@ TEST(UtilityTest, JsonConvertFail) {
                           "seconds exceeds limit for field:  seconds: -281474976710656\n");
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/3665.
+TEST(UtilityTest, JsonConvertCamelSnake) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  // Make sure we use a field eligible for snake/camel case translation.
+  bootstrap.mutable_cluster_manager()->set_local_cluster_name("foo");
+  ProtobufWkt::Struct json;
+  MessageUtil::jsonConvert(bootstrap, json);
+  // Verify we can round-trip. This didn't cause the #3665 regression, but useful as a sanity check.
+  MessageUtil::loadFromJson(MessageUtil::getJsonStringFromMessage(json, false), bootstrap);
+  // Verify we don't do a camel case conversion.
+  EXPECT_EQ("foo", json.fields()
+                       .at("cluster_manager")
+                       .struct_value()
+                       .fields()
+                       .at("local_cluster_name")
+                       .string_value());
+}
+
 TEST(DurationUtilTest, OutOfRange) {
   {
     ProtobufWkt::Duration duration;
@@ -242,5 +260,40 @@ TEST(DurationUtilTest, OutOfRange) {
     EXPECT_THROW(DurationUtil::durationToMilliseconds(duration), DurationUtil::OutOfRangeException);
   }
 }
+
+class TimestampUtilTest : public ::testing::Test, public ::testing::WithParamInterface<int64_t> {};
+
+TEST_P(TimestampUtilTest, SystemClockToTimestampTest) {
+  // Generate an input time_point<system_clock>,
+  std::chrono::time_point<std::chrono::system_clock> epoch_time;
+  auto time_original = epoch_time + std::chrono::milliseconds(GetParam());
+
+  // And convert that to Timestamp.
+  ProtobufWkt::Timestamp timestamp;
+  TimestampUtil::systemClockToTimestamp(time_original, timestamp);
+
+  // Then convert that Timestamp back into a time_point<system_clock>,
+  std::chrono::time_point<std::chrono::system_clock> time_reflected =
+      epoch_time +
+      std::chrono::milliseconds(Protobuf::util::TimeUtil::TimestampToMilliseconds(timestamp));
+
+  EXPECT_EQ(time_original, time_reflected);
+}
+
+INSTANTIATE_TEST_CASE_P(TimestampUtilTestAcrossRange, TimestampUtilTest,
+                        ::testing::Values(-1000 * 60 * 60 * 24 * 7, // week
+                                          -1000 * 60 * 60 * 24,     // day
+                                          -1000 * 60 * 60,          // hour
+                                          -1000 * 60,               // minute
+                                          -1000,                    // second
+                                          -1,                       // millisecond
+                                          0,
+                                          1,                      // millisecond
+                                          1000,                   // second
+                                          1000 * 60,              // minute
+                                          1000 * 60 * 60,         // hour
+                                          1000 * 60 * 60 * 24,    // day
+                                          1000 * 60 * 60 * 24 * 7 // week
+                                          ));
 
 } // namespace Envoy

@@ -3,6 +3,7 @@ syntax = "proto3";
 import "validate/validate.proto";
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/route/route.proto";
+import "envoy/type/matcher/metadata.proto";
 
 package envoy.config.rbac.v2alpha;
 option go_package = "v2alpha";
@@ -111,6 +112,9 @@ message Permission {
 
     // A port number that describes the destination port connecting to.
     uint32 destination_port = 6 [(validate.rules).uint32.lte = 65535];
+
+    // Metadata that describes additional information about the action.
+    envoy.type.matcher.MetadataMatcher metadata = 7;
   }
 }
 
@@ -150,5 +154,8 @@ message Principal {
 
     // A header (or psuedo-header such as :path or :method) on the incoming HTTP request.
     envoy.api.v2.route.HeaderMatcher header = 6;
+
+    // Metadata that describes additional information about the principal.
+    envoy.type.matcher.MetadataMatcher metadata = 7;
   }
 }

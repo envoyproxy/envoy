@@ -17,6 +17,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -104,7 +105,7 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
     if (codec_->protocol() == Protocol::Http2) {
       stats_.named_.downstream_cx_http2_active_.dec();
     } else {
-      if (isWebSocketConnection()) {
+      if (isOldStyleWebSocketConnection()) {
         stats_.named_.downstream_cx_websocket_active_.dec();
       } else {
         stats_.named_.downstream_cx_http1_active_.dec();
@@ -188,7 +189,6 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder)
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   new_stream->buffer_limit_ = new_stream->response_encoder_->getStream().bufferLimit();
-  config_.filterFactory().createFilterChain(*new_stream);
   // Make sure new streams are apprised that the underlying connection is blocked.
   if (read_callbacks_->connection().aboveHighWatermark()) {
     new_stream->callHighWatermarkCallbacks();
@@ -203,7 +203,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
   // will still be processed as a normal HTTP/1.1 request, where Envoy will
   // detect the WebSocket upgrade and establish a connection to the
   // upstream.
-  if (isWebSocketConnection()) {
+  if (isOldStyleWebSocketConnection()) {
     return ws_connection_->onData(data, end_stream);
   }
 
@@ -253,7 +253,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       }
 
       if (!streams_.empty() && streams_.front()->state_.remote_complete_ &&
-          !isWebSocketConnection()) {
+          !isOldStyleWebSocketConnection()) {
         read_callbacks_->connection().readDisable(true);
       }
     }
@@ -361,14 +361,14 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   } else {
     connection_manager_.stats_.named_.downstream_rq_http1_total_.inc();
   }
-  request_info_.downstream_local_address_ =
-      connection_manager_.read_callbacks_->connection().localAddress();
+  request_info_.setDownstreamLocalAddress(
+      connection_manager_.read_callbacks_->connection().localAddress());
   // Initially, the downstream remote address is the source address of the
   // downstream connection. That can change later in the request's lifecycle,
   // based on XFF processing, but setting the downstream remote address here
   // prevents surprises for logging code in edge cases.
-  request_info_.downstream_remote_address_ =
-      connection_manager_.read_callbacks_->connection().remoteAddress();
+  request_info_.setDownstreamRemoteAddress(
+      connection_manager_.read_callbacks_->connection().remoteAddress());
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
@@ -386,7 +386,9 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
 
   if (request_info_.healthCheck()) {
     connection_manager_.config_.tracingStats().health_check_.inc();
-  } else if (active_span_) {
+  }
+
+  if (active_span_) {
     Tracing::HttpTracerUtility::finalizeSpan(*active_span_, request_headers_.get(), request_info_,
                                              *this);
   }
@@ -444,8 +446,10 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
-  maybeEndDecode(end_stream);
   request_headers_ = std::move(headers);
+  createFilterChain();
+
+  maybeEndDecode(end_stream);
 
   ENVOY_STREAM_LOG(debug, "request headers complete (end_stream={}):\n{}", *this, end_stream,
                    *request_headers_);
@@ -536,11 +540,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   // Modify the downstream remote address depending on configuration and headers.
-  request_info_.downstream_remote_address_ = ConnectionManagerUtility::mutateRequestHeaders(
+  request_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
       *request_headers_, protocol, connection_manager_.read_callbacks_->connection(),
       connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
-      connection_manager_.runtime_, connection_manager_.local_info_);
-  ASSERT(request_info_.downstream_remote_address_ != nullptr);
+      connection_manager_.runtime_, connection_manager_.local_info_));
+  ASSERT(request_info_.downstreamRemoteAddress() != nullptr);
 
   ASSERT(!cached_route_);
   refreshCachedRoute();
@@ -550,10 +554,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // should return 404. The current returns no response if there is no router filter.
   if (protocol == Protocol::Http11 && cached_route_.value()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
-    const bool websocket_allowed = (route_entry != nullptr) && route_entry->useWebSocket();
+    const bool old_style_websocket =
+        (route_entry != nullptr) && route_entry->useOldStyleWebSocket();
     const bool websocket_requested = Utility::isWebSocketUpgradeRequest(*request_headers_);
 
-    if (websocket_requested && websocket_allowed) {
+    if (websocket_requested && old_style_websocket) {
       ENVOY_STREAM_LOG(debug, "found websocket connection. (end_stream={}):", *this, end_stream);
 
       connection_manager_.ws_connection_ = route_entry->createWebSocketProxy(
@@ -681,11 +686,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
 
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
   maybeEndDecode(end_stream);
-  request_info_.bytes_received_ += data.length();
+  request_info_.addBytesReceived(data.length());
 
   // If the initial websocket upgrade request had an HTTP body
   // let's send this up
-  if (connection_manager_.isWebSocketConnection()) {
+  if (connection_manager_.isOldStyleWebSocketConnection()) {
     if (data.length() > 0) {
       connection_manager_.ws_connection_->onData(data, false);
     }
@@ -864,7 +869,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
 
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
-  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_);
+  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_, EMPTY_STRING);
 
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(headers);
@@ -903,7 +908,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   connection_manager_.config_.dateProvider().setDateHeader(headers);
   // Following setReference() is safe because serverName() is constant for the life of the listener.
   headers.insertServer().value().setReference(connection_manager_.config_.serverName());
-  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_);
+  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_,
+                                                  connection_manager_.config_.via());
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
   // header block.
@@ -1024,7 +1030,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
   ENVOY_STREAM_LOG(trace, "encoding data via codec (size={} end_stream={})", *this, data.length(),
                    end_stream);
 
-  request_info_.bytes_sent_ += data.length();
+  request_info_.addBytesSent(data.length());
   response_encoder_->encodeData(data, end_stream);
   maybeEndEncode(end_stream);
 }
@@ -1110,6 +1116,10 @@ void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
   if (buffered_response_data_) {
     buffered_response_data_->setWatermarks(buffer_limit_);
   }
+}
+
+void ConnectionManagerImpl::ActiveStream::createFilterChain() {
+  connection_manager_.config_.filterFactory().createFilterChain(*this);
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {

@@ -5,6 +5,7 @@
 
 #include "test/integration/integration.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/secret/mocks.h"
 
 #include "gtest/gtest.h"
 
@@ -40,6 +41,7 @@ public:
   ConnectionStatusCallbacks connect_callbacks_;
   MockWatermarkBuffer* client_write_buffer_;
   std::shared_ptr<WaitForPayloadReader> payload_reader_;
+  Secret::MockSecretManager secret_manager_;
 };
 
 } // namespace

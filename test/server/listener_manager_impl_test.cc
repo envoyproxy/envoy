@@ -52,7 +52,8 @@ class ListenerManagerImplTest : public testing::Test {
 public:
   ListenerManagerImplTest() {
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
-    manager_.reset(new ListenerManagerImpl(server_, listener_factory_, worker_factory_));
+    manager_.reset(
+        new ListenerManagerImpl(server_, listener_factory_, worker_factory_, system_time_source_));
   }
 
   /**
@@ -113,6 +114,7 @@ public:
   NiceMock<MockWorkerFactory> worker_factory_;
   std::unique_ptr<ListenerManagerImpl> manager_;
   NiceMock<MockGuardDog> guard_dog_;
+  NiceMock<MockSystemTimeSource> system_time_source_;
 };
 
 class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
@@ -216,6 +218,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SslContext) {
     "ssl_context" : {
       "cert_chain_file" : "{{ test_rundir }}/test/common/ssl/test_data/san_uri_cert.pem",
       "private_key_file" : "{{ test_rundir }}/test/common/ssl/test_data/san_uri_key.pem",
+      "ca_cert_file" : "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
       "verify_subject_alt_name" : [
         "localhost",
         "127.0.0.1"
@@ -386,6 +389,9 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
 
 // Make sure that a listener that is not modifiable cannot be updated or removed.
 TEST_F(ListenerManagerImplTest, UpdateRemoveNotModifiableListener) {
+  ON_CALL(system_time_source_, currentTime())
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1001001001001))));
+
   InSequence s;
 
   // Add foo listener.
@@ -403,12 +409,16 @@ TEST_F(ListenerManagerImplTest, UpdateRemoveNotModifiableListener) {
   checkStats(1, 0, 0, 0, 1, 0);
   checkConfigDump(R"EOF(
 static_listeners:
-  name: "foo"
-  address:
-    socket_address:
-      address: "127.0.0.1"
-      port_value: 1234
-  filter_chains: {}
+  listener:
+    name: "foo"
+    address:
+      socket_address:
+        address: "127.0.0.1"
+        port_value: 1234
+    filter_chains: {}
+  last_updated:
+    seconds: 1001001001
+    nanos: 1000000
 dynamic_active_listeners:
 dynamic_warming_listeners:
 dynamic_draining_listeners:
@@ -437,6 +447,9 @@ dynamic_draining_listeners:
 }
 
 TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
+  ON_CALL(system_time_source_, currentTime())
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1001001001001))));
+
   InSequence s;
 
   MockLdsApi* lds_api = new MockLdsApi();
@@ -480,6 +493,9 @@ dynamic_active_listeners:
         address: "127.0.0.1"
         port_value: 1234
     filter_chains: {}
+  last_updated:
+    seconds: 1001001001
+    nanos: 1000000
 dynamic_warming_listeners:
 dynamic_draining_listeners:
 )EOF");
@@ -498,6 +514,9 @@ address:
 filter_chains: {}
 per_connection_buffer_limit_bytes: 10
   )EOF";
+
+  ON_CALL(system_time_source_, currentTime())
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(2002002002002))));
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(false);
   EXPECT_CALL(*listener_foo, onDestroy());
@@ -518,6 +537,9 @@ dynamic_active_listeners:
         port_value: 1234
     filter_chains: {}
     per_connection_buffer_limit_bytes: 10
+  last_updated:
+    seconds: 2002002002
+    nanos: 2000000
 dynamic_warming_listeners:
 dynamic_draining_listeners:
 )EOF");
@@ -532,6 +554,9 @@ dynamic_draining_listeners:
   EXPECT_FALSE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
   checkStats(1, 1, 0, 0, 1, 0);
+
+  ON_CALL(system_time_source_, currentTime())
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(3003003003003))));
 
   // Update foo. Should go into warming, have an immediate warming callback, and start immediate
   // removal.
@@ -556,6 +581,9 @@ dynamic_active_listeners:
         address: "127.0.0.1"
         port_value: 1234
     filter_chains: {}
+  last_updated:
+    seconds: 3003003003
+    nanos: 3000000
 dynamic_warming_listeners:
 dynamic_draining_listeners:
   version_info: "version2"
@@ -567,6 +595,9 @@ dynamic_draining_listeners:
         port_value: 1234
     filter_chains: {}
     per_connection_buffer_limit_bytes: 10
+  last_updated:
+    seconds: 2002002002
+    nanos: 2000000
 )EOF");
 
   EXPECT_CALL(*worker_, removeListener(_, _));
@@ -575,6 +606,9 @@ dynamic_draining_listeners:
   EXPECT_CALL(*listener_foo_update1, onDestroy());
   worker_->callRemovalCompletion();
   checkStats(1, 2, 0, 0, 1, 0);
+
+  ON_CALL(system_time_source_, currentTime())
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(4004004004004))));
 
   // Add bar listener.
   const std::string listener_bar_yaml = R"EOF(
@@ -594,6 +628,9 @@ filter_chains: {}
   EXPECT_EQ(2UL, manager_->listeners().size());
   worker_->callAddCompletion(true);
   checkStats(2, 2, 0, 0, 2, 0);
+
+  ON_CALL(system_time_source_, currentTime())
+      .WillByDefault(Return(SystemTime(std::chrono::milliseconds(5005005005005))));
 
   // Add baz listener, this time requiring initializing.
   const std::string listener_baz_yaml = R"EOF(
@@ -625,6 +662,9 @@ dynamic_active_listeners:
           address: "127.0.0.1"
           port_value: 1234
       filter_chains: {}
+    last_updated:
+      seconds: 3003003003
+      nanos: 3000000
   - version_info: "version4"
     listener:
       name: "bar"
@@ -633,6 +673,9 @@ dynamic_active_listeners:
           address: "127.0.0.1"
           port_value: 1235
       filter_chains: {}
+    last_updated:
+      seconds: 4004004004
+      nanos: 4000000
 dynamic_warming_listeners:
   - version_info: "version5"
     listener:
@@ -642,6 +685,9 @@ dynamic_warming_listeners:
           address: "127.0.0.1"
           port_value: 1236
       filter_chains: {}
+    last_updated:
+      seconds: 5005005005
+      nanos: 5000000
 dynamic_draining_listeners:
 )EOF");
 
@@ -1820,13 +1866,14 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
     createFilterFactoryFromProto(const Protobuf::Message&,
                                  Configuration::ListenerFactoryContext& context) override {
       auto option = std::make_unique<Network::MockSocketOption>();
-      EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind))
+      EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
           .WillOnce(Return(true));
-      EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PostBind))
-          .WillOnce(Invoke([](Network::Socket& socket, Network::Socket::SocketState) -> bool {
-            fd = socket.fd();
-            return true;
-          }));
+      EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))
+          .WillOnce(Invoke(
+              [](Network::Socket& socket, envoy::api::v2::core::SocketOption::SocketState) -> bool {
+                fd = socket.fd();
+                return true;
+              }));
       context.addListenSocketOption(std::move(option));
       return [](Network::ListenerFilterManager& filter_manager) -> void {
         filter_manager.addAcceptFilter(std::make_unique<OriginalDstTestFilter>());
@@ -1895,7 +1942,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
     createFilterFactoryFromProto(const Protobuf::Message&,
                                  Configuration::ListenerFactoryContext& context) override {
       auto option = std::make_unique<Network::MockSocketOption>();
-      EXPECT_CALL(*option, setOption(_, Network::Socket::SocketState::PreBind))
+      EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
           .WillOnce(Return(false));
       context.addListenSocketOption(std::move(option));
       return [](Network::ListenerFilterManager& filter_manager) -> void {
@@ -1984,8 +2031,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
                                 bool) -> Network::SocketSharedPtr {
           EXPECT_NE(options.get(), nullptr);
           EXPECT_EQ(options->size(), 2);
-          EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                                    Network::Socket::SocketState::PreBind));
+          EXPECT_TRUE(
+              Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                            envoy::api::v2::core::SocketOption::STATE_PREBIND));
           return listener_factory_.socket_;
         }));
     // Expecting the socket option to bet set twice, once pre-bind, once post-bind.
@@ -2034,8 +2082,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
                                 bool) -> Network::SocketSharedPtr {
           EXPECT_NE(options.get(), nullptr);
           EXPECT_EQ(options->size(), 1);
-          EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                                    Network::Socket::SocketState::PreBind));
+          EXPECT_TRUE(
+              Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                            envoy::api::v2::core::SocketOption::STATE_PREBIND));
           return listener_factory_.socket_;
         }));
     EXPECT_CALL(os_sys_calls, setsockopt_(_, ENVOY_SOCKET_IP_FREEBIND.value().first,
@@ -2053,6 +2102,50 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
         "MockListenerComponentFactory: Setting socket options failed");
     EXPECT_EQ(0U, manager_->listeners().size());
   }
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: SockoptsListener
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1111 }
+    filter_chains:
+    - filters:
+    socket_options: [
+      # The socket goes through socket() and bind() but never listen(), so if we
+      # ever saw (7, 8, 9) being applied it would cause a EXPECT_CALL failure.
+      { level: 1, name: 2, int_value: 3, state: STATE_PREBIND },
+      { level: 4, name: 5, int_value: 6, state: STATE_BOUND },
+      { level: 7, name: 8, int_value: 9, state: STATE_LISTENING },
+    ]
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true))
+      .WillOnce(Invoke([this](Network::Address::InstanceConstSharedPtr,
+                              const Network::Socket::OptionsSharedPtr& options,
+                              bool) -> Network::SocketSharedPtr {
+        EXPECT_NE(options.get(), nullptr);
+        EXPECT_EQ(options->size(), 3);
+        EXPECT_TRUE(
+            Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                          envoy::api::v2::core::SocketOption::STATE_PREBIND));
+        return listener_factory_.socket_;
+      }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, 1, 2, _, sizeof(int)))
+      .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+        EXPECT_EQ(3, *static_cast<const int*>(optval));
+        return 0;
+      }));
+  EXPECT_CALL(os_sys_calls, setsockopt_(_, 4, 5, _, sizeof(int)))
+      .WillOnce(Invoke([](int, int, int, const void* optval, socklen_t) -> int {
+        EXPECT_EQ(6, *static_cast<const int*>(optval));
+        return 0;
+      }));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
 }
 
 // Set the resolver to the default IP resolver. The address resolver logic is unit tested in
@@ -2158,8 +2251,70 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CRLWithNoCA) {
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
-                          EnvoyException,
-                          "^Failed to load CRL from .* without trusted CA certificates$");
+                          EnvoyException, "^Failed to load CRL from .* without trusted CA$");
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, VerifySanWithNoCA) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+          validation_context:
+            verify_subject_alt_name: "spiffe://lyft.com/testclient"
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                            EnvoyException,
+                            "SAN-based verification of peer certificates without trusted CA "
+                            "is insecure and not allowed");
+}
+
+// Disabling certificate expiration checks only makes sense with a trusted CA.
+TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithNoCA) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+          validation_context:
+            allow_expired_certificate: true
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                            EnvoyException,
+                            "Certificate validity period is always ignored without trusted CA");
+}
+
+// Verify that with a CA, expired certificates are allowed.
+TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    filter_chains:
+    - tls_context:
+        common_tls_context:
+          tls_certificates:
+            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
+              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
+
+          validation_context:
+            trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+            allow_expired_certificate: true
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_NO_THROW(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true));
 }
 
 } // namespace Server

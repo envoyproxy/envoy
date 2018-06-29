@@ -159,6 +159,8 @@ public:
     return &read_callbacks_->connection();
   }
 
+  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
+
   // These two functions allow enabling/disabling reads on the upstream and downstream connections.
   // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.
   void readDisableUpstream(bool disable);
@@ -223,6 +225,8 @@ protected:
   }
 
   virtual void onConnectionSuccess() {}
+
+  virtual RequestInfo::RequestInfo& getRequestInfo() { return request_info_; }
 
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
   Network::FilterStatus initializeUpstreamConnection();

@@ -34,9 +34,15 @@ public:
                        Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info);
 
   static void mutateResponseHeaders(Http::HeaderMap& response_headers,
-                                    const Http::HeaderMap& request_headers);
+                                    const Http::HeaderMap& request_headers, const std::string& via);
 
 private:
+  /**
+   * Mutate request headers if request needs to be traced.
+   */
+  static void mutateTracingRequestHeader(Http::HeaderMap& request_headers, Runtime::Loader& runtime,
+                                         ConnectionManagerConfig& config);
+
   static void mutateXfccRequestHeader(Http::HeaderMap& request_headers,
                                       Network::Connection& connection,
                                       ConnectionManagerConfig& config);

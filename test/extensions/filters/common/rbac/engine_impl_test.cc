@@ -20,19 +20,21 @@ namespace Common {
 namespace RBAC {
 namespace {
 
-void checkEngine(const RBAC::RoleBasedAccessControlEngineImpl& engine, bool expected,
-                 const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
-                 const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl()) {
-  EXPECT_EQ(expected, engine.allowed(connection, headers));
+void checkEngine(
+    const RBAC::RoleBasedAccessControlEngineImpl& engine, bool expected,
+    const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
+    const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl(),
+    const envoy::api::v2::core::Metadata& metadata = envoy::api::v2::core::Metadata()) {
+  EXPECT_EQ(expected, engine.allowed(connection, headers, metadata));
 }
 
 TEST(RoleBasedAccessControlEngineImpl, Disabled) {
-  envoy::config::filter::http::rbac::v2::RBACPerRoute config;
-  config.set_disabled(true);
-  checkEngine(RBAC::RoleBasedAccessControlEngineImpl(config), true);
-  checkEngine(
-      RBAC::RoleBasedAccessControlEngineImpl(envoy::config::filter::http::rbac::v2::RBAC(), true),
-      true);
+  envoy::config::rbac::v2alpha::RBAC rbac;
+  rbac.set_action(envoy::config::rbac::v2alpha::RBAC_Action::RBAC_Action_ALLOW);
+  checkEngine(RBAC::RoleBasedAccessControlEngineImpl(rbac), false);
+
+  rbac.set_action(envoy::config::rbac::v2alpha::RBAC_Action::RBAC_Action_DENY);
+  checkEngine(RBAC::RoleBasedAccessControlEngineImpl(rbac), true);
 }
 
 TEST(RoleBasedAccessControlEngineImpl, AllowedWhitelist) {
@@ -40,12 +42,10 @@ TEST(RoleBasedAccessControlEngineImpl, AllowedWhitelist) {
   policy.add_permissions()->set_destination_port(123);
   policy.add_principals()->set_any(true);
 
-  envoy::config::filter::http::rbac::v2::RBACPerRoute config;
-  envoy::config::rbac::v2alpha::RBAC* rbac = config.mutable_rbac()->mutable_rules();
-  rbac->set_action(envoy::config::rbac::v2alpha::RBAC_Action::RBAC_Action_ALLOW);
-  (*rbac->mutable_policies())["foo"] = policy;
-
-  RBAC::RoleBasedAccessControlEngineImpl engine(config);
+  envoy::config::rbac::v2alpha::RBAC rbac;
+  rbac.set_action(envoy::config::rbac::v2alpha::RBAC_Action::RBAC_Action_ALLOW);
+  (*rbac.mutable_policies())["foo"] = policy;
+  RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
 
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
@@ -63,12 +63,10 @@ TEST(RoleBasedAccessControlEngineImpl, DeniedBlacklist) {
   policy.add_permissions()->set_destination_port(123);
   policy.add_principals()->set_any(true);
 
-  envoy::config::filter::http::rbac::v2::RBACPerRoute config;
-  envoy::config::rbac::v2alpha::RBAC* rbac = config.mutable_rbac()->mutable_rules();
-  rbac->set_action(envoy::config::rbac::v2alpha::RBAC_Action::RBAC_Action_DENY);
-  (*rbac->mutable_policies())["foo"] = policy;
-
-  RBAC::RoleBasedAccessControlEngineImpl engine(config);
+  envoy::config::rbac::v2alpha::RBAC rbac;
+  rbac.set_action(envoy::config::rbac::v2alpha::RBAC_Action::RBAC_Action_DENY);
+  (*rbac.mutable_policies())["foo"] = policy;
+  RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
 
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr addr =

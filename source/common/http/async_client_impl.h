@@ -172,7 +172,8 @@ private:
       return Http::Code::InternalServerError;
     }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
-    void finalizeRequestHeaders(Http::HeaderMap&, const RequestInfo::RequestInfo&) const override {}
+    void finalizeRequestHeaders(Http::HeaderMap&, const RequestInfo::RequestInfo&,
+                                bool) const override {}
     void finalizeResponseHeaders(Http::HeaderMap&, const RequestInfo::RequestInfo&) const override {
     }
     const Router::HashPolicy* hashPolicy() const override { return nullptr; }
@@ -190,6 +191,9 @@ private:
         return std::chrono::milliseconds(0);
       }
     }
+    absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
+      return absl::nullopt;
+    }
     const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
       return nullptr;
     }
@@ -198,8 +202,8 @@ private:
     }
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
-    bool useWebSocket() const override { return false; }
-    Http::WebSocketProxyPtr createWebSocketProxy(Http::HeaderMap&, const RequestInfo::RequestInfo&,
+    bool useOldStyleWebSocket() const override { return false; }
+    Http::WebSocketProxyPtr createWebSocketProxy(Http::HeaderMap&, RequestInfo::RequestInfo&,
                                                  Http::WebSocketProxyCallbacks&,
                                                  Upstream::ClusterManager&,
                                                  Network::ReadFilterCallbacks*) const override {

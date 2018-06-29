@@ -532,11 +532,22 @@ public:
   virtual ~FilterChainFactory() {}
 
   /**
-   * Called when a new stream is created on the connection.
+   * Called when a new HTTP stream is created on the connection.
    * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
    *                  FilterChainFactoryCallbacks.
    */
   virtual void createFilterChain(FilterChainFactoryCallbacks& callbacks) PURE;
+
+  /**
+   * Called when a new upgrade stream is created on the connection.
+   * @param upgrade supplies the upgrade header from downstream
+   * @param callbacks supplies the "sink" that is used for actually creating the filter chain. @see
+   *                  FilterChainFactoryCallbacks.
+   * @return true if upgrades of this type are allowed and the filter chain has been created.
+   *    returns false if this upgrade type is not configured, and no filter chain is created.
+   */
+  virtual bool createUpgradeFilterChain(absl::string_view upgrade,
+                                        FilterChainFactoryCallbacks& callbacks) PURE;
 };
 
 } // namespace Http

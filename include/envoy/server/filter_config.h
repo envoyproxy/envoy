@@ -79,7 +79,7 @@ public:
   /**
    * @return information about the local environment the server is running in.
    */
-  virtual const LocalInfo::LocalInfo& localInfo() PURE;
+  virtual const LocalInfo::LocalInfo& localInfo() const PURE;
 
   /**
    * @return RandomGenerator& the random generator for the server.
@@ -128,6 +128,11 @@ public:
    * listener.
    */
   virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
+
+  /**
+   * @return SystemTimeSource& a reference to the top-level SystemTime source.
+   */
+  virtual SystemTimeSource& systemTimeSource() PURE;
 };
 
 class ListenerFactoryContext : public FactoryContext {

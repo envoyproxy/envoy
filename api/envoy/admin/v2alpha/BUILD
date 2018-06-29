@@ -13,3 +13,21 @@ api_proto_library(
         "//envoy/config/bootstrap/v2:bootstrap",
     ],
 )
+
+api_proto_library(
+    name = "clusters",
+    srcs = ["clusters.proto"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":metrics",
+        "//envoy/api/v2/core:address",
+        "//envoy/api/v2/core:health_check",
+        "//envoy/type:percent",
+    ],
+)
+
+api_proto_library(
+    name = "metrics",
+    srcs = ["metrics.proto"],
+    visibility = ["//visibility:public"],
+)

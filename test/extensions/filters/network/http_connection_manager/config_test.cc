@@ -6,6 +6,7 @@
 
 #include "extensions/filters/network/http_connection_manager/config.h"
 
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
@@ -16,6 +17,7 @@
 
 using testing::ContainerEq;
 using testing::Return;
+using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -356,6 +358,119 @@ TEST_F(HttpConnectionManagerConfigTest, BadAccessLogNestedTypes) {
   Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
   HttpConnectionManagerFilterConfigFactory factory;
   EXPECT_THROW(factory.createFilterFactory(*json_config, context_), Json::Exception);
+}
+
+class FilterChainTest : public HttpConnectionManagerConfigTest {
+public:
+  const std::string basic_config_ = R"EOF(
+  {
+    "codec_type": "http1",
+    "server_name": "foo",
+    "stat_prefix": "router",
+    "route_config":
+    {
+      "virtual_hosts": [
+        {
+          "name": "service",
+          "domains": [ "*" ],
+          "routes": [
+            {
+              "prefix": "/",
+              "cluster": "cluster"
+            }
+          ]
+        }
+      ]
+    },
+    "filters": [
+      { "name": "http_dynamo_filter", "config": {} },
+      { "name": "router", "config": {} }
+    ]
+  }
+  )EOF";
+};
+
+TEST_F(FilterChainTest, createFilterChain) {
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromJson(basic_config_), context_,
+                                     date_provider_, route_config_provider_manager_);
+
+  Http::MockFilterChainFactoryCallbacks callbacks;
+  EXPECT_CALL(callbacks, addStreamFilter(_));        // Dynamo
+  EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+  config.createFilterChain(callbacks);
+}
+
+TEST_F(FilterChainTest, createUpgradeFilterChain) {
+  auto hcm_config = parseHttpConnectionManagerFromJson(basic_config_);
+  hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
+
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_);
+
+  Http::MockFilterChainFactoryCallbacks callbacks;
+  {
+    EXPECT_CALL(callbacks, addStreamFilter(_));        // Dynamo
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+    EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", callbacks));
+  }
+
+  {
+    EXPECT_CALL(callbacks, addStreamFilter(_)).Times(0);
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(0);
+    EXPECT_FALSE(config.createUpgradeFilterChain("foo", callbacks));
+  }
+}
+
+TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
+  auto hcm_config = parseHttpConnectionManagerFromJson(basic_config_);
+  auto websocket_config = hcm_config.add_upgrade_configs();
+  websocket_config->set_upgrade_type("websocket");
+
+  ASSERT_TRUE(websocket_config->add_filters()->ParseFromString("\n\fenvoy.router"));
+
+  auto foo_config = hcm_config.add_upgrade_configs();
+  foo_config->set_upgrade_type("foo");
+  foo_config->add_filters()->ParseFromString("\n\fenvoy.router");
+  foo_config->add_filters()->ParseFromString("\n"
+                                             "\x18"
+                                             "envoy.http_dynamo_filter");
+  foo_config->add_filters()->ParseFromString("\n"
+                                             "\x18"
+                                             "envoy.http_dynamo_filter");
+
+  HttpConnectionManagerConfig config(hcm_config, context_, date_provider_,
+                                     route_config_provider_manager_);
+
+  {
+    Http::MockFilterChainFactoryCallbacks callbacks;
+    EXPECT_CALL(callbacks, addStreamFilter(_));        // Dynamo
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+    config.createFilterChain(callbacks);
+  }
+
+  {
+    Http::MockFilterChainFactoryCallbacks callbacks;
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+    EXPECT_TRUE(config.createUpgradeFilterChain("websocket", callbacks));
+  }
+
+  {
+    Http::MockFilterChainFactoryCallbacks callbacks;
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_));   // Router
+    EXPECT_CALL(callbacks, addStreamFilter(_)).Times(2); // Dynamo
+    EXPECT_TRUE(config.createUpgradeFilterChain("Foo", callbacks));
+  }
+}
+
+TEST_F(FilterChainTest, invalidConfig) {
+  auto hcm_config = parseHttpConnectionManagerFromJson(basic_config_);
+  hcm_config.add_upgrade_configs()->set_upgrade_type("WEBSOCKET");
+  hcm_config.add_upgrade_configs()->set_upgrade_type("websocket");
+
+  EXPECT_THROW_WITH_MESSAGE(HttpConnectionManagerConfig(hcm_config, context_, date_provider_,
+                                                        route_config_provider_manager_),
+                            EnvoyException,
+                            "Error: multiple upgrade configs with the same name: 'websocket'");
 }
 
 } // namespace HttpConnectionManager
