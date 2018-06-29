@@ -1412,7 +1412,7 @@ public:
 
     health_checker_.reset(new TestProdHttpHealthChecker(*cluster_, parseHealthCheckFromV2Yaml(yaml),
                                                         dispatcher_, runtime_, random_,
-                                                   HealthCheckEventLoggerPtr(event_logger_)));
+                                                        HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -1434,7 +1434,7 @@ public:
 
     health_checker_.reset(new TestProdHttpHealthChecker(*cluster_, parseHealthCheckFromV2Yaml(yaml),
                                                         dispatcher_, runtime_, random_,
-                                                   HealthCheckEventLoggerPtr(event_logger_)));
+                                                        HealthCheckEventLoggerPtr(event_logger_)));
     health_checker_->addHostCheckCompleteCb(
         [this](HostSharedPtr host, HealthTransition changed_state) -> void {
           onHostStatus(host, changed_state);
@@ -3005,16 +3005,19 @@ TEST(HealthCheckEventLoggerImplTest, All) {
   HealthCheckEventLoggerImpl event_logger(log_manager, "foo");
 
   EXPECT_CALL(*file, write(absl::string_view{
-                         "{\"health_checker_type\":\"HTTP\","
-                         "\"host_address\":\"10.0.0.1:443\",\"cluster_name\":\"fake_cluster\","
-                         "\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\"}}\n"}));
+                         "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
+                         "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
+                         "cluster\",\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\"}}\n"}));
   event_logger.logEjectUnhealthy(envoy::data::core::v2alpha::HealthCheckerType::HTTP, host,
                                  envoy::data::core::v2alpha::HealthCheckFailureType::ACTIVE);
 
   EXPECT_CALL(*file, write(absl::string_view{
-                         "{\"health_checker_type\":\"HTTP\","
-                         "\"host_address\":\"10.0.0.1:443\",\"cluster_name\":\"fake_cluster\","
-                         "\"add_healthy_event\":{\"first_check\":false}}\n"}));
+                         "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
+                         "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
+                         "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
+                         "cluster\",\"add_healthy_event\":{\"first_check\":false}}\n"}));
+
   event_logger.logAddHealthy(envoy::data::core::v2alpha::HealthCheckerType::HTTP, host, false);
 }
 

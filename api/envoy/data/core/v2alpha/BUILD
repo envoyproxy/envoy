@@ -5,5 +5,8 @@ licenses(["notice"])  # Apache 2
 api_proto_library(
     name = "health_check_event",
     srcs = ["health_check_event.proto"],
-    deps = ["//envoy/api/v2/core:base"],
+    deps = [
+        "//envoy/api/v2/core:address",
+        "//envoy/api/v2/core:base",
+    ],
 )

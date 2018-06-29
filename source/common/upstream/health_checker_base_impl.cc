@@ -275,7 +275,9 @@ void HealthCheckEventLoggerImpl::logEjectUnhealthy(
     envoy::data::core::v2alpha::HealthCheckFailureType failure_type) {
   envoy::data::core::v2alpha::HealthCheckEvent event;
   event.set_health_checker_type(health_checker_type);
-  event.set_host_address(host->address()->asString());
+  envoy::api::v2::core::Address address;
+  Network::Utility::addressToProtobufAddress(*host->address(), address);
+  *event.mutable_host() = std::move(address);
   event.set_cluster_name(host->cluster().name());
   event.mutable_eject_unhealthy_event()->set_failure_type(failure_type);
   // Make sure the type enums make it into the JSON
@@ -289,7 +291,9 @@ void HealthCheckEventLoggerImpl::logAddHealthy(
     const HostDescriptionConstSharedPtr& host, bool first_check) {
   envoy::data::core::v2alpha::HealthCheckEvent event;
   event.set_health_checker_type(health_checker_type);
-  event.set_host_address(host->address()->asString());
+  envoy::api::v2::core::Address address;
+  Network::Utility::addressToProtobufAddress(*host->address(), address);
+  *event.mutable_host() = std::move(address);
   event.set_cluster_name(host->cluster().name());
   event.mutable_add_healthy_event()->set_first_check(first_check);
   // Make sure the type enums make it into the JSON

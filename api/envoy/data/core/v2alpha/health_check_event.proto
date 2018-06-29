@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.data.core.v2alpha;
 
+import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/duration.proto";
@@ -16,8 +17,8 @@ option (gogoproto.equal_all) = true;
 // :ref:`Health check logging <arch_overview_health_check_logging>`.
 
 message HealthCheckEvent {
-  HealthCheckerType health_checker_type = 1;
-  string host_address = 2 [(validate.rules).string.min_bytes = 1];
+  HealthCheckerType health_checker_type = 1 [(validate.rules).enum.defined_only = true];
+  envoy.api.v2.core.Address host = 2;
   string cluster_name = 3 [(validate.rules).string.min_bytes = 1];
 
   oneof event {
@@ -46,7 +47,7 @@ enum HealthCheckerType {
 
 message HealthCheckEjectUnhealthy {
   // The type of failure that caused this ejection.
-  HealthCheckFailureType failure_type = 1;
+  HealthCheckFailureType failure_type = 1 [(validate.rules).enum.defined_only = true];
 }
 
 message HealthCheckAddHealthy {
