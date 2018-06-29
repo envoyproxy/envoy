@@ -125,6 +125,11 @@ int MetadataMapWrapper::luaPairs(lua_State* state) {
   return 1;
 }
 
+int ConnectionWrapper::luaSecure(lua_State* state) {
+  lua_pushboolean(state, connection_->ssl() != nullptr);
+  return 1;
+}
+
 } // namespace Lua
 } // namespace Common
 } // namespace Filters

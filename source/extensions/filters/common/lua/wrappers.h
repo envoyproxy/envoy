@@ -99,6 +99,24 @@ private:
   friend class MetadataMapIterator;
 };
 
+/**
+ * Lua wrapper for Network::Connection.
+ */
+class ConnectionWrapper : public BaseLuaObject<ConnectionWrapper> {
+public:
+  ConnectionWrapper(const Network::Connection* connection) : connection_{connection} {}
+  static ExportedFunctions exportedFunctions() { return {{"secure", static_luaSecure}}; }
+
+private:
+  /**
+   * Check if the connection is secured or not.
+   * @return boolean true if secured and false if not.
+   */
+  DECLARE_LUA_FUNCTION(ConnectionWrapper, luaSecure);
+
+  const Network::Connection* connection_;
+};
+
 } // namespace Lua
 } // namespace Common
 } // namespace Filters
