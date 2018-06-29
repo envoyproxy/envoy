@@ -1,8 +1,8 @@
-load("//bazel:api_build_system.bzl", "api_proto_library")
+load("//bazel:api_build_system.bzl", "api_proto_library_internal")
 
 licenses(["notice"])  # Apache 2
 
-api_proto_library(
+api_proto_library_internal(
     name = "config_dump",
     srcs = ["config_dump.proto"],
     visibility = ["//visibility:public"],
@@ -14,7 +14,7 @@ api_proto_library(
     ],
 )
 
-api_proto_library(
+api_proto_library_internal(
     name = "clusters",
     srcs = ["clusters.proto"],
     visibility = ["//visibility:public"],
@@ -26,7 +26,7 @@ api_proto_library(
     ],
 )
 
-api_proto_library(
+api_proto_library_internal(
     name = "metrics",
     srcs = ["metrics.proto"],
     visibility = ["//visibility:public"],
