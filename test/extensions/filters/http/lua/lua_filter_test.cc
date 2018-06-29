@@ -1468,7 +1468,7 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoLuaMetadata) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
-TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
+TEST_F(LuaHttpFilterTest, GetCurrentProtocolHTTP11) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
       request_handle:logTrace(request_handle:requestInfo():protocol())
@@ -1482,12 +1482,20 @@ TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("HTTP/1.1")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
 
-  setupRequestInfoProtocol(Http::Protocol::Http10);
-  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("HTTP/1.0")));
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+TEST_F(LuaHttpFilterTest, GetCurrentProtocolHTTP2) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace(request_handle:requestInfo():protocol())
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
 
   setupRequestInfoProtocol(Http::Protocol::Http2);
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("HTTP/2")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
