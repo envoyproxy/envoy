@@ -15,6 +15,8 @@ using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
+using testing::ReturnPointee;
+using testing::ReturnRef;
 using testing::StrEq;
 using testing::_;
 
@@ -72,6 +74,11 @@ public:
         .WillOnce(testing::ReturnRef(metadata_));
   }
 
+  void setupRequestInfoProtocol(const absl::optional<Envoy::Http::Protocol>& protocol) {
+    ON_CALL(request_info_, protocol()).WillByDefault(ReturnPointee(&protocol));
+    EXPECT_CALL(decoder_callbacks_, requestInfo()).WillOnce(ReturnRef(request_info_));
+  }
+
   NiceMock<ThreadLocal::MockInstance> tls_;
   Upstream::MockClusterManager cluster_manager_;
   std::shared_ptr<FilterConfig> config_;
@@ -79,6 +86,7 @@ public:
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
   envoy::api::v2::core::Metadata metadata_;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info_;
 
   const std::string HEADER_ONLY_SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -1457,6 +1465,30 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoLuaMetadata) {
 
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("ok")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace(request_handle:requestInfo():protocol())
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  setupRequestInfoProtocol(Http::Protocol::Http11);
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("HTTP/1.1")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  setupRequestInfoProtocol(Http::Protocol::Http10);
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("HTTP/1.0")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  setupRequestInfoProtocol(Http::Protocol::Http2);
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("HTTP/2")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
