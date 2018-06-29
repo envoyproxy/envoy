@@ -228,7 +228,7 @@ public:
   /**
    * @return whether any response flag is set or not.
    */
-  virtual bool hasResponseFlag() const PURE;
+  virtual bool hasAnyResponseFlag() const PURE;
 
   /**
    * @return upstream host description.

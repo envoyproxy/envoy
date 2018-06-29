@@ -34,7 +34,7 @@ public:
   bool hasResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) const override {
     return response_flags_ & response_flag;
   }
-  bool hasResponseFlag() const override { return response_flags_ != 0; }
+  bool hasAnyResponseFlag() const override { return response_flags_ != 0; }
   void setResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) override {
     response_flags_ |= response_flag;
   }

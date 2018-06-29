@@ -11,7 +11,6 @@
 
 #include "common/http/header_utility.h"
 #include "common/protobuf/protobuf.h"
-#include "common/request_info/request_info_impl.h"
 
 namespace Envoy {
 namespace AccessLog {

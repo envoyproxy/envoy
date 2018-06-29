@@ -195,7 +195,7 @@ bool ResponseFlagFilter::evaluate(const RequestInfo::RequestInfo& info, const Ht
   if (configured_flags_ != 0) {
     return info.intersectResponseFlags(configured_flags_);
   }
-  return info.hasResponseFlag();
+  return info.hasAnyResponseFlag();
 }
 
 InstanceSharedPtr
