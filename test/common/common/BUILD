@@ -11,6 +11,14 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "backoff_strategy_test",
+    srcs = ["backoff_strategy_test.cc"],
+    deps = [
+        "//source/common/common:backoff_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "base64_test",
     srcs = ["base64_test.cc"],
     deps = [
