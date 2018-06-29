@@ -130,7 +130,6 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
         if (header_to_modify) {
           header_to_modify->value(header.second.c_str(), header.second.size());
-
         } else {
           request_headers_->addCopy(header.first, header.second);
         }
