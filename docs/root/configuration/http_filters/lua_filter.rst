@@ -290,6 +290,17 @@ under the filter name i.e. *envoy.lua*. Below is an example of a *metadata* in a
 
 Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.
 
+connection()
+^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  connection = handle:connection()
+
+Returns the current request's underlying :repo:`connection <include/envoy/network/connection.h>`.
+
+Returns a :ref:`metadata object <config_http_filters_lua_connection_wrapper>`.
+
 .. _config_http_filters_lua_header_wrapper:
 
 Header object API
@@ -403,3 +414,19 @@ __pairs()
 
 Iterates through every *metadata* entry. *key* is a string that supplies a *metadata*
 key. *value* is *metadata* entry value.
+
+.. _config_http_filters_lua_connection_wrapper:
+
+Connection object API
+---------------------
+
+secure()
+^^^^^^^^
+
+.. code-block:: lua
+
+  if connection:secure() then
+    print("secure")
+  do
+
+Returns boolean value indicating that the current connection is secured or not.

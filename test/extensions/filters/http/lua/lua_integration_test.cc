@@ -109,6 +109,11 @@ config:
       request_handle:headers():add("request_body_size", body_length)
       request_handle:headers():add("request_metadata_foo", metadata["foo"])
       request_handle:headers():add("request_metadata_baz", metadata["baz"])
+      if request_handle:connection():secure() then
+        request_handle:headers():add("request_secure", "true")
+      else
+        request_handle:headers():add("request_secure", "false")
+      end
     end
 
     function envoy_on_response(response_handle)
@@ -152,6 +157,10 @@ config:
                           .get(Http::LowerCaseString("request_metadata_baz"))
                           ->value()
                           .c_str());
+
+  EXPECT_STREQ(
+      "false",
+      upstream_request_->headers().get(Http::LowerCaseString("request_secure"))->value().c_str());
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   upstream_request_->encodeHeaders(response_headers, false);
