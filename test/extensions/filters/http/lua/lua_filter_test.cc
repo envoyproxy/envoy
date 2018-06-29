@@ -74,11 +74,6 @@ public:
         .WillOnce(testing::ReturnRef(metadata_));
   }
 
-  void setupRequestInfoProtocol(const absl::optional<Envoy::Http::Protocol>& protocol) {
-    EXPECT_CALL(decoder_callbacks_, requestInfo()).WillOnce(ReturnRef(request_info_));
-    EXPECT_CALL(request_info_, protocol()).WillOnce(ReturnPointee(&protocol));
-  }
-
   NiceMock<ThreadLocal::MockInstance> tls_;
   Upstream::MockClusterManager cluster_manager_;
   std::shared_ptr<FilterConfig> config_;
@@ -1465,6 +1460,25 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoLuaMetadata) {
 
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("ok")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// No available Lua metadata on route.
+TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace(request_handle:requestInfo():protocol())
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillOnce(ReturnRef(request_info_));
+  EXPECT_CALL(request_info_, protocol()).WillOnce(Return(Http::Protocol::Http11));
+
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("HTTP/1.1")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
