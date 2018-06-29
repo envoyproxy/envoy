@@ -157,10 +157,25 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     SSL_CTX_set_cert_verify_callback(ctx_.get(), ContextImpl::verifyCallback, this);
   }
 
+  updateCertChain(config);
+
+  // use the server's cipher list preferences
+  SSL_CTX_set_options(ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
+
+  parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
+}
+
+void ContextImpl::updateCertChain(const ContextConfig& config) {
   if (config.certChain().empty() != config.privateKey().empty()) {
     throw EnvoyException(fmt::format("Failed to load incomplete certificate from {}, {}",
                                      config.certChainPath(), config.privateKeyPath()));
   }
+
+  // reset the SSL cert chain.
+  // TODO(qiwzhang) not sure how to reset private key
+  cert_chain_.reset();
+  cert_chain_file_path_.clear();
+  SSL_CTX_clear_extra_chain_certs(ctx_.get());
 
   if (!config.certChain().empty()) {
     // Load certificate chain.
@@ -205,11 +220,6 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
           fmt::format("Failed to load private key from {}", config.privateKeyPath()));
     }
   }
-
-  // use the server's cipher list preferences
-  SSL_CTX_set_options(ctx_.get(), SSL_OP_CIPHER_SERVER_PREFERENCE);
-
-  parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols());
 }
 
 int ServerContextImpl::alpnSelectCallback(const unsigned char** out, unsigned char* outlen,

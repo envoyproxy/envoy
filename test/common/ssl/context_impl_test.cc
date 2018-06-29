@@ -158,6 +158,17 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   EXPECT_TRUE(context->getCaCertInformation().find(ca_cert_partial_output) != std::string::npos);
   EXPECT_TRUE(context->getCertChainInformation().find(cert_chain_partial_output) !=
               std::string::npos);
+
+  // Update to an empty one.
+  Json::ObjectSharedPtr loader1 = TestEnvironment::jsonLoadFromString("{}");
+  ClientContextConfigImpl cfg1(*loader1, secret_manager_);
+  dynamic_cast<ContextImpl&>(*context).updateCertChain(cfg1);
+  EXPECT_EQ("", context->getCertChainInformation());
+
+  // Update back to a valid one.
+  dynamic_cast<ContextImpl&>(*context).updateCertChain(cfg);
+  EXPECT_TRUE(context->getCertChainInformation().find(cert_chain_partial_output) !=
+              std::string::npos);
 }
 
 TEST_F(SslContextImplTest, TestNoCert) {
