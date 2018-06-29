@@ -75,8 +75,8 @@ public:
   }
 
   void setupRequestInfoProtocol(const absl::optional<Envoy::Http::Protocol>& protocol) {
-    ON_CALL(request_info_, protocol()).WillByDefault(ReturnPointee(&protocol));
     EXPECT_CALL(decoder_callbacks_, requestInfo()).WillOnce(ReturnRef(request_info_));
+    EXPECT_CALL(request_info_, protocol()).WillOnce(ReturnPointee(&protocol));
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
