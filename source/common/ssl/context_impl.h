@@ -74,6 +74,11 @@ public:
   std::string getCaCertInformation() const override;
   std::string getCertChainInformation() const override;
 
+  /**
+     update the cert chain from the config.
+   */
+  void updateCertChain(const ContextConfig& config);
+
 protected:
   ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, const ContextConfig& config);
   ~ContextImpl() { parent_.releaseContext(this); }
