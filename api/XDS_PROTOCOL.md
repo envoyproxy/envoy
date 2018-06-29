@@ -303,10 +303,10 @@ stream. This allows the xDS server to keep track of the state of xDS clients
 connected to it. There is no REST version of Incremental xDS.
 
 In incremental xDS the nonce field is required and used to pair a
-[`IncrementalDiscoveryResponse`]](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#discoveryrequest)
+[`IncrementalDiscoveryResponse`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#discoveryrequest)
 to a [`IncrementalDiscoveryRequest`](https://www.envoyproxy.io/docs/envoy/latest/api-v2/api/v2/discovery.proto#discoveryrequest)
 ACK or NACK.
-Optionaly, a response message level system_version_info is present for
+Optionally, a response message level system_version_info is present for
 debugging purposes only.
 
 `IncrementalDiscoveryRequest` can be sent in 3 situations:
