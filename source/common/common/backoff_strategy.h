@@ -25,7 +25,6 @@ public:
 
 private:
   uint64_t computeNextInterval();
-  uint64_t multiplyInterval();
 
   uint64_t initial_interval_;
   uint64_t max_interval_;

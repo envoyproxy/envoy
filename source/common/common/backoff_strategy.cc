@@ -22,15 +22,10 @@ uint64_t ExponentialBackOffStrategy::computeNextInterval() {
   } else if (current_interval_ >= max_interval_) {
     current_interval_ = max_interval_;
   } else {
-    current_interval_ = multiplyInterval();
+    uint64_t new_interval = current_interval_;
+    new_interval *= multiplier_;
+    current_interval_ = new_interval > max_interval_ ? max_interval_ : new_interval;
   }
   return current_interval_;
 }
-
-uint64_t ExponentialBackOffStrategy::multiplyInterval() {
-  uint64_t temp_interval = current_interval_;
-  temp_interval *= multiplier_;
-  return (temp_interval > max_interval_ ? max_interval_ : temp_interval);
-}
-
 } // namespace Envoy
