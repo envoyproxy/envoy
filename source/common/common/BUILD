@@ -20,7 +20,10 @@ envoy_cc_library(
     name = "backoff_lib",
     srcs = ["backoff_strategy.cc"],
     hdrs = ["backoff_strategy.h"],
-    deps = [":assert_lib"],
+    deps = [
+        ":assert_lib",
+        "//include/envoy/common:backoff_strategy_interface",
+    ],
 )
 
 envoy_cc_library(

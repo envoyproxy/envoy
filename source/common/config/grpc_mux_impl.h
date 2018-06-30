@@ -43,9 +43,9 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   // TODO(htuch): Make this configurable or some static.
-  const uint32_t RETRY_INITIAL_DELAY_MS = 5000;
-  const uint32_t RETRY_MAX_DELAY_MS = 120000; // Do not cross more than 2 mins
-  const uint32_t MULTIPLIER = 2;
+  const uint32_t RETRY_INITIAL_DELAY_MS = 500;
+  const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
+  const double MULTIPLIER = 2;
 
 private:
   void setRetryTimer();
