@@ -1,5 +1,8 @@
 #include "extensions/filters/common/lua/wrappers.h"
 
+#include "common/http/utility.h"
+#include "common/protobuf/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -26,7 +29,7 @@ int BufferWrapper::luaGetBytes(lua_State* state) {
   return 1;
 }
 
-void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value& value) {
+void MetadataMapHelper::setValue(lua_State* state, const ProtobufWkt::Value& value) {
   ProtobufWkt::Value::KindCase kind = value.kind_case();
 
   switch (kind) {
@@ -76,7 +79,7 @@ void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value& va
   }
 }
 
-void MetadataMapWrapper::createTable(
+void MetadataMapHelper::createTable(
     lua_State* state,
     const Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Value>& fields) {
   lua_createtable(state, 0, fields.size());
@@ -98,7 +101,7 @@ int MetadataMapIterator::luaPairsIterator(lua_State* state) {
   }
 
   lua_pushstring(state, current_->first.c_str());
-  parent_.setValue(state, current_->second);
+  MetadataMapHelper::setValue(state, current_->second);
 
   current_++;
   return 2;
@@ -111,7 +114,7 @@ int MetadataMapWrapper::luaGet(lua_State* state) {
     return 0;
   }
 
-  setValue(state, filter_it->second);
+  MetadataMapHelper::setValue(state, filter_it->second);
   return 1;
 }
 
@@ -122,6 +125,72 @@ int MetadataMapWrapper::luaPairs(lua_State* state) {
 
   iterator_.reset(MetadataMapIterator::create(state, *this), true);
   lua_pushcclosure(state, MetadataMapIterator::static_luaPairsIterator, 1);
+  return 1;
+}
+
+int RequestInfoWrapper::luaDynamicMetadata(lua_State* state) {
+  if (metadata_wrapper_.get() != nullptr) {
+    metadata_wrapper_.pushStack();
+  } else {
+    metadata_wrapper_.reset(DynamicMetadataMapWrapper::create(state, request_info_), true);
+  }
+  return 1;
+}
+
+int RequestInfoWrapper::luaProtocol(lua_State* state) {
+  lua_pushstring(state, Http::Utility::getProtocolString(request_info_.protocol().value()).c_str());
+  return 1;
+}
+
+DynamicMetadataMapIterator::DynamicMetadataMapIterator(DynamicMetadataMapWrapper& parent)
+    : parent_{parent}, current_{parent.request_info_.dynamicMetadata().filter_metadata().begin()} {}
+
+int DynamicMetadataMapIterator::luaPairsIterator(lua_State* state) {
+  if (current_ == parent_.request_info_.dynamicMetadata().filter_metadata().end()) {
+    parent_.iterator_.reset();
+    return 0;
+  }
+
+  lua_pushstring(state, current_->first.c_str());
+  MetadataMapHelper::createTable(state, current_->second.fields());
+
+  current_++;
+  return 2;
+}
+
+int DynamicMetadataMapWrapper::luaGet(lua_State* state) {
+  const char* filter_name = luaL_checkstring(state, 2);
+  const auto& metadata = request_info_.dynamicMetadata().filter_metadata();
+  const auto filter_it = metadata.find(filter_name);
+  if (filter_it == metadata.end()) {
+    return 0;
+  }
+
+  MetadataMapHelper::createTable(state, filter_it->second.fields());
+  return 1;
+}
+
+int DynamicMetadataMapWrapper::luaSet(lua_State* state) {
+  // TODO(dio): Allow to set dynamic metadata using a table.
+  const char* filter_name = luaL_checkstring(state, 2);
+  const char* key = luaL_checkstring(state, 3);
+  const char* value = luaL_checkstring(state, 4);
+  request_info_.setDynamicMetadata(filter_name, MessageUtil::keyValueStruct(key, value));
+  return 0;
+}
+
+int DynamicMetadataMapWrapper::luaPairs(lua_State* state) {
+  if (iterator_.get() != nullptr) {
+    luaL_error(state, "cannot create a second iterator before completing the first");
+  }
+
+  iterator_.reset(DynamicMetadataMapIterator::create(state, *this), true);
+  lua_pushcclosure(state, DynamicMetadataMapIterator::static_luaPairsIterator, 1);
+  return 1;
+}
+
+int ConnectionWrapper::luaSecure(lua_State* state) {
+  lua_pushboolean(state, connection_->ssl() != nullptr);
   return 1;
 }
 

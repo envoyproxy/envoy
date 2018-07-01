@@ -290,6 +290,11 @@ under the filter name i.e. *envoy.lua*. Below is an example of a *metadata* in a
 
 Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.
 
+requestInfo()
+^^^^^^^^^^^^^
+
+Returns a :ref:`request info object <config_http_filters_lua_request_info_wrapper>`.
+
 .. _config_http_filters_lua_header_wrapper:
 
 Header object API
@@ -403,3 +408,52 @@ __pairs()
 
 Iterates through every *metadata* entry. *key* is a string that supplies a *metadata*
 key. *value* is *metadata* entry value.
+
+.. _config_http_filters_lua_request_info_wrapper:
+
+Request Info object API
+-----------------------
+
+dynamicMetadata()
+^^^^^^^^^^^^^^^^^
+
+Returns a :ref:`dynamicMetadata object <config_http_filters_lua_dynamic_metadata_wrapper>`.
+
+.. _config_http_filters_lua_dynamic_metadata_wrapper:
+
+Dynamic Metadata object API
+---------------------------
+
+get()
+^^^^^
+
+.. code-block:: lua
+
+  dynamicMetadata:get(filterName)
+
+  -- to get a value from a returned table.
+  dynamicMetadata:get(filterName)[key]
+
+Gets an entry in dynamic metadata struct. *filterName* is a string that supplies the filter name, e.g. *envoy.lb*.
+Returns the corresponding *table* of a given *filterName*.
+
+set()
+^^^^^
+
+.. code-block:: lua
+
+  dynamicMetadata:set(filterName, key, value)
+
+Sets key-value pair of a *filterName*'s metadata. *filterName* is a key specifying the target filter name,
+e.g. *envoy.lb*. The type of *key* and *value* is *string*.
+
+__pairs()
+^^^^^^^^^
+
+.. code-block:: lua
+
+  for key, value in pairs(dynamicMetadata) do
+  end
+
+Iterates through every *dynamicMetadata* entry. *key* is a string that supplies a *dynamicMetadata*
+key. *value* is *dynamicMetadata* entry value.
