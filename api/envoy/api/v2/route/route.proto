@@ -303,6 +303,9 @@ message CorsPolicy {
 
   // Specifies if CORS is enabled. Defaults to true. Only effective on route.
   google.protobuf.BoolValue enabled = 7;
+
+  // Specifies regex patterns that match allowed origins.
+  repeated string allow_origin_regex = 8;
 }
 
 // [#comment:next free field: 24]
