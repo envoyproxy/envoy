@@ -41,7 +41,7 @@ setRouteUsingWebsocket(const envoy::api::v2::route::RouteAction::WebSocketProxyC
                        bool old_style) {
   if (!old_style) {
     return [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-              hcm) { hcm.add_upgrade_configs()->set_upgrade_type("websocket"); };
+                  hcm) { hcm.add_upgrade_configs()->set_upgrade_type("websocket"); };
   }
   return
       [ws_config](
