@@ -1,46 +1,19 @@
-#include "extensions/filters/network/thrift_proxy/transport.h"
-
-#include <ctype.h>
-
-#include <algorithm>
-#include <vector>
+#include "extensions/filters/network/thrift_proxy/transport_impl.h"
 
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
-#include "common/common/byte_order.h"
-#include "common/common/utility.h"
 
-#include "extensions/filters/network/thrift_proxy/binary_protocol.h"
+#include "extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
 #include "extensions/filters/network/thrift_proxy/buffer_helper.h"
-#include "extensions/filters/network/thrift_proxy/compact_protocol.h"
+#include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
+#include "extensions/filters/network/thrift_proxy/framed_transport_impl.h"
+#include "extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
-
-bool FramedTransportImpl::decodeFrameStart(Buffer::Instance& buffer) {
-  if (buffer.length() < 4) {
-    return false;
-  }
-
-  int32_t size = BufferHelper::peekI32(buffer);
-
-  if (size <= 0 || size > MaxFrameSize) {
-    throw EnvoyException(fmt::format("invalid thrift framed transport frame size {}", size));
-  }
-
-  onFrameStart(absl::optional<uint32_t>(static_cast<uint32_t>(size)));
-
-  buffer.drain(4);
-  return true;
-}
-
-bool FramedTransportImpl::decodeFrameEnd(Buffer::Instance&) {
-  onFrameComplete();
-  return true;
-}
 
 bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer) {
   if (transport_ == nullptr) {
