@@ -77,13 +77,20 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
   // for streaming (e.g. SSE stream sent to hystrix dashboard), we do not want
   // chunk transfer encoding but we don't have a content-length so we pass "envoy only"
   // header to avoid adding chunks
+  //
+  // Note that for HEAD requests Envoy does best-effort guessing when there is no
+  // content-length. If a client makes a HEAD request for an upstream resource
+  // with no bytes but the upstream response doesn't include "Content-length: 0",
+  // Envoy will incorrectly assume a subsequent response to GET will be chunk encoded.
   if (saw_content_length || headers.NoChunks()) {
     chunk_encoding_ = false;
   } else {
     if (processing_100_continue_) {
       // Make sure we don't serialize chunk information with 100-Continue headers.
       chunk_encoding_ = false;
-    } else if (end_stream) {
+    } else if (end_stream && !is_response_to_head_request_) {
+      // If this is a headers-only stream, append an explicit "Content-Length: 0" unless it's a
+      // response to a HEAD request.
       encodeHeader(Headers::get().ContentLength.get().c_str(),
                    Headers::get().ContentLength.get().size(), "0", 1);
       chunk_encoding_ = false;
@@ -94,7 +101,9 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
                    Headers::get().TransferEncoding.get().size(),
                    Headers::get().TransferEncodingValues.Chunked.c_str(),
                    Headers::get().TransferEncodingValues.Chunked.size());
-      chunk_encoding_ = true;
+      // When sending a response to a HEAD request Envoy may send an informational
+      // "Transfer-Encoding: chunked" header, but should not send a chunk encoded body.
+      chunk_encoding_ = !is_response_to_head_request_;
     }
   }
 
@@ -486,6 +495,10 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
   // sense.
   if (active_request_) {
     const char* method_string = http_method_str(static_cast<http_method>(parser_.method));
+
+    // Inform the response encoder about any HEAD method, so it can set content
+    // length and transfer encoding headers correctly.
+    active_request_->response_encoder_.isResponseToHeadRequest(parser_.method == HTTP_HEAD);
 
     // Currently, CONNECT is not supported, however; http_parser_parse_url needs to know about
     // CONNECT
