@@ -15,6 +15,7 @@ upstream cluster to route to or whether to perform a redirect.
     "name": "...",
     "domains": [],
     "routes": [],
+    "cors": {},
     "require_ssl": "...",
     "virtual_clusters": [],
     "rate_limits": [],

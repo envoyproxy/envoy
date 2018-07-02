@@ -487,7 +487,7 @@ string map. Nested objects are not supported.
 
 .. _config_http_conn_man_route_table_cors:
 
-Cors
+CORS
 --------
 
 Settings on a route take precedence over settings on the virtual host.
@@ -497,6 +497,7 @@ Settings on a route take precedence over settings on the virtual host.
   {
     "enabled": false,
     "allow_origin": ["http://foo.example"],
+    "allow_origin_regex": [".*\\.envoyproxy.io*"],
     "allow_methods": "POST, GET, OPTIONS",
     "allow_headers": "Content-Type",
     "allow_credentials": false,
@@ -511,6 +512,9 @@ enabled
 allow_origin
   *(optional, array)* The origins that will be allowed to do CORS request.
   Wildcard "\*" will allow any origin.
+
+allow_origin_regex
+  *(optiona, array)* A list of regexes that match allowed origins. E.g. matching all subdomains.
 
 allow_methods
   *(optional, string)* The content for the *access-control-allow-methods* header.
