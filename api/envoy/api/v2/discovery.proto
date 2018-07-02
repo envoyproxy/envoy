@@ -146,6 +146,7 @@ message IncrementalDiscoveryRequest {
   //
   // A list of Resource names to add to the list of tracked resources.
   repeated string resource_names_subscribe = 3;
+
   // A list of Resource names to remove from the list of tracked resources.
   repeated string resource_names_unsubscribe = 4;
 
