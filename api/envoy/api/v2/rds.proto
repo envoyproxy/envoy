@@ -28,7 +28,8 @@ service RouteDiscoveryService {
   rpc StreamRoutes(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 
-  rpc IncrementalRoutes(stream IncrementalDiscoveryRequest) returns (stream IncrementalDiscoveryResponse) {
+  rpc IncrementalRoutes(stream IncrementalDiscoveryRequest)
+      returns (stream IncrementalDiscoveryResponse) {
   }
 
   rpc FetchRoutes(DiscoveryRequest) returns (DiscoveryResponse) {

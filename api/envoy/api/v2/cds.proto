@@ -30,7 +30,8 @@ service ClusterDiscoveryService {
   rpc StreamClusters(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 
-  rpc IncrementalClusters(stream IncrementalDiscoveryRequest) returns (stream IncrementalDiscoveryResponse) {
+  rpc IncrementalClusters(stream IncrementalDiscoveryRequest)
+      returns (stream IncrementalDiscoveryResponse) {
   }
 
   rpc FetchClusters(DiscoveryRequest) returns (DiscoveryResponse) {
