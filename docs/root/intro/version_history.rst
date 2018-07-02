@@ -3,6 +3,8 @@ Version history
 
 1.8.0 (Pending)
 ===============
+* access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>` 
+  to filter based on the presence of Envoy response flags. 
 * admin: added :http:get:`/hystrix_event_stream` as an endpoint for monitoring envoy's statistics 
   through `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
 * http: response filters not applied to early error paths such as http_parser generated 400s.
