@@ -45,7 +45,6 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   request_headers.removeEnvoyInternalRequest();
   request_headers.removeKeepAlive();
   request_headers.removeProxyConnection();
-  // TODO(alyssawilk) handle this with current and new websocket here and below.
   request_headers.removeTransferEncoding();
 
   // If we are "using remote address" this means that we create/append to XFF with our immediate

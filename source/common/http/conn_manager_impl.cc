@@ -447,7 +447,7 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   request_headers_ = std::move(headers);
-  createFilterChain();
+  bool upgrade_rejected = createFilterChain() == false;
 
   maybeEndDecode(end_stream);
 
@@ -569,7 +569,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
       connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
       return;
-    } else if (websocket_requested) {
+    } else if (websocket_requested && upgrade_rejected) {
       // Do not allow WebSocket upgrades if the route does not support it.
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
       sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::Forbidden, "",
@@ -942,7 +942,9 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   if (connection_manager_.drain_state_ == DrainState::Closing &&
       connection_manager_.codec_->protocol() != Protocol::Http2) {
-    headers.insertConnection().value().setReference(Headers::get().ConnectionValues.Close);
+    if (headers.Connection() == nullptr || headers.Connection()->value() != "Upgrade") {
+      headers.insertConnection().value().setReference(Headers::get().ConnectionValues.Close);
+    }
   }
 
   if (connection_manager_.config_.tracingConfig()) {
@@ -1118,8 +1120,17 @@ void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::createFilterChain() {
-  connection_manager_.config_.filterFactory().createFilterChain(*this);
+bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
+  auto upgrade = request_headers_->Upgrade();
+  if (upgrade != nullptr) {
+    if (!connection_manager_.config_.filterFactory().createUpgradeFilterChain(
+            upgrade->value().c_str(), *this)) {
+      return false;
+    }
+  } else {
+    connection_manager_.config_.filterFactory().createFilterChain(*this);
+  }
+  return true;
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {

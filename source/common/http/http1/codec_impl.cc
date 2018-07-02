@@ -94,7 +94,7 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
                    Headers::get().TransferEncoding.get().size(),
                    Headers::get().TransferEncodingValues.Chunked.c_str(),
                    Headers::get().TransferEncodingValues.Chunked.size());
-      chunk_encoding_ = true;
+      chunk_encoding_ = headers.Upgrade() == nullptr;
     }
   }
 
@@ -270,7 +270,7 @@ http_parser_settings ConnectionImpl::settings_{
       return 0;
     },
     [](http_parser* parser) -> int {
-      static_cast<ConnectionImpl*>(parser->data)->onMessageComplete();
+      static_cast<ConnectionImpl*>(parser->data)->onMessageCompleteBase();
       return 0;
     },
     nullptr, // on_chunk_header
@@ -304,8 +304,31 @@ void ConnectionImpl::completeLastHeader() {
   ASSERT(current_header_value_.empty());
 }
 
+bool ConnectionImpl::maybeDirectDispatch(Buffer::Instance& data) {
+  if (!handling_upgrade_) {
+    // Only direct dispatch for Upgrade requests.
+    return false;
+  }
+
+  ssize_t total_parsed = 0;
+  uint64_t num_slices = data.getRawSlices(nullptr, 0);
+  Buffer::RawSlice slices[num_slices];
+  data.getRawSlices(slices, num_slices);
+  for (Buffer::RawSlice& slice : slices) {
+    total_parsed += slice.len_;
+    onBody(static_cast<const char*>(slice.mem_), slice.len_);
+  }
+  ENVOY_CONN_LOG(trace, "direct-dispatched {} bytes", connection_, total_parsed);
+  data.drain(total_parsed);
+  return true;
+}
+
 void ConnectionImpl::dispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "parsing {} bytes", connection_, data.length());
+
+  if (maybeDirectDispatch(data)) {
+    return;
+  }
 
   // Always unpause before dispatch.
   http_parser_pause(&parser_, 0);
@@ -324,6 +347,8 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
 
   ENVOY_CONN_LOG(trace, "parsed {} bytes", connection_, total_parsed);
   data.drain(total_parsed);
+
+  maybeDirectDispatch(data);
 }
 
 size_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
@@ -368,11 +393,30 @@ int ConnectionImpl::onHeadersCompleteBase() {
     // HTTP/1.1 or not.
     protocol_ = Protocol::Http10;
   }
+  if (current_header_map_->Upgrade() != nullptr) {
+    ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
+    handling_upgrade_ = true;
+  }
 
   int rc = onHeadersComplete(std::move(current_header_map_));
   current_header_map_.reset();
   header_parsing_state_ = HeaderParsingState::Done;
-  return rc;
+
+  // Returning 2 informs http_parser to not expect a body or further data on this connection.
+  return handling_upgrade_ ? 2 : rc;
+}
+
+void ConnectionImpl::onMessageCompleteBase() {
+  ENVOY_CONN_LOG(trace, "message complete", connection_);
+  if (handling_upgrade_) {
+    // If this is an upgrade request, swallow the onMessageComplete. The
+    // upgrade payload will be treated as stream body.
+    ASSERT(!deferred_end_stream_headers_);
+    ENVOY_CONN_LOG(trace, "Pausing parser due to upgrade.", connection_);
+    http_parser_pause(&parser_, 1);
+    return;
+  }
+  onMessageComplete();
 }
 
 void ConnectionImpl::onMessageBeginBase() {
@@ -501,7 +545,7 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
     // scenario where the higher layers stream through and implicitly switch to chunked transfer
     // encoding because end stream with zero body length has not yet been indicated.
     if (parser_.flags & F_CHUNKED ||
-        (parser_.content_length > 0 && parser_.content_length != ULLONG_MAX)) {
+        (parser_.content_length > 0 && parser_.content_length != ULLONG_MAX) || handling_upgrade_) {
       active_request_->request_decoder_->decodeHeaders(std::move(headers), false);
 
       // If the connection has been closed (or is closing) after decoding headers, pause the parser
@@ -543,7 +587,6 @@ void ServerConnectionImpl::onBody(const char* data, size_t length) {
 
 void ServerConnectionImpl::onMessageComplete() {
   if (active_request_) {
-    ENVOY_CONN_LOG(trace, "message complete", connection_);
     Buffer::OwnedImpl buffer;
     active_request_->remote_complete_ = true;
 
@@ -662,7 +705,6 @@ void ClientConnectionImpl::onBody(const char* data, size_t length) {
 }
 
 void ClientConnectionImpl::onMessageComplete() {
-  ENVOY_CONN_LOG(trace, "message complete", connection_);
   if (ignore_message_complete_for_100_continue_) {
     ignore_message_complete_for_100_continue_ = false;
     return;
