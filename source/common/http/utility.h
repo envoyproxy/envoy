@@ -94,6 +94,14 @@ std::string makeSetCookieValue(const std::string& key, const std::string& value,
 uint64_t getResponseStatus(const HeaderMap& headers);
 
 /**
+ * Determine whether these headers are a valid Upgrade request or response.
+ * This function returns true if the following HTTP headers and values are present:
+ * - Connection: Upgrade
+ * - Upgrade: [any value]
+ */
+bool isUpgrade(const HeaderMap& headers);
+
+/**
  * Determine whether this is a WebSocket Upgrade request.
  * This function returns true if the following HTTP headers and values are present:
  * - Connection: Upgrade
