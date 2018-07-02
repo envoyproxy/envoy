@@ -1,0 +1,44 @@
+static_resources:
+  listeners:
+  - address:
+      pipe:
+        path: "{{ socket_dir }}/unix-sockets.listener_0"
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        config:
+          value:
+            filters:
+            - type: decoder
+              name: router
+              config: {}
+            codec_type: auto
+            stat_prefix: router
+            drain_timeout_ms: 5000
+            route_config:
+              virtual_hosts:
+              - domains:
+                - "*"
+                name: vhost_0
+                routes:
+                - prefix: "/"
+                  cluster: cluster_0
+          deprecated_v1: true
+        deprecated_v1:
+          type: read
+  clusters:
+  - name: cluster_0
+    connect_timeout: 5s
+    hosts:
+    - socket_address:
+        address: "{{ ip_loopback_address }}"
+        port_value: 0
+    dns_lookup_family: V4_ONLY
+cluster_manager: {}
+watchdog: {}
+admin:
+  access_log_path: "/dev/null"
+  address:
+    socket_address:
+      address: "{{ ip_loopback_address }}"
+      port_value: 0
