@@ -30,6 +30,9 @@ service ClusterDiscoveryService {
   rpc StreamClusters(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 
+  rpc IncrementalClusters(stream IncrementalDiscoveryRequest) returns (stream IncrementalDiscoveryResponse) {
+  }
+
   rpc FetchClusters(DiscoveryRequest) returns (DiscoveryResponse) {
     option (google.api.http) = {
       post: "/v2/discovery:clusters"

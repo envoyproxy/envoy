@@ -287,7 +287,8 @@ admin:
 
 ### Incremental xDS
 
-Incremental xDS is separate xDS endpoint available for ADS that allows:
+Incremental xDS is separate xDS endpoint available for ADS, CDS and RDS that
+allows:
 
   * Incremental updates of the list of tracked resources by the xDS client.
     This supports Envoy on-demand / lazily requesting additional resources. For
@@ -328,8 +329,6 @@ On reconnect the xDS Incremental client may tell the server of its known resourc
 to avoid resending them over the network.
 
 ![Incremental reconnect example](diagrams/incremental-reconnect.svg)
-
-The incremental xDS method may be added to CDS and RDS in the future.
 
 ## REST-JSON polling subscriptions
 
