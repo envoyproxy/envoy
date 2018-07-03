@@ -16,8 +16,7 @@ namespace Envoy {
 class ExponentialBackOffStrategy : public BackOffStrategy {
 
 public:
-  ExponentialBackOffStrategy(const uint64_t initial_interval, const uint64_t max_interval,
-                             const double multiplier);
+  ExponentialBackOffStrategy(uint64_t initial_interval, uint64_t max_interval, double multiplier);
 
   // BackOffStrategy methods
   uint64_t nextBackOff() override;

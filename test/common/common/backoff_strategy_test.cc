@@ -12,6 +12,16 @@ TEST(BackOffStrategyTest, ExponentialBackOffBasicTest) {
   EXPECT_EQ(80, exponential_back_off.nextBackOff());
 }
 
+TEST(BackOffStrategyTest, ExponentialBackOffFractionalMultiplier) {
+  ExponentialBackOffStrategy exponential_back_off(10, 50, 1.5);
+  EXPECT_EQ(10, exponential_back_off.nextBackOff());
+  EXPECT_EQ(15, exponential_back_off.nextBackOff());
+  EXPECT_EQ(23, exponential_back_off.nextBackOff());
+  EXPECT_EQ(35, exponential_back_off.nextBackOff());
+  EXPECT_EQ(50, exponential_back_off.nextBackOff());
+  EXPECT_EQ(50, exponential_back_off.nextBackOff());
+}
+
 TEST(BackOffStrategyTest, ExponentialBackOffMaxIntervalReached) {
   ExponentialBackOffStrategy exponential_back_off(10, 100, 2);
   EXPECT_EQ(10, exponential_back_off.nextBackOff());
