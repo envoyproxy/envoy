@@ -125,8 +125,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
 bool EdsClusterImpl::updateHostsPerLocality(const uint32_t priority, const HostVector& new_hosts,
                                             LocalityWeightsMap& locality_weights_map,
                                             LocalityWeightsMap& new_locality_weights_map) {
-  HostVectorSharedPtr current_hosts_copy(
-      new HostVector(priority_set_.getOrCreateHostSet(priority).hosts()));
+  const auto& host_set = priority_set_.getOrCreateHostSet(priority);
+  HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
 
   HostVector hosts_added;
   HostVector hosts_removed;
@@ -141,7 +141,6 @@ bool EdsClusterImpl::updateHostsPerLocality(const uint32_t priority, const HostV
   if (updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed) ||
       locality_weights_map != new_locality_weights_map) {
     locality_weights_map = new_locality_weights_map;
-    const auto& host_set = priority_set_.getOrCreateHostSet(priority);
     ENVOY_LOG(debug, "EDS hosts or locality weights changed for cluster: {} ({}) priority {}",
               info_->name(), host_set.hosts().size(), host_set.priority());
 
