@@ -15,6 +15,9 @@ Version history
 * http: response filters not applied to early error paths such as http_parser generated 400s.
 * http: added generic +:ref:`Upgrade support 
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`
+* listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
+  :ref:`destination_port <envoy_api_field_listener.FilterChainMatch.destination_port>` and
+  :ref:`prefix_ranges <envoy_api_field_listener.FilterChainMatch.prefix_ranges>`.
 * lua: added :ref:`connection() <config_http_filters_lua_connection_wrapper>` wrapper and *ssl()* API.
 * lua: added :ref:`requestInfo() <config_http_filters_lua_request_info_wrapper>` wrapper and *protocol()* API.
 * ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`.
