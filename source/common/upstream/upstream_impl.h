@@ -528,8 +528,7 @@ public:
   // initialized.
   void updateClusterPrioritySet(const uint32_t priority, HostVectorSharedPtr current_hosts,
                                 const absl::optional<HostVector>& hosts_added,
-                                const absl::optional<HostVector>& hosts_removed,
-                                const bool health_checker_flag);
+                                const absl::optional<HostVector>& hosts_removed);
 
   // Returns the size of the current cluster priority state.
   size_t size() const { return priority_state_.size(); }

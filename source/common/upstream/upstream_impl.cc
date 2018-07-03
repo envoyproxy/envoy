@@ -689,11 +689,10 @@ void PriorityStateManager::registerHostForPriority(
   }
 }
 
-void PriorityStateManager::updateClusterPrioritySet(const uint32_t priority,
-                                                    HostVectorSharedPtr current_hosts,
-                                                    const absl::optional<HostVector>& hosts_added,
-                                                    const absl::optional<HostVector>& hosts_removed,
-                                                    const bool health_checker_flag) {
+void PriorityStateManager::updateClusterPrioritySet(
+    const uint32_t priority, HostVectorSharedPtr current_hosts,
+    const absl::optional<HostVector>& hosts_added,
+    const absl::optional<HostVector>& hosts_removed) {
   // If local locality is not defined then skip populating per locality hosts.
   const auto& local_locality = local_info_node_.locality();
   ENVOY_LOG(trace, "Local locality: {}", local_locality.DebugString());
@@ -719,12 +718,9 @@ void PriorityStateManager::updateClusterPrioritySet(const uint32_t priority,
   std::map<envoy::api::v2::core::Locality, HostVector, LocalityLess> hosts_per_locality;
 
   for (const HostSharedPtr& host : *hosts) {
-    // TODO(dio): Add more comments on this in case of EDS.
-    if (health_checker_flag) {
-      // At this point see if we have a health checker. If so, mark all the hosts unhealthy and
-      // then fire update callbacks to start the health checking process.
-      host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-    }
+    // TODO(dio): Take into consideration of having active health checking for other than EDS, to
+    // mark all the hosts unhealthy (host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC)) and
+    // then fire update callbacks to start the health checking process.
     hosts_per_locality[host->locality()].push_back(host);
   }
 
