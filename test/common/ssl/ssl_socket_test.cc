@@ -2549,6 +2549,23 @@ TEST_P(SslSocketTest, RevokedCertificate) {
            true, GetParam());
 }
 
+TEST_P(SslSocketTest, GetRequestedServerName) {
+  envoy::api::v2::Listener listener;
+  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::api::v2::auth::TlsCertificate* server_cert =
+      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  server_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem"));
+  server_cert->mutable_private_key()->set_filename(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem"));
+
+  envoy::api::v2::auth::UpstreamTlsContext client;
+  client.set_sni("lyft.com");
+
+  testUtilV2(listener, client, "", true, "", "", "", "", "ssl.handshake", 2, "lyft.com",
+             GetParam());
+}
+
 class SslReadBufferLimitTest : public SslCertsTest,
                                public testing::WithParamInterface<Network::Address::IpVersion> {
 public:
