@@ -109,10 +109,10 @@ config:
       request_handle:headers():add("request_body_size", body_length)
       request_handle:headers():add("request_metadata_foo", metadata["foo"])
       request_handle:headers():add("request_metadata_baz", metadata["baz"])
-      if request_handle:connection():secure() then
-        request_handle:headers():add("request_secure", "true")
-      else
+      if request_handle:connection():ssl() == nil then
         request_handle:headers():add("request_secure", "false")
+      else
+        request_handle:headers():add("request_secure", "true")
       end
     end
 

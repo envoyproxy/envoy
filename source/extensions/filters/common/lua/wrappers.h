@@ -100,21 +100,36 @@ private:
 };
 
 /**
+ * Lua wrapper for Ssl::Connection.
+ */
+class SslConnectionWrapper : public BaseLuaObject<SslConnectionWrapper> {
+public:
+  SslConnectionWrapper(const Ssl::Connection*) {}
+  static ExportedFunctions exportedFunctions() { return {}; }
+
+  // TODO(dio): Add more Lua APIs around Ssl::Connection later.
+};
+
+/**
  * Lua wrapper for Network::Connection.
  */
 class ConnectionWrapper : public BaseLuaObject<ConnectionWrapper> {
 public:
   ConnectionWrapper(const Network::Connection* connection) : connection_{connection} {}
-  static ExportedFunctions exportedFunctions() { return {{"secure", static_luaSecure}}; }
+  static ExportedFunctions exportedFunctions() { return {{"ssl", static_luaSsl}}; }
 
 private:
   /**
-   * Check if the connection is secured or not.
-   * @return boolean true if secured and false if not.
+   * Get the Ssl::Connection wrapper
+   * @return object if secured and nil if not.
    */
-  DECLARE_LUA_FUNCTION(ConnectionWrapper, luaSecure);
+  DECLARE_LUA_FUNCTION(ConnectionWrapper, luaSsl);
+
+  // Envoy::Lua::BaseLuaObject
+  void onMarkDead() override { ssl_connection_wrapper_.reset(); }
 
   const Network::Connection* connection_;
+  LuaDeathRef<SslConnectionWrapper> ssl_connection_wrapper_;
 };
 
 } // namespace Lua

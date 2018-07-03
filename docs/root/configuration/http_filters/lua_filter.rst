@@ -401,7 +401,7 @@ get()
   metadata:get(key)
 
 Gets a metadata. *key* is a string that supplies the metadata key. Returns the corresponding
-value of the given metadata key. The type of the value can be: *null*, *boolean*, *number*,
+value of the given metadata key. The type of the value can be: *nil*, *boolean*, *number*,
 *string* and *table*.
 
 __pairs()
@@ -420,13 +420,20 @@ key. *value* is *metadata* entry value.
 Connection object API
 ---------------------
 
-secure()
+ssl()
 ^^^^^^^^
 
 .. code-block:: lua
 
-  if connection:secure() then
+  if connection:ssl() == nil then
+    print("plain")
+  else
     print("secure")
-  do
+  end
 
-Returns boolean value indicating that the current connection is secured or not.
+Returns :repo:`SSL connection <include/envoy/ssl>` object when the connection is secured
+and *nil* when it is not.
+
+.. note::
+
+  Currently the SSL connection object has no exposed APIs.

@@ -4,7 +4,7 @@ Version history
 1.8.0 (Pending)
 ===============
 * http: response filters not applied to early error paths such as http_parser generated 400s.
-* lua: added :ref:`connection() <config_http_filters_lua_connection_wrapper>` wrapper and *secure()* API.
+* lua: added :ref:`connection() <config_http_filters_lua_connection_wrapper>` wrapper and *ssl()* API.
 * ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`.
   Lyft's reference implementation of the `ratelimit <https://github.com/lyft/ratelimit>`_ service also supports the data-plane-api proto as of v1.1.0.
   Envoy can use either proto to send client requests to a ratelimit server with the use of the

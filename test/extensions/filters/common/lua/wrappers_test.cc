@@ -33,16 +33,17 @@ class LuaConnectionWrapperTest : public LuaWrappersTestBase<ConnectionWrapper> {
 public:
   virtual void setup(const std::string& script) {
     LuaWrappersTestBase<ConnectionWrapper>::setup(script);
+    state_->registerType<SslConnectionWrapper>();
   }
 
 protected:
   void expectSecureConnection(const bool secure) {
     const std::string SCRIPT{R"EOF(
       function callMe(object)
-        if object:secure() then
-          testPrint("secure")
-        else
+        if object:ssl() == nil then
           testPrint("plain")
+        else
+          testPrint("secure")
         end
       end
     )EOF"};

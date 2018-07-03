@@ -1472,10 +1472,10 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoLuaMetadata) {
 TEST_F(LuaHttpFilterTest, CheckConnection) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
-      if request_handle:connection():secure() then
-        request_handle:logTrace("secure")
-      else
+      if request_handle:connection():ssl() == nil then
         request_handle:logTrace("plain")
+      else
+        request_handle:logTrace("secure")
       end
     end
   )EOF"};
