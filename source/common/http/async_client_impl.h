@@ -195,6 +195,7 @@ private:
         return std::chrono::milliseconds(0);
       }
     }
+    absl::optional<std::chrono::milliseconds> idleTimeout() const override { return absl::nullopt; }
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
       return absl::nullopt;
     }

@@ -311,6 +311,7 @@ public:
     return vhost_.virtualClusterFromEntries(headers);
   }
   std::chrono::milliseconds timeout() const override { return timeout_; }
+  absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
     return max_grpc_timeout_;
   }
@@ -395,6 +396,9 @@ private:
     const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
     const ShadowPolicy& shadowPolicy() const override { return parent_->shadowPolicy(); }
     std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
+    absl::optional<std::chrono::milliseconds> idleTimeout() const override {
+      return parent_->idleTimeout();
+    }
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
       return parent_->maxGrpcTimeout();
     }
@@ -512,6 +516,7 @@ private:
   const Http::LowerCaseString cluster_header_name_;
   const Http::Code cluster_not_found_response_code_;
   const std::chrono::milliseconds timeout_;
+  const absl::optional<std::chrono::milliseconds> idle_timeout_;
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
   const absl::optional<RuntimeData> runtime_;
   Runtime::Loader& loader_;

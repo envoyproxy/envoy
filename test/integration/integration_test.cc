@@ -102,6 +102,20 @@ TEST_P(IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 
 TEST_P(IntegrationTest, Retry) { testRetry(); }
 
+TEST_P(IntegrationTest, PerStreamIdleTimeoutBeforeUpstreamHeaders) {
+  testPerStreamIdleTimeoutBeforeUpstreamHeaders();
+}
+
+TEST_P(IntegrationTest, PerStreamIdleTimeoutAfterUpstreamHeaders) {
+  testPerStreamIdleTimeoutAfterUpstreamHeaders();
+}
+
+TEST_P(IntegrationTest, PerStreamIdleTimeoutAfterData) { testPerStreamIdleTimeoutAfterData(); }
+
+TEST_P(IntegrationTest, PerStreamIdleTimeoutRequestAndResponse) {
+  testPerStreamIdleTimeoutRequestAndResponse();
+}
+
 TEST_P(IntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
 
 TEST_P(IntegrationTest, EnvoyHandlingDuplicate100Continues) { testEnvoyHandling100Continue(true); }

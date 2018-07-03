@@ -635,6 +635,121 @@ void HttpIntegrationTest::testRetry() {
   EXPECT_EQ(512U, response->body().size());
 }
 
+IntegrationStreamDecoderPtr HttpIntegrationTest::setupPerStreamIdleTimeoutTest() {
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        auto* route = virtual_host->mutable_routes(0)->mutable_route();
+        route->mutable_idle_timeout()->set_seconds(1);
+      });
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
+  upstream_request_->waitForHeadersComplete();
+  return response;
+}
+
+// Per-stream idle timeout when waiting for initial upstream headers.
+void HttpIntegrationTest::testPerStreamIdleTimeoutBeforeUpstreamHeaders() {
+  auto response = setupPerStreamIdleTimeoutTest();
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    codec_client_->waitForDisconnect();
+  } else {
+    response->waitForReset();
+    codec_client_->close();
+  }
+
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("408", response->headers().Status()->value().c_str());
+  EXPECT_EQ("stream timeout", response->body());
+}
+
+// Per-stream idle timeout after upstream headers have been sent.
+void HttpIntegrationTest::testPerStreamIdleTimeoutAfterUpstreamHeaders() {
+  auto response = setupPerStreamIdleTimeoutTest();
+
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    codec_client_->waitForDisconnect();
+  } else {
+    response->waitForReset();
+    codec_client_->close();
+  }
+
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
+  EXPECT_FALSE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("", response->body());
+}
+
+// Per-stream idle timeout after a sequence of header/data events.
+void HttpIntegrationTest::testPerStreamIdleTimeoutAfterData() {
+  auto response = setupPerStreamIdleTimeoutTest();
+
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(600));
+  upstream_request_->encodeData(1, false);
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(600));
+  codec_client_->sendData(*request_encoder_, 1, false);
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(600));
+  Http::TestHeaderMapImpl request_trailers{{"request1", "trailer1"}, {"request2", "trailer2"}};
+  codec_client_->sendTrailers(*request_encoder_, request_trailers);
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(600));
+  upstream_request_->encodeData(1, false);
+
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    codec_client_->waitForDisconnect();
+  } else {
+    response->waitForReset();
+    codec_client_->close();
+  }
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1U, upstream_request_->bodyLength());
+
+  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
+  EXPECT_FALSE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("aa", response->body());
+}
+
+// Successful request/response when per-stream idle timeout is configured.
+void HttpIntegrationTest::testPerStreamIdleTimeoutRequestAndResponse() {
+  config_helper_.addConfigModifier(
+      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+          -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        auto* route = virtual_host->mutable_routes(0)->mutable_route();
+        route->mutable_idle_timeout()->set_seconds(1);
+      });
+
+  testRouterRequestAndResponseWithBody(1024, 1024, false, nullptr);
+}
+
 // Change the default route to be restrictive, and send a request to an alternate route.
 void HttpIntegrationTest::testGrpcRouterNotFound() {
   config_helper_.setDefaultHostAndRoute("foo.com", "/found");
