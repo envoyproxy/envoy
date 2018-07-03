@@ -135,6 +135,7 @@ def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], de
     native.cc_proto_library(
         name = _Suffix(name, _CC_SUFFIX) + "_native",
         deps = [name],
+        tags=["manual"],
         visibility = ["//visibility:public"],
     )
 

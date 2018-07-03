@@ -47,6 +47,7 @@ proto_library(
 cc_proto_library(
     name = "http_api_protos_native",
     deps = [":http_api_protos_proto"],
+    tags=["manual"],
     visibility = ["//visibility:public"],
 )
 
