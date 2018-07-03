@@ -645,6 +645,292 @@ TEST(BinaryProtocolTest, ReadBinary) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
+TEST(BinaryProtocolTest, WriteMessageBegin) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+
+  // Named call
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeMessageBegin(buffer, "message", MessageType::Call, 1);
+    EXPECT_EQ(std::string("\x80\x1\0\x1\0\0\0\x7message\0\0\0\x1", 19), buffer.toString());
+  }
+
+  // Unnamed oneway
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeMessageBegin(buffer, "", MessageType::Oneway, 2);
+    EXPECT_EQ(std::string("\x80\x1\0\x4\0\0\0\0\0\0\0\x2", 12), buffer.toString());
+  }
+}
+
+TEST(BinaryProtocolTest, WriteMessageEnd) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+  Buffer::OwnedImpl buffer;
+  proto.writeMessageEnd(buffer);
+  EXPECT_EQ(0, buffer.length());
+}
+
+TEST(BinaryProtocolTest, WriteStructBegin) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+  Buffer::OwnedImpl buffer;
+  proto.writeStructBegin(buffer, "unused");
+  EXPECT_EQ(0, buffer.length());
+}
+
+TEST(BinaryProtocolTest, WriteStructEnd) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+  Buffer::OwnedImpl buffer;
+  proto.writeStructEnd(buffer);
+  EXPECT_EQ(0, buffer.length());
+}
+
+TEST(BinaryProtocolTest, WriteFieldBegin) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+
+  // Stop field
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeFieldBegin(buffer, "unused", FieldType::Stop, 1);
+    EXPECT_EQ(std::string("\0", 1), buffer.toString());
+  }
+
+  // Normal field
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeFieldBegin(buffer, "unused", FieldType::I32, 1);
+    EXPECT_EQ(std::string("\x8\0\x1", 3), buffer.toString());
+  }
+}
+
+TEST(BinaryProtocolTest, WriteFieldEnd) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+  Buffer::OwnedImpl buffer;
+  proto.writeFieldEnd(buffer);
+  EXPECT_EQ(0, buffer.length());
+}
+
+TEST(BinaryProtocolTest, WriteMapBegin) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+
+  // Non-empty map
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeMapBegin(buffer, FieldType::I32, FieldType::String, 3);
+    EXPECT_EQ(std::string("\x8\xb\0\0\0\x3", 6), buffer.toString());
+  }
+
+  // Empty map
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeMapBegin(buffer, FieldType::I32, FieldType::String, 0);
+    EXPECT_EQ(std::string("\x8\xb\0\0\0\0", 6), buffer.toString());
+  }
+
+  // Oversized map
+  {
+    Buffer::OwnedImpl buffer;
+    EXPECT_THROW_WITH_MESSAGE(
+        proto.writeMapBegin(buffer, FieldType::I32, FieldType::String, 3000000000), EnvoyException,
+        "illegal binary protocol map size 3000000000");
+  }
+}
+
+TEST(BinaryProtocolTest, WriteMapEnd) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+  Buffer::OwnedImpl buffer;
+  proto.writeMapEnd(buffer);
+  EXPECT_EQ(0, buffer.length());
+}
+
+TEST(BinaryProtocolTest, WriteListBegin) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+
+  // Non-empty list
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeListBegin(buffer, FieldType::String, 3);
+    EXPECT_EQ(std::string("\xb\0\0\0\x3", 5), buffer.toString());
+  }
+
+  // Empty list
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeListBegin(buffer, FieldType::String, 0);
+    EXPECT_EQ(std::string("\xb\0\0\0\0", 5), buffer.toString());
+  }
+
+  // Oversized list
+  {
+    Buffer::OwnedImpl buffer;
+    EXPECT_THROW_WITH_MESSAGE(proto.writeListBegin(buffer, FieldType::String, 3000000000),
+                              EnvoyException, "illegal binary protocol list/set size 3000000000");
+  }
+}
+
+TEST(BinaryProtocolTest, WriteListEnd) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+  Buffer::OwnedImpl buffer;
+  proto.writeListEnd(buffer);
+  EXPECT_EQ(0, buffer.length());
+}
+
+TEST(BinaryProtocolTest, WriteSetBegin) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+
+  // Only test the happy path, as this shares an implementation with writeListBegin
+  // Non-empty list
+  Buffer::OwnedImpl buffer;
+  proto.writeSetBegin(buffer, FieldType::String, 3);
+  EXPECT_EQ(std::string("\xb\0\0\0\x3", 5), buffer.toString());
+}
+
+TEST(BinaryProtocolTest, WriteSetEnd) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+  Buffer::OwnedImpl buffer;
+  proto.writeSetEnd(buffer);
+  EXPECT_EQ(0, buffer.length());
+}
+
+TEST(BinaryProtocolTest, WriteBool) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+
+  // True
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeBool(buffer, true);
+    EXPECT_EQ("\x1", buffer.toString());
+  }
+
+  // False
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeBool(buffer, false);
+    EXPECT_EQ(std::string("\0", 1), buffer.toString());
+  }
+}
+
+TEST(BinaryProtocolTest, WriteByte) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeByte(buffer, -1);
+    EXPECT_EQ("\xFF", buffer.toString());
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeByte(buffer, 127);
+    EXPECT_EQ("\x7F", buffer.toString());
+  }
+}
+
+TEST(BinaryProtocolTest, WriteInt16) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt16(buffer, -1);
+    EXPECT_EQ("\xFF\xFF", buffer.toString());
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt16(buffer, 0x0102);
+    EXPECT_EQ("\x1\x2", buffer.toString());
+  }
+}
+
+TEST(BinaryProtocolTest, WriteInt32) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt32(buffer, -1);
+    EXPECT_EQ("\xFF\xFF\xFF\xFF", buffer.toString());
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt32(buffer, 0x01020304);
+    EXPECT_EQ("\x1\x2\x3\x4", buffer.toString());
+  }
+}
+
+TEST(BinaryProtocolTest, WriteInt64) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt64(buffer, -1);
+    EXPECT_EQ("\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF", buffer.toString());
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt64(buffer, 0x0102030405060708);
+    EXPECT_EQ("\x1\x2\x3\x4\x5\x6\x7\x8", buffer.toString());
+  }
+}
+
+TEST(BinaryProtocolTest, WriteDouble) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+  Buffer::OwnedImpl buffer;
+  proto.writeDouble(buffer, 3.0);
+  EXPECT_EQ(std::string("\x40\x8\0\0\0\0\0\0", 8), buffer.toString());
+}
+
+TEST(BinaryProtocolTest, WriteString) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeString(buffer, "abc");
+    EXPECT_EQ(std::string("\0\0\0\x3"
+                          "abc",
+                          7),
+              buffer.toString());
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeString(buffer, "");
+    EXPECT_EQ(std::string("\0\0\0\0", 4), buffer.toString());
+  }
+}
+
+TEST(BinaryProtocolTest, WriteBinary) {
+  StrictMock<MockProtocolCallbacks> cb;
+  BinaryProtocolImpl proto(cb);
+
+  // Happy path only, since this is just a synonym for writeString
+  Buffer::OwnedImpl buffer;
+  proto.writeBinary(buffer, "abc");
+  EXPECT_EQ(std::string("\0\0\0\x3"
+                        "abc",
+                        7),
+            buffer.toString());
+}
+
 TEST(LaxBinaryProtocolTest, Name) {
   StrictMock<MockProtocolCallbacks> cb;
   LaxBinaryProtocolImpl proto(cb);
@@ -747,6 +1033,25 @@ TEST(LaxBinaryProtocolTest, ReadMessageBegin) {
     EXPECT_EQ(msg_type, MessageType::Call);
     EXPECT_EQ(seq_id, 5678);
     EXPECT_EQ(buffer.length(), 0);
+  }
+}
+
+TEST(LaxBinaryProtocolTest, WriteMessageBegin) {
+  StrictMock<MockProtocolCallbacks> cb;
+  LaxBinaryProtocolImpl proto(cb);
+
+  // Named call
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeMessageBegin(buffer, "message", MessageType::Call, 1);
+    EXPECT_EQ(std::string("\0\0\0\x7message\x1\0\0\0\x1", 16), buffer.toString());
+  }
+
+  // Unnamed oneway
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeMessageBegin(buffer, "", MessageType::Oneway, 2);
+    EXPECT_EQ(std::string("\0\0\0\0\x4\0\0\0\x2", 9), buffer.toString());
   }
 }
 

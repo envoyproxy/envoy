@@ -97,8 +97,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "transport_interface",
     hdrs = ["transport.h"],
+    external_deps = ["abseil_optional"],
     deps = [
-        ":protocol_lib",
         "//include/envoy/buffer:buffer_interface",
         "//source/common/singleton:const_singleton",
     ],

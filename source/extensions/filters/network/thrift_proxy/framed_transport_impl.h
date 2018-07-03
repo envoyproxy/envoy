@@ -25,6 +25,7 @@ public:
   const std::string& name() const override { return TransportNames::get().FRAMED; }
   bool decodeFrameStart(Buffer::Instance& buffer) override;
   bool decodeFrameEnd(Buffer::Instance& buffer) override;
+  void encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) override;
 
   static const int32_t MaxFrameSize = 0xFA0000;
 };

@@ -1048,21 +1048,520 @@ TEST_P(CompactProtocolFieldTypeTest, ConvertsToFieldType) {
 
   NiceMock<MockProtocolCallbacks> cb;
   CompactProtocolImpl proto(cb);
-  Buffer::OwnedImpl buffer;
   std::string name = "-";
   int8_t invalid_field_type = static_cast<int8_t>(FieldType::LastFieldType) + 1;
   FieldType field_type = static_cast<FieldType>(invalid_field_type);
   int16_t field_id = 0;
 
-  addInt8(buffer, compact_field_type);
-  addInt8(buffer, 0x02); // zigzag(2) = 1
+  {
+    Buffer::OwnedImpl buffer;
+    addInt8(buffer, compact_field_type);
+    addInt8(buffer, 0x02); // zigzag(2) = 1
 
-  EXPECT_TRUE(proto.readFieldBegin(buffer, name, field_type, field_id));
-  EXPECT_LE(field_type, FieldType::LastFieldType);
+    EXPECT_TRUE(proto.readFieldBegin(buffer, name, field_type, field_id));
+    EXPECT_LE(field_type, FieldType::LastFieldType);
+  }
+
+  {
+    // Long form field header
+    Buffer::OwnedImpl buffer;
+    proto.writeFieldBegin(buffer, "-", field_type, 100);
+    if (field_type == FieldType::Bool) {
+      proto.writeBool(buffer, compact_field_type == 1);
+    }
+
+    uint8_t* data = static_cast<uint8_t*>(buffer.linearize(1));
+    EXPECT_NE(nullptr, data);
+    EXPECT_EQ(compact_field_type, *data);
+  }
 }
 
 INSTANTIATE_TEST_CASE_P(CompactFieldTypes, CompactProtocolFieldTypeTest,
                         Values(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12));
+
+TEST(CompactProtocolTest, WriteMessageBegin) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+
+  // Named call
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeMessageBegin(buffer, "message", MessageType::Call, 1);
+    EXPECT_EQ(std::string("\x82\x21\x1\x7message", 11), buffer.toString());
+  }
+
+  // Unnamed oneway
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeMessageBegin(buffer, "", MessageType::Oneway, 2);
+    EXPECT_EQ(std::string("\x82\x81\x2\0", 4), buffer.toString());
+  }
+}
+
+TEST(CompactProtocolTest, WriteMessageEnd) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+  Buffer::OwnedImpl buffer;
+  proto.writeMessageEnd(buffer);
+  EXPECT_EQ(0, buffer.length());
+}
+
+TEST(CompactProtocolTest, WriteStruct) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+  Buffer::OwnedImpl buffer;
+
+  proto.writeStructBegin(buffer, "unused");
+  proto.writeStructEnd(buffer);
+  EXPECT_EQ(0, buffer.length());
+
+  // struct begin/end always appear in nested pairs
+  EXPECT_THROW_WITH_MESSAGE(proto.writeStructEnd(buffer), EnvoyException,
+                            "invalid write of compact protocol struct end")
+}
+
+TEST(CompactProtocolTest, WriteFieldBegin) {
+  // Stop field
+  {
+    StrictMock<MockProtocolCallbacks> cb;
+    CompactProtocolImpl proto(cb);
+    Buffer::OwnedImpl buffer;
+    proto.writeFieldBegin(buffer, "unused", FieldType::Stop, 1);
+    EXPECT_EQ(std::string("\0", 1), buffer.toString());
+  }
+
+  {
+    StrictMock<MockProtocolCallbacks> cb;
+    CompactProtocolImpl proto(cb);
+
+    // Short form
+    {
+      Buffer::OwnedImpl buffer;
+      proto.writeFieldBegin(buffer, "unused", FieldType::I32, 1);
+      EXPECT_EQ("\x15", buffer.toString());
+    }
+
+    // Long form
+    {
+      Buffer::OwnedImpl buffer;
+      proto.writeFieldBegin(buffer, "unused", FieldType::Struct, 17);
+      EXPECT_EQ(std::string("\xC\0\x11", 3), buffer.toString());
+    }
+
+    // Short form
+    {
+      Buffer::OwnedImpl buffer;
+      proto.writeFieldBegin(buffer, "unused", FieldType::Byte, 32);
+      EXPECT_EQ("\xF3", buffer.toString());
+    }
+
+    // Short form
+    {
+      Buffer::OwnedImpl buffer;
+      proto.writeFieldBegin(buffer, "unused", FieldType::String, 33);
+      EXPECT_EQ("\x18", buffer.toString());
+    }
+  }
+
+  {
+    StrictMock<MockProtocolCallbacks> cb;
+    CompactProtocolImpl proto(cb);
+
+    // Long form
+    {
+      Buffer::OwnedImpl buffer;
+      proto.writeFieldBegin(buffer, "unused", FieldType::I32, 16);
+      EXPECT_EQ(std::string("\x5\0\x10", 3), buffer.toString());
+    }
+
+    // Short form
+    {
+      Buffer::OwnedImpl buffer;
+      proto.writeFieldBegin(buffer, "unused", FieldType::Struct, 17);
+      EXPECT_EQ("\x1C", buffer.toString());
+    }
+
+    // Long form
+    {
+      Buffer::OwnedImpl buffer;
+      proto.writeFieldBegin(buffer, "unused", FieldType::Byte, 33);
+      EXPECT_EQ(std::string("\x3\0\x21", 3), buffer.toString());
+    }
+
+    // Long form
+    {
+      Buffer::OwnedImpl buffer;
+      proto.writeFieldBegin(buffer, "unused", FieldType::String, 49);
+      EXPECT_EQ(std::string("\x8\0\x31", 3), buffer.toString());
+    }
+  }
+
+  // Unknown field type
+  {
+    StrictMock<MockProtocolCallbacks> cb;
+    CompactProtocolImpl proto(cb);
+    Buffer::OwnedImpl buffer;
+
+    int8_t invalid_field_type = static_cast<int8_t>(FieldType::LastFieldType) + 1;
+    FieldType field_type = static_cast<FieldType>(invalid_field_type);
+
+    EXPECT_THROW_WITH_MESSAGE(proto.writeFieldBegin(buffer, "unused", field_type, 1),
+                              EnvoyException,
+                              fmt::format("unknown protocol field type {}", invalid_field_type));
+  }
+}
+
+TEST(CompactProtocolTest, WriteFieldEnd) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+  Buffer::OwnedImpl buffer;
+  proto.writeFieldEnd(buffer);
+  EXPECT_EQ(0, buffer.length());
+}
+
+TEST(CompactProtocolTest, WriteBoolField) {
+  // Boolean struct fields are encoded with custom types to save a byte
+
+  // Short form field
+  {
+    StrictMock<MockProtocolCallbacks> cb;
+    CompactProtocolImpl proto(cb);
+    {
+      Buffer::OwnedImpl buffer;
+      proto.writeFieldBegin(buffer, "unused", FieldType::Bool, 8);
+      EXPECT_EQ(0, buffer.length());
+      proto.writeBool(buffer, true);
+      EXPECT_EQ("\x81", buffer.toString());
+    }
+
+    {
+      Buffer::OwnedImpl buffer;
+      proto.writeFieldBegin(buffer, "unused", FieldType::Bool, 12);
+      EXPECT_EQ(0, buffer.length());
+      proto.writeBool(buffer, false);
+      EXPECT_EQ("\x42", buffer.toString());
+    }
+  }
+
+  // Long form field
+  {
+    StrictMock<MockProtocolCallbacks> cb;
+    CompactProtocolImpl proto(cb);
+
+    {
+      Buffer::OwnedImpl buffer;
+      proto.writeFieldBegin(buffer, "unused", FieldType::Bool, 16);
+      EXPECT_EQ(0, buffer.length());
+      proto.writeBool(buffer, true);
+      EXPECT_EQ(std::string("\x1\0\x10", 3), buffer.toString());
+    }
+
+    {
+      Buffer::OwnedImpl buffer;
+      proto.writeFieldBegin(buffer, "unused", FieldType::Bool, 32);
+      EXPECT_EQ(0, buffer.length());
+      proto.writeBool(buffer, false);
+      EXPECT_EQ(std::string("\x2\0\x20", 3), buffer.toString());
+    }
+  }
+}
+
+TEST(CompactProtocolTest, WriteMapBegin) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+
+  // Empty map
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeMapBegin(buffer, FieldType::I32, FieldType::Bool, 0);
+    EXPECT_EQ(std::string("\0", 1), buffer.toString());
+  }
+
+  // Non-empty map
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeMapBegin(buffer, FieldType::I32, FieldType::Bool, 3);
+    EXPECT_EQ("\3\x51", buffer.toString());
+  }
+
+  // Oversized map
+  {
+    Buffer::OwnedImpl buffer;
+    EXPECT_THROW_WITH_MESSAGE(
+        proto.writeMapBegin(buffer, FieldType::I32, FieldType::Bool, 3000000000), EnvoyException,
+        "illegal compact protocol map size 3000000000");
+  }
+}
+
+TEST(CompactProtocolTest, WriteMapEnd) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+  Buffer::OwnedImpl buffer;
+  proto.writeMapEnd(buffer);
+  EXPECT_EQ(0, buffer.length());
+}
+
+TEST(CompactProtocolTest, WriteListBegin) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+
+  // Empty list
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeListBegin(buffer, FieldType::I32, 0);
+    EXPECT_EQ("\x5", buffer.toString());
+  }
+
+  // List (short form)
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeListBegin(buffer, FieldType::I32, 14);
+    EXPECT_EQ("\xE5", buffer.toString());
+  }
+
+  // List (long form)
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeListBegin(buffer, FieldType::Bool, 15);
+    EXPECT_EQ("\xF1\xF", buffer.toString());
+  }
+
+  // Oversized list
+  {
+    Buffer::OwnedImpl buffer;
+    EXPECT_THROW_WITH_MESSAGE(proto.writeListBegin(buffer, FieldType::I32, 3000000000),
+                              EnvoyException, "illegal compact protocol list/set size 3000000000");
+  }
+}
+
+TEST(CompactProtocolTest, WriteListEnd) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+  Buffer::OwnedImpl buffer;
+  proto.writeListEnd(buffer);
+  EXPECT_EQ(0, buffer.length());
+}
+
+TEST(CompactProtocolTest, WriteSetBegin) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+
+  // Empty set only, as writeSetBegin delegates to writeListBegin.
+  Buffer::OwnedImpl buffer;
+  proto.writeSetBegin(buffer, FieldType::I32, 0);
+  EXPECT_EQ("\x5", buffer.toString());
+}
+
+TEST(CompactProtocolTest, WriteSetEnd) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+  Buffer::OwnedImpl buffer;
+  proto.writeSetEnd(buffer);
+  EXPECT_EQ(0, buffer.length());
+}
+
+TEST(CompactProtocolTest, WriteBool) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+
+  // Non-field bools (see WriteBoolField test)
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeBool(buffer, true);
+    EXPECT_EQ("\x1", buffer.toString());
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeBool(buffer, false);
+    EXPECT_EQ(std::string("\0", 1), buffer.toString());
+  }
+}
+
+TEST(CompactProtocolTest, WriteByte) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeByte(buffer, -1);
+    EXPECT_EQ("\xFF", buffer.toString());
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeByte(buffer, 127);
+    EXPECT_EQ("\x7F", buffer.toString());
+  }
+}
+
+TEST(CompactProtocolTest, WriteInt16) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+
+  // zigzag(1) = 2
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt16(buffer, 1);
+    EXPECT_EQ("\x2", buffer.toString());
+  }
+
+  // zigzag(128) = 256 (0x200)
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt16(buffer, 128);
+    EXPECT_EQ("\x80\x2", buffer.toString());
+  }
+
+  // zigzag(-1) = 1
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt16(buffer, -1);
+    EXPECT_EQ("\x1", buffer.toString());
+  }
+
+  // zigzag(32767) = 65534 (0xFFFE)
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt16(buffer, INT16_MAX);
+    EXPECT_EQ("\xFE\xFF\x3", buffer.toString());
+  }
+
+  // zigzag(-32768) = 65535 (0xFFFF)
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt16(buffer, INT16_MIN);
+    EXPECT_EQ("\xFF\xFF\x3", buffer.toString());
+  }
+}
+
+TEST(CompactProtocolTest, WriteInt32) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+
+  // zigzag(1) = 2
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt32(buffer, 1);
+    EXPECT_EQ("\x2", buffer.toString());
+  }
+
+  // zigzag(128) = 256 (0x200)
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt32(buffer, 128);
+    EXPECT_EQ("\x80\x2", buffer.toString());
+  }
+
+  // zigzag(-1) = 1
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt32(buffer, -1);
+    EXPECT_EQ("\x1", buffer.toString());
+  }
+
+  // zigzag(0x7FFFFFFF) = 0xFFFFFFFE
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt32(buffer, INT32_MAX);
+    EXPECT_EQ("\xFE\xFF\xFF\xFF\xF", buffer.toString());
+  }
+
+  // zigzag(0x80000000) = 0xFFFFFFFF
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt32(buffer, INT32_MIN);
+    EXPECT_EQ("\xFF\xFF\xFF\xFF\xF", buffer.toString());
+  }
+}
+
+TEST(CompactProtocolTest, WriteInt64) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+
+  // zigzag(1) = 2
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt64(buffer, 1);
+    EXPECT_EQ("\x2", buffer.toString());
+  }
+
+  // zigzag(128) = 256 (0x200)
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt64(buffer, 128);
+    EXPECT_EQ("\x80\x2", buffer.toString());
+  }
+
+  // zigzag(-1) = 1
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt64(buffer, -1);
+    EXPECT_EQ("\x1", buffer.toString());
+  }
+
+  // zigzag(0x7FFFFFFF FFFFFFFF) = 0xFFFFFFFF FFFFFFFE
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt64(buffer, INT64_MAX);
+    EXPECT_EQ("\xFE\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x1", buffer.toString());
+  }
+
+  // zigzag(0x80000000 00000000) = 0xFFFFFFFF FFFFFFFF
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeInt64(buffer, INT64_MIN);
+    EXPECT_EQ("\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x1", buffer.toString());
+  }
+}
+
+TEST(CompactProtocolTest, WriteDouble) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+  Buffer::OwnedImpl buffer;
+  proto.writeDouble(buffer, 3.0);
+  EXPECT_EQ(std::string("\x40\x8\0\0\0\0\0\0", 8), buffer.toString());
+}
+
+TEST(CompactProtocolTest, WriteString) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeString(buffer, "abc");
+    EXPECT_EQ(std::string("\x3"
+                          "abc",
+                          4),
+              buffer.toString());
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    std::string data(192, 'a');
+    proto.writeString(buffer, data);
+    EXPECT_EQ(std::string("\xC0\x1") + data, buffer.toString());
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    proto.writeString(buffer, "");
+    EXPECT_EQ(std::string("\0", 1), buffer.toString());
+  }
+}
+
+TEST(CompactProtocolTest, WriteBinary) {
+  StrictMock<MockProtocolCallbacks> cb;
+  CompactProtocolImpl proto(cb);
+
+  // writeBinary is an alias for writeString
+  Buffer::OwnedImpl buffer;
+  proto.writeBinary(buffer, "abc");
+  EXPECT_EQ(std::string("\x3"
+                        "abc",
+                        4),
+            buffer.toString());
+}
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters
