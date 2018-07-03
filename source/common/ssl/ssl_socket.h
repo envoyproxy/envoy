@@ -26,6 +26,7 @@ public:
   bool peerCertificatePresented() const override;
   std::string uriSanLocalCertificate() override;
   const std::string& sha256PeerCertificateDigest() const override;
+  std::string serialNumberPeerCertificate() const override;
   std::string subjectPeerCertificate() const override;
   std::string subjectLocalCertificate() const override;
   std::string uriSanPeerCertificate() const override;
@@ -51,6 +52,7 @@ private:
   void drainErrorQueue();
   void shutdownSsl();
   std::string getUriSanFromCertificate(X509* cert) const;
+  std::string getSerialNumberFromCertificate(X509* cert) const;
   std::string getSubjectFromCertificate(X509* cert) const;
   std::vector<std::string> getDnsSansFromCertificate(X509* cert);
 
