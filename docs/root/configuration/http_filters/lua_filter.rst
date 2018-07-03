@@ -290,6 +290,17 @@ under the filter name i.e. *envoy.lua*. Below is an example of a *metadata* in a
 
 Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.
 
+requestInfo()
+^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  requestInfo = handle:requestInfo()
+
+Returns :repo:`information <include/request_info/request_info.h>` related to the current request.
+
+Returns a :ref:`request info object <config_http_filters_lua_request_info_wrapper>`.
+
 .. _config_http_filters_lua_header_wrapper:
 
 Header object API
@@ -403,3 +414,18 @@ __pairs()
 
 Iterates through every *metadata* entry. *key* is a string that supplies a *metadata*
 key. *value* is *metadata* entry value.
+
+.. _config_http_filters_lua_request_info_wrapper:
+
+Request info object API
+-----------------------
+
+protocol()
+^^^^^^^^^^
+
+.. code-block:: lua
+
+  requestInfo:protocol()
+
+Returns the string representation of :repo:`HTTP protocol <include/envoy/http/protocol.h>`
+used by the current request. The possible values are: *HTTP/1.0*, *HTTP/1.1*, and *HTTP/2*.

@@ -31,6 +31,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/lua:wrappers_lib",
         "//test/extensions/filters/common/lua:lua_wrappers_lib",
+        "//test/mocks/request_info:request_info_mocks",
         "//test/test_common:utility_lib",
     ],
 )
