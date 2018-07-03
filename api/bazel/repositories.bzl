@@ -18,7 +18,7 @@ def api_dependencies():
         strip_prefix = "googleapis-" + GOOGLEAPIS_SHA,
         url = "https://github.com/googleapis/googleapis/archive/" + GOOGLEAPIS_SHA + ".tar.gz",
         build_file_content = """
-load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
+load("@com_google_protobuf//:protobuf.bzl", "py_proto_library", pb_cc_proto_library="cc_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
 filegroup(
@@ -45,6 +45,12 @@ proto_library(
 )
 
 cc_proto_library(
+    name = "http_api_protos_native",
+    deps = [":http_api_protos_proto"],
+    visibility = ["//visibility:public"],
+)
+
+pb_cc_proto_library(
     name = "http_api_protos",
     srcs = [
         "google/api/annotations.proto",
@@ -93,7 +99,8 @@ proto_library(
      deps = ["@com_google_protobuf//:any_proto"],
      visibility = ["//visibility:public"],
 )
-cc_proto_library(
+
+pb_cc_proto_library(
      name = "rpc_status_protos",
      srcs = ["google/rpc/status.proto"],
      default_runtime = "@com_google_protobuf//:protobuf",
@@ -133,7 +140,7 @@ py_proto_library(
         strip_prefix = "protobuf-" + GOGOPROTO_SHA,
         url = "https://github.com/gogo/protobuf/archive/" + GOGOPROTO_SHA + ".tar.gz",
         build_file_content = """
-load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
+load("@com_google_protobuf//:protobuf.bzl", "py_proto_library", pb_cc_proto_library="cc_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
 
 proto_library(
@@ -154,7 +161,7 @@ go_proto_library(
     visibility = ["//visibility:public"],
 )
 
-cc_proto_library(
+pb_cc_proto_library(
     name = "gogo_proto_cc",
     srcs = [
         "gogoproto/gogo.proto",

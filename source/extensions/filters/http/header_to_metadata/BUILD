@@ -14,10 +14,12 @@ envoy_cc_library(
     name = "header_to_metadata_filter_lib",
     srcs = ["header_to_metadata_filter.cc"],
     hdrs = ["header_to_metadata_filter.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/http/header_to_metadata/v2:header_to_metadata_cc",
+    ],
     deps = [
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/http:well_known_names",
-        "@envoy_api//envoy/config/filter/http/header_to_metadata/v2:header_to_metadata_cc",
     ],
 )
 

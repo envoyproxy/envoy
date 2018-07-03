@@ -14,6 +14,9 @@ envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/http/rate_limit/v2:rate_limit_cc",
+    ],
     deps = [
         "//include/envoy/http:codes_interface",
         "//source/common/common:assert_lib",
@@ -21,7 +24,6 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/http:codes_lib",
         "//source/common/router:config_lib",
-        "@envoy_api//envoy/config/filter/http/rate_limit/v2:rate_limit_cc",
     ],
 )
 

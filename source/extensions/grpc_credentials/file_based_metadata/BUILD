@@ -14,6 +14,9 @@ envoy_cc_library(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     external_deps = ["grpc"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/grpc_credential/v2alpha:file_based_metadata_cc",
+    ],
     deps = [
         "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/registry",
@@ -21,6 +24,5 @@ envoy_cc_library(
         "//source/common/grpc:common_lib",
         "//source/common/grpc:google_grpc_creds_lib",
         "//source/extensions/grpc_credentials:well_known_names",
-        "@envoy_api//envoy/config/grpc_credential/v2alpha:file_based_metadata_cc",
     ],
 )

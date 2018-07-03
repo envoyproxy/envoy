@@ -23,13 +23,15 @@ envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v2alpha1:thrift_proxy_cc",
+    ],
     deps = [
         ":filter_lib",
         "//include/envoy/registry",
         "//source/common/config:filter_json_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v2alpha1:thrift_proxy_cc",
     ],
 )
 

@@ -5,19 +5,40 @@ def envoy_package():
 
 # Compute the final copts based on various options.
 def envoy_copts(repository, test = False):
-    return [
-        "-Wall",
-        "-Wextra",
-        "-Werror",
-        "-Wnon-virtual-dtor",
-        "-Woverloaded-virtual",
-        "-Wold-style-cast",
-        "-std=c++14",
-    ] + select({
+    posix_options = [
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "-Wnon-virtual-dtor",
+          "-Woverloaded-virtual",
+          "-Wold-style-cast",
+          "-std=c++14",
+    ]
+
+    msvc_options = [
+        "-WX",
+        "-DWIN32",
+        "-DDISABLE_PROTO_VALIDATE",
+        "-DWIN32_LEAN_AND_MEAN",
+        # need win8 for ntohll
+        # https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
+        "-D_WIN32_WINNT=0x0602",
+        "-DNTDDI_VERSION=0x06020000",
+        "-DCARES_STATICLIB",
+        "-DNGHTTP2_STATICLIB",
+    ]
+
+    return select({
+        "//bazel:windows_x86_64": msvc_options,
+        "//conditions:default": posix_options,
+    }) + select({
         # Bazel adds an implicit -DNDEBUG for opt.
         repository + "//bazel:opt_build": [] if test else ["-ggdb3"],
         repository + "//bazel:fastbuild_build": [],
         repository + "//bazel:dbg_build": ["-ggdb3"],
+        repository + "//bazel:windows_opt_build": [],
+        repository + "//bazel:windows_fastbuild_build": [],
+        repository + "//bazel:windows_dbg_build": [],
     }) + select({
         repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
         "//conditions:default": ["-DTCMALLOC"],
@@ -44,6 +65,9 @@ def envoy_linkopts():
             # See note here: http://luajit.org/install.html
             "-pagezero_size 10000", "-image_base 100000000",
         ],
+        "//bazel:windows_x86_64": [
+            "-DEFAULTLIB:advapi32.lib",
+        ],
         "//conditions:default": [
             "-pthread",
             "-lrt",
@@ -65,6 +89,8 @@ def _envoy_stamped_linkopts():
     "@bazel_tools//tools/osx:darwin": [
         "-sectcreate __TEXT __build_id", "$(location @envoy//bazel:raw_build_id.ldscript)"
     ],
+
+    "//bazel:windows_x86_64": [],
 
     # Note: assumes GNU GCC (or compatible) handling of `--build-id` flag.
     "//conditions:default": [
@@ -115,6 +141,16 @@ def tcmalloc_external_deps(repository):
         "//conditions:default": [envoy_external_dep_path("tcmalloc_and_profiler")],
     })
 
+# Dependencies on libevent should be wrapped with this function.
+def libevent_external_deps(repository):
+    return [envoy_external_dep_path("event")] + select({
+      repository + "//bazel:windows_x86_64": [],
+      "//conditions:default": [envoy_external_dep_path("event_pthreads")],
+    })
+
+def http_api_protos_external_deps(repository):
+    return envoy_protobuf_cc_select(repository, [envoy_external_dep_path("http_api_protos")])
+
 # Transform the package path (e.g. include/envoy/common) into a path for
 # exporting the package headers at (e.g. envoy/common). Source files can then
 # include using this path scheme (e.g. #include "envoy/common/time.h").
@@ -130,14 +166,27 @@ def envoy_include_prefix(path):
 def envoy_basic_cc_library(name, **kargs):
     native.cc_library(name = name, **kargs)
 
+def envoy_windows_protobuf_cc_dep_path(dep):
+    return dep + "_native"
+
+def envoy_protobuf_cc_select(repository, deps = []):
+    windows_deps = [envoy_windows_protobuf_cc_dep_path(dep) for dep in deps]
+    return select({
+        repository + "//bazel:windows_x86_64": windows_deps,
+        "//conditions:default": deps,
+    })
+
 # Envoy C++ library targets should be specified with this function.
 def envoy_cc_library(name,
                      srcs = [],
                      hdrs = [],
                      copts = [],
                      visibility = None,
+                     protobuf_cc_deps = [],
                      external_deps = [],
                      tcmalloc_dep = None,
+                     libevent_dep = None,
+                     http_api_protos_dep = None,
                      repository = "",
                      linkstamp = None,
                      tags = [],
@@ -145,6 +194,11 @@ def envoy_cc_library(name,
                      strip_include_prefix = None):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
+    if libevent_dep:
+        deps += libevent_external_deps(repository)
+    if http_api_protos_dep:
+        deps += http_api_protos_external_deps(repository)
+
     native.cc_library(
         name = name,
         srcs = srcs,
@@ -158,11 +212,14 @@ def envoy_cc_library(name,
             envoy_external_dep_path('abseil_strings'),
             envoy_external_dep_path('spdlog'),
             envoy_external_dep_path('fmtlib'),
-        ],
+        ] + envoy_protobuf_cc_select(repository, protobuf_cc_deps),
         include_prefix = envoy_include_prefix(PACKAGE_NAME),
         alwayslink = 1,
         linkstatic = 1,
-        linkstamp = linkstamp,
+        linkstamp = select({
+          repository + "//bazel:windows_x86_64": None,
+          "//conditions:default": linkstamp,
+        }),
         strip_include_prefix = strip_include_prefix,
    )
 
@@ -458,5 +515,6 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
     return select({
         "@envoy//bazel:force_libcpp": if_libcpp,
         "@bazel_tools//tools/osx:darwin": [],
+        "//bazel:windows_x86_64": [],
         "//conditions:default": default or [],
     })

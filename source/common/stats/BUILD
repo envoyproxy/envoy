@@ -16,6 +16,9 @@ envoy_cc_library(
         "abseil_optional",
         "libcircllhist",
     ],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/metrics/v2:stats_cc",
+    ],
     deps = [
         "//include/envoy/common:time_interface",
         "//include/envoy/server:options_interface",
@@ -29,7 +32,6 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
-        "@envoy_api//envoy/config/metrics/v2:stats_cc",
     ],
 )
 

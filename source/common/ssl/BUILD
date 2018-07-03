@@ -32,6 +32,9 @@ envoy_cc_library(
     external_deps = [
         "ssl",
     ],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2/auth:cert_cc",
+    ],
     deps = [
         "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/ssl:context_config_interface",
@@ -41,7 +44,6 @@ envoy_cc_library(
         "//source/common/config:tls_context_json_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )
 
@@ -73,9 +75,11 @@ envoy_cc_library(
     name = "tls_certificate_config_impl_lib",
     srcs = ["tls_certificate_config_impl.cc"],
     hdrs = ["tls_certificate_config_impl.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2/auth:cert_cc",
+    ],
     deps = [
         "//include/envoy/ssl:tls_certificate_config_interface",
         "//source/common/config:datasource_lib",
-        "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )

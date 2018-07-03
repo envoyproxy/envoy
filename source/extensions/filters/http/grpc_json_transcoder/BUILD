@@ -18,7 +18,10 @@ envoy_cc_library(
     external_deps = [
         "path_matcher",
         "grpc_transcoding",
-        "http_api_protos",
+    ],
+    http_api_protos_dep = True,
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/http/transcoder/v2:transcoder_cc",
     ],
     deps = [
         ":transcoder_input_stream_lib",
@@ -28,7 +31,6 @@ envoy_cc_library(
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/config/filter/http/transcoder/v2:transcoder_cc",
     ],
 )
 
@@ -37,7 +39,10 @@ envoy_cc_library(
     srcs = ["transcoder_input_stream_impl.cc"],
     hdrs = ["transcoder_input_stream_impl.h"],
     external_deps = ["grpc_transcoding"],
-    deps = ["//source/common/buffer:zero_copy_input_stream_lib"],
+    deps = [
+        "//source/common/buffer:zero_copy_input_stream_lib",
+        "//source/common/protobuf",
+    ],
 )
 
 envoy_cc_library(

@@ -17,6 +17,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "route_config_provider_manager_interface",
     hdrs = ["route_config_provider_manager.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
+    ],
     deps = [
         ":rds_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -28,7 +31,6 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
 )
 
@@ -36,6 +38,9 @@ envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
     external_deps = ["abseil_optional"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2:rds_cc",
+    ],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/http:codec_interface",
@@ -46,7 +51,6 @@ envoy_cc_library(
         "//include/envoy/upstream:resource_manager_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2:rds_cc",
     ],
 )
 

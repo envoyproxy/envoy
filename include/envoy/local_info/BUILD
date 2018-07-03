@@ -11,8 +11,10 @@ envoy_package()
 envoy_cc_library(
     name = "local_info_interface",
     hdrs = ["local_info.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2/core:base_cc",
+    ],
     deps = [
         "//include/envoy/network:address_interface",
-        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )

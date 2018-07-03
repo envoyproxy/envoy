@@ -1,0 +1,7 @@
+# Windows/Envoy specific Bazel build/test options.
+
+build --workspace_status_command=windows/bazel/get_workspace_status.bat
+build --experimental_shortened_obj_file_path
+build --define signal_trace=disabled
+build --define hot_restart=disabled
+build --define tcmalloc=disabled

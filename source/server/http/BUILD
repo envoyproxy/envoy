@@ -12,6 +12,10 @@ envoy_cc_library(
     name = "admin_lib",
     srcs = ["admin.cc"],
     hdrs = ["admin.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/admin/v2alpha:clusters_cc",
+        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
+    ],
     deps = [
         ":config_tracker_lib",
         "//include/envoy/filesystem:filesystem_interface",
@@ -55,8 +59,6 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/upstream:host_utility_lib",
         "//source/extensions/access_loggers/file:file_access_log_lib",
-        "@envoy_api//envoy/admin/v2alpha:clusters_cc",
-        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
     ],
 )
 

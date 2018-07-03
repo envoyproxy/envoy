@@ -25,6 +25,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "watcher_lib",
     srcs = select({
+        "//bazel:windows_x86_64": [
+            "win32/watcher_impl.cc",
+        ],
         "@bazel_tools//tools/osx:darwin": [
             "kqueue/watcher_impl.cc",
         ],
@@ -33,6 +36,9 @@ envoy_cc_library(
         ],
     }),
     hdrs = select({
+        "//bazel:windows_x86_64": [
+            "win32/watcher_impl.h",
+        ],
         "@bazel_tools//tools/osx:darwin": [
             "kqueue/watcher_impl.h",
         ],
@@ -40,8 +46,9 @@ envoy_cc_library(
             "inotify/watcher_impl.h",
         ],
     }),
-    external_deps = ["event"],
+    libevent_dep = 1,
     strip_include_prefix = select({
+        "//bazel:windows_x86_64": "win32",
         "@bazel_tools//tools/osx:darwin": "kqueue",
         "//conditions:default": "inotify",
     }),

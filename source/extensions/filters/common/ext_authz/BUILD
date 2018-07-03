@@ -11,10 +11,12 @@ envoy_package()
 envoy_cc_library(
     name = "ext_authz_interface",
     hdrs = ["ext_authz.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/service/auth/v2alpha:external_auth_cc",
+    ],
     deps = [
         "//include/envoy/http:codes_interface",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/service/auth/v2alpha:external_auth_cc",
     ],
 )
 
@@ -60,12 +62,14 @@ envoy_cc_library(
     name = "check_request_utils_lib",
     srcs = ["check_request_utils.cc"],
     hdrs = ["check_request_utils.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/service/auth/v2alpha:external_auth_cc",
+    ],
     deps = [
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/grpc:async_client_manager_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:async_client_lib",
-        "@envoy_api//envoy/service/auth/v2alpha:external_auth_cc",
     ],
 )

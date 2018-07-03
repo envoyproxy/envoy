@@ -23,17 +23,19 @@ envoy_cc_library(
 envoy_cc_library(
     name = "async_client_manager_interface",
     hdrs = ["async_client_manager.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2/core:grpc_service_cc",
+    ],
     deps = [
         ":async_client_interface",
         "//include/envoy/stats:stats_interface",
-        "@envoy_api//envoy/api/v2/core:grpc_service_cc",
     ],
 )
 
 envoy_cc_library(
     name = "google_grpc_creds_interface",
     hdrs = ["google_grpc_creds.h"],
-    deps = [
+    protobuf_cc_deps = [
         "@envoy_api//envoy/api/v2/core:grpc_service_cc",
     ],
 )

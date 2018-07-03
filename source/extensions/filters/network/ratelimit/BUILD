@@ -14,6 +14,9 @@ envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit.cc"],
     hdrs = ["ratelimit.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/network/rate_limit/v2:rate_limit_cc",
+    ],
     deps = [
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
@@ -21,7 +24,6 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/config/filter/network/rate_limit/v2:rate_limit_cc",
     ],
 )
 

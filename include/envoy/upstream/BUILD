@@ -11,6 +11,10 @@ envoy_package()
 envoy_cc_library(
     name = "cluster_manager_interface",
     hdrs = ["cluster_manager.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2:cds_cc",
+        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+    ],
     deps = [
         ":load_balancer_interface",
         ":thread_local_cluster_interface",
@@ -24,8 +28,6 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/server:admin_interface",
-        "@envoy_api//envoy/api/v2:cds_cc",
-        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )
 
@@ -43,12 +45,14 @@ envoy_cc_library(
 envoy_cc_library(
     name = "host_description_interface",
     hdrs = ["host_description.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2/core:base_cc",
+    ],
     deps = [
         ":health_check_host_monitor_interface",
         ":outlier_detection_interface",
         "//include/envoy/network:address_interface",
         "//include/envoy/stats:stats_macros",
-        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 
@@ -64,9 +68,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "load_balancer_type_interface",
     hdrs = ["load_balancer_type.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2:cds_cc",
+    ],
     deps = [
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:cds_cc",
     ],
 )
 

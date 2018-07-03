@@ -134,6 +134,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "filter_config_interface",
     hdrs = ["filter_config.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2/core:base_cc",
+    ],
     deps = [
         ":admin_interface",
         "//include/envoy/access_log:access_log_interface",
@@ -151,13 +154,15 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:macros",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/core:base_cc",
     ],
 )
 
 envoy_cc_library(
     name = "listener_manager_interface",
     hdrs = ["listener_manager.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2/listener:listener_cc",
+    ],
     deps = [
         ":drain_manager_interface",
         ":filter_config_interface",
@@ -166,7 +171,6 @@ envoy_cc_library(
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/ssl:context_interface",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/listener:listener_cc",
     ],
 )
 

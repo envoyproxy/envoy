@@ -62,6 +62,9 @@ envoy_cc_library(
     name = "conn_pool_lib",
     srcs = ["conn_pool_impl.cc"],
     hdrs = ["conn_pool_impl.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
+    ],
     deps = [
         ":codec_lib",
         ":conn_pool_interface",
@@ -72,7 +75,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/network:filter_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
     ],
 )
 
@@ -80,6 +82,9 @@ envoy_cc_library(
     name = "proxy_filter_lib",
     srcs = ["proxy_filter.cc"],
     hdrs = ["proxy_filter.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
+    ],
     deps = [
         ":codec_interface",
         ":command_splitter_interface",
@@ -89,7 +94,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:redis_proxy_cc",
     ],
 )
 

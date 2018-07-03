@@ -13,6 +13,11 @@ envoy_cc_library(
     name = "ratelimit_lib",
     srcs = ["ratelimit_impl.cc"],
     hdrs = ["ratelimit_impl.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2/ratelimit:ratelimit_cc",
+        "@envoy_api//envoy/config/ratelimit/v2:rls_cc",
+        "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
+    ],
     deps = [
         ":ratelimit_proto",
         "//include/envoy/grpc:async_client_interface",
@@ -23,9 +28,6 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:headers_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/api/v2/ratelimit:ratelimit_cc",
-        "@envoy_api//envoy/config/ratelimit/v2:rls_cc",
-        "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     ],
 )
 

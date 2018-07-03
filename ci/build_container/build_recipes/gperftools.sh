@@ -3,6 +3,9 @@
 set -e
 
 VERSION=2.7
+if [[ "${OS}" == "Windows_NT" ]]; then
+  exit 0
+fi
 
 wget -O gperftools-"$VERSION".tar.gz https://github.com/gperftools/gperftools/releases/download/gperftools-"$VERSION"/gperftools-"$VERSION".tar.gz
 tar xf gperftools-"$VERSION".tar.gz

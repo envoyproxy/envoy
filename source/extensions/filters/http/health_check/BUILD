@@ -14,6 +14,9 @@ envoy_cc_library(
     name = "health_check_lib",
     srcs = ["health_check.cc"],
     hdrs = ["health_check.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/http/health_check/v2:health_check_cc",
+    ],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
@@ -28,7 +31,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/filter/http/health_check/v2:health_check_cc",
     ],
 )
 

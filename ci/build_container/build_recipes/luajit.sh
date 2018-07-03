@@ -46,15 +46,25 @@ index f7f81a4..e698517 100644
  # Disable the JIT compiler, i.e. turn LuaJIT into a pure interpreter.
  #XCFLAGS+= -DLUAJIT_DISABLE_JIT
 @@ -564,7 +564,7 @@ endif
- 
+
  Q= @
  E= @echo
 -#Q=
 +Q=
  #E= @:
- 
+
  ##############################################################################
 EOF
-patch -p1 < ../luajit_make.diff
 
-DEFAULT_CC=${CC} TARGET_CFLAGS=${CFLAGS} TARGET_LDFLAGS=${CFLAGS} CFLAGS="" make V=1 PREFIX="$THIRDPARTY_BUILD" install
+if [[ "${OS}" == "Windows_NT" ]]; then
+  cd src
+  ./msvcbuild.bat debug
+
+  mkdir -p "$THIRDPARTY_BUILD/include/luajit-2.0"
+  cp *.h* "$THIRDPARTY_BUILD/include/luajit-2.0"
+  cp luajit.lib "$THIRDPARTY_BUILD/lib"
+  cp *.pdb "$THIRDPARTY_BUILD/lib"
+else
+  patch -p1 < ../luajit_make.diff
+  DEFAULT_CC=${CC} TARGET_CFLAGS=${CFLAGS} TARGET_LDFLAGS=${CFLAGS} CFLAGS="" make V=1 PREFIX="$THIRDPARTY_BUILD" install
+fi

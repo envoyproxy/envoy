@@ -57,10 +57,7 @@ envoy_cc_library(
     name = "libevent_lib",
     srcs = ["libevent.cc"],
     hdrs = ["libevent.h"],
-    external_deps = [
-        "event",
-        "event_pthreads",
-    ],
+    libevent_dep = 1,
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
@@ -71,10 +68,7 @@ envoy_cc_library(
     name = "dispatched_thread_lib",
     srcs = ["dispatched_thread.cc"],
     hdrs = ["dispatched_thread.h"],
-    external_deps = [
-        "event",
-        "event_pthreads",
-    ],
+    libevent_dep = 1,
     deps = [
         ":dispatcher_lib",
         "//include/envoy/event:dispatcher_interface",

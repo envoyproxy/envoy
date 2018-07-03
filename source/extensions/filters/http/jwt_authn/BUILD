@@ -12,9 +12,11 @@ envoy_cc_library(
     name = "extractor_lib",
     srcs = ["extractor.cc"],
     hdrs = ["extractor.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:jwt_authn_cc",
+    ],
     deps = [
         "//source/common/http:utility_lib",
-        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:jwt_authn_cc",
     ],
 )
 
@@ -25,11 +27,13 @@ envoy_cc_library(
     external_deps = [
         "jwt_verify_lib",
     ],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:jwt_authn_cc",
+    ],
     deps = [
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:jwt_authn_cc",
     ],
 )
 

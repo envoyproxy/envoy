@@ -13,6 +13,9 @@ envoy_cc_library(
     name = "metrics_service_grpc_lib",
     srcs = ["grpc_metrics_service_impl.cc"],
     hdrs = ["grpc_metrics_service_impl.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
+    ],
     deps = [
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -21,7 +24,6 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/grpc:async_client_lib",
-        "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
     ],
 )
 
@@ -29,12 +31,14 @@ envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/metrics/v2:stats_cc",
+        "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
+    ],
     deps = [
         "//include/envoy/registry",
         "//source/extensions/stat_sinks:well_known_names",
         "//source/extensions/stat_sinks/metrics_service:metrics_service_grpc_lib",
         "//source/server:configuration_lib",
-        "@envoy_api//envoy/config/metrics/v2:stats_cc",
-        "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
     ],
 )

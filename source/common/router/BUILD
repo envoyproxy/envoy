@@ -53,6 +53,9 @@ envoy_cc_library(
     name = "config_utility_lib",
     srcs = ["config_utility.cc"],
     hdrs = ["config_utility.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2:rds_cc",
+    ],
     deps = [
         "//include/envoy/http:codes_interface",
         "//include/envoy/upstream:resource_manager_interface",
@@ -62,7 +65,6 @@ envoy_cc_library(
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2:rds_cc",
     ],
 )
 
@@ -70,6 +72,11 @@ envoy_cc_library(
     name = "rds_lib",
     srcs = ["rds_impl.cc"],
     hdrs = ["rds_impl.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
+        "@envoy_api//envoy/api/v2:rds_cc",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
+    ],
     deps = [
         ":config_lib",
         ":rds_subscription_lib",
@@ -88,9 +95,6 @@ envoy_cc_library(
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
-        "@envoy_api//envoy/api/v2:rds_cc",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
 )
 
@@ -98,6 +102,9 @@ envoy_cc_library(
     name = "rds_subscription_lib",
     srcs = ["rds_subscription.cc"],
     hdrs = ["rds_subscription.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
+    ],
     deps = [
         "//include/envoy/config:subscription_interface",
         "//source/common/common:assert_lib",
@@ -106,7 +113,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/json:json_loader_lib",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:http_connection_manager_cc",
     ],
 )
 
@@ -135,6 +141,9 @@ envoy_cc_library(
     name = "router_lib",
     srcs = ["router.cc"],
     hdrs = ["router.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
+    ],
     deps = [
         ":config_lib",
         ":header_parser_lib",
@@ -172,7 +181,6 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/request_info:request_info_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/config/filter/http/router/v2:router_cc",
     ],
 )
 

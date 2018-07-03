@@ -12,6 +12,9 @@ envoy_cc_library(
     name = "tcp_proxy",
     srcs = ["tcp_proxy.cc"],
     hdrs = ["tcp_proxy.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:tcp_proxy_cc",
+    ],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
@@ -35,6 +38,5 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/request_info:request_info_lib",
         "//source/common/router:metadatamatchcriteria_lib",
-        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:tcp_proxy_cc",
     ],
 )

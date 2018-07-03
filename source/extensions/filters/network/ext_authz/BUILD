@@ -14,6 +14,9 @@ envoy_cc_library(
     name = "ext_authz",
     srcs = ["ext_authz.cc"],
     hdrs = ["ext_authz.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/network/ext_authz/v2:ext_authz_cc",
+    ],
     deps = [
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
@@ -24,7 +27,6 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_interface",
-        "@envoy_api//envoy/config/filter/network/ext_authz/v2:ext_authz_cc",
     ],
 )
 
@@ -32,12 +34,14 @@ envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/network/ext_authz/v2:ext_authz_cc",
+    ],
     deps = [
         "//include/envoy/registry",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/ext_authz",
-        "@envoy_api//envoy/config/filter/network/ext_authz/v2:ext_authz_cc",
     ],
 )

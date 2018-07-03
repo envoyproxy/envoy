@@ -14,6 +14,8 @@ envoy_basic_cc_library(
     hdrs = [
         "exception.h",
         "pure.h",
+        "socket_fd.h",
+        "ssize.h",
     ],
     include_prefix = "envoy/common",
 )

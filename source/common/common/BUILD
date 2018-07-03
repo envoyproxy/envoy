@@ -118,13 +118,15 @@ envoy_cc_library(
     srcs = ["matchers.cc"],
     hdrs = ["matchers.h"],
     external_deps = ["abseil_optional"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/type/matcher:metadata_cc",
+        "@envoy_api//envoy/type/matcher:number_cc",
+        "@envoy_api//envoy/type/matcher:string_cc",
+    ],
     deps = [
         ":utility_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/type/matcher:metadata_cc",
-        "@envoy_api//envoy/type/matcher:number_cc",
-        "@envoy_api//envoy/type/matcher:string_cc",
     ],
 )
 

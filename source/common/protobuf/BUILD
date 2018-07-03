@@ -13,8 +13,10 @@ proto_library(
     deps = [
         "@com_google_protobuf//:any_proto",
         "@com_google_protobuf//:descriptor_proto",
+        "@com_google_protobuf//:duration_proto",
         "@com_google_protobuf//:empty_proto",
         "@com_google_protobuf//:struct_proto",
+        "@com_google_protobuf//:timestamp_proto",
         "@com_google_protobuf//:wrappers_proto",
     ],
 )
@@ -38,6 +40,9 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     external_deps = ["protobuf"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/type:percent_cc",
+    ],
     deps = [
         ":protobuf",
         "//source/common/common:assert_lib",
@@ -45,6 +50,5 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/json:json_loader_lib",
-        "@envoy_api//envoy/type:percent_cc",
     ],
 )

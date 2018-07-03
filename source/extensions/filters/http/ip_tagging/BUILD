@@ -14,6 +14,9 @@ envoy_cc_library(
     name = "ip_tagging_filter_lib",
     srcs = ["ip_tagging_filter.cc"],
     hdrs = ["ip_tagging_filter.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/http/ip_tagging/v2:ip_tagging_cc",
+    ],
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/runtime:runtime_interface",
@@ -21,7 +24,6 @@ envoy_cc_library(
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
         "//source/common/network:lc_trie_lib",
-        "@envoy_api//envoy/config/filter/http/ip_tagging/v2:ip_tagging_cc",
     ],
 )
 

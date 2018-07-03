@@ -14,6 +14,9 @@ envoy_cc_library(
     name = "fault_filter_lib",
     srcs = ["fault_filter.cc"],
     hdrs = ["fault_filter.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/http/fault/v2:fault_cc",
+    ],
     deps = [
         "//include/envoy/event:timer_interface",
         "//include/envoy/http:codes_interface",
@@ -29,7 +32,6 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/filter/http/fault/v2:fault_cc",
     ],
 )
 

@@ -37,6 +37,9 @@ envoy_cc_library(
     name = "access_log_lib",
     srcs = ["access_log_impl.cc"],
     hdrs = ["access_log_impl.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/accesslog/v2:accesslog_cc",
+    ],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/filesystem:filesystem_interface",
@@ -55,6 +58,5 @@ envoy_cc_library(
         "//source/common/request_info:request_info_lib",
         "//source/common/runtime:uuid_util_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/config/filter/accesslog/v2:accesslog_cc",
     ],
 )

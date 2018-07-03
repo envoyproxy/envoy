@@ -14,6 +14,9 @@ envoy_cc_library(
     name = "client_ssl_auth",
     srcs = ["client_ssl_auth.cc"],
     hdrs = ["client_ssl_auth.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/network/client_ssl_auth/v2:client_ssl_auth_cc",
+    ],
     deps = [
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
@@ -31,7 +34,6 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:utility_lib",
-        "@envoy_api//envoy/config/filter/network/client_ssl_auth/v2:client_ssl_auth_cc",
     ],
 )
 

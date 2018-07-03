@@ -14,6 +14,9 @@ envoy_cc_library(
     name = "buffer_filter_lib",
     srcs = ["buffer_filter.cc"],
     hdrs = ["buffer_filter.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/http/buffer/v2:buffer_cc",
+    ],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
@@ -29,7 +32,6 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http:well_known_names",
-        "@envoy_api//envoy/config/filter/http/buffer/v2:buffer_cc",
     ],
 )
 

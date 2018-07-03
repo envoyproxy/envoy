@@ -24,6 +24,9 @@ envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/accesslog/v2:file_cc",
+    ],
     deps = [
         ":file_access_log_lib",
         "//include/envoy/registry",
@@ -31,6 +34,5 @@ envoy_cc_library(
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/protobuf",
         "//source/extensions/access_loggers:well_known_names",
-        "@envoy_api//envoy/config/accesslog/v2:file_cc",
     ],
 )

@@ -14,6 +14,9 @@ envoy_cc_library(
     name = "gzip_filter_lib",
     srcs = ["gzip_filter.cc"],
     hdrs = ["gzip_filter.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/filter/http/gzip/v2:gzip_cc",
+    ],
     deps = [
         "//include/envoy/http:filter_interface",
         "//include/envoy/json:json_object_interface",
@@ -25,7 +28,6 @@ envoy_cc_library(
         "//source/common/json:config_schemas_lib",
         "//source/common/json:json_validator_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/config/filter/http/gzip/v2:gzip_cc",
     ],
 )
 

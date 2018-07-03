@@ -72,6 +72,9 @@ envoy_cc_library(
     name = "codes_lib",
     srcs = ["codes.cc"],
     hdrs = ["codes.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/type:http_status_cc",
+    ],
     deps = [
         ":headers_lib",
         ":utility_lib",
@@ -80,7 +83,6 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
-        "@envoy_api//envoy/type:http_status_cc",
     ],
 )
 
@@ -236,6 +238,10 @@ envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2/core:http_uri_cc",
+        "@envoy_api//envoy/api/v2/core:protocol_cc",
+    ],
     deps = [
         ":exception_lib",
         ":header_map_lib",
@@ -254,8 +260,6 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/core:http_uri_cc",
-        "@envoy_api//envoy/api/v2/core:protocol_cc",
     ],
 )
 
@@ -273,13 +277,15 @@ envoy_cc_library(
     name = "header_utility_lib",
     srcs = ["header_utility.cc"],
     hdrs = ["header_utility.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2/route:route_cc",
+        "@envoy_api//envoy/type:range_cc",
+    ],
     deps = [
         "//include/envoy/http:header_map_interface",
         "//include/envoy/json:json_object_interface",
         "//source/common/common:utility_lib",
         "//source/common/config:rds_json_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/route:route_cc",
-        "@envoy_api//envoy/type:range_cc",
     ],
 )

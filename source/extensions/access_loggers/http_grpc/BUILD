@@ -14,6 +14,11 @@ envoy_cc_library(
     name = "grpc_access_log_lib",
     srcs = ["grpc_access_log_impl.cc"],
     hdrs = ["grpc_access_log_impl.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/accesslog/v2:als_cc",
+        "@envoy_api//envoy/config/filter/accesslog/v2:accesslog_cc",
+        "@envoy_api//envoy/service/accesslog/v2:als_cc",
+    ],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/grpc:async_client_interface",
@@ -23,9 +28,6 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/grpc:async_client_lib",
         "//source/common/network:utility_lib",
-        "@envoy_api//envoy/config/accesslog/v2:als_cc",
-        "@envoy_api//envoy/config/filter/accesslog/v2:accesslog_cc",
-        "@envoy_api//envoy/service/accesslog/v2:als_cc",
     ],
 )
 

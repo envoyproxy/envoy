@@ -13,6 +13,9 @@ envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/metrics/v2:stats_cc",
+    ],
     deps = [
         "//include/envoy/registry",
         "//source/common/network:address_lib",
@@ -20,7 +23,6 @@ envoy_cc_library(
         "//source/extensions/stat_sinks:well_known_names",
         "//source/extensions/stat_sinks/hystrix:hystrix_lib",
         "//source/server:configuration_lib",
-        "@envoy_api//envoy/config/metrics/v2:stats_cc",
     ],
 )
 

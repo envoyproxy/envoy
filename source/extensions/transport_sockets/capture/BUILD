@@ -13,14 +13,16 @@ envoy_cc_library(
     name = "capture_lib",
     srcs = ["capture.cc"],
     hdrs = ["capture.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
+        "@envoy_api//envoy/data/tap/v2alpha:capture_cc",
+    ],
     deps = [
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
-        "@envoy_api//envoy/data/tap/v2alpha:capture_cc",
     ],
 )
 
@@ -28,6 +30,9 @@ envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
+    ],
     deps = [
         ":capture_lib",
         "//include/envoy/network:transport_socket_interface",
@@ -36,6 +41,5 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/transport_sockets:well_known_names",
-        "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
     ],
 )

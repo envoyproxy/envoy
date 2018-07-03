@@ -12,6 +12,10 @@ envoy_cc_library(
     name = "matchers_lib",
     srcs = ["matchers.cc"],
     hdrs = ["matchers.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/config/rbac/v2alpha:rbac_cc",
+    ],
     deps = [
         "//include/envoy/http:header_map_interface",
         "//include/envoy/network:connection_interface",
@@ -19,8 +23,6 @@ envoy_cc_library(
         "//source/common/common:matchers_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/network:cidr_range_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
-        "@envoy_api//envoy/config/rbac/v2alpha:rbac_cc",
     ],
 )
 
@@ -38,10 +40,12 @@ envoy_cc_library(
     name = "engine_lib",
     srcs = ["engine_impl.cc"],
     hdrs = ["engine_impl.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/config/filter/http/rbac/v2:rbac_cc",
+    ],
     deps = [
         "//source/extensions/filters/common/rbac:engine_interface",
         "//source/extensions/filters/common/rbac:matchers_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
-        "@envoy_api//envoy/config/filter/http/rbac/v2:rbac_cc",
     ],
 )

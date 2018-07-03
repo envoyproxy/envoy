@@ -131,6 +131,13 @@ def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], de
         ],
         visibility = ["//visibility:public"],
     )
+
+    native.cc_proto_library(
+        name = _Suffix(name, _CC_SUFFIX) + "_native",
+        deps = [name],
+        visibility = ["//visibility:public"],
+    )
+
     if (require_py == 1):
       api_py_proto_library(name, srcs, deps, has_services)
 
