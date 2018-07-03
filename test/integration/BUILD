@@ -77,6 +77,20 @@ envoy_cc_fuzz_test(
     ],
 )
 
+envoy_cc_fuzz_test(
+    name = "h1_capture_direct_response_fuzz_test",
+    srcs = ["h1_capture_direct_response_fuzz_test.cc"],
+    corpus = "h1_capture_direct_response_corpus",
+    deps = [
+        ":capture_fuzz_proto",
+        ":http_integration_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//test/integration:integration_lib",
+        "//test/test_common:environment_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "eds_integration_test",
     srcs = ["eds_integration_test.cc"],
