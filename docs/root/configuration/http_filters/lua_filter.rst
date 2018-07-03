@@ -297,7 +297,7 @@ requestInfo()
 
   requestInfo = handle:requestInfo()
 
-Returns some :repo:`information <include/request_info/request_info.h>` related to the current request.
+Returns :repo:`information <include/request_info/request_info.h>` related to the current request.
 
 Returns a :ref:`request info object <config_http_filters_lua_request_info_wrapper>`.
 
