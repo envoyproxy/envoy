@@ -309,6 +309,10 @@ ConnPoolImpl::ActiveConn::ActiveConn(ConnPoolImpl& parent)
                              parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
                              parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_,
                              &parent_.host_->cluster().stats().bind_errors_});
+
+  // We just universally set no delay on connections. Theoretically we might at some point want
+  // to make this configurable.
+  conn_->noDelay(true);
 }
 
 ConnPoolImpl::ActiveConn::~ActiveConn() {
