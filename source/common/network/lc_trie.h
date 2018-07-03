@@ -41,7 +41,9 @@ constexpr size_t MaxLcTrieNodes = (1 << 20);
 template <class T> class LcTrie {
 public:
   /**
-   * @param tag_data supplies a vector of tag and CIDR ranges.
+   * @param data supplies a vector of data and CIDR ranges.
+   * @param exclusive if true then only data for the most specific subnet will be returned
+                      (i.e. data isn't inherited from wider ranges).
    * @param fill_factor supplies the fraction of completeness to use when calculating the branch
    *                    value for a sub-trie.
    * @param root_branching_factor supplies the branching factor at the root.
@@ -53,7 +55,7 @@ public:
    * let consumers decide.
    */
   LcTrie(const std::vector<std::pair<T, std::vector<Address::CidrRange>>>& data,
-         double fill_factor = 0.5, uint32_t root_branching_factor = 0) {
+         bool exclusive = false, double fill_factor = 0.5, uint32_t root_branching_factor = 0) {
 
     // The LcTrie implementation uses 20-bit "pointers" in its compact internal representation,
     // so it cannot hold more than 2^20 nodes. But the number of nodes can be greater than the
@@ -97,8 +99,8 @@ public:
     // algorithm does not support nested prefixes. The next step will solve that
     // problem.
 
-    BinaryTrie<Ipv4> ipv4_temp;
-    BinaryTrie<Ipv6> ipv6_temp;
+    BinaryTrie<Ipv4> ipv4_temp(exclusive);
+    BinaryTrie<Ipv6> ipv6_temp(exclusive);
     for (const auto& pair_data : data) {
       for (const auto& cidr_range : pair_data.second) {
         if (cidr_range.ip()->version() == Address::IpVersion::v4) {
@@ -309,7 +311,7 @@ private:
    */
   template <class IpType, uint32_t address_size = CHAR_BIT * sizeof(IpType)> class BinaryTrie {
   public:
-    BinaryTrie() : root_(std::make_unique<Node>()) {}
+    BinaryTrie(bool exclusive) : root_(std::make_unique<Node>()), exclusive_(exclusive) {}
 
     /**
      * Add a CIDR prefix and associated tag to the binary trie. If an entry already
@@ -349,7 +351,7 @@ private:
             if (data != nullptr) {
               if (node->data == nullptr) {
                 node->data = data;
-              } else {
+              } else if (!exclusive_) {
                 node->data->insert(data->begin(), data->end());
               }
             }
@@ -392,6 +394,7 @@ private:
     };
     typedef std::unique_ptr<Node> NodePtr;
     NodePtr root_;
+    bool exclusive_;
   };
 
   /**
