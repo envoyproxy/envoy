@@ -691,14 +691,6 @@ void PriorityStateManager::registerHostForPriority(
   }
 }
 
-void PriorityStateManager::registerHostForPriority(const HostSharedPtr& host,
-                                                   const uint32_t priority) {
-  // Should be called after initializePriorityFor.
-  ASSERT(priority_state_[priority].first);
-
-  priority_state_[priority].first->emplace_back(host);
-}
-
 void PriorityStateManager::updateClusterPrioritySet(const uint32_t priority,
                                                     HostVectorSharedPtr current_hosts,
                                                     const absl::optional<HostVector>& hosts_added,
