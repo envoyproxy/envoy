@@ -15,14 +15,6 @@
 
 namespace Envoy {
 
-std::string udsSocketName(const std::string& path, bool abstract_namespace) {
-  const std::string name = TestEnvironment::unixDomainSocketPath(path);
-  if (!abstract_namespace) {
-    return name;
-  }
-  return "@" + name;
-}
-
 class UdsUpstreamIntegrationTest
     : public HttpIntegrationTest,
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
@@ -33,7 +25,8 @@ public:
 
   void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(
-        udsSocketName("udstest.1.sock", abstract_namespace_), FakeHttpConnection::Type::HTTP1));
+        TestEnvironment::unixDomainSocketPath("udstest.1.sock", abstract_namespace_),
+        FakeHttpConnection::Type::HTTP1));
 
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
@@ -43,7 +36,7 @@ public:
             for (int j = 0; j < cluster->hosts_size(); ++j) {
               cluster->mutable_hosts(j)->clear_socket_address();
               cluster->mutable_hosts(j)->mutable_pipe()->set_path(
-                  udsSocketName("udstest.1.sock", abstract_namespace_));
+                  TestEnvironment::unixDomainSocketPath("udstest.1.sock", abstract_namespace_));
             }
           }
         });
@@ -63,10 +56,12 @@ public:
 
   void initialize() override;
 
-  std::string getAdminSocketName() { return udsSocketName("admin.sock", abstract_namespace_); }
+  std::string getAdminSocketName() {
+    return TestEnvironment::unixDomainSocketPath("admin.sock", abstract_namespace_);
+  }
 
   std::string getListenerSocketName() {
-    return udsSocketName("listener_0.sock", abstract_namespace_);
+    return TestEnvironment::unixDomainSocketPath("listener_0.sock", abstract_namespace_);
   }
 
 protected:
