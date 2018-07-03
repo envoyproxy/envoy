@@ -97,6 +97,9 @@ struct ConnectionManagerTracingStats {
 struct TracingConnectionManagerConfig {
   Tracing::OperationName operation_name_;
   std::vector<Http::LowerCaseString> request_headers_for_tags_;
+  uint64_t client_sampling_;
+  uint64_t random_sampling_;
+  uint64_t overall_sampling_;
 };
 
 typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManagerConfigPtr;
@@ -135,7 +138,7 @@ enum class ForwardClientCertType {
  * Configuration for the fields of the client cert, used for populating the current client cert
  * information to the next hop.
  */
-enum class ClientCertDetailsType { Cert, Subject, SAN, URI, DNS };
+enum class ClientCertDetailsType { Cert, Subject, URI, DNS };
 
 /**
  * Abstract configuration for the connection manager.

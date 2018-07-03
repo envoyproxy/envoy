@@ -13,6 +13,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -35,10 +36,12 @@ public:
                             Network::DnsResolverSharedPtr dns_resolver,
                             Ssl::ContextManager& ssl_context_manager,
                             Event::Dispatcher& main_thread_dispatcher,
-                            const LocalInfo::LocalInfo& local_info)
+                            const LocalInfo::LocalInfo& local_info,
+                            Secret::SecretManager& secret_manager)
       : main_thread_dispatcher_(main_thread_dispatcher), runtime_(runtime), stats_(stats),
         tls_(tls), random_(random), dns_resolver_(dns_resolver),
-        ssl_context_manager_(ssl_context_manager), local_info_(local_info) {}
+        ssl_context_manager_(ssl_context_manager), local_info_(local_info),
+        secret_manager_(secret_manager) {}
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
@@ -56,6 +59,7 @@ public:
   CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                       const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                       ClusterManager& cm) override;
+  Secret::SecretManager& secretManager() override { return secret_manager_; }
 
 protected:
   Event::Dispatcher& main_thread_dispatcher_;
@@ -68,6 +72,7 @@ private:
   Network::DnsResolverSharedPtr dns_resolver_;
   Ssl::ContextManager& ssl_context_manager_;
   const LocalInfo::LocalInfo& local_info_;
+  Secret::SecretManager& secret_manager_;
 };
 
 /**
@@ -150,7 +155,9 @@ public:
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin);
+                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                     SystemTimeSource& system_time_source,
+                     MonotonicTimeSource& monotonic_time_source);
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
@@ -191,6 +198,8 @@ public:
 
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
+
+  ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
 private:
   /**
@@ -292,10 +301,11 @@ private:
 
   struct ClusterData {
     ClusterData(const envoy::api::v2::Cluster& cluster_config, const std::string& version_info,
-                bool added_via_api, ClusterSharedPtr&& cluster)
+                bool added_via_api, ClusterSharedPtr&& cluster,
+                SystemTimeSource& system_time_source)
         : cluster_config_(cluster_config), config_hash_(MessageUtil::hash(cluster_config)),
-          version_info_(version_info), added_via_api_(added_via_api), cluster_(std::move(cluster)) {
-    }
+          version_info_(version_info), added_via_api_(added_via_api), cluster_(std::move(cluster)),
+          last_updated_(system_time_source.currentTime()) {}
 
     bool blockUpdate(uint64_t hash) { return !added_via_api_ || config_hash_ == hash; }
 
@@ -314,6 +324,7 @@ private:
     ClusterSharedPtr cluster_;
     // Optional thread aware LB depending on the LB type. Not all clusters have one.
     ThreadAwareLoadBalancerPtr thread_aware_lb_;
+    SystemTime last_updated_;
   };
 
   struct ClusterUpdateCallbacksHandleImpl : public ClusterUpdateCallbacksHandle {
@@ -361,6 +372,7 @@ private:
   std::string local_cluster_name_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
+  SystemTimeSource& system_time_source_;
 };
 
 } // namespace Upstream

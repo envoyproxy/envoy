@@ -301,13 +301,18 @@ void GoogleAsyncStreamImpl::handleOpCompletion(GoogleAsyncTag::Operation op, boo
   case GoogleAsyncTag::Operation::Read: {
     ASSERT(ok);
     ProtobufTypes::MessagePtr response = callbacks_.createEmptyResponse();
-    grpc::ProtoBufferReader reader(&read_buf_);
-    if (!response->ParseFromZeroCopyStream(&reader)) {
-      // This is basically streamError in Grpc::AsyncClientImpl.
-      notifyRemoteClose(Status::GrpcStatus::Internal, nullptr, EMPTY_STRING);
-      resetStream();
-      break;
-    };
+    {
+      // reader must be destructed before we queue up read_buf_ for the next
+      // Read op, otherwise we can race between this thread in the reader
+      // destructor and the gRPC op thread.
+      grpc::ProtoBufferReader reader(&read_buf_);
+      if (!response->ParseFromZeroCopyStream(&reader)) {
+        // This is basically streamError in Grpc::AsyncClientImpl.
+        notifyRemoteClose(Status::GrpcStatus::Internal, nullptr, EMPTY_STRING);
+        resetStream();
+        break;
+      };
+    }
     callbacks_.onReceiveMessageUntyped(std::move(response));
     rw_->Read(&read_buf_, &read_tag_);
     ++inflight_tags_;

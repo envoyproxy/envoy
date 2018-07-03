@@ -2,10 +2,12 @@
 
 #include <memory>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/rbac/v2alpha/rbac.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
+#include "common/common/matchers.h"
 #include "common/http/header_utility.h"
 #include "common/network/cidr_range.h"
 
@@ -31,9 +33,10 @@ public:
    * @param connection the downstream connection used to match against.
    * @param headers    the request headers used to match against. An empty map should be used if
    *                   there are none headers available.
+   * @param metadata   the additional information about the action/principal.
    */
-  virtual bool matches(const Network::Connection& connection,
-                       const Envoy::Http::HeaderMap& headers) const PURE;
+  virtual bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+                       const envoy::api::v2::core::Metadata& metadata) const PURE;
 
   /**
    * Creates a shared instance of a matcher based off the rules defined in the Permission config
@@ -53,7 +56,8 @@ public:
  */
 class AlwaysMatcher : public Matcher {
 public:
-  bool matches(const Network::Connection&, const Envoy::Http::HeaderMap&) const override {
+  bool matches(const Network::Connection&, const Envoy::Http::HeaderMap&,
+               const envoy::api::v2::core::Metadata&) const override {
     return true;
   }
 };
@@ -67,8 +71,8 @@ public:
   AndMatcher(const envoy::config::rbac::v2alpha::Permission_Set& rules);
   AndMatcher(const envoy::config::rbac::v2alpha::Principal_Set& ids);
 
-  bool matches(const Network::Connection& connection,
-               const Envoy::Http::HeaderMap& headers) const override;
+  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+               const envoy::api::v2::core::Metadata&) const override;
 
 private:
   std::vector<MatcherConstSharedPtr> matchers_;
@@ -85,8 +89,8 @@ public:
   OrMatcher(const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Permission>& rules);
   OrMatcher(const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Principal>& ids);
 
-  bool matches(const Network::Connection& connection,
-               const Envoy::Http::HeaderMap& headers) const override;
+  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+               const envoy::api::v2::core::Metadata&) const override;
 
 private:
   std::vector<MatcherConstSharedPtr> matchers_;
@@ -100,8 +104,8 @@ class HeaderMatcher : public Matcher {
 public:
   HeaderMatcher(const envoy::api::v2::route::HeaderMatcher& matcher) : header_(matcher) {}
 
-  bool matches(const Network::Connection& connection,
-               const Envoy::Http::HeaderMap& headers) const override;
+  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+               const envoy::api::v2::core::Metadata&) const override;
 
 private:
   const Envoy::Http::HeaderUtility::HeaderData header_;
@@ -116,8 +120,8 @@ public:
   IPMatcher(const envoy::api::v2::core::CidrRange& range, bool destination)
       : range_(Network::Address::CidrRange::create(range)), destination_(destination) {}
 
-  bool matches(const Network::Connection& connection,
-               const Envoy::Http::HeaderMap& headers) const override;
+  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+               const envoy::api::v2::core::Metadata&) const override;
 
 private:
   const Network::Address::CidrRange range_;
@@ -131,8 +135,8 @@ class PortMatcher : public Matcher {
 public:
   PortMatcher(const uint32_t port) : port_(port) {}
 
-  bool matches(const Network::Connection& connection,
-               const Envoy::Http::HeaderMap& headers) const override;
+  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+               const envoy::api::v2::core::Metadata&) const override;
 
 private:
   const uint32_t port_;
@@ -147,8 +151,8 @@ public:
   AuthenticatedMatcher(const envoy::config::rbac::v2alpha::Principal_Authenticated& auth)
       : name_(auth.name()) {}
 
-  bool matches(const Network::Connection& connection,
-               const Envoy::Http::HeaderMap& headers) const override;
+  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+               const envoy::api::v2::core::Metadata&) const override;
 
 private:
   const std::string name_;
@@ -163,12 +167,23 @@ public:
   PolicyMatcher(const envoy::config::rbac::v2alpha::Policy& policy)
       : permissions_(policy.permissions()), principals_(policy.principals()) {}
 
-  bool matches(const Network::Connection& connection,
-               const Envoy::Http::HeaderMap& headers) const override;
+  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+               const envoy::api::v2::core::Metadata&) const override;
 
 private:
   const OrMatcher permissions_;
   const OrMatcher principals_;
+};
+
+class MetadataMatcher : public Matcher {
+public:
+  MetadataMatcher(const Envoy::Matchers::MetadataMatcher& matcher) : matcher_(matcher) {}
+
+  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+               const envoy::api::v2::core::Metadata& metadata) const override;
+
+private:
+  const Envoy::Matchers::MetadataMatcher matcher_;
 };
 
 } // namespace RBAC

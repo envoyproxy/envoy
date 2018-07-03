@@ -191,6 +191,9 @@ private:
         return std::chrono::milliseconds(0);
       }
     }
+    absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
+      return absl::nullopt;
+    }
     const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
       return nullptr;
     }
@@ -199,7 +202,7 @@ private:
     }
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
-    bool useWebSocket() const override { return false; }
+    bool useOldStyleWebSocket() const override { return false; }
     Http::WebSocketProxyPtr createWebSocketProxy(Http::HeaderMap&, RequestInfo::RequestInfo&,
                                                  Http::WebSocketProxyCallbacks&,
                                                  Upstream::ClusterManager&,

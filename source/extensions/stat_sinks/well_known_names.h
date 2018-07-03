@@ -18,6 +18,8 @@ public:
   const std::string DOG_STATSD = "envoy.dog_statsd";
   // MetricsService sink
   const std::string METRICS_SERVICE = "envoy.metrics_service";
+  // Hystrix sink
+  const std::string HYSTRIX = "envoy.stat_sinks.hystrix";
 };
 
 typedef ConstSingleton<StatsSinkNameValues> StatsSinkNames;

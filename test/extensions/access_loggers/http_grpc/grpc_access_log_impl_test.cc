@@ -219,7 +219,7 @@ http_logs:
     request_info.addBytesReceived(10);
     request_info.addBytesSent(20);
     request_info.response_code_ = 200;
-    ON_CALL(request_info, getResponseFlag(RequestInfo::ResponseFlag::FaultInjected))
+    ON_CALL(request_info, hasResponseFlag(RequestInfo::ResponseFlag::FaultInjected))
         .WillByDefault(Return(true));
 
     Http::TestHeaderMapImpl request_headers{
@@ -414,7 +414,7 @@ http_logs:
 
 TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   NiceMock<RequestInfo::MockRequestInfo> request_info;
-  ON_CALL(request_info, getResponseFlag(_)).WillByDefault(Return(true));
+  ON_CALL(request_info, hasResponseFlag(_)).WillByDefault(Return(true));
   envoy::data::accesslog::v2::AccessLogCommon common_access_log;
   HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(common_access_log, request_info);
 

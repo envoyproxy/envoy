@@ -1,5 +1,7 @@
 #include "server/config_validation/cluster_manager.h"
 
+#include "common/common/utility.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -7,9 +9,9 @@ ValidationClusterManagerFactory::ValidationClusterManagerFactory(
     Runtime::Loader& runtime, Stats::Store& stats, ThreadLocal::Instance& tls,
     Runtime::RandomGenerator& random, Network::DnsResolverSharedPtr dns_resolver,
     Ssl::ContextManager& ssl_context_manager, Event::Dispatcher& main_thread_dispatcher,
-    const LocalInfo::LocalInfo& local_info)
+    const LocalInfo::LocalInfo& local_info, Secret::SecretManager& secret_manager)
     : ProdClusterManagerFactory(runtime, stats, tls, random, dns_resolver, ssl_context_manager,
-                                main_thread_dispatcher, local_info) {}
+                                main_thread_dispatcher, local_info, secret_manager) {}
 
 ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v2::Bootstrap& bootstrap, Stats::Store& stats,
@@ -37,7 +39,8 @@ ValidationClusterManager::ValidationClusterManager(
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
     Server::Admin& admin)
     : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
-                         main_thread_dispatcher, admin) {}
+                         main_thread_dispatcher, admin, ProdSystemTimeSource::instance_,
+                         ProdMonotonicTimeSource::instance_) {}
 
 Http::ConnectionPool::Instance*
 ValidationClusterManager::httpConnPoolForCluster(const std::string&, ResourcePriority,

@@ -20,10 +20,12 @@ namespace Common {
 namespace RBAC {
 namespace {
 
-void checkMatcher(const RBAC::Matcher& matcher, bool expected,
-                  const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
-                  const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl()) {
-  EXPECT_EQ(expected, matcher.matches(connection, headers));
+void checkMatcher(
+    const RBAC::Matcher& matcher, bool expected,
+    const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
+    const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl(),
+    const envoy::api::v2::core::Metadata& metadata = envoy::api::v2::core::Metadata()) {
+  EXPECT_EQ(expected, matcher.matches(connection, headers, metadata));
 }
 
 TEST(AlwaysMatcher, AlwaysMatches) { checkMatcher(RBAC::AlwaysMatcher(), true); }
@@ -208,6 +210,27 @@ TEST(AuthenticatedMatcher, NoSSL) {
   Envoy::Network::MockConnection conn;
   EXPECT_CALL(Const(conn), ssl()).WillOnce(Return(nullptr));
   checkMatcher(AuthenticatedMatcher({}), false, conn);
+}
+
+TEST(MetadataMatcher, MetadataMatcher) {
+  Envoy::Network::MockConnection conn;
+  Envoy::Http::HeaderMapImpl header;
+
+  auto label = MessageUtil::keyValueStruct("label", "prod");
+  envoy::api::v2::core::Metadata metadata;
+  metadata.mutable_filter_metadata()->insert(
+      Protobuf::MapPair<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>("other", label));
+  metadata.mutable_filter_metadata()->insert(
+      Protobuf::MapPair<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>("rbac", label));
+
+  envoy::type::matcher::MetadataMatcher matcher;
+  matcher.set_filter("rbac");
+  matcher.add_path()->set_key("label");
+
+  matcher.mutable_value()->mutable_string_match()->set_exact("test");
+  checkMatcher(MetadataMatcher(matcher), false, conn, header, metadata);
+  matcher.mutable_value()->mutable_string_match()->set_exact("prod");
+  checkMatcher(MetadataMatcher(matcher), true, conn, header, metadata);
 }
 
 TEST(PolicyMatcher, PolicyMatcher) {

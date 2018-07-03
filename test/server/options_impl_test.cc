@@ -83,12 +83,15 @@ TEST(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
   EXPECT_EQ(true, options->hotRestartDisabled());
+
+  options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_EQ(Server::Mode::InitOnly, options->mode());
 }
 
 TEST(OptionsImplTest, SetAll) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
   bool v2_config_only = options->v2ConfigOnly();
-  bool hot_restart_disabled = options->v2ConfigOnly();
+  bool hot_restart_disabled = options->hotRestartDisabled();
   options->setBaseId(109876);
   options->setConcurrency(42);
   options->setConfigPath("foo");

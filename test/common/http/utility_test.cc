@@ -46,6 +46,8 @@ TEST(HttpUtility, isWebSocketUpgradeRequest) {
   EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(TestHeaderMapImpl{{"upgrade", "websocket"}}));
   EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(
       TestHeaderMapImpl{{"Connection", "close"}, {"Upgrade", "websocket"}}));
+  EXPECT_FALSE(Utility::isUpgrade(
+      TestHeaderMapImpl{{"Connection", "IsNotAnUpgrade"}, {"Upgrade", "websocket"}}));
 
   EXPECT_TRUE(Utility::isWebSocketUpgradeRequest(
       TestHeaderMapImpl{{"Connection", "upgrade"}, {"Upgrade", "websocket"}}));
@@ -53,6 +55,23 @@ TEST(HttpUtility, isWebSocketUpgradeRequest) {
       TestHeaderMapImpl{{"connection", "upgrade"}, {"upgrade", "websocket"}}));
   EXPECT_TRUE(Utility::isWebSocketUpgradeRequest(
       TestHeaderMapImpl{{"connection", "Upgrade"}, {"upgrade", "WebSocket"}}));
+}
+
+TEST(HttpUtility, isUpgrade) {
+  EXPECT_FALSE(Utility::isUpgrade(TestHeaderMapImpl{}));
+  EXPECT_FALSE(Utility::isUpgrade(TestHeaderMapImpl{{"connection", "upgrade"}}));
+  EXPECT_FALSE(Utility::isUpgrade(TestHeaderMapImpl{{"upgrade", "foo"}}));
+  EXPECT_FALSE(Utility::isUpgrade(TestHeaderMapImpl{{"Connection", "close"}, {"Upgrade", "foo"}}));
+  EXPECT_FALSE(
+      Utility::isUpgrade(TestHeaderMapImpl{{"Connection", "IsNotAnUpgrade"}, {"Upgrade", "foo"}}));
+  EXPECT_FALSE(Utility::isUpgrade(
+      TestHeaderMapImpl{{"Connection", "Is Not An Upgrade"}, {"Upgrade", "foo"}}));
+
+  EXPECT_TRUE(Utility::isUpgrade(TestHeaderMapImpl{{"Connection", "upgrade"}, {"Upgrade", "foo"}}));
+  EXPECT_TRUE(Utility::isUpgrade(TestHeaderMapImpl{{"connection", "upgrade"}, {"upgrade", "foo"}}));
+  EXPECT_TRUE(Utility::isUpgrade(TestHeaderMapImpl{{"connection", "Upgrade"}, {"upgrade", "FoO"}}));
+  EXPECT_TRUE(Utility::isUpgrade(
+      TestHeaderMapImpl{{"connection", "keep-alive, Upgrade"}, {"upgrade", "FOO"}}));
 }
 
 TEST(HttpUtility, appendXff) {
@@ -155,6 +174,39 @@ TEST(HttpUtility, getLastAddressFromXFF) {
     EXPECT_EQ(first_address, ret.address_->ip()->addressAsString());
     EXPECT_FALSE(ret.single_address_);
     ret = Utility::getLastAddressFromXFF(request_headers, 3);
+    EXPECT_EQ(nullptr, ret.address_);
+    EXPECT_FALSE(ret.single_address_);
+  }
+  {
+    const std::string first_address = "192.0.2.10";
+    const std::string second_address = "192.0.2.1";
+    const std::string third_address = "10.0.0.1";
+    const std::string fourth_address = "10.0.0.2";
+    TestHeaderMapImpl request_headers{
+        {"x-forwarded-for", "192.0.2.10, 192.0.2.1 ,10.0.0.1,10.0.0.2"}};
+
+    // No space on the left.
+    auto ret = Utility::getLastAddressFromXFF(request_headers);
+    EXPECT_EQ(fourth_address, ret.address_->ip()->addressAsString());
+    EXPECT_FALSE(ret.single_address_);
+
+    // No space on either side.
+    ret = Utility::getLastAddressFromXFF(request_headers, 1);
+    EXPECT_EQ(third_address, ret.address_->ip()->addressAsString());
+    EXPECT_FALSE(ret.single_address_);
+
+    // Exercise rtrim() and ltrim().
+    ret = Utility::getLastAddressFromXFF(request_headers, 2);
+    EXPECT_EQ(second_address, ret.address_->ip()->addressAsString());
+    EXPECT_FALSE(ret.single_address_);
+
+    // No space trimming.
+    ret = Utility::getLastAddressFromXFF(request_headers, 3);
+    EXPECT_EQ(first_address, ret.address_->ip()->addressAsString());
+    EXPECT_FALSE(ret.single_address_);
+
+    // No address found.
+    ret = Utility::getLastAddressFromXFF(request_headers, 4);
     EXPECT_EQ(nullptr, ret.address_);
     EXPECT_FALSE(ret.single_address_);
   }
@@ -308,6 +360,60 @@ TEST(HttpUtility, SendLocalReplyDestroyedEarly) {
   }));
   EXPECT_CALL(callbacks, encodeData(_, true)).Times(0);
   Utility::sendLocalReply(false, callbacks, is_reset, Http::Code::PayloadTooLarge, "large");
+}
+
+TEST(HttpUtility, TestExtractHostPathFromUri) {
+  absl::string_view host, path;
+
+  // FQDN
+  Utility::extractHostPathFromUri("scheme://dns.name/x/y/z", host, path);
+  EXPECT_EQ(host, "dns.name");
+  EXPECT_EQ(path, "/x/y/z");
+
+  // Just the host part
+  Utility::extractHostPathFromUri("dns.name", host, path);
+  EXPECT_EQ(host, "dns.name");
+  EXPECT_EQ(path, "/");
+
+  // Just host and path
+  Utility::extractHostPathFromUri("dns.name/x/y/z", host, path);
+  EXPECT_EQ(host, "dns.name");
+  EXPECT_EQ(path, "/x/y/z");
+
+  // Just the path
+  Utility::extractHostPathFromUri("/x/y/z", host, path);
+  EXPECT_EQ(host, "");
+  EXPECT_EQ(path, "/x/y/z");
+
+  // Some invalid URI
+  Utility::extractHostPathFromUri("scheme://adf-scheme://adf", host, path);
+  EXPECT_EQ(host, "adf-scheme:");
+  EXPECT_EQ(path, "//adf");
+
+  Utility::extractHostPathFromUri("://", host, path);
+  EXPECT_EQ(host, "");
+  EXPECT_EQ(path, "/");
+
+  Utility::extractHostPathFromUri("/:/adsf", host, path);
+  EXPECT_EQ(host, "");
+  EXPECT_EQ(path, "/:/adsf");
+}
+
+TEST(HttpUtility, TestPrepareHeaders) {
+  envoy::api::v2::core::HttpUri http_uri;
+  http_uri.set_uri("scheme://dns.name/x/y/z");
+
+  Http::MessagePtr message = Utility::prepareHeaders(http_uri);
+
+  EXPECT_STREQ("/x/y/z", message->headers().Path()->value().c_str());
+  EXPECT_STREQ("dns.name", message->headers().Host()->value().c_str());
+}
+
+TEST(HttpUtility, QueryParamsToString) {
+  EXPECT_EQ("", Utility::queryParamsToString(Utility::QueryParams({})));
+  EXPECT_EQ("?a=1", Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}})));
+  EXPECT_EQ("?a=1&b=2",
+            Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}, {"b", "2"}})));
 }
 
 } // namespace Http

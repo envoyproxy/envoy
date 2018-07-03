@@ -108,7 +108,7 @@ public:
     EXPECT_CALL(*read_filter_, onNewConnection());
     EXPECT_CALL(*read_filter_, onData(_, _))
         .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> Network::FilterStatus {
-          EXPECT_EQ(TestUtility::bufferToString(buffer), expected);
+          EXPECT_EQ(buffer.toString(), expected);
           buffer.drain(expected.length());
           dispatcher_.exit();
           return Network::FilterStatus::Continue;
@@ -627,7 +627,7 @@ public:
     EXPECT_CALL(*read_filter_, onNewConnection());
     EXPECT_CALL(*read_filter_, onData(_, _))
         .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> Network::FilterStatus {
-          EXPECT_EQ(TestUtility::bufferToString(buffer), expected);
+          EXPECT_EQ(buffer.toString(), expected);
           buffer.drain(expected.length());
           dispatcher_.exit();
           return Network::FilterStatus::Continue;

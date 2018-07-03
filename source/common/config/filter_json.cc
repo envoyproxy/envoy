@@ -220,7 +220,7 @@ void FilterJson::translateHttpConnectionManager(
       proto_config.mutable_set_current_client_cert_details()->mutable_subject()->set_value(true);
     } else {
       ASSERT(detail == "SAN");
-      proto_config.mutable_set_current_client_cert_details()->mutable_san()->set_value(true);
+      proto_config.mutable_set_current_client_cert_details()->set_uri(true);
     }
   }
 }

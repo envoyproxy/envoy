@@ -16,11 +16,11 @@
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
+#include "common/http/message_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/str_cat.h"
-#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Http {
@@ -201,15 +201,18 @@ uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   return response_code;
 }
 
-bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
+bool Utility::isUpgrade(const HeaderMap& headers) {
   // In firefox the "Connection" request header value is "keep-alive, Upgrade",
   // we should check if it contains the "Upgrade" token.
   return (headers.Connection() && headers.Upgrade() &&
-          headers.Connection()->value().caseInsensitiveContains(
-              Http::Headers::get().ConnectionValues.Upgrade.c_str()) &&
-          (0 == StringUtil::caseInsensitiveCompare(
-                    headers.Upgrade()->value().c_str(),
-                    Http::Headers::get().UpgradeValues.WebSocket.c_str())));
+          Envoy::StringUtil::caseFindToken(headers.Connection()->value().getStringView(), ",",
+                                           Http::Headers::get().ConnectionValues.Upgrade.c_str()));
+}
+
+bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
+  return (isUpgrade(headers) && (0 == StringUtil::caseInsensitiveCompare(
+                                          headers.Upgrade()->value().c_str(),
+                                          Http::Headers::get().UpgradeValues.WebSocket.c_str())));
 }
 
 Http2Settings
@@ -292,7 +295,7 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   }
 
   absl::string_view xff_string(xff_header->value().c_str(), xff_header->value().size());
-  static const std::string seperator(", ");
+  static const std::string seperator(",");
   // Ignore the last num_to_skip addresses at the end of XFF.
   for (uint32_t i = 0; i < num_to_skip; i++) {
     std::string::size_type last_comma = xff_string.rfind(seperator);
@@ -307,6 +310,10 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   if (last_comma != std::string::npos && last_comma + seperator.size() < xff_string.size()) {
     xff_string = xff_string.substr(last_comma + seperator.size());
   }
+
+  // Ignore the whitespace, since they are allowed in HTTP lists (see RFC7239#section-7.1).
+  xff_string = StringUtil::ltrim(xff_string);
+  xff_string = StringUtil::rtrim(xff_string);
 
   try {
     // This technically requires a copy because inet_pton takes a null terminated string. In
@@ -332,6 +339,57 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
   }
 
   NOT_REACHED;
+}
+
+void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
+                                     absl::string_view& path) {
+  /**
+   *  URI RFC: https://www.ietf.org/rfc/rfc2396.txt
+   *
+   *  Example:
+   *  uri  = "https://example.com:8443/certs"
+   *  pos:          ^
+   *  host_pos:       ^
+   *  path_pos:                       ^
+   *  host = "example.com:8443"
+   *  path = "/certs"
+   */
+  const auto pos = uri.find("://");
+  // Start position of the host
+  const auto host_pos = (pos == std::string::npos) ? 0 : pos + 3;
+  // Start position of the path
+  const auto path_pos = uri.find("/", host_pos);
+  if (path_pos == std::string::npos) {
+    // If uri doesn't have "/", the whole string is treated as host.
+    host = uri.substr(host_pos);
+    path = "/";
+  } else {
+    host = uri.substr(host_pos, path_pos - host_pos);
+    path = uri.substr(path_pos);
+  }
+}
+
+MessagePtr Utility::prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_uri) {
+  absl::string_view host, path;
+  extractHostPathFromUri(http_uri.uri(), host, path);
+
+  MessagePtr message(new RequestMessageImpl());
+  message->headers().insertPath().value(path.data(), path.size());
+  message->headers().insertHost().value(host.data(), host.size());
+
+  return message;
+}
+
+// TODO(jmarantz): make QueryParams a real class and put this serializer there,
+// along with proper URL escaping of the name and value.
+std::string Utility::queryParamsToString(const QueryParams& params) {
+  std::string out;
+  std::string delim = "?";
+  for (auto p : params) {
+    absl::StrAppend(&out, delim, p.first, "=", p.second);
+    delim = "&";
+  }
+  return out;
 }
 
 } // namespace Http

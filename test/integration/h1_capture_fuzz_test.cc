@@ -25,7 +25,7 @@ public:
       ENVOY_LOG_MISC(debug, "Processing event: {}", event.DebugString());
       // If we're disconnected, we fail out.
       if (!tcp_client->connected()) {
-        EXPECT_TRUE(tcp_client->connected());
+        ENVOY_LOG_MISC(debug, "Disconnected, no further event processing.");
         break;
       }
       switch (event.event_selector_case()) {
@@ -59,8 +59,10 @@ public:
         break;
       }
     }
-    if (fake_upstream_connection != nullptr && fake_upstream_connection->connected()) {
-      fake_upstream_connection->close();
+    if (fake_upstream_connection != nullptr) {
+      if (fake_upstream_connection->connected()) {
+        fake_upstream_connection->close();
+      }
       fake_upstream_connection->waitForDisconnect(true);
     }
     tcp_client->close();

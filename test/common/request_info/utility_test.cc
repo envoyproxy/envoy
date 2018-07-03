@@ -34,14 +34,14 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
 
   for (const auto& test_case : expected) {
     NiceMock<MockRequestInfo> request_info;
-    ON_CALL(request_info, getResponseFlag(test_case.first)).WillByDefault(Return(true));
+    ON_CALL(request_info, hasResponseFlag(test_case.first)).WillByDefault(Return(true));
     EXPECT_EQ(test_case.second, ResponseFlagUtils::toShortString(request_info));
   }
 
   // No flag is set.
   {
     NiceMock<MockRequestInfo> request_info;
-    ON_CALL(request_info, getResponseFlag(_)).WillByDefault(Return(false));
+    ON_CALL(request_info, hasResponseFlag(_)).WillByDefault(Return(false));
     EXPECT_EQ("-", ResponseFlagUtils::toShortString(request_info));
   }
 
@@ -49,11 +49,39 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
   // These are not real use cases, but are used to cover multiple response flags case.
   {
     NiceMock<MockRequestInfo> request_info;
-    ON_CALL(request_info, getResponseFlag(ResponseFlag::DelayInjected)).WillByDefault(Return(true));
-    ON_CALL(request_info, getResponseFlag(ResponseFlag::FaultInjected)).WillByDefault(Return(true));
-    ON_CALL(request_info, getResponseFlag(ResponseFlag::UpstreamRequestTimeout))
+    ON_CALL(request_info, hasResponseFlag(ResponseFlag::DelayInjected)).WillByDefault(Return(true));
+    ON_CALL(request_info, hasResponseFlag(ResponseFlag::FaultInjected)).WillByDefault(Return(true));
+    ON_CALL(request_info, hasResponseFlag(ResponseFlag::UpstreamRequestTimeout))
         .WillByDefault(Return(true));
     EXPECT_EQ("UT,DI,FI", ResponseFlagUtils::toShortString(request_info));
+  }
+}
+
+TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
+  static_assert(ResponseFlag::LastFlag == 0x1000, "A flag has been added. Fix this code.");
+
+  std::vector<std::pair<std::string, ResponseFlag>> expected = {
+      std::make_pair("LH", ResponseFlag::FailedLocalHealthCheck),
+      std::make_pair("UH", ResponseFlag::NoHealthyUpstream),
+      std::make_pair("UT", ResponseFlag::UpstreamRequestTimeout),
+      std::make_pair("LR", ResponseFlag::LocalReset),
+      std::make_pair("UR", ResponseFlag::UpstreamRemoteReset),
+      std::make_pair("UF", ResponseFlag::UpstreamConnectionFailure),
+      std::make_pair("UC", ResponseFlag::UpstreamConnectionTermination),
+      std::make_pair("UO", ResponseFlag::UpstreamOverflow),
+      std::make_pair("NR", ResponseFlag::NoRouteFound),
+      std::make_pair("DI", ResponseFlag::DelayInjected),
+      std::make_pair("FI", ResponseFlag::FaultInjected),
+      std::make_pair("RL", ResponseFlag::RateLimited),
+      std::make_pair("UAEX", ResponseFlag::UnauthorizedExternalService),
+  };
+
+  EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());
+
+  for (const auto& test_case : expected) {
+    absl::optional<ResponseFlag> response_flag = ResponseFlagUtils::toResponseFlag(test_case.first);
+    EXPECT_TRUE(response_flag.has_value());
+    EXPECT_EQ(test_case.second, response_flag.value());
   }
 }
 

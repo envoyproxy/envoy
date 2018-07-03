@@ -16,6 +16,7 @@ public:
 
   // RequestInfo::RequestInfo
   MOCK_METHOD1(setResponseFlag, void(ResponseFlag response_flag));
+  MOCK_CONST_METHOD1(intersectResponseFlags, bool(uint64_t));
   MOCK_METHOD1(onUpstreamHostSelected, void(Upstream::HostDescriptionConstSharedPtr host));
   MOCK_CONST_METHOD0(startTime, SystemTime());
   MOCK_CONST_METHOD0(startTimeMonotonic, MonotonicTime());
@@ -43,7 +44,8 @@ public:
   MOCK_CONST_METHOD0(responseCode, absl::optional<uint32_t>());
   MOCK_METHOD1(addBytesSent, void(uint64_t));
   MOCK_CONST_METHOD0(bytesSent, uint64_t());
-  MOCK_CONST_METHOD1(getResponseFlag, bool(ResponseFlag));
+  MOCK_CONST_METHOD1(hasResponseFlag, bool(ResponseFlag));
+  MOCK_CONST_METHOD0(hasAnyResponseFlag, bool());
   MOCK_CONST_METHOD0(upstreamHost, Upstream::HostDescriptionConstSharedPtr());
   MOCK_METHOD1(setUpstreamLocalAddress, void(const Network::Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(upstreamLocalAddress, const Network::Address::InstanceConstSharedPtr&());
@@ -74,8 +76,6 @@ public:
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
   envoy::api::v2::core::Metadata metadata_;
-
-private:
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
