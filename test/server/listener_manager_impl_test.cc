@@ -1986,7 +1986,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
   EXPECT_NE(fd, -1);
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTestIPv6, OriginalDstTestFilterOptionFail) {
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFailIPv6) {
   class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
   public:
     // NamedListenerFilterConfigFactory
