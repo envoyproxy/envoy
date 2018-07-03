@@ -665,8 +665,6 @@ void PriorityStateManager::initializePriorityFor(
     priority_state_[priority].first.reset(new HostVector());
   }
   if (locality_lb_endpoint.has_locality() && locality_lb_endpoint.has_load_balancing_weight()) {
-    // TODO(dio): Add tests as per @alyssawilk's comment here
-    // https://github.com/envoyproxy/envoy/pull/3261/files#r188292098
     priority_state_[priority].second[locality_lb_endpoint.locality()] =
         locality_lb_endpoint.load_balancing_weight().value();
   }
