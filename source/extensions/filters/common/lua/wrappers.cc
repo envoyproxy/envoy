@@ -127,14 +127,14 @@ int MetadataMapWrapper::luaPairs(lua_State* state) {
 
 int ConnectionWrapper::luaSsl(lua_State* state) {
   const auto& ssl = connection_->ssl();
-  if (ssl == nullptr) {
-    lua_pushnil(state);
-  } else {
+  if (ssl != nullptr) {
     if (ssl_connection_wrapper_.get() != nullptr) {
       ssl_connection_wrapper_.pushStack();
     } else {
       ssl_connection_wrapper_.reset(SslConnectionWrapper::create(state, ssl), true);
     }
+  } else {
+    lua_pushnil(state);
   }
   return 1;
 }
