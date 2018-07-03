@@ -431,8 +431,8 @@ ssl()
     print("secure")
   end
 
-Returns :repo:`SSL connection <include/envoy/ssl>` object when the connection is secured
-and *nil* when it is not.
+Returns :repo:`SSL connection <include/envoy/ssl/connection.h>` object when the connection is
+secured and *nil* when it is not.
 
 .. note::
 
