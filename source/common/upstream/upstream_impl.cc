@@ -648,7 +648,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
                                            const LocalInfo::LocalInfo& local_info,
                                            const absl::optional<std::string> error_prefix)
-    : priority_state_(1), parent_(cluster), local_info_node_(local_info.node()) {
+    : parent_(cluster), priority_state_(1), local_info_node_(local_info.node()) {
   if (error_prefix.has_value()) {
     Config::Utility::checkLocalInfo(error_prefix.value(), local_info);
   }

@@ -500,8 +500,8 @@ typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
 
 /**
  * Manages PriorityState of a cluster. PriorityState is a per-priority binding of a set of hosts
- * with its corresponding locality weight map. This is not used at runtime, but useful to store
- * priorities/hosts/localities before updating the cluster priority set.
+ * with its corresponding locality weight map. This is useful to store priorities/hosts/localities
+ * before updating the cluster priority set.
  */
 class PriorityStateManager : protected Logger::Loggable<Logger::Id::upstream> {
 public:
@@ -534,10 +534,12 @@ public:
   // Returns the size of the current cluster priority state.
   size_t size() const { return priority_state_.size(); }
 
-  PriorityState priority_state_;
+  // Returns the saved priority state.
+  PriorityState& priorityState() { return priority_state_; }
 
 private:
   ClusterImplBase& parent_;
+  PriorityState priority_state_;
   const envoy::api::v2::core::Node& local_info_node_;
 };
 

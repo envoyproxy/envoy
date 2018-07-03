@@ -60,7 +60,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
                                      cluster_load_assignment.cluster_name()));
   }
 
-  auto& priority_state = priority_state_manager_->priority_state_;
+  auto& priority_state = priority_state_manager_->priorityState();
   priority_state.clear();
 
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
