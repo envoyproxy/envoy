@@ -40,11 +40,17 @@ public:
 
 typedef std::shared_ptr<Config> ConfigSharedPtr;
 
-enum ProxyProtocolVersion { kUnknown = -1, kInProgress = -2, kV1 = 1, kV2 = 2 };
+enum ProxyProtocolVersion { Unknown = -1, InProgress = -2, V1 = 1, V2 = 2 };
 
 /**
  * Implementation the PROXY Protocol listener filter
  * (https://github.com/haproxy/haproxy/blob/master/doc/proxy-protocol.txt)
+ *
+ * This implementation supports Proxy Protocol v1 (TCP/UDP, v4/v6),
+ * and Proxy Protocol v2 (TCP/UDP, v4/v6).
+ *
+ * Non INET (AF_UNIX) address family in v2 is not supported, will throw an error.
+ * Extensions (TLV) in v2 are skipped over.
  */
 class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
 public:
@@ -54,7 +60,8 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
 private:
-  static const size_t MAX_PROXY_PROTO_LEN = PP2_HEADER_LEN + PP2_ADDR_LEN_UNIX;
+  static const size_t MAX_PROXY_PROTO_LEN =
+      PROXY_PROTO_V2_HEADER_LEN + PROXY_PROTO_V2_ADDR_LEN_UNIX;
   static const size_t MAX_PROXY_PROTO_LEN_V1 = 108;
 
   void onRead();
@@ -66,13 +73,13 @@ private:
    * throws EnvoyException on any socket errors.
    * @return bool true valid header, false if more data is needed.
    */
-  bool readProxyHeader(int fd, PpHeader& hdr);
+  bool readProxyHeader(int fd, absl::optional<WireHeader>& hdr);
 
   /**
    * Given a char * & len, parse the header as per spec
    */
-  void parseV1Header(char* buf, size_t len, PpHeader& hdr);
-  void parseV2Header(char* buf, size_t len, PpHeader& hdr);
+  void parseV1Header(char* buf, size_t len, absl::optional<WireHeader>& hdr);
+  void parseV2Header(char* buf, size_t len, absl::optional<WireHeader>& hdr);
 
   Network::ListenerFilterCallbacks* cb_{};
   Event::FileEventPtr file_event_;
@@ -83,7 +90,7 @@ private:
   // The index in buf_ where the search for '\r\n' should continue from
   size_t search_index_{1};
 
-  ProxyProtocolVersion header_version_{kUnknown};
+  ProxyProtocolVersion header_version_{Unknown};
 
   // Stores the portion of the first line that has been read so far.
   char buf_[MAX_PROXY_PROTO_LEN];
