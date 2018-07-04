@@ -512,17 +512,19 @@ public:
   void
   initializePriorityFor(const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint);
 
-  // TODO(dio): Add an override to register a host to the PriorityState based on a specified
-  // priority. void registerHostForPriority(const HostSharedPtr& host, const uint32_t priority);
-
-  // Registers a host based on its address to the PriorityState based on the specified priority.
+  // Registers a host based on its address to the PriorityState based on the specified priority (the
+  // priority is specified by locality_lb_endpoint.priority()).
   void
   registerHostForPriority(const std::string& hostname,
                           Network::Address::InstanceConstSharedPtr address,
                           const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-                          // The priority is specified by locality_lb_endpoint.priority().
                           const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
                           const absl::optional<Upstream::Host::HealthFlag> health_checker_flag);
+
+  // TODO(dio): Add an override of registerHostForPriority to register a host to the PriorityState
+  // based on a specified priority. This will be useful for non-EDS cluster hosts setup.
+  //
+  // void registerHostForPriority(const HostSharedPtr& host, const uint32_t priority);
 
   // Updates the cluster priority set. This should be called after the PriorityStateManager is
   // initialized.
