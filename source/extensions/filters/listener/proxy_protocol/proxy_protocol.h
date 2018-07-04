@@ -73,13 +73,19 @@ private:
    * throws EnvoyException on any socket errors.
    * @return bool true valid header, false if more data is needed.
    */
-  bool readProxyHeader(int fd, absl::optional<WireHeader>& hdr);
+  bool readProxyHeader(int fd);
+
+  /**
+   * Parse (and discard unknown) header extensions (until hdr.extensions_length == 0)
+   */
+  bool parseExtensions(int fd);
 
   /**
    * Given a char * & len, parse the header as per spec
    */
-  void parseV1Header(char* buf, size_t len, absl::optional<WireHeader>& hdr);
-  void parseV2Header(char* buf, size_t len, absl::optional<WireHeader>& hdr);
+  void parseV1Header(char* buf, size_t len);
+  void parseV2Header(char* buf);
+  size_t lenV2Address(char* buf);
 
   Network::ListenerFilterCallbacks* cb_{};
   Event::FileEventPtr file_event_;
@@ -96,6 +102,8 @@ private:
   char buf_[MAX_PROXY_PROTO_LEN];
 
   ConfigSharedPtr config_;
+
+  absl::optional<WireHeader> proxyProtocolHeader_;
 };
 
 } // namespace ProxyProtocol

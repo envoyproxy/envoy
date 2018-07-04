@@ -1,4 +1,5 @@
 #pragma once
+#include "common/common/assert.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,9 +22,12 @@ constexpr uint32_t PROXY_PROTO_V2_AF_INET6 = 0x2;
 constexpr uint32_t PROXY_PROTO_V2_AF_UNIX = 0x3;
 
 struct WireHeader {
-  WireHeader(Network::Address::IpVersion pv, Network::Address::InstanceConstSharedPtr ra,
+  WireHeader(size_t el, Network::Address::IpVersion pv, Network::Address::InstanceConstSharedPtr ra,
              Network::Address::InstanceConstSharedPtr la)
-      : protocol_version(pv), remote_address(ra), local_address(la) {}
+      : extensions_length(el), protocol_version(pv), remote_address(ra), local_address(la) {
+    ASSERT(el <= 65535);
+  }
+  size_t extensions_length;
   Network::Address::IpVersion protocol_version;
   Network::Address::InstanceConstSharedPtr remote_address;
   Network::Address::InstanceConstSharedPtr local_address;
@@ -31,7 +35,7 @@ struct WireHeader {
 
 constexpr uint32_t PROXY_PROTO_V2_ADDR_LEN_UNSPEC = 0;
 constexpr uint32_t PROXY_PROTO_V2_ADDR_LEN_INET = 12;
-constexpr uint32_t PROXY_PROTO_V2_ADDR_LEN_INET6 = 40;
+constexpr uint32_t PROXY_PROTO_V2_ADDR_LEN_INET6 = 36;
 constexpr uint32_t PROXY_PROTO_V2_ADDR_LEN_UNIX = 216;
 
 constexpr uint8_t PROXY_PROTO_V2_TRANSPORT_STREAM = 0x1;

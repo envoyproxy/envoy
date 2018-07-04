@@ -14,18 +14,22 @@
 
 #include "extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::AnyNumber;
 using testing::AtLeast;
+using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
@@ -47,6 +51,7 @@ public:
       : socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true),
         connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
+
     connection_handler_->addListener(*this);
     conn_ = dispatcher_.createClientConnection(socket_.localAddress(),
                                                Network::Address::InstanceConstSharedPtr(),
@@ -213,10 +218,138 @@ TEST_P(ProxyProtocolTest, v2BasicV6) {
   disconnect();
 }
 
+TEST_P(ProxyProtocolTest, v2UnsupportedAF) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x41, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  connect(false);
+  write(buffer, sizeof(buffer));
+
+  expectProxyProtoError();
+}
+
+TEST_P(ProxyProtocolTest, errorRecv_1) {
+  constexpr uint8_t buffer1[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t buffer2[] = {'m', 'o', 'r', 'e', ' ', 'd', 'a', 't', 'a'};
+
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, void* buf, size_t len, int flags) { return ::recv(fd, buf, len, flags); }));
+  EXPECT_CALL(os_sys_calls, recv(_, _, sizeof(buffer1), _))
+      .Times(AnyNumber())
+      .WillOnce(Return((errno = EAGAIN, -1)));
+
+  EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
+        return ::ioctl(fd, request, argp);
+      }));
+  EXPECT_CALL(os_sys_calls, writev(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+
+  connect();
+  write(buffer1, sizeof(buffer1));
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  write(buffer2, sizeof(buffer2));
+
+  expectData("more data");
+  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
+  EXPECT_TRUE(server_connection_->localAddressRestored());
+
+  disconnect();
+}
+
+TEST_P(ProxyProtocolTest, errorRecv_2) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _)).Times(AnyNumber()).WillOnce(Return((errno = 0, -1)));
+  EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
+        return ::ioctl(fd, request, argp);
+      }));
+  EXPECT_CALL(os_sys_calls, writev(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+
+  connect(false);
+  write(buffer, sizeof(buffer));
+
+  errno = 0;
+  expectProxyProtoError();
+}
+
+TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _)).WillOnce(Return(-1));
+  EXPECT_CALL(os_sys_calls, writev(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+
+  connect(false);
+  write(buffer, sizeof(buffer));
+
+  expectProxyProtoError();
+}
+
+TEST_P(ProxyProtocolTest, v2NotLocalOrOnBehalf) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x23, 0x1f, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  connect(false);
+  write(buffer, sizeof(buffer));
+
+  expectProxyProtoError();
+}
+
 TEST_P(ProxyProtocolTest, v2ShortV4) {
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x21, 0x00, 0x04, 0x00, 0x08, 0x00, 0x02,
                                 'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  connect(false);
+
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+}
+
+TEST_P(ProxyProtocolTest, v2ShortAddrV4) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0b, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   connect(false);
 
   write(buffer, sizeof(buffer));
@@ -228,6 +361,19 @@ TEST_P(ProxyProtocolTest, v2ShortV6) {
       0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21, 0x22, 0x00,
       0x14, 0x00, 0x01, 0x01, 0x00, 0x02, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x08, 0x00, 0x02, 'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+  connect(false);
+
+  write(buffer, sizeof(buffer));
+  expectProxyProtoError();
+}
+
+TEST_P(ProxyProtocolTest, v2ShortAddrV6) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
+                                0x0a, 0x21, 0x22, 0x00, 0x23, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03,
+                                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00,
+                                0x01, 0x01, 0x00, 0x02, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00,
+                                0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x02, 'm',  'o',  'r',
+                                'e',  ' ',  'd',  'a',  't',  'a'};
   connect(false);
 
   write(buffer, sizeof(buffer));
@@ -252,49 +398,6 @@ TEST_P(ProxyProtocolTest, v2MalformedInet2) {
   connect(false);
   write(buffer, sizeof(buffer));
 
-  expectProxyProtoError();
-}
-
-TEST_P(ProxyProtocolTest, v2MalformedInet3) {
-  constexpr uint8_t buffer[] = {
-      0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21, 0x11, 0x4f,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-
-  connect(false);
-  write(buffer, sizeof(buffer));
   expectProxyProtoError();
 }
 
@@ -339,14 +442,129 @@ TEST_P(ProxyProtocolTest, v1TooLong) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, v2TooLong) {
-  constexpr uint8_t buffer[] = {
-      0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21, 0x22, 0xff,
-      0xff, 0x00, 0x01, 0x01, 0x00, 0x02, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0x00, 0x00, 0x00, 0x08, 0x00, 0x02, 'm',  'o',  'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+TEST_P(ProxyProtocolTest, v2ParseExtensions) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x14, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv[] = {0x0, 0x0, 0x1, 0xff};
+
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  connect();
+  write(buffer, sizeof(buffer));
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  for (int i = 0; i < 2; i++) {
+    write(tlv, sizeof(tlv));
+  }
+  write(data, sizeof(data));
+  expectData("DATA");
+  disconnect();
+}
+
+TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x10, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv[] = {0x0, 0x0, 0x1, 0xff};
+
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
+        int x = ::ioctl(fd, request, argp);
+        if (x == 0 && *static_cast<int*>(argp) == sizeof(tlv)) {
+          return -1;
+        } else {
+          return x;
+        }
+      }));
+
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, void* buf, size_t len, int flags) { return ::recv(fd, buf, len, flags); }));
+
+  EXPECT_CALL(os_sys_calls, writev(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+
   connect(false);
   write(buffer, sizeof(buffer));
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  write(tlv, sizeof(tlv));
+
   expectProxyProtoError();
+}
+
+TEST_P(ProxyProtocolTest, v2ParseExtensionsReadEAGAIN) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x14, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv[] = {0x0, 0x0, 0x1, 0xff};
+  constexpr uint8_t data[] = {'m', 'o', 'r', 'e'};
+
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(
+          Invoke([](int fd, unsigned long int req, void* argp) { return ::ioctl(fd, req, argp); }));
+
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, void* buf, size_t len, int flags) { return ::recv(fd, buf, len, flags); }));
+  EXPECT_CALL(os_sys_calls, recv(_, _, sizeof(tlv), _))
+      .Times(AnyNumber())
+      .WillOnce(Return((errno = EAGAIN, -1)));
+  EXPECT_CALL(os_sys_calls, recv(_, _, 2 * sizeof(tlv), _))
+      .Times(AnyNumber())
+      .WillOnce(Return((errno = 0, -1)));
+
+  EXPECT_CALL(os_sys_calls, writev(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+
+  connect(false);
+  write(buffer, sizeof(buffer));
+  write(tlv, sizeof(tlv));
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  errno = 0;
+  write(tlv, sizeof(tlv));
+  write(data, sizeof(data));
+
+  expectProxyProtoError();
+}
+
+TEST_P(ProxyProtocolTest, v2ParseExtensionsFrag) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x14, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
+  constexpr uint8_t tlv[] = {0x0, 0x0, 0x1, 0xff};
+
+  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
+
+  connect();
+  write(buffer, sizeof(buffer));
+  for (int i = 0; i < 2; i++) {
+    write(tlv, sizeof(tlv));
+  }
+  write(data, sizeof(data));
+  expectData("DATA");
+  disconnect();
 }
 
 TEST_P(ProxyProtocolTest, Fragmented) {
@@ -382,7 +600,6 @@ TEST_P(ProxyProtocolTest, v2Fragmented1) {
   write(buffer + 20, 17);
 
   expectData("more data");
-
   EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
   EXPECT_TRUE(server_connection_->localAddressRestored());
 
@@ -407,6 +624,78 @@ TEST_P(ProxyProtocolTest, v2Fragmented2) {
   EXPECT_TRUE(server_connection_->localAddressRestored());
 
   disconnect();
+}
+
+TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, void* buf, size_t len, int flags) { return ::recv(fd, buf, len, flags); }));
+  EXPECT_CALL(os_sys_calls, recv(_, _, 1, _)).Times(AnyNumber()).WillOnce(Return(-1));
+
+  EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
+        return ::ioctl(fd, request, argp);
+      }));
+  EXPECT_CALL(os_sys_calls, writev(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+
+  connect(false);
+  write(buffer, 17);
+
+  expectProxyProtoError();
+}
+
+TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
+  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02, 'm',  'o',
+                                'r',  'e',  ' ',  'd',  'a',  't',  'a'};
+
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, void* buf, size_t len, int flags) { return ::recv(fd, buf, len, flags); }));
+  EXPECT_CALL(os_sys_calls, recv(_, _, 4, _)).Times(AnyNumber()).WillOnce(Return(-1));
+
+  EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
+        return ::ioctl(fd, request, argp);
+      }));
+  EXPECT_CALL(os_sys_calls, writev(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+  EXPECT_CALL(os_sys_calls, readv(_, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(
+          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+
+  connect(false);
+  write(buffer, 10);
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  write(buffer + 10, 10);
+
+  expectProxyProtoError();
 }
 
 TEST_P(ProxyProtocolTest, PartialRead) {

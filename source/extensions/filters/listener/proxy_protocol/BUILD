@@ -20,6 +20,7 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:minimal_logger_lib",
