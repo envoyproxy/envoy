@@ -158,7 +158,7 @@ TEST_P(TcpConnPoolIntegrationTest, SingleRequest) {
 TEST_P(TcpConnPoolIntegrationTest, MultipleRequests) {
   std::string request1("request1");
   std::string request2("request2");
-  std::string response1("response2");
+  std::string response1("response1");
   std::string response2("response2");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
@@ -179,7 +179,7 @@ TEST_P(TcpConnPoolIntegrationTest, MultipleRequests) {
 
   // send response 1
   fake_upstream_connection1->write(response1);
-  tcp_client->waitForData(response1);
+  tcp_client->waitForData(response1, false);
 
   tcp_client->close();
 }
