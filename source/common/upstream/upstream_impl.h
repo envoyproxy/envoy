@@ -512,7 +512,7 @@ public:
   void
   initializePriorityFor(const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint);
 
-  // TODO(dio): Add an overload to registers a host to the PriorityState based on a specified
+  // TODO(dio): Add an override to register a host to the PriorityState based on a specified
   // priority. void registerHostForPriority(const HostSharedPtr& host, const uint32_t priority);
 
   // Registers a host based on its address to the PriorityState based on the specified priority.

@@ -660,10 +660,12 @@ void PriorityStateManager::initializePriorityFor(
   if (priority_state_.size() <= priority) {
     priority_state_.resize(priority + 1);
   }
+
   ASSERT(priority < priority_state_.size());
   if (priority_state_[priority].first == nullptr) {
     priority_state_[priority].first.reset(new HostVector());
   }
+
   if (locality_lb_endpoint.has_locality() && locality_lb_endpoint.has_load_balancing_weight()) {
     priority_state_[priority].second[locality_lb_endpoint.locality()] =
         locality_lb_endpoint.load_balancing_weight().value();
@@ -676,6 +678,7 @@ void PriorityStateManager::registerHostForPriority(
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
     const absl::optional<Upstream::Host::HealthFlag> health_checker_flag) {
   const uint32_t priority = locality_lb_endpoint.priority();
+  ASSERT(priority < priority_state_.size());
 
   // Should be called after initializePriorityFor.
   ASSERT(priority_state_[priority].first);
@@ -693,22 +696,18 @@ void PriorityStateManager::updateClusterPrioritySet(
     const uint32_t priority, HostVectorSharedPtr current_hosts,
     const absl::optional<HostVector>& hosts_added,
     const absl::optional<HostVector>& hosts_removed) {
+  ASSERT(priority < priority_state_.size());
   // If local locality is not defined then skip populating per locality hosts.
   const auto& local_locality = local_info_node_.locality();
   ENVOY_LOG(trace, "Local locality: {}", local_locality.DebugString());
 
-  if (current_hosts == nullptr) {
-    ASSERT(priority_state_[priority].first);
-  }
-
-  HostVectorSharedPtr hosts(current_hosts != nullptr ? std::move(current_hosts)
-                                                     : std::move(priority_state_[priority].first));
+  // For non-EDS, most likely the current hosts are from priority_state_[priority].first.
+  HostVectorSharedPtr hosts(std::move(current_hosts));
   LocalityWeightsMap& locality_weights_map = priority_state_[priority].second;
   LocalityWeightsSharedPtr locality_weights;
   std::vector<HostVector> per_locality;
 
-  // If we are configured for locality weighted LB we populate the locality
-  // weights.
+  // If we are configured for locality weighted LB we populate the locality weights.
   const bool locality_weighted_lb = parent_.info()->lbConfig().has_locality_weighted_lb_config();
   if (locality_weighted_lb) {
     locality_weights = std::make_shared<LocalityWeights>();
@@ -718,7 +717,7 @@ void PriorityStateManager::updateClusterPrioritySet(
   std::map<envoy::api::v2::core::Locality, HostVector, LocalityLess> hosts_per_locality;
 
   for (const HostSharedPtr& host : *hosts) {
-    // TODO(dio): Take into consideration of having active health checking for other than EDS, to
+    // TODO(dio): Take into consideration when a non-EDS cluster has active health checking, i.e. to
     // mark all the hosts unhealthy (host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC)) and
     // then fire update callbacks to start the health checking process.
     hosts_per_locality[host->locality()].push_back(host);
@@ -729,8 +728,8 @@ void PriorityStateManager::updateClusterPrioritySet(
       local_info_node_.has_locality() &&
       hosts_per_locality.find(local_locality) != hosts_per_locality.end();
 
-  // As per HostsPerLocality::get(), the per_locality vector must have the
-  // local locality hosts first if non_empty_local_locality.
+  // As per HostsPerLocality::get(), the per_locality vector must have the local locality hosts
+  // first if non_empty_local_locality.
   if (non_empty_local_locality) {
     per_locality.emplace_back(hosts_per_locality[local_locality]);
     if (locality_weighted_lb) {
@@ -738,9 +737,8 @@ void PriorityStateManager::updateClusterPrioritySet(
     }
   }
 
-  // After the local locality hosts (if any), we place the remaining locality
-  // host groups in lexicographic order. This provides a stable ordering for
-  // zone aware routing.
+  // After the local locality hosts (if any), we place the remaining locality host groups in
+  // lexicographic order. This provides a stable ordering for zone aware routing.
   for (auto& entry : hosts_per_locality) {
     if (!non_empty_local_locality || !LocalityEqualTo()(local_locality, entry.first)) {
       per_locality.emplace_back(entry.second);
