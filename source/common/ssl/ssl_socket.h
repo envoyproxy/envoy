@@ -51,8 +51,9 @@ private:
   Network::PostIoAction doHandshake();
   void drainErrorQueue();
   void shutdownSsl();
+
+  // TODO: Move helper functions to the `Ssl::Utility` namespace.
   std::string getUriSanFromCertificate(X509* cert) const;
-  std::string getSerialNumberFromCertificate(X509* cert) const;
   std::string getSubjectFromCertificate(X509* cert) const;
   std::vector<std::string> getDnsSansFromCertificate(X509* cert);
 
