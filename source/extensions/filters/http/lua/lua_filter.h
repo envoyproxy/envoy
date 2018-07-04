@@ -70,8 +70,8 @@ public:
   virtual const ProtobufWkt::Struct& metadata() const PURE;
 
   /**
-   * @return RequestInfo::RequestInfo the current request info handle. This handle is mutable to
-   * accomodate write APIs e.g. setDynamicMetadata().
+   * @return RequestInfo::RequestInfo& the current request info handle. This handle is mutable to
+   * accomodate write API e.g. setDynamicMetadata().
    */
   virtual RequestInfo::RequestInfo& requestInfo() PURE;
 
