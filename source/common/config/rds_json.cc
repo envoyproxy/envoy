@@ -42,9 +42,6 @@ void RdsJson::translateCors(const Json::Object& json_cors,
   for (const std::string& origin : json_cors.getStringArray("allow_origin", true)) {
     cors.add_allow_origin(origin);
   }
-  for (const std::string& regex : json_cors.getStringArray("allow_origin_regex", true)) {
-    cors.add_allow_origin_regex(regex);
-  }
   JSON_UTIL_SET_STRING(json_cors, cors, allow_methods);
   JSON_UTIL_SET_STRING(json_cors, cors, allow_headers);
   JSON_UTIL_SET_STRING(json_cors, cors, expose_headers);
