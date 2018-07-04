@@ -27,4 +27,26 @@ uint64_t ExponentialBackOffStrategy::computeNextInterval() {
   }
   return current_interval_;
 }
+
+JitteredBackOffStrategy::JitteredBackOffStrategy(uint64_t base_interval,
+                                                 Runtime::RandomGenerator& random)
+    : base_interval_(base_interval), random_(random) {}
+
+JitteredBackOffStrategy::JitteredBackOffStrategy(uint64_t base_interval, uint64_t max_interval,
+                                                 Runtime::RandomGenerator& random)
+    : base_interval_(base_interval), max_interval_(max_interval), random_(random) {
+  ASSERT(base_interval_ < max_interval_);
+}
+
+uint64_t JitteredBackOffStrategy::nextBackOffMs() { return computeNextInterval(); }
+
+void JitteredBackOffStrategy::reset() { current_retry_ = 0; }
+
+uint64_t JitteredBackOffStrategy::computeNextInterval() {
+  current_retry_++;
+  uint32_t multiplier = (1 << current_retry_) - 1;
+  uint64_t new_interval = random_.random() % (base_interval_ * multiplier);
+  return (max_interval_ != 0 && new_interval > max_interval_) ? max_interval_ : new_interval;
+}
+
 } // namespace Envoy
