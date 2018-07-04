@@ -37,7 +37,7 @@ public:
    * @return Http::StreamDecoderFilterCallbacks& to be used by the handler to get HTTP request data
    * for streaming.
    */
-  virtual const Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const PURE;
+  virtual Http::StreamDecoderFilterCallbacks& getDecoderFilterCallbacks() const PURE;
 
   /**
    * @return Http::HeaderMap& to be used by handler to parse header information sent with the
@@ -54,7 +54,7 @@ public:
  */
 #define MAKE_ADMIN_HANDLER(X)                                                                      \
   [this](absl::string_view path_and_query, Http::HeaderMap& response_headers,                      \
-         Buffer::Instance& data, AdminStream& admin_stream) -> Http::Code {                        \
+         Buffer::Instance& data, Server::AdminStream& admin_stream) -> Http::Code {                \
     return X(path_and_query, response_headers, data, admin_stream);                                \
   }
 

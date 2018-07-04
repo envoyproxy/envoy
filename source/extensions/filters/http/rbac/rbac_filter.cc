@@ -65,13 +65,27 @@ RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpec
 
 Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::HeaderMap& headers,
                                                                       bool) {
+  ENVOY_LOG(
+      debug,
+      "checking request: remoteAddress: {}, localAddress: {}, ssl: {}, headers: {}, "
+      "dynamicMetadata: {}",
+      callbacks_->connection()->remoteAddress()->asString(),
+      callbacks_->connection()->localAddress()->asString(),
+      callbacks_->connection()->ssl()
+          ? "uriSanPeerCertificate: " + callbacks_->connection()->ssl()->uriSanPeerCertificate() +
+                ", subjectPeerCertificate: " +
+                callbacks_->connection()->ssl()->subjectPeerCertificate()
+          : "none",
+      headers, callbacks_->requestInfo().dynamicMetadata().DebugString());
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>& shadow_engine =
       config_->engine(callbacks_->route(), EnforcementMode::Shadow);
   if (shadow_engine.has_value()) {
     if (shadow_engine->allowed(*callbacks_->connection(), headers,
                                callbacks_->requestInfo().dynamicMetadata())) {
+      ENVOY_LOG(debug, "shadow allowed");
       config_->stats().shadow_allowed_.inc();
     } else {
+      ENVOY_LOG(debug, "shadow denied");
       config_->stats().shadow_denied_.inc();
     }
   }
@@ -81,15 +95,18 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
   if (engine.has_value()) {
     if (engine->allowed(*callbacks_->connection(), headers,
                         callbacks_->requestInfo().dynamicMetadata())) {
+      ENVOY_LOG(debug, "enforced allowed");
       config_->stats().allowed_.inc();
       return Http::FilterHeadersStatus::Continue;
     } else {
+      ENVOY_LOG(debug, "enforced denied");
       callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr);
       config_->stats().denied_.inc();
       return Http::FilterHeadersStatus::StopIteration;
     }
   }
 
+  ENVOY_LOG(debug, "no engine, allowed by default");
   return Http::FilterHeadersStatus::Continue;
 }
 

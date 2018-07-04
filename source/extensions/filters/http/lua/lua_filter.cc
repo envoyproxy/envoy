@@ -367,6 +367,16 @@ int StreamHandleWrapper::luaMetadata(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaRequestInfo(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (request_info_wrapper_.get() != nullptr) {
+    request_info_wrapper_.pushStack();
+  } else {
+    request_info_wrapper_.reset(RequestInfoWrapper::create(state, callbacks_.requestInfo()), true);
+  }
+  return 1;
+}
+
 int StreamHandleWrapper::luaConnection(lua_State* state) {
   ASSERT(state_ == State::Running);
   if (connection_wrapper_.get() != nullptr) {
@@ -424,6 +434,7 @@ FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocat
   lua_state_.registerType<Filters::Common::Lua::SslConnectionWrapper>();
   lua_state_.registerType<HeaderMapWrapper>();
   lua_state_.registerType<HeaderMapIterator>();
+  lua_state_.registerType<RequestInfoWrapper>();
   lua_state_.registerType<StreamHandleWrapper>();
 
   request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");

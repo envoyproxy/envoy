@@ -107,7 +107,7 @@ public:
   SslConnectionWrapper(const Ssl::Connection*) {}
   static ExportedFunctions exportedFunctions() { return {}; }
 
-  // TODO(dio): Add more Lua APIs around Ssl::Connection later.
+  // TODO(dio): Add more Lua APIs around Ssl::Connection.
 };
 
 /**

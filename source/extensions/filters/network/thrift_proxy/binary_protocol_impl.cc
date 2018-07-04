@@ -1,4 +1,4 @@
-#include "extensions/filters/network/thrift_proxy/binary_protocol.h"
+#include "extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
 
 #include "envoy/common/exception.h"
 

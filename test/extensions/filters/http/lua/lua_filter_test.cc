@@ -17,6 +17,8 @@ using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
+using testing::ReturnPointee;
+using testing::ReturnRef;
 using testing::StrEq;
 using testing::_;
 
@@ -86,8 +88,9 @@ public:
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
   envoy::api::v2::core::Metadata metadata_;
-  NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::Ssl::MockConnection> ssl_;
+  NiceMock<Envoy::Network::MockConnection> connection_;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info_;
 
   const std::string HEADER_ONLY_SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -1469,6 +1472,26 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoLuaMetadata) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
+// Get the current protocol.
+TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logTrace(request_handle:requestInfo():protocol())
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillOnce(ReturnRef(request_info_));
+  EXPECT_CALL(request_info_, protocol()).WillOnce(Return(Http::Protocol::Http11));
+
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("HTTP/1.1")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Check the connection.
 TEST_F(LuaHttpFilterTest, CheckConnection) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
