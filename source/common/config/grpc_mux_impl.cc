@@ -31,7 +31,7 @@ GrpcMuxImpl::~GrpcMuxImpl() {
 void GrpcMuxImpl::start() { establishNewStream(); }
 
 void GrpcMuxImpl::setRetryTimer() {
-  retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_ptr_->nextBackOff()));
+  retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_ptr_->nextBackOffMs()));
 }
 
 void GrpcMuxImpl::establishNewStream() {
