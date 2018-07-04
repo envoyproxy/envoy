@@ -11,9 +11,9 @@ public:
   virtual ~BackOffStrategy() {}
 
   /**
-   * Returns the next backoff interval.
+   * @return the next backoff interval in milli seconds.
    */
-  virtual uint64_t nextBackOff() PURE;
+  virtual uint64_t nextBackOffMs() PURE;
 
   /**
    * Resets the intervals so that the back off intervals can start again.

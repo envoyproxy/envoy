@@ -19,15 +19,15 @@ public:
   ExponentialBackOffStrategy(uint64_t initial_interval, uint64_t max_interval, double multiplier);
 
   // BackOffStrategy methods
-  uint64_t nextBackOff() override;
+  uint64_t nextBackOffMs() override;
   void reset() override;
 
 private:
   uint64_t computeNextInterval();
 
-  uint64_t initial_interval_;
-  uint64_t max_interval_;
-  double multiplier_;
+  const uint64_t initial_interval_;
+  const uint64_t max_interval_;
+  const double multiplier_;
   uint64_t current_interval_;
 };
 } // namespace Envoy

@@ -11,7 +11,7 @@ ExponentialBackOffStrategy::ExponentialBackOffStrategy(uint64_t initial_interval
   ASSERT(initial_interval_ * multiplier_ <= max_interval_);
 }
 
-uint64_t ExponentialBackOffStrategy::nextBackOff() { return computeNextInterval(); }
+uint64_t ExponentialBackOffStrategy::nextBackOffMs() { return computeNextInterval(); }
 
 void ExponentialBackOffStrategy::reset() { current_interval_ = 0; }
 
