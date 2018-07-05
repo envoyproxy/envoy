@@ -27,6 +27,7 @@ envoy_cc_library(
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
+        "//source/common/json:json_loader_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/filter/http/transcoder/v2:transcoder_cc",
     ],

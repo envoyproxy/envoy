@@ -4,16 +4,19 @@
 #include "envoy/http/filter.h"
 
 #include "common/common/assert.h"
+#include "common/common/base64.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+#include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
+#include "google/api/httpbody.pb.h"
 #include "grpc_transcoding/json_request_translator.h"
 #include "grpc_transcoding/path_matcher_utility.h"
 #include "grpc_transcoding/response_to_json_translator.h"
@@ -349,6 +352,10 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   readToBuffer(*transcoder_->ResponseOutput(), data);
 
   if (!method_->server_streaming() && !end_stream) {
+    if (hasHttpBodyAsOutputType()) {
+      // Set content-type and data from HttpBody.
+      buildResponseFromHttpBodyOutput(*response_headers_, data);
+    }
     // Buffer until the response is complete.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
@@ -413,6 +420,28 @@ bool JsonTranscoderFilter::readToBuffer(Protobuf::io::ZeroCopyInputStream& strea
     }
   }
   return false;
+}
+
+void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& response_headers,
+                                                           Buffer::Instance& data) {
+  // TODO(dio): Wrap JSON parsing in a try-catch block.
+  const Json::ObjectSharedPtr http_body = Json::Factory::loadFromString(data.toString());
+  const std::string decoded_body = Base64::decode(http_body->getString("data"));
+
+  data.drain(data.length());
+  data.add(decoded_body);
+
+  response_headers.insertContentType().value(http_body->getString("contentType"));
+  response_headers.insertContentLength().value(decoded_body.size());
+}
+
+bool JsonTranscoderFilter::hasHttpBodyAsOutputType() {
+  absl::string_view output_type = method_->output_type()->full_name();
+  absl::string_view http_body_type = google::api::HttpBody::descriptor()->full_name();
+  if (output_type.length() != http_body_type.length()) {
+    return false;
+  }
+  return StringUtil::startsWith(output_type.data(), http_body_type.data(), true);
 }
 
 } // namespace GrpcJsonTranscoder

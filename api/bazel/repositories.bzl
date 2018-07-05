@@ -26,6 +26,7 @@ filegroup(
     srcs = [
         "google/api/annotations.proto",
         "google/api/http.proto",
+        "google/api/httpbody.proto",
     ],
     visibility = ["//visibility:public"],
  )
@@ -49,6 +50,7 @@ cc_proto_library(
     srcs = [
         "google/api/annotations.proto",
         "google/api/http.proto",
+        "google/api/httpbody.proto",
     ],
     default_runtime = "@com_google_protobuf//:protobuf",
     protoc = "@com_google_protobuf//:protoc",
@@ -61,6 +63,7 @@ py_proto_library(
     srcs = [
         "google/api/annotations.proto",
         "google/api/http.proto",
+        "google/api/httpbody.proto",
     ],
     include = ".",
     default_runtime = "@com_google_protobuf//:protobuf_python",
