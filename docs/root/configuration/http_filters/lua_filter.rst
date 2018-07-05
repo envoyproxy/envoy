@@ -310,7 +310,7 @@ connection()
 
 Returns the current request's underlying :repo:`connection <include/envoy/network/connection.h>`.
 
-Returns a :ref:`metadata object <config_http_filters_lua_connection_wrapper>`.
+Returns a :ref:`connection object <config_http_filters_lua_connection_wrapper>`.
 
 .. _config_http_filters_lua_header_wrapper:
 
