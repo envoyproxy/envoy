@@ -424,15 +424,19 @@ bool JsonTranscoderFilter::readToBuffer(Protobuf::io::ZeroCopyInputStream& strea
 
 void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& response_headers,
                                                            Buffer::Instance& data) {
-  // TODO(dio): Wrap JSON parsing in a try-catch block.
-  const Json::ObjectSharedPtr http_body = Json::Factory::loadFromString(data.toString());
-  const std::string decoded_body = Base64::decode(http_body->getString("data"));
+  try {
+    const Json::ObjectSharedPtr http_body = Json::Factory::loadFromString(data.toString());
+    const std::string decoded_body = Base64::decode(http_body->getString("data"));
 
-  data.drain(data.length());
-  data.add(decoded_body);
+    data.drain(data.length());
+    data.add(decoded_body);
 
-  response_headers.insertContentType().value(http_body->getString("contentType"));
-  response_headers.insertContentLength().value(decoded_body.size());
+    response_headers.insertContentType().value(http_body->getString("contentType"));
+    response_headers.insertContentLength().value(decoded_body.size());
+  } catch (const Json::Exception& e) {
+    ENVOY_LOG(debug, "Failed to parse output of '{}'. e.what(): {}",
+              method_->input_type()->full_name(), e.what());
+  }
 }
 
 bool JsonTranscoderFilter::hasHttpBodyAsOutputType() {
