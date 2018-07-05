@@ -660,12 +660,9 @@ void PriorityStateManager::initializePriorityFor(
   if (priority_state_.size() <= priority) {
     priority_state_.resize(priority + 1);
   }
-
-  ASSERT(priority < priority_state_.size());
   if (priority_state_[priority].first == nullptr) {
     priority_state_[priority].first.reset(new HostVector());
   }
-
   if (locality_lb_endpoint.has_locality() && locality_lb_endpoint.has_load_balancing_weight()) {
     priority_state_[priority].second[locality_lb_endpoint.locality()] =
         locality_lb_endpoint.load_balancing_weight().value();
@@ -678,8 +675,6 @@ void PriorityStateManager::registerHostForPriority(
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
     const absl::optional<Upstream::Host::HealthFlag> health_checker_flag) {
   const uint32_t priority = locality_lb_endpoint.priority();
-  ASSERT(priority < priority_state_.size());
-
   // Should be called after initializePriorityFor.
   ASSERT(priority_state_[priority].first);
   priority_state_[priority].first->emplace_back(
@@ -696,7 +691,6 @@ void PriorityStateManager::updateClusterPrioritySet(
     const uint32_t priority, HostVectorSharedPtr current_hosts,
     const absl::optional<HostVector>& hosts_added,
     const absl::optional<HostVector>& hosts_removed) {
-  ASSERT(priority < priority_state_.size());
   // If local locality is not defined then skip populating per locality hosts.
   const auto& local_locality = local_info_node_.locality();
   ENVOY_LOG(trace, "Local locality: {}", local_locality.DebugString());
