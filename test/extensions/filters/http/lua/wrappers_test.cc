@@ -1,9 +1,13 @@
+#include "common/http/utility.h"
+
 #include "extensions/filters/http/lua/wrappers.h"
 
 #include "test/extensions/filters/common/lua/lua_wrappers.h"
+#include "test/mocks/request_info/mocks.h"
 #include "test/test_common/utility.h"
 
 using testing::InSequence;
+using testing::ReturnPointee;
 
 namespace Envoy {
 namespace Extensions {
@@ -208,6 +212,42 @@ TEST_F(LuaHeaderMapWrapperTest, IteratorAcrossYield) {
   wrapper.reset();
   EXPECT_THROW_WITH_MESSAGE(coroutine_->resume(0, [] {}), Filters::Common::Lua::LuaException,
                             "[string \"...\"]:5: object used outside of proper scope");
+}
+
+class LuaRequestInfoWrapperTest
+    : public Filters::Common::Lua::LuaWrappersTestBase<RequestInfoWrapper> {
+public:
+  virtual void setup(const std::string& script) {
+    Filters::Common::Lua::LuaWrappersTestBase<RequestInfoWrapper>::setup(script);
+  }
+
+protected:
+  void expectToPrintCurrentProtocol(const absl::optional<Envoy::Http::Protocol>& protocol) {
+    const std::string SCRIPT{R"EOF(
+      function callMe(object)
+        testPrint(string.format("'%s'", object:protocol()))
+      end
+    )EOF"};
+
+    InSequence s;
+    setup(SCRIPT);
+
+    NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+    ON_CALL(request_info, protocol()).WillByDefault(ReturnPointee(&protocol));
+    Filters::Common::Lua::LuaDeathRef<RequestInfoWrapper> wrapper(
+        RequestInfoWrapper::create(coroutine_->luaState(), request_info), true);
+    EXPECT_CALL(*this,
+                testPrint(fmt::format("'{}'", Http::Utility::getProtocolString(protocol.value()))));
+    start("callMe");
+    wrapper.reset();
+  }
+};
+
+// Return the current request protocol.
+TEST_F(LuaRequestInfoWrapperTest, ReturnCurrentProtocol) {
+  expectToPrintCurrentProtocol(Http::Protocol::Http10);
+  expectToPrintCurrentProtocol(Http::Protocol::Http11);
+  expectToPrintCurrentProtocol(Http::Protocol::Http2);
 }
 
 } // namespace Lua

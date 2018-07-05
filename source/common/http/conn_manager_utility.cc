@@ -23,9 +23,9 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     ConnectionManagerConfig& config, const Router::Config& route_config,
     Runtime::RandomGenerator& random, Runtime::Loader& runtime,
     const LocalInfo::LocalInfo& local_info) {
-  // If this is a WebSocket Upgrade request, do not remove the Connection and Upgrade headers,
+  // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
-  if (protocol == Protocol::Http11 && Utility::isWebSocketUpgradeRequest(request_headers)) {
+  if (protocol == Protocol::Http11 && Utility::isUpgrade(request_headers)) {
     // The current WebSocket implementation re-uses the HTTP1 codec to send upgrade headers to
     // the upstream host. This adds the "transfer-encoding: chunked" request header if the stream
     // has not ended and content-length does not exist. In HTTP1.1, if transfer-encoding and
@@ -45,6 +45,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   request_headers.removeEnvoyInternalRequest();
   request_headers.removeKeepAlive();
   request_headers.removeProxyConnection();
+  // TODO(alyssawilk) handle this with current and new websocket here and below.
   request_headers.removeTransferEncoding();
 
   // If we are "using remote address" this means that we create/append to XFF with our immediate
@@ -299,7 +300,19 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,
                                                      const Http::HeaderMap& request_headers,
                                                      const std::string& via) {
-  response_headers.removeConnection();
+  if (Utility::isUpgrade(request_headers) && Utility::isUpgrade(response_headers)) {
+    // As in mutateRequestHeaders, Upgrade responses have special handling.
+    //
+    // Unlike mutateRequestHeaders there is no explicit protocol check. If Envoy is proxying an
+    // upgrade response it has already passed the protocol checks.
+    const bool no_body =
+        (!response_headers.TransferEncoding() && !response_headers.ContentLength());
+    if (no_body) {
+      response_headers.insertContentLength().value(uint64_t(0));
+    }
+  } else {
+    response_headers.removeConnection();
+  }
   response_headers.removeTransferEncoding();
 
   if (request_headers.EnvoyForceTrace() && request_headers.RequestId()) {

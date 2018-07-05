@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/header_map.h"
+#include "envoy/request_info/request_info.h"
 
 #include "extensions/filters/common/lua/lua.h"
 
@@ -96,6 +97,23 @@ private:
   Filters::Common::Lua::LuaDeathRef<HeaderMapIterator> iterator_;
 
   friend class HeaderMapIterator;
+};
+
+/**
+ * Lua wrapper for a request info.
+ */
+class RequestInfoWrapper : public Filters::Common::Lua::BaseLuaObject<RequestInfoWrapper> {
+public:
+  RequestInfoWrapper(RequestInfo::RequestInfo& request_info) : request_info_{request_info} {}
+  static ExportedFunctions exportedFunctions() { return {{"protocol", static_luaProtocol}}; }
+
+private:
+  /**
+   * Get current protocol being used.
+   * @return string representation of Http::Protocol.
+   */
+  DECLARE_LUA_FUNCTION(RequestInfoWrapper, luaProtocol);
+  RequestInfo::RequestInfo& request_info_;
 };
 
 } // namespace Lua

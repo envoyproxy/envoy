@@ -68,6 +68,12 @@ public:
    * route entry.
    */
   virtual const ProtobufWkt::Struct& metadata() const PURE;
+
+  /**
+   * @return RequestInfo::RequestInfo& the current request info handle. This handle is mutable to
+   * accomodate write API e.g. setDynamicMetadata().
+   */
+  virtual RequestInfo::RequestInfo& requestInfo() PURE;
 };
 
 class Filter;
@@ -122,7 +128,7 @@ public:
             {"logDebug", static_luaLogDebug},       {"logInfo", static_luaLogInfo},
             {"logWarn", static_luaLogWarn},         {"logErr", static_luaLogErr},
             {"logCritical", static_luaLogCritical}, {"httpCall", static_luaHttpCall},
-            {"respond", static_luaRespond}};
+            {"respond", static_luaRespond},         {"requestInfo", static_luaRequestInfo}};
   }
 
 private:
@@ -177,6 +183,11 @@ private:
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaMetadata);
 
   /**
+   * @return a handle to the request info.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaRequestInfo);
+
+  /**
    * Log a message to the Envoy log.
    * @param 1 (string): The log message.
    */
@@ -202,6 +213,7 @@ private:
     body_wrapper_.reset();
     trailers_wrapper_.reset();
     metadata_wrapper_.reset();
+    request_info_wrapper_.reset();
   }
 
   // Http::AsyncClient::Callbacks
@@ -220,6 +232,7 @@ private:
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> headers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<RequestInfoWrapper> request_info_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
   State state_{State::Running};
   std::function<void()> yield_callback_;
@@ -310,6 +323,7 @@ private:
     void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
     const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
+    RequestInfo::RequestInfo& requestInfo() override { return callbacks_->requestInfo(); }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -328,6 +342,7 @@ private:
     void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
     const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
+    RequestInfo::RequestInfo& requestInfo() override { return callbacks_->requestInfo(); }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};

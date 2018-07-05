@@ -93,3 +93,103 @@ message DiscoveryResponse {
   // required for non-stream based xDS implementations.
   string nonce = 5;
 }
+
+// IncrementalDiscoveryRequest and IncrementalDiscoveryResponse are used in a
+// new gRPC endpoint for Incremental xDS. The feature is not supported for REST
+// management servers.
+//
+// With Incremental xDS, the IncrementalDiscoveryResponses do not need to
+// include a full snapshot of the tracked resources. Instead
+// IncrementalDiscoveryResponses are a diff to the state of a xDS client.
+// In Incremental XDS there are per resource versions which allows to track
+// state at the resource granularity.
+// An xDS Incremental session is always in the context of a gRPC bidirectional
+// stream. This allows the xDS server to keep track of the state of xDS clients
+// connected to it.
+//
+// In Incremental xDS the nonce field is required and used to pair
+// IncrementalDiscoveryResponse to a IncrementalDiscoveryRequest ACK or NACK.
+// Optionaly, a response message level system_version_info is present for
+// debugging purposes only.
+//
+// IncrementalDiscoveryRequest can be sent in 3 situations:
+//   1. Initial message in a xDS bidirectional gRPC stream.
+//   2. As a ACK or NACK response to a previous IncrementalDiscoveryResponse.
+//      In this case the response_nonce is set to the nonce value in the Response.
+//      ACK or NACK is determined by the absence or presence of error_detail.
+//   3. Spontaneous IncrementalDiscoveryRequest from the client.
+//      This can be done to dynamically add or remove elements from the tracked
+//      resource_names set. In this case response_nonce must be omitted.
+message IncrementalDiscoveryRequest {
+  // The node making the request.
+  core.Node node = 1;
+
+  // Type of the resource that is being requested, e.g.
+  // "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment". This is implicit
+  // in requests made via singleton xDS APIs such as CDS, LDS, etc. but is
+  // required for ADS.
+  string type_url = 2;
+
+  // IncrementalDiscoveryRequests allow the client to add or remove individual
+  // resources to the set of tracked resources in the context of a stream.
+  // All resource names in the resource_names_subscribe list are added to the
+  // set of tracked resources and all resource names in the resource_names_unsubscribe
+  // list are removed from the set of tracked resources.
+  // Unlike in non incremental xDS, an empty resource_names_subscribe or
+  // resource_names_unsubscribe list simply means that no resources are to be
+  // added or removed to the resource list.
+  // The xDS server must send updates for all tracked resources but can also
+  // send updates for resources the client has not subscribed to. This behavior
+  // is similar to non incremental xDS.
+  // These two fields can be set for all types of IncrementalDiscoveryRequests
+  // (initial, ACK/NACK or spontaneous).
+  //
+  // A list of Resource names to add to the list of tracked resources.
+  repeated string resource_names_subscribe = 3;
+
+  // A list of Resource names to remove from the list of tracked resources.
+  repeated string resource_names_unsubscribe = 4;
+
+  // This map must be populated when the IncrementalDiscoveryRequest is the
+  // first in a stream. The keys are the resources names of the xDS resources
+  // known to the xDS client. The values in the map are the associated resource
+  // level version info.
+  map<string, string> initial_resource_versions = 5;
+
+  // When the IncrementalDiscoveryRequest is a ACK or NACK message in response
+  // to a previous IncrementalDiscoveryResponse, the response_nonce must be the
+  // nonce in the IncrementalDiscoveryResponse.
+  // Otherwise response_nonce must be omitted.
+  string response_nonce = 6;
+
+  // This is populated when the previous :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
+  // failed to update configuration. The *message* field in *error_details*
+  // provides the Envoy internal exception related to the failure.
+  google.rpc.Status error_detail = 7;
+}
+
+message IncrementalDiscoveryResponse {
+  // The version of the response data (used for debugging).
+  string system_version_info = 1;
+
+  // The response resources. These are typed resources that match the type url
+  // in the IncrementalDiscoveryRequest.
+  repeated Resource resources = 2 [(gogoproto.nullable) = false];
+
+  // Resources names of resources that have be deleted and to be removed from the xDS Client.
+  // Removed resources for missing resources can be ignored.
+  repeated string removed_resources = 6;
+
+  // The nonce provides a way for IncrementalDiscoveryRequests to uniquely
+  // reference a IncrementalDiscoveryResponse. The nonce is required.
+  string nonce = 5;
+}
+
+message Resource {
+  // The resource level version. It allows xDS to track the state of individual
+  // resources.
+  string version = 1;
+
+  // The resource being tracked.
+  google.protobuf.Any resource = 2;
+}

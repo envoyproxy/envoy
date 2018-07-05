@@ -49,7 +49,9 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
 }
 
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message) {
-  const auto status = Protobuf::util::JsonStringToMessage(json, &message);
+  Protobuf::util::JsonParseOptions options;
+  options.ignore_unknown_fields = true;
+  const auto status = Protobuf::util::JsonStringToMessage(json, &message, options);
   if (!status.ok()) {
     throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
   }

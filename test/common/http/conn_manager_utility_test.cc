@@ -548,15 +548,72 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForHttp2Requests) {
 // Test cleaning response headers.
 TEST_F(ConnectionManagerUtilityTest, MutateResponseHeaders) {
   TestHeaderMapImpl response_headers{
-      {"connection", "foo"}, {"transfer-encoding", "foo"}, {"custom_header", "foo"}};
+      {"connection", "foo"}, {"transfer-encoding", "foo"}, {"custom_header", "custom_value"}};
   TestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
 
   ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
 
   EXPECT_EQ(1UL, response_headers.size());
-  EXPECT_EQ("foo", response_headers.get_("custom_header"));
+  EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
   EXPECT_FALSE(response_headers.has("x-request-id"));
   EXPECT_FALSE(response_headers.has(Headers::get().Via));
+}
+
+// Make sure we don't remove connection headers on all Upgrade responses.
+TEST_F(ConnectionManagerUtilityTest, DoNotRemoveConnectionUpgradeForWebSocketResponses) {
+  TestHeaderMapImpl request_headers{{"connection", "UpGrAdE"}, {"upgrade", "foo"}};
+  TestHeaderMapImpl response_headers{
+      {"connection", "upgrade"}, {"transfer-encoding", "foo"}, {"upgrade", "bar"}};
+  EXPECT_TRUE(Utility::isUpgrade(request_headers));
+  EXPECT_TRUE(Utility::isUpgrade(response_headers));
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+
+  EXPECT_EQ(2UL, response_headers.size()) << response_headers;
+  EXPECT_EQ("upgrade", response_headers.get_("connection"));
+  EXPECT_EQ("bar", response_headers.get_("upgrade"));
+}
+
+TEST_F(ConnectionManagerUtilityTest, ClearUpgradeHeadersForNonUpgradeRequests) {
+  // Test clearing non-upgrade request and response headers
+  {
+    TestHeaderMapImpl request_headers{{"x-request-id", "request-id"}};
+    TestHeaderMapImpl response_headers{
+        {"connection", "foo"}, {"transfer-encoding", "bar"}, {"custom_header", "custom_value"}};
+    EXPECT_FALSE(Utility::isUpgrade(request_headers));
+    EXPECT_FALSE(Utility::isUpgrade(response_headers));
+    ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+
+    EXPECT_EQ(1UL, response_headers.size()) << response_headers;
+    EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
+  }
+
+  // Test with the request headers not valid upgrade headers
+  {
+    TestHeaderMapImpl request_headers{{"upgrade", "foo"}};
+    TestHeaderMapImpl response_headers{{"connection", "upgrade"},
+                                       {"transfer-encoding", "eep"},
+                                       {"upgrade", "foo"},
+                                       {"custom_header", "custom_value"}};
+    EXPECT_FALSE(Utility::isUpgrade(request_headers));
+    EXPECT_TRUE(Utility::isUpgrade(response_headers));
+    ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+
+    EXPECT_EQ(2UL, response_headers.size()) << response_headers;
+    EXPECT_EQ("custom_value", response_headers.get_("custom_header"));
+    EXPECT_EQ("foo", response_headers.get_("upgrade"));
+  }
+
+  // Test with the response headers not valid upgrade headers
+  {
+    TestHeaderMapImpl request_headers{{"connection", "UpGrAdE"}, {"upgrade", "foo"}};
+    TestHeaderMapImpl response_headers{{"transfer-encoding", "foo"}, {"upgrade", "bar"}};
+    EXPECT_TRUE(Utility::isUpgrade(request_headers));
+    EXPECT_FALSE(Utility::isUpgrade(response_headers));
+    ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+
+    EXPECT_EQ(1UL, response_headers.size()) << response_headers;
+    EXPECT_EQ("bar", response_headers.get_("upgrade"));
+  }
 }
 
 // Test that we correctly return x-request-id if we were requested to force a trace.

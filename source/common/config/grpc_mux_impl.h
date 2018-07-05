@@ -11,6 +11,7 @@
 #include "envoy/grpc/status.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/backoff_strategy.h"
 #include "common/common/logger.h"
 
 namespace Envoy {
@@ -42,7 +43,9 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   // TODO(htuch): Make this configurable or some static.
-  const uint32_t RETRY_DELAY_MS = 5000;
+  const uint32_t RETRY_INITIAL_DELAY_MS = 500;
+  const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
+  const double MULTIPLIER = 2;
 
 private:
   void setRetryTimer();
@@ -101,6 +104,7 @@ private:
   std::list<std::string> subscriptions_;
   Event::TimerPtr retry_timer_;
   MonotonicTimeSource& time_source_;
+  BackOffStrategyPtr backoff_strategy_ptr_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {
