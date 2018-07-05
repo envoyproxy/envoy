@@ -434,8 +434,8 @@ void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& resp
     response_headers.insertContentType().value(http_body->getString("contentType"));
     response_headers.insertContentLength().value(decoded_body.size());
   } catch (const Json::Exception& e) {
-    ENVOY_LOG(debug, "Failed to parse output of '{}'. e.what(): {}",
-              method_->input_type()->full_name(), e.what());
+    ENVOY_LOG(debug, "Failed to parse output of '{}'. e.what(): {}", method_->full_name(),
+              e.what());
   }
 }
 
