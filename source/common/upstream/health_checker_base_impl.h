@@ -133,8 +133,6 @@ public:
   HealthCheckEventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name)
       : file_(log_manager.createAccessLog(file_name)) {}
 
-  virtual ~HealthCheckEventLoggerImpl() {}
-
   void logEjectUnhealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
                          const HostDescriptionConstSharedPtr& host,
                          envoy::data::core::v2alpha::HealthCheckFailureType failure_type) override;
