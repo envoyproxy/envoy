@@ -1,5 +1,7 @@
 #include "common/upstream/health_checker_base_impl.h"
 
+#include "envoy/data/core/v2alpha/health_check_event.pb.h"
+
 #include "common/router/router.h"
 
 namespace Envoy {
@@ -9,14 +11,15 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
                                              const envoy::api::v2::core::HealthCheck& config,
                                              Event::Dispatcher& dispatcher,
                                              Runtime::Loader& runtime,
-                                             Runtime::RandomGenerator& random)
+                                             Runtime::RandomGenerator& random,
+                                             HealthCheckEventLoggerPtr&& event_logger)
     : cluster_(cluster), dispatcher_(dispatcher),
       timeout_(PROTOBUF_GET_MS_REQUIRED(config, timeout)),
       unhealthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, unhealthy_threshold)),
       healthy_threshold_(PROTOBUF_GET_WRAPPED_REQUIRED(config, healthy_threshold)),
       stats_(generateStats(cluster.info()->statsScope())), runtime_(runtime), random_(random),
       reuse_connection_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, reuse_connection, true)),
-      interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
+      event_logger_(std::move(event_logger)), interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
       no_traffic_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, no_traffic_interval, 60000)),
       interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)),
       unhealthy_interval_(
@@ -160,7 +163,7 @@ void HealthCheckerImplBase::setUnhealthyCrossThread(const HostSharedPtr& host) {
       return;
     }
 
-    session->second->setUnhealthy(ActiveHealthCheckSession::FailureType::Passive);
+    session->second->setUnhealthy(envoy::data::core::v2alpha::HealthCheckFailureType::PASSIVE);
   });
 }
 
@@ -200,6 +203,9 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess() {
       host_->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.incHealthy();
       changed_state = HealthTransition::Changed;
+      if (parent_.event_logger_) {
+        parent_.event_logger_->logAddHealthy(parent_.healthCheckerType(), host_, first_check_);
+      }
     } else {
       changed_state = HealthTransition::ChangePending;
     }
@@ -213,25 +219,30 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::handleSuccess() {
   interval_timer_->enableTimer(parent_.interval(HealthState::Healthy, changed_state));
 }
 
-HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(FailureType type) {
+HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(
+    envoy::data::core::v2alpha::HealthCheckFailureType type) {
   // If we are unhealthy, reset the # of healthy to zero.
   num_healthy_ = 0;
 
   HealthTransition changed_state = HealthTransition::Unchanged;
   if (!host_->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    if (type != FailureType::Network || ++num_unhealthy_ == parent_.unhealthy_threshold_) {
+    if (type != envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK ||
+        ++num_unhealthy_ == parent_.unhealthy_threshold_) {
       host_->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
       parent_.decHealthy();
       changed_state = HealthTransition::Changed;
+      if (parent_.event_logger_) {
+        parent_.event_logger_->logEjectUnhealthy(parent_.healthCheckerType(), host_, type);
+      }
     } else {
       changed_state = HealthTransition::ChangePending;
     }
   }
 
   parent_.stats_.failure_.inc();
-  if (type == FailureType::Network) {
+  if (type == envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK) {
     parent_.stats_.network_failure_.inc();
-  } else if (type == FailureType::Passive) {
+  } else if (type == envoy::data::core::v2alpha::HealthCheckFailureType::PASSIVE) {
     parent_.stats_.passive_failure_.inc();
   }
 
@@ -240,7 +251,8 @@ HealthTransition HealthCheckerImplBase::ActiveHealthCheckSession::setUnhealthy(F
   return changed_state;
 }
 
-void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(FailureType type) {
+void HealthCheckerImplBase::ActiveHealthCheckSession::handleFailure(
+    envoy::data::core::v2alpha::HealthCheckFailureType type) {
   HealthTransition changed_state = setUnhealthy(type);
   timeout_timer_->disableTimer();
   interval_timer_->enableTimer(parent_.interval(HealthState::Unhealthy, changed_state));
@@ -254,7 +266,40 @@ void HealthCheckerImplBase::ActiveHealthCheckSession::onIntervalBase() {
 
 void HealthCheckerImplBase::ActiveHealthCheckSession::onTimeoutBase() {
   onTimeout();
-  handleFailure(FailureType::Network);
+  handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
+}
+
+void HealthCheckEventLoggerImpl::logEjectUnhealthy(
+    envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+    const HostDescriptionConstSharedPtr& host,
+    envoy::data::core::v2alpha::HealthCheckFailureType failure_type) {
+  envoy::data::core::v2alpha::HealthCheckEvent event;
+  event.set_health_checker_type(health_checker_type);
+  envoy::api::v2::core::Address address;
+  Network::Utility::addressToProtobufAddress(*host->address(), address);
+  *event.mutable_host() = std::move(address);
+  event.set_cluster_name(host->cluster().name());
+  event.mutable_eject_unhealthy_event()->set_failure_type(failure_type);
+  // Make sure the type enums make it into the JSON
+  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
+                                                          /* always_print_primitive_fields */ true);
+  file_->write(fmt::format("{}\n", json));
+}
+
+void HealthCheckEventLoggerImpl::logAddHealthy(
+    envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+    const HostDescriptionConstSharedPtr& host, bool first_check) {
+  envoy::data::core::v2alpha::HealthCheckEvent event;
+  event.set_health_checker_type(health_checker_type);
+  envoy::api::v2::core::Address address;
+  Network::Utility::addressToProtobufAddress(*host->address(), address);
+  *event.mutable_host() = std::move(address);
+  event.set_cluster_name(host->cluster().name());
+  event.mutable_add_healthy_event()->set_first_check(first_check);
+  // Make sure the type enums make it into the JSON
+  const auto json = MessageUtil::getJsonStringFromMessage(event, /* pretty_print */ false,
+                                                          /* always_print_primitive_fields */ true);
+  file_->write(fmt::format("{}\n", json));
 }
 
 } // namespace Upstream
