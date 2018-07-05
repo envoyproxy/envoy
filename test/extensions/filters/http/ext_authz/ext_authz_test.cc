@@ -379,6 +379,15 @@ TEST_P(HttpExtAuthzFilterParamTest, DeniedResponseWith403) {
 TEST_P(HttpExtAuthzFilterParamTest, DestroyResponseBeforeSendLocalReply) {
   InSequence s;
 
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::Forbidden;
+  response.body = std::string{"foo"};
+  response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
+                                               {Http::LowerCaseString{"bar"}, "foo"}};
+  Filters::Common::ExtAuthz::ResponsePtr response_ptr =
+      std::make_unique<Filters::Common::ExtAuthz::Response>(response);
+
   ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
   EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
   EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
@@ -395,23 +404,12 @@ TEST_P(HttpExtAuthzFilterParamTest, DestroyResponseBeforeSendLocalReply) {
                                            {"content-type", "text/plain"},
                                            {"foo", "bar"},
                                            {"bar", "foo"}};
-  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false))
+      .WillOnce(
+          Invoke([&response_ptr](Http::TestHeaderMapImpl, bool) -> void { response_ptr.reset(); }));
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(Envoy::RequestInfo::ResponseFlag::UnauthorizedExternalService));
-
-  Filters::Common::ExtAuthz::Response response{};
-  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
-  response.status_code = Http::Code::Forbidden;
-  response.body = std::string{"foo"};
-  response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
-                                               {Http::LowerCaseString{"bar"}, "foo"}};
-  Filters::Common::ExtAuthz::ResponsePtr response_ptr =
-      std::make_unique<Filters::Common::ExtAuthz::Response>(response);
-
-  ON_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false))
-      .WillByDefault(
-          Invoke([&response_ptr](Http::TestHeaderMapImpl, bool) -> void { response_ptr.reset(); }));
 
   request_callbacks_->onComplete(std::move(response_ptr));
 
