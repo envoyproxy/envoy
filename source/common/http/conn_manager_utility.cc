@@ -299,7 +299,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,
                                                      const Http::HeaderMap& request_headers,
-                                                     const std::string& via) {
+                                                     Protocol protocol, const std::string& via) {
   if (Utility::isUpgrade(request_headers) && Utility::isUpgrade(response_headers)) {
     // As in mutateRequestHeaders, Upgrade responses have special handling.
     //
@@ -317,6 +317,11 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
 
   if (request_headers.EnvoyForceTrace() && request_headers.RequestId()) {
     response_headers.insertRequestId().value(*request_headers.RequestId());
+  }
+
+  if (protocol == Protocol::Http2) {
+    response_headers.removeKeepAlive();
+    response_headers.removeProxyConnection();
   }
 
   if (!via.empty()) {
