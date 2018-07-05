@@ -891,7 +891,7 @@ message RateLimit {
 //
 // .. attention::
 //   In the absence of any header match specifier, match will default to :ref:`present_match <envoy_api_field_route.HeaderMatcher.present_match>`.
-//   i.e, a request that has the :ref:`envoy_api_msg_route.HeaderMatcher.name` header will match, regardless of the header's value.
+//   i.e, a request that has the :ref:`name <envoy_api_field_route.HeaderMatcher.name>` header will match, regardless of the header's value.
 //
 message HeaderMatcher {
   // Specifies the name of the header in the request.
