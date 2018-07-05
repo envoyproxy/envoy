@@ -127,7 +127,11 @@ def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], de
         deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps],
         external_deps = [
             "@com_google_protobuf//:cc_wkt_protos",
-            "@googleapis//:api_httpbody_protos",
+            # TODO(dio): Running `bazel build @envoy_api//envoy/...` on mac
+            # with the following line uncommented gives:
+            # 'error=7, Argument list too long'
+            #
+            # "@googleapis//:api_httpbody_protos",
             "@googleapis//:http_api_protos",
             "@googleapis//:rpc_status_protos",
             "@com_github_gogo_protobuf//:gogo_proto_cc",
