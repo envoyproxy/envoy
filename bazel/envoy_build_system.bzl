@@ -366,6 +366,10 @@ def envoy_proto_library(name, srcs = [], deps = [], external_deps = [],
     cc_proto_deps = []
     py_proto_deps = ["@com_google_protobuf//:protobuf_python"]
 
+    if "api_httpbody_protos" in external_deps:
+        cc_proto_deps.append("@googleapis//:api_httpbody_protos")
+        py_proto_deps.append("@googleapis//:api_httpbody_protos_py")
+
     if "http_api_protos" in external_deps:
         cc_proto_deps.append("@googleapis//:http_api_protos")
         py_proto_deps.append("@googleapis//:http_api_protos_py")
@@ -402,6 +406,10 @@ def envoy_proto_library(name, srcs = [], deps = [], external_deps = [],
 def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
     input_files = ["$(location " + src + ")" for src in srcs]
     include_paths = [".", PACKAGE_NAME]
+
+    if "api_httpbody_protos" in external_deps:
+        srcs.append("@googleapis//:api_httpbody_protos_src")
+        include_paths.append("external/googleapis")
 
     if "http_api_protos" in external_deps:
         srcs.append("@googleapis//:http_api_protos_src")

@@ -19,6 +19,7 @@ envoy_cc_library(
         "path_matcher",
         "grpc_transcoding",
         "http_api_protos",
+        "api_httpbody_protos",
     ],
     deps = [
         ":transcoder_input_stream_lib",

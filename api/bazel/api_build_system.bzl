@@ -32,6 +32,7 @@ def api_py_proto_library(name, srcs = [], deps = [], has_services = 0):
         protoc = "@com_google_protobuf//:protoc",
         deps = [_LibrarySuffix(d, _PY_SUFFIX) for d in deps] + [
             "@com_lyft_protoc_gen_validate//validate:validate_py",
+            "@googleapis//:api_httpbody_protos_py",
             "@googleapis//:http_api_protos_py",
             "@googleapis//:rpc_status_protos_py",
             "@com_github_gogo_protobuf//:gogo_proto_py",
@@ -108,6 +109,7 @@ def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], de
             "@com_google_protobuf//:struct_proto",
             "@com_google_protobuf//:timestamp_proto",
             "@com_google_protobuf//:wrappers_proto",
+            "@googleapis//:api_httpbody_protos_proto",
             "@googleapis//:http_api_protos_proto",
             "@googleapis//:rpc_status_protos_lib",
             "@com_github_gogo_protobuf//:gogo_proto",
@@ -125,6 +127,7 @@ def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], de
         deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps],
         external_deps = [
             "@com_google_protobuf//:cc_wkt_protos",
+            "@googleapis//:api_httpbody_protos",
             "@googleapis//:http_api_protos",
             "@googleapis//:rpc_status_protos",
             "@com_github_gogo_protobuf//:gogo_proto_cc",
