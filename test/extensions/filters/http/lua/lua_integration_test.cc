@@ -109,6 +109,11 @@ config:
       request_handle:headers():add("request_body_size", body_length)
       request_handle:headers():add("request_metadata_foo", metadata["foo"])
       request_handle:headers():add("request_metadata_baz", metadata["baz"])
+      if request_handle:connection():ssl() == nil then
+        request_handle:headers():add("request_secure", "false")
+      else
+        request_handle:headers():add("request_secure", "true")
+      end
       request_handle:headers():add("request_protocol", request_handle:requestInfo():protocol())
     end
 
@@ -154,6 +159,9 @@ config:
                           .get(Http::LowerCaseString("request_metadata_baz"))
                           ->value()
                           .c_str());
+  EXPECT_STREQ(
+      "false",
+      upstream_request_->headers().get(Http::LowerCaseString("request_secure"))->value().c_str());
 
   EXPECT_STREQ(
       "HTTP/1.1",

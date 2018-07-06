@@ -301,6 +301,17 @@ Returns :repo:`information <include/request_info/request_info.h>` related to the
 
 Returns a :ref:`request info object <config_http_filters_lua_request_info_wrapper>`.
 
+connection()
+^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  connection = handle:connection()
+
+Returns the current request's underlying :repo:`connection <include/envoy/network/connection.h>`.
+
+Returns a :ref:`connection object <config_http_filters_lua_connection_wrapper>`.
+
 .. _config_http_filters_lua_header_wrapper:
 
 Header object API
@@ -401,7 +412,7 @@ get()
   metadata:get(key)
 
 Gets a metadata. *key* is a string that supplies the metadata key. Returns the corresponding
-value of the given metadata key. The type of the value can be: *null*, *boolean*, *number*,
+value of the given metadata key. The type of the value can be: *nil*, *boolean*, *number*,
 *string* and *table*.
 
 __pairs()
@@ -429,3 +440,26 @@ protocol()
 
 Returns the string representation of :repo:`HTTP protocol <include/envoy/http/protocol.h>`
 used by the current request. The possible values are: *HTTP/1.0*, *HTTP/1.1*, and *HTTP/2*.
+
+.. _config_http_filters_lua_connection_wrapper:
+
+Connection object API
+---------------------
+
+ssl()
+^^^^^^^^
+
+.. code-block:: lua
+
+  if connection:ssl() == nil then
+    print("plain")
+  else
+    print("secure")
+  end
+
+Returns :repo:`SSL connection <include/envoy/ssl/connection.h>` object when the connection is
+secured and *nil* when it is not.
+
+.. note::
+
+  Currently the SSL connection object has no exposed APIs.
