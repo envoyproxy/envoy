@@ -562,10 +562,8 @@ TEST_P(SubsetLoadBalancerTest, UpdateMetadata) {
   EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
 
   // Add hosts initial hosts.
-  init({
-      {"tcp://127.0.0.1:8000", {{"version", "1.2"}}},
-      {"tcp://127.0.0.1:8001", {{"version", "1.0"}}}
-  });
+  init({{"tcp://127.0.0.1:8000", {{"version", "1.2"}}},
+        {"tcp://127.0.0.1:8001", {{"version", "1.0"}}}});
   EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(2U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
