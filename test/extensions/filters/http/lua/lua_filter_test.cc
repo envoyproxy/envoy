@@ -4,6 +4,8 @@
 #include "extensions/filters/http/lua/lua_filter.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/network/mocks.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
@@ -68,6 +70,11 @@ public:
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
+  void setupSecureConnection(const bool secure) {
+    EXPECT_CALL(decoder_callbacks_, connection()).WillOnce(Return(&connection_));
+    EXPECT_CALL(Const(connection_), ssl()).Times(1).WillOnce(Return(secure ? &ssl_ : nullptr));
+  }
+
   void setupMetadata(const std::string& yaml) {
     MessageUtil::loadFromYaml(yaml, metadata_);
     EXPECT_CALL(decoder_callbacks_.route_->route_entry_, metadata())
@@ -81,6 +88,8 @@ public:
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
   envoy::api::v2::core::Metadata metadata_;
+  NiceMock<Envoy::Ssl::MockConnection> ssl_;
+  NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info_;
 
   const std::string HEADER_ONLY_SCRIPT{R"EOF(
@@ -1463,7 +1472,7 @@ TEST_F(LuaHttpFilterTest, GetMetadataFromHandleNoLuaMetadata) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
-// No available Lua metadata on route.
+// Get the current protocol.
 TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
   const std::string SCRIPT{R"EOF(
     function envoy_on_request(request_handle)
@@ -1479,6 +1488,32 @@ TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
 
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("HTTP/1.1")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Check the connection.
+TEST_F(LuaHttpFilterTest, CheckConnection) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      if request_handle:connection():ssl() == nil then
+        request_handle:logTrace("plain")
+      else
+        request_handle:logTrace("secure")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+
+  setupSecureConnection(false);
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("plain")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+
+  setupSecureConnection(true);
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("secure")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 
