@@ -211,7 +211,6 @@ void Utility::checkObjNameLength(const std::string& error_prefix, const std::str
     throw EnvoyException(fmt::format("{}: Length of {} ({}) exceeds allowed maximum length ({})",
                                      error_prefix, name, name.length(),
                                      stats_options.maxNameLength()));
-    ;
   }
 }
 
