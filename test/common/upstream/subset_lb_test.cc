@@ -569,13 +569,21 @@ TEST_P(SubsetLoadBalancerTest, UpdateMetadata) {
   EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
 
   // Update the metadata for each host. Subsets should be removed.
+  HostSharedPtr host_v12 = host_set_.hosts_[0];
+  HostSharedPtr host_v10 = host_set_.hosts_[1];
+
   modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.3"}}),
                makeHost("tcp://127.0.0.1:8001", {{"version", "1.2"}})},
-              {makeHost("tcp://127.0.0.1:8000", {{"version", "1.2"}}),
-               makeHost("tcp://127.0.0.1:8001", {{"version", "1.0"}})});
-  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
-  EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
-  EXPECT_EQ(1U, stats_.lb_subsets_removed_.value());
+              {host_v12, host_v10});
+  if (GetParam() != REMOVES_FIRST) {
+    EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+    EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+    EXPECT_EQ(1U, stats_.lb_subsets_removed_.value());
+  } else {
+    EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+    EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+    EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
+  }
 }
 
 TEST_P(SubsetLoadBalancerTest, UpdateRemovingLastSubsetHost) {
