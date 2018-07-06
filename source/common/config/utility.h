@@ -272,6 +272,8 @@ public:
    * It should be within the configured length limit. Throws on error.
    * @param error_prefix supplies the prefix to use in error messages.
    * @param name supplies the name to check for length limits.
+   * @param stats_options the top-level statsOptions struct, which contains the max stat name /
+   * suffix lengths for stats.
    */
   static void checkObjNameLength(const std::string& error_prefix, const std::string& name,
                                  const Stats::StatsOptions& stats_options);
