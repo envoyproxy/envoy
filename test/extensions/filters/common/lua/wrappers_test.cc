@@ -45,17 +45,19 @@ protected:
         else
           testPrint("secure")
         end
+        testPrint(type(object:ssl()))
       end
     )EOF"};
-
     testing::InSequence s;
     setup(SCRIPT);
 
     // Setup secure connection if required.
-    EXPECT_CALL(Const(connection_), ssl()).Times(1).WillOnce(Return(secure ? &ssl_ : nullptr));
+    EXPECT_CALL(Const(connection_), ssl()).WillOnce(Return(secure ? &ssl_ : nullptr));
 
     ConnectionWrapper::create(coroutine_->luaState(), &connection_);
     EXPECT_CALL(*this, testPrint(secure ? "secure" : "plain"));
+    EXPECT_CALL(Const(connection_), ssl()).WillOnce(Return(secure ? &ssl_ : nullptr));
+    EXPECT_CALL(*this, testPrint(secure ? "userdata" : "nil"));
     start("callMe");
   }
 
