@@ -8,6 +8,8 @@ Version history
 * admin: added :http:get:`/hystrix_event_stream` as an endpoint for monitoring envoy's statistics
   through `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
 * grpc-json: added support for encoding `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
+* health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
+* health_check: added support for :ref:`health check event logging <arch_overview_health_check_logging>`.
 * http: response filters not applied to early error paths such as http_parser generated 400s.
 * lua: added :ref:`requestInfo() <config_http_filters_lua_request_info_wrapper>` wrapper and *protocol()* API.
 * ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`.

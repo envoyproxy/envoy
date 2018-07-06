@@ -20,6 +20,7 @@ public:
       const Upstream::Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
       const envoy::config::health_checker::redis::v2::Redis& redis_config,
       Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      Upstream::HealthCheckEventLoggerPtr&& event_logger,
       Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory& client_factory);
 
   static const Extensions::NetworkFilters::RedisProxy::RespValue& pingHealthCheckRequest() {
@@ -31,6 +32,11 @@ public:
   existsHealthCheckRequest(const std::string& key) {
     static HealthCheckRequest* request = new HealthCheckRequest(key);
     return request->request_;
+  }
+
+protected:
+  envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const override {
+    return envoy::data::core::v2alpha::HealthCheckerType::REDIS;
   }
 
 private:
