@@ -109,6 +109,11 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
   return cluster_options;
 }
 
+bool metadataEq(const envoy::api::v2::core::Metadata& lhs,
+                const envoy::api::v2::core::Metadata& rhs) {
+  return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
+}
+
 } // namespace
 
 Host::CreateConnectionData
@@ -691,7 +696,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // TODO(htuch): We can be smarter about this potentially, and not force a full
   // host set update on health status change. The way this would work is to
   // implement a HealthChecker subclass that provides thread local health
-  // updates to the Cluster objeect. This will probably make sense to do in
+  // updates to the Cluster object. This will probably make sense to do in
   // conjunction with https://github.com/envoyproxy/envoy/issues/2874.
   bool health_changed = false;
 
@@ -732,6 +737,15 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
             // rebuild.
             health_changed |= !previously_healthy && (*i)->healthy();
           }
+        }
+
+        // Did metadata change?
+        if (!metadataEq(host->metadata(), (*i)->metadata())) {
+          (*i)->metadata(host->metadata());
+          (*i)->canary(host->canary());
+
+          // If metadata changed, we need to rebuild. See github issue #3810.
+          health_changed = true;
         }
 
         (*i)->weight(host->weight());

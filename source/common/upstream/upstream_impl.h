@@ -75,7 +75,15 @@ public:
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
+
+  // Upstream::HostDescription
+  void canary(bool is_canary) override { canary_ = is_canary; }
+
   const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
+  virtual void metadata(const envoy::api::v2::core::Metadata& new_metadata) override {
+    metadata_ = new_metadata;
+  }
+
   const ClusterInfo& cluster() const override { return *cluster_; }
   HealthCheckHostMonitor& healthChecker() const override {
     if (health_checker_) {
@@ -108,8 +116,8 @@ protected:
   const std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
-  const bool canary_;
-  const envoy::api::v2::core::Metadata metadata_;
+  bool canary_;
+  envoy::api::v2::core::Metadata metadata_;
   const envoy::api::v2::core::Locality locality_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;

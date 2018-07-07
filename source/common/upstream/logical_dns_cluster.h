@@ -62,9 +62,12 @@ private:
 
     // Upstream:HostDescription
     bool canary() const override { return false; }
+    void canary(bool) override {}
     const envoy::api::v2::core::Metadata& metadata() const override {
       return envoy::api::v2::core::Metadata::default_instance();
     }
+    void metadata(const envoy::api::v2::core::Metadata&) override {}
+
     const ClusterInfo& cluster() const override { return logical_host_->cluster(); }
     HealthCheckHostMonitor& healthChecker() const override {
       return logical_host_->healthChecker();
