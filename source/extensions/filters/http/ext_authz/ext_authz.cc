@@ -103,8 +103,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       (response->status == CheckStatus::Error && !config_->failureModeAllow())) {
     ENVOY_STREAM_LOG(debug, "Ext_authz rejected the request", *callbacks_);
     ENVOY_STREAM_LOG(trace, "Ext_authz downstream header(s):", *callbacks_);
-    const std::string body = std::move(response->body);
-    callbacks_->sendLocalReply(response->status_code, body,
+    callbacks_->sendLocalReply(response->status_code, response->body,
                                [& headers = response->headers_to_add,
                                 &callbacks = *callbacks_ ](Http::HeaderMap & response_headers)
                                    ->void {

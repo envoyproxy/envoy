@@ -404,12 +404,19 @@ TEST_P(HttpExtAuthzFilterParamTest, DestroyResponseBeforeSendLocalReply) {
                                            {"content-type", "text/plain"},
                                            {"foo", "bar"},
                                            {"bar", "foo"}};
+
+  Http::HeaderMap* saved_headers;
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false))
-      .WillOnce(
-          Invoke([&response_ptr](Http::TestHeaderMapImpl, bool) -> void { response_ptr.reset(); }));
-  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
-  EXPECT_CALL(filter_callbacks_.request_info_,
-              setResponseFlag(Envoy::RequestInfo::ResponseFlag::UnauthorizedExternalService));
+      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) { saved_headers = &headers; }));
+
+  EXPECT_CALL(filter_callbacks_, encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        response_ptr.reset();
+        Http::TestHeaderMapImpl test_headers{*saved_headers};
+        EXPECT_EQ(test_headers.get_("foo"), "bar");
+        EXPECT_EQ(test_headers.get_("bar"), "foo");
+        EXPECT_EQ(data.toString(), "foo");
+      }));
 
   request_callbacks_->onComplete(std::move(response_ptr));
 
