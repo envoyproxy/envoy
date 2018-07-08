@@ -65,7 +65,11 @@ envoy_proto_library(
 
 envoy_cc_fuzz_test(
     name = "h1_capture_fuzz_test",
-    srcs = ["h1_capture_fuzz_test.cc"],
+    srcs = [
+        "h1_capture_fuzz_test.cc",
+        "h1_fuzz.cc",
+        "h1_fuzz.h",
+    ],
     corpus = "h1_capture_corpus",
     deps = [
         ":capture_fuzz_proto",
@@ -79,7 +83,11 @@ envoy_cc_fuzz_test(
 
 envoy_cc_fuzz_test(
     name = "h1_capture_direct_response_fuzz_test",
-    srcs = ["h1_capture_direct_response_fuzz_test.cc"],
+    srcs = [
+        "h1_capture_direct_response_fuzz_test.cc",
+        "h1_fuzz.cc",
+        "h1_fuzz.h",
+    ],
     corpus = "h1_capture_direct_response_corpus",
     deps = [
         ":capture_fuzz_proto",
