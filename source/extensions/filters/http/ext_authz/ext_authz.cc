@@ -108,6 +108,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
                                 &callbacks = *callbacks_ ](Http::HeaderMap & response_headers)
                                    ->void {
                                      for (const auto& header : headers) {
+                                       response_headers.remove(header.first);
                                        response_headers.addCopy(header.first, header.second);
                                        ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks,
                                                         header.first.get(), header.second);
