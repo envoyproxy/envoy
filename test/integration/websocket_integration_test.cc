@@ -473,7 +473,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
   initialize();
 
   // Websocket upgrades are configured to disallow large payload.
-  const std::string early_data_req_str("a", 2048);
+  const std::string early_data_req_str(2048, 'a');
   {
     const std::string upgrade_req_str =
         fmt::format("GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "

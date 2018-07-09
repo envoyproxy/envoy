@@ -101,11 +101,12 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
                    Headers::get().TransferEncoding.get().size(),
                    Headers::get().TransferEncodingValues.Chunked.c_str(),
                    Headers::get().TransferEncodingValues.Chunked.size());
-      // We do not do chunk encoding for HTTP upgrades.
+      // We do not aply chunk encoding for HTTP upgrades. Any incoming chunks
+      // will be through-proxied by maybeDirectDispatch untouched.
       //
       // When sending a response to a HEAD request Envoy may send an informational
       // "Transfer-Encoding: chunked" header, but should not send a chunk encoded body.
-      chunk_encoding_ = headers.Upgrade() == nullptr && !is_response_to_head_request_;
+      chunk_encoding_ = !Utility::isUpgrade(headers) && !is_response_to_head_request_;
     }
   }
 
@@ -406,7 +407,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
     // HTTP/1.1 or not.
     protocol_ = Protocol::Http10;
   }
-  if (current_header_map_->Upgrade() != nullptr) {
+  if (Utility::isUpgrade(*current_header_map_)) {
     ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
     handling_upgrade_ = true;
   }
