@@ -7,8 +7,6 @@
 #include "common/thread_local/thread_local_impl.h"
 
 #include "server/config_validation/server.h"
-#include "server/drain_manager_impl.h"
-#include "server/hot_restart_nop_impl.h"
 #include "server/options_impl.h"
 #include "server/server.h"
 #include "server/test_hooks.h"
@@ -21,7 +19,8 @@
 
 namespace Envoy {
 namespace Server {
-
+// Derived from //test/server:server_fuzz_test.cc, but starts the server in configuration validation
+// mode (quits upon validation of the given config)
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
   testing::NiceMock<MockOptions> options;
   TestComponentFactory component_factory;
