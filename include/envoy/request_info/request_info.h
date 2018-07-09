@@ -65,6 +65,13 @@ public:
   virtual void setResponseFlag(ResponseFlag response_flag) PURE;
 
   /**
+   * @param response_flags the response_flags to intersect with.
+   * @return true if the intersection of the response_flags argument and the currently set response
+   * flags is non-empty.
+   */
+  virtual bool intersectResponseFlags(uint64_t response_flags) const PURE;
+
+  /**
    * @param host the selected upstream host for the request.
    */
   virtual void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) PURE;
@@ -216,7 +223,12 @@ public:
   /**
    * @return whether response flag is set or not.
    */
-  virtual bool getResponseFlag(ResponseFlag response_flag) const PURE;
+  virtual bool hasResponseFlag(ResponseFlag response_flag) const PURE;
+
+  /**
+   * @return whether any response flag is set or not.
+   */
+  virtual bool hasAnyResponseFlag() const PURE;
 
   /**
    * @return upstream host description.

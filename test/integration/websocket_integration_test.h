@@ -17,6 +17,8 @@ protected:
   void validateInitialDownstreamData(const std::string& received_data);
   void validateFinalDownstreamData(const std::string& received_data,
                                    const std::string& expected_data);
+  void validateFinalUpstreamData(const std::string& received_data,
+                                 const std::string& expected_data);
 
   const std::string upgrade_req_str_ = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nConnection: "
                                        "keep-alive, Upgrade\r\nUpgrade: websocket\r\n\r\n";

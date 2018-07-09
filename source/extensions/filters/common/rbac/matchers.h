@@ -96,6 +96,20 @@ private:
   std::vector<MatcherConstSharedPtr> matchers_;
 };
 
+class NotMatcher : public Matcher {
+public:
+  NotMatcher(const envoy::config::rbac::v2alpha::Permission& permission)
+      : matcher_(Matcher::create(permission)) {}
+  NotMatcher(const envoy::config::rbac::v2alpha::Principal& principal)
+      : matcher_(Matcher::create(principal)) {}
+
+  bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+               const envoy::api::v2::core::Metadata&) const override;
+
+private:
+  MatcherConstSharedPtr matcher_;
+};
+
 /**
  * Perform a match against any HTTP header (or pseudo-header, such as `:path` or `:authority`). Will
  * always fail to match on any non-HTTP connection.

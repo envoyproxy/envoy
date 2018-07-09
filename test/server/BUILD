@@ -174,6 +174,7 @@ envoy_cc_test(
     srcs = ["server_test.cc"],
     data = [
         ":cluster_dupe_bootstrap.yaml",
+        ":cluster_health_check_bootstrap.yaml",
         ":empty_bootstrap.yaml",
         ":node_bootstrap.yaml",
         "//test/config/integration:server.json",

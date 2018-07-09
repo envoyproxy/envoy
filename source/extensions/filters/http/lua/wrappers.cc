@@ -1,5 +1,7 @@
 #include "extensions/filters/http/lua/wrappers.h"
 
+#include "common/http/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -98,6 +100,11 @@ void HeaderMapWrapper::checkModifiable(lua_State* state) {
   if (!cb_()) {
     luaL_error(state, "header map can no longer be modified");
   }
+}
+
+int RequestInfoWrapper::luaProtocol(lua_State* state) {
+  lua_pushstring(state, Http::Utility::getProtocolString(request_info_.protocol().value()).c_str());
+  return 1;
 }
 
 } // namespace Lua

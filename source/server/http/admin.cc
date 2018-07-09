@@ -179,7 +179,7 @@ void AdminFilter::addOnDestroyCallback(std::function<void()> cb) {
   on_destroy_callbacks_.push_back(std::move(cb));
 }
 
-const Http::StreamDecoderFilterCallbacks& AdminFilter::getDecoderFilterCallbacks() const {
+Http::StreamDecoderFilterCallbacks& AdminFilter::getDecoderFilterCallbacks() const {
   ASSERT(callbacks_ != nullptr);
   return *callbacks_;
 }

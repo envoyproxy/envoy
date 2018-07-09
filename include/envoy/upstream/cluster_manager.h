@@ -18,6 +18,7 @@
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/admin.h"
 #include "envoy/tcp/conn_pool.h"
+#include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
@@ -276,6 +277,7 @@ public:
   virtual ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster,
                                             ClusterManager& cm,
                                             Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                            AccessLog::AccessLogManager& log_manager,
                                             bool added_via_api) PURE;
 
   /**

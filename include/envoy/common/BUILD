@@ -37,3 +37,8 @@ envoy_cc_library(
     name = "callback",
     hdrs = ["callback.h"],
 )
+
+envoy_cc_library(
+    name = "backoff_strategy_interface",
+    hdrs = ["backoff_strategy.h"],
+)

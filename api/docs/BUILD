@@ -58,6 +58,7 @@ proto_library(
         "//envoy/config/trace/v2:trace",
         "//envoy/config/transport_socket/capture/v2alpha:capture",
         "//envoy/data/accesslog/v2:accesslog",
+        "//envoy/data/core/v2alpha:health_check_event",
         "//envoy/data/tap/v2alpha:capture",
         "//envoy/service/accesslog/v2:als",
         "//envoy/service/auth/v2alpha:attribute_context",
