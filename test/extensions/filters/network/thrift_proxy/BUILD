@@ -117,6 +117,7 @@ envoy_extension_cc_test(
         ":mocks",
         ":utility_lib",
         "//source/extensions/filters/network/thrift_proxy:transport_lib",
+        "//test/mocks/buffer:buffer_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",
     ],

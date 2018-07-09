@@ -45,6 +45,29 @@ public:
   bool readDouble(Buffer::Instance& buffer, double& value) override;
   bool readString(Buffer::Instance& buffer, std::string& value) override;
   bool readBinary(Buffer::Instance& buffer, std::string& value) override;
+  void writeMessageBegin(Buffer::Instance& buffer, const std::string& name, MessageType msg_type,
+                         int32_t seq_id) override;
+  void writeMessageEnd(Buffer::Instance& buffer) override;
+  void writeStructBegin(Buffer::Instance& buffer, const std::string& name) override;
+  void writeStructEnd(Buffer::Instance& buffer) override;
+  void writeFieldBegin(Buffer::Instance& buffer, const std::string& name, FieldType field_type,
+                       int16_t field_id) override;
+  void writeFieldEnd(Buffer::Instance& buffer) override;
+  void writeMapBegin(Buffer::Instance& buffer, FieldType key_type, FieldType value_type,
+                     uint32_t size) override;
+  void writeMapEnd(Buffer::Instance& buffer) override;
+  void writeListBegin(Buffer::Instance& buffer, FieldType elem_type, uint32_t size) override;
+  void writeListEnd(Buffer::Instance& buffer) override;
+  void writeSetBegin(Buffer::Instance& buffer, FieldType elem_type, uint32_t size) override;
+  void writeSetEnd(Buffer::Instance& buffer) override;
+  void writeBool(Buffer::Instance& buffer, bool value) override;
+  void writeByte(Buffer::Instance& buffer, uint8_t value) override;
+  void writeInt16(Buffer::Instance& buffer, int16_t value) override;
+  void writeInt32(Buffer::Instance& buffer, int32_t value) override;
+  void writeInt64(Buffer::Instance& buffer, int64_t value) override;
+  void writeDouble(Buffer::Instance& buffer, double value) override;
+  void writeString(Buffer::Instance& buffer, const std::string& value) override;
+  void writeBinary(Buffer::Instance& buffer, const std::string& value) override;
 
   static bool isMagic(uint16_t word) { return word == Magic; }
 
@@ -64,6 +87,8 @@ public:
 
   bool readMessageBegin(Buffer::Instance& buffer, std::string& name, MessageType& msg_type,
                         int32_t& seq_id) override;
+  void writeMessageBegin(Buffer::Instance& buffer, const std::string& name, MessageType msg_type,
+                         int32_t seq_id) override;
 };
 
 } // namespace ThriftProxy

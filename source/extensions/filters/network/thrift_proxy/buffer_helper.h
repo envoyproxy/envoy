@@ -212,6 +212,83 @@ public:
    */
   static int32_t peekZigZagI32(Buffer::Instance& buffer, uint64_t offset, int& size);
 
+  /**
+   * Writes an int8_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int8_t to write
+   */
+  static void writeI8(Buffer::Instance& buffer, int8_t value);
+
+  /**
+   * Writes an int16_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int16_t to write
+   */
+  static void writeI16(Buffer::Instance& buffer, int16_t value);
+
+  /**
+   * Writes an uint16_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the uint16_t to write
+   */
+  static void writeU16(Buffer::Instance& buffer, uint16_t value);
+
+  /**
+   * Writes an int32_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int32_t to write
+   */
+  static void writeI32(Buffer::Instance& buffer, int32_t value);
+
+  /**
+   * Writes an uint32_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the uint32_t to write
+   */
+  static void writeU32(Buffer::Instance& buffer, uint32_t value);
+
+  /**
+   * Writes an int64_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int64_t to write
+   */
+  static void writeI64(Buffer::Instance& buffer, int64_t value);
+
+  /**
+   * Writes a double to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the double to write
+   */
+  static void writeDouble(Buffer::Instance& buffer, double value);
+
+  /**
+   * Writes a var-int encoded int32_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int32_t to write
+   */
+  static void writeVarIntI32(Buffer::Instance& buffer, int32_t value);
+
+  /**
+   * Writes a var-int encoded int64_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int64_t to write
+   */
+  static void writeVarIntI64(Buffer::Instance& buffer, int64_t value);
+
+  /**
+   * Writes a zig-zag encoded int32_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int32_t to write
+   */
+  static void writeZigZagI32(Buffer::Instance& buffer, int32_t value);
+
+  /**
+   * Writes a zig-zag encoded int64_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int64_t to write
+   */
+  static void writeZigZagI64(Buffer::Instance& buffer, int64_t value);
+
 private:
   /**
    * Peeks at a variable-length int of up to 64 bits at offset. Updates size to indicate how many
