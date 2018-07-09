@@ -88,8 +88,8 @@ void Utility::checkApiConfigSourceNames(
       (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
 
   if (api_config_source.cluster_names().empty() && api_config_source.grpc_services().empty()) {
-      throw EnvoyException("API configs must have either a gRPC service or a cluster name defined");
-    }
+    throw EnvoyException("API configs must have either a gRPC service or a cluster name defined");
+  }
 
   if (is_grpc) {
     if (!api_config_source.cluster_names().empty()) {
