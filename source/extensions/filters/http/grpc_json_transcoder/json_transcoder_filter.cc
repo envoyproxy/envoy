@@ -440,12 +440,7 @@ void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& resp
 }
 
 bool JsonTranscoderFilter::hasHttpBodyAsOutputType() {
-  absl::string_view output_type = method_->output_type()->full_name();
-  absl::string_view http_body_type = google::api::HttpBody::descriptor()->full_name();
-  if (output_type.length() != http_body_type.length()) {
-    return false;
-  }
-  return StringUtil::startsWith(output_type.data(), http_body_type.data(), true);
+  return method_->output_type()->full_name() == google::api::HttpBody::descriptor()->full_name();
 }
 
 } // namespace GrpcJsonTranscoder
