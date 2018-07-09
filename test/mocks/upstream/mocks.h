@@ -154,10 +154,10 @@ public:
                                      ResourcePriority priority, Http::Protocol protocol,
                                      const Network::ConnectionSocket::OptionsSharedPtr& options));
 
-  MOCK_METHOD4(clusterFromProto,
+  MOCK_METHOD5(clusterFromProto,
                ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                 Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                bool added_via_api));
+                                AccessLog::AccessLogManager& log_manager, bool added_via_api));
 
   MOCK_METHOD3(createCds,
                CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config,
@@ -230,6 +230,15 @@ public:
   }
 
   std::list<HostStatusCb> callbacks_;
+};
+
+class MockHealthCheckEventLogger : public HealthCheckEventLogger {
+public:
+  MOCK_METHOD3(logEjectUnhealthy, void(envoy::data::core::v2alpha::HealthCheckerType,
+                                       const HostDescriptionConstSharedPtr&,
+                                       envoy::data::core::v2alpha::HealthCheckFailureType));
+  MOCK_METHOD3(logAddHealthy, void(envoy::data::core::v2alpha::HealthCheckerType,
+                                   const HostDescriptionConstSharedPtr&, bool));
 };
 
 class MockCdsApi : public CdsApi {

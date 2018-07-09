@@ -90,24 +90,26 @@ JSON_TEST_ARRAY=()
 # Parameterize IPv4 and IPv6 testing.
 if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "all" ]] \
   || [[ "${ENVOY_IP_TEST_VERSIONS}" == "v4only" ]]; then
-  HOT_RESTART_JSON_V4="${TEST_TMPDIR}"/hot_restart_v4.json
+  HOT_RESTART_JSON_V4="${TEST_TMPDIR}"/hot_restart_v4.yaml
   echo building ${HOT_RESTART_JSON_V4} ...
-  cat "${TEST_RUNDIR}"/test/config/integration/server.json |
+  cat "${TEST_RUNDIR}"/test/config/integration/server.yaml |
     sed -e "s#{{ upstream_. }}#0#g" | \
     sed -e "s#{{ test_rundir }}#$TEST_RUNDIR#" | \
+    sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
     sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
-    sed -e "s#{{ dns_lookup_family }}#v4_only#" | \
+    sed -e "s#{{ dns_lookup_family }}#V4_ONLY#" | \
     cat > "${HOT_RESTART_JSON_V4}"
   JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_V4}")
 fi
 
 if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "all" ]] \
   || [[ "${ENVOY_IP_TEST_VERSIONS}" == "v6only" ]]; then
-  HOT_RESTART_JSON_V6="${TEST_TMPDIR}"/hot_restart_v6.json
-  cat "${TEST_RUNDIR}"/test/config/integration/server.json |
+  HOT_RESTART_JSON_V6="${TEST_TMPDIR}"/hot_restart_v6.yaml
+  cat "${TEST_RUNDIR}"/test/config/integration/server.yaml |
     sed -e "s#{{ upstream_. }}#0#g" | \
     sed -e "s#{{ test_rundir }}#$TEST_RUNDIR#" | \
-    sed -e "s#{{ ip_loopback_address }}#[::1]#" | \
+    sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
+    sed -e "s#{{ ip_loopback_address }}#::1#" | \
     sed -e "s#{{ dns_lookup_family }}#v6_only#" | \
     cat > "${HOT_RESTART_JSON_V6}"
   JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_V6}")
@@ -115,9 +117,9 @@ fi
 
 # Also test for listening on UNIX domain sockets. We use IPv4 for the
 # upstreams to avoid too much wild sedding.
-HOT_RESTART_JSON_UDS="${TEST_TMPDIR}"/hot_restart_uds.json
+HOT_RESTART_JSON_UDS="${TEST_TMPDIR}"/hot_restart_uds.yaml
 SOCKET_DIR="$(mktemp -d /tmp/envoy_test_hotrestart.XXXXXX)"
-cat "${TEST_RUNDIR}"/test/config/integration/server_unix_listener.json |
+cat "${TEST_RUNDIR}"/test/config/integration/server_unix_listener.yaml |
   sed -e "s#{{ socket_dir }}#${SOCKET_DIR}#" | \
   sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
   cat > "${HOT_RESTART_JSON_UDS}"
@@ -150,9 +152,9 @@ do
 
   FIRST_SERVER_PID=$BACKGROUND_PID
 
-  start_test Updating original config json listener addresses
+  start_test Updating original config listener addresses
   sleep 3
-  UPDATED_HOT_RESTART_JSON="${TEST_TMPDIR}"/hot_restart_updated."${TEST_INDEX}".json
+  UPDATED_HOT_RESTART_JSON="${TEST_TMPDIR}"/hot_restart_updated."${TEST_INDEX}".yaml
   "${TEST_RUNDIR}"/tools/socket_passing "-o" "${HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_0}" \
     "-u" "${UPDATED_HOT_RESTART_JSON}"
 
@@ -197,7 +199,7 @@ do
   sleep 7
 
   start_test Checking that listener addresses have not changed
-  HOT_RESTART_JSON_1="${TEST_TMPDIR}"/hot_restart.1."${TEST_INDEX}".json
+  HOT_RESTART_JSON_1="${TEST_TMPDIR}"/hot_restart.1."${TEST_INDEX}".yaml
   "${TEST_RUNDIR}"/tools/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_1}" \
     "-u" "${HOT_RESTART_JSON_1}"
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_1}")
@@ -213,7 +215,7 @@ do
   sleep 3
 
   start_test Checking that listener addresses have not changed
-  HOT_RESTART_JSON_2="${TEST_TMPDIR}"/hot_restart.2."${TEST_INDEX}".json
+  HOT_RESTART_JSON_2="${TEST_TMPDIR}"/hot_restart.2."${TEST_INDEX}".yaml
   "${TEST_RUNDIR}"/tools/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_2}" \
     "-u" "${HOT_RESTART_JSON_2}"
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_2}")

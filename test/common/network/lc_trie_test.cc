@@ -26,9 +26,9 @@ public:
     }
     // Use custom fill factors and root branch factors if they are in the valid range.
     if ((fill_factor > 0) && (fill_factor <= 1) && (root_branch_factor > 0)) {
-      trie_.reset(new LcTrie(output, fill_factor, root_branch_factor));
+      trie_.reset(new LcTrie<std::string>(output, fill_factor, root_branch_factor));
     } else {
-      trie_.reset(new LcTrie(output));
+      trie_.reset(new LcTrie<std::string>(output));
     }
   }
 
@@ -37,13 +37,13 @@ public:
     for (const auto& kv : test_output) {
       std::vector<std::string> expected(kv.second);
       std::sort(expected.begin(), expected.end());
-      std::vector<std::string> actual(trie_->getTags(Utility::parseInternetAddress(kv.first)));
+      std::vector<std::string> actual(trie_->getData(Utility::parseInternetAddress(kv.first)));
       std::sort(actual.begin(), actual.end());
       EXPECT_EQ(expected, actual);
     }
   }
 
-  std::unique_ptr<LcTrie> trie_;
+  std::unique_ptr<LcTrie<std::string>> trie_;
 };
 
 // Use the default constructor values.
@@ -315,7 +315,7 @@ TEST_F(LcTrieTest, MaximumEntriesExceptionDefault) {
   std::pair<std::string, std::vector<Address::CidrRange>> ip_tag =
       std::make_pair("bad_tag", prefixes);
   std::vector<std::pair<std::string, std::vector<Address::CidrRange>>> ip_tags_input{ip_tag};
-  EXPECT_THROW_WITH_MESSAGE(new LcTrie(ip_tags_input), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(new LcTrie<std::string>(ip_tags_input), EnvoyException,
                             "The input vector has '524288' CIDR range entries. "
                             "LC-Trie can only support '262144' CIDR ranges with "
                             "the specified fill factor.");
@@ -339,7 +339,7 @@ TEST_F(LcTrieTest, MaximumEntriesExceptionOverride) {
   std::pair<std::string, std::vector<Address::CidrRange>> ip_tag =
       std::make_pair("bad_tag", prefixes);
   std::vector<std::pair<std::string, std::vector<Address::CidrRange>>> ip_tags_input{ip_tag};
-  EXPECT_THROW_WITH_MESSAGE(new LcTrie(ip_tags_input, 0.01), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(new LcTrie<std::string>(ip_tags_input, 0.01), EnvoyException,
                             "The input vector has '8192' CIDR range entries. "
                             "LC-Trie can only support '5242' CIDR ranges with "
                             "the specified fill factor.");

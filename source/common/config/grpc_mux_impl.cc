@@ -16,6 +16,8 @@ GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClie
     : node_(node), async_client_(std::move(async_client)), service_method_(service_method),
       time_source_(time_source) {
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
+  backoff_strategy_ptr_ = std::make_unique<ExponentialBackOffStrategy>(
+      RETRY_INITIAL_DELAY_MS, RETRY_MAX_DELAY_MS, MULTIPLIER);
 }
 
 GrpcMuxImpl::~GrpcMuxImpl() {
@@ -29,7 +31,7 @@ GrpcMuxImpl::~GrpcMuxImpl() {
 void GrpcMuxImpl::start() { establishNewStream(); }
 
 void GrpcMuxImpl::setRetryTimer() {
-  retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS));
+  retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_ptr_->nextBackOffMs()));
 }
 
 void GrpcMuxImpl::establishNewStream() {
@@ -156,6 +158,9 @@ void GrpcMuxImpl::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
 }
 
 void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
+  // Reset here so that it starts with fresh backoff interval on next disconnect.
+  backoff_strategy_ptr_->reset();
+
   const std::string& type_url = message->type_url();
   ENVOY_LOG(debug, "Received gRPC message for {} at version {}", type_url, message->version_info());
   if (api_state_.count(type_url) == 0) {

@@ -14,6 +14,7 @@ namespace RequestInfo {
 class ResponseFlagUtils {
 public:
   static const std::string toShortString(const RequestInfo& request_info);
+  static absl::optional<ResponseFlag> toResponseFlag(const std::string& response_flag);
 
 private:
   ResponseFlagUtils();

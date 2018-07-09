@@ -1,4 +1,4 @@
-#include "extensions/filters/network/thrift_proxy/protocol.h"
+#include "extensions/filters/network/thrift_proxy/protocol_impl.h"
 
 #include <algorithm>
 
@@ -8,9 +8,9 @@
 #include "common/common/byte_order.h"
 #include "common/common/macros.h"
 
-#include "extensions/filters/network/thrift_proxy/binary_protocol.h"
+#include "extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
 #include "extensions/filters/network/thrift_proxy/buffer_helper.h"
-#include "extensions/filters/network/thrift_proxy/compact_protocol.h"
+#include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
 
 namespace Envoy {
 namespace Extensions {
