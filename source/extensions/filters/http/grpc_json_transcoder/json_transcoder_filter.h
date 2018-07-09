@@ -7,6 +7,7 @@
 #include "envoy/json/json_object.h"
 
 #include "common/common/logger.h"
+#include "common/grpc/codec.h"
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/filters/http/grpc_json_transcoder/transcoder_input_stream_impl.h"
@@ -117,7 +118,7 @@ public:
 
 private:
   bool readToBuffer(Protobuf::io::ZeroCopyInputStream& stream, Buffer::Instance& data);
-  void buildResponseFromHttpBodyOutput(Http::HeaderMap& response_headers, Buffer::Instance& data);
+  bool buildResponseFromHttpBodyOutput(Http::HeaderMap& response_headers, Buffer::Instance& data);
   bool hasHttpBodyAsOutputType();
 
   JsonTranscoderConfig& config_;
@@ -128,8 +129,10 @@ private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};
   const Protobuf::MethodDescriptor* method_{nullptr};
   Http::HeaderMap* response_headers_{nullptr};
+  Grpc::Decoder decoder_;
 
   bool error_{false};
+  bool has_http_body_output_{false};
 };
 
 } // namespace GrpcJsonTranscoder

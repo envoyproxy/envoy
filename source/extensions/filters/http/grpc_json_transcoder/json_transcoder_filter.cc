@@ -11,7 +11,6 @@
 #include "common/grpc/common.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
-#include "common/json/json_loader.h"
 #include "common/protobuf/protobuf.h"
 
 #include "google/api/annotations.pb.h"
@@ -225,6 +224,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
     // just pass-through the request to upstream.
     return Http::FilterHeadersStatus::Continue;
   }
+  has_http_body_output_ = hasHttpBodyAsOutputType();
 
   headers.removeContentLength();
   headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Grpc);
@@ -343,6 +343,10 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
     return Http::FilterDataStatus::Continue;
   }
 
+  if (has_http_body_output_ && buildResponseFromHttpBodyOutput(*response_headers_, data)) {
+    return Http::FilterDataStatus::StopIterationAndBuffer;
+  }
+
   response_in_.move(data);
 
   if (end_stream) {
@@ -352,13 +356,10 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
   readToBuffer(*transcoder_->ResponseOutput(), data);
 
   if (!method_->server_streaming() && !end_stream) {
-    if (hasHttpBodyAsOutputType()) {
-      // Set content-type and data from HttpBody.
-      buildResponseFromHttpBodyOutput(*response_headers_, data);
-    }
     // Buffer until the response is complete.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
+  // TODO(dio): Add support for streaming case.
   // TODO(lizan): Check ResponseStatus
 
   return Http::FilterDataStatus::Continue;
@@ -422,21 +423,27 @@ bool JsonTranscoderFilter::readToBuffer(Protobuf::io::ZeroCopyInputStream& strea
   return false;
 }
 
-void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& response_headers,
+bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& response_headers,
                                                            Buffer::Instance& data) {
-  try {
-    const Json::ObjectSharedPtr http_body = Json::Factory::loadFromString(data.toString());
-    const std::string decoded_body = Base64::decode(http_body->getString("data"));
-
-    data.drain(data.length());
-    data.add(decoded_body);
-
-    response_headers.insertContentType().value(http_body->getString("contentType"));
-    response_headers.insertContentLength().value(decoded_body.size());
-  } catch (const Json::Exception& e) {
-    ENVOY_LOG(debug, "Failed to parse output of '{}'. e.what(): {}", method_->full_name(),
-              e.what());
+  std::vector<Grpc::Frame> frames;
+  decoder_.decode(data, frames);
+  if (frames.empty()) {
+    return true;
   }
+
+  google::api::HttpBody http_body;
+  for (auto& frame : frames) {
+    if (frame.length_ > 0) {
+      Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
+      http_body.ParseFromZeroCopyStream(&stream);
+      const auto& body = http_body.data();
+      data.add(body);
+      response_headers.insertContentType().value(http_body.content_type());
+      response_headers.insertContentLength().value(body.length());
+      return true;
+    }
+  }
+  return false;
 }
 
 bool JsonTranscoderFilter::hasHttpBodyAsOutputType() {
