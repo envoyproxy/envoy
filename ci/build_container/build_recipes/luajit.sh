@@ -4,7 +4,7 @@ set -e
 
 VERSION=2.0.5
 
-wget -O LuaJIT-"$VERSION".tar.gz https://github.com/LuaJIT/LuaJIT/archive/v"$VERSION".tar.gz
+curl https://github.com/LuaJIT/LuaJIT/archive/v"$VERSION".tar.gz -sLo LuaJIT-"$VERSION".tar.gz
 tar xf LuaJIT-"$VERSION".tar.gz
 cd LuaJIT-"$VERSION"
 
