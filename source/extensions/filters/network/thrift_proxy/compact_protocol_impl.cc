@@ -1,5 +1,7 @@
 #include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
 
+#include <limits>
+
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
@@ -140,7 +142,7 @@ bool CompactProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& 
       return false;
     }
 
-    if (id < 0 || id > INT16_MAX) {
+    if (id < 0 || id > std::numeric_limits<int16_t>::max()) {
       throw EnvoyException(fmt::format("invalid compact protocol field id {}", id));
     }
 
@@ -299,7 +301,7 @@ bool CompactProtocolImpl::readInt16(Buffer::Instance& buffer, int16_t& value) {
     return false;
   }
 
-  if (i < INT16_MIN || i > INT16_MAX) {
+  if (i < std::numeric_limits<int16_t>::min() || i > std::numeric_limits<int16_t>::max()) {
     throw EnvoyException(fmt::format("compact protocol i16 exceeds allowable range {}", i));
   }
 
@@ -471,7 +473,7 @@ void CompactProtocolImpl::writeFieldEnd(Buffer::Instance& buffer) {
 
 void CompactProtocolImpl::writeMapBegin(Buffer::Instance& buffer, FieldType key_type,
                                         FieldType value_type, uint32_t size) {
-  if (size > INT32_MAX) {
+  if (size > std::numeric_limits<int32_t>::max()) {
     throw EnvoyException(fmt::format("illegal compact protocol map size {}", size));
   }
 
@@ -490,7 +492,7 @@ void CompactProtocolImpl::writeMapEnd(Buffer::Instance& buffer) { UNREFERENCED_P
 
 void CompactProtocolImpl::writeListBegin(Buffer::Instance& buffer, FieldType elem_type,
                                          uint32_t size) {
-  if (size > INT32_MAX) {
+  if (size > std::numeric_limits<int32_t>::max()) {
     throw EnvoyException(fmt::format("illegal compact protocol list/set size {}", size));
   }
 
