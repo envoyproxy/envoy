@@ -32,8 +32,6 @@ public:
     return ServerContextSharedPtr{createSslServerContext_(scope, config, server_names)};
   }
 
-  MOCK_METHOD1(removeContext, void(Context*));
-
   MOCK_METHOD2(createSslClientContext_,
                ClientContext*(Stats::Scope& scope, const ClientContextConfig& config));
   MOCK_METHOD3(createSslServerContext_,

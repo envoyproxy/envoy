@@ -11,7 +11,7 @@ namespace Ssl {
 
 ContextManagerImpl::~ContextManagerImpl() { ASSERT(contexts_.empty()); }
 
-void ContextManagerImpl::removeContext(Context* context) {
+void ContextManagerImpl::releaseContext(Context* context) {
   std::unique_lock<std::shared_timed_mutex> lock(contexts_lock_);
 
   // context may not be found, in the case that a subclass of Context throws

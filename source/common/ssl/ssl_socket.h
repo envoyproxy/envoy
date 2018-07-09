@@ -71,7 +71,6 @@ class ClientSslSocketFactory : public Network::TransportSocketFactory {
 public:
   ClientSslSocketFactory(const ClientContextConfig& config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope);
-  ~ClientSslSocketFactory();
 
   Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
@@ -85,7 +84,6 @@ class ServerSslSocketFactory : public Network::TransportSocketFactory {
 public:
   ServerSslSocketFactory(const ServerContextConfig& config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope, const std::vector<std::string>& server_names);
-  ~ServerSslSocketFactory();
 
   Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;

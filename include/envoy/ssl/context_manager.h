@@ -30,11 +30,6 @@ public:
                          const std::vector<std::string>& server_names) PURE;
 
   /**
-   * Remove a context from the manager.
-   */
-  virtual void removeContext(Context* context) PURE;
-
-  /**
    * @return the number of days until the next certificate being managed will expire.
    */
   virtual size_t daysUntilFirstCertExpires() const PURE;

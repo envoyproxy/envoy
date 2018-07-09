@@ -27,7 +27,7 @@ public:
    * admin purposes. When a caller frees a context it will tell us to release it also from the list
    * of contexts.
    */
-  void removeContext(Context* context) override;
+  void releaseContext(Context* context);
 
   // Ssl::ContextManager
   Ssl::ClientContextSharedPtr createSslClientContext(Stats::Scope& scope,
