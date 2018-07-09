@@ -1146,7 +1146,7 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
   {
     InSequence s;
 
-    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _)).WillOnce(Return(cluster1));
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, _)).WillOnce(Return(cluster1));
     EXPECT_CALL(health_checker, addHostCheckCompleteCb(_));
     EXPECT_CALL(outlier_detector, addChangedStateCb(_));
     EXPECT_CALL(*cluster1, initialize(_))
