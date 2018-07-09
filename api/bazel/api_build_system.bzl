@@ -1,23 +1,22 @@
 load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 load("@com_lyft_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
-load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library", "go_grpc_library")
+load("@io_bazel_rules_go//proto:def.bzl", "go_grpc_library", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
 
-_PY_SUFFIX="_py"
-_CC_SUFFIX="_cc"
-_GO_PROTO_SUFFIX="_go_proto"
-_GO_GRPC_SUFFIX="_go_grpc"
-_GO_IMPORTPATH_PREFIX="github.com/envoyproxy/data-plane-api/api/"
+_PY_SUFFIX = "_py"
+_CC_SUFFIX = "_cc"
+_GO_PROTO_SUFFIX = "_go_proto"
+_GO_GRPC_SUFFIX = "_go_grpc"
+_GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/data-plane-api/api/"
 
 def _Suffix(d, suffix):
-  return d + suffix
+    return d + suffix
 
 def _LibrarySuffix(library_name, suffix):
-  # Transform //a/b/c to //a/b/c:c in preparation for suffix operation below.
-  if library_name.startswith("//") and ":" not in library_name:
-      library_name += ":" + Label(library_name).name
-  return _Suffix(library_name, suffix)
-
+    # Transform //a/b/c to //a/b/c:c in preparation for suffix operation below.
+    if library_name.startswith("//") and ":" not in library_name:
+        library_name += ":" + Label(library_name).name
+    return _Suffix(library_name, suffix)
 
 # TODO(htuch): has_services is currently ignored but will in future support
 # gRPC stub generation.
@@ -54,7 +53,7 @@ def api_go_proto_library(name, proto, deps = []):
             "@com_github_golang_protobuf//ptypes/any:go_default_library",
             "@com_lyft_protoc_gen_validate//validate:go_default_library",
             "@googleapis//:rpc_status_go_proto",
-        ]
+        ],
     )
 
 def api_go_grpc_library(name, proto, deps = []):
@@ -71,19 +70,18 @@ def api_go_grpc_library(name, proto, deps = []):
             "@com_github_golang_protobuf//ptypes/any:go_default_library",
             "@com_lyft_protoc_gen_validate//validate:go_default_library",
             "@googleapis//:http_api_go_proto",
-        ]
+        ],
     )
 
 # This is api_proto_library plus some logic internal to //envoy/api.
 def api_proto_library_internal(visibility = ["//visibility:private"], **kwargs):
     # //envoy/docs/build.sh needs visibility in order to generate documents.
     if visibility == ["//visibility:private"]:
-      visibility = ["//docs"]
+        visibility = ["//docs"]
     elif visibility != ["//visibility:public"]:
-      visibility = visibility + ["//docs"]
+        visibility = visibility + ["//docs"]
 
-    api_proto_library(visibility=visibility, **kwargs)
-
+    api_proto_library(visibility = visibility, **kwargs)
 
 # TODO(htuch): has_services is currently ignored but will in future support
 # gRPC stub generation.
@@ -115,6 +113,7 @@ def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], de
         ],
         visibility = visibility,
     )
+
     # Under the hood, this is just an extension of the Protobuf library's
     # bespoke cc_proto_library. It doesn't consume proto_library as a proto
     # provider. Hopefully one day we can move to a model where this target and
@@ -132,7 +131,7 @@ def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], de
         visibility = ["//visibility:public"],
     )
     if (require_py == 1):
-      api_py_proto_library(name, srcs, deps, has_services)
+        api_py_proto_library(name, srcs, deps, has_services)
 
 def api_cc_test(name, srcs, proto_deps):
     native.cc_test(
