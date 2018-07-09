@@ -29,6 +29,7 @@ message ClusterStatus {
   // :ref:`Cluster outlier detection <arch_overview_outlier_detection>` statistics
   //
   // Note: this field may be omitted in any of the three following cases:
+  //
   // 1. There were not enough hosts with enough request volume to proceed with success rate based
   //    outlier ejection.
   // 2. The threshold is computed to be < 0 because a negative value implies that there was no
