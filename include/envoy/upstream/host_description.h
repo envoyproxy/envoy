@@ -60,7 +60,7 @@ public:
   /**
    * @return the metadata associated with this host
    */
-  virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
+  virtual const std::shared_ptr<envoy::api::v2::core::Metadata> metadata() const PURE;
 
   /**
    * Set the current metadata.

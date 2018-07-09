@@ -7,6 +7,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -69,9 +70,9 @@ public:
         canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                                 Config::MetadataEnvoyLbKeys::get().CANARY)
                     .bool_value()),
-        metadata_(metadata), locality_(locality), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_),
-                                                                        POOL_GAUGE(stats_store_))} {
-  }
+        metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)),
+        locality_(locality), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_),
+                                                   POOL_GAUGE(stats_store_))} {}
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
@@ -79,9 +80,12 @@ public:
   // Upstream::HostDescription
   void canary(bool is_canary) override { canary_ = is_canary; }
 
-  const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
+  const std::shared_ptr<envoy::api::v2::core::Metadata> metadata() const override {
+    return metadata_;
+  }
   virtual void metadata(const envoy::api::v2::core::Metadata& new_metadata) override {
-    metadata_ = new_metadata;
+    std::unique_lock<std::shared_timed_mutex> lock(metadata_mutex_);
+    metadata_ = std::make_shared<envoy::api::v2::core::Metadata>(new_metadata);
   }
 
   const ClusterInfo& cluster() const override { return *cluster_; }
@@ -116,8 +120,9 @@ protected:
   const std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
-  bool canary_;
-  envoy::api::v2::core::Metadata metadata_;
+  std::atomic<bool> canary_;
+  std::shared_timed_mutex metadata_mutex_;
+  std::shared_ptr<envoy::api::v2::core::Metadata> metadata_;
   const envoy::api::v2::core::Locality locality_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;

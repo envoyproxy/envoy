@@ -742,9 +742,15 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
         // Did metadata change?
         const bool metadata_changed =
-            !Protobuf::util::MessageDifferencer::Equivalent(host->metadata(), (*i)->metadata());
+            !Protobuf::util::MessageDifferencer::Equivalent(*host->metadata(), *(*i)->metadata());
         if (metadata_changed) {
-          (*i)->metadata(host->metadata());
+          // First, update the entire metadata for the endpoint.
+          (*i)->metadata(*host->metadata());
+
+          // Also, given that the canary attribute of an endpoint is derived from its metadata
+          // (e.g.: from envoy.lb/canary), we do a blind update here since it's cheaper than testing
+          // to see if it actually changed. We must update this besides just updating the metadata,
+          // because it'll be used by the router filter to compute upstream stats.
           (*i)->canary(host->canary());
 
           // If metadata changed, we need to rebuild. See github issue #3810.

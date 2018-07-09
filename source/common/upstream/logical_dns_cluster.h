@@ -63,8 +63,9 @@ private:
     // Upstream:HostDescription
     bool canary() const override { return false; }
     void canary(bool) override {}
-    const envoy::api::v2::core::Metadata& metadata() const override {
-      return envoy::api::v2::core::Metadata::default_instance();
+    const std::shared_ptr<envoy::api::v2::core::Metadata> metadata() const override {
+      return std::make_shared<envoy::api::v2::core::Metadata>(
+          envoy::api::v2::core::Metadata::default_instance());
     }
     void metadata(const envoy::api::v2::core::Metadata&) override {}
 
