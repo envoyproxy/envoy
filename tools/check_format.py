@@ -184,18 +184,20 @@ def fixSourcePath(file_path):
     sys.stdout.write(fixSourceLine(line))
 
   error_messages = []
-  if not file_path.endswith(DOCS_SUFFIX) and not file_path.endswith(PROTO_SUFFIX):
-    error_messages += fixHeaderOrder(file_path)
+  if not file_path.endswith(DOCS_SUFFIX):
+    if not file_path.endswith(PROTO_SUFFIX):
+      error_messages += fixHeaderOrder(file_path)
     error_messages += clangFormat(file_path)
   return error_messages
 
 def checkSourcePath(file_path):
   error_messages = checkFileContents(file_path, checkSourceLine)
 
-  if not file_path.endswith(DOCS_SUFFIX) and not file_path.endswith(PROTO_SUFFIX):
-    error_messages += checkNamespace(file_path)
-    command = ("%s %s | diff %s -" % (HEADER_ORDER_PATH, file_path, file_path))
-    error_messages += executeCommand(command, "header_order.py check failed", file_path)
+  if not file_path.endswith(DOCS_SUFFIX):
+    if not file_path.endswith(PROTO_SUFFIX):
+      error_messages += checkNamespace(file_path)
+      command = ("%s %s | diff %s -" % (HEADER_ORDER_PATH, file_path, file_path))
+      error_messages += executeCommand(command, "header_order.py check failed", file_path)
     command = ("%s %s | diff %s -" % (CLANG_FORMAT_PATH, file_path, file_path))
     error_messages += executeCommand(command, "clang-format check failed", file_path)
 
