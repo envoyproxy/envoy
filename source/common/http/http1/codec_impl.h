@@ -46,6 +46,8 @@ public:
   void readDisable(bool disable) override;
   uint32_t bufferLimit() override;
 
+  void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
+
 protected:
   StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {}
 
@@ -71,6 +73,7 @@ private:
 
   bool chunk_encoding_{true};
   bool processing_100_continue_{false};
+  bool is_response_to_head_request_{false};
 };
 
 /**

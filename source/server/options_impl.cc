@@ -57,7 +57,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::ValueArg<std::string> config_yaml(
       "", "config-yaml", "Inline YAML configuration, merges with the contents of --config-path",
       false, "", "string", cmd);
-  TCLAP::SwitchArg v2_config_only("", "v2-config-only", "parse config as v2 only", cmd, false);
+  TCLAP::SwitchArg v2_config_only("", "v2-config-only", "parse config as v2 only", cmd, true);
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
                                                   false, "", "string", cmd);
   TCLAP::ValueArg<std::string> local_address_ip_version("", "local-address-ip-version",

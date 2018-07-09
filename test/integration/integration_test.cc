@@ -15,7 +15,10 @@
 
 #include "gtest/gtest.h"
 
+using testing::EndsWith;
+using testing::HasSubstr;
 using testing::MatchesRegex;
+using testing::Not;
 
 namespace Envoy {
 
@@ -204,6 +207,64 @@ TEST_P(IntegrationTest, MultipleContentLengths) { testMultipleContentLengths(); 
 TEST_P(IntegrationTest, OverlyLongHeaders) { testOverlyLongHeaders(); }
 
 TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
+
+TEST_P(IntegrationTest, TestHead) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestHeaderMapImpl head_request{{":method", "HEAD"},
+                                       {":path", "/test/long/url"},
+                                       {":scheme", "http"},
+                                       {":authority", "host"}};
+
+  // Without an explicit content length, assume we chunk for HTTP/1.1
+  auto response = sendRequestAndWaitForResponse(head_request, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_TRUE(response->headers().ContentLength() == nullptr);
+  ASSERT_TRUE(response->headers().TransferEncoding() != nullptr);
+  EXPECT_EQ(Http::Headers::get().TransferEncodingValues.Chunked,
+            response->headers().TransferEncoding()->value().c_str());
+  EXPECT_EQ(0, response->body().size());
+
+  // Preserve explicit content length.
+  Http::TestHeaderMapImpl content_length_response{{":status", "200"}, {"content-length", "12"}};
+  response = sendRequestAndWaitForResponse(head_request, 0, content_length_response, 0);
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  ASSERT_TRUE(response->headers().ContentLength() != nullptr);
+  EXPECT_STREQ(response->headers().ContentLength()->value().c_str(), "12");
+  EXPECT_TRUE(response->headers().TransferEncoding() == nullptr);
+  EXPECT_EQ(0, response->body().size());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// The Envoy HTTP/1.1 codec ASSERTs that T-E headers are cleared in
+// encodeHeaders, so to test upstreams explicitly sending T-E: chunked we have
+// to send raw HTTP.
+TEST_P(IntegrationTest, TestHeadWithExplicitTE) {
+  initialize();
+
+  auto tcp_client = makeTcpConnection(lookupPort("http"));
+  tcp_client->write("HEAD / HTTP/1.1\r\nHost: host\r\n\r\n");
+  auto fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  fake_upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("\r\n\r\n"));
+
+  fake_upstream_connection->write("HTTP/1.1 200 OK\r\nTransfer-encoding: chunked\r\n\r\n");
+  tcp_client->waitForData("\r\n\r\n", false);
+  std::string response = tcp_client->data();
+
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+  EXPECT_THAT(response, Not(HasSubstr("content-length")));
+  EXPECT_THAT(response, HasSubstr("transfer-encoding: chunked\r\n"));
+  EXPECT_THAT(response, EndsWith("\r\n\r\n"));
+
+  fake_upstream_connection->close();
+  fake_upstream_connection->waitForDisconnect();
+  tcp_client->close();
+}
 
 TEST_P(IntegrationTest, TestBind) {
   std::string address_string;

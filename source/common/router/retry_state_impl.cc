@@ -76,6 +76,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
 RetryStateImpl::~RetryStateImpl() { resetRetry(); }
 
 void RetryStateImpl::enableBackoffTimer() {
+  // TODO(ramaraochavali): Implement JitteredExponentialBackOff and refactor this.
   // We use a fully jittered exponential backoff algorithm.
   current_retry_++;
   uint32_t multiplier = (1 << current_retry_) - 1;
