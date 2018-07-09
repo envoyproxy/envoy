@@ -144,7 +144,7 @@ void Filter::onRead() {
   // platforms.
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   ssize_t n = os_syscalls.recv(cb_->socket().fd(), buf_, config_->maxClientHelloSize(), MSG_PEEK);
-  int error = errno; // Latch errno right after the recv call.
+  const int error = errno; // Latch errno right after the recv call.
   ENVOY_LOG(trace, "tls inspector: recv: {}", n);
 
   if (n == -1 && error == EAGAIN) {

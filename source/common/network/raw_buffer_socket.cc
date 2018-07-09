@@ -18,7 +18,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   do {
     // 16K read is arbitrary. TODO(mattklein123) PERF: Tune the read size.
     int rc = buffer.read(callbacks_->fd(), 16384);
-    int error = errno; // Latch errno before any logging calls can overwrite it.
+    const int error = errno; // Latch errno before any logging calls can overwrite it.
     ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), rc);
 
     if (rc == 0) {
@@ -61,7 +61,7 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
       break;
     }
     int rc = buffer.write(callbacks_->fd());
-    int error = errno; // Latch errno before any logging calls can overwrite it.
+    const int error = errno; // Latch errno before any logging calls can overwrite it.
     ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), rc);
     if (rc == -1) {
       ENVOY_CONN_LOG(trace, "write error: {} ({})", callbacks_->connection(), error,
