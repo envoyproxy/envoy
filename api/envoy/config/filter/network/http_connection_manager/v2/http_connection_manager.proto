@@ -276,7 +276,7 @@ message HttpConnectionManager {
   //    added in the future if needed.
   //
   // .. warning::
-  //    The current iplementation of upgrade headers does not work with HTTP/2
+  //    The current implementation of upgrade headers does not work with HTTP/2
   //    upstreams.
   message UpgradeConfig {
     // The case-insensitive name of this upgrade, e.g. "websocket".

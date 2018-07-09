@@ -348,6 +348,8 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
   ENVOY_CONN_LOG(trace, "parsed {} bytes", connection_, total_parsed);
   data.drain(total_parsed);
 
+  // If an upgrade has been handled and there is body data or early upgrade
+  // payload to send on, send it on.
   maybeDirectDispatch(data);
 }
 
