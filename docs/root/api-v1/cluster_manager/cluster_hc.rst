@@ -80,6 +80,9 @@ interval_jitter_percent
   interval. If specified, during every interval Envoy will add 0 to
   *interval_jitter_percent / 100 x interval_ms* milliseconds to the wait time.
 
+  If interval_jitter_ms and interval_jitter_percent are both set, both of them
+  will be used to increase the wait time.
+
 .. _config_cluster_manager_cluster_hc_service_name:
 
 service_name
