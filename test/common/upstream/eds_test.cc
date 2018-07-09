@@ -168,6 +168,9 @@ TEST_F(EdsTest, EndpointMetadata) {
                                          Config::MetadataFilters::get().ENVOY_LB,
                                          Config::MetadataEnvoyLbKeys::get().CANARY)
       .set_bool_value(true);
+  Config::Metadata::mutableMetadataValue(*canary->mutable_metadata(),
+                                         Config::MetadataFilters::get().ENVOY_LB, "version")
+      .set_string_value("v1");
 
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });
@@ -197,10 +200,47 @@ TEST_F(EdsTest, EndpointMetadata) {
                                               Config::MetadataEnvoyLbKeys::get().CANARY)
                   .bool_value());
   EXPECT_TRUE(hosts[1]->canary());
+  EXPECT_EQ(Config::Metadata::metadataValue(hosts[1]->metadata(),
+                                            Config::MetadataFilters::get().ENVOY_LB, "version")
+                .string_value(),
+            "v1");
 
   // We don't rebuild with the exact same config.
   VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
   EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+
+  // Remove endpoint, if we don't the Metadata isn't updated.
+  {
+    Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+    auto* cluster_load_assignment = resources.Add();
+    cluster_load_assignment->set_cluster_name("fare");
+    auto* endpoints = cluster_load_assignment->add_endpoints();
+
+    auto* endpoint = endpoints->add_lb_endpoints();
+    endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
+        "1.2.3.4");
+    endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+    Config::Metadata::mutableMetadataValue(*endpoint->mutable_metadata(),
+                                           Config::MetadataFilters::get().ENVOY_LB, "string_key")
+        .set_string_value("string_value");
+    Config::Metadata::mutableMetadataValue(*endpoint->mutable_metadata(), "custom_namespace",
+                                           "num_key")
+        .set_number_value(1.1);
+
+    VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
+  }
+
+  // New resources with Metadata updated.
+  Config::Metadata::mutableMetadataValue(*canary->mutable_metadata(),
+                                         Config::MetadataFilters::get().ENVOY_LB, "version")
+      .set_string_value("v2");
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
+  auto& nhosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+  EXPECT_EQ(nhosts.size(), 2);
+  EXPECT_EQ(Config::Metadata::metadataValue(nhosts[1]->metadata(),
+                                            Config::MetadataFilters::get().ENVOY_LB, "version")
+                .string_value(),
+            "v2");
 }
 
 // Validate that onConfigUpdate() updates endpoint health status.

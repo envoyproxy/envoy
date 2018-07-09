@@ -554,6 +554,38 @@ TEST_P(SubsetLoadBalancerTest, UpdateFailover) {
   EXPECT_FALSE(nullptr == lb_->chooseHost(&context_10).get());
 }
 
+TEST_P(SubsetLoadBalancerTest, UpdateMetadata) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+
+  std::vector<std::set<std::string>> subset_keys = {{"version"}};
+  EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
+
+  // Add hosts initial hosts.
+  init({{"tcp://127.0.0.1:8000", {{"version", "1.2"}}},
+        {"tcp://127.0.0.1:8001", {{"version", "1.0"}}}});
+  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(2U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+
+  // Update the metadata for each host. Subsets should be removed.
+  HostSharedPtr host_v12 = host_set_.hosts_[0];
+  HostSharedPtr host_v10 = host_set_.hosts_[1];
+
+  modifyHosts({makeHost("tcp://127.0.0.1:8000", {{"version", "1.3"}}),
+               makeHost("tcp://127.0.0.1:8001", {{"version", "1.2"}})},
+              {host_v12, host_v10});
+  if (GetParam() != REMOVES_FIRST) {
+    EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+    EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+    EXPECT_EQ(1U, stats_.lb_subsets_removed_.value());
+  } else {
+    EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+    EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+    EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
+  }
+}
+
 TEST_P(SubsetLoadBalancerTest, UpdateRemovingLastSubsetHost) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
