@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 
+#include "envoy/data/core/v2alpha/health_check_event.pb.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
@@ -58,6 +59,37 @@ typedef std::shared_ptr<HealthChecker> HealthCheckerSharedPtr;
 
 std::ostream& operator<<(std::ostream& out, HealthState state);
 std::ostream& operator<<(std::ostream& out, HealthTransition changed_state);
+
+/**
+ * Sink for health check event logs.
+ */
+class HealthCheckEventLogger {
+public:
+  virtual ~HealthCheckEventLogger() {}
+
+  /**
+   * Log an unhealthy host ejection event.
+   * @param health_checker_type supplies the type of health checker that generated the event.
+   * @param host supplies the host that generated the event.
+   * @param failure_type supplies the type of health check failure
+   */
+  virtual void
+  logEjectUnhealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+                    const HostDescriptionConstSharedPtr& host,
+                    envoy::data::core::v2alpha::HealthCheckFailureType failure_type) PURE;
+
+  /**
+   * Log a healthy host addition event.
+   * @param health_checker_type supplies the type of health checker that generated the event.
+   * @param host supplies the host that generated the event.
+   * @param healthy_threshold supplied the configured healthy threshold for this health check
+   * @param first_check whether this is a fast path success on the first health check for this host
+   */
+  virtual void logAddHealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+                             const HostDescriptionConstSharedPtr& host, bool first_check) PURE;
+};
+
+typedef std::unique_ptr<HealthCheckEventLogger> HealthCheckEventLoggerPtr;
 
 } // namespace Upstream
 } // namespace Envoy

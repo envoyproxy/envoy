@@ -101,10 +101,12 @@ public:
   /**
    * Prefix a given path with the Unix Domain Socket temporary directory.
    * @param path path suffix.
+   * @param abstract_namespace true if an abstract namespace should be returned.
    * @return std::string path qualified with the Unix Domain Socket temporary directory.
    */
-  static std::string unixDomainSocketPath(const std::string& path) {
-    return unixDomainSocketDirectory() + "/" + path;
+  static std::string unixDomainSocketPath(const std::string& path,
+                                          bool abstract_namespace = false) {
+    return (abstract_namespace ? "@" : "") + unixDomainSocketDirectory() + "/" + path;
   }
 
   /**

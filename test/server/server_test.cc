@@ -123,7 +123,7 @@ protected:
         bootstrap_path,
         {{"health_check_timeout", fmt::format("{}", timeout).c_str()},
          {"health_check_interval", fmt::format("{}", interval).c_str()}},
-        {}, version_);
+        TestEnvironment::PortMap{}, version_);
     server_.reset(new InstanceImpl(
         options_,
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),

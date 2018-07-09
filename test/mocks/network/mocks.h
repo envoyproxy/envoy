@@ -78,6 +78,7 @@ public:
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
+  MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
@@ -117,6 +118,7 @@ public:
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
+  MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));

@@ -263,7 +263,7 @@ TEST(HttpConnManFinalizerImpl, SpanPopulatedFailureResponse) {
   absl::optional<uint32_t> response_code(503);
   EXPECT_CALL(request_info, responseCode()).WillRepeatedly(ReturnPointee(&response_code));
   EXPECT_CALL(request_info, bytesSent()).WillOnce(Return(100));
-  ON_CALL(request_info, getResponseFlag(RequestInfo::ResponseFlag::UpstreamRequestTimeout))
+  ON_CALL(request_info, hasResponseFlag(RequestInfo::ResponseFlag::UpstreamRequestTimeout))
       .WillByDefault(Return(true));
   EXPECT_CALL(request_info, upstreamHost()).WillOnce(Return(nullptr));
 

@@ -187,6 +187,11 @@ public:
   virtual const Ssl::Connection* ssl() const PURE;
 
   /**
+   * @return requested server name (e.g. SNI in TLS), if any.
+   */
+  virtual absl::string_view requestedServerName() const PURE;
+
+  /**
    * @return State the current state of the connection.
    */
   virtual State state() const PURE;

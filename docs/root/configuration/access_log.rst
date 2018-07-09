@@ -102,6 +102,8 @@ The following command operators are supported:
   TCP
     Total duration in milliseconds of the downstream connection.
 
+.. _config_access_log_format_response_flags:
+
 %RESPONSE_FLAGS%
   Additional details about the response or connection, if any. For TCP connections, the response codes mentioned in
   the descriptions do not apply. Possible values are:

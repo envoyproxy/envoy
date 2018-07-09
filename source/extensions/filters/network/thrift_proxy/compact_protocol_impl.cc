@@ -1,4 +1,4 @@
-#include "extensions/filters/network/thrift_proxy/compact_protocol.h"
+#include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
 
 #include "envoy/common/exception.h"
 

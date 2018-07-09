@@ -36,8 +36,8 @@ envoy_extension_cc_test_library(
 )
 
 envoy_extension_cc_test(
-    name = "binary_protocol_test",
-    srcs = ["binary_protocol_test.cc"],
+    name = "binary_protocol_impl_test",
+    srcs = ["binary_protocol_impl_test.cc"],
     extension_name = "envoy.filters.network.thrift_proxy",
     deps = [
         ":mocks",
@@ -61,8 +61,8 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "compact_protocol_test",
-    srcs = ["compact_protocol_test.cc"],
+    name = "compact_protocol_impl_test",
+    srcs = ["compact_protocol_impl_test.cc"],
     extension_name = "envoy.filters.network.thrift_proxy",
     deps = [
         ":mocks",
@@ -110,8 +110,21 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "protocol_test",
-    srcs = ["protocol_test.cc"],
+    name = "framed_transport_impl_test",
+    srcs = ["framed_transport_impl_test.cc"],
+    extension_name = "envoy.filters.network.thrift_proxy",
+    deps = [
+        ":mocks",
+        ":utility_lib",
+        "//source/extensions/filters/network/thrift_proxy:transport_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "protocol_impl_test",
+    srcs = ["protocol_impl_test.cc"],
     extension_name = "envoy.filters.network.thrift_proxy",
     deps = [
         ":mocks",
@@ -123,8 +136,21 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "transport_test",
-    srcs = ["transport_test.cc"],
+    name = "transport_impl_test",
+    srcs = ["transport_impl_test.cc"],
+    extension_name = "envoy.filters.network.thrift_proxy",
+    deps = [
+        ":mocks",
+        ":utility_lib",
+        "//source/extensions/filters/network/thrift_proxy:transport_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "unframed_transport_impl_test",
+    srcs = ["unframed_transport_impl_test.cc"],
     extension_name = "envoy.filters.network.thrift_proxy",
     deps = [
         ":mocks",
