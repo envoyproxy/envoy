@@ -888,37 +888,24 @@ message RateLimit {
 //       "name": ":method",
 //       "value": "POST"
 //     }
+//
+// .. attention::
+//   In the absence of any header match specifier, match will default to :ref:`present_match
+//   <envoy_api_field_route.HeaderMatcher.present_match>`. i.e, a request that has the :ref:`name
+//   <envoy_api_field_route.HeaderMatcher.name>` header will match, regardless of the header's
+//   value.
+//
 message HeaderMatcher {
   // Specifies the name of the header in the request.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
-  // Specifies the value of the header. If the value is absent a request that
-  // has the name header will match, regardless of the header’s value.
-  //
-  // .. attention::
-  //   Deprecated. Use :ref:`exact_match <envoy_api_field_route.HeaderMatcher.exact_match>` instead.
-  string value = 2 [deprecated = true];
+  reserved 2; // value deprecated by :ref:`exact_match
+              // <envoy_api_field_route.HeaderMatcher.exact_match>`
 
-  // Specifies whether the header value is a regular
-  // expression or not. Defaults to false. The entire request header value must match the regex. The
-  // rule will not match if only a subsequence of the request header value matches the regex. The
-  // regex grammar used in the value field is defined
-  // `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
-  //
-  // Examples:
-  //
-  // * The regex *\d{3}* matches the value *123*
-  // * The regex *\d{3}* does not match the value *1234*
-  // * The regex *\d{3}* does not match the value *123.456*
-  //
-  // .. attention::
-  //   Deprecated. Use :ref:`regex_match <envoy_api_field_route.HeaderMatcher.regex_match>` instead.
-  google.protobuf.BoolValue regex = 3 [deprecated = true];
+  reserved 3; // regex deprecated by :ref:`regex_match
+              // <envoy_api_field_route.HeaderMatcher.regex_match>`
 
   // Specifies how the header match will be performed to route the request.
-  // If header_match_specifier is absent, a request that has the
-  // :ref:`envoy_api_msg_route.HeaderMatcher.name` header will match, regardless of the header's
-  // value.
   oneof header_match_specifier {
     // If specified, header match will be performed based on the value of the header.
     string exact_match = 4;
