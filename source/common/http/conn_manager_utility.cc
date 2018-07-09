@@ -319,6 +319,9 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
     response_headers.insertRequestId().value(*request_headers.RequestId());
   }
 
+  response_headers.removeKeepAlive();
+  response_headers.removeProxyConnection();
+
   if (!via.empty()) {
     Utility::appendVia(response_headers, via);
   }
