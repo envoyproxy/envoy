@@ -685,7 +685,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
                                                    HostVector& hosts_removed) {
   uint64_t max_host_weight = 1;
 
-  // Did hosts changed?
+  // Did hosts change?
   //
   // Has the EDS health status changed the health of any endpoint? If so, we
   // rebuild the hosts vectors. We only do this if the health status of an
