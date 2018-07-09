@@ -13,6 +13,7 @@ CLUSTER_BLOB = {
         "timeout_ms": 2000,
         "interval_ms": 10000,
         "interval_jitter_ms": 10000,
+        "interval_jitter_percent": 100,
         "unhealthy_threshold": 2,
         "healthy_threshold": 2,
         "path": "/healthcheck",

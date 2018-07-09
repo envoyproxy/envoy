@@ -1403,6 +1403,11 @@ const std::string Json::Schema::CLUSTER_HEALTH_CHECK_SCHEMA(R"EOF(
         "minimum" : 0,
         "exclusiveMinimum" : true
       },
+      "interval_jitter_percent" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
       "reuse_connection" : {"type" : "boolean"},
       "service_name" : {"type" : "string"},
       "redis_key" : {"type" : "string"}

@@ -22,6 +22,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       event_logger_(std::move(event_logger)), interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
       no_traffic_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, no_traffic_interval, 60000)),
       interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)),
+      interval_jitter_percent_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, interval_jitter_percent, 0)),
       unhealthy_interval_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, unhealthy_interval, interval_.count())),
       unhealthy_edge_interval_(
@@ -87,6 +88,10 @@ std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
 
   if (interval_jitter_.count() > 0) {
     base_time_ms += (random_.random() % interval_jitter_.count());
+  }
+
+  if (interval_jitter_percent_ > 0) {
+    base_time_ms += (random_.random() * interval_jitter_percent_ / 100.0 * interval_.count());
   }
 
   uint64_t min_interval = runtime_.snapshot().getInteger("health_check.min_interval", 0);

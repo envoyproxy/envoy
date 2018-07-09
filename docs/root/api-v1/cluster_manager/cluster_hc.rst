@@ -73,7 +73,12 @@ receive
 
 interval_jitter_ms
   *(optional, integer)* An optional jitter amount in millseconds. If specified, during every
-  internal Envoy will add 0 to *interval_jitter_ms* milliseconds to the wait time.
+  interval Envoy will add 0 to *interval_jitter_ms* milliseconds to the wait time.
+
+interval_jitter_percent
+  *(optional, integer)* An optional jitter amount, as a percentage of the
+  interval. If specified, during every interval Envoy will add 0 to
+  *interval_jitter_percent / 100 x interval_ms* milliseconds to the wait time.
 
 .. _config_cluster_manager_cluster_hc_service_name:
 
