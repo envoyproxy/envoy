@@ -1,4 +1,4 @@
 echo "Start"
 @ECHO OFF
-bash -c "./repositories.sh  %*"
+%BAZEL_SH% -c "./repositories.sh  %*"
 exit %ERRORLEVEL%
