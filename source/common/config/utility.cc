@@ -87,13 +87,12 @@ void Utility::checkApiConfigSourceNames(
   const bool is_grpc =
       (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
 
-  if (api_config_source.cluster_names().size() == 0 &&
-      api_config_source.grpc_services().size() == 0) {
-    throw EnvoyException("API configs must have either a gRPC service or a cluster name defined");
-  }
+  if (api_config_source.cluster_names().empty() && api_config_source.grpc_services().empty()) {
+      throw EnvoyException("API configs must have either a gRPC service or a cluster name defined");
+    }
 
   if (is_grpc) {
-    if (api_config_source.cluster_names().size() != 0) {
+    if (!api_config_source.cluster_names().empty()) {
       throw EnvoyException(
           "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified.");
     }
@@ -102,7 +101,7 @@ void Utility::checkApiConfigSourceNames(
           "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
     }
   } else {
-    if (api_config_source.grpc_services().size() != 0) {
+    if (!api_config_source.grpc_services().empty()) {
       throw EnvoyException("envoy::api::v2::core::ConfigSource, if not of type gRPC, must not have "
                            "a gRPC service specified");
     }
