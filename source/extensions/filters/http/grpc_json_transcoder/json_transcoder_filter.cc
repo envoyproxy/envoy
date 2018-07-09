@@ -4,7 +4,6 @@
 #include "envoy/http/filter.h"
 
 #include "common/common/assert.h"
-#include "common/common/base64.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"
 #include "common/filesystem/filesystem_impl.h"
