@@ -22,7 +22,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(const Cluster& cluster,
       event_logger_(std::move(event_logger)), interval_(PROTOBUF_GET_MS_REQUIRED(config, interval)),
       no_traffic_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, no_traffic_interval, 60000)),
       interval_jitter_(PROTOBUF_GET_MS_OR_DEFAULT(config, interval_jitter, 0)),
-      interval_jitter_percent_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, interval_jitter_percent, 0)),
+      interval_jitter_percent_(config.interval_jitter_percent()),
       unhealthy_interval_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, unhealthy_interval, interval_.count())),
       unhealthy_edge_interval_(
