@@ -21,7 +21,7 @@ fi
 cmake -G "$cmake_generator" ../benchmark \
   -DCMAKE_BUILD_TYPE=RELEASE \
   -DBENCHMARK_ENABLE_GTEST_TESTS=OFF
-$make_cmd
+"$make_cmd"
 cp "src/$benchmark_lib" "$THIRDPARTY_BUILD"/lib
 cd ../benchmark
 

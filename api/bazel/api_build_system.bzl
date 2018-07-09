@@ -5,6 +5,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_test")
 
 _PY_SUFFIX="_py"
 _CC_SUFFIX="_cc"
+_CC_NATIVE_SUFFIX="_cc_native"
 _GO_PROTO_SUFFIX="_go_proto"
 _GO_GRPC_SUFFIX="_go_grpc"
 _GO_IMPORTPATH_PREFIX="github.com/envoyproxy/data-plane-api/api/"
@@ -133,9 +134,9 @@ def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], de
     )
 
     native.cc_proto_library(
-        name = _Suffix(name, _CC_SUFFIX) + "_native",
+        name = _Suffix(name, _CC_NATIVE_SUFFIX),
         deps = [name],
-        tags=["manual"],
+        tags = ["manual"],
         visibility = ["//visibility:public"],
     )
 
