@@ -1,14 +1,23 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
+#include "envoy/upstream/upstream.h"
 
+#include "common/config/metadata.h"
 #include "common/config/resources.h"
+#include "common/json/config_schemas.h"
+#include "common/json/json_loader.h"
+#include "common/network/utility.h"
+#include "common/protobuf/utility.h"
+#include "common/upstream/health_checker_impl.h"
+#include "common/upstream/health_discovery_service.h"
 
+#include "test/common/upstream/utility.h"
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
-#include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -47,7 +56,8 @@ public:
     });
     HttpIntegrationTest::initialize();
     hds_upstream_ = fake_upstreams_[0].get();
-    for (uint32_t i = 0; i < upstream_endpoints_; ++i) {
+    host_upstream_ = new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_);
+    for (uint32_t i = 0; i < upstream_endpoints_ - 2; ++i) {
       service_upstream_[i] = fake_upstreams_[i + 1].get();
     }
   }
@@ -88,22 +98,42 @@ public:
   FakeHttpConnectionPtr fake_hds_connection_;
   FakeStreamPtr hds_stream_;
   FakeUpstream* hds_upstream_{};
+  FakeUpstream* host_upstream_{};
   FakeUpstream* service_upstream_[upstream_endpoints_]{};
   uint32_t hds_requests_{};
   EdsHelper eds_helper_;
+  FakeHttpConnectionPtr fake_fake_connection;
+  FakeStreamPtr fake_fake_stream;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, HdsIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
-// Test connectivity of Envoy and the Server
-TEST_P(HdsIntegrationTest, Simple) {
+// Test setup of Envoy, the Server, and a host
+TEST_P(HdsIntegrationTest, Setup) {
   initialize();
+
+  // Messages
   envoy::service::discovery::v2::HealthCheckRequest envoy_msg;
   envoy::service::discovery::v2::HealthCheckRequest envoy_msg_2;
+
+  // HealthCheckSpecifier
   envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier;
   server_health_check_specifier.mutable_interval()->set_nanos(500000000); // 500ms
+  auto* endpoint_address = server_health_check_specifier.add_health_check()
+                               ->add_endpoints()
+                               ->add_endpoints()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+  endpoint_address->set_address(Network::Test::getLoopbackAddressString(
+      version_)); // fake_upstreams_[2]->localAddress()->ip()->addressAsString());
+  endpoint_address->set_port_value(host_upstream_->localAddress()->ip()->port());
+
+  auto* anna = server_health_check_specifier.mutable_health_check(0)->mutable_endpoints(0);
+  anna->mutable_locality()->set_region("some_region");
+  anna->mutable_locality()->set_zone("some_zone");
+  anna->mutable_locality()->set_sub_zone("crete");
 
   // Server <--> Envoy
   fake_hds_connection_ = hds_upstream_->waitForHttpConnection(*dispatcher_);
@@ -113,18 +143,26 @@ TEST_P(HdsIntegrationTest, Simple) {
   EXPECT_EQ(0, test_server_->counter("hds_delegate.requests")->value());
   EXPECT_EQ(1, test_server_->counter("hds_delegate.responses")->value());
 
-  // Send a message to Envoy, and wait until it's received
+  // Server asks for healthchecking
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier);
-  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
-  // Wait for Envoy to reply
+  EXPECT_EQ(host_upstream_->httpType(), FakeHttpConnection::Type::HTTP1);
+  fake_fake_connection = host_upstream_->waitForHttpConnection(*dispatcher_);
+
+  test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
   hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_2);
+  fake_fake_stream = fake_fake_connection->waitForNewStream(*dispatcher_);
+  fake_fake_stream->waitForEndStream(*dispatcher_);
+  test_server_->waitForCounterGe("hds_delegate.responses", 2);
+
+  // Clean up connections
+  fake_fake_connection->close();
+  fake_fake_connection->waitForDisconnect();
+  cleanupHdsConnection();
 
   EXPECT_EQ(1, test_server_->counter("hds_delegate.requests")->value());
   EXPECT_EQ(2, test_server_->counter("hds_delegate.responses")->value());
-
-  cleanupHdsConnection();
 }
 
 } // namespace

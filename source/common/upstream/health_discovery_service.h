@@ -8,6 +8,8 @@
 
 #include "common/common/logger.h"
 #include "common/grpc/async_client_impl.h"
+#include "common/network/resolver_impl.h"
+#include "common/upstream/health_checker_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
@@ -35,7 +37,10 @@ class HdsDelegate
       Logger::Loggable<Logger::Id::upstream> {
 public:
   HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& scope,
-              Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher);
+              Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
+              Runtime::Loader& runtime, Envoy::Stats::Store& stats,
+              Ssl::ContextManager& ssl_context_manager, Secret::SecretManager& secret_manager,
+              Runtime::RandomGenerator& random);
 
   // Grpc::TypedAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
@@ -63,6 +68,12 @@ private:
   envoy::service::discovery::v2::HealthCheckRequest health_check_request_;
   std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier> health_check_message_;
   std::vector<std::string> clusters_;
+  Runtime::Loader& runtime_h;
+  Envoy::Stats::Store& store_stats;
+  Ssl::ContextManager& ssl_context_manager_;
+  Secret::SecretManager& secret_manager_;
+  Runtime::RandomGenerator& random_;
+  Event::Dispatcher& dispatcher_;
 };
 
 /**
@@ -87,13 +98,31 @@ public:
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
+  HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
+             const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
+             Ssl::ContextManager& ssl_context_manager, Secret::SecretManager& secret_manager,
+             bool added_via_api);
+  void reloadHealthyHosts();
+  const Network::Address::InstanceConstSharedPtr
+  resolveProtoAddress2(const envoy::api::v2::core::Address& address);
 
 protected:
-  HdsCluster();
   ClusterInfoConstSharedPtr info_;
   PrioritySetImpl priority_set_;
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
+  Runtime::Loader& runtime_;
+  static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
+  static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);
+  void onPreInitComplete();
+  void startPreInit();
+
+private:
+  std::function<void()> initialization_complete_callback_;
+  void finishInitialization();
+  bool initialization_started_{};
+  HostVectorSharedPtr initial_hosts_;
+  uint64_t pending_initialize_health_checks_{};
 };
 
 typedef std::unique_ptr<HdsDelegate> HdsDelegatePtr;
