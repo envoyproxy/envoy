@@ -385,7 +385,7 @@ std::string SslSocket::subjectLocalCertificate() const {
 ClientSslSocketFactory::ClientSslSocketFactory(const ClientContextConfig& config,
                                                Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope)
-    : manager_(manager), ssl_ctx_(manager.createSslClientContext(stats_scope, config)) {}
+    : ssl_ctx_(manager.createSslClientContext(stats_scope, config)) {}
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() const {
   return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Client);
@@ -397,8 +397,7 @@ ServerSslSocketFactory::ServerSslSocketFactory(const ServerContextConfig& config
                                                Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope,
                                                const std::vector<std::string>& server_names)
-    : manager_(manager),
-      ssl_ctx_(manager.createSslServerContext(stats_scope, config, server_names)) {}
+    : ssl_ctx_(manager.createSslServerContext(stats_scope, config, server_names)) {}
 
 Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() const {
   return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Server);

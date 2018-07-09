@@ -76,7 +76,6 @@ public:
   bool implementsSecureTransport() const override;
 
 private:
-  Ssl::ContextManager& manager_;
   ClientContextSharedPtr ssl_ctx_;
 };
 
@@ -89,7 +88,6 @@ public:
   bool implementsSecureTransport() const override;
 
 private:
-  Ssl::ContextManager& manager_;
   ServerContextSharedPtr ssl_ctx_;
 };
 
