@@ -1,5 +1,3 @@
-#include "test/integration/h1_fuzz.h"
-
 #include <functional>
 
 #include "common/common/assert.h"
@@ -9,6 +7,7 @@
 #include "test/integration/capture_fuzz.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
+#include "test/integration/h1_fuzz.h"
 
 namespace Envoy {
 
