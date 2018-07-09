@@ -86,12 +86,12 @@ std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
     base_time_ms = no_traffic_interval_.count();
   }
 
-  if (interval_jitter_.count() > 0) {
-    base_time_ms += (random_.random() % interval_jitter_.count());
+  if (interval_jitter_percent_ > 0) {
+    base_time_ms += random_.random() % (interval_jitter_percent_ * base_time_ms / 100);
   }
 
-  if (interval_jitter_percent_ > 0) {
-    base_time_ms += random_.random() % (interval_jitter_percent_ * interval_.count() / 100);
+  if (interval_jitter_.count() > 0) {
+    base_time_ms += (random_.random() % interval_jitter_.count());
   }
 
   uint64_t min_interval = runtime_.snapshot().getInteger("health_check.min_interval", 0);
