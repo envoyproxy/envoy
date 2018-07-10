@@ -76,10 +76,7 @@ public:
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
-
-  // Upstream::HostDescription
   void canary(bool is_canary) override { canary_ = is_canary; }
-
   const std::shared_ptr<envoy::api::v2::core::Metadata> metadata() const override {
     return metadata_;
   }
@@ -87,7 +84,6 @@ public:
     std::unique_lock<std::shared_timed_mutex> lock(metadata_mutex_);
     metadata_ = std::make_shared<envoy::api::v2::core::Metadata>(new_metadata);
   }
-
   const ClusterInfo& cluster() const override { return *cluster_; }
   HealthCheckHostMonitor& healthChecker() const override {
     if (health_checker_) {
