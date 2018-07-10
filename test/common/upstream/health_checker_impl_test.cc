@@ -479,7 +479,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessIntervalJitter) {
   }
 }
 
-TEST_F(HttpHealthCheckerImplTest, SuccessIntervalJitterPercentNoInterval) {
+TEST_F(HttpHealthCheckerImplTest, SuccessIntervalJitterPercentNoTraffic) {
   setupIntervalJitterPercent();
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(testing::AnyNumber());
 
