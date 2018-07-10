@@ -519,7 +519,7 @@ TEST(BufferHelperTest, WriteU16) {
   }
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeU16(buffer, std::numeric_limits<int16_t>::max() + 1);
+    BufferHelper::writeU16(buffer, static_cast<uint16_t>(std::numeric_limits<int16_t>::max()) + 1);
     EXPECT_EQ(std::string("\x80\0", 2), buffer.toString());
   }
   {
@@ -565,7 +565,7 @@ TEST(BufferHelperTest, WriteU32) {
   }
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeU32(buffer, std::numeric_limits<int32_t>::max() + 1);
+    BufferHelper::writeU32(buffer, static_cast<uint32_t>(std::numeric_limits<int32_t>::max()) + 1);
     EXPECT_EQ(std::string("\x80\0\0\0", 4), buffer.toString());
   }
   {
