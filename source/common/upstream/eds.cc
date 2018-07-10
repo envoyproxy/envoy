@@ -24,10 +24,11 @@ EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::
                                bool added_via_api)
     : BaseDynamicClusterImpl(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
                              cm.clusterManagerFactory().secretManager(), added_via_api),
-      cm_(cm), cluster_name_(cluster.eds_cluster_config().service_name().empty()
-                                 ? cluster.name()
-                                 : cluster.eds_cluster_config().service_name()),
-      priority_state_manager_(new PriorityStateManager(*this, local_info, "eds")) {
+      cm_(cm), local_info_(local_info),
+      cluster_name_(cluster.eds_cluster_config().service_name().empty()
+                        ? cluster.name()
+                        : cluster.eds_cluster_config().service_name()) {
+  Config::Utility::checkLocalInfo("eds", local_info_);
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
   subscription_ = Config::SubscriptionFactory::subscriptionFromConfigSource<
       envoy::api::v2::ClusterLoadAssignment>(
@@ -52,6 +53,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
   if (resources.size() != 1) {
     throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
   }
+
+  PriorityStateManager priority_state_manager(*this, local_info_);
   const auto& cluster_load_assignment = resources[0];
   MessageUtil::validate(cluster_load_assignment);
   // TODO(PiotrSikora): Remove this hack once fixed internally.
@@ -60,27 +63,18 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
                                      cluster_load_assignment.cluster_name()));
   }
 
-  auto& priority_state = priority_state_manager_->priorityState();
-  priority_state.clear();
-
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     const uint32_t priority = locality_lb_endpoint.priority();
     if (priority > 0 && !cluster_name_.empty() && cluster_name_ == cm_.localClusterName()) {
       throw EnvoyException(
           fmt::format("Unexpected non-zero priority for local cluster '{}'.", cluster_name_));
     }
-    priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
+    priority_state_manager.initializePriorityFor(locality_lb_endpoint);
 
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
-      const auto& health_status = lb_endpoint.health_status();
-      priority_state_manager_->registerHostForPriority(
+      priority_state_manager.registerHostForPriority(
           "", resolveProtoAddress(lb_endpoint.endpoint().address()), locality_lb_endpoint,
-          lb_endpoint,
-          health_status == envoy::api::v2::core::HealthStatus::UNHEALTHY ||
-                  health_status == envoy::api::v2::core::HealthStatus::DRAINING ||
-                  health_status == envoy::api::v2::core::HealthStatus::TIMEOUT
-              ? absl::optional<Host::HealthFlag>(Host::HealthFlag::FAILED_EDS_HEALTH)
-              : absl::nullopt);
+          lb_endpoint, Host::HealthFlag::FAILED_EDS_HEALTH);
     }
   }
 
@@ -89,14 +83,16 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
 
   // Loop over existing priorities not present in the config. This will empty out any priorities
   // the config update did not refer to
+  auto& priority_state = priority_state_manager.priorityState();
   for (size_t i = 0; i < priority_state.size(); ++i) {
     if (priority_state[i].first != nullptr) {
       if (locality_weights_map_.size() <= i) {
         locality_weights_map_.resize(i + 1);
       }
 
-      cluster_rebuilt |= updateHostsPerLocality(i, *priority_state[i].first,
-                                                locality_weights_map_[i], priority_state[i].second);
+      cluster_rebuilt |=
+          updateHostsPerLocality(i, *priority_state[i].first, locality_weights_map_[i],
+                                 priority_state[i].second, priority_state_manager);
     }
   }
 
@@ -109,8 +105,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
     if (locality_weights_map_.size() <= i) {
       locality_weights_map_.resize(i + 1);
     }
-    cluster_rebuilt |=
-        updateHostsPerLocality(i, empty_hosts, locality_weights_map_[i], empty_locality_map);
+    cluster_rebuilt |= updateHostsPerLocality(i, empty_hosts, locality_weights_map_[i],
+                                              empty_locality_map, priority_state_manager);
   }
 
   if (!cluster_rebuilt) {
@@ -124,7 +120,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
 
 bool EdsClusterImpl::updateHostsPerLocality(const uint32_t priority, const HostVector& new_hosts,
                                             LocalityWeightsMap& locality_weights_map,
-                                            LocalityWeightsMap& new_locality_weights_map) {
+                                            LocalityWeightsMap& new_locality_weights_map,
+                                            PriorityStateManager& priority_state_manager) {
   const auto& host_set = priority_set_.getOrCreateHostSet(priority);
   HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
 
@@ -144,8 +141,8 @@ bool EdsClusterImpl::updateHostsPerLocality(const uint32_t priority, const HostV
     ENVOY_LOG(debug, "EDS hosts or locality weights changed for cluster: {} ({}) priority {}",
               info_->name(), host_set.hosts().size(), host_set.priority());
 
-    priority_state_manager_->updateClusterPrioritySet(priority, current_hosts_copy, hosts_added,
-                                                      hosts_removed);
+    priority_state_manager.updateClusterPrioritySet(priority, std::move(current_hosts_copy),
+                                                    hosts_added, hosts_removed);
     return true;
   }
   return false;

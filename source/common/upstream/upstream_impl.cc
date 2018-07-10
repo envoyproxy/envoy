@@ -646,13 +646,8 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
 }
 
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
-                                           const LocalInfo::LocalInfo& local_info,
-                                           const absl::optional<std::string> error_prefix)
-    : parent_(cluster), priority_state_(1), local_info_node_(local_info.node()) {
-  if (error_prefix.has_value()) {
-    Config::Utility::checkLocalInfo(error_prefix.value(), local_info);
-  }
-}
+                                           const LocalInfo::LocalInfo& local_info)
+    : parent_(cluster), local_info_node_(local_info.node()) {}
 
 void PriorityStateManager::initializePriorityFor(
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint) {
@@ -673,7 +668,7 @@ void PriorityStateManager::registerHostForPriority(
     const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
-    const absl::optional<Upstream::Host::HealthFlag> health_checker_flag) {
+    const Upstream::Host::HealthFlag health_checker_flag) {
   const uint32_t priority = locality_lb_endpoint.priority();
   // Should be called after initializePriorityFor.
   ASSERT(priority_state_[priority].first);
@@ -682,13 +677,16 @@ void PriorityStateManager::registerHostForPriority(
                    lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
                    lb_endpoint.endpoint().health_check_config()));
 
-  if (health_checker_flag.has_value()) {
-    priority_state_[priority].first->back()->healthFlagSet(health_checker_flag.value());
+  const auto& health_status = lb_endpoint.health_status();
+  if (health_status == envoy::api::v2::core::HealthStatus::UNHEALTHY ||
+      health_status == envoy::api::v2::core::HealthStatus::DRAINING ||
+      health_status == envoy::api::v2::core::HealthStatus::TIMEOUT) {
+    priority_state_[priority].first->back()->healthFlagSet(health_checker_flag);
   }
 }
 
 void PriorityStateManager::updateClusterPrioritySet(
-    const uint32_t priority, HostVectorSharedPtr current_hosts,
+    const uint32_t priority, HostVectorSharedPtr&& current_hosts,
     const absl::optional<HostVector>& hosts_added,
     const absl::optional<HostVector>& hosts_removed) {
   // If local locality is not defined then skip populating per locality hosts.

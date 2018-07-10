@@ -39,16 +39,17 @@ private:
       std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
   bool updateHostsPerLocality(const uint32_t priority, const HostVector& new_hosts,
                               LocalityWeightsMap& locality_weights_map,
-                              LocalityWeightsMap& new_locality_weights_map);
+                              LocalityWeightsMap& new_locality_weights_map,
+                              PriorityStateManager& priority_state_manager);
 
   // ClusterImplBase
   void startPreInit() override;
 
   const ClusterManager& cm_;
+  const LocalInfo::LocalInfo& local_info_;
   std::unique_ptr<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>> subscription_;
   const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
-  PriorityStateManagerPtr priority_state_manager_;
 };
 
 } // namespace Upstream

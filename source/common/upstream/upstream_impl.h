@@ -505,8 +505,7 @@ typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
  */
 class PriorityStateManager : protected Logger::Loggable<Logger::Id::upstream> {
 public:
-  PriorityStateManager(ClusterImplBase& cluster, const LocalInfo::LocalInfo& local_info,
-                       const absl::optional<std::string> error_prefix);
+  PriorityStateManager(ClusterImplBase& cluster, const LocalInfo::LocalInfo& local_info);
 
   // Initializes the PriorityState vector based on the priority specified in locality_lb_endpoint.
   void
@@ -519,7 +518,7 @@ public:
                           Network::Address::InstanceConstSharedPtr address,
                           const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
                           const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
-                          const absl::optional<Upstream::Host::HealthFlag> health_checker_flag);
+                          const Upstream::Host::HealthFlag health_checker_flag);
 
   // TODO(dio): Add an override of registerHostForPriority to register a host to the PriorityState
   // based on a specified priority. This will be useful for non-EDS cluster hosts setup.
@@ -528,7 +527,7 @@ public:
 
   // Updates the cluster priority set. This should be called after the PriorityStateManager is
   // initialized.
-  void updateClusterPrioritySet(const uint32_t priority, HostVectorSharedPtr current_hosts,
+  void updateClusterPrioritySet(const uint32_t priority, HostVectorSharedPtr&& current_hosts,
                                 const absl::optional<HostVector>& hosts_added,
                                 const absl::optional<HostVector>& hosts_removed);
 
