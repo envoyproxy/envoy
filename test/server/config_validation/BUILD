@@ -77,10 +77,7 @@ envoy_cc_fuzz_test(
     srcs = ["config_fuzz_test.cc"],
     corpus = "config_corpus",
     deps = [
-        "//source/common/thread_local:thread_local_lib",
-        "//source/server:configuration_lib",
         "//source/server:options_lib",
-        "//source/server:server_lib",
         "//source/server/config_validation:server_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",

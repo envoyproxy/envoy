@@ -1,20 +1,12 @@
 #include <fstream>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
-
 #include "common/network/address_impl.h"
-#include "common/thread_local/thread_local_impl.h"
 
 #include "server/config_validation/server.h"
-#include "server/options_impl.h"
-#include "server/server.h"
-#include "server/test_hooks.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/server.h"
 #include "test/mocks/server/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
 
 namespace Envoy {
