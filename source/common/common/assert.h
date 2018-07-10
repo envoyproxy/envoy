@@ -16,6 +16,21 @@ namespace Envoy {
     }                                                                                              \
   } while (false)
 
+/**
+ * A version of RELEASE_ASSERT that allows for ostream style extra data.
+ */
+#define VERBOSE_RELEASE_ASSERT(X, Y)                                                               \
+  do {                                                                                             \
+    if (!(X)) {                                                                                    \
+      std::ostringstream stream;                                                                   \
+      stream << Y;                                                                                 \
+      std::string details = stream.str();                                                          \
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,    \
+                          "assert failure: {}. Details: {} ", #X, details);                        \
+      abort();                                                                                     \
+    }                                                                                              \
+  } while (false)
+
 #ifndef NDEBUG
 #define ASSERT(X) RELEASE_ASSERT(X)
 #else
