@@ -51,7 +51,7 @@ public:
       const Json::Object& json_config,
       envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
           proto_config,
-      const Stats::Scope& scope);
+      const Stats::StatsOptions& stats_options);
 
   /**
    * Translate a v1 JSON Redis proxy object to v2

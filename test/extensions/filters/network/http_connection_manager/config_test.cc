@@ -31,7 +31,7 @@ parseHttpConnectionManagerFromJson(const std::string& json_string) {
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
   NiceMock<Stats::MockStore> scope;
   Config::FilterJson::translateHttpConnectionManager(*json_object_ptr, http_connection_manager,
-                                                     scope);
+                                                     scope.statsOptions());
   return http_connection_manager;
 }
 

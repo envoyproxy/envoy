@@ -127,7 +127,7 @@ void FilterJson::translateHttpConnectionManager(
     const Json::Object& json_config,
     envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         proto_config,
-    const Stats::Scope& scope) {
+    const Stats::StatsOptions& stats_options) {
   json_config.validateSchema(Json::Schema::HTTP_CONN_NETWORK_FILTER_SCHEMA);
 
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::CodecType
@@ -140,7 +140,7 @@ void FilterJson::translateHttpConnectionManager(
 
   if (json_config.hasObject("rds")) {
     Utility::translateRdsConfig(*json_config.getObject("rds"), *proto_config.mutable_rds(),
-                                scope.statsOptions());
+                                stats_options);
   }
   if (json_config.hasObject("route_config")) {
     if (json_config.hasObject("rds")) {
@@ -148,8 +148,7 @@ void FilterJson::translateHttpConnectionManager(
           "http connection manager must have either rds or route_config but not both");
     }
     RdsJson::translateRouteConfiguration(*json_config.getObject("route_config"),
-                                         *proto_config.mutable_route_config(),
-                                         scope.statsOptions());
+                                         *proto_config.mutable_route_config(), stats_options);
   }
 
   for (const auto& json_filter : json_config.getObjectArray("filters", true)) {
