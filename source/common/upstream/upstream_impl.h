@@ -7,6 +7,7 @@
 #include <functional>
 #include <list>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -69,13 +70,32 @@ public:
         canary_(Config::Metadata::metadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                                 Config::MetadataEnvoyLbKeys::get().CANARY)
                     .bool_value()),
-        metadata_(metadata), locality_(locality), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_),
-                                                                        POOL_GAUGE(stats_store_))} {
-  }
+        metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)),
+        locality_(locality), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_),
+                                                   POOL_GAUGE(stats_store_))} {}
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
-  const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
+  void canary(bool is_canary) override { canary_ = is_canary; }
+
+  // Metadata getter/setter.
+  //
+  // It's possible that the lock that guards the metadata will become highly contended (e.g.:
+  // endpoints churning during a deploy of a large cluster). A possible improvement
+  // would be to use TLS and post metadata updates from the main thread. This model would
+  // possibly benefit other related and expensive computations too (e.g.: updating subsets).
+  //
+  // TODO(rgs1): we should move to absl locks, once there's support for R/W locks. We should
+  // also add lock annotations, once they work correctly with R/W locks.
+  const std::shared_ptr<envoy::api::v2::core::Metadata> metadata() const override {
+    std::shared_lock<std::shared_timed_mutex> lock(metadata_mutex_);
+    return metadata_;
+  }
+  virtual void metadata(const envoy::api::v2::core::Metadata& new_metadata) override {
+    std::unique_lock<std::shared_timed_mutex> lock(metadata_mutex_);
+    metadata_ = std::make_shared<envoy::api::v2::core::Metadata>(new_metadata);
+  }
+
   const ClusterInfo& cluster() const override { return *cluster_; }
   HealthCheckHostMonitor& healthChecker() const override {
     if (health_checker_) {
@@ -108,8 +128,9 @@ protected:
   const std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
-  const bool canary_;
-  const envoy::api::v2::core::Metadata metadata_;
+  std::atomic<bool> canary_;
+  mutable std::shared_timed_mutex metadata_mutex_;
+  std::shared_ptr<envoy::api::v2::core::Metadata> metadata_;
   const envoy::api::v2::core::Locality locality_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;
