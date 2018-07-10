@@ -4,6 +4,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/hex.h"
 #include "common/http/headers.h"
+#include "common/ssl/utility.h"
 
 #include "absl/strings/str_replace.h"
 #include "openssl/err.h"
@@ -337,6 +338,14 @@ std::string SslSocket::protocol() const {
   unsigned int proto_len;
   SSL_get0_alpn_selected(ssl_.get(), &proto, &proto_len);
   return std::string(reinterpret_cast<const char*>(proto), proto_len);
+}
+
+std::string SslSocket::serialNumberPeerCertificate() const {
+  bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
+  if (!cert) {
+    return "";
+  }
+  return Utility::getSerialNumberFromCertificate(*cert.get());
 }
 
 std::string SslSocket::getSubjectFromCertificate(X509* cert) const {

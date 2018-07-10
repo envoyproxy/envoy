@@ -12,6 +12,7 @@
 #include "common/common/base64.h"
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
+#include "common/ssl/utility.h"
 
 #include "openssl/hmac.h"
 #include "openssl/rand.h"
@@ -446,7 +447,7 @@ std::string ContextImpl::getCaCertInformation() const {
     return "";
   }
   return fmt::format("Certificate Path: {}, Serial Number: {}, Days until Expiration: {}",
-                     getCaFileName(), getSerialNumber(ca_cert_.get()),
+                     getCaFileName(), Utility::getSerialNumberFromCertificate(*ca_cert_.get()),
                      getDaysUntilExpiration(ca_cert_.get()));
 }
 
@@ -455,24 +456,9 @@ std::string ContextImpl::getCertChainInformation() const {
     return "";
   }
   return fmt::format("Certificate Path: {}, Serial Number: {}, Days until Expiration: {}",
-                     getCertChainFileName(), getSerialNumber(cert_chain_.get()),
+                     getCertChainFileName(),
+                     Utility::getSerialNumberFromCertificate(*cert_chain_.get()),
                      getDaysUntilExpiration(cert_chain_.get()));
-}
-
-std::string ContextImpl::getSerialNumber(const X509* cert) {
-  ASSERT(cert);
-  ASN1_INTEGER* serial_number = X509_get_serialNumber(const_cast<X509*>(cert));
-  BIGNUM num_bn;
-  BN_init(&num_bn);
-  ASN1_INTEGER_to_BN(serial_number, &num_bn);
-  char* char_serial_number = BN_bn2hex(&num_bn);
-  BN_free(&num_bn);
-  if (char_serial_number != nullptr) {
-    std::string serial_number(char_serial_number);
-    OPENSSL_free(char_serial_number);
-    return serial_number;
-  }
-  return "";
 }
 
 ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,

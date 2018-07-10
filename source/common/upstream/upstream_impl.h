@@ -413,14 +413,13 @@ private:
 class ClusterImplBase : public Cluster, protected Logger::Loggable<Logger::Id::upstream> {
 
 public:
-  static ClusterSharedPtr create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                                 Stats::Store& stats, ThreadLocal::Instance& tls,
-                                 Network::DnsResolverSharedPtr dns_resolver,
-                                 Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
-                                 Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-                                 const LocalInfo::LocalInfo& local_info,
-                                 Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                 bool added_via_api);
+  static ClusterSharedPtr
+  create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
+         ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
+         Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
+         Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+         AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
+         Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api);
   // From Upstream::Cluster
   virtual PrioritySet& prioritySet() override { return priority_set_; }
   virtual const PrioritySet& prioritySet() const override { return priority_set_; }

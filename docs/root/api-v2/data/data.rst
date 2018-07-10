@@ -6,4 +6,5 @@ Envoy data
   :maxdepth: 2
 
   accesslog/accesslog
+  core/core
   tap/tap

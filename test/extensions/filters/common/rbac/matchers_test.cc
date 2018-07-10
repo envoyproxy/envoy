@@ -116,6 +116,20 @@ TEST(OrMatcher, Principal_Set) {
   checkMatcher(RBAC::OrMatcher(set), true, conn);
 }
 
+TEST(NotMatcher, Permission) {
+  envoy::config::rbac::v2alpha::Permission perm;
+  perm.set_any(true);
+
+  checkMatcher(RBAC::NotMatcher(perm), false, Envoy::Network::MockConnection());
+}
+
+TEST(NotMatcher, Principal) {
+  envoy::config::rbac::v2alpha::Principal principal;
+  principal.set_any(true);
+
+  checkMatcher(RBAC::NotMatcher(principal), false, Envoy::Network::MockConnection());
+}
+
 TEST(HeaderMatcher, HeaderMatcher) {
   envoy::api::v2::route::HeaderMatcher config;
   config.set_name("foo");

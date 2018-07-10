@@ -115,6 +115,11 @@ message Permission {
 
     // Metadata that describes additional information about the action.
     envoy.type.matcher.MetadataMatcher metadata = 7;
+
+    // Negates matching the provided permission. For instance, if the value of `not_rule` would
+    // match, this permission would not match. Conversely, if the value of `not_rule` would not
+    // match, this permission would match.
+    Permission not_rule = 8;
   }
 }
 
@@ -157,5 +162,10 @@ message Principal {
 
     // Metadata that describes additional information about the principal.
     envoy.type.matcher.MetadataMatcher metadata = 7;
+
+    // Negates matching the provided principal. For instance, if the value of `not_id` would match,
+    // this principal would not match. Conversely, if the value of `not_id` would not match, this
+    // principal would match.
+    Principal not_id = 8;
   }
 }

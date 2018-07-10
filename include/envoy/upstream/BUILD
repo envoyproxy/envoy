@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "cluster_manager_interface",
     hdrs = ["cluster_manager.h"],
     deps = [
+        ":health_checker_interface",
         ":load_balancer_interface",
         ":thread_local_cluster_interface",
         ":upstream_interface",
@@ -32,7 +33,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "health_checker_interface",
     hdrs = ["health_checker.h"],
-    deps = [":upstream_interface"],
+    deps = [
+        ":upstream_interface",
+        "@envoy_api//envoy/data/core/v2alpha:health_check_event_cc",
+    ],
 )
 
 envoy_cc_library(
