@@ -201,15 +201,18 @@ uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   return response_code;
 }
 
-bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
+bool Utility::isUpgrade(const HeaderMap& headers) {
   // In firefox the "Connection" request header value is "keep-alive, Upgrade",
   // we should check if it contains the "Upgrade" token.
   return (headers.Connection() && headers.Upgrade() &&
-          headers.Connection()->value().caseInsensitiveContains(
-              Http::Headers::get().ConnectionValues.Upgrade.c_str()) &&
-          (0 == StringUtil::caseInsensitiveCompare(
-                    headers.Upgrade()->value().c_str(),
-                    Http::Headers::get().UpgradeValues.WebSocket.c_str())));
+          Envoy::StringUtil::caseFindToken(headers.Connection()->value().getStringView(), ",",
+                                           Http::Headers::get().ConnectionValues.Upgrade.c_str()));
+}
+
+bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
+  return (isUpgrade(headers) && (0 == StringUtil::caseInsensitiveCompare(
+                                          headers.Upgrade()->value().c_str(),
+                                          Http::Headers::get().UpgradeValues.WebSocket.c_str())));
 }
 
 Http2Settings

@@ -185,6 +185,10 @@ message HealthCheck {
   //
   // The default value for "healthy edge interval" is the same as the default interval.
   google.protobuf.Duration healthy_edge_interval = 16;
+
+  // Specifies the path to the :ref:`health check event log <arch_overview_health_check_logging>`.
+  // If empty, no event log will be written.
+  string event_log_path = 17;
 }
 
 // Endpoint health status.

@@ -96,7 +96,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "lc_trie_lib",
-    srcs = ["lc_trie.cc"],
     hdrs = ["lc_trie.h"],
     external_deps = ["abseil_int128"],
     deps = [

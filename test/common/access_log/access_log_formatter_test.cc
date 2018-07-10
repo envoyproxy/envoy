@@ -115,7 +115,7 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
 
   {
     RequestInfoFormatter response_flags_format("RESPONSE_FLAGS");
-    ON_CALL(request_info, getResponseFlag(RequestInfo::ResponseFlag::LocalReset))
+    ON_CALL(request_info, hasResponseFlag(RequestInfo::ResponseFlag::LocalReset))
         .WillByDefault(Return(true));
     EXPECT_EQ("LR", response_flags_format.format(header, header, header, request_info));
   }

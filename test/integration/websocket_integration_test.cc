@@ -71,6 +71,13 @@ void WebsocketIntegrationTest::validateFinalDownstreamData(const std::string& re
   EXPECT_EQ(received_data, expected_data);
 }
 
+void WebsocketIntegrationTest::validateFinalUpstreamData(const std::string& received_data,
+                                                         const std::string& expected_data) {
+  std::regex extra_response_headers("x-request-id:.*\r\n");
+  std::string stripped_data = std::regex_replace(received_data, extra_response_headers, "");
+  EXPECT_EQ(expected_data, stripped_data);
+}
+
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   config_helper_.addConfigModifier(setRouteUsingWebsocket(nullptr));
   initialize();
@@ -294,6 +301,66 @@ TEST_P(WebsocketIntegrationTest, WebSocketLogging) {
                                                    82, // response length
                                                    5,  // hello length
                                                    ip_port_regex, ip_port_regex, ip_port_regex)));
+}
+
+TEST_P(WebsocketIntegrationTest, BidirectionalChunkedData) {
+  config_helper_.addConfigModifier(setRouteUsingWebsocket(nullptr));
+  initialize();
+  const std::string upgrade_req_str = "GET /websocket/test HTTP/1.1\r\nHost: host\r\nconnection: "
+                                      "keep-alive, Upgrade\r\nupgrade: Websocket\r\n"
+                                      "transfer-encoding: chunked\r\n\r\n"
+                                      "3\r\n123\r\n0\r\n\r\n"
+                                      "SomeWebSocketPayload";
+
+  // Upgrade, send initial data and wait for it to be received.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
+  tcp_client->write(upgrade_req_str);
+  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  // TODO(alyssawilk) We should be able to wait for SomeWebSocketPayload but it
+  // is not flushed immediately.
+  const std::string data =
+      fake_upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("\r\n\r\n"));
+
+  // Finish the upgrade.
+  const std::string upgrade_resp_str =
+      "HTTP/1.1 101 Switching Protocols\r\nconnection: Upgrade\r\nupgrade: Websocket\r\n"
+      "transfer-encoding: chunked\r\n\r\n"
+      "4\r\nabcd\r\n0\r\n"
+      "SomeWebsocketResponsePayload";
+  fake_upstream_connection->write(upgrade_resp_str);
+  tcp_client->waitForData("Payload", false);
+
+  // Verify bidirectional data still works.
+  tcp_client->write("FinalClientPayload");
+  std::string final_data = fake_upstream_connection->waitForData(
+      FakeRawConnection::waitForInexactMatch("FinalClientPayload"));
+  fake_upstream_connection->write("FinalServerPayload");
+  tcp_client->waitForData("FinalServerPayload", false);
+
+  // Clean up.
+  tcp_client->close();
+  fake_upstream_connection->waitForDisconnect();
+
+  // TODO(alyssawilk) the current stack is stripping chunked encoding, then
+  // adding back the chunked encoding header without actually chunk encoding.
+  // Data about HTTP vs websocket data boundaries is therefore lost. Fix by
+  // actually chunk encoding.
+  const std::string old_style_modified_payload = "GET /websocket HTTP/1.1\r\n"
+                                                 "host: host\r\n"
+                                                 "connection: keep-alive, Upgrade\r\n"
+                                                 "upgrade: Websocket\r\n"
+                                                 "x-forwarded-proto: http\r\n"
+                                                 "x-envoy-original-path: /websocket/test\r\n"
+                                                 "transfer-encoding: chunked\r\n\r\n"
+                                                 "123SomeWebSocketPayloadFinalClientPayload";
+  validateFinalUpstreamData(final_data, old_style_modified_payload);
+
+  const std::string modified_downstream_payload =
+      "HTTP/1.1 101 Switching Protocols\r\nconnection: Upgrade\r\nupgrade: Websocket\r\n"
+      "transfer-encoding: chunked\r\n\r\n"
+      "4\r\nabcd\r\n0\r\n"
+      "SomeWebsocketResponsePayloadFinalServerPayload";
+  validateFinalDownstreamData(tcp_client->data(), modified_downstream_payload);
 }
 
 } // namespace Envoy
