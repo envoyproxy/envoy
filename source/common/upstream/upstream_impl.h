@@ -543,8 +543,6 @@ private:
   const envoy::api::v2::core::Node& local_info_node_;
 };
 
-typedef std::unique_ptr<PriorityStateManager> PriorityStateManagerPtr;
-
 /**
  * Implementation of Upstream::Cluster for static clusters (clusters that have a fixed number of
  * hosts with resolved IP addresses).

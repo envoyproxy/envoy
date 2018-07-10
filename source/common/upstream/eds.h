@@ -46,8 +46,8 @@ private:
   void startPreInit() override;
 
   const ClusterManager& cm_;
-  const LocalInfo::LocalInfo& local_info_;
   std::unique_ptr<Config::Subscription<envoy::api::v2::ClusterLoadAssignment>> subscription_;
+  const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
   std::vector<LocalityWeightsMap> locality_weights_map_;
 };

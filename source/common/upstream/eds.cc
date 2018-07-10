@@ -63,7 +63,6 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
     throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
                                      cluster_load_assignment.cluster_name()));
   }
-
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     const uint32_t priority = locality_lb_endpoint.priority();
     if (priority > 0 && !cluster_name_.empty() && cluster_name_ == cm_.localClusterName()) {
@@ -90,7 +89,6 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
       if (locality_weights_map_.size() <= i) {
         locality_weights_map_.resize(i + 1);
       }
-
       cluster_rebuilt |=
           updateHostsPerLocality(i, *priority_state[i].first, locality_weights_map_[i],
                                  priority_state[i].second, priority_state_manager);
