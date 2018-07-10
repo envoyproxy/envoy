@@ -25,13 +25,15 @@ message ClusterStatus {
   bool added_via_api = 2;
 
   // The success rate threshold used in the last interval. The threshold is used to eject hosts
-  // based on their success rate. See 
+  // based on their success rate. See
   // :ref:`Cluster outlier detection <arch_overview_outlier_detection>` statistics
   //
   // Note: this field may be omitted in any of the three following cases:
-  // 1. There were not enough hosts with enough request volume to proceed with success rate based outlier ejection.
-  // 2. The threshold is computed to be < 0 because a negative value implies that there was no threshold for that
-  // interval.
+  //
+  // 1. There were not enough hosts with enough request volume to proceed with success rate based
+  //    outlier ejection.
+  // 2. The threshold is computed to be < 0 because a negative value implies that there was no
+  //    threshold for that interval.
   // 3. Outlier detection is not enabled for this cluster.
   envoy.type.Percent success_rate_ejection_threshold = 3;
 
@@ -66,7 +68,8 @@ message HostHealthStatus {
   // The host is currently considered an outlier and has been ejected.
   bool failed_outlier_check = 2;
 
-  // Health status as reported by EDS. Note: only HEALTHY and UNHEALTHY are currently supported here.
+  // Health status as reported by EDS. Note: only HEALTHY and UNHEALTHY are currently supported
+  // here.
   // TODO(mrice32): pipe through remaining EDS health status possibilities.
   envoy.api.v2.core.HealthStatus eds_health_status = 3;
 }

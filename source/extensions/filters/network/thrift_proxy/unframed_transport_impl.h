@@ -31,6 +31,9 @@ public:
     onFrameComplete();
     return true;
   }
+  void encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) override {
+    buffer.move(message);
+  }
 };
 
 } // namespace ThriftProxy

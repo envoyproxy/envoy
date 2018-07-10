@@ -9,13 +9,8 @@
 namespace Envoy {
 namespace Http {
 
-// HeaderMatcher will consist of one of the below two options:
-// 1.value (string) and regex (bool)
-//   An empty header value allows for matching to be only based on header presence.
-//   Regex is an opt-in. Unless explicitly mentioned, the header values will be used for
-//   exact string matching.
-//   This is now deprecated.
-// 2.header_match_specifier which can be any one of exact_match, regex_match, range_match,
+// HeaderMatcher will consist of:
+//   header_match_specifier which can be any one of exact_match, regex_match, range_match,
 //   present_match, prefix_match or suffix_match.
 //   Each of these also can be inverted with the invert_match option.
 //   Absence of these options implies empty header value match based on header presence.
@@ -56,15 +51,7 @@ HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher
   case envoy::api::v2::route::HeaderMatcher::HEADER_MATCH_SPECIFIER_NOT_SET:
     FALLTHRU;
   default:
-    if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)) {
-      header_match_type_ = HeaderMatchType::Regex;
-      regex_pattern_ = RegexUtil::parseRegex(config.value());
-    } else if (config.value().empty()) {
-      header_match_type_ = HeaderMatchType::Present;
-    } else {
-      header_match_type_ = HeaderMatchType::Value;
-      value_ = config.value();
-    }
+    header_match_type_ = HeaderMatchType::Present;
     break;
   }
 }

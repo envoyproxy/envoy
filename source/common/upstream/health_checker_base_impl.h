@@ -121,6 +121,7 @@ private:
   const std::chrono::milliseconds interval_;
   const std::chrono::milliseconds no_traffic_interval_;
   const std::chrono::milliseconds interval_jitter_;
+  const uint32_t interval_jitter_percent_;
   const std::chrono::milliseconds unhealthy_interval_;
   const std::chrono::milliseconds unhealthy_edge_interval_;
   const std::chrono::milliseconds healthy_edge_interval_;
