@@ -83,8 +83,9 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
 
-  envoy::api::v2::core::Metadata metadata = TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
-      R"EOF(
+  auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(
+      TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
+          R"EOF(
         filter_metadata:
           namespace:
             key: value
@@ -99,11 +100,11 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
               list_key: [ list_element ]
               struct_key:
                 deep_key: deep_value
-      )EOF");
+      )EOF"));
 
   // Prove we're testing the expected types.
   const auto& nested_struct =
-      Envoy::Config::Metadata::metadataValue(metadata, "namespace", "nested").struct_value();
+      Envoy::Config::Metadata::metadataValue(*metadata, "namespace", "nested").struct_value();
   EXPECT_EQ(nested_struct.fields().at("str_key").kind_case(), ProtobufWkt::Value::kStringValue);
   EXPECT_EQ(nested_struct.fields().at("bool_key1").kind_case(), ProtobufWkt::Value::kBoolValue);
   EXPECT_EQ(nested_struct.fields().at("bool_key2").kind_case(), ProtobufWkt::Value::kBoolValue);
@@ -114,7 +115,7 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   EXPECT_EQ(nested_struct.fields().at("struct_key").kind_case(), ProtobufWkt::Value::kStructValue);
 
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
-  ON_CALL(*host, metadata()).WillByDefault(ReturnRef(metadata));
+  ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
   // Top-level value.
   testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "value");
@@ -331,13 +332,14 @@ TEST(HeaderParserTest, TestParseInternal) {
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
 
   // Metadata with percent signs in the key.
-  envoy::api::v2::core::Metadata metadata = TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
-      R"EOF(
+  auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(
+      TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
+          R"EOF(
         filter_metadata:
           ns:
             key: value
-      )EOF");
-  ON_CALL(*host, metadata()).WillByDefault(ReturnRef(metadata));
+      )EOF"));
+  ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
   // "2018-04-03T23:06:09.123Z".
   const SystemTime start_time(std::chrono::milliseconds(1522796769123));
@@ -411,9 +413,9 @@ TEST(HeaderParserTest, EvaluateEmptyHeaders) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  envoy::api::v2::core::Metadata metadata;
+  auto metadata = std::make_shared<envoy::api::v2::core::Metadata>();
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
-  ON_CALL(*host, metadata()).WillByDefault(ReturnRef(metadata));
+  ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
   req_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_FALSE(headerMap.has("x-key"));
 }
@@ -485,13 +487,14 @@ route:
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
 
   // Metadata with percent signs in the key.
-  envoy::api::v2::core::Metadata metadata = TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
-      R"EOF(
+  auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(
+      TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
+          R"EOF(
         filter_metadata:
           namespace:
             "%key%": value
-      )EOF");
-  ON_CALL(*host, metadata()).WillByDefault(ReturnRef(metadata));
+      )EOF"));
+  ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
   req_header_parser->evaluateHeaders(headerMap, request_info);
 
