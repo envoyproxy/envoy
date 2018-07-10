@@ -216,7 +216,7 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
 void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   // Close the upstream connection first. If there's an outstanding request,
   // closing the client may result in a FIN being sent upstream, and FakeConnectionBase::close
-  // will interpret that as an unexpected disconnect.  The codec client is not
+  // will interpret that as an unexpected disconnect. The codec client is not
   // subject to the same failure mode.
   if (fake_upstream_connection_) {
     fake_upstream_connection_->close();
