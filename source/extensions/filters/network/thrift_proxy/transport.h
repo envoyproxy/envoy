@@ -87,6 +87,15 @@ public:
    * @throws EnvoyException if the data is not valid for this transport.
    */
   virtual bool decodeFrameEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * encodeFrame wraps the given message buffer with the transport's header and trailer (if any).
+   * After encoding, message will be empty.
+   * @param buffer is the output buffer
+   * @param message a protocol-encoded message
+   * @throws EnvoyException if the message is too large for the transport
+   */
+  virtual void encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) PURE;
 };
 
 typedef std::unique_ptr<Transport> TransportPtr;

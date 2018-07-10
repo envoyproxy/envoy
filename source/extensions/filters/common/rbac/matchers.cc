@@ -24,6 +24,8 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Permis
     return std::make_shared<const AlwaysMatcher>();
   case envoy::config::rbac::v2alpha::Permission::RuleCase::kMetadata:
     return std::make_shared<const MetadataMatcher>(permission.metadata());
+  case envoy::config::rbac::v2alpha::Permission::RuleCase::kNotRule:
+    return std::make_shared<const NotMatcher>(permission.not_rule());
   default:
     NOT_REACHED;
   }
@@ -45,6 +47,8 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Princi
     return std::make_shared<const AlwaysMatcher>();
   case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kMetadata:
     return std::make_shared<const MetadataMatcher>(principal.metadata());
+  case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kNotId:
+    return std::make_shared<const NotMatcher>(principal.not_id());
   default:
     NOT_REACHED;
   }
@@ -98,6 +102,12 @@ bool OrMatcher::matches(const Network::Connection& connection,
   }
 
   return false;
+}
+
+bool NotMatcher::matches(const Network::Connection& connection,
+                         const Envoy::Http::HeaderMap& headers,
+                         const envoy::api::v2::core::Metadata& metadata) const {
+  return !matcher_->matches(connection, headers, metadata);
 }
 
 bool HeaderMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap& headers,

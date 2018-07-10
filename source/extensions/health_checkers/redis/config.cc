@@ -14,10 +14,9 @@ namespace RedisHealthChecker {
 Upstream::HealthCheckerSharedPtr RedisHealthCheckerFactory::createCustomHealthChecker(
     const envoy::api::v2::core::HealthCheck& config,
     Server::Configuration::HealthCheckerFactoryContext& context) {
-
   return std::make_shared<RedisHealthChecker>(
       context.cluster(), config, getRedisHealthCheckConfig(config), context.dispatcher(),
-      context.runtime(), context.random(),
+      context.runtime(), context.random(), context.eventLogger(),
       NetworkFilters::RedisProxy::ConnPool::ClientFactoryImpl::instance_);
 };
 

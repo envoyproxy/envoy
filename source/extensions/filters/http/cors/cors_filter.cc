@@ -100,9 +100,13 @@ Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::HeaderMap& headers, bo
 
 void CorsFilter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
-};
+}
 
 bool CorsFilter::isOriginAllowed(const Http::HeaderString& origin) {
+  return isOriginAllowedString(origin) || isOriginAllowedRegex(origin);
+}
+
+bool CorsFilter::isOriginAllowedString(const Http::HeaderString& origin) {
   if (allowOrigins() == nullptr) {
     return false;
   }
@@ -114,10 +118,31 @@ bool CorsFilter::isOriginAllowed(const Http::HeaderString& origin) {
   return false;
 }
 
+bool CorsFilter::isOriginAllowedRegex(const Http::HeaderString& origin) {
+  if (allowOriginRegexes() == nullptr) {
+    return false;
+  }
+  for (const auto& regex : *allowOriginRegexes()) {
+    if (std::regex_match(origin.c_str(), regex)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 const std::list<std::string>* CorsFilter::allowOrigins() {
   for (const auto policy : policies_) {
     if (policy && !policy->allowOrigins().empty()) {
       return &policy->allowOrigins();
+    }
+  }
+  return nullptr;
+}
+
+const std::list<std::regex>* CorsFilter::allowOriginRegexes() {
+  for (const auto policy : policies_) {
+    if (policy && !policy->allowOriginRegexes().empty()) {
+      return &policy->allowOriginRegexes();
     }
   }
   return nullptr;

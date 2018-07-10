@@ -26,6 +26,7 @@ public:
   bool peerCertificatePresented() const override;
   std::string uriSanLocalCertificate() override;
   const std::string& sha256PeerCertificateDigest() const override;
+  std::string serialNumberPeerCertificate() const override;
   std::string subjectPeerCertificate() const override;
   std::string subjectLocalCertificate() const override;
   std::string uriSanPeerCertificate() const override;
@@ -50,6 +51,8 @@ private:
   Network::PostIoAction doHandshake();
   void drainErrorQueue();
   void shutdownSsl();
+
+  // TODO: Move helper functions to the `Ssl::Utility` namespace.
   std::string getUriSanFromCertificate(X509* cert) const;
   std::string getSubjectFromCertificate(X509* cert) const;
   std::vector<std::string> getDnsSansFromCertificate(X509* cert);

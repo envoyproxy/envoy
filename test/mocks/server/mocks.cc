@@ -169,10 +169,12 @@ MockListenerFactoryContext::MockListenerFactoryContext() {}
 MockListenerFactoryContext::~MockListenerFactoryContext() {}
 
 MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
+  event_logger_ = new NiceMock<Upstream::MockHealthCheckEventLogger>();
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(*this, eventLogger_()).WillByDefault(Return(event_logger_));
 }
 
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() {}

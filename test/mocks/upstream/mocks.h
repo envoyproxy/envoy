@@ -20,6 +20,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/secret/mocks.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/mocks/tcp/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 
 #include "gmock/gmock.h"
@@ -154,10 +155,16 @@ public:
                                      ResourcePriority priority, Http::Protocol protocol,
                                      const Network::ConnectionSocket::OptionsSharedPtr& options));
 
-  MOCK_METHOD4(clusterFromProto,
+  MOCK_METHOD4(
+      allocateTcpConnPool,
+      Tcp::ConnectionPool::InstancePtr(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                                       ResourcePriority priority,
+                                       const Network::ConnectionSocket::OptionsSharedPtr& options));
+
+  MOCK_METHOD5(clusterFromProto,
                ClusterSharedPtr(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
                                 Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                bool added_via_api));
+                                AccessLog::AccessLogManager& log_manager, bool added_via_api));
 
   MOCK_METHOD3(createCds,
                CdsApiPtr(const envoy::api::v2::core::ConfigSource& cds_config,
@@ -191,6 +198,9 @@ public:
                Http::ConnectionPool::Instance*(const std::string& cluster,
                                                ResourcePriority priority, Http::Protocol protocol,
                                                LoadBalancerContext* context));
+  MOCK_METHOD3(tcpConnPoolForCluster,
+               Tcp::ConnectionPool::Instance*(const std::string& cluster, ResourcePriority priority,
+                                              LoadBalancerContext* context));
   MOCK_METHOD2(tcpConnForCluster_,
                MockHost::MockCreateConnectionData(const std::string& cluster,
                                                   LoadBalancerContext* context));
@@ -207,6 +217,7 @@ public:
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
+  NiceMock<Tcp::ConnectionPool::MockInstance> tcp_conn_pool_;
   NiceMock<MockThreadLocalCluster> thread_local_cluster_;
   envoy::api::v2::core::BindConfig bind_config_;
   NiceMock<Config::MockGrpcMux> ads_mux_;
@@ -230,6 +241,15 @@ public:
   }
 
   std::list<HostStatusCb> callbacks_;
+};
+
+class MockHealthCheckEventLogger : public HealthCheckEventLogger {
+public:
+  MOCK_METHOD3(logEjectUnhealthy, void(envoy::data::core::v2alpha::HealthCheckerType,
+                                       const HostDescriptionConstSharedPtr&,
+                                       envoy::data::core::v2alpha::HealthCheckFailureType));
+  MOCK_METHOD3(logAddHealthy, void(envoy::data::core::v2alpha::HealthCheckerType,
+                                   const HostDescriptionConstSharedPtr&, bool));
 };
 
 class MockCdsApi : public CdsApi {

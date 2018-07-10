@@ -90,6 +90,9 @@ private:
   struct NullCorsPolicy : public Router::CorsPolicy {
     // Router::CorsPolicy
     const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
+    const std::list<std::regex>& allowOriginRegexes() const override {
+      return allow_origin_regex_;
+    };
     const std::string& allowMethods() const override { return EMPTY_STRING; };
     const std::string& allowHeaders() const override { return EMPTY_STRING; };
     const std::string& exposeHeaders() const override { return EMPTY_STRING; };
@@ -98,6 +101,7 @@ private:
     bool enabled() const override { return false; };
 
     static const std::list<std::string> allow_origin_;
+    static const std::list<std::regex> allow_origin_regex_;
     static const absl::optional<bool> allow_credentials_;
   };
 

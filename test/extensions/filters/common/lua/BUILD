@@ -27,6 +27,8 @@ envoy_cc_test(
         ":lua_wrappers_lib",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/common/lua:wrappers_lib",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:utility_lib",
     ],
 )

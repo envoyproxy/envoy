@@ -467,6 +467,21 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "tcp_conn_pool_integration_test",
+    srcs = [
+        "tcp_conn_pool_integration_test.cc",
+    ],
+    deps = [
+        ":integration_lib",
+        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/tcp:conn_pool_interface",
+        "//test/server:utility_lib",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "uds_integration_test",
     srcs = [
         "uds_integration_test.cc",

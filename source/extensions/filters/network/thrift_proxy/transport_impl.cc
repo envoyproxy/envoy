@@ -59,6 +59,11 @@ bool AutoTransportImpl::decodeFrameEnd(Buffer::Instance& buffer) {
   return transport_->decodeFrameEnd(buffer);
 }
 
+void AutoTransportImpl::encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) {
+  RELEASE_ASSERT(transport_ != nullptr);
+  transport_->encodeFrame(buffer, message);
+}
+
 } // namespace ThriftProxy
 } // namespace NetworkFilters
 } // namespace Extensions

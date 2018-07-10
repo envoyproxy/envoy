@@ -25,15 +25,19 @@ void Utility::translateApiConfigSource(const std::string& cluster, uint32_t refr
                                        envoy::api::v2::core::ApiConfigSource& api_config_source) {
   // TODO(junr03): document the option to chose an api type once we have created
   // stronger constraints around v2.
-  if (api_type == ApiType::get().RestLegacy) {
-    api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
-  } else if (api_type == ApiType::get().Rest) {
-    api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
-  } else {
-    ASSERT(api_type == ApiType::get().Grpc);
+  if (api_type == ApiType::get().Grpc) {
     api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+    envoy::api::v2::core::GrpcService* grpc_service = api_config_source.add_grpc_services();
+    grpc_service->mutable_envoy_grpc()->set_cluster_name(cluster);
+  } else {
+    if (api_type == ApiType::get().RestLegacy) {
+      api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
+    } else if (api_type == ApiType::get().Rest) {
+      api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
+    }
+    api_config_source.add_cluster_names(cluster);
   }
-  api_config_source.add_cluster_names(cluster);
+
   api_config_source.mutable_refresh_delay()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
 }
@@ -83,26 +87,21 @@ void Utility::checkApiConfigSourceNames(
   const bool is_grpc =
       (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
 
-  if (api_config_source.cluster_names().size() == 0 &&
-      api_config_source.grpc_services().size() == 0) {
+  if (api_config_source.cluster_names().empty() && api_config_source.grpc_services().empty()) {
     throw EnvoyException("API configs must have either a gRPC service or a cluster name defined");
   }
 
   if (is_grpc) {
-    if (api_config_source.cluster_names().size() != 0) {
-      ENVOY_LOG_MISC(warn, "Setting a cluster name for API config source type "
-                           "envoy::api::v2::core::ConfigSource::GRPC is deprecated");
-    }
-    if (api_config_source.cluster_names().size() > 1) {
+    if (!api_config_source.cluster_names().empty()) {
       throw EnvoyException(
-          "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified");
+          "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified.");
     }
     if (api_config_source.grpc_services().size() > 1) {
       throw EnvoyException(
           "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
     }
   } else {
-    if (api_config_source.grpc_services().size() != 0) {
+    if (!api_config_source.grpc_services().empty()) {
       throw EnvoyException("envoy::api::v2::core::ConfigSource, if not of type gRPC, must not have "
                            "a gRPC service specified");
     }
@@ -219,11 +218,7 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
   Utility::checkApiConfigSourceNames(api_config_source);
 
   envoy::api::v2::core::GrpcService grpc_service;
-  if (api_config_source.cluster_names().empty()) {
-    grpc_service.MergeFrom(api_config_source.grpc_services(0));
-  } else {
-    grpc_service.mutable_envoy_grpc()->set_cluster_name(api_config_source.cluster_names(0));
-  }
+  grpc_service.MergeFrom(api_config_source.grpc_services(0));
 
   return async_client_manager.factoryForGrpcService(grpc_service, scope, false);
 }

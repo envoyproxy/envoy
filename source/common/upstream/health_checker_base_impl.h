@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
@@ -45,17 +46,15 @@ public:
 protected:
   class ActiveHealthCheckSession {
   public:
-    enum class FailureType { Active, Passive, Network };
-
     virtual ~ActiveHealthCheckSession();
-    HealthTransition setUnhealthy(FailureType type);
+    HealthTransition setUnhealthy(envoy::data::core::v2alpha::HealthCheckFailureType type);
     void start() { onIntervalBase(); }
 
   protected:
     ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
 
     void handleSuccess();
-    void handleFailure(FailureType type);
+    void handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType type);
 
     HostSharedPtr host_;
 
@@ -77,9 +76,10 @@ protected:
 
   HealthCheckerImplBase(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Runtime::RandomGenerator& random);
+                        Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
+  virtual envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const PURE;
 
   const Cluster& cluster_;
   Event::Dispatcher& dispatcher_;
@@ -90,6 +90,7 @@ protected:
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
   const bool reuse_connection_;
+  HealthCheckEventLoggerPtr event_logger_;
 
 private:
   struct HealthCheckHostMonitorImpl : public HealthCheckHostMonitor {
@@ -125,6 +126,21 @@ private:
   const std::chrono::milliseconds healthy_edge_interval_;
   std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
   uint64_t local_process_healthy_{};
+};
+
+class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {
+public:
+  HealthCheckEventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name)
+      : file_(log_manager.createAccessLog(file_name)) {}
+
+  void logEjectUnhealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+                         const HostDescriptionConstSharedPtr& host,
+                         envoy::data::core::v2alpha::HealthCheckFailureType failure_type) override;
+  void logAddHealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+                     const HostDescriptionConstSharedPtr& host, bool first_check) override;
+
+private:
+  Filesystem::FileSharedPtr file_;
 };
 
 } // namespace Upstream
