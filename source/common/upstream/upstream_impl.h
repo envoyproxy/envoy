@@ -512,6 +512,9 @@ public:
 
   // Registers a host based on its address to the PriorityState based on the specified priority (the
   // priority is specified by locality_lb_endpoint.priority()).
+  //
+  // The specified health_checker_flag is used to set the registered-host's health-flag when the
+  // lb_endpoint health status is unhealty, draining or timeout.
   void
   registerHostForPriority(const std::string& hostname,
                           Network::Address::InstanceConstSharedPtr address,
