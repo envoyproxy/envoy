@@ -1,12 +1,3 @@
-#include <functional>
-
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-
-#include "test/fuzz/fuzz_runner.h"
-#include "test/integration/capture_fuzz.pb.h"
-#include "test/integration/http_integration.h"
-#include "test/test_common/environment.h"
 #include "test/integration/h1_fuzz.h"
 
 namespace Envoy {
@@ -14,16 +5,16 @@ namespace Envoy {
 void H1FuzzIntegrationTest::initialize() {
   const std::string body = "Response body";
   const std::string file_path = TestEnvironment::writeStringToFileForTest("test_envoy", body);
-  static const std::string domain("direct.example.com");
-  static const std::string prefix("/");
-  static const Http::Code status(Http::Code::OK);
+  const std::string domain("direct.example.com");
+  const std::string prefix("/");
+  const Http::Code status(Http::Code::OK);
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+      [&file_path, &domain, &prefix](
+          envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
           -> void {
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->add_virtual_hosts();
         virtual_host->set_name(domain);
-
         virtual_host->add_domains(domain);
         virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
         virtual_host->mutable_routes(0)->mutable_direct_response()->set_status(
