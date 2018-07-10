@@ -66,14 +66,6 @@ public:
     test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
   }
 
-  void cleanupUpstreamConnection() {
-    codec_client_->close();
-    if (fake_upstream_connection_ != nullptr) {
-      fake_upstream_connection_->close();
-      fake_upstream_connection_->waitForDisconnect();
-    }
-  }
-
   void cleanupHdsConnection() {
     if (fake_hds_connection_ != nullptr) {
       fake_hds_connection_->close();
