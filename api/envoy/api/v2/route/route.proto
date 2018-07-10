@@ -282,9 +282,17 @@ message RouteMatch {
   repeated QueryParameterMatcher query_parameters = 7;
 }
 
+// [#comment:next free field: 9]
 message CorsPolicy {
   // Specifies the origins that will be allowed to do CORS requests.
+  //
+  // An origin is allowed if either allow_origin or allow_origin_regex match.
   repeated string allow_origin = 1;
+
+  // Specifies regex patterns that match allowed origins.
+  //
+  // An origin is allowed if either allow_origin or allow_origin_regex match.
+  repeated string allow_origin_regex = 8;
 
   // Specifies the content for the *access-control-allow-methods* header.
   string allow_methods = 2;

@@ -487,7 +487,7 @@ string map. Nested objects are not supported.
 
 .. _config_http_conn_man_route_table_cors:
 
-Cors
+CORS
 --------
 
 Settings on a route take precedence over settings on the virtual host.

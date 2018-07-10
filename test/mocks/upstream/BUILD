@@ -52,5 +52,6 @@ envoy_cc_mock(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/tcp:tcp_mocks",
     ],
 )
