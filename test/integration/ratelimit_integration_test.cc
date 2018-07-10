@@ -74,11 +74,11 @@ public:
   }
 
   void waitForRatelimitRequest() {
-    fake_ratelimit_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-    ratelimit_request_ = fake_ratelimit_connection_->waitForNewStream(*dispatcher_);
+    ASSERT(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, &fake_ratelimit_connection_));
+    ASSERT(fake_ratelimit_connection_->waitForNewStream(*dispatcher_, &ratelimit_request_));
     envoy::service::ratelimit::v2::RateLimitRequest request_msg;
-    ratelimit_request_->waitForGrpcMessage(*dispatcher_, request_msg);
-    ratelimit_request_->waitForEndStream(*dispatcher_);
+    ASSERT(ratelimit_request_->waitForGrpcMessage(*dispatcher_, request_msg));
+    ASSERT(ratelimit_request_->waitForEndStream(*dispatcher_));
     EXPECT_STREQ("POST", ratelimit_request_->headers().Method()->value().c_str());
     if (useDataPlaneProto()) {
       EXPECT_STREQ("/envoy.service.ratelimit.v2.RateLimitService/ShouldRateLimit",
@@ -98,9 +98,9 @@ public:
   }
 
   void waitForSuccessfulUpstreamResponse() {
-    fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-    upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
-    upstream_request_->waitForEndStream(*dispatcher_);
+    ASSERT(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, &fake_upstream_connection_));
+    ASSERT(fake_upstream_connection_->waitForNewStream(*dispatcher_, &upstream_request_));
+    ASSERT(upstream_request_->waitForEndStream(*dispatcher_));
 
     upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
     upstream_request_->encodeData(response_size_, true);
@@ -133,9 +133,9 @@ public:
     if (fake_ratelimit_connection_ != nullptr) {
       if (clientType() != Grpc::ClientType::GoogleGrpc) {
         // TODO(htuch) we should document the underlying cause of this difference and/or fix it.
-        fake_ratelimit_connection_->close();
+        ASSERT(fake_ratelimit_connection_->close());
       }
-      fake_ratelimit_connection_->waitForDisconnect();
+      ASSERT(fake_ratelimit_connection_->waitForDisconnect());
     }
     cleanupUpstreamAndDownstream();
   }
@@ -213,9 +213,9 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
 
 TEST_P(RatelimitIntegrationTest, ConnectImmediateDisconnect) {
   initiateClientConnection();
-  fake_ratelimit_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-  fake_ratelimit_connection_->close();
-  fake_ratelimit_connection_->waitForDisconnect(true);
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, &fake_ratelimit_connection_));
+  ASSERT_TRUE(fake_ratelimit_connection_->close());
+  ASSERT_TRUE(fake_ratelimit_connection_->waitForDisconnect(true));
   fake_ratelimit_connection_ = nullptr;
   // Rate limiter fails open
   waitForSuccessfulUpstreamResponse();
