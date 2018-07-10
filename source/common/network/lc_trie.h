@@ -314,7 +314,7 @@ private:
     BinaryTrie(bool exclusive) : root_(std::make_unique<Node>()), exclusive_(exclusive) {}
 
     /**
-     * Add a CIDR prefix and associated datato the binary trie. If an entry already
+     * Add a CIDR prefix and associated data to the binary trie. If an entry already
      * exists for the prefix, merge the data into the existing entry.
      */
     void insert(const IpPrefix<IpType>& prefix) {
