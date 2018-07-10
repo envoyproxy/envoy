@@ -11,7 +11,7 @@ JitteredBackOffStrategy::JitteredBackOffStrategy(uint64_t base_interval, uint64_
 uint64_t JitteredBackOffStrategy::nextBackOffMs() {
   current_retry_++;
   uint32_t multiplier = (1 << current_retry_) - 1;
-  // for retries that take longer, multiplier may overflow and become zero. 
+  // for retries that take longer, multiplier may overflow and become zero.
   if (multiplier == 0) {
     current_retry_ = 1;
     multiplier = (1 << current_retry_) - 1;
