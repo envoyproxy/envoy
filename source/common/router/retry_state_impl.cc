@@ -71,9 +71,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
   // Merge in the route policy.
   retry_on_ |= route_policy.retryOn();
   retries_remaining_ = std::max(retries_remaining_, route_policy.numRetries());
-
-  backoff_strategy_ptr_ = std::make_unique<JitteredBackOffStrategy>(
-      runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25), random_);
+  uint32_t base = runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25);
+  backoff_strategy_ptr_ = std::make_unique<JitteredBackOffStrategy>(base, base * 10, random_);
 }
 
 RetryStateImpl::~RetryStateImpl() { resetRetry(); }

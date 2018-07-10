@@ -12,12 +12,12 @@ namespace Config {
 GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
-                         MonotonicTimeSource& time_source)
+                         Runtime::RandomGenerator& random, MonotonicTimeSource& time_source)
     : node_(node), async_client_(std::move(async_client)), service_method_(service_method),
-      time_source_(time_source) {
+      random_(random), time_source_(time_source) {
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
-  backoff_strategy_ptr_ = std::make_unique<ExponentialBackOffStrategy>(
-      RETRY_INITIAL_DELAY_MS, RETRY_MAX_DELAY_MS, MULTIPLIER);
+  backoff_strategy_ptr_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
+                                                                    RETRY_MAX_DELAY_MS, random_);
 }
 
 GrpcMuxImpl::~GrpcMuxImpl() {
