@@ -1,3 +1,5 @@
+#include <limits>
+
 #include "envoy/common/exception.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -283,7 +285,7 @@ TEST(BufferHelperTest, DrainDouble) {
   addSeq(buffer, {0xFF, 0xEF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
 
   EXPECT_EQ(BufferHelper::drainDouble(buffer), 3.0);
-  EXPECT_EQ(BufferHelper::drainDouble(buffer), -DBL_MAX);
+  EXPECT_EQ(BufferHelper::drainDouble(buffer), std::numeric_limits<double>::lowest());
   EXPECT_EQ(buffer.length(), 0);
 }
 
@@ -484,7 +486,7 @@ TEST(BufferHelperTest, WriteI8) {
 TEST(BufferHelperTest, WriteI16) {
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeI16(buffer, INT16_MIN);
+    BufferHelper::writeI16(buffer, std::numeric_limits<int16_t>::min());
     EXPECT_EQ(std::string("\x80\0", 2), buffer.toString());
   }
   {
@@ -499,7 +501,7 @@ TEST(BufferHelperTest, WriteI16) {
   }
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeI16(buffer, INT16_MAX);
+    BufferHelper::writeI16(buffer, std::numeric_limits<int16_t>::max());
     EXPECT_EQ("\x7F\xFF", buffer.toString());
   }
 }
@@ -517,12 +519,12 @@ TEST(BufferHelperTest, WriteU16) {
   }
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeU16(buffer, static_cast<uint16_t>(INT16_MAX) + 1);
+    BufferHelper::writeU16(buffer, static_cast<uint16_t>(std::numeric_limits<int16_t>::max()) + 1);
     EXPECT_EQ(std::string("\x80\0", 2), buffer.toString());
   }
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeU16(buffer, UINT16_MAX);
+    BufferHelper::writeU16(buffer, std::numeric_limits<uint16_t>::max());
     EXPECT_EQ("\xFF\xFF", buffer.toString());
   }
 }
@@ -530,7 +532,7 @@ TEST(BufferHelperTest, WriteU16) {
 TEST(BufferHelperTest, WriteI32) {
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeI32(buffer, INT32_MIN);
+    BufferHelper::writeI32(buffer, std::numeric_limits<int32_t>::min());
     EXPECT_EQ(std::string("\x80\0\0\0", 4), buffer.toString());
   }
   {
@@ -545,7 +547,7 @@ TEST(BufferHelperTest, WriteI32) {
   }
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeI32(buffer, INT32_MAX);
+    BufferHelper::writeI32(buffer, std::numeric_limits<int32_t>::max());
     EXPECT_EQ("\x7F\xFF\xFF\xFF", buffer.toString());
   }
 }
@@ -563,19 +565,19 @@ TEST(BufferHelperTest, WriteU32) {
   }
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeU32(buffer, static_cast<uint32_t>(INT32_MAX) + 1);
+    BufferHelper::writeU32(buffer, static_cast<uint32_t>(std::numeric_limits<int32_t>::max()) + 1);
     EXPECT_EQ(std::string("\x80\0\0\0", 4), buffer.toString());
   }
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeU32(buffer, UINT32_MAX);
+    BufferHelper::writeU32(buffer, std::numeric_limits<uint32_t>::max());
     EXPECT_EQ("\xFF\xFF\xFF\xFF", buffer.toString());
   }
 }
 TEST(BufferHelperTest, WriteI64) {
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeI64(buffer, INT64_MIN);
+    BufferHelper::writeI64(buffer, std::numeric_limits<int64_t>::min());
     EXPECT_EQ(std::string("\x80\0\0\0\0\0\0\0\0", 8), buffer.toString());
   }
   {
@@ -590,7 +592,7 @@ TEST(BufferHelperTest, WriteI64) {
   }
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeI64(buffer, INT64_MAX);
+    BufferHelper::writeI64(buffer, std::numeric_limits<int64_t>::max());
     EXPECT_EQ("\x7F\xFF\xFF\xFF\xFF\xFF\xFF\xFF", buffer.toString());
   }
 }
@@ -605,7 +607,7 @@ TEST(BufferHelperTest, WriteDouble) {
 
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeDouble(buffer, -DBL_MAX);
+    BufferHelper::writeDouble(buffer, std::numeric_limits<double>::lowest());
     EXPECT_EQ("\xFF\xEF\xFF\xFF\xFF\xFF\xFF\xFF", buffer.toString());
   }
 }
@@ -638,7 +640,7 @@ TEST(BufferHelperTest, WriteVarIntI32) {
   }
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeVarIntI32(buffer, INT32_MAX);
+    BufferHelper::writeVarIntI32(buffer, std::numeric_limits<int32_t>::max());
     EXPECT_EQ("\xFF\xFF\xFF\xFF\x7", buffer.toString());
   }
   {
@@ -648,7 +650,7 @@ TEST(BufferHelperTest, WriteVarIntI32) {
   }
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeVarIntI32(buffer, INT32_MIN);
+    BufferHelper::writeVarIntI32(buffer, std::numeric_limits<int32_t>::min());
     EXPECT_EQ("\x80\x80\x80\x80\x8", buffer.toString());
   }
 }
@@ -686,12 +688,12 @@ TEST(BufferHelperTest, WriteVarIntI64) {
   }
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeVarIntI64(buffer, INT32_MAX);
+    BufferHelper::writeVarIntI64(buffer, std::numeric_limits<int32_t>::max());
     EXPECT_EQ("\xFF\xFF\xFF\xFF\x7", buffer.toString());
   }
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeVarIntI64(buffer, INT64_MAX);
+    BufferHelper::writeVarIntI64(buffer, std::numeric_limits<int64_t>::max());
     EXPECT_EQ("\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x7F", buffer.toString());
   }
   {
@@ -701,12 +703,12 @@ TEST(BufferHelperTest, WriteVarIntI64) {
   }
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeVarIntI64(buffer, INT32_MIN);
+    BufferHelper::writeVarIntI64(buffer, std::numeric_limits<int32_t>::min());
     EXPECT_EQ("\x80\x80\x80\x80\xF8\xFF\xFF\xFF\xFF\x1", buffer.toString());
   }
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeVarIntI64(buffer, INT64_MIN);
+    BufferHelper::writeVarIntI64(buffer, std::numeric_limits<int64_t>::min());
     EXPECT_EQ("\x80\x80\x80\x80\x80\x80\x80\x80\x80\x1", buffer.toString());
   }
 }
@@ -757,14 +759,14 @@ TEST(BufferHelperTest, WriteZigZagI32) {
   // zigzag(0x7FFFFFFF) = 0xFFFFFFFE
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeZigZagI32(buffer, INT32_MAX);
+    BufferHelper::writeZigZagI32(buffer, std::numeric_limits<int32_t>::max());
     EXPECT_EQ("\xFE\xFF\xFF\xFF\xF", buffer.toString());
   }
 
   // zigzag(0x80000000) = 0xFFFFFFFF
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeZigZagI32(buffer, INT32_MIN);
+    BufferHelper::writeZigZagI32(buffer, std::numeric_limits<int32_t>::min());
     EXPECT_EQ("\xFF\xFF\xFF\xFF\xF", buffer.toString());
   }
 }
@@ -815,28 +817,28 @@ TEST(BufferHelperTest, WriteZigZagI64) {
   // zigzag(0x7FFFFFFF) = 0xFFFFFFFE
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeZigZagI64(buffer, INT32_MAX);
+    BufferHelper::writeZigZagI64(buffer, std::numeric_limits<int32_t>::max());
     EXPECT_EQ("\xFE\xFF\xFF\xFF\xF", buffer.toString());
   }
 
   // zigzag(0x80000000) = 0xFFFFFFFF
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeZigZagI64(buffer, INT32_MIN);
+    BufferHelper::writeZigZagI64(buffer, std::numeric_limits<int32_t>::min());
     EXPECT_EQ("\xFF\xFF\xFF\xFF\xF", buffer.toString());
   }
 
   // zigzag(0x7FFFFFFF FFFFFFFF) = 0xFFFFFFFFFFFFFFFE
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeZigZagI64(buffer, INT64_MAX);
+    BufferHelper::writeZigZagI64(buffer, std::numeric_limits<int64_t>::max());
     EXPECT_EQ("\xFE\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x1", buffer.toString());
   }
 
   // zigzag(0x8000000000000000) = 0xFFFFFFFFFFFFFFFF
   {
     Buffer::OwnedImpl buffer;
-    BufferHelper::writeZigZagI64(buffer, INT64_MIN);
+    BufferHelper::writeZigZagI64(buffer, std::numeric_limits<int64_t>::min());
     EXPECT_EQ("\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x1", buffer.toString());
   }
 }

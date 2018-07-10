@@ -431,6 +431,67 @@ TEST_P(HttpExtAuthzFilterParamTest, DestroyResponseBeforeSendLocalReply) {
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_403").value());
 }
 
+// Verify that authz denied response headers overrides the existing encoding headers.
+TEST_P(HttpExtAuthzFilterParamTest, OverrideEncodingHeaders) {
+  InSequence s;
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
+  response.status_code = Http::Code::Forbidden;
+  response.body = std::string{"foo"};
+  response.headers_to_add = Http::HeaderVector{{Http::LowerCaseString{"foo"}, "bar"},
+                                               {Http::LowerCaseString{"bar"}, "foo"}};
+  Filters::Common::ExtAuthz::ResponsePtr response_ptr =
+      std::make_unique<Filters::Common::ExtAuthz::Response>(response);
+
+  ON_CALL(filter_callbacks_, connection()).WillByDefault(Return(&connection_));
+  EXPECT_CALL(connection_, remoteAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(connection_, localAddress()).WillOnce(ReturnRef(addr_));
+  EXPECT_CALL(*client_, check(_, _, _))
+      .WillOnce(
+          WithArgs<0>(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks) -> void {
+            request_callbacks_ = &callbacks;
+          })));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  Http::TestHeaderMapImpl response_headers{{":status", "403"},
+                                           {"content-length", "3"},
+                                           {"content-type", "text/plain"},
+                                           {"foo", "bar"},
+                                           {"bar", "foo"}};
+
+  Http::HeaderMap* saved_headers;
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false))
+      .WillOnce(Invoke([&](Http::HeaderMap& headers, bool) {
+        headers.addCopy(Http::LowerCaseString{"foo"}, std::string{"OVERRIDE_WITH_bar"});
+        headers.addCopy(Http::LowerCaseString{"foobar"}, std::string{"DO_NOT_OVERRIDE"});
+        saved_headers = &headers;
+      }));
+
+  EXPECT_CALL(filter_callbacks_, encodeData(_, true))
+      .WillOnce(Invoke([&](Buffer::Instance& data, bool) {
+        response_ptr.reset();
+        Http::TestHeaderMapImpl test_headers{*saved_headers};
+        EXPECT_EQ(test_headers.get_("foo"), "bar");
+        EXPECT_EQ(test_headers.get_("bar"), "foo");
+        EXPECT_EQ(test_headers.get_("foobar"), "DO_NOT_OVERRIDE");
+        EXPECT_EQ(data.toString(), "foo");
+      }));
+
+  request_callbacks_->onComplete(std::move(response_ptr));
+
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ext_authz.denied").value());
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_4xx").value());
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_403").value());
+}
+
 // Test that when a connection awaiting a authorization response is canceled then the
 // authorization call is closed.
 TEST_P(HttpExtAuthzFilterParamTest, ResetDuringCall) {
