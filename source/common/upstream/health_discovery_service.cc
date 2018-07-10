@@ -67,7 +67,6 @@ void HdsDelegate::onReceiveMessage(
 
   // Create HdsCluster config
   ENVOY_LOG(debug, "Creating HdsCluster config");
-  envoy::api::v2::Cluster cluster_config;
   envoy::api::v2::Cluster& cluster_config_r = cluster_config;
   cluster_config_r.set_name("anna");
   cluster_config_r.mutable_connect_timeout()->set_seconds(2);
@@ -91,6 +90,7 @@ void HdsDelegate::onReceiveMessage(
   socket->set_address(endpoint_address);
   socket->set_port_value(endpoint_port);
 
+
   // Add health checker to cluster
   auto* cluster_health_check = cluster_config_r.add_health_checks();
   cluster_health_check->mutable_timeout()->set_seconds(1);
@@ -101,22 +101,22 @@ void HdsDelegate::onReceiveMessage(
   auto* http_health_check = cluster_health_check->mutable_http_health_check();
   http_health_check->set_use_http2(false);
   http_health_check->set_path("/healthcheck");
-  http_health_check->set_service_name("locations");
+  //http_health_check->set_service_name("locations");
 
   ENVOY_LOG(debug, "New cluster config {} ", cluster_config_r.DebugString());
 
   // Creating HdsCluster
-  HdsCluster cluster(runtime_h, cluster_config_r, bind_config, store_stats, ssl_context_manager_,
-                     secret_manager_, false);
+  cluster_.reset( new HdsCluster(runtime_h, cluster_config_r, bind_config, store_stats, ssl_context_manager_,
+                     secret_manager_, false));
 
   // Creating HealthChecker
-  Upstream::HealthCheckerSharedPtr health_checker_ptr = Upstream::HealthCheckerFactory::create(
-      *cluster_health_check, cluster, runtime_h, random_, dispatcher_);
+  health_checker_ptr = Upstream::HealthCheckerFactory::create(
+      *cluster_health_check, *cluster_, runtime_h, random_, dispatcher_);
 
   // Initializing HealthChecker
-  cluster.setHealthChecker(health_checker_ptr);
+  cluster_->setHealthChecker(health_checker_ptr);
   bool initialized = false;
-  cluster.initialize([&initialized] { initialized = true; });
+  cluster_->initialize([&initialized] { initialized = true; });
 
   // We're done
   stream_->sendMessage(health_check_request_, false);
@@ -160,15 +160,15 @@ void HdsCluster::setHealthChecker(const HealthCheckerSharedPtr& health_checker) 
   ASSERT(!health_checker_);
   health_checker_ = health_checker;
   health_checker_->start();
-  health_checker_->addHostCheckCompleteCb(
-      [this](HostSharedPtr, HealthTransition changed_state) -> void {
-        // If we get a health check completion that resulted in a state change, signal to
-        // update the host sets on all threads.
-        ENVOY_LOG(debug, "Callback from setting healthchecker");
-        if (changed_state == HealthTransition::Changed) {
-          reloadHealthyHosts();
-        }
-      });
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr, HealthTransition changed_state) -> void {
+          // If we get a health check completion that resulted in a state change, signal to
+          // update the host sets on all threads.
+          ENVOY_LOG(debug, "Callback from setting healthchecker");
+          if (changed_state == HealthTransition::Changed) {
+            reloadHealthyHosts();
+          }
+        });
 }
 
 void HdsCluster::reloadHealthyHosts() {
@@ -222,6 +222,8 @@ void HdsCluster::startPreInit() {
       host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
     }
   }
+
+  //info_->stats().upstream_cx_total_.inc();
   // Given the current config, only EDS clusters support multiple priorities.
   ASSERT(priority_set_.hostSetsPerPriority().size() == 1);
 

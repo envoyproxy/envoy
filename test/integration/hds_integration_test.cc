@@ -5,8 +5,6 @@
 
 #include "common/config/metadata.h"
 #include "common/config/resources.h"
-#include "common/json/config_schemas.h"
-#include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/health_checker_impl.h"
@@ -154,7 +152,15 @@ TEST_P(HdsIntegrationTest, Setup) {
   hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_2);
   fake_fake_stream = fake_fake_connection->waitForNewStream(*dispatcher_);
   fake_fake_stream->waitForEndStream(*dispatcher_);
+
+  EXPECT_STREQ(fake_fake_stream->headers().Path()->value().c_str() , "/healthcheck");
+  EXPECT_STREQ(fake_fake_stream->headers().Method()->value().c_str(), "GET");
   test_server_->waitForCounterGe("hds_delegate.responses", 2);
+
+  // Endpoint reponds to the healthcheck
+  fake_fake_stream->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  fake_fake_stream->encodeData(1024, true);
+
 
   // Clean up connections
   fake_fake_connection->close();
