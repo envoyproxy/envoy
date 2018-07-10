@@ -265,6 +265,106 @@ bool BinaryProtocolImpl::readBinary(Buffer::Instance& buffer, std::string& value
   return readString(buffer, value);
 }
 
+void BinaryProtocolImpl::writeMessageBegin(Buffer::Instance& buffer, const std::string& name,
+                                           MessageType msg_type, int32_t seq_id) {
+  BufferHelper::writeU16(buffer, Magic);
+  BufferHelper::writeU16(buffer, static_cast<uint16_t>(msg_type));
+  writeString(buffer, name);
+  BufferHelper::writeI32(buffer, seq_id);
+}
+
+void BinaryProtocolImpl::writeMessageEnd(Buffer::Instance& buffer) {
+  UNREFERENCED_PARAMETER(buffer);
+}
+
+void BinaryProtocolImpl::writeStructBegin(Buffer::Instance& buffer, const std::string& name) {
+  UNREFERENCED_PARAMETER(buffer);
+  UNREFERENCED_PARAMETER(name);
+}
+
+void BinaryProtocolImpl::writeStructEnd(Buffer::Instance& buffer) {
+  UNREFERENCED_PARAMETER(buffer);
+}
+
+void BinaryProtocolImpl::writeFieldBegin(Buffer::Instance& buffer, const std::string& name,
+                                         FieldType field_type, int16_t field_id) {
+  UNREFERENCED_PARAMETER(name);
+
+  BufferHelper::writeI8(buffer, static_cast<uint8_t>(field_type));
+  if (field_type == FieldType::Stop) {
+    return;
+  }
+
+  BufferHelper::writeI16(buffer, field_id);
+}
+
+void BinaryProtocolImpl::writeFieldEnd(Buffer::Instance& buffer) { UNREFERENCED_PARAMETER(buffer); }
+
+void BinaryProtocolImpl::writeMapBegin(Buffer::Instance& buffer, FieldType key_type,
+                                       FieldType value_type, uint32_t size) {
+  if (size > INT32_MAX) {
+    throw EnvoyException(fmt::format("illegal binary protocol map size {}", size));
+  }
+
+  BufferHelper::writeI8(buffer, static_cast<int8_t>(key_type));
+  BufferHelper::writeI8(buffer, static_cast<int8_t>(value_type));
+  BufferHelper::writeI32(buffer, static_cast<int32_t>(size));
+}
+
+void BinaryProtocolImpl::writeMapEnd(Buffer::Instance& buffer) { UNREFERENCED_PARAMETER(buffer); }
+
+void BinaryProtocolImpl::writeListBegin(Buffer::Instance& buffer, FieldType elem_type,
+                                        uint32_t size) {
+  if (size > INT32_MAX) {
+    throw EnvoyException(fmt::format("illegal binary protocol list/set size {}", size));
+  }
+
+  BufferHelper::writeI8(buffer, static_cast<int8_t>(elem_type));
+  BufferHelper::writeI32(buffer, static_cast<int32_t>(size));
+}
+
+void BinaryProtocolImpl::writeListEnd(Buffer::Instance& buffer) { UNREFERENCED_PARAMETER(buffer); }
+
+void BinaryProtocolImpl::writeSetBegin(Buffer::Instance& buffer, FieldType elem_type,
+                                       uint32_t size) {
+  writeListBegin(buffer, elem_type, size);
+}
+
+void BinaryProtocolImpl::writeSetEnd(Buffer::Instance& buffer) { writeListEnd(buffer); }
+
+void BinaryProtocolImpl::writeBool(Buffer::Instance& buffer, bool value) {
+  BufferHelper::writeI8(buffer, value ? 1 : 0);
+}
+
+void BinaryProtocolImpl::writeByte(Buffer::Instance& buffer, uint8_t value) {
+  BufferHelper::writeI8(buffer, value);
+}
+
+void BinaryProtocolImpl::writeInt16(Buffer::Instance& buffer, int16_t value) {
+  BufferHelper::writeI16(buffer, value);
+}
+
+void BinaryProtocolImpl::writeInt32(Buffer::Instance& buffer, int32_t value) {
+  BufferHelper::writeI32(buffer, value);
+}
+
+void BinaryProtocolImpl::writeInt64(Buffer::Instance& buffer, int64_t value) {
+  BufferHelper::writeI64(buffer, value);
+}
+
+void BinaryProtocolImpl::writeDouble(Buffer::Instance& buffer, double value) {
+  BufferHelper::writeDouble(buffer, value);
+}
+
+void BinaryProtocolImpl::writeString(Buffer::Instance& buffer, const std::string& value) {
+  BufferHelper::writeU32(buffer, value.length());
+  buffer.add(value);
+}
+
+void BinaryProtocolImpl::writeBinary(Buffer::Instance& buffer, const std::string& value) {
+  writeString(buffer, value);
+}
+
 bool LaxBinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string& name,
                                              MessageType& msg_type, int32_t& seq_id) {
   // Minimum message length:
@@ -302,6 +402,13 @@ bool LaxBinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::stri
 
   onMessageStart(absl::string_view(name), msg_type, seq_id);
   return true;
+}
+
+void LaxBinaryProtocolImpl::writeMessageBegin(Buffer::Instance& buffer, const std::string& name,
+                                              MessageType msg_type, int32_t seq_id) {
+  writeString(buffer, name);
+  BufferHelper::writeI8(buffer, static_cast<int8_t>(msg_type));
+  BufferHelper::writeI32(buffer, seq_id);
 }
 
 } // namespace ThriftProxy

@@ -49,6 +49,7 @@ public:
             cors->set_expose_headers("content-type");
             cors->set_max_age("100");
           }
+
           {
             auto* route = virtual_host->add_routes();
             route->mutable_match()->set_prefix("/cors-credentials-allowed");
@@ -56,6 +57,14 @@ public:
             auto* cors = route->mutable_route()->mutable_cors();
             cors->add_allow_origin("test-origin-1");
             cors->mutable_allow_credentials()->set_value(true);
+          }
+
+          {
+            auto* route = virtual_host->add_routes();
+            route->mutable_match()->set_prefix("/cors-allow-origin-regex");
+            route->mutable_route()->set_cluster("cluster_0");
+            auto* cors = route->mutable_route()->mutable_cors();
+            cors->add_allow_origin_regex(".*\\.envoyproxy\\.io");
           }
         });
     HttpIntegrationTest::initialize();
@@ -198,6 +207,24 @@ TEST_P(CorsFilterIntegrationTest, TestEncodeHeadersCredentialsAllowed) {
       },
       Http::TestHeaderMapImpl{
           {"access-control-allow-origin", "test-origin"},
+          {"access-control-allow-credentials", "true"},
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+      });
+}
+
+TEST_P(CorsFilterIntegrationTest, TestAllowedOriginRegex) {
+  testNormalRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/cors-allow-origin-regex/test"},
+          {":scheme", "http"},
+          {":authority", "test-host"},
+          {"origin", "www.envoyproxy.io"},
+      },
+      Http::TestHeaderMapImpl{
+          {"access-control-allow-origin", "www.envoyproxy.io"},
           {"access-control-allow-credentials", "true"},
           {"server", "envoy"},
           {"content-length", "0"},

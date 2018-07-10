@@ -54,6 +54,9 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) 
   for (const auto& origin : config.allow_origin()) {
     allow_origin_.push_back(origin);
   }
+  for (const auto& regex : config.allow_origin_regex()) {
+    allow_origin_regex_.push_back(RegexUtil::parseRegex(regex));
+  }
   allow_methods_ = config.allow_methods();
   allow_headers_ = config.allow_headers();
   expose_headers_ = config.expose_headers();

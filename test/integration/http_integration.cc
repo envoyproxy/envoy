@@ -1120,6 +1120,11 @@ void HttpIntegrationTest::testHttp10Enabled() {
       reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())->lastRequestHeaders();
   ASSERT_TRUE(upstream_headers.get() != nullptr);
   EXPECT_EQ(upstream_headers->Host()->value(), "default.com");
+
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "HEAD / HTTP/1.0\r\n\r\n", &response, false);
+  EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
+  EXPECT_THAT(response, HasSubstr("connection: close"));
+  EXPECT_THAT(response, Not(HasSubstr("transfer-encoding: chunked\r\n")));
 }
 
 // Verify for HTTP/1.0 a keep-alive header results in no connection: close.
