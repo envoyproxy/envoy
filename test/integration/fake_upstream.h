@@ -206,7 +206,9 @@ public:
       if (connected()) {
         f(connection_);
       } else {
-        RELEASE_ASSERT(allow_unexpected_disconnects_);
+        RELEASE_ASSERT(
+            allow_unexpected_disconnects_,
+            "The connection disconnected unexpectedly, and allow_unexpected_disconnects_ is false");
       }
       callback_ready_event.notifyOne();
     });
@@ -242,7 +244,11 @@ public:
         allow_unexpected_disconnects_(allow_unexpected_disconnects) {
     shared_connection_.addDisconnectCallback([this] {
       Thread::LockGuard lock(lock_);
-      RELEASE_ASSERT(parented_ || allow_unexpected_disconnects_);
+      RELEASE_ASSERT(parented_ || allow_unexpected_disconnects_,
+                     "An queued upstream connection was torn down without being associated "
+                     "with a fake connection. Either manage the connection via "
+                     "waitForRawConnection() or waitForHttpConnection(), or "
+                     "set_allow_unexpected_disconnects(true).");
     });
   }
 

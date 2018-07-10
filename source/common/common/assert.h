@@ -3,11 +3,11 @@
 #include "common/common/logger.h"
 
 namespace Envoy {
+
 /**
- * assert macro that uses our builtin logging which gives us thread ID and can log to various
- * sinks.
+ * The original version of RELEASE_ASSERT which simply checks and logs the condition.
  */
-#define RELEASE_ASSERT(X)                                                                          \
+#define _RELEASE_ASSERT_ORIGINAL(X)                                                                \
   do {                                                                                             \
     if (!(X)) {                                                                                    \
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,    \
@@ -15,6 +15,38 @@ namespace Envoy {
       abort();                                                                                     \
     }                                                                                              \
   } while (false)
+
+/**
+ * The new version of RELEASE_ASSERT which allows for a more verbose explanation
+ */
+#define _RELEASE_ASSERT_VERBOSE(X, Y)                                                              \
+  do {                                                                                             \
+    if (!(X)) {                                                                                    \
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,    \
+                          "assert failure: {}. Details: {} ", #X, (Y));                            \
+      abort();                                                                                     \
+    }                                                                                              \
+  } while (false)
+
+#define __RELEASE_ASSERT_SELECTOR(_1, _2, ASSERT_MACRO, ...) ASSERT_MACRO
+
+/**
+ * assert macro that uses our builtin logging which gives us thread ID and can log to various
+ * sinks.
+ *
+ * The old style release assert is of the form
+ * RELEASE_ASSERT(foo == bar);
+ * where it will log stack traces and the failed conditional and crash if the
+ * condition is not met.
+ *
+ * The new style of release assert is of the form
+ * RELEASE_ASSERT(foo == bar, "reason foo should actually be bar");
+ * where new uses of RELEASE_ASSERT are strongly encouraged to supply a verbose
+ * explanation of what went wrong.
+ */
+#define RELEASE_ASSERT(...)                                                                        \
+  __RELEASE_ASSERT_SELECTOR(__VA_ARGS__, _RELEASE_ASSERT_VERBOSE, _RELEASE_ASSERT_ORIGINAL)        \
+  (__VA_ARGS__)
 
 #ifndef NDEBUG
 #define ASSERT(X) RELEASE_ASSERT(X)
