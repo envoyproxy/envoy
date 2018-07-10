@@ -56,8 +56,7 @@ void Filter::onReadWorker() {
   Network::ConnectionSocket& socket = cb_->socket();
 
   if ((!proxyProtocolHeader_.has_value() && !readProxyHeader(socket.fd())) ||
-      (proxyProtocolHeader_.has_value() && proxyProtocolHeader_.value().extensions_length_ &&
-       !parseExtensions(socket.fd()))) {
+      (proxyProtocolHeader_.has_value() && !parseExtensions(socket.fd()))) {
     // We return if a) we do not yet have the header, or b) we have the header but not yet all
     // the extension data. In both cases we'll be called again when the socket is ready to read
     // and pick up where we left off.
@@ -111,23 +110,23 @@ size_t Filter::lenV2Address(char* buf) {
 }
 
 void Filter::parseV2Header(char* buf) {
-  // Skip the first 12-bytes
-  // Next is ver/cmd
   const int ver_cmd = buf[PROXY_PROTO_V2_SIGNATURE_LEN];
   uint8_t u = buf[PROXY_PROTO_V2_HEADER_LEN - 2];
   uint8_t l = buf[PROXY_PROTO_V2_HEADER_LEN - 1];
   size_t hdr_addr_len = (u << 8) + l;
 
-  // Only do connections on behalf of another user, not
-  // internally-driven health-checks. If its not on behalf
-  // of someone, or its not AF_INET{6} / STREAM/DGRAM, ignore
-  // and use the real-remote info
+  if ((ver_cmd & 0xf) == PROXY_PROTO_V2_LOCAL) {
+    // This is locally-initiated, e.g. health-check, and should not override remote address
+    return;
+  }
+
+  // Only do connections on behalf of another user, not internally-driven health-checks. If
+  // its not on behalf of someone, or its not AF_INET{6} / STREAM/DGRAM, ignore and
+  /// use the real-remote info
   if ((ver_cmd & 0xf) == PROXY_PROTO_V2_ONBEHALF_OF) {
     uint8_t proto_family = buf[PROXY_PROTO_V2_SIGNATURE_LEN + 1];
-    if ((((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET ||
-         ((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET6) &&
-        (((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_STREAM) ||
-         ((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_DGRAM))) {
+    if (((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_STREAM) ||
+        ((proto_family & 0x0f) == PROXY_PROTO_V2_TRANSPORT_DGRAM)) {
       if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET) {
         typedef struct {
           uint32_t src_addr;
@@ -148,6 +147,7 @@ void Filter::parseV2Header(char* buf) {
             WireHeader{hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
                        std::make_shared<Network::Address::Ipv4Instance>(&ra4),
                        std::make_shared<Network::Address::Ipv4Instance>(&la4)});
+        return;
       } else if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET6) {
         typedef struct {
           uint8_t src_addr[16];
@@ -169,13 +169,11 @@ void Filter::parseV2Header(char* buf) {
             hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,
             std::make_shared<Network::Address::Ipv6Instance>(ra6),
             std::make_shared<Network::Address::Ipv6Instance>(la6)});
+        return;
       }
     }
-  } else if ((ver_cmd & 0xf) != PROXY_PROTO_V2_LOCAL) {
-    // PROXY_PROTO_V2_LOCAL indicates its established as e.g. health-check, local
-    // other values must be rejected
-    throw EnvoyException("Unsupported V2 proxy protocol command");
   }
+  throw EnvoyException("Unsupported command or address family or transport");
 }
 
 void Filter::parseV1Header(char* buf, size_t len) {
@@ -301,8 +299,8 @@ bool Filter::readProxyHeader(int fd) {
         throw EnvoyException("failed to read proxy protocol (insufficient data)");
       }
       if (ssize_t(buf_off_) + nread >= PROXY_PROTO_V2_HEADER_LEN + addr_len) {
-        int lread;
-        int missing = (PROXY_PROTO_V2_HEADER_LEN + addr_len) - buf_off_;
+        ssize_t lread;
+        ssize_t missing = (PROXY_PROTO_V2_HEADER_LEN + addr_len) - buf_off_;
         lread = os_syscalls.recv(fd, buf_ + buf_off_, missing, 0);
         if (lread != missing) {
           throw EnvoyException("failed to read proxy protocol (remote closed)");

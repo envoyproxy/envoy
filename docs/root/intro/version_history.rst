@@ -12,7 +12,7 @@ Version history
 * health_check: added support for :ref:`health check event logging <arch_overview_health_check_logging>`.
 * http: better handling of HEAD requests. Now sending transfer-encoding: chunked rather than content-length: 0.
 * http: response filters not applied to early error paths such as http_parser generated 400s.
-* proxy_protocol: added support for HAProxy Proxy Protocol v2 (AF_INET/AF_INET6 only)
+* proxy_protocol: added support for HAProxy Proxy Protocol v2 (AF_INET/AF_INET6 only).
 * lua: added :ref:`connection() <config_http_filters_lua_connection_wrapper>` wrapper and *ssl()* API.
 * lua: added :ref:`requestInfo() <config_http_filters_lua_request_info_wrapper>` wrapper and *protocol()* API.
 * ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`.
