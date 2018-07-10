@@ -54,8 +54,6 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
   if (resources.size() != 1) {
     throw EnvoyException(fmt::format("Unexpected EDS resource length: {}", resources.size()));
   }
-
-  PriorityStateManager priority_state_manager(*this, local_info_);
   const auto& cluster_load_assignment = resources[0];
   MessageUtil::validate(cluster_load_assignment);
   // TODO(PiotrSikora): Remove this hack once fixed internally.
@@ -63,6 +61,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
     throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
                                      cluster_load_assignment.cluster_name()));
   }
+  PriorityStateManager priority_state_manager(*this, local_info_);
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     const uint32_t priority = locality_lb_endpoint.priority();
     if (priority > 0 && !cluster_name_.empty() && cluster_name_ == cm_.localClusterName()) {
