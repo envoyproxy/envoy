@@ -695,7 +695,9 @@ void PriorityStateManager::updateClusterPrioritySet(
 
   // For non-EDS, most likely the current hosts are from priority_state_[priority].first.
   HostVectorSharedPtr hosts(std::move(current_hosts));
-  LocalityWeightsMap& locality_weights_map = priority_state_[priority].second;
+  LocalityWeightsMap empty_locality_map;
+  LocalityWeightsMap& locality_weights_map =
+      priority_state_.empty() ? empty_locality_map : priority_state_[priority].second;
   LocalityWeightsSharedPtr locality_weights;
   std::vector<HostVector> per_locality;
 
