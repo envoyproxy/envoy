@@ -28,7 +28,7 @@ protected:
       name[xfer] = '\0';
     }
     static uint64_t sizeGivenStatsOptions(const Stats::StatsOptions& stats_options) {
-      (void)stats_options;
+      UNREFERENCED_PARAMETER(stats_options);
       return sizeof(TestValue);
     }
 
