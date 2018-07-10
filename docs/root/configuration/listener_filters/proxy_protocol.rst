@@ -16,7 +16,7 @@ using them.
 
 This implementation supports both version 1 and version 2, it
 automatically determines on a per-connection basis which of the two
-versions is present.  Note: if the filter is enabled, the Proxy Protocol
+versions is present. Note: if the filter is enabled, the Proxy Protocol
 must be present on the connection (either version 1 or version 2),
 the standard does not allow parsing to determine if it is present or not.
 
