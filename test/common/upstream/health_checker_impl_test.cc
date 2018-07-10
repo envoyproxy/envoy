@@ -466,16 +466,16 @@ TEST_F(HttpHealthCheckerImplTest, SuccessIntervalJitter) {
   respond(0, "200", false, true, true);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
 
-
   for (int i = 0; i < 50000; i += 239) {
-      EXPECT_CALL(random_, random()).WillOnce(Return(i));
-      EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
-      expectStreamCreate(0);
-      test_sessions_[0]->interval_timer_->callback_();
-      // the jitter is 1000ms here
-      EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(5000 + i % 1000)));
-      EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-      respond(0, "200", false, true, true);
+    EXPECT_CALL(random_, random()).WillOnce(Return(i));
+    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+    expectStreamCreate(0);
+    test_sessions_[0]->interval_timer_->callback_();
+    // the jitter is 1000ms here
+    EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+                enableTimer(std::chrono::milliseconds(5000 + i % 1000)));
+    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+    respond(0, "200", false, true, true);
   }
 }
 
@@ -495,16 +495,16 @@ TEST_F(HttpHealthCheckerImplTest, SuccessIntervalJitterPercentNoInterval) {
   respond(0, "200", false, true, true);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
 
-
   for (int i = 0; i < 50000; i += 239) {
-      EXPECT_CALL(random_, random()).WillOnce(Return(i));
-      EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
-      expectStreamCreate(0);
-      test_sessions_[0]->interval_timer_->callback_();
-      // the jitter is 40% of 5000, so should be 2000
-      EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(5000 + i % 2000)));
-      EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-      respond(0, "200", false, true, true);
+    EXPECT_CALL(random_, random()).WillOnce(Return(i));
+    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+    expectStreamCreate(0);
+    test_sessions_[0]->interval_timer_->callback_();
+    // the jitter is 40% of 5000, so should be 2000
+    EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+                enableTimer(std::chrono::milliseconds(5000 + i % 2000)));
+    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+    respond(0, "200", false, true, true);
   }
 }
 
@@ -525,16 +525,16 @@ TEST_F(HttpHealthCheckerImplTest, SuccessIntervalJitterPercent) {
   respond(0, "200", false, true, true);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
 
-
   for (int i = 0; i < 50000; i += 239) {
-      EXPECT_CALL(random_, random()).WillOnce(Return(i));
-      EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
-      expectStreamCreate(0);
-      test_sessions_[0]->interval_timer_->callback_();
-      // the jitter is 40% of 1000, so should be 400
-      EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(1000 + i % 400)));
-      EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-      respond(0, "200", false, true, true);
+    EXPECT_CALL(random_, random()).WillOnce(Return(i));
+    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+    expectStreamCreate(0);
+    test_sessions_[0]->interval_timer_->callback_();
+    // the jitter is 40% of 1000, so should be 400
+    EXPECT_CALL(*test_sessions_[0]->interval_timer_,
+                enableTimer(std::chrono::milliseconds(1000 + i % 400)));
+    EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+    respond(0, "200", false, true, true);
   }
 }
 
