@@ -342,7 +342,8 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
     return Http::FilterDataStatus::Continue;
   }
 
-  if (has_http_body_output_ && buildResponseFromHttpBodyOutput(*response_headers_, data)) {
+  if (has_http_body_output_) {
+    buildResponseFromHttpBodyOutput(*response_headers_, data);
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
 
@@ -422,12 +423,12 @@ bool JsonTranscoderFilter::readToBuffer(Protobuf::io::ZeroCopyInputStream& strea
   return false;
 }
 
-bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& response_headers,
+void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& response_headers,
                                                            Buffer::Instance& data) {
   std::vector<Grpc::Frame> frames;
   decoder_.decode(data, frames);
   if (frames.empty()) {
-    return true;
+    return;
   }
 
   google::api::HttpBody http_body;
@@ -439,10 +440,9 @@ bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& resp
       data.add(body);
       response_headers.insertContentType().value(http_body.content_type());
       response_headers.insertContentLength().value(body.length());
-      return true;
+      return;
     }
   }
-  return false;
 }
 
 bool JsonTranscoderFilter::hasHttpBodyAsOutputType() {
