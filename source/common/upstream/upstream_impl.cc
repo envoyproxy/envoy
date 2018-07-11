@@ -684,16 +684,22 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
                                                    HostVector& hosts_added,
                                                    HostVector& hosts_removed) {
   uint64_t max_host_weight = 1;
+
+  // Did hosts change?
+  //
   // Has the EDS health status changed the health of any endpoint? If so, we
   // rebuild the hosts vectors. We only do this if the health status of an
   // endpoint has materially changed (e.g. if previously failing active health
   // checks, we just note it's now failing EDS health status but don't rebuild).
+  //
+  // Likewise, if metadata for an endpoint changed we rebuild the hosts vectors.
+  //
   // TODO(htuch): We can be smarter about this potentially, and not force a full
   // host set update on health status change. The way this would work is to
   // implement a HealthChecker subclass that provides thread local health
-  // updates to the Cluster objeect. This will probably make sense to do in
+  // updates to the Cluster object. This will probably make sense to do in
   // conjunction with https://github.com/envoyproxy/envoy/issues/2874.
-  bool health_changed = false;
+  bool hosts_changed = false;
 
   // Go through and see if the list we have is different from what we just got. If it is, we make a
   // new host list and raise a change notification. This uses an N^2 search given that this does not
@@ -725,13 +731,30 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
             (*i)->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
             // If the host was previously healthy and we're now unhealthy, we need to
             // rebuild.
-            health_changed |= previously_healthy;
+            hosts_changed |= previously_healthy;
           } else {
             (*i)->healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
             // If the host was previously unhealthy and now healthy, we need to
             // rebuild.
-            health_changed |= !previously_healthy && (*i)->healthy();
+            hosts_changed |= !previously_healthy && (*i)->healthy();
           }
+        }
+
+        // Did metadata change?
+        const bool metadata_changed =
+            !Protobuf::util::MessageDifferencer::Equivalent(*host->metadata(), *(*i)->metadata());
+        if (metadata_changed) {
+          // First, update the entire metadata for the endpoint.
+          (*i)->metadata(*host->metadata());
+
+          // Also, given that the canary attribute of an endpoint is derived from its metadata
+          // (e.g.: from envoy.lb/canary), we do a blind update here since it's cheaper than testing
+          // to see if it actually changed. We must update this besides just updating the metadata,
+          // because it'll be used by the router filter to compute upstream stats.
+          (*i)->canary(host->canary());
+
+          // If metadata changed, we need to rebuild. See github issue #3810.
+          hosts_changed = true;
         }
 
         (*i)->weight(host->weight());
@@ -791,11 +814,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     // During the search we moved all of the hosts from hosts_ into final_hosts so just
     // move them back.
     current_hosts = std::move(final_hosts);
-    // We return false here in the absence of EDS health status, because we
+    // We return false here in the absence of EDS health status or metadata changes, because we
     // have no changes to host vector status (modulo weights). When we have EDS
-    // health status, we return true, causing updateHosts() to fire in the
+    // health status or metadata changed, we return true, causing updateHosts() to fire in the
     // caller.
-    return health_changed;
+    return hosts_changed;
   }
 }
 

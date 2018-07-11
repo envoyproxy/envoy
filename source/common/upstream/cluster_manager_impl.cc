@@ -216,7 +216,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
             ->create(),
         main_thread_dispatcher,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources")));
+            "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
+        random_));
   } else {
     ads_mux_.reset(new Config::NullGrpcMuxImpl());
   }

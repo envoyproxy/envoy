@@ -13,13 +13,15 @@ import traceback
 
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/",
                      "./bazel-", "./bazel/external", "./.cache",
+                     "./source/extensions/extensions_build_config.bzl",
                      "./tools/testdata/check_format/")
-SUFFIXES = (".cc", ".h", "BUILD", ".md", ".rst", ".proto")
+SUFFIXES = (".cc", ".h", "BUILD", ".bzl", ".md", ".rst", ".proto")
 DOCS_SUFFIX = (".md", ".rst")
 PROTO_SUFFIX = (".proto")
 
 # Files in these paths can make reference to protobuf stuff directly
-GOOGLE_PROTOBUF_WHITELIST = ('ci/prebuilt', 'source/common/protobuf', 'api/test')
+GOOGLE_PROTOBUF_WHITELIST = ("ci/prebuilt", "source/common/protobuf", "api/test")
+REPOSITORIES_BZL = "bazel/repositories.bzl"
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-5.0")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
@@ -60,7 +62,7 @@ def checkNamespace(file_path):
 
 # To avoid breaking the Lyft import, we just check for path inclusion here.
 def whitelistedForProtobufDeps(file_path):
-  return (file_path.endswith(PROTO_SUFFIX) or
+  return (file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL) or \
           any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_WHITELIST))
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
@@ -82,6 +84,9 @@ def isBuildFile(file_path):
   if basename in {"BUILD", "BUILD.bazel"} or basename.endswith(".BUILD"):
     return True
   return False
+
+def isSkylarkFile(file_path):
+  return file_path.endswith(".bzl")
 
 def hasInvalidAngleBracketDirectory(line):
   if not line.startswith(INCLUDE_ANGLE):
@@ -145,36 +150,35 @@ def checkBuildLine(line, file_path, reportError):
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:
     reportError("unexpected direct external dependency on protobuf, use "
                 "//source/common/protobuf instead.")
-  if envoy_build_rule_check and '@envoy//' in line:
+  if envoy_build_rule_check and not isSkylarkFile(file_path) and '@envoy//' in line:
     reportError("Superfluous '@envoy//' prefix")
 
-def fixBuildLine(line):
-  if envoy_build_rule_check:
+def fixBuildLine(line, file_path):
+  if envoy_build_rule_check and not isSkylarkFile(file_path):
     line = line.replace('@envoy//', '//')
   return line
 
 def fixBuildPath(file_path):
   for line in fileinput.input(file_path, inplace=True):
-    sys.stdout.write(fixBuildLine(line))
+    sys.stdout.write(fixBuildLine(line, file_path))
 
   error_messages = []
   # TODO(htuch): Add API specific BUILD fixer script.
-  if not isApiFile(file_path):
-    if os.system(
-        "%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
+  if not isApiFile(file_path) and not isSkylarkFile(file_path):
+    if os.system("%s %s %s" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)) != 0:
       error_messages += ["envoy_build_fixer rewrite failed for file: %s" % file_path]
-    if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
-      error_messages += ["buildifier rewrite failed for file: %s" % file_path]
+
+  if os.system("%s -mode=fix %s" % (BUILDIFIER_PATH, file_path)) != 0:
+    error_messages += ["buildifier rewrite failed for file: %s" % file_path]
   return error_messages
 
 def checkBuildPath(file_path):
   error_messages = []
-  if not isApiFile(file_path):
+  if not isApiFile(file_path) and not isSkylarkFile(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
-    error_messages += executeCommand(
-        command, "envoy_build_fixer check failed", file_path)
+    error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
 
-  command = "cat %s | %s -mode=fix | diff %s -" % (file_path, BUILDIFIER_PATH, file_path)
+  command = "%s -mode=diff %s" % (BUILDIFIER_PATH, file_path)
   error_messages += executeCommand(command, "buildifier check failed", file_path)
   error_messages += checkFileContents(file_path, checkBuildLine)
   return error_messages
@@ -247,7 +251,7 @@ def checkFormat(file_path):
   # Apply fixes first, if asked, and then run checks. If we wind up attempting to fix
   # an issue, but there's still an error, that's a problem.
   try_to_fix = operation_type == "fix"
-  if isBuildFile(file_path):
+  if isBuildFile(file_path) or isSkylarkFile(file_path):
     if try_to_fix:
       error_messages += fixBuildPath(file_path)
     error_messages += checkBuildPath(file_path)
