@@ -661,6 +661,100 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
 }
 
+TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
+  TestLoadBalancerContext context_10({{"version", "1.0"}});
+  TestLoadBalancerContext context_12({{"version", "1.2"}});
+  TestLoadBalancerContext context_13({{"version", "1.3"}});
+  TestLoadBalancerContext context_14({{"version", "1.4"}});
+  TestLoadBalancerContext context_default({{"default", "true"}});
+  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"default", "true"}});
+
+  EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+
+  std::vector<std::set<std::string>> subset_keys = {{"version"}, {"default"}};
+  EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
+
+  // Add hosts initial hosts.
+  init({{"tcp://127.0.0.1:8000", {{"version", "1.2"}}},
+        {"tcp://127.0.0.1:8001", {{"version", "1.0"}, {"default", "true"}}}});
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
+
+  // Swap the default version.
+  envoy::api::v2::core::Metadata metadata_enable_12;
+  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_12,
+                                                Config::MetadataFilters::get().ENVOY_LB, "version")
+      .set_string_value("1.2");
+  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_12,
+                                                Config::MetadataFilters::get().ENVOY_LB, "default")
+      .set_string_value("true");
+  host_set_.hosts_[0]->metadata(metadata_enable_12);
+  envoy::api::v2::core::Metadata metadata_disable_10;
+  Envoy::Config::Metadata::mutableMetadataValue(metadata_disable_10,
+                                                Config::MetadataFilters::get().ENVOY_LB, "version")
+      .set_string_value("1.0");
+  host_set_.hosts_[1]->metadata(metadata_disable_10);
+
+  // Add a new host.
+  modifyHosts({makeHost("tcp://127.0.0.1:8002", {{"version", "1.3"}})}, {});
+
+  EXPECT_EQ(4U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_13));
+
+  // Swap default again and remove the previous one.
+  envoy::api::v2::core::Metadata metadata_disable_12;
+  Envoy::Config::Metadata::mutableMetadataValue(metadata_disable_12,
+                                                Config::MetadataFilters::get().ENVOY_LB, "version")
+      .set_string_value("1.2");
+  host_set_.hosts_[0]->metadata(metadata_disable_12);
+  envoy::api::v2::core::Metadata metadata_enable_10;
+  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_10,
+                                                Config::MetadataFilters::get().ENVOY_LB, "version")
+      .set_string_value("1.0");
+  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_10,
+                                                Config::MetadataFilters::get().ENVOY_LB, "default")
+      .set_string_value("true");
+  host_set_.hosts_[1]->metadata(metadata_enable_10);
+
+  modifyHosts({}, {host_set_.hosts_[2]});
+
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(1U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
+
+  // Swap the default version once more, this time adding a new host and removing
+  // the current default version.
+  host_set_.hosts_[0]->metadata(metadata_enable_12);
+  host_set_.hosts_[1]->metadata(metadata_disable_10);
+
+  modifyHosts({makeHost("tcp://127.0.0.1:8003", {{"version", "1.4"}})}, {host_set_.hosts_[1]});
+
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(5U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_14));
+}
+
 TEST_P(SubsetLoadBalancerTest, UpdateRemovingLastSubsetHost) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
