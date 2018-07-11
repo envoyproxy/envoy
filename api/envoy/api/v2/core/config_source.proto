@@ -28,7 +28,7 @@ message ApiConfigSource {
     GRPC = 2;
   }
   ApiType api_type = 1 [(validate.rules).enum.defined_only = true];
-  // Multiple cluster names may be provided for REST_LEGACY/REST. If > 1
+  // Cluster names should be used only with REST_LEGACY/REST. If > 1
   // cluster is defined, clusters will be cycled through if any kind of failure
   // occurs.
   //
@@ -40,11 +40,6 @@ message ApiConfigSource {
 
   // Multiple gRPC services be provided for GRPC. If > 1 cluster is defined,
   // services will be cycled through if any kind of failure occurs.
-  //
-  // .. note::
-  //
-  //  If a gRPC service points to a ``cluster_name``, it must be statically
-  //  defined and its type must not be ``EDS``.
   repeated GrpcService grpc_services = 4;
 
   // For REST APIs, the delay between successive polls.
