@@ -554,6 +554,47 @@ TEST_P(SubsetLoadBalancerTest, UpdateFailover) {
   EXPECT_FALSE(nullptr == lb_->chooseHost(&context_10).get());
 }
 
+TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+
+  std::vector<std::set<std::string>> subset_keys = {{"version"}};
+  EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
+
+  // Add hosts initial hosts.
+  init({{"tcp://127.0.0.1:8000", {{"version", "1.2"}}},
+        {"tcp://127.0.0.1:8001", {{"version", "1.0"}}}});
+  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(2U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+
+  // Update metadata for the first host, one subset should be removed.
+  envoy::api::v2::core::Metadata metadata;
+  Envoy::Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                                "version")
+      .set_string_value("1.3");
+  host_set_.hosts_[0]->metadata(metadata);
+
+  // No hosts added nor removed, so we bypass modifyHosts().
+  host_set_.runCallbacks({}, {});
+
+  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(1U, stats_.lb_subsets_removed_.value());
+
+  // Now, rollback to the original version — no new subsets, but 1.3 gets removed.
+  Envoy::Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
+                                                "version")
+      .set_string_value("1.2");
+  host_set_.hosts_[0]->metadata(metadata);
+
+  host_set_.runCallbacks({}, {});
+
+  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
+}
+
 TEST_P(SubsetLoadBalancerTest, UpdateRemovingLastSubsetHost) {
   EXPECT_CALL(subset_info_, fallbackPolicy())
       .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));

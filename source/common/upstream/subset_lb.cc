@@ -215,6 +215,20 @@ void SubsetLoadBalancer::processSubsets(
 // new subsets as necessary.
 void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added,
                                 const HostVector& hosts_removed) {
+  // It's possible that metadata changed, without hosts being added nor removed.
+  // If so, we need to go over all hosts to check for new or unused subsets.
+  if (!hosts_added.size() && !hosts_removed.size()) {
+    for (auto& host_set : original_priority_set_.hostSetsPerPriority()) {
+      // Prevent endless recursion.
+      if (!host_set->hosts().size()) {
+        continue;
+      }
+      update(host_set->priority(), host_set->hosts(), {});
+    }
+
+    return;
+  }
+
   updateFallbackSubset(priority, hosts_added, hosts_removed);
 
   processSubsets(hosts_added, hosts_removed,
