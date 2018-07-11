@@ -14,7 +14,7 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")),
-      runtime_h(runtime), store_stats(stats), ssl_context_manager_(ssl_context_manager),
+      runtime_(runtime), store_stats(stats), ssl_context_manager_(ssl_context_manager),
       secret_manager_(secret_manager), random_(random), dispatcher_(dispatcher) {
   health_check_request_.mutable_node()->MergeFrom(node);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
@@ -64,31 +64,31 @@ void HdsDelegate::processMessage(
   // Create HdsCluster config
   ENVOY_LOG(debug, "Creating HdsCluster config");
   envoy::api::v2::core::BindConfig bind_config;
-  // envoy::api::v2::Cluster& cluster_config_r = cluster_config;
-  cluster_config_r.set_name("anna");
-  cluster_config_r.mutable_connect_timeout()->set_seconds(2);
-  cluster_config_r.mutable_http2_protocol_options();
-  cluster_config_r.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
+  // envoy::api::v2::Cluster& cluster_config_ = cluster_config;
+  cluster_config_.set_name("anna");
+  cluster_config_.mutable_connect_timeout()->set_seconds(2);
+  cluster_config_.mutable_http2_protocol_options();
+  cluster_config_.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
 
   // Add endpoint to cluster
-  cluster_config_r.add_hosts()->MergeFrom(*message->mutable_health_check(0)
-                                               ->mutable_endpoints(0)
-                                               ->mutable_endpoints(0)
-                                               ->mutable_address());
+  cluster_config_.add_hosts()->MergeFrom(*message->mutable_health_check(0)
+                                              ->mutable_endpoints(0)
+                                              ->mutable_endpoints(0)
+                                              ->mutable_address());
 
   // Add health checker to cluster
-  cluster_config_r.add_health_checks()->MergeFrom(
+  cluster_config_.add_health_checks()->MergeFrom(
       *message->mutable_health_check(0)->mutable_health_checks(0));
 
-  ENVOY_LOG(debug, "New HdsCluster config {} ", cluster_config_r.DebugString());
+  ENVOY_LOG(debug, "New HdsCluster config {} ", cluster_config_.DebugString());
 
   // Creating HdsCluster
-  cluster_.reset(new HdsCluster(runtime_h, cluster_config_r, bind_config, store_stats,
+  cluster_.reset(new HdsCluster(runtime_, cluster_config_, bind_config, store_stats,
                                 ssl_context_manager_, secret_manager_, false));
 
   // Creating HealthChecker
   health_checker_ptr = Upstream::HealthCheckerFactory::create(
-      *cluster_config_r.mutable_health_checks(0), *cluster_, runtime_h, random_, dispatcher_);
+      *cluster_config_.mutable_health_checks(0), *cluster_, runtime_, random_, dispatcher_);
 }
 
 void HdsDelegate::onReceiveMessage(
@@ -100,7 +100,7 @@ void HdsDelegate::onReceiveMessage(
   // Process the HealthCheckSpecifier message
   processMessage(std::move(message));
 
-  // Initializing Cluster % HealthChecker
+  // Initializing Cluster & HealthChecker
   cluster_->setHealthChecker(health_checker_ptr);
   bool initialized = false;
   cluster_->initialize([&initialized] { initialized = true; });
@@ -161,8 +161,6 @@ HostsPerLocalityConstSharedPtr HdsCluster::createHealthyHostLists(const HostsPer
 void HdsCluster::initialize(std::function<void()> callback) {
   ASSERT(initialization_complete_callback_ == nullptr);
   initialization_complete_callback_ = callback;
-  // At this point see if we have a health checker. If so, mark all the hosts unhealthy and then
-  // fire update callbacks to start the health checking process.
   if (health_checker_) {
     for (const auto& host : *initial_hosts_) {
       host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);

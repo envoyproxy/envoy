@@ -114,7 +114,7 @@ private:
   envoy::service::discovery::v2::HealthCheckRequest health_check_request_;
   std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier> health_check_message_;
   std::vector<std::string> clusters_;
-  Runtime::Loader& runtime_h;
+  Runtime::Loader& runtime_;
   Envoy::Stats::Store& store_stats;
   Ssl::ContextManager& ssl_context_manager_;
   Secret::SecretManager& secret_manager_;
@@ -122,7 +122,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Upstream::HealthCheckerSharedPtr health_checker_ptr;
   envoy::api::v2::Cluster cluster_config;
-  envoy::api::v2::Cluster& cluster_config_r = cluster_config;
+  envoy::api::v2::Cluster& cluster_config_ = cluster_config;
   HdsClusterPtr cluster_;
 };
 
