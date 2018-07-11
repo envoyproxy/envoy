@@ -555,8 +555,12 @@ TEST_P(SubsetLoadBalancerTest, UpdateFailover) {
 }
 
 TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
+  TestLoadBalancerContext context_10({{"version", "1.0"}});
+  TestLoadBalancerContext context_12({{"version", "1.2"}});
+  TestLoadBalancerContext context_13({{"version", "1.3"}});
+
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
 
   std::vector<std::set<std::string>> subset_keys = {{"version"}};
   EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
@@ -567,6 +571,9 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(2U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_13));
 
   // Update metadata for the first host, one subset should be removed.
   envoy::api::v2::core::Metadata metadata;
@@ -581,6 +588,9 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(1U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_12));
 
   // Now, rollback to the original version.
   Envoy::Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
@@ -593,6 +603,9 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
   EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(nullptr, lb_->chooseHost(&context_13));
 }
 
 TEST_P(SubsetLoadBalancerTest, UpdateRemovingLastSubsetHost) {
