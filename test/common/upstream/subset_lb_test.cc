@@ -582,7 +582,7 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(1U, stats_.lb_subsets_removed_.value());
 
-  // Now, rollback to the original version — no new subsets, but 1.3 gets removed.
+  // Now, rollback to the original version.
   Envoy::Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                                 "version")
       .set_string_value("1.2");
