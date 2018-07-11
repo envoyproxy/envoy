@@ -459,22 +459,6 @@ std::string ContextImpl::getCertChainInformation() const {
                      getDaysUntilExpiration(cert_chain_.get()));
 }
 
-std::string ContextImpl::getSerialNumber(const X509* cert) {
-  ASSERT(cert);
-  ASN1_INTEGER* serial_number = X509_get_serialNumber(const_cast<X509*>(cert));
-  BIGNUM num_bn;
-  BN_init(&num_bn);
-  ASN1_INTEGER_to_BN(serial_number, &num_bn);
-  char* char_serial_number = BN_bn2hex(&num_bn);
-  BN_free(&num_bn);
-  if (char_serial_number != nullptr) {
-    std::string serial_number(char_serial_number);
-    OPENSSL_free(char_serial_number);
-    return serial_number;
-  }
-  return "";
-}
-  
 ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config)
     : ContextImpl(scope, config), server_name_indication_(config.serverNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()) {
@@ -483,6 +467,9 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextCon
                                      parsed_alpn_protocols_.size());
     RELEASE_ASSERT(rc == 0, "");
   }
+}
+
+bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
   bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl());
 
   if (!server_name_indication_.empty()) {
