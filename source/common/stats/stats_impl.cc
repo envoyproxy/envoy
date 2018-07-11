@@ -52,12 +52,12 @@ uint64_t& RawStatData::initializeAndGetMutableMaxObjNameLength(uint64_t configur
 
 void RawStatData::configure(Server::Options& options) {
   const uint64_t configured = options.maxObjNameLength();
-  RELEASE_ASSERT(configured > 0);
+  RELEASE_ASSERT(configured > 0, "");
   uint64_t max_obj_name_length = initializeAndGetMutableMaxObjNameLength(configured);
 
   // If this fails, it means that this function was called too late during
   // startup because things were already using this size before it was set.
-  RELEASE_ASSERT(max_obj_name_length == configured);
+  RELEASE_ASSERT(max_obj_name_length == configured, "");
 }
 
 void RawStatData::configureForTestsOnly(Server::Options& options) {

@@ -242,8 +242,8 @@ Network::ClientConnectionPtr BaseIntegrationTest::makeClientConnection(uint32_t 
 }
 
 void BaseIntegrationTest::initialize() {
-  RELEASE_ASSERT(!initialized_);
-  RELEASE_ASSERT(Event::Libevent::Global::initialized());
+  RELEASE_ASSERT(!initialized_, "");
+  RELEASE_ASSERT(Event::Libevent::Global::initialized(), "");
   initialized_ = true;
 
   createUpstreams();
@@ -289,12 +289,12 @@ void BaseIntegrationTest::setUpstreamProtocol(FakeHttpConnection::Type protocol)
   if (upstream_protocol_ == FakeHttpConnection::Type::HTTP2) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1);
+          RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
           auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
           cluster->mutable_http2_protocol_options();
         });
   } else {
-    RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP1);
+    RELEASE_ASSERT(protocol == FakeHttpConnection::Type::HTTP1, "");
   }
 }
 
@@ -312,7 +312,7 @@ uint32_t BaseIntegrationTest::lookupPort(const std::string& key) {
   if (it != port_map_.end()) {
     return it->second;
   }
-  RELEASE_ASSERT(false);
+  RELEASE_ASSERT(false, "");
 }
 
 void BaseIntegrationTest::setUpstreamAddress(uint32_t upstream_index,

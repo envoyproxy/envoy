@@ -103,8 +103,8 @@ RingHashLoadBalancer::Ring::Ring(
     // new address that is larger, or runs on a platform where UDS is larger. I don't think it's
     // worth the defensive coding to deal with the heap allocation case (e.g. via
     // absl::InlinedVector) at the current time.
-    RELEASE_ASSERT(address_string.size() + 1 + StringUtil::MIN_ITOA_OUT_LEN <=
-                   sizeof(hash_key_buffer));
+    RELEASE_ASSERT(
+        address_string.size() + 1 + StringUtil::MIN_ITOA_OUT_LEN <= sizeof(hash_key_buffer), "");
     memcpy(hash_key_buffer, address_string.c_str(), offset_start);
     hash_key_buffer[offset_start++] = '_';
     for (uint64_t i = 0; i < hashes_per_host; i++) {

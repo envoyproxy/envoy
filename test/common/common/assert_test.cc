@@ -5,8 +5,7 @@
 namespace Envoy {
 
 TEST(Assert, VariousLogs) {
-  EXPECT_DEATH({ RELEASE_ASSERT(0); }, ".*assert failure: 0.*");
-  EXPECT_DEATH({ RELEASE_ASSERT(0 == EAGAIN); }, ".*assert failure: 0 == EAGAIN.*");
+  EXPECT_DEATH({ RELEASE_ASSERT(0, ""); }, ".*assert failure: 0.*");
   EXPECT_DEATH({ RELEASE_ASSERT(0, "With some logs"); },
                ".*assert failure: 0. Details: With some logs.*");
   EXPECT_DEATH({ RELEASE_ASSERT(0 == EAGAIN, fmt::format("using {}", "fmt")); },

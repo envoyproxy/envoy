@@ -29,7 +29,7 @@ Writer::Writer(Network::Address::InstanceConstSharedPtr address) {
 
 Writer::~Writer() {
   if (fd_ != -1) {
-    RELEASE_ASSERT(close(fd_) == 0);
+    RELEASE_ASSERT(close(fd_) == 0, "");
   }
 }
 

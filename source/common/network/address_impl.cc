@@ -25,7 +25,7 @@ namespace {
 bool ipFamilySupported(int domain) {
   const int fd = ::socket(domain, SOCK_STREAM, 0);
   if (fd >= 0) {
-    RELEASE_ASSERT(::close(fd) == 0);
+    RELEASE_ASSERT(::close(fd) == 0, "");
   }
   return fd != -1;
 }
@@ -54,16 +54,16 @@ void validateIpv6Supported(const std::string& address) {
 
 Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t ss_len,
                                                     bool v6only) {
-  RELEASE_ASSERT(ss_len == 0 || ss_len >= sizeof(sa_family_t));
+  RELEASE_ASSERT(ss_len == 0 || ss_len >= sizeof(sa_family_t), "");
   switch (ss.ss_family) {
   case AF_INET: {
-    RELEASE_ASSERT(ss_len == 0 || ss_len == sizeof(sockaddr_in));
+    RELEASE_ASSERT(ss_len == 0 || ss_len == sizeof(sockaddr_in), "");
     const struct sockaddr_in* sin = reinterpret_cast<const struct sockaddr_in*>(&ss);
     ASSERT(AF_INET == sin->sin_family);
     return std::make_shared<Address::Ipv4Instance>(sin);
   }
   case AF_INET6: {
-    RELEASE_ASSERT(ss_len == 0 || ss_len == sizeof(sockaddr_in6));
+    RELEASE_ASSERT(ss_len == 0 || ss_len == sizeof(sockaddr_in6), "");
     const struct sockaddr_in6* sin6 = reinterpret_cast<const struct sockaddr_in6*>(&ss);
     ASSERT(AF_INET6 == sin6->sin6_family);
     if (!v6only && IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
@@ -84,7 +84,7 @@ Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, 
   case AF_UNIX: {
     const struct sockaddr_un* sun = reinterpret_cast<const struct sockaddr_un*>(&ss);
     ASSERT(AF_UNIX == sun->sun_family);
-    RELEASE_ASSERT(ss_len == 0 || ss_len >= offsetof(struct sockaddr_un, sun_path) + 1);
+    RELEASE_ASSERT(ss_len == 0 || ss_len >= offsetof(struct sockaddr_un, sun_path) + 1, "");
     return std::make_shared<Address::PipeInstance>(sun, ss_len);
   }
   default:
@@ -104,7 +104,7 @@ InstanceConstSharedPtr addressFromFd(int fd) {
   int socket_v6only = 0;
   if (ss.ss_family == AF_INET6) {
     socklen_t size_int = sizeof(socket_v6only);
-    RELEASE_ASSERT(::getsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int) == 0);
+    RELEASE_ASSERT(::getsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &socket_v6only, &size_int) == 0, "");
   }
   return addressFromSockAddr(ss, ss_len, rc == 0 && socket_v6only);
 }
@@ -161,11 +161,11 @@ int InstanceBase::socketFromSocketType(SocketType socketType) const {
   }
 
   int fd = ::socket(domain, flags, 0);
-  RELEASE_ASSERT(fd != -1);
+  RELEASE_ASSERT(fd != -1, "");
 
 #ifdef __APPLE__
   // Cannot set SOCK_NONBLOCK as a ::socket flag.
-  RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1);
+  RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1, "");
 #endif
 
   return fd;
@@ -290,7 +290,7 @@ int Ipv6Instance::socket(SocketType type) const {
 
   // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
   const int v6only = ip_.v6only_;
-  RELEASE_ASSERT(::setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1);
+  RELEASE_ASSERT(::setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1, "");
   return fd;
 }
 
@@ -300,7 +300,7 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
 #if !defined(__linux__)
     throw EnvoyException("Abstract AF_UNIX sockets are only supported on linux.");
 #endif
-    RELEASE_ASSERT(ss_len >= offsetof(struct sockaddr_un, sun_path) + 1);
+    RELEASE_ASSERT(ss_len >= offsetof(struct sockaddr_un, sun_path) + 1, "");
     abstract_namespace_ = true;
     address_length_ = ss_len - offsetof(struct sockaddr_un, sun_path);
   }

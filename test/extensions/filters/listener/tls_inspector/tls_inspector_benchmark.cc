@@ -34,7 +34,7 @@ public:
       : socket_(socket), dispatcher_(dispatcher) {}
   Network::ConnectionSocket& socket() override { return socket_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
-  void continueFilterChain(bool success) override { RELEASE_ASSERT(success); }
+  void continueFilterChain(bool success) override { RELEASE_ASSERT(success, ""); }
 
   Network::ConnectionSocket& socket_;
   Event::Dispatcher& dispatcher_;
@@ -63,7 +63,7 @@ public:
   FastMockOsSysCalls(const std::vector<uint8_t>& client_hello) : client_hello_(client_hello) {}
 
   ssize_t recv(int, void* buffer, size_t length, int) override {
-    RELEASE_ASSERT(length >= client_hello_.size());
+    RELEASE_ASSERT(length >= client_hello_.size(), "");
     memcpy(buffer, client_hello_.data(), client_hello_.size());
     return client_hello_.size();
   }
@@ -85,10 +85,11 @@ static void BM_TlsInspector(benchmark::State& state) {
     Filter filter(cfg);
     filter.onAccept(cb);
     dispatcher.file_event_callback_(Event::FileReadyType::Read);
-    RELEASE_ASSERT(socket.detectedTransportProtocol() == "tls");
-    RELEASE_ASSERT(socket.requestedServerName() == "example.com");
+    RELEASE_ASSERT(socket.detectedTransportProtocol() == "tls", "");
+    RELEASE_ASSERT(socket.requestedServerName() == "example.com", "");
     RELEASE_ASSERT(socket.requestedApplicationProtocols().size() == 2 &&
-                   socket.requestedApplicationProtocols().front() == "h2");
+                       socket.requestedApplicationProtocols().front() == "h2",
+                   "");
     socket.setDetectedTransportProtocol("");
     socket.setRequestedServerName("");
     socket.setRequestedApplicationProtocols({});

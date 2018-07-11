@@ -22,8 +22,7 @@ envoy_cc_test(
     name = "assert_test",
     srcs = ["assert_test.cc"],
     deps = [
-        "//source/common/buffer:buffer_lib",
-        "//source/common/common:base64_lib",
+        "//source/common/common:assert_lib",
     ],
 )
 
@@ -31,7 +30,8 @@ envoy_cc_test(
     name = "base64_test",
     srcs = ["base64_test.cc"],
     deps = [
-        "//source/common/common:assert_lib",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:base64_lib",
     ],
 )
 
