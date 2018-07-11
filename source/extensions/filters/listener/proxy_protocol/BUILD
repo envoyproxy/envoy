@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Proxy protocol V1 listener filter: https://www.haproxy.org/download/1.8/doc/proxy-protocol.txt
 # Note: Currently there are no public docs for this filter as it is implicitly loaded by
 #       configuration options. In the future it will likely be configurable on a per filter chain

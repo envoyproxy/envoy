@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Stats sink for the gRPC metrics service: api/envoy/service/metrics/v2/metrics_service.proto
 
 load(

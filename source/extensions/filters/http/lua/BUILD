@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Lua scripting L7 HTTP filter (https://www.lua.org/, http://luajit.org/)
 # Public docs: docs/root/configuration/http_filters/lua_filter.rst
 
