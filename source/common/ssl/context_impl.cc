@@ -29,10 +29,8 @@ int ContextImpl::sslContextIndex() {
   }());
 }
 
-ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
-                         const ContextConfig& config)
-    : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope),
-      stats_(generateStats(scope)) {
+ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
+    : ctx_(SSL_CTX_new(TLS_method())), scope_(scope), stats_(generateStats(scope)) {
   RELEASE_ASSERT(ctx_, "");
 
   int rc = SSL_CTX_set_ex_data(ctx_.get(), sslContextIndex(), this);
@@ -461,18 +459,30 @@ std::string ContextImpl::getCertChainInformation() const {
                      getDaysUntilExpiration(cert_chain_.get()));
 }
 
-ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
-                                     const ClientContextConfig& config)
-    : ContextImpl(parent, scope, config), server_name_indication_(config.serverNameIndication()),
+std::string ContextImpl::getSerialNumber(const X509* cert) {
+  ASSERT(cert);
+  ASN1_INTEGER* serial_number = X509_get_serialNumber(const_cast<X509*>(cert));
+  BIGNUM num_bn;
+  BN_init(&num_bn);
+  ASN1_INTEGER_to_BN(serial_number, &num_bn);
+  char* char_serial_number = BN_bn2hex(&num_bn);
+  BN_free(&num_bn);
+  if (char_serial_number != nullptr) {
+    std::string serial_number(char_serial_number);
+    OPENSSL_free(char_serial_number);
+    return serial_number;
+  }
+  return "";
+}
+  
+ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config)
+    : ContextImpl(scope, config), server_name_indication_(config.serverNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
                                      parsed_alpn_protocols_.size());
     RELEASE_ASSERT(rc == 0, "");
   }
-}
-
-bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
   bssl::UniquePtr<SSL> ssl_con(ContextImpl::newSsl());
 
   if (!server_name_indication_.empty()) {
@@ -487,11 +497,10 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
   return ssl_con;
 }
 
-ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
-                                     const ServerContextConfig& config,
+ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
                                      Runtime::Loader& runtime)
-    : ContextImpl(parent, scope, config), runtime_(runtime),
+    : ContextImpl(scope, config), runtime_(runtime),
       session_ticket_keys_(config.sessionTicketKeys()) {
   if (config.certChain().empty()) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");

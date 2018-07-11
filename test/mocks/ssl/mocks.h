@@ -21,22 +21,11 @@ public:
   MockContextManager();
   ~MockContextManager();
 
-  ClientContextSharedPtr createSslClientContext(Stats::Scope& scope,
-                                                const ClientContextConfig& config) override {
-    return ClientContextSharedPtr{createSslClientContext_(scope, config)};
-  }
-
-  ServerContextSharedPtr
-  createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
-                         const std::vector<std::string>& server_names) override {
-    return ServerContextSharedPtr{createSslServerContext_(scope, config, server_names)};
-  }
-
-  MOCK_METHOD2(createSslClientContext_,
-               ClientContext*(Stats::Scope& scope, const ClientContextConfig& config));
-  MOCK_METHOD3(createSslServerContext_,
-               ServerContext*(Stats::Scope& stats, const ServerContextConfig& config,
-                              const std::vector<std::string>& server_names));
+  MOCK_METHOD2(createSslClientContext,
+               ClientContextSharedPtr(Stats::Scope& scope, const ClientContextConfig& config));
+  MOCK_METHOD3(createSslServerContext,
+               ServerContextSharedPtr(Stats::Scope& stats, const ServerContextConfig& config,
+                                      const std::vector<std::string>& server_names));
   MOCK_CONST_METHOD0(daysUntilFirstCertExpires, size_t());
   MOCK_METHOD1(iterateContexts, void(std::function<void(const Context&)> callback));
 };
