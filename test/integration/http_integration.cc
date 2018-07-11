@@ -65,7 +65,7 @@ typeToCodecType(Http::CodecClient::Type type) {
     return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
         HTTP2;
   default:
-    RELEASE_ASSERT(0);
+    RELEASE_ASSERT(0, "");
   }
 }
 

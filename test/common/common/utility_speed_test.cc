@@ -111,7 +111,7 @@ BENCHMARK(BM_RTrimStringViewAlreadyTrimmedAndMakeString);
 static void BM_FindToken(benchmark::State& state) {
   const absl::string_view cache_control(CacheControl, CacheControlLength);
   for (auto _ : state) {
-    RELEASE_ASSERT(Envoy::StringUtil::findToken(cache_control, ",", "no-transform"));
+    RELEASE_ASSERT(Envoy::StringUtil::findToken(cache_control, ",", "no-transform"), "");
   }
 }
 BENCHMARK(BM_FindToken);
@@ -153,7 +153,7 @@ static bool findTokenWithoutSplitting(absl::string_view str, char delim, absl::s
 static void BM_FindTokenWithoutSplitting(benchmark::State& state) {
   const absl::string_view cache_control(CacheControl, CacheControlLength);
   for (auto _ : state) {
-    RELEASE_ASSERT(findTokenWithoutSplitting(cache_control, ',', "no-transform", true));
+    RELEASE_ASSERT(findTokenWithoutSplitting(cache_control, ',', "no-transform", true), "");
   }
 }
 BENCHMARK(BM_FindTokenWithoutSplitting);
@@ -168,7 +168,7 @@ static void BM_FindTokenValueNestedSplit(benchmark::State& state) {
         max_age = Envoy::StringUtil::trim(name_value[1]);
       }
     }
-    RELEASE_ASSERT(max_age == "300");
+    RELEASE_ASSERT(max_age == "300", "");
   }
 }
 BENCHMARK(BM_FindTokenValueNestedSplit);
@@ -184,7 +184,7 @@ static void BM_FindTokenValueSearchForEqual(benchmark::State& state) {
         max_age = Envoy::StringUtil::trim(token.substr(equals + 1));
       }
     }
-    RELEASE_ASSERT(max_age == "300");
+    RELEASE_ASSERT(max_age == "300", "");
   }
 }
 BENCHMARK(BM_FindTokenValueSearchForEqual);
@@ -199,7 +199,7 @@ static void BM_FindTokenValueNoSplit(benchmark::State& state) {
         max_age = Envoy::StringUtil::trim(token);
       }
     }
-    RELEASE_ASSERT(max_age == "300");
+    RELEASE_ASSERT(max_age == "300", "");
   }
 }
 BENCHMARK(BM_FindTokenValueNoSplit);
