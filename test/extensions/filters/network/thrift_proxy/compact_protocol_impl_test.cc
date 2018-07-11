@@ -868,11 +868,11 @@ TEST(CompactProtocolTest, ReadIntegerTypes) {
 
     addSeq(buffer, {0xFE, 0xFF, 0xFF, 0xFF, 0x0F}); // zigzag(0xFFFFFFFE) = 0x7FFFFFFF
     EXPECT_TRUE(proto.readInt32(buffer, value));
-    EXPECT_EQ(value, INT32_MAX);
+    EXPECT_EQ(value, std::numeric_limits<int32_t>::max());
 
     addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF, 0x0F}); // zigzag(0xFFFFFFFF) = 0x80000000
     EXPECT_TRUE(proto.readInt32(buffer, value));
-    EXPECT_EQ(value, INT32_MIN);
+    EXPECT_EQ(value, std::numeric_limits<int32_t>::min());
 
     // More than 32 bits
     value = 1;
@@ -901,12 +901,12 @@ TEST(CompactProtocolTest, ReadIntegerTypes) {
     // zigzag(0xFFFFFFFFFFFFFFFE) = 0x7FFFFFFFFFFFFFFF
     addSeq(buffer, {0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01});
     EXPECT_TRUE(proto.readInt64(buffer, value));
-    EXPECT_EQ(value, INT64_MAX);
+    EXPECT_EQ(value, std::numeric_limits<int64_t>::max());
 
     // zigzag(0xFFFFFFFFFFFFFFFF) = 0x8000000000000000
     addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01});
     EXPECT_TRUE(proto.readInt64(buffer, value));
-    EXPECT_EQ(value, INT64_MIN);
+    EXPECT_EQ(value, std::numeric_limits<int64_t>::min());
 
     // More than 64 bits
     value = 1;
@@ -1423,14 +1423,14 @@ TEST(CompactProtocolTest, WriteInt16) {
   // zigzag(32767) = 65534 (0xFFFE)
   {
     Buffer::OwnedImpl buffer;
-    proto.writeInt16(buffer, INT16_MAX);
+    proto.writeInt16(buffer, std::numeric_limits<int16_t>::max());
     EXPECT_EQ("\xFE\xFF\x3", buffer.toString());
   }
 
   // zigzag(-32768) = 65535 (0xFFFF)
   {
     Buffer::OwnedImpl buffer;
-    proto.writeInt16(buffer, INT16_MIN);
+    proto.writeInt16(buffer, std::numeric_limits<int16_t>::min());
     EXPECT_EQ("\xFF\xFF\x3", buffer.toString());
   }
 }
@@ -1463,14 +1463,14 @@ TEST(CompactProtocolTest, WriteInt32) {
   // zigzag(0x7FFFFFFF) = 0xFFFFFFFE
   {
     Buffer::OwnedImpl buffer;
-    proto.writeInt32(buffer, INT32_MAX);
+    proto.writeInt32(buffer, std::numeric_limits<int32_t>::max());
     EXPECT_EQ("\xFE\xFF\xFF\xFF\xF", buffer.toString());
   }
 
   // zigzag(0x80000000) = 0xFFFFFFFF
   {
     Buffer::OwnedImpl buffer;
-    proto.writeInt32(buffer, INT32_MIN);
+    proto.writeInt32(buffer, std::numeric_limits<int32_t>::min());
     EXPECT_EQ("\xFF\xFF\xFF\xFF\xF", buffer.toString());
   }
 }
@@ -1503,14 +1503,14 @@ TEST(CompactProtocolTest, WriteInt64) {
   // zigzag(0x7FFFFFFF FFFFFFFF) = 0xFFFFFFFF FFFFFFFE
   {
     Buffer::OwnedImpl buffer;
-    proto.writeInt64(buffer, INT64_MAX);
+    proto.writeInt64(buffer, std::numeric_limits<int64_t>::max());
     EXPECT_EQ("\xFE\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x1", buffer.toString());
   }
 
   // zigzag(0x80000000 00000000) = 0xFFFFFFFF FFFFFFFF
   {
     Buffer::OwnedImpl buffer;
-    proto.writeInt64(buffer, INT64_MIN);
+    proto.writeInt64(buffer, std::numeric_limits<int64_t>::min());
     EXPECT_EQ("\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x1", buffer.toString());
   }
 }

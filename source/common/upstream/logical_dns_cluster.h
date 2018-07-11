@@ -58,13 +58,18 @@ private:
   struct RealHostDescription : public HostDescription {
     RealHostDescription(Network::Address::InstanceConstSharedPtr address,
                         HostConstSharedPtr logical_host)
-        : address_(address), logical_host_(logical_host) {}
+        : address_(address), logical_host_(logical_host),
+          metadata_(std::make_shared<envoy::api::v2::core::Metadata>(
+              envoy::api::v2::core::Metadata::default_instance())) {}
 
     // Upstream:HostDescription
     bool canary() const override { return false; }
-    const envoy::api::v2::core::Metadata& metadata() const override {
-      return envoy::api::v2::core::Metadata::default_instance();
+    void canary(bool) override {}
+    const std::shared_ptr<envoy::api::v2::core::Metadata> metadata() const override {
+      return metadata_;
     }
+    void metadata(const envoy::api::v2::core::Metadata&) override {}
+
     const ClusterInfo& cluster() const override { return logical_host_->cluster(); }
     HealthCheckHostMonitor& healthChecker() const override {
       return logical_host_->healthChecker();
@@ -84,6 +89,7 @@ private:
     }
     Network::Address::InstanceConstSharedPtr address_;
     HostConstSharedPtr logical_host_;
+    const std::shared_ptr<envoy::api::v2::core::Metadata> metadata_;
   };
 
   struct PerThreadCurrentHostData : public ThreadLocal::ThreadLocalObject {
