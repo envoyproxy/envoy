@@ -16,7 +16,7 @@ ContextManagerImpl::~ContextManagerImpl() {
 
 void ContextManagerImpl::removeEmptyContexts() {
   for (auto it = contexts_.begin(); it != contexts_.end();) {
-    if (!it->lock()) {
+    if (it->expired()) {
       it = contexts_.erase(it);
     } else {
       ++it;
@@ -58,9 +58,11 @@ size_t ContextManagerImpl::daysUntilFirstCertExpires() const {
 
 void ContextManagerImpl::iterateContexts(std::function<void(const Context&)> callback) {
   std::shared_lock<std::shared_timed_mutex> lock(contexts_lock_);
-  for (const auto& ctx_weak_ptr : contexts_) {
-    ContextSharedPtr context = ctx_weak_ptr.lock();
-    if (context) {
+  for (auto it = contexts_.begin(); it != contexts_.end();) {
+    ContextSharedPtr context = it->lock();
+    if (!context) {
+      it = contexts_.erase(it);
+    } else {
       callback(*context);
     }
   }
