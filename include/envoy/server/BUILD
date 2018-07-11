@@ -180,3 +180,21 @@ envoy_cc_library(
         "//source/common/protobuf",
     ],
 )
+
+envoy_cc_library(
+    name = "resource_monitor_interface",
+    hdrs = ["resource_monitor.h"],
+    deps = [
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "resource_monitor_config_interface",
+    hdrs = ["resource_monitor_config.h"],
+    deps = [
+        ":resource_monitor_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//source/common/protobuf",
+    ],
+)
