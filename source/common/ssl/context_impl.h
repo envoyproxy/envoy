@@ -138,6 +138,8 @@ protected:
   std::string cert_chain_file_path_;
 };
 
+typedef std::shared_ptr<ContextImpl> ContextImplSharedPtr;
+
 class ClientContextImpl : public ContextImpl, public ClientContext {
 public:
   ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,

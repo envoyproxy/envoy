@@ -58,7 +58,7 @@ private:
   std::vector<std::string> getDnsSansFromCertificate(X509* cert);
 
   Network::TransportSocketCallbacks* callbacks_{};
-  ContextSharedPtr ctx_;
+  ContextImplSharedPtr ctx_;
   bssl::UniquePtr<SSL> ssl_;
   bool handshake_complete_{};
   bool shutdown_sent_{};
