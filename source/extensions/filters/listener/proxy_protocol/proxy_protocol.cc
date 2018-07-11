@@ -147,10 +147,10 @@ void Filter::parseV2Header(char* buf) {
         sockaddr_in ra4, la4;
         ra4.sin_family = AF_INET;
         ra4.sin_port = v4->src_port;
-        ra4.sin_addr.s_addr = (v4->src_addr);
+        ra4.sin_addr.s_addr = v4->src_addr;
 
-        la4.sin_port = (v4->dst_port);
-        la4.sin_addr.s_addr = (v4->dst_addr);
+        la4.sin_port = v4->dst_port;
+        la4.sin_addr.s_addr = v4->dst_addr;
         proxy_protocol_header_.emplace(
             WireHeader{hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
                        std::make_shared<Network::Address::Ipv4Instance>(&ra4),
@@ -167,7 +167,7 @@ void Filter::parseV2Header(char* buf) {
         v6 = reinterpret_cast<pp_ipv6_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
         sockaddr_in6 ra6, la6;
         ra6.sin6_family = AF_INET;
-        ra6.sin6_port = (v6->src_port);
+        ra6.sin6_port = v6->src_port;
         memcpy(ra6.sin6_addr.s6_addr, v6->src_addr, sizeof(ra6.sin6_addr.s6_addr));
 
         la6.sin6_port = v6->dst_port;
