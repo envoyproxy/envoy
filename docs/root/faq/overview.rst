@@ -13,4 +13,3 @@ FAQ
   zipkin_tracing
   lb_panic_threshold
   concurrency_lb
-  websocket
