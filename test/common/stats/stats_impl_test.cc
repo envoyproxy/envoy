@@ -5,6 +5,7 @@
 #include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/common/hex.h"
 #include "common/config/well_known_names.h"
 #include "common/stats/stats_impl.h"
 
@@ -475,6 +476,32 @@ TEST(TagProducerTest, CheckConstructor) {
   EXPECT_THROW_WITH_MESSAGE(
       TagProducerImpl{stats_config}, EnvoyException,
       "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
+}
+
+// Check consistency of internal stat representation
+TEST(RawStatDataTest, Consistency) {
+  HeapRawStatDataAllocator alloc;
+  // Generate a stat, encode it to hex, and take the hash of that hex string. We expect the hash to
+  // vary only when the internal representation of a stat has been intentionally changed, in which
+  // case SharedMemory::VERSION should be incremented as well.
+  uint64_t expected_hash = 1874506077228772558;
+  uint64_t max_name_length = RawStatData::maxNameLength();
+
+  const std::string name_1(max_name_length, 'A');
+  RawStatData* stat_1 = alloc.alloc(name_1);
+  std::string stat_hex_dump_1 =
+      Hex::encode(reinterpret_cast<uint8_t*>(stat_1), sizeof(RawStatData) + max_name_length);
+  EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_1), expected_hash);
+  alloc.free(*stat_1);
+
+  // If a stat name is truncated, we expect that its internal representation is the same as if it
+  // had been initialized with the already-truncated name.
+  const std::string name_2(max_name_length + 1, 'A');
+  RawStatData* stat_2 = alloc.alloc(name_2);
+  std::string stat_hex_dump_2 =
+      Hex::encode(reinterpret_cast<uint8_t*>(stat_2), sizeof(RawStatData) + max_name_length);
+  EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_2), expected_hash);
+  alloc.free(*stat_2);
 }
 
 // Validate truncation behavior of RawStatData.
