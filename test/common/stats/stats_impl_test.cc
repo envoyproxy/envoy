@@ -483,7 +483,7 @@ TEST(RawStatDataTest, Consistency) {
   HeapRawStatDataAllocator alloc;
   // Generate a stat, encode it to hex, and take the hash of that hex string. We expect the hash to
   // vary only when the internal representation of a stat has been intentionally changed, in which
-  // case SharedMemory::Version should be incremented as well.
+  // case SharedMemory::VERSION should be incremented as well.
   uint64_t expected_hash = 1874506077228772558;
   uint64_t max_name_length = RawStatData::maxNameLength();
 
