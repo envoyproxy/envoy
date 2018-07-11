@@ -60,7 +60,7 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
 private:
-  static const size_t MAX_PROXY_PROTO_LEN =
+  static const size_t MAX_PROXY_PROTO_LEN_V2 =
       PROXY_PROTO_V2_HEADER_LEN + PROXY_PROTO_V2_ADDR_LEN_UNIX;
   static const size_t MAX_PROXY_PROTO_LEN_V1 = 108;
 
@@ -99,11 +99,11 @@ private:
   ProxyProtocolVersion header_version_{Unknown};
 
   // Stores the portion of the first line that has been read so far.
-  char buf_[MAX_PROXY_PROTO_LEN];
+  char buf_[MAX_PROXY_PROTO_LEN_V2];
 
   ConfigSharedPtr config_;
 
-  absl::optional<WireHeader> proxyProtocolHeader_;
+  absl::optional<WireHeader> proxy_protocol_header_;
 };
 
 } // namespace ProxyProtocol

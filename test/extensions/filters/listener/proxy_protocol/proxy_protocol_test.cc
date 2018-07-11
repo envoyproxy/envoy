@@ -229,49 +229,6 @@ TEST_P(ProxyProtocolTest, v2UnsupportedAF) {
   expectProxyProtoError();
 }
 
-TEST_P(ProxyProtocolTest, errorRecv_1) {
-  constexpr uint8_t buffer1[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
-                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
-                                 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
-  constexpr uint8_t buffer2[] = {'m', 'o', 'r', 'e', ' ', 'd', 'a', 't', 'a'};
-
-  Api::MockOsSysCalls os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
-  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, void* buf, size_t len, int flags) { return ::recv(fd, buf, len, flags); }));
-  EXPECT_CALL(os_sys_calls, recv(_, _, sizeof(buffer1), _))
-      .Times(AnyNumber())
-      .WillOnce(Return((errno = EAGAIN, -1)));
-
-  EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
-        return ::ioctl(fd, request, argp);
-      }));
-  EXPECT_CALL(os_sys_calls, writev(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
-
-  connect();
-  write(buffer1, sizeof(buffer1));
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-  write(buffer2, sizeof(buffer2));
-
-  expectData("more data");
-  EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "1.2.3.4");
-  EXPECT_TRUE(server_connection_->localAddressRestored());
-
-  disconnect();
-}
-
 TEST_P(ProxyProtocolTest, errorRecv_2) {
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
@@ -499,52 +456,6 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
   write(buffer, sizeof(buffer));
   dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
   write(tlv, sizeof(tlv));
-
-  expectProxyProtoError();
-}
-
-TEST_P(ProxyProtocolTest, v2ParseExtensionsReadEAGAIN) {
-  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
-                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x14, 0x01, 0x02, 0x03, 0x04,
-                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
-  constexpr uint8_t tlv[] = {0x0, 0x0, 0x1, 0xff};
-  constexpr uint8_t data[] = {'m', 'o', 'r', 'e'};
-
-  Api::MockOsSysCalls os_sys_calls;
-  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-
-  EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(
-          Invoke([](int fd, unsigned long int req, void* argp) { return ::ioctl(fd, req, argp); }));
-
-  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, void* buf, size_t len, int flags) { return ::recv(fd, buf, len, flags); }));
-  EXPECT_CALL(os_sys_calls, recv(_, _, sizeof(tlv), _))
-      .Times(AnyNumber())
-      .WillOnce(Return((errno = EAGAIN, -1)));
-  EXPECT_CALL(os_sys_calls, recv(_, _, 2 * sizeof(tlv), _))
-      .Times(AnyNumber())
-      .WillOnce(Return((errno = 0, -1)));
-
-  EXPECT_CALL(os_sys_calls, writev(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
-  EXPECT_CALL(os_sys_calls, readv(_, _, _))
-      .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
-
-  connect(false);
-  write(buffer, sizeof(buffer));
-  write(tlv, sizeof(tlv));
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-  errno = 0;
-  write(tlv, sizeof(tlv));
-  write(data, sizeof(data));
 
   expectProxyProtoError();
 }
