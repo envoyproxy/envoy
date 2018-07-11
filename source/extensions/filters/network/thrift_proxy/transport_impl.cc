@@ -60,7 +60,7 @@ bool AutoTransportImpl::decodeFrameEnd(Buffer::Instance& buffer) {
 }
 
 void AutoTransportImpl::encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) {
-  RELEASE_ASSERT(transport_ != nullptr);
+  RELEASE_ASSERT(transport_ != nullptr, "");
   transport_->encodeFrame(buffer, message);
 }
 
