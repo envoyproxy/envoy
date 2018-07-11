@@ -136,8 +136,9 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
-  RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::sizeGivenName(name), 1));
-  data->initialize(name);
+  uint64_t num_bytes_to_allocate = RawStatData::sizeGivenName(name);
+  RawStatData* data = static_cast<RawStatData*>(::calloc(num_bytes_to_allocate, 1));
+  data->initialize(name, num_bytes_to_allocate);
 
   Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data);
@@ -331,11 +332,13 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
   ::free(&data);
 }
 
-void RawStatData::initialize(absl::string_view key) {
+void RawStatData::initialize(absl::string_view key, uint64_t num_bytes_allocated) {
   ASSERT(!initialized());
   ref_count_ = 1;
 
   uint64_t xfer_size = key.size();
+  ASSERT(xfer_size <= num_bytes_allocated);
+
   memcpy(name_, key.data(), xfer_size);
   name_[xfer_size] = '\0';
 }

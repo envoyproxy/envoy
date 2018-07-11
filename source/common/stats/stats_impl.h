@@ -219,9 +219,10 @@ struct RawStatData {
   /**
    * Initializes this object to have the specified key,
    * a refcount of 1, and all other values zero. Required for the HeapRawStatDataAllocator, which
-   * does not expect stat name truncation.
+   * does not expect stat name truncation. We pass in the number of bytes allocated in order to
+   * assert the copy is safe inline.
    */
-  void initialize(absl::string_view key);
+  void initialize(absl::string_view key, uint64_t num_bytes_allocated);
 
   /**
    * Initializes this object to have the specified key,
