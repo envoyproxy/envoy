@@ -38,7 +38,7 @@ public:
     }));
 
     EXPECT_CALL(*this, alloc("stats.overflow"));
-    store_.reset(new ThreadLocalStoreImpl(options_, *this));
+    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, *this);
     store_->addSink(sink_);
   }
 

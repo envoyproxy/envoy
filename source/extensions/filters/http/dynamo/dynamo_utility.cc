@@ -27,7 +27,6 @@ std::string Utility::buildPartitionStatString(const std::string& stat_prefix,
   if (stats_table_prefix.size() > remaining_size) {
     stats_table_prefix = stats_table_prefix.substr(0, remaining_size);
   }
-
   return fmt::format("{}{}", stats_table_prefix, stats_partition_postfix);
 }
 
