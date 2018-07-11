@@ -10,21 +10,20 @@ namespace Envoy {
  *
  * The old style release assert was of the form RELEASE_ASSERT(foo == bar);
  * where it would log stack traces and the failed conditional and crash if the
- * condition is not met.  The are many legacy RELEASE_ASSERTS in Envoy which
+ * condition is not met. The are many legacy RELEASE_ASSERTS in Envoy which
  * were converted to RELEASE_ASSERT(foo == bar, "");
  *
  * The new style of release assert is of the form
  * RELEASE_ASSERT(foo == bar, "reason foo should actually be bar");
- * new uses of RELEASE_ASSERT are strongly encouraged to supply a verbose
- * explanation of what went wrong.
+ * new uses of RELEASE_ASSERT should supply a verbose explanation of what went wrong.
  */
 #define RELEASE_ASSERT(X, DETAILS)                                                                 \
   do {                                                                                             \
     if (!(X)) {                                                                                    \
-      std::string details = DETAILS;                                                               \
+      absl::string_view details = DETAILS;                                                         \
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,    \
                           "assert failure: {}.{}{}", #X,                                           \
-                          details.length() == 0 ? "" : " Details: ", DETAILS);                     \
+                          details.empty() ? "" : " Details: ", DETAILS);                           \
       abort();                                                                                     \
     }                                                                                              \
   } while (false)
