@@ -225,12 +225,14 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
   }
   has_http_body_output_ = hasHttpBodyAsOutputType();
 
-  headers.removeContentLength();
-  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Grpc);
-  headers.insertEnvoyOriginalPath().value(*headers.Path());
-  headers.insertPath().value("/" + method_->service()->full_name() + "/" + method_->name());
-  headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
-  headers.insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
+  if (!method_->server_streaming()) {
+    headers.removeContentLength();
+    headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Grpc);
+    headers.insertEnvoyOriginalPath().value(*headers.Path());
+    headers.insertPath().value("/" + method_->service()->full_name() + "/" + method_->name());
+    headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
+    headers.insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
+  }
 
   if (!config_.matchIncomingRequestInfo()) {
     decoder_callbacks_->clearRouteCache();
@@ -342,6 +344,7 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
     return Http::FilterDataStatus::Continue;
   }
 
+  // TODO(dio): Add support for streaming case.
   if (has_http_body_output_) {
     buildResponseFromHttpBodyOutput(*response_headers_, data);
     return Http::FilterDataStatus::StopIterationAndBuffer;
