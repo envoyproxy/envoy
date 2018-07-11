@@ -172,6 +172,22 @@ TEST_P(ProxyProtocolTest, v1Basic) {
   disconnect();
 }
 
+TEST_P(ProxyProtocolTest, v1Minimal) {
+  connect();
+  write("PROXY UNKNOWN\r\nmore data");
+
+  expectData("more data");
+
+  if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
+    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "127.0.0.1");
+  } else {
+    EXPECT_EQ(server_connection_->remoteAddress()->ip()->addressAsString(), "::1");
+  }
+  EXPECT_FALSE(server_connection_->localAddressRestored());
+
+  disconnect();
+}
+
 TEST_P(ProxyProtocolTest, v2Basic) {
   // A well-formed ipv4/tcp message, no extensions
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,

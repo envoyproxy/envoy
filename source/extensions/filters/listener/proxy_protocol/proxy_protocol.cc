@@ -145,10 +145,13 @@ void Filter::parseV2Header(char* buf) {
         pp_ipv4_addr* v4;
         v4 = reinterpret_cast<pp_ipv4_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
         sockaddr_in ra4, la4;
+        memset(&ra4, 0, sizeof(ra4));
+        memset(&la4, 0, sizeof(la4));
         ra4.sin_family = AF_INET;
         ra4.sin_port = v4->src_port;
         ra4.sin_addr.s_addr = v4->src_addr;
 
+        la4.sin_family = AF_INET;
         la4.sin_port = v4->dst_port;
         la4.sin_addr.s_addr = v4->dst_addr;
         proxy_protocol_header_.emplace(
@@ -166,10 +169,13 @@ void Filter::parseV2Header(char* buf) {
         pp_ipv6_addr* v6;
         v6 = reinterpret_cast<pp_ipv6_addr*>(&buf[PROXY_PROTO_V2_HEADER_LEN]);
         sockaddr_in6 ra6, la6;
-        ra6.sin6_family = AF_INET;
+        memset(&ra6, 0, sizeof(ra6));
+        memset(&la6, 0, sizeof(la6));
+        ra6.sin6_family = AF_INET6;
         ra6.sin6_port = v6->src_port;
         memcpy(ra6.sin6_addr.s6_addr, v6->src_addr, sizeof(ra6.sin6_addr.s6_addr));
 
+        la6.sin6_family = AF_INET6;
         la6.sin6_port = v6->dst_port;
         memcpy(la6.sin6_addr.s6_addr, v6->dst_addr, sizeof(la6.sin6_addr.s6_addr));
 
@@ -228,6 +234,8 @@ void Filter::parseV1Header(char* buf, size_t len) {
 }
 
 bool Filter::parseExtensions(int fd) {
+  // If we ever implement extensions elsewhere, be sure to
+  // continue to skip and ignore those for LOCAL.
   while (proxy_protocol_header_.value().extensions_length_) {
     // buf_ is no longer in use so we re-use it to read/discard
     int bytes_avail;
