@@ -63,11 +63,12 @@ void Filter::onReadWorker() {
     return;
   }
 
-  if (proxy_protocol_header_.has_value()) {
+  if (proxy_protocol_header_.has_value() && !proxy_protocol_header_.value().local_command_) {
+    // If this is a local_command, we are not to override address
     // Error check the source and destination fields. Most errors are caught by the address
     // parsing above, but a malformed IPv6 address may combine with a malformed port and parse as
-    // an IPv6 address when parsing for an IPv4 address. Remote address refers to the source
-    // address.
+    // an IPv6 address when parsing for an IPv4 address(for v1 mode). Remote address refers to the
+    // source address.
     const auto remote_version = proxy_protocol_header_.value().remote_address_->ip()->version();
     const auto local_version = proxy_protocol_header_.value().local_address_->ip()->version();
     if (remote_version != proxy_protocol_header_.value().protocol_version_ ||
@@ -94,7 +95,13 @@ void Filter::onReadWorker() {
 
 size_t Filter::lenV2Address(char* buf) {
   const uint8_t proto_family = buf[PROXY_PROTO_V2_SIGNATURE_LEN + 1];
+  const int ver_cmd = buf[PROXY_PROTO_V2_SIGNATURE_LEN];
   size_t len;
+
+  if ((ver_cmd & 0xf) == PROXY_PROTO_V2_LOCAL) {
+    // According to the spec there is no address encoded, len=0, and we must ignore
+    return 0;
+  }
 
   switch ((proto_family & 0xf0) >> 4) {
   case PROXY_PROTO_V2_AF_INET:
@@ -117,6 +124,7 @@ void Filter::parseV2Header(char* buf) {
 
   if ((ver_cmd & 0xf) == PROXY_PROTO_V2_LOCAL) {
     // This is locally-initiated, e.g. health-check, and should not override remote address
+    proxy_protocol_header_.emplace(WireHeader{hdr_addr_len});
     return;
   }
 
