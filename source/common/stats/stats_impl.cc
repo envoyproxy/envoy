@@ -138,7 +138,10 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   uint64_t num_bytes_to_allocate = RawStatData::sizeGivenName(name);
   RawStatData* data = static_cast<RawStatData*>(::calloc(num_bytes_to_allocate, 1));
-  data->initialize(name, num_bytes_to_allocate);
+  if (data == nullptr) {
+    throw EnvoyException("HeapRawStatDataAllocator: unable to allocate a new stat");
+  }
+  data->checkAndInit(name, num_bytes_to_allocate);
 
   Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data);
@@ -332,31 +335,31 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
   ::free(&data);
 }
 
-void RawStatData::initialize(absl::string_view key, uint64_t num_bytes_allocated) {
+void RawStatData::initialize(absl::string_view key, uint64_t xfer_size) {
   ASSERT(!initialized());
   ref_count_ = 1;
-
-  uint64_t xfer_size = key.size();
-  ASSERT(xfer_size <= num_bytes_allocated);
-
   memcpy(name_, key.data(), xfer_size);
   name_[xfer_size] = '\0';
 }
 
+void RawStatData::checkAndInit(absl::string_view key, uint64_t num_bytes_allocated) {
+  uint64_t xfer_size = key.size();
+  ASSERT(sizeof(RawStatData) + xfer_size + 1 <= num_bytes_allocated);
+
+  initialize(key, xfer_size);
+}
+
 void RawStatData::truncateAndInit(absl::string_view key, const StatsOptions& stats_options) {
-  ASSERT(!initialized());
   if (key.size() > stats_options.maxNameLength()) {
     ENVOY_LOG_MISC(
         warn,
         "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
         key.size(), stats_options.maxNameLength());
   }
-  ref_count_ = 1;
 
   // key is not necessarily nul-terminated, but we want to make sure name_ is.
   uint64_t xfer_size = std::min(stats_options.maxNameLength(), key.size());
-  memcpy(name_, key.data(), xfer_size);
-  name_[xfer_size] = '\0';
+  initialize(key, xfer_size);
 }
 
 HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr)

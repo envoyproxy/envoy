@@ -222,7 +222,7 @@ struct RawStatData {
    * does not expect stat name truncation. We pass in the number of bytes allocated in order to
    * assert the copy is safe inline.
    */
-  void initialize(absl::string_view key, uint64_t num_bytes_allocated);
+  void checkAndInit(absl::string_view key, uint64_t num_bytes_allocated);
 
   /**
    * Initializes this object to have the specified key,
@@ -254,6 +254,7 @@ struct RawStatData {
   char name_[];
 
 private:
+  void initialize(absl::string_view key, uint64_t num_bytes_allocated);
 };
 
 /**
