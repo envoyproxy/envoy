@@ -558,54 +558,107 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   TestLoadBalancerContext context_10({{"version", "1.0"}});
   TestLoadBalancerContext context_12({{"version", "1.2"}});
   TestLoadBalancerContext context_13({{"version", "1.3"}});
+  TestLoadBalancerContext context_default({{"default", "true"}});
+  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"default", "true"}});
 
+  EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
   EXPECT_CALL(subset_info_, fallbackPolicy())
-      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK));
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
 
-  std::vector<std::set<std::string>> subset_keys = {{"version"}};
+  std::vector<std::set<std::string>> subset_keys = {{"version"}, {"default"}};
   EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
 
   // Add hosts initial hosts.
   init({{"tcp://127.0.0.1:8000", {{"version", "1.2"}}},
-        {"tcp://127.0.0.1:8001", {{"version", "1.0"}}}});
-  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
-  EXPECT_EQ(2U, stats_.lb_subsets_created_.value());
+        {"tcp://127.0.0.1:8001", {{"version", "1.0"}, {"default", "true"}}}});
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
   EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
 
-  // Update metadata for the first host, one subset should be removed.
-  envoy::api::v2::core::Metadata metadata;
-  Envoy::Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
-                                                "version")
+  // Swap the default version.
+  envoy::api::v2::core::Metadata metadata_enable_new_default;
+  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_new_default,
+                                                Config::MetadataFilters::get().ENVOY_LB, "version")
+      .set_string_value("1.2");
+  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_new_default,
+                                                Config::MetadataFilters::get().ENVOY_LB, "default")
+      .set_string_value("true");
+  host_set_.hosts_[0]->metadata(metadata_enable_new_default);
+  envoy::api::v2::core::Metadata metadata_disable_old_default;
+  Envoy::Config::Metadata::mutableMetadataValue(metadata_disable_old_default,
+                                                Config::MetadataFilters::get().ENVOY_LB, "version")
+      .set_string_value("1.0");
+  host_set_.hosts_[1]->metadata(metadata_disable_old_default);
+
+  host_set_.runCallbacks({}, {});
+
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13));
+
+  // Bump 1.0 to 1.3, one subset should be removed.
+  envoy::api::v2::core::Metadata metadata_13;
+  Envoy::Config::Metadata::mutableMetadataValue(metadata_13,
+                                                Config::MetadataFilters::get().ENVOY_LB, "version")
       .set_string_value("1.3");
-  host_set_.hosts_[0]->metadata(metadata);
+  host_set_.hosts_[1]->metadata(metadata_13);
 
   // No hosts added nor removed, so we bypass modifyHosts().
   host_set_.runCallbacks({}, {});
 
-  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
-  EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(1U, stats_.lb_subsets_removed_.value());
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13));
-  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
 
-  // Now, rollback to the original version.
-  Envoy::Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
-                                                "version")
-      .set_string_value("1.2");
-  host_set_.hosts_[0]->metadata(metadata);
+  // Rollback from 1.3 to 1.0.
+  envoy::api::v2::core::Metadata metadata_10;
+  Envoy::Config::Metadata::mutableMetadataValue(metadata_10,
+                                                Config::MetadataFilters::get().ENVOY_LB, "version")
+      .set_string_value("1.0");
+  host_set_.hosts_[1]->metadata(metadata_10);
 
   host_set_.runCallbacks({}, {});
 
-  EXPECT_EQ(2U, stats_.lb_subsets_active_.value());
-  EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(5U, stats_.lb_subsets_created_.value());
   EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
-  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
   EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
-  EXPECT_EQ(nullptr, lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13));
+
+  // Make 1.0 default again.
+  Envoy::Config::Metadata::mutableMetadataValue(metadata_10,
+                                                Config::MetadataFilters::get().ENVOY_LB, "default")
+      .set_string_value("true");
+  host_set_.hosts_[1]->metadata(metadata_10);
+  envoy::api::v2::core::Metadata metadata_12;
+  Envoy::Config::Metadata::mutableMetadataValue(metadata_12,
+                                                Config::MetadataFilters::get().ENVOY_LB, "version")
+      .set_string_value("1.2");
+  host_set_.hosts_[0]->metadata(metadata_12);
+
+  host_set_.runCallbacks({}, {});
+
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(5U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
 }
 
 TEST_P(SubsetLoadBalancerTest, UpdateRemovingLastSubsetHost) {
