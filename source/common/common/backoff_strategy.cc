@@ -9,16 +9,14 @@ JitteredBackOffStrategy::JitteredBackOffStrategy(uint64_t base_interval, uint64_
 }
 
 uint64_t JitteredBackOffStrategy::nextBackOffMs() {
-  current_retry_++;
-  uint32_t multiplier = (1 << current_retry_) - 1;
-  // for retries that take longer, multiplier may overflow and become zero.
-  if (multiplier == 0) {
-    current_retry_ = 1;
-    multiplier = (1 << current_retry_) - 1;
+  const uint64_t multiplier = (1 << current_retry_) - 1;
+  const uint64_t base_backoff = multiplier * base_interval_;
+  if (base_backoff <= max_interval_) {
+    current_retry_++;
   }
-  return std::min(random_.random() % (base_interval_ * multiplier), max_interval_);
+  return std::min(random_.random() % base_backoff, max_interval_);
 }
 
-void JitteredBackOffStrategy::reset() { current_retry_ = 0; }
+void JitteredBackOffStrategy::reset() { current_retry_ = 1; }
 
 } // namespace Envoy

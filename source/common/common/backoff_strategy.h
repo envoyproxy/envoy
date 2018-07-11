@@ -32,7 +32,7 @@ public:
 private:
   const uint64_t base_interval_;
   const uint64_t max_interval_{};
-  uint64_t current_retry_{};
+  uint64_t current_retry_{1};
   Runtime::RandomGenerator& random_;
 };
 } // namespace Envoy

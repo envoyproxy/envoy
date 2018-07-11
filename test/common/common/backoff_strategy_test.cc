@@ -34,37 +34,26 @@ TEST(BackOffStrategyTest, JitteredBackOffWithMaxInterval) {
   NiceMock<Runtime::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(1024));
 
-  JitteredBackOffStrategy jittered_back_off(5, 15, random);
+  JitteredBackOffStrategy jittered_back_off(5, 100, random);
   EXPECT_EQ(4, jittered_back_off.nextBackOffMs());
   EXPECT_EQ(4, jittered_back_off.nextBackOffMs());
   EXPECT_EQ(9, jittered_back_off.nextBackOffMs());
-  EXPECT_EQ(15, jittered_back_off.nextBackOffMs()); // Should return Max here
-  EXPECT_EQ(15, jittered_back_off.nextBackOffMs());
+  EXPECT_EQ(49, jittered_back_off.nextBackOffMs());
+  EXPECT_EQ(94, jittered_back_off.nextBackOffMs());
+  EXPECT_EQ(94, jittered_back_off.nextBackOffMs()); // Should return Max here
 }
 
 TEST(BackOffStrategyTest, JitteredBackOffWithMaxIntervalReset) {
   NiceMock<Runtime::MockRandomGenerator> random;
   ON_CALL(random, random()).WillByDefault(Return(1024));
 
-  JitteredBackOffStrategy jittered_back_off(5, 15, random);
+  JitteredBackOffStrategy jittered_back_off(5, 100, random);
   EXPECT_EQ(4, jittered_back_off.nextBackOffMs());
   EXPECT_EQ(4, jittered_back_off.nextBackOffMs());
   EXPECT_EQ(9, jittered_back_off.nextBackOffMs());
-  EXPECT_EQ(15, jittered_back_off.nextBackOffMs()); // Should return Max here
+  EXPECT_EQ(49, jittered_back_off.nextBackOffMs());
 
   jittered_back_off.reset();
   EXPECT_EQ(4, jittered_back_off.nextBackOffMs()); // Should start from start
 }
-
-TEST(BackOffStrategyTest, JitteredBackOffLongerDuration) {
-  NiceMock<Runtime::MockRandomGenerator> random;
-  ON_CALL(random, random()).WillByDefault(Return(1024));
-
-  JitteredBackOffStrategy jittered_back_off(5, 250, random);
-
-  for (size_t i = 0; i < 10000; i++) {
-    EXPECT_GE(jittered_back_off.nextBackOffMs(), 1);
-  }
-}
-
 } // namespace Envoy

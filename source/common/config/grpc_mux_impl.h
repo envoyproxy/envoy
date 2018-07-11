@@ -105,7 +105,7 @@ private:
   Event::TimerPtr retry_timer_;
   Runtime::RandomGenerator& random_;
   MonotonicTimeSource& time_source_;
-  BackOffStrategyPtr backoff_strategy_ptr_;
+  BackOffStrategyPtr backoff_strategy_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {

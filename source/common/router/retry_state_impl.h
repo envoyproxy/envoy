@@ -60,7 +60,7 @@ private:
   DoRetryCallback callback_;
   Event::TimerPtr retry_timer_;
   Upstream::ResourcePriority priority_;
-  BackOffStrategyPtr backoff_strategy_ptr_;
+  BackOffStrategyPtr backoff_strategy_;
 };
 
 } // namespace Router

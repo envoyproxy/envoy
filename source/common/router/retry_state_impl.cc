@@ -71,8 +71,9 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
   // Merge in the route policy.
   retry_on_ |= route_policy.retryOn();
   retries_remaining_ = std::max(retries_remaining_, route_policy.numRetries());
-  uint32_t base = runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25);
-  backoff_strategy_ptr_ = std::make_unique<JitteredBackOffStrategy>(base, base * 10, random_);
+  const uint32_t base = runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25);
+  // Cap the max interval to 10 times the base interval to ensure reasonable backoff intervals.
+  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(base, base * 10, random_);
 }
 
 RetryStateImpl::~RetryStateImpl() { resetRetry(); }
@@ -83,7 +84,7 @@ void RetryStateImpl::enableBackoffTimer() {
   }
 
   // We use a fully jittered exponential backoff algorithm.
-  retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_ptr_->nextBackOffMs()));
+  retry_timer_->enableTimer(std::chrono::milliseconds(backoff_strategy_->nextBackOffMs()));
 }
 
 uint32_t RetryStateImpl::parseRetryOn(absl::string_view config) {
