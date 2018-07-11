@@ -4,6 +4,26 @@
 
 namespace Envoy {
 
+#define EXECUTE(NAME, ARGS) NAME ARGS
+
+#define SELECT_DETAILS(_0, _1, DETAIL_MACRO, ...) DETAIL_MACRO
+#define EVAL_IF_VAARGS_EMPTY() ,
+
+#define NO_DETAILS() ""
+#define HAS_DETAILS(X) std::string(" Details: ") + X
+
+/*  Returns either NO_DETAILS or HAS_DETAILS based on the present of __VA_ARGS__
+ *
+ * Roughly this goes from:
+ *  EXECUTE( SELECT_DETAILS, (EVAL_IF_VAARGS_EMPTY __VA_ARGS__ (), NO_DETAILS, HAS_DETAILS) )
+ *  SELECT_DETAILS(EVAL_IF_VAARGS_EMPTY __VA_ARGS__ (), NO_DETAILS, HAS_DETAILS)
+ *  SELECT_DETAILS(EVAL_IF_VAARGS_EMPTY __VA_ARGS__ (), NO_DETAILS, HAS_DETAILS)
+ *  SELECT_DETAILS(,, NO_DETAILS, HAS_DETAILS) or  -> NO_DETAILS
+ *  SELECT_DETAILS (EVAL_IF_VAARGS_EMPTY "fmt"(), NO_DETAILS, HAS_DETAILS)) -> HAS_DETAILS
+ * */
+#define DETAILS_FN(...)                                                                            \
+  EXECUTE(SELECT_DETAILS, (EVAL_IF_VAARGS_EMPTY __VA_ARGS__(), NO_DETAILS, HAS_DETAILS))
+
 /**
  * assert macro that uses our builtin logging which gives us thread ID and can log to various
  * sinks.
@@ -18,17 +38,12 @@ namespace Envoy {
  * where new uses of RELEASE_ASSERT are strongly encouraged to supply a verbose
  * explanation of what went wrong.
  */
-#define _NO_DETAILS() ""
-#define _PRINT_DETAILS(Y) "some details"
-
-#define __DETAILS_SELECTOR(MAYBE_ARGUMENT, ASSERT_MACRO, ...) ASSERT_MACRO
-
-#define RELEASE_ASSERT(X, ...)                                                                        \
+#define RELEASE_ASSERT(X, ...)                                                                     \
   do {                                                                                             \
     if (!(X)) {                                                                                    \
+      std::string s = DETAILS_FN(__VA_ARGS__)(__VA_ARGS__);                                        \
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,    \
-                          "assert failure: {}{}", #X,                                              \
-                          __DETAILS_SELECTOR(__VA_ARGS__, _PRINT_DETAILS, _NO_DETAILS)(__VA_ARGS__));                                                       \
+                          "assert failure: {}.{}", #X, s);                                         \
       abort();                                                                                     \
     }                                                                                              \
   } while (false)
