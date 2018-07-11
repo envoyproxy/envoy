@@ -40,7 +40,6 @@ public:
              const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
              Ssl::ContextManager& ssl_context_manager, Secret::SecretManager& secret_manager,
              bool added_via_api);
-  void reloadHealthyHosts();
   const Network::Address::InstanceConstSharedPtr
   resolveProtoAddress2(const envoy::api::v2::core::Address& address);
 
@@ -52,15 +51,10 @@ protected:
   Runtime::Loader& runtime_;
   static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
   static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);
-  void onPreInitComplete();
-  void startPreInit();
 
 private:
   std::function<void()> initialization_complete_callback_;
-  void finishInitialization();
-  bool initialization_started_{};
   HostVectorSharedPtr initial_hosts_;
-  uint64_t pending_initialize_health_checks_{};
 };
 
 typedef std::unique_ptr<HdsCluster> HdsClusterPtr;
@@ -108,6 +102,8 @@ private:
   void establishNewStream();
   void sendHealthCheckRequest();
   void handleFailure();
+  void
+  processMessage(std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message);
 
   HdsDelegateStats stats_;
   Grpc::AsyncClientPtr async_client_;
@@ -129,7 +125,6 @@ private:
   envoy::api::v2::Cluster& cluster_config_r = cluster_config;
   HdsClusterPtr cluster_;
 };
-
 
 typedef std::unique_ptr<HdsDelegate> HdsDelegatePtr;
 

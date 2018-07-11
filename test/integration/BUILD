@@ -373,6 +373,7 @@ envoy_cc_test(
     srcs = ["hds_integration_test.cc"],
     deps = [
         ":http_integration_lib",
+        ":integration_lib",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/config:metadata_lib",
         "//source/common/config:resources_lib",
@@ -384,7 +385,6 @@ envoy_cc_test(
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
         "//test/test_common:network_utility_lib",
-        ":integration_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/service/discovery/v2:hds_cc",
     ],
