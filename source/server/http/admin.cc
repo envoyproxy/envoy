@@ -564,7 +564,7 @@ std::string PrometheusStatsFormatter::sanitizeName(const std::string& name) {
 std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
   std::vector<std::string> buf;
   for (const Stats::Tag& tag : tags) {
-    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), sanitizeName(tag.value_)));
+    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), tag.value_));
   }
   return StringUtil::join(buf, ",");
 }

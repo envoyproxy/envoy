@@ -11,6 +11,7 @@ Version history
   `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
 * config: v1 disabled by default. v1 support remains available until October via flipping --v2-config-only=false.
 * health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
+* health check: added support for :ref:`specifying jitter as a percentage <envoy_api_field_core.HealthCheck.interval_jitter_percent>`.
 * health_check: added support for :ref:`health check event logging <arch_overview_health_check_logging>`.
 * http: better handling of HEAD requests. Now sending transfer-encoding: chunked rather than content-length: 0.
 * http: response filters not applied to early error paths such as http_parser generated 400s.

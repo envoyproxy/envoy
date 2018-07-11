@@ -277,7 +277,6 @@ TEST_P(IntegrationTest, TestBind) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  // Request 1.
 
   auto response =
       codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
@@ -285,17 +284,14 @@ TEST_P(IntegrationTest, TestBind) {
                                                                  {":scheme", "http"},
                                                                  {":authority", "host"}},
                                          1024);
-
   fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
   std::string address =
       fake_upstream_connection_->connection().remoteAddress()->ip()->addressAsString();
   EXPECT_EQ(address, address_string);
   upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
   upstream_request_->waitForEndStream(*dispatcher_);
-  // Cleanup both downstream and upstream
-  codec_client_->close();
-  fake_upstream_connection_->close();
-  fake_upstream_connection_->waitForDisconnect();
+
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(IntegrationTest, TestFailedBind) {
