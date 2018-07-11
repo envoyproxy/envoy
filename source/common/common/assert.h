@@ -20,10 +20,10 @@ namespace Envoy {
 #define RELEASE_ASSERT(X, DETAILS)                                                                 \
   do {                                                                                             \
     if (!(X)) {                                                                                    \
-      absl::string_view details = DETAILS;                                                         \
+      const std::string& details = (DETAILS);                                                      \
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,    \
                           "assert failure: {}.{}{}", #X,                                           \
-                          details.empty() ? "" : " Details: ", DETAILS);                           \
+                          details.empty() ? "" : " Details: ", details);                           \
       abort();                                                                                     \
     }                                                                                              \
   } while (false)
