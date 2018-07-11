@@ -362,7 +362,6 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
     // Buffer until the response is complete.
     return Http::FilterDataStatus::StopIterationAndBuffer;
   }
-  // TODO(dio): Add support for streaming case.
   // TODO(lizan): Check ResponseStatus
 
   return Http::FilterDataStatus::Continue;
