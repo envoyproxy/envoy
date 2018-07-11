@@ -10,6 +10,7 @@
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
@@ -44,7 +45,7 @@ public:
         dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        time_source_));
+        random_, time_source_));
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -72,6 +73,7 @@ public:
 
   envoy::api::v2::core::Node node_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  Runtime::MockRandomGenerator random_;
   Grpc::MockAsyncClient* async_client_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
@@ -112,6 +114,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   expectSendMessage("baz", {"z"}, "");
   grpc_mux_->start();
 
+  EXPECT_CALL(random_, random());
   EXPECT_CALL(*timer_, enableTimer(_));
   grpc_mux_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
