@@ -5,32 +5,6 @@
 namespace Envoy {
 
 /**
- * The original version of RELEASE_ASSERT which simply checks and logs the condition.
- */
-#define _RELEASE_ASSERT_ORIGINAL(X)                                                                \
-  do {                                                                                             \
-    if (!(X)) {                                                                                    \
-      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,    \
-                          "assert failure: {}", #X);                                               \
-      abort();                                                                                     \
-    }                                                                                              \
-  } while (false)
-
-/**
- * The new version of RELEASE_ASSERT which allows for a more verbose explanation
- */
-#define _RELEASE_ASSERT_VERBOSE(X, Y)                                                              \
-  do {                                                                                             \
-    if (!(X)) {                                                                                    \
-      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,    \
-                          "assert failure: {}. Details: {} ", #X, (Y));                            \
-      abort();                                                                                     \
-    }                                                                                              \
-  } while (false)
-
-#define __RELEASE_ASSERT_SELECTOR(_1, _2, ASSERT_MACRO, ...) ASSERT_MACRO
-
-/**
  * assert macro that uses our builtin logging which gives us thread ID and can log to various
  * sinks.
  *
@@ -44,9 +18,20 @@ namespace Envoy {
  * where new uses of RELEASE_ASSERT are strongly encouraged to supply a verbose
  * explanation of what went wrong.
  */
-#define RELEASE_ASSERT(...)                                                                        \
-  __RELEASE_ASSERT_SELECTOR(__VA_ARGS__, _RELEASE_ASSERT_VERBOSE, _RELEASE_ASSERT_ORIGINAL)        \
-  (__VA_ARGS__)
+#define _NO_DETAILS() ""
+#define _PRINT_DETAILS(Y) "some details"
+
+#define __DETAILS_SELECTOR(MAYBE_ARGUMENT, ASSERT_MACRO, ...) ASSERT_MACRO
+
+#define RELEASE_ASSERT(X, ...)                                                                        \
+  do {                                                                                             \
+    if (!(X)) {                                                                                    \
+      ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,    \
+                          "assert failure: {}{}", #X,                                              \
+                          __DETAILS_SELECTOR(__VA_ARGS__, _PRINT_DETAILS, _NO_DETAILS)(__VA_ARGS__));                                                       \
+      abort();                                                                                     \
+    }                                                                                              \
+  } while (false)
 
 #ifndef NDEBUG
 #define ASSERT(X) RELEASE_ASSERT(X)
