@@ -240,8 +240,9 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         filter_chain_match.application_protocols().begin(),
         filter_chain_match.application_protocols().end());
 
-    addFilterChain(filter_chain_match.destination_port().value(), destination_ips, server_names,
-                   filter_chain_match.transport_protocol(), application_protocols,
+    addFilterChain(PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0),
+                   destination_ips, server_names, filter_chain_match.transport_protocol(),
+                   application_protocols,
                    config_factory.createTransportSocketFactory(*message, *this, server_names),
                    parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), *this));
 
