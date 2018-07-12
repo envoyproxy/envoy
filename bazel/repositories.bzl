@@ -25,8 +25,9 @@ def _repository_impl(name, **kwargs):
     # user a useful error if they accidentally specify a tag.
     if "tag" in location:
         fail(
-            "Refusing to depend on Git tag %r for external dependency %r: use 'commit' instead."
-            % (location["tag"], name))
+            "Refusing to depend on Git tag %r for external dependency %r: use 'commit' instead." %
+            (location["tag"], name),
+        )
 
     if "commit" in location:
         # Git repository at given commit ID. Add a BUILD file if requested.
@@ -35,13 +36,15 @@ def _repository_impl(name, **kwargs):
                 name = name,
                 remote = location["remote"],
                 commit = location["commit"],
-                **kwargs)
+                **kwargs
+            )
         else:
             git_repository(
                 name = name,
                 remote = location["remote"],
                 commit = location["commit"],
-                **kwargs)
+                **kwargs
+            )
     else:  # HTTP
         # HTTP tarball at a given URL. Add a BUILD file if requested.
         if "build_file" in kwargs:
@@ -50,25 +53,31 @@ def _repository_impl(name, **kwargs):
                 urls = location["urls"],
                 sha256 = location["sha256"],
                 strip_prefix = location["strip_prefix"],
-                **kwargs)
+                **kwargs
+            )
         else:
             native.http_archive(
                 name = name,
                 urls = location["urls"],
                 sha256 = location["sha256"],
                 strip_prefix = location["strip_prefix"],
-                **kwargs)
+                **kwargs
+            )
 
 def _build_recipe_repository_impl(ctxt):
     # Setup the build directory with links to the relevant files.
     ctxt.symlink(Label("//bazel:repositories.sh"), "repositories.sh")
-    ctxt.symlink(Label("//ci/build_container:build_and_install_deps.sh"),
-                 "build_and_install_deps.sh")
+    ctxt.symlink(
+        Label("//ci/build_container:build_and_install_deps.sh"),
+        "build_and_install_deps.sh",
+    )
     ctxt.symlink(Label("//ci/build_container:recipe_wrapper.sh"), "recipe_wrapper.sh")
     ctxt.symlink(Label("//ci/build_container:Makefile"), "Makefile")
     for r in ctxt.attr.recipes:
-        ctxt.symlink(Label("//ci/build_container/build_recipes:" + r + ".sh"),
-                     "build_recipes/" + r + ".sh")
+        ctxt.symlink(
+            Label("//ci/build_container/build_recipes:" + r + ".sh"),
+            "build_recipes/" + r + ".sh",
+        )
     ctxt.symlink(Label("//ci/prebuilt:BUILD"), "BUILD")
 
     # Run the build script.
@@ -86,6 +95,7 @@ def _build_recipe_repository_impl(ctxt):
         print("\033[31;1m\033[48;5;226m External dependency build failed, check above log " +
               "for errors and ensure all prerequisites at " +
               "https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#quick-start-bazel-build-for-developers are met.")
+
         # This error message doesn't appear to the user :( https://github.com/bazelbuild/bazel/issues/3683
         fail("External dep build failed")
 
@@ -97,7 +107,7 @@ def _default_envoy_build_config_impl(ctx):
 _default_envoy_build_config = repository_rule(
     implementation = _default_envoy_build_config_impl,
     attrs = {
-        "config": attr.label(default="@envoy//source/extensions:extensions_build_config.bzl"),
+        "config": attr.label(default = "@envoy//source/extensions:extensions_build_config.bzl"),
     },
 )
 
@@ -113,12 +123,12 @@ def _default_envoy_api_impl(ctx):
         "tools",
     ]
     for d in api_dirs:
-      ctx.symlink(ctx.path(ctx.attr.api).dirname.get_child(d), d)
+        ctx.symlink(ctx.path(ctx.attr.api).dirname.get_child(d), d)
 
 _default_envoy_api = repository_rule(
     implementation = _default_envoy_api_impl,
     attrs = {
-        "api": attr.label(default="@envoy//api:BUILD"),
+        "api": attr.label(default = "@envoy//api:BUILD"),
     },
 )
 
@@ -180,7 +190,7 @@ def _envoy_api_deps():
     # Treat the data plane API as an external repo, this simplifies exporting the API to
     # https://github.com/envoyproxy/data-plane-api.
     if "envoy_api" not in native.existing_rules().keys():
-        _default_envoy_api(name="envoy_api")
+        _default_envoy_api(name = "envoy_api")
 
     native.bind(
         name = "http_api_protos",
@@ -203,7 +213,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
             "CXX",
             "CFLAGS",
             "CXXFLAGS",
-            "LD_LIBRARY_PATH"
+            "LD_LIBRARY_PATH",
         ],
         # Don't pretend we're in the sandbox, we do some evil stuff with envoy_dep_cache.
         local = True,
@@ -451,32 +461,32 @@ def _com_github_grpc_grpc():
 
     # Rebind some stuff to match what the gRPC Bazel is expecting.
     native.bind(
-      name = "protobuf_headers",
-      actual = "@com_google_protobuf//:protobuf_headers",
+        name = "protobuf_headers",
+        actual = "@com_google_protobuf//:protobuf_headers",
     )
     native.bind(
-      name = "libssl",
-      actual = "//external:ssl",
+        name = "libssl",
+        actual = "//external:ssl",
     )
     native.bind(
-      name = "cares",
-      actual = "//external:ares",
-    )
-
-    native.bind(
-      name = "grpc",
-      actual = "@com_github_grpc_grpc//:grpc++"
+        name = "cares",
+        actual = "//external:ares",
     )
 
     native.bind(
-      name = "grpc_health_proto",
-      actual = "@envoy//bazel:grpc_health_proto",
+        name = "grpc",
+        actual = "@com_github_grpc_grpc//:grpc++",
+    )
+
+    native.bind(
+        name = "grpc_health_proto",
+        actual = "@envoy//bazel:grpc_health_proto",
     )
 
 def _com_github_google_jwt_verify():
     _repository_impl("com_github_google_jwt_verify")
 
     native.bind(
-      name = "jwt_verify_lib",
-      actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
+        name = "jwt_verify_lib",
+        actual = "@com_github_google_jwt_verify//:jwt_verify_lib",
     )

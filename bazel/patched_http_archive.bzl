@@ -1,9 +1,9 @@
 def _patched_http_archive(ctx):
     ctx.download_and_extract(
         ctx.attr.urls,
-        "", # output
+        "",  # output
         ctx.attr.sha256,
-        "", # type
+        "",  # type
         ctx.attr.strip_prefix,
     )
     for ii, patch in enumerate(ctx.attr.patches):
@@ -11,7 +11,7 @@ def _patched_http_archive(ctx):
         ctx.symlink(patch, patch_input)
         patch_result = ctx.execute(["patch", "-p0", "--input", patch_input])
         if patch_result.return_code != 0:
-          fail("Failed to apply patch %r: %s" % (patch, patch_result.stderr))
+            fail("Failed to apply patch %r: %s" % (patch, patch_result.stderr))
 
 patched_http_archive = repository_rule(
     attrs = {

@@ -123,16 +123,16 @@ protected:
     file = TestEnvironment::substitute(file, version_);
 
     std::ifstream is(file, std::ios::binary | std::ios::ate);
-    RELEASE_ASSERT(!is.fail());
+    RELEASE_ASSERT(!is.fail(), "");
 
     std::ifstream::pos_type len = is.tellg();
     if (len > 0) {
       std::vector<char> bytes(len, 0);
       is.seekg(0, std::ios::beg);
-      RELEASE_ASSERT(!is.fail());
+      RELEASE_ASSERT(!is.fail(), "");
 
       is.read(bytes.data(), len);
-      RELEASE_ASSERT(!is.fail());
+      RELEASE_ASSERT(!is.fail(), "");
 
       buffer.add(bytes.data(), len);
     }

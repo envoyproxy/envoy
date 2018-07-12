@@ -97,7 +97,7 @@ public:
 
   /** Examines the data structures to see if they are sane, assert-failing on any trouble. */
   void sanityCheck() {
-    RELEASE_ASSERT(control_->size <= control_->options.capacity);
+    RELEASE_ASSERT(control_->size <= control_->options.capacity, "");
 
     // As a sanity check, make sure there are control_->size values
     // reachable from the slots, each of which has a valid
@@ -111,15 +111,15 @@ public:
       uint32_t next = 0; // initialized to silence compilers.
       for (uint32_t cell_index = slots_[slot];
            (cell_index != Sentinal) && (num_values <= control_->size); cell_index = next) {
-        RELEASE_ASSERT(cell_index < control_->options.capacity);
+        RELEASE_ASSERT(cell_index < control_->options.capacity, "");
         Cell& cell = getCell(cell_index);
         absl::string_view key = cell.value.key();
-        RELEASE_ASSERT(computeSlot(key) == slot);
+        RELEASE_ASSERT(computeSlot(key) == slot, "");
         next = cell.next_cell_index;
         ++num_values;
       }
     }
-    RELEASE_ASSERT(num_values == control_->size);
+    RELEASE_ASSERT(num_values == control_->size, "");
 
     uint32_t num_free_entries = 0;
     uint32_t expected_free_entries = control_->options.capacity - control_->size;
@@ -130,7 +130,7 @@ public:
          cell_index = getCell(cell_index).next_cell_index) {
       ++num_free_entries;
     }
-    RELEASE_ASSERT(num_free_entries == expected_free_entries);
+    RELEASE_ASSERT(num_free_entries == expected_free_entries, "");
   }
 
   /**
@@ -314,7 +314,7 @@ private:
     const uint64_t alignment = calculateAlignment();
     // Check that alignment is a power of 2:
     // http://www.graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
-    RELEASE_ASSERT((alignment > 0) && ((alignment & (alignment - 1)) == 0));
+    RELEASE_ASSERT((alignment > 0) && ((alignment & (alignment - 1)) == 0), "");
     return (size + alignment - 1) & ~(alignment - 1);
   }
 
@@ -336,7 +336,7 @@ private:
   Cell& getCell(uint32_t cell_index) {
     // Because the key-size is parameteriziable, an array-lookup on sizeof(Cell) does not work.
     char* ptr = reinterpret_cast<char*>(cells_) + cellOffset(cell_index);
-    RELEASE_ASSERT((reinterpret_cast<uint64_t>(ptr) & (calculateAlignment() - 1)) == 0);
+    RELEASE_ASSERT((reinterpret_cast<uint64_t>(ptr) & (calculateAlignment() - 1)) == 0, "");
     return *reinterpret_cast<Cell*>(ptr);
   }
 

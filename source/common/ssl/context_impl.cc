@@ -24,7 +24,7 @@ namespace Ssl {
 int ContextImpl::sslContextIndex() {
   CONSTRUCT_ON_FIRST_USE(int, []() -> int {
     int ssl_context_index = SSL_CTX_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
-    RELEASE_ASSERT(ssl_context_index >= 0);
+    RELEASE_ASSERT(ssl_context_index >= 0, "");
     return ssl_context_index;
   }());
 }
@@ -33,16 +33,16 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
                          const ContextConfig& config)
     : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope),
       stats_(generateStats(scope)) {
-  RELEASE_ASSERT(ctx_);
+  RELEASE_ASSERT(ctx_, "");
 
   int rc = SSL_CTX_set_ex_data(ctx_.get(), sslContextIndex(), this);
-  RELEASE_ASSERT(rc == 1);
+  RELEASE_ASSERT(rc == 1, "");
 
   rc = SSL_CTX_set_min_proto_version(ctx_.get(), config.minProtocolVersion());
-  RELEASE_ASSERT(rc == 1);
+  RELEASE_ASSERT(rc == 1, "");
 
   rc = SSL_CTX_set_max_proto_version(ctx_.get(), config.maxProtocolVersion());
-  RELEASE_ASSERT(rc == 1);
+  RELEASE_ASSERT(rc == 1, "");
 
   if (!SSL_CTX_set_strict_cipher_list(ctx_.get(), config.cipherSuites().c_str())) {
     throw EnvoyException(
@@ -59,7 +59,7 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     ca_file_path_ = config.caCertPath();
     bssl::UniquePtr<BIO> bio(
         BIO_new_mem_buf(const_cast<char*>(config.caCert().data()), config.caCert().size()));
-    RELEASE_ASSERT(bio != nullptr);
+    RELEASE_ASSERT(bio != nullptr, "");
     // Based on BoringSSL's X509_load_cert_crl_file().
     bssl::UniquePtr<STACK_OF(X509_INFO)> list(
         PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
@@ -101,7 +101,7 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     bssl::UniquePtr<BIO> bio(
         BIO_new_mem_buf(const_cast<char*>(config.certificateRevocationList().data()),
                         config.certificateRevocationList().size()));
-    RELEASE_ASSERT(bio != nullptr);
+    RELEASE_ASSERT(bio != nullptr, "");
 
     // Based on BoringSSL's X509_load_cert_crl_file().
     bssl::UniquePtr<STACK_OF(X509_INFO)> list(
@@ -168,7 +168,7 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     cert_chain_file_path_ = config.certChainPath();
     bssl::UniquePtr<BIO> bio(
         BIO_new_mem_buf(const_cast<char*>(config.certChain().data()), config.certChain().size()));
-    RELEASE_ASSERT(bio != nullptr);
+    RELEASE_ASSERT(bio != nullptr, "");
     cert_chain_.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
     if (cert_chain_ == nullptr || !SSL_CTX_use_certificate(ctx_.get(), cert_chain_.get())) {
       throw EnvoyException(
@@ -199,7 +199,7 @@ ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
     // Load private key.
     bio.reset(
         BIO_new_mem_buf(const_cast<char*>(config.privateKey().data()), config.privateKey().size()));
-    RELEASE_ASSERT(bio != nullptr);
+    RELEASE_ASSERT(bio != nullptr, "");
     bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
     if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ctx_.get(), pkey.get())) {
       throw EnvoyException(
@@ -381,7 +381,7 @@ bool ContextImpl::verifyCertificateHashList(
   std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
   unsigned int n;
   X509_digest(cert, EVP_sha256(), computed_hash.data(), &n);
-  RELEASE_ASSERT(n == computed_hash.size());
+  RELEASE_ASSERT(n == computed_hash.size(), "");
 
   for (const auto& expected_hash : expected_hashes) {
     if (computed_hash == expected_hash) {
@@ -468,7 +468,7 @@ ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& s
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
                                      parsed_alpn_protocols_.size());
-    RELEASE_ASSERT(rc == 0);
+    RELEASE_ASSERT(rc == 0, "");
   }
 }
 
@@ -477,7 +477,7 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
 
   if (!server_name_indication_.empty()) {
     int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication_.c_str());
-    RELEASE_ASSERT(rc);
+    RELEASE_ASSERT(rc, "");
   }
 
   if (allow_renegotiation_) {
@@ -499,11 +499,11 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
   if (!config.caCert().empty()) {
     bssl::UniquePtr<BIO> bio(
         BIO_new_mem_buf(const_cast<char*>(config.caCert().data()), config.caCert().size()));
-    RELEASE_ASSERT(bio != nullptr);
+    RELEASE_ASSERT(bio != nullptr, "");
     // Based on BoringSSL's SSL_add_file_cert_subjects_to_stack().
     bssl::UniquePtr<STACK_OF(X509_NAME)> list(sk_X509_NAME_new(
         [](const X509_NAME** a, const X509_NAME** b) -> int { return X509_NAME_cmp(*a, *b); }));
-    RELEASE_ASSERT(list != nullptr);
+    RELEASE_ASSERT(list != nullptr, "");
     for (;;) {
       bssl::UniquePtr<X509> cert(PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr));
       if (cert == nullptr) {
@@ -560,7 +560,7 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
           ContextImpl* context_impl = static_cast<ContextImpl*>(
               SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), sslContextIndex()));
           ServerContextImpl* server_context_impl = dynamic_cast<ServerContextImpl*>(context_impl);
-          RELEASE_ASSERT(server_context_impl != nullptr); // for Coverity
+          RELEASE_ASSERT(server_context_impl != nullptr, ""); // for Coverity
           return server_context_impl->sessionTicketProcess(ssl, key_name, iv, ctx, hmac_ctx,
                                                            encrypt);
         });
@@ -570,25 +570,25 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
   unsigned session_context_len = 0;
   EVP_MD_CTX md;
   int rc = EVP_DigestInit(&md, EVP_sha256());
-  RELEASE_ASSERT(rc == 1);
+  RELEASE_ASSERT(rc == 1, "");
 
   // Hash the CommonName/SANs of the server certificate. This makes sure that
   // sessions can only be resumed to a certificate for the same name, but allows
   // resuming to unique certs in the case that different Envoy instances each have
   // their own certs.
   X509* cert = SSL_CTX_get0_certificate(ctx_.get());
-  RELEASE_ASSERT(cert != nullptr);
+  RELEASE_ASSERT(cert != nullptr, "");
   X509_NAME* cert_subject = X509_get_subject_name(cert);
-  RELEASE_ASSERT(cert_subject != nullptr);
+  RELEASE_ASSERT(cert_subject != nullptr, "");
   int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
   // It's possible that the certificate doesn't have CommonName, but has SANs.
   if (cn_index >= 0) {
     X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
-    RELEASE_ASSERT(cn_entry != nullptr);
+    RELEASE_ASSERT(cn_entry != nullptr, "");
     ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
-    RELEASE_ASSERT(ASN1_STRING_length(cn_asn1) > 0);
+    RELEASE_ASSERT(ASN1_STRING_length(cn_asn1) > 0, "");
     rc = EVP_DigestUpdate(&md, ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
-    RELEASE_ASSERT(rc == 1);
+    RELEASE_ASSERT(rc == 1, "");
   }
 
   bssl::UniquePtr<GENERAL_NAMES> san_names(
@@ -597,19 +597,19 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
     for (const GENERAL_NAME* san : san_names.get()) {
       if (san->type == GEN_DNS || san->type == GEN_URI) {
         rc = EVP_DigestUpdate(&md, ASN1_STRING_data(san->d.ia5), ASN1_STRING_length(san->d.ia5));
-        RELEASE_ASSERT(rc == 1);
+        RELEASE_ASSERT(rc == 1, "");
       }
     }
   } else {
     // Make sure that we have either CommonName or SANs.
-    RELEASE_ASSERT(cn_index >= 0);
+    RELEASE_ASSERT(cn_index >= 0, "");
   }
 
   X509_NAME* cert_issuer_name = X509_get_issuer_name(cert);
   rc = X509_NAME_digest(cert_issuer_name, EVP_sha256(), session_context_buf, &session_context_len);
-  RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH);
+  RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH, "");
   rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
-  RELEASE_ASSERT(rc == 1);
+  RELEASE_ASSERT(rc == 1, "");
 
   // Hash all the settings that affect whether the server will allow/accept
   // the client connection. This ensures that the client is always validated against
@@ -617,14 +617,14 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
   // is enabled.
   if (ca_cert_ != nullptr) {
     rc = X509_digest(ca_cert_.get(), EVP_sha256(), session_context_buf, &session_context_len);
-    RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH);
+    RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH, "");
     rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
-    RELEASE_ASSERT(rc == 1);
+    RELEASE_ASSERT(rc == 1, "");
 
     // verify_subject_alt_name_list_ can only be set with a ca_cert
     for (const std::string& name : verify_subject_alt_name_list_) {
       rc = EVP_DigestUpdate(&md, name.data(), name.size());
-      RELEASE_ASSERT(rc == 1);
+      RELEASE_ASSERT(rc == 1, "");
     }
   }
 
@@ -632,27 +632,27 @@ ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& s
     rc = EVP_DigestUpdate(&md, hash.data(),
                           hash.size() *
                               sizeof(std::remove_reference<decltype(hash)>::type::value_type));
-    RELEASE_ASSERT(rc == 1);
+    RELEASE_ASSERT(rc == 1, "");
   }
 
   for (const auto& hash : verify_certificate_spki_list_) {
     rc = EVP_DigestUpdate(&md, hash.data(),
                           hash.size() *
                               sizeof(std::remove_reference<decltype(hash)>::type::value_type));
-    RELEASE_ASSERT(rc == 1);
+    RELEASE_ASSERT(rc == 1, "");
   }
 
   // Hash configured SNIs for this context, so that sessions cannot be resumed across different
   // filter chains, even when using the same server certificate.
   for (const auto& name : server_names) {
     rc = EVP_DigestUpdate(&md, name.data(), name.size());
-    RELEASE_ASSERT(rc == 1);
+    RELEASE_ASSERT(rc == 1, "");
   }
 
   rc = EVP_DigestFinal(&md, session_context_buf, &session_context_len);
-  RELEASE_ASSERT(rc == 1);
+  RELEASE_ASSERT(rc == 1, "");
   rc = SSL_CTX_set_session_id_context(ctx_.get(), session_context_buf, session_context_len);
-  RELEASE_ASSERT(rc == 1);
+  RELEASE_ASSERT(rc == 1, "");
 }
 
 int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv,
@@ -662,7 +662,7 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 
   if (encrypt == 1) {
     // Encrypt
-    RELEASE_ASSERT(session_ticket_keys_.size() >= 1);
+    RELEASE_ASSERT(session_ticket_keys_.size() >= 1, "");
     // TODO(ggreenway): validate in SDS that session_ticket_keys_ cannot be empty,
     // or if we allow it to be emptied, reconfigure the context so this callback
     // isn't set.
@@ -678,7 +678,7 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
 
     // This RELEASE_ASSERT is logically a static_assert, but we can't actually get
     // EVP_CIPHER_key_length(cipher) at compile-time
-    RELEASE_ASSERT(key.aes_key_.size() == EVP_CIPHER_key_length(cipher));
+    RELEASE_ASSERT(key.aes_key_.size() == EVP_CIPHER_key_length(cipher), "");
     if (!EVP_EncryptInit_ex(ctx, cipher, nullptr, key.aes_key_.data(), iv)) {
       return -1;
     }
@@ -699,7 +699,7 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
           return -1;
         }
 
-        RELEASE_ASSERT(key.aes_key_.size() == EVP_CIPHER_key_length(cipher));
+        RELEASE_ASSERT(key.aes_key_.size() == EVP_CIPHER_key_length(cipher), "");
         if (!EVP_DecryptInit_ex(ctx, cipher, nullptr, key.aes_key_.data(), iv)) {
           return -1;
         }
