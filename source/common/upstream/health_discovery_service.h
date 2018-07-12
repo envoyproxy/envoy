@@ -121,8 +121,7 @@ private:
   Runtime::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
   Upstream::HealthCheckerSharedPtr health_checker_ptr;
-  envoy::api::v2::Cluster cluster_config;
-  envoy::api::v2::Cluster& cluster_config_ = cluster_config;
+  envoy::api::v2::Cluster cluster_config_;
   HdsClusterPtr cluster_;
 };
 

@@ -27,7 +27,6 @@ void HdsDelegate::setRetryTimer() {
 }
 
 void HdsDelegate::establishNewStream() {
-
   ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
   stream_ = async_client_->start(service_method_, *this);
   if (stream_ == nullptr) {
@@ -45,6 +44,7 @@ void HdsDelegate::sendHealthCheckRequest() {
   stats_.responses_.inc();
 }
 
+// TODO(lilika) : Use jittered backoff as in https://github.com/envoyproxy/envoy/pull/3791
 void HdsDelegate::handleFailure() {
   ENVOY_LOG(warn, "HdsDelegate stream/connection failure, will retry in {} ms.", RETRY_DELAY_MS);
   stats_.errors_.inc();
@@ -93,7 +93,6 @@ void HdsDelegate::processMessage(
 
 void HdsDelegate::onReceiveMessage(
     std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
-
   stats_.requests_.inc();
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
 
@@ -102,8 +101,7 @@ void HdsDelegate::onReceiveMessage(
 
   // Initializing Cluster & HealthChecker
   cluster_->setHealthChecker(health_checker_ptr);
-  bool initialized = false;
-  cluster_->initialize([&initialized] { initialized = true; });
+  cluster_->initialize([] {});
 }
 
 void HdsDelegate::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
@@ -177,25 +175,14 @@ void HdsCluster::initialize(std::function<void()> callback) {
 
 const Network::Address::InstanceConstSharedPtr
 HdsCluster::resolveProtoAddress2(const envoy::api::v2::core::Address& address) {
-  try {
-    return Network::Address::resolveProtoAddress(address);
-  } catch (EnvoyException& e) {
-    if (info_->type() == envoy::api::v2::Cluster::STATIC ||
-        info_->type() == envoy::api::v2::Cluster::EDS) {
-      throw EnvoyException(fmt::format("{}. Consider setting resolver_name or setting cluster type "
-                                       "to 'STRICT_DNS' or 'LOGICAL_DNS'",
-                                       e.what()));
-    }
-    throw e;
-  }
+  return Network::Address::resolveProtoAddress(address);
 }
 
 void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector) {
   if (outlier_detector) {
-    ENVOY_LOG(debug, "There is an outlier detector");
-  } else {
-    ENVOY_LOG(debug, "There is no outlier detector");
+    NOT_IMPLEMENTED;
   }
+  NOT_IMPLEMENTED;
 }
 
 } // namespace Upstream
