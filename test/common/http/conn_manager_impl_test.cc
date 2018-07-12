@@ -1115,8 +1115,8 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNotConfigured) {
   EXPECT_EQ(0U, stats_.named_.downstream_rq_idle_timeout_.value());
 }
 
-// Validate the per-stream idle timeout when waiting for initial upstream headers.
-TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutBeforeUpstreamHeaders) {
+// Validate the per-stream idle timeout after having sent downstream headers.
+TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
   setup(false, "");
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, idleTimeout())
       .WillByDefault(Return(std::chrono::milliseconds(10)));
@@ -1153,9 +1153,9 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutBeforeUpstreamHeaders)
   EXPECT_EQ(1U, stats_.named_.downstream_rq_idle_timeout_.value());
 }
 
-// Validate the per-stream idle timeout when waiting for initial upstream headers after sending
-// data.
-TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutBeforeUpstreamHeadersAfterData) {
+// Validate the per-stream idle timeout after having sent downstream
+// headers+body.
+TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeadersAndBody) {
   setup(false, "");
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, idleTimeout())
       .WillByDefault(Return(std::chrono::milliseconds(10)));
@@ -1242,7 +1242,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterUpstreamHeaders) 
 }
 
 // Validate the per-stream idle timeout after a sequence of header/data events.
-TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterData) {
+TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
   setup(false, "");
   ON_CALL(route_config_provider_.route_config_->route_->route_entry_, idleTimeout())
       .WillByDefault(Return(std::chrono::milliseconds(10)));

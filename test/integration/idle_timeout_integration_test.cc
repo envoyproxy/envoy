@@ -30,13 +30,24 @@ public:
                                                             {":authority", "host"}});
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
     upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
     upstream_request_->waitForHeadersComplete();
     return response;
   }
 
-  void Sleep() { std::this_thread::sleep_for(std::chrono::milliseconds(TimeoutMs / 2)); }
+  void sleep() { std::this_thread::sleep_for(std::chrono::milliseconds(TimeoutMs / 2)); }
+
+  void waitForTimeout(IntegrationStreamDecoder& response) {
+    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+      codec_client_->waitForDisconnect();
+    } else {
+      response.waitForReset();
+      codec_client_->close();
+    }
+    EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
+  }
 
   // TODO(htuch): This might require scaling for TSAN/ASAN/Valgrind/etc. Bump if
   // this is the cause of flakes.
@@ -47,45 +58,30 @@ INSTANTIATE_TEST_CASE_P(Protocols, IdleTimeoutIntegrationTest,
                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-// Per-stream idle timeout when waiting for initial upstream headers.
-TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutBeforeUpstreamHeaders) {
+// Per-stream idle timeout after having sent downstream headers.
+TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
   auto response = setupPerStreamIdleTimeoutTest();
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
-  } else {
-    response->waitForReset();
-    codec_client_->close();
-  }
+  waitForTimeout(*response);
 
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
-
-  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("408", response->headers().Status()->value().c_str());
   EXPECT_EQ("stream timeout", response->body());
 }
 
-// Per-stream idle timeout when waiting for initial upstream headers after
-// sending data.
-TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutBeforeUpstreamHeadersAfterData) {
+// Per-stream idle timeout after having sent downstream headers+body.
+TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeadersAndBody) {
   auto response = setupPerStreamIdleTimeoutTest();
 
-  Sleep();
+  sleep();
   codec_client_->sendData(*request_encoder_, 1, false);
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
-  } else {
-    response->waitForReset();
-    codec_client_->close();
-  }
+  waitForTimeout(*response);
 
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(1U, upstream_request_->bodyLength());
-
-  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("408", response->headers().Status()->value().c_str());
   EXPECT_EQ("stream timeout", response->body());
@@ -97,56 +93,42 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterUpstreamHeaders) {
 
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
-  } else {
-    response->waitForReset();
-    codec_client_->close();
-  }
+  waitForTimeout(*response);
 
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
-
-  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
   EXPECT_FALSE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_EQ("", response->body());
 }
 
 // Per-stream idle timeout after a sequence of header/data events.
-TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterData) {
+TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterBidiData) {
   auto response = setupPerStreamIdleTimeoutTest();
 
-  Sleep();
+  sleep();
   upstream_request_->encode100ContinueHeaders(Http::TestHeaderMapImpl{{":status", "100"}});
 
-  Sleep();
+  sleep();
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
 
-  Sleep();
+  sleep();
   upstream_request_->encodeData(1, false);
 
-  Sleep();
+  sleep();
   codec_client_->sendData(*request_encoder_, 1, false);
 
-  Sleep();
+  sleep();
   Http::TestHeaderMapImpl request_trailers{{"request1", "trailer1"}, {"request2", "trailer2"}};
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
-  Sleep();
+  sleep();
   upstream_request_->encodeData(1, false);
 
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    codec_client_->waitForDisconnect();
-  } else {
-    response->waitForReset();
-    codec_client_->close();
-  }
+  waitForTimeout(*response);
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1U, upstream_request_->bodyLength());
-
-  EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
   EXPECT_FALSE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_EQ("aa", response->body());
