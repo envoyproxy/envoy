@@ -321,6 +321,27 @@ TEST_F(CorsFilterTest, EncodeWithAllowCredentialsTrue) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers_));
 }
 
+TEST_F(CorsFilterTest, EncodeWithExposeHeaders) {
+  Http::TestHeaderMapImpl request_headers{{"origin", "localhost"}};
+  cors_policy_->expose_headers_ = "custom-header-1";
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  Http::TestHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_.encode100ContinueHeaders(continue_headers));
+
+  Http::TestHeaderMapImpl response_headers{};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ("localhost", response_headers.get_("access-control-allow-origin"));
+  EXPECT_EQ("custom-header-1", response_headers.get_("access-control-expose-headers"));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers_));
+}
+
 TEST_F(CorsFilterTest, EncodeWithAllowCredentialsFalse) {
   Http::TestHeaderMapImpl request_headers{{"origin", "localhost"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));

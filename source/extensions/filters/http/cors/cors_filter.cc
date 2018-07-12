@@ -95,6 +95,10 @@ Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::HeaderMap& headers, bo
     headers.insertAccessControlAllowCredentials().value(Http::Headers::get().CORSValues.True);
   }
 
+  if (!exposeHeaders().empty()) {
+    headers.insertAccessControlExposeHeaders().value(exposeHeaders());
+  }
+
   return Http::FilterHeadersStatus::Continue;
 }
 
