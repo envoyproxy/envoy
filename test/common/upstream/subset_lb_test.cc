@@ -753,6 +753,28 @@ TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13));
   EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_14));
+
+  // Make 1.4 default, without hosts being added/removed.
+  envoy::api::v2::core::Metadata metadata_enable_14;
+  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_14,
+                                                Config::MetadataFilters::get().ENVOY_LB, "version")
+      .set_string_value("1.4");
+  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_14,
+                                                Config::MetadataFilters::get().ENVOY_LB, "default")
+      .set_string_value("true");
+  host_set_.hosts_[0]->metadata(metadata_disable_12);
+  host_set_.hosts_[1]->metadata(metadata_enable_14);
+
+  host_set_.runCallbacks({}, {});
+
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(5U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_14));
 }
 
 TEST_P(SubsetLoadBalancerTest, UpdateRemovingLastSubsetHost) {
