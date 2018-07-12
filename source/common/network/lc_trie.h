@@ -29,8 +29,8 @@ namespace LcTrie {
 constexpr size_t MaxLcTrieNodes = (1 << 20);
 
 /**
- * Level Compressed Trie for tagging IP addresses. Both IPv4 and IPv6 addresses are supported
- * within this class with no calling pattern changes.
+ * Level Compressed Trie for associating data with CIDR ranges. Both IPv4 and IPv6 addresses are
+ * supported within this class with no calling pattern changes.
  *
  * The algorithm to build the LC-Trie is desribed in the paper 'IP-address lookup using LC-tries'
  * by 'S. Nilsson' and 'G. Karlsson'. The paper and reference C implementation can be found here:
@@ -41,7 +41,9 @@ constexpr size_t MaxLcTrieNodes = (1 << 20);
 template <class T> class LcTrie {
 public:
   /**
-   * @param tag_data supplies a vector of tag and CIDR ranges.
+   * @param data supplies a vector of data and CIDR ranges.
+   * @param exclusive if true then only data for the most specific subnet will be returned
+                      (i.e. data isn't inherited from wider ranges).
    * @param fill_factor supplies the fraction of completeness to use when calculating the branch
    *                    value for a sub-trie.
    * @param root_branching_factor supplies the branching factor at the root.
@@ -53,13 +55,13 @@ public:
    * let consumers decide.
    */
   LcTrie(const std::vector<std::pair<T, std::vector<Address::CidrRange>>>& data,
-         double fill_factor = 0.5, uint32_t root_branching_factor = 0) {
+         bool exclusive = false, double fill_factor = 0.5, uint32_t root_branching_factor = 0) {
 
     // The LcTrie implementation uses 20-bit "pointers" in its compact internal representation,
     // so it cannot hold more than 2^20 nodes. But the number of nodes can be greater than the
-    // number of supported prefixes. Given N prefixes in the tag_data input list, step 2 below
-    // can produce a new list of up to 2*N prefixes to insert in the LC trie. And the LC trie
-    // can use up to 2*N/fill_factor nodes.
+    // number of supported prefixes. Given N prefixes in the data input list, step 2 below can
+    // produce a new list of up to 2*N prefixes to insert in the LC trie. And the LC trie can
+    // use up to 2*N/fill_factor nodes.
     size_t num_prefixes = 0;
     for (const auto& pair_data : data) {
       num_prefixes += pair_data.second.size();
@@ -97,8 +99,8 @@ public:
     // algorithm does not support nested prefixes. The next step will solve that
     // problem.
 
-    BinaryTrie<Ipv4> ipv4_temp;
-    BinaryTrie<Ipv6> ipv6_temp;
+    BinaryTrie<Ipv4> ipv4_temp(exclusive);
+    BinaryTrie<Ipv6> ipv6_temp(exclusive);
     for (const auto& pair_data : data) {
       for (const auto& cidr_range : pair_data.second) {
         if (cidr_range.ip()->version() == Address::IpVersion::v4) {
@@ -232,14 +234,14 @@ private:
   typedef std::shared_ptr<DataSet> DataSetSharedPtr;
 
   /**
-   * Structure to hold a CIDR range and the tag associated with it.
+   * Structure to hold a CIDR range and the data associated with it.
    */
   template <class IpType, uint32_t address_size = CHAR_BIT * sizeof(IpType)> struct IpPrefix {
 
     IpPrefix() {}
 
-    IpPrefix(const IpType& ip, uint32_t length, const T& tag) : ip_(ip), length_(length) {
-      data_.insert(tag);
+    IpPrefix(const IpType& ip, uint32_t length, const T& data) : ip_(ip), length_(length) {
+      data_.insert(data);
     }
 
     IpPrefix(const IpType& ip, int length, const DataSet& data)
@@ -309,11 +311,11 @@ private:
    */
   template <class IpType, uint32_t address_size = CHAR_BIT * sizeof(IpType)> class BinaryTrie {
   public:
-    BinaryTrie() : root_(std::make_unique<Node>()) {}
+    BinaryTrie(bool exclusive) : root_(std::make_unique<Node>()), exclusive_(exclusive) {}
 
     /**
-     * Add a CIDR prefix and associated tag to the binary trie. If an entry already
-     * exists for the prefix, merge the tag into the existing entry.
+     * Add a CIDR prefix and associated data to the binary trie. If an entry already
+     * exists for the prefix, merge the data into the existing entry.
      */
     void insert(const IpPrefix<IpType>& prefix) {
       Node* node = root_.get();
@@ -349,7 +351,7 @@ private:
             if (data != nullptr) {
               if (node->data == nullptr) {
                 node->data = data;
-              } else {
+              } else if (!exclusive_) {
                 node->data->insert(data->begin(), data->end());
               }
             }
@@ -392,6 +394,7 @@ private:
     };
     typedef std::unique_ptr<Node> NodePtr;
     NodePtr root_;
+    bool exclusive_;
   };
 
   /**
@@ -411,18 +414,18 @@ private:
   public:
     /**
      * Construct a LC-Trie for IpType.
-     * @param tag_data supplies a vector of tag and CIDR ranges (in IpPrefix format).
+     * @param data supplies a vector of data and CIDR ranges (in IpPrefix format).
      * @param fill_factor supplies the fraction of completeness to use when calculating the branch
      *                    value for a sub-trie.
      * @param root_branching_factor supplies the branching factor at the root. The paper suggests
      *                              for large LC-Tries to use the value '16' for the root
      *                              branching factor. It reduces the depth of the trie.
      */
-    LcTrieInternal(std::vector<IpPrefix<IpType>>& tag_data, double fill_factor,
+    LcTrieInternal(std::vector<IpPrefix<IpType>>& data, double fill_factor,
                    uint32_t root_branching_factor);
 
     /**
-     * Retrieve the tag associated with the CIDR range that contains `ip_address`.
+     * Retrieve the data associated with the CIDR range that contains `ip_address`.
      * @param  ip_address supplies the IP address in host byte order.
      * @return a vector of data from the CIDR ranges and IP addresses that encompasses the input.
      * An empty vector is returned if the LC Trie is empty.
@@ -431,15 +434,15 @@ private:
 
   private:
     /**
-     * Builds the Level Compresesed Trie, by first sorting the tag data, removing duplicated
+     * Builds the Level Compresesed Trie, by first sorting the data, removing duplicated
      * prefixes and invoking buildRecursive() to build the trie.
      */
-    void build(std::vector<IpPrefix<IpType>>& tag_data) {
-      if (tag_data.empty()) {
+    void build(std::vector<IpPrefix<IpType>>& data) {
+      if (data.empty()) {
         return;
       }
 
-      ip_prefixes_ = tag_data;
+      ip_prefixes_ = data;
       std::sort(ip_prefixes_.begin(), ip_prefixes_.end());
 
       // In theory, the trie_ vector can have at most twice the number of ip_prefixes entries - 1.
@@ -684,9 +687,9 @@ private:
 
     // The CIDR range and data needs to be maintained separately from the LC-Trie. A LC-Trie skips
     // chunks of data while searching for a match. This means that the node found in the LC-Trie
-    // is not guaranteed to have the IP address in range. The last step prior to returning a tag
-    // is to check the CIDR range pointed to by the node in the LC-Trie has the IP address in
-    // range.
+    // is not guaranteed to have the IP address in range. The last step prior to returning
+    // associated data is to check the CIDR range pointed to by the node in the LC-Trie has
+    // the IP address in range.
     std::vector<IpPrefix<IpType>> ip_prefixes_;
 
     // Main trie search structure.
@@ -702,10 +705,11 @@ private:
 
 template <class T>
 template <class IpType, uint32_t address_size>
-LcTrie<T>::LcTrieInternal<IpType, address_size>::LcTrieInternal(
-    std::vector<IpPrefix<IpType>>& tag_data, double fill_factor, uint32_t root_branching_factor)
+LcTrie<T>::LcTrieInternal<IpType, address_size>::LcTrieInternal(std::vector<IpPrefix<IpType>>& data,
+                                                                double fill_factor,
+                                                                uint32_t root_branching_factor)
     : fill_factor_(fill_factor), root_branching_factor_(root_branching_factor) {
-  build(tag_data);
+  build(data);
 }
 
 template <class T>
