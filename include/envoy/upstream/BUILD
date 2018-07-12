@@ -36,9 +36,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "health_checker_interface",
     hdrs = ["health_checker.h"],
+    protobuf_cc_deps = [
+        "@envoy_api//envoy/data/core/v2alpha:health_check_event_cc",
+    ],
     deps = [
         ":upstream_interface",
-        "@envoy_api//envoy/data/core/v2alpha:health_check_event_cc",
     ],
 )
 
