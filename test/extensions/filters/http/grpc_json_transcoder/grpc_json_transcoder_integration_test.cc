@@ -174,8 +174,8 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGet) {
 
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetHttpBody) {
   testTranscoding<Empty, google::api::HttpBody>(
-      Http::TestHeaderMapImpl{{":method", "GET"}, {":path", "/index"}, {":authority", "host"}},
-      "", {""}, {R"(content_type: "text/html" data: "<h1>Hello!</h1>" )"}, Status(),
+      Http::TestHeaderMapImpl{{":method", "GET"}, {":path", "/index"}, {":authority", "host"}}, "",
+      {""}, {R"(content_type: "text/html" data: "<h1>Hello!</h1>" )"}, Status(),
       Http::TestHeaderMapImpl{{":status", "200"},
                               {"content-type", "text/html"},
                               {"content-length", "15"},
