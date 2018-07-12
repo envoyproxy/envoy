@@ -6,13 +6,13 @@ def envoy_package():
 # Compute the final copts based on various options.
 def envoy_copts(repository, test = False):
     posix_options = [
-          "-Wall",
-          "-Wextra",
-          "-Werror",
-          "-Wnon-virtual-dtor",
-          "-Woverloaded-virtual",
-          "-Wold-style-cast",
-          "-std=c++14",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wnon-virtual-dtor",
+        "-Woverloaded-virtual",
+        "-Wold-style-cast",
+        "-std=c++14",
     ]
 
     msvc_options = [
@@ -29,8 +29,8 @@ def envoy_copts(repository, test = False):
     ]
 
     return select({
-              "//bazel:windows_x86_64": msvc_options,
-              "//conditions:default": posix_options,
+               "//bazel:windows_x86_64": msvc_options,
+               "//conditions:default": posix_options,
            }) + select({
                # Bazel adds an implicit -DNDEBUG for opt.
                repository + "//bazel:opt_build": [] if test else ["-ggdb3"],
@@ -101,7 +101,6 @@ def _envoy_stamped_linkopts():
         ],
     })
 
-
 def _envoy_stamped_deps():
     return select({
         "@bazel_tools//tools/osx:darwin": [
@@ -149,8 +148,8 @@ def tcmalloc_external_deps(repository):
 # Dependencies on libevent should be wrapped with this function.
 def libevent_external_deps(repository):
     return [envoy_external_dep_path("event")] + select({
-      repository + "//bazel:windows_x86_64": [],
-      "//conditions:default": [envoy_external_dep_path("event_pthreads")],
+        repository + "//bazel:windows_x86_64": [],
+        "//conditions:default": [envoy_external_dep_path("event_pthreads")],
     })
 
 def http_api_protos_external_deps(repository):
@@ -198,7 +197,6 @@ def envoy_cc_library(
         tags = [],
         deps = [],
         strip_include_prefix = None):
-
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
     if libevent_dep:
@@ -224,8 +222,8 @@ def envoy_cc_library(
         alwayslink = 1,
         linkstatic = 1,
         linkstamp = select({
-          repository + "//bazel:windows_x86_64": None,
-          "//conditions:default": linkstamp,
+            repository + "//bazel:windows_x86_64": None,
+            "//conditions:default": linkstamp,
         }),
         strip_include_prefix = strip_include_prefix,
     )

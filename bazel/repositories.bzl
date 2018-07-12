@@ -7,9 +7,10 @@ load(":genrule_repository.bzl", "genrule_repository")
 load(":patched_http_archive.bzl", "patched_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
 load(":target_recipes.bzl", "TARGET_RECIPES")
-load("@bazel_tools//tools/cpp:windows_cc_configure.bzl",
-     "find_vc_path",
-     "setup_vc_env_vars",
+load(
+    "@bazel_tools//tools/cpp:windows_cc_configure.bzl",
+    "find_vc_path",
+    "setup_vc_env_vars",
 )
 load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_env_var")
 
@@ -93,9 +94,9 @@ def _build_recipe_repository_impl(ctxt):
         vc_path = find_vc_path(ctxt)
         current_path = get_env_var(ctxt, "PATH", None, False)
         env = setup_vc_env_vars(ctxt, vc_path)
-        env["PATH"]+=(";%s" % current_path)
-        env["CC"]="cl"
-        env["CXX"]="cl"
+        env["PATH"] += (";%s" % current_path)
+        env["CC"] = "cl"
+        env["CXX"] = "cl"
         env["CXXFLAGS"] = "-DNDEBUG"
         env["CFLAGS"] = "-DNDEBUG"
         command = ["./repositories.bat"] + ctxt.attr.recipes
