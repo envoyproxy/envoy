@@ -323,6 +323,25 @@ public:
     EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
   }
 
+  envoy::api::v2::core::Metadata buildMetadata(const std::string& version,
+                                               bool is_default = false) const {
+    envoy::api::v2::core::Metadata metadata;
+
+    if (version != "") {
+      Envoy::Config::Metadata::mutableMetadataValue(
+          metadata, Config::MetadataFilters::get().ENVOY_LB, "version")
+          .set_string_value(version);
+    }
+
+    if (is_default) {
+      Envoy::Config::Metadata::mutableMetadataValue(
+          metadata, Config::MetadataFilters::get().ENVOY_LB, "default")
+          .set_string_value("true");
+    }
+
+    return metadata;
+  }
+
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
   NiceMock<MockPrioritySet> priority_set_;
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
@@ -552,6 +571,174 @@ TEST_P(SubsetLoadBalancerTest, UpdateFailover) {
                makeHost("tcp://127.0.0.1:8001", {{"version", "1.0"}})},
               {}, {}, 0);
   EXPECT_FALSE(nullptr == lb_->chooseHost(&context_10).get());
+}
+
+TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
+  TestLoadBalancerContext context_10({{"version", "1.0"}});
+  TestLoadBalancerContext context_12({{"version", "1.2"}});
+  TestLoadBalancerContext context_13({{"version", "1.3"}});
+  TestLoadBalancerContext context_default({{"default", "true"}});
+  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"default", "true"}});
+
+  EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+
+  std::vector<std::set<std::string>> subset_keys = {{"version"}, {"default"}};
+  EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
+
+  // Add hosts initial hosts.
+  init({{"tcp://127.0.0.1:8000", {{"version", "1.2"}}},
+        {"tcp://127.0.0.1:8001", {{"version", "1.0"}, {"default", "true"}}}});
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
+
+  // Swap the default version.
+  host_set_.hosts_[0]->metadata(buildMetadata("1.2", true));
+  host_set_.hosts_[1]->metadata(buildMetadata("1.0"));
+
+  host_set_.runCallbacks({}, {});
+
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13));
+
+  // Bump 1.0 to 1.3, one subset should be removed.
+  host_set_.hosts_[1]->metadata(buildMetadata("1.3"));
+
+  // No hosts added nor removed, so we bypass modifyHosts().
+  host_set_.runCallbacks({}, {});
+
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(1U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
+
+  // Rollback from 1.3 to 1.0.
+  host_set_.hosts_[1]->metadata(buildMetadata("1.0"));
+
+  host_set_.runCallbacks({}, {});
+
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(5U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13));
+
+  // Make 1.0 default again.
+  host_set_.hosts_[1]->metadata(buildMetadata("1.0", true));
+  host_set_.hosts_[0]->metadata(buildMetadata("1.2"));
+
+  host_set_.runCallbacks({}, {});
+
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(5U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
+}
+
+TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
+  TestLoadBalancerContext context_10({{"version", "1.0"}});
+  TestLoadBalancerContext context_12({{"version", "1.2"}});
+  TestLoadBalancerContext context_13({{"version", "1.3"}});
+  TestLoadBalancerContext context_14({{"version", "1.4"}});
+  TestLoadBalancerContext context_default({{"default", "true"}});
+  const ProtobufWkt::Struct default_subset = makeDefaultSubset({{"default", "true"}});
+
+  EXPECT_CALL(subset_info_, defaultSubset()).WillRepeatedly(ReturnRef(default_subset));
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET));
+
+  std::vector<std::set<std::string>> subset_keys = {{"version"}, {"default"}};
+  EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
+
+  // Add hosts initial hosts.
+  init({{"tcp://127.0.0.1:8000", {{"version", "1.2"}}},
+        {"tcp://127.0.0.1:8001", {{"version", "1.0"}, {"default", "true"}}}});
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(3U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
+
+  // Swap the default version.
+  host_set_.hosts_[0]->metadata(buildMetadata("1.2", true));
+  host_set_.hosts_[1]->metadata(buildMetadata("1.0"));
+
+  // Add a new host.
+  modifyHosts({makeHost("tcp://127.0.0.1:8002", {{"version", "1.3"}})}, {});
+
+  EXPECT_EQ(4U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_13));
+
+  // Swap default again and remove the previous one.
+  host_set_.hosts_[0]->metadata(buildMetadata("1.2"));
+  host_set_.hosts_[1]->metadata(buildMetadata("1.0", true));
+
+  modifyHosts({}, {host_set_.hosts_[2]});
+
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(4U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(1U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
+
+  // Swap the default version once more, this time adding a new host and removing
+  // the current default version.
+  host_set_.hosts_[0]->metadata(buildMetadata("1.2", true));
+  host_set_.hosts_[1]->metadata(buildMetadata("1.0"));
+
+  modifyHosts({makeHost("tcp://127.0.0.1:8003", {{"version", "1.4"}})}, {host_set_.hosts_[1]});
+
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(5U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_14));
+
+  // Make 1.4 default, without hosts being added/removed.
+  host_set_.hosts_[0]->metadata(buildMetadata("1.2"));
+  host_set_.hosts_[1]->metadata(buildMetadata("1.4", true));
+
+  host_set_.runCallbacks({}, {});
+
+  EXPECT_EQ(3U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(5U, stats_.lb_subsets_created_.value());
+  EXPECT_EQ(2U, stats_.lb_subsets_removed_.value());
+  EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_12));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_10));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_default));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
+  EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_14));
 }
 
 TEST_P(SubsetLoadBalancerTest, UpdateRemovingLastSubsetHost) {
