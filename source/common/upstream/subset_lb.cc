@@ -63,12 +63,7 @@ void SubsetLoadBalancer::refreshSubsets() {
 
 void SubsetLoadBalancer::refreshSubsets(uint32_t priority) {
   const auto& host_sets = original_priority_set_.hostSetsPerPriority();
-
-  if (priority >= host_sets.size()) {
-    ENVOY_LOG(debug, "subset lb: refreshSubsets() called with unknown priority");
-    return;
-  }
-
+  ASSERT(priority < host_sets.size());
   update(priority, host_sets[priority]->hosts(), {});
 }
 
