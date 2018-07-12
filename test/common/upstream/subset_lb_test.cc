@@ -323,6 +323,25 @@ public:
     EXPECT_EQ(added_host, lb_->chooseHost(nullptr));
   }
 
+  envoy::api::v2::core::Metadata buildMetadata(const std::string& version,
+                                               bool is_default = false) const {
+    envoy::api::v2::core::Metadata metadata;
+
+    if (version != "") {
+      Envoy::Config::Metadata::mutableMetadataValue(
+          metadata, Config::MetadataFilters::get().ENVOY_LB, "version")
+          .set_string_value(version);
+    }
+
+    if (is_default) {
+      Envoy::Config::Metadata::mutableMetadataValue(
+          metadata, Config::MetadataFilters::get().ENVOY_LB, "default")
+          .set_string_value("true");
+    }
+
+    return metadata;
+  }
+
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
   NiceMock<MockPrioritySet> priority_set_;
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
@@ -580,19 +599,8 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
 
   // Swap the default version.
-  envoy::api::v2::core::Metadata metadata_enable_new_default;
-  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_new_default,
-                                                Config::MetadataFilters::get().ENVOY_LB, "version")
-      .set_string_value("1.2");
-  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_new_default,
-                                                Config::MetadataFilters::get().ENVOY_LB, "default")
-      .set_string_value("true");
-  host_set_.hosts_[0]->metadata(metadata_enable_new_default);
-  envoy::api::v2::core::Metadata metadata_disable_old_default;
-  Envoy::Config::Metadata::mutableMetadataValue(metadata_disable_old_default,
-                                                Config::MetadataFilters::get().ENVOY_LB, "version")
-      .set_string_value("1.0");
-  host_set_.hosts_[1]->metadata(metadata_disable_old_default);
+  host_set_.hosts_[0]->metadata(buildMetadata("1.2", true));
+  host_set_.hosts_[1]->metadata(buildMetadata("1.0"));
 
   host_set_.runCallbacks({}, {});
 
@@ -605,11 +613,7 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13));
 
   // Bump 1.0 to 1.3, one subset should be removed.
-  envoy::api::v2::core::Metadata metadata_13;
-  Envoy::Config::Metadata::mutableMetadataValue(metadata_13,
-                                                Config::MetadataFilters::get().ENVOY_LB, "version")
-      .set_string_value("1.3");
-  host_set_.hosts_[1]->metadata(metadata_13);
+  host_set_.hosts_[1]->metadata(buildMetadata("1.3"));
 
   // No hosts added nor removed, so we bypass modifyHosts().
   host_set_.runCallbacks({}, {});
@@ -623,11 +627,7 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_10));
 
   // Rollback from 1.3 to 1.0.
-  envoy::api::v2::core::Metadata metadata_10;
-  Envoy::Config::Metadata::mutableMetadataValue(metadata_10,
-                                                Config::MetadataFilters::get().ENVOY_LB, "version")
-      .set_string_value("1.0");
-  host_set_.hosts_[1]->metadata(metadata_10);
+  host_set_.hosts_[1]->metadata(buildMetadata("1.0"));
 
   host_set_.runCallbacks({}, {});
 
@@ -640,15 +640,8 @@ TEST_P(SubsetLoadBalancerTest, OnlyMetadataChanged) {
   EXPECT_EQ(host_set_.hosts_[0], lb_->chooseHost(&context_13));
 
   // Make 1.0 default again.
-  Envoy::Config::Metadata::mutableMetadataValue(metadata_10,
-                                                Config::MetadataFilters::get().ENVOY_LB, "default")
-      .set_string_value("true");
-  host_set_.hosts_[1]->metadata(metadata_10);
-  envoy::api::v2::core::Metadata metadata_12;
-  Envoy::Config::Metadata::mutableMetadataValue(metadata_12,
-                                                Config::MetadataFilters::get().ENVOY_LB, "version")
-      .set_string_value("1.2");
-  host_set_.hosts_[0]->metadata(metadata_12);
+  host_set_.hosts_[1]->metadata(buildMetadata("1.0", true));
+  host_set_.hosts_[0]->metadata(buildMetadata("1.2"));
 
   host_set_.runCallbacks({}, {});
 
@@ -688,19 +681,8 @@ TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
   EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_13));
 
   // Swap the default version.
-  envoy::api::v2::core::Metadata metadata_enable_12;
-  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_12,
-                                                Config::MetadataFilters::get().ENVOY_LB, "version")
-      .set_string_value("1.2");
-  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_12,
-                                                Config::MetadataFilters::get().ENVOY_LB, "default")
-      .set_string_value("true");
-  host_set_.hosts_[0]->metadata(metadata_enable_12);
-  envoy::api::v2::core::Metadata metadata_disable_10;
-  Envoy::Config::Metadata::mutableMetadataValue(metadata_disable_10,
-                                                Config::MetadataFilters::get().ENVOY_LB, "version")
-      .set_string_value("1.0");
-  host_set_.hosts_[1]->metadata(metadata_disable_10);
+  host_set_.hosts_[0]->metadata(buildMetadata("1.2", true));
+  host_set_.hosts_[1]->metadata(buildMetadata("1.0"));
 
   // Add a new host.
   modifyHosts({makeHost("tcp://127.0.0.1:8002", {{"version", "1.3"}})}, {});
@@ -714,19 +696,8 @@ TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
   EXPECT_EQ(host_set_.hosts_[2], lb_->chooseHost(&context_13));
 
   // Swap default again and remove the previous one.
-  envoy::api::v2::core::Metadata metadata_disable_12;
-  Envoy::Config::Metadata::mutableMetadataValue(metadata_disable_12,
-                                                Config::MetadataFilters::get().ENVOY_LB, "version")
-      .set_string_value("1.2");
-  host_set_.hosts_[0]->metadata(metadata_disable_12);
-  envoy::api::v2::core::Metadata metadata_enable_10;
-  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_10,
-                                                Config::MetadataFilters::get().ENVOY_LB, "version")
-      .set_string_value("1.0");
-  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_10,
-                                                Config::MetadataFilters::get().ENVOY_LB, "default")
-      .set_string_value("true");
-  host_set_.hosts_[1]->metadata(metadata_enable_10);
+  host_set_.hosts_[0]->metadata(buildMetadata("1.2"));
+  host_set_.hosts_[1]->metadata(buildMetadata("1.0", true));
 
   modifyHosts({}, {host_set_.hosts_[2]});
 
@@ -740,8 +711,8 @@ TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
 
   // Swap the default version once more, this time adding a new host and removing
   // the current default version.
-  host_set_.hosts_[0]->metadata(metadata_enable_12);
-  host_set_.hosts_[1]->metadata(metadata_disable_10);
+  host_set_.hosts_[0]->metadata(buildMetadata("1.2", true));
+  host_set_.hosts_[1]->metadata(buildMetadata("1.0"));
 
   modifyHosts({makeHost("tcp://127.0.0.1:8003", {{"version", "1.4"}})}, {host_set_.hosts_[1]});
 
@@ -755,15 +726,8 @@ TEST_P(SubsetLoadBalancerTest, MetadataChangedHostsAddedRemoved) {
   EXPECT_EQ(host_set_.hosts_[1], lb_->chooseHost(&context_14));
 
   // Make 1.4 default, without hosts being added/removed.
-  envoy::api::v2::core::Metadata metadata_enable_14;
-  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_14,
-                                                Config::MetadataFilters::get().ENVOY_LB, "version")
-      .set_string_value("1.4");
-  Envoy::Config::Metadata::mutableMetadataValue(metadata_enable_14,
-                                                Config::MetadataFilters::get().ENVOY_LB, "default")
-      .set_string_value("true");
-  host_set_.hosts_[0]->metadata(metadata_disable_12);
-  host_set_.hosts_[1]->metadata(metadata_enable_14);
+  host_set_.hosts_[0]->metadata(buildMetadata("1.2"));
+  host_set_.hosts_[1]->metadata(buildMetadata("1.4", true));
 
   host_set_.runCallbacks({}, {});
 
