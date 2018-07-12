@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Ratelimit L4 network filter
 # Public docs: docs/root/configuration/network_filters/rate_limit_filter.rst
 

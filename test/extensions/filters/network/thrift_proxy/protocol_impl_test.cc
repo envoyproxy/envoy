@@ -104,7 +104,7 @@ TEST(AutoProtocolTest, ReadMessageBegin) {
   }
 }
 
-TEST(AutoProtocolTest, Delegation) {
+TEST(AutoProtocolTest, ReadDelegation) {
   NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
   NiceMock<MockProtocolCallbacks> dummy_cb;
   AutoProtocolImpl auto_proto(dummy_cb);
@@ -228,6 +228,94 @@ TEST(AutoProtocolTest, Delegation) {
     EXPECT_CALL(*proto, readBinary(Ref(buffer), Ref(value))).WillOnce(Return(true));
     EXPECT_TRUE(auto_proto.readBinary(buffer, value));
   }
+}
+
+TEST(AutoProtocolTest, WriteDelegation) {
+  NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
+  NiceMock<MockProtocolCallbacks> dummy_cb;
+  AutoProtocolImpl auto_proto(dummy_cb);
+  auto_proto.setProtocol(ProtocolPtr{proto});
+
+  // writeMessageBegin
+  Buffer::OwnedImpl buffer;
+  EXPECT_CALL(*proto, writeMessageBegin(Ref(buffer), "name", MessageType::Call, 100));
+  auto_proto.writeMessageBegin(buffer, "name", MessageType::Call, 100);
+
+  // writeMessageEnd
+  EXPECT_CALL(*proto, writeMessageEnd(Ref(buffer)));
+  auto_proto.writeMessageEnd(buffer);
+
+  // writeStructBegin
+  EXPECT_CALL(*proto, writeStructBegin(Ref(buffer), "name"));
+  auto_proto.writeStructBegin(buffer, "name");
+
+  // writeStructEnd
+  EXPECT_CALL(*proto, writeStructEnd(Ref(buffer)));
+  auto_proto.writeStructEnd(buffer);
+
+  // writeFieldBegin
+  EXPECT_CALL(*proto, writeFieldBegin(Ref(buffer), "name", FieldType::Stop, 100));
+  auto_proto.writeFieldBegin(buffer, "name", FieldType::Stop, 100);
+
+  // writeFieldEnd
+  EXPECT_CALL(*proto, writeFieldEnd(Ref(buffer)));
+  auto_proto.writeFieldEnd(buffer);
+
+  // writeMapBegin
+  EXPECT_CALL(*proto, writeMapBegin(Ref(buffer), FieldType::I32, FieldType::String, 100));
+  auto_proto.writeMapBegin(buffer, FieldType::I32, FieldType::String, 100);
+
+  // writeMapEnd
+  EXPECT_CALL(*proto, writeMapEnd(Ref(buffer)));
+  auto_proto.writeMapEnd(buffer);
+
+  // writeListBegin
+  EXPECT_CALL(*proto, writeListBegin(Ref(buffer), FieldType::String, 100));
+  auto_proto.writeListBegin(buffer, FieldType::String, 100);
+
+  // writeListEnd
+  EXPECT_CALL(*proto, writeListEnd(Ref(buffer)));
+  auto_proto.writeListEnd(buffer);
+
+  // writeSetBegin
+  EXPECT_CALL(*proto, writeSetBegin(Ref(buffer), FieldType::String, 100));
+  auto_proto.writeSetBegin(buffer, FieldType::String, 100);
+
+  // writeSetEnd
+  EXPECT_CALL(*proto, writeSetEnd(Ref(buffer)));
+  auto_proto.writeSetEnd(buffer);
+
+  // writeBool
+  EXPECT_CALL(*proto, writeBool(Ref(buffer), true));
+  auto_proto.writeBool(buffer, true);
+
+  // writeByte
+  EXPECT_CALL(*proto, writeByte(Ref(buffer), 100));
+  auto_proto.writeByte(buffer, 100);
+
+  // writeInt16
+  EXPECT_CALL(*proto, writeInt16(Ref(buffer), 100));
+  auto_proto.writeInt16(buffer, 100);
+
+  // writeInt32
+  EXPECT_CALL(*proto, writeInt32(Ref(buffer), 100));
+  auto_proto.writeInt32(buffer, 100);
+
+  // writeInt64
+  EXPECT_CALL(*proto, writeInt64(Ref(buffer), 100));
+  auto_proto.writeInt64(buffer, 100);
+
+  // writeDouble
+  EXPECT_CALL(*proto, writeDouble(Ref(buffer), 10.0));
+  auto_proto.writeDouble(buffer, 10.0);
+
+  // writeString
+  EXPECT_CALL(*proto, writeString(Ref(buffer), "string"));
+  auto_proto.writeString(buffer, "string");
+
+  // writeBinary
+  EXPECT_CALL(*proto, writeBinary(Ref(buffer), "binary"));
+  auto_proto.writeBinary(buffer, "binary");
 }
 
 TEST(AutoProtocolTest, Name) {

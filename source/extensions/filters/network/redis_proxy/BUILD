@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Redis proxy L4 network filter. Implements consistent hashing and observability for large redis
 # clusters.
 # Public docs: docs/root/configuration/network_filters/redis_proxy_filter.rst

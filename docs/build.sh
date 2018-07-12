@@ -104,6 +104,7 @@ PROTO_RST="
   /envoy/config/rbac/v2alpha/rbac/envoy/config/rbac/v2alpha/rbac.proto.rst
   /envoy/config/transport_socket/capture/v2alpha/capture/envoy/config/transport_socket/capture/v2alpha/capture.proto.rst
   /envoy/data/accesslog/v2/accesslog/envoy/data/accesslog/v2/accesslog.proto.rst
+  /envoy/data/core/v2alpha/health_check_event/envoy/data/core/v2alpha/health_check_event.proto.rst
   /envoy/data/tap/v2alpha/capture/envoy/data/tap/v2alpha/capture.proto.rst
   /envoy/service/accesslog/v2/als/envoy/service/accesslog/v2/als.proto.rst
   /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/attribute_context.proto.rst

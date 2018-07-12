@@ -43,35 +43,6 @@ name: test-header
   EXPECT_EQ(HeaderUtility::HeaderMatchType::Present, header_data.header_match_type_);
 }
 
-TEST(HeaderDataConstructorTest, ValueSet) {
-  const std::string yaml = R"EOF(
-name: test-header
-value: value
-  )EOF";
-
-  HeaderUtility::HeaderData header_data =
-      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
-
-  EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Value, header_data.header_match_type_);
-  EXPECT_EQ("value", header_data.value_);
-}
-
-TEST(HeaderDataConstructorTest, ValueAndRegexFlagSet) {
-  const std::string yaml = R"EOF(
-name: test-header
-value: value
-regex: true
-  )EOF";
-
-  HeaderUtility::HeaderData header_data =
-      HeaderUtility::HeaderData(parseHeaderMatcherFromYaml(yaml));
-
-  EXPECT_EQ("test-header", header_data.name_.get());
-  EXPECT_EQ(HeaderUtility::HeaderMatchType::Regex, header_data.header_match_type_);
-  EXPECT_EQ("", header_data.value_);
-}
-
 TEST(HeaderDataConstructorTest, ExactMatchSpecifier) {
   const std::string yaml = R"EOF(
 name: test-header

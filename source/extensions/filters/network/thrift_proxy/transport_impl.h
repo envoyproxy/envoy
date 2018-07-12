@@ -43,13 +43,17 @@ public:
   const std::string& name() const override { return name_; }
   bool decodeFrameStart(Buffer::Instance& buffer) override;
   bool decodeFrameEnd(Buffer::Instance& buffer) override;
+  void encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) override;
 
-private:
+  /*
+   * Explicitly set the transport. Public to simplify testing.
+   */
   void setTransport(TransportPtr&& transport) {
     transport_ = std::move(transport);
     name_ = fmt::format("{}({})", transport_->name(), TransportNames::get().AUTO);
   }
 
+private:
   TransportPtr transport_{};
   std::string name_;
 };

@@ -15,9 +15,9 @@ template <class ResourceType>
 class GrpcSubscriptionImpl : public Config::Subscription<ResourceType> {
 public:
   GrpcSubscriptionImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClientPtr async_client,
-                       Event::Dispatcher& dispatcher,
+                       Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                        const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats)
-      : grpc_mux_(node, std::move(async_client), dispatcher, service_method),
+      : grpc_mux_(node, std::move(async_client), dispatcher, service_method, random),
         grpc_mux_subscription_(grpc_mux_, stats) {}
 
   // Config::Subscription

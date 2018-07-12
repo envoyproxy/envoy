@@ -130,15 +130,11 @@ public:
   }
 
   void cleanup() {
-    codec_client_->close();
     if (fake_ratelimit_connection_ != nullptr) {
       fake_ratelimit_connection_->close();
       fake_ratelimit_connection_->waitForDisconnect();
     }
-    if (fake_upstream_connection_ != nullptr) {
-      fake_upstream_connection_->close();
-      fake_upstream_connection_->waitForDisconnect();
-    }
+    cleanupUpstreamAndDownstream();
   }
 
   FakeHttpConnectionPtr fake_ratelimit_connection_;

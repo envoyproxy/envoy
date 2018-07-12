@@ -17,6 +17,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "backoff_lib",
+    srcs = ["backoff_strategy.cc"],
+    hdrs = ["backoff_strategy.h"],
+    deps = [
+        ":assert_lib",
+        "//include/envoy/common:backoff_strategy_interface",
+        "//include/envoy/runtime:runtime_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "base64_lib",
     srcs = ["base64.cc"],
     hdrs = ["base64.h"],

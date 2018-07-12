@@ -14,6 +14,7 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
+
 class UdsUpstreamIntegrationTest
     : public HttpIntegrationTest,
       public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
@@ -23,8 +24,9 @@ public:
         abstract_namespace_(std::get<1>(GetParam())) {}
 
   void createUpstreams() override {
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(getSocketName(), FakeHttpConnection::Type::HTTP1));
+    fake_upstreams_.emplace_back(new FakeUpstream(
+        TestEnvironment::unixDomainSocketPath("udstest.1.sock", abstract_namespace_),
+        FakeHttpConnection::Type::HTTP1));
 
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
@@ -33,15 +35,11 @@ public:
             auto* cluster = static_resources->mutable_clusters(i);
             for (int j = 0; j < cluster->hosts_size(); ++j) {
               cluster->mutable_hosts(j)->clear_socket_address();
-              cluster->mutable_hosts(j)->mutable_pipe()->set_path(getSocketName());
+              cluster->mutable_hosts(j)->mutable_pipe()->set_path(
+                  TestEnvironment::unixDomainSocketPath("udstest.1.sock", abstract_namespace_));
             }
           }
         });
-  }
-
-  std::string getSocketName() {
-    return abstract_namespace_ ? "@/my/udstest"
-                               : TestEnvironment::unixDomainSocketPath("udstest.1.sock");
   }
 
 protected:
@@ -58,17 +56,13 @@ public:
 
   void initialize() override;
 
-  std::string getSocketName(const std::string& path) {
-    const std::string name = TestEnvironment::unixDomainSocketPath(path);
-    if (!abstract_namespace_) {
-      return name;
-    }
-    return "@" + name;
+  std::string getAdminSocketName() {
+    return TestEnvironment::unixDomainSocketPath("admin.sock", abstract_namespace_);
   }
 
-  std::string getAdminSocketName() { return getSocketName("admin.sock"); }
-
-  std::string getListenerSocketName() { return getSocketName("listener_0.sock"); }
+  std::string getListenerSocketName() {
+    return TestEnvironment::unixDomainSocketPath("listener_0.sock", abstract_namespace_);
+  }
 
 protected:
   HttpIntegrationTest::ConnectionCreationFunction createConnectionFn();

@@ -336,6 +336,151 @@ public:
    * @throw EnvoyException if the data is not a valid set footer
    */
   virtual bool readBinary(Buffer::Instance& buffer, std::string& value) PURE;
+
+  /**
+   * Writes the start of a Thrift protocol message to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param name the message name
+   * @param msg_type the message's MessageType
+   * @param seq_id the message sequende ID
+   */
+  virtual void writeMessageBegin(Buffer::Instance& buffer, const std::string& name,
+                                 MessageType msg_type, int32_t seq_id) PURE;
+
+  /**
+   * Writes the end of a Thrift protocol message to the buffer.
+   * @param buffer Buffer::Instance to modify
+   */
+  virtual void writeMessageEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Writes the start of a Thrift struct to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param name the struct name, if known
+   */
+  virtual void writeStructBegin(Buffer::Instance& buffer, const std::string& name) PURE;
+
+  /**
+   * Writes the end of a Thrift struct to the buffer.
+   * @param buffer Buffer::Instance to modify
+   */
+  virtual void writeStructEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Writes the start of a Thrift struct field to the buffer
+   * @param buffer Buffer::Instance to modify
+   * @param name the field name, if known
+   * @param field_type the field's FieldType
+   * @param field_id the field ID
+   */
+  virtual void writeFieldBegin(Buffer::Instance& buffer, const std::string& name,
+                               FieldType field_type, int16_t field_id) PURE;
+
+  /**
+   * Writes the end of a Thrift struct field to the buffer.
+   * @param buffer Buffer::Instance to modify
+   */
+  virtual void writeFieldEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Writes the start of a Thrift map to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param key_type the map key FieldType
+   * @param value_type the map value FieldType
+   * @param size the number of key-value pairs in the map
+   */
+  virtual void writeMapBegin(Buffer::Instance& buffer, FieldType key_type, FieldType value_type,
+                             uint32_t size) PURE;
+
+  /**
+   * Writes the end of a Thrift map to the buffer.
+   * @param buffer Buffer::Instance to modify
+   */
+  virtual void writeMapEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Writes the start of a Thrift list to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param elem_type the list element FieldType
+   * @param size the number of list members
+   */
+  virtual void writeListBegin(Buffer::Instance& buffer, FieldType elem_type, uint32_t size) PURE;
+
+  /**
+   * Writes the end of a Thrift list to the buffer.
+   * @param buffer Buffer::Instance to modify
+   */
+  virtual void writeListEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Writes the start of a Thrift set to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param elem_type the set element FieldType
+   * @param size the number of set members
+   */
+  virtual void writeSetBegin(Buffer::Instance& buffer, FieldType elem_type, uint32_t size) PURE;
+
+  /**
+   * Writes the end of a Thrift set to the buffer.
+   * @param buffer Buffer::Instance to modify
+   */
+  virtual void writeSetEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Writes a boolean value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value bool to write
+   */
+  virtual void writeBool(Buffer::Instance& buffer, bool value) PURE;
+
+  /**
+   * Writes a byte value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value uint8_t to write
+   */
+  virtual void writeByte(Buffer::Instance& buffer, uint8_t value) PURE;
+
+  /**
+   * Writes a int16_t value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value int16_t to write
+   */
+  virtual void writeInt16(Buffer::Instance& buffer, int16_t value) PURE;
+
+  /**
+   * Writes a int32_t value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value int32_t to write
+   */
+  virtual void writeInt32(Buffer::Instance& buffer, int32_t value) PURE;
+
+  /**
+   * Writes a int64_t value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value int64_t to write
+   */
+  virtual void writeInt64(Buffer::Instance& buffer, int64_t value) PURE;
+
+  /**
+   * Writes a double value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value double to write
+   */
+  virtual void writeDouble(Buffer::Instance& buffer, double value) PURE;
+
+  /**
+   * Writes a string value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value std::string to write
+   */
+  virtual void writeString(Buffer::Instance& buffer, const std::string& value) PURE;
+
+  /**
+   * Writes a binary value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value std::string to write
+   */
+  virtual void writeBinary(Buffer::Instance& buffer, const std::string& value) PURE;
 };
 
 typedef std::unique_ptr<Protocol> ProtocolPtr;

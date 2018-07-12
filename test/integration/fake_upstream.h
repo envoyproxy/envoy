@@ -263,7 +263,7 @@ private:
 /**
  * Base class for both fake raw connections and fake HTTP connections.
  */
-class FakeConnectionBase {
+class FakeConnectionBase : public Logger::Loggable<Logger::Id::testing> {
 public:
   virtual ~FakeConnectionBase() {
     ASSERT(initialized_);
@@ -341,7 +341,7 @@ typedef std::unique_ptr<FakeHttpConnection> FakeHttpConnectionPtr;
 /**
  * Fake raw connection for integration testing.
  */
-class FakeRawConnection : Logger::Loggable<Logger::Id::testing>, public FakeConnectionBase {
+class FakeRawConnection : public FakeConnectionBase {
 public:
   FakeRawConnection(SharedConnectionWrapper& shared_connection)
       : FakeConnectionBase(shared_connection) {}

@@ -69,7 +69,7 @@ TEST(OptionsImplTest, All) {
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
-  EXPECT_TRUE(options->v2ConfigOnly());
+  EXPECT_FALSE(options->v2ConfigOnly());
   EXPECT_EQ("path", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v6, options->localAddressIpVersion());
   EXPECT_EQ(1U, options->restartEpoch());

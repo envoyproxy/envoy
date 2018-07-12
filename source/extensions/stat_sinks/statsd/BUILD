@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # Stats sink for the basic version of the statsd protocol (https://github.com/b/statsd_spec).
 
 load(

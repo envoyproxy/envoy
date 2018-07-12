@@ -89,6 +89,7 @@ public:
   const ConnectionSocket::OptionsSharedPtr& socketOptions() const override {
     return socket_->options();
   }
+  absl::string_view requestedServerName() const override { return socket_->requestedServerName(); }
 
   // Network::BufferSource
   BufferSource::StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }

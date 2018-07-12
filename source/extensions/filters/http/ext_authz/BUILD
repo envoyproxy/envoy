@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # External authorization L7 HTTP filter
 # Public docs: TODO(saumoh): Docs needed in docs/root/configuration/http_filters
 
