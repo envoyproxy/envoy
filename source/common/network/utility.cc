@@ -5,10 +5,11 @@
 
 #if defined(__linux__)
 #include <linux/netfilter_ipv4.h>
+#endif
+
 #ifndef IP6T_SO_ORIGINAL_DST
 // From linux/netfilter_ipv6/ip6_tables.h
 #define IP6T_SO_ORIGINAL_DST 80
-#endif
 #endif
 
 #include <netinet/ip.h>
@@ -304,15 +305,14 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
     return nullptr;
   }
 
-  switch (socket_domain) {
-  case AF_INET:
+  if ( socket_domain == AF_INET ) {
     status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
-  case AF_INET6:
+  } else if ( socket_domain == AF_INET6 ){
     status = getsockopt(fd, SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len);
-  default:
+  } else {
     return nullptr;
   }
-
+  
   if (status != 0) {
     return nullptr;
   }
