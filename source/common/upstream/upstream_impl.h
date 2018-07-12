@@ -467,6 +467,9 @@ public:
   const Network::Address::InstanceConstSharedPtr
   resolveProtoAddress(const envoy::api::v2::core::Address& address);
 
+  static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
+  static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);
+
   // Upstream::Cluster
   HealthChecker* healthChecker() override { return health_checker_.get(); }
   ClusterInfoConstSharedPtr info() const override { return info_; }
@@ -479,9 +482,6 @@ protected:
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
                   Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                   Secret::SecretManager& secret_manager, bool added_via_api);
-
-  static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
-  static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
@@ -496,9 +496,8 @@ protected:
   void onPreInitComplete();
 
   Runtime::Loader& runtime_;
-  ClusterInfoConstSharedPtr
-      info_; // This cluster info stores the stats scope so it must be initialized first
-             // and destroyed last.
+  ClusterInfoConstSharedPtr info_; // This cluster info stores the stats scope so it must be
+                                   // initialized first and destroyed last.
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
 
@@ -512,6 +511,59 @@ private:
   bool initialization_started_{};
   std::function<void()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
+};
+
+typedef std::unique_ptr<HostVector> HostListPtr;
+typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
+    LocalityWeightsMap;
+typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
+
+/**
+ * Manages PriorityState of a cluster. PriorityState is a per-priority binding of a set of hosts
+ * with its corresponding locality weight map. This is useful to store priorities/hosts/localities
+ * before updating the cluster priority set.
+ */
+class PriorityStateManager : protected Logger::Loggable<Logger::Id::upstream> {
+public:
+  PriorityStateManager(ClusterImplBase& cluster, const LocalInfo::LocalInfo& local_info);
+
+  // Initializes the PriorityState vector based on the priority specified in locality_lb_endpoint.
+  void
+  initializePriorityFor(const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint);
+
+  // Registers a host based on its address to the PriorityState based on the specified priority (the
+  // priority is specified by locality_lb_endpoint.priority()).
+  //
+  // The specified health_checker_flag is used to set the registered-host's health-flag when the
+  // lb_endpoint health status is unhealty, draining or timeout.
+  void
+  registerHostForPriority(const std::string& hostname,
+                          Network::Address::InstanceConstSharedPtr address,
+                          const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
+                          const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
+                          const Upstream::Host::HealthFlag health_checker_flag);
+
+  // TODO(dio): Add an override of registerHostForPriority to register a host to the PriorityState
+  // based on a specified priority. This will be useful for non-EDS cluster hosts setup.
+  //
+  // void registerHostForPriority(const HostSharedPtr& host, const uint32_t priority);
+
+  // Updates the cluster priority set. This should be called after the PriorityStateManager is
+  // initialized.
+  void updateClusterPrioritySet(const uint32_t priority, HostVectorSharedPtr&& current_hosts,
+                                const absl::optional<HostVector>& hosts_added,
+                                const absl::optional<HostVector>& hosts_removed);
+
+  // Returns the size of the current cluster priority state.
+  size_t size() const { return priority_state_.size(); }
+
+  // Returns the saved priority state.
+  PriorityState& priorityState() { return priority_state_; }
+
+private:
+  ClusterImplBase& parent_;
+  PriorityState priority_state_;
+  const envoy::api::v2::core::Node& local_info_node_;
 };
 
 /**
