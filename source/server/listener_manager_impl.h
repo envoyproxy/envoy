@@ -369,7 +369,7 @@ private:
 
   // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
   // and application protocols, using structures defined above.
-  DestinationPortsMap filter_chains_;
+  DestinationPortsMap destination_ports_map_;
 
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;

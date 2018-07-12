@@ -285,7 +285,7 @@ ListenerImpl::~ListenerImpl() {
   // active. This is done here explicitly by setting a boolean and then clearing the factory
   // vector for clarity.
   initialize_canceled_ = true;
-  filter_chains_.clear();
+  destination_ports_map_.clear();
 }
 
 bool ListenerImpl::isWildcardServerName(const std::string& name) {
@@ -301,8 +301,9 @@ void ListenerImpl::addFilterChain(uint16_t destination_port,
                                   std::vector<Network::FilterFactoryCb> filters_factory) {
   const auto filter_chain = std::make_shared<FilterChainImpl>(std::move(transport_socket_factory),
                                                               std::move(filters_factory));
-  addFilterChainForDestinationPorts(filter_chains_, destination_port, destination_ips, server_names,
-                                    transport_protocol, application_protocols, filter_chain);
+  addFilterChainForDestinationPorts(destination_ports_map_, destination_port, destination_ips,
+                                    server_names, transport_protocol, application_protocols,
+                                    filter_chain);
 }
 
 void ListenerImpl::addFilterChainForDestinationPorts(
@@ -371,7 +372,7 @@ void ListenerImpl::addFilterChainForApplicationProtocols(
 }
 
 void ListenerImpl::finishFilterChain() {
-  for (auto& port : filter_chains_) {
+  for (auto& port : destination_ports_map_) {
     auto& destination_ips_pair = port.second;
     auto& destination_ips_map = destination_ips_pair.first;
     std::vector<std::pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>> list;
@@ -401,15 +402,15 @@ ListenerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
 
   // Match on destination port (only for IP addresses).
   if (address->type() == Network::Address::Type::Ip) {
-    const auto port_match = filter_chains_.find(address->ip()->port());
-    if (port_match != filter_chains_.end()) {
+    const auto port_match = destination_ports_map_.find(address->ip()->port());
+    if (port_match != destination_ports_map_.end()) {
       return findFilterChainForDestinationIP(*port_match->second.second, socket);
     }
   }
 
   // Match on catch-all port 0.
-  const auto port_match = filter_chains_.find(0);
-  if (port_match != filter_chains_.end()) {
+  const auto port_match = destination_ports_map_.find(0);
+  if (port_match != destination_ports_map_.end()) {
     return findFilterChainForDestinationIP(*port_match->second.second, socket);
   }
 
