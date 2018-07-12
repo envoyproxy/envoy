@@ -266,7 +266,6 @@ message HttpConnectionManager {
   // control.
   bool represent_ipv4_remote_address_as_ipv4_mapped_ipv6 = 20;
 
-  // [#not-implemented-hide:]
   // The configuration for HTTP upgrades.
   // For each upgrade type desired, an UpgradeConfig must be added.
   //
@@ -275,6 +274,10 @@ message HttpConnectionManager {
   //    The current implementation of upgrade headers does not handle
   //    multi-valued upgrade headers. Support for multi-valued headers may be
   //    added in the future if needed.
+  //
+  // .. warning::
+  //    The current implementation of upgrade headers does not work with HTTP/2
+  //    upstreams.
   message UpgradeConfig {
     // The case-insensitive name of this upgrade, e.g. "websocket".
     // For each upgrade type present in upgrade_configs, requests with
@@ -286,7 +289,6 @@ message HttpConnectionManager {
     // HTTP connections will be used for this upgrade type.
     repeated HttpFilter filters = 2;
   };
-  // [#not-implemented-hide:]
   repeated UpgradeConfig upgrade_configs = 23;
 }
 

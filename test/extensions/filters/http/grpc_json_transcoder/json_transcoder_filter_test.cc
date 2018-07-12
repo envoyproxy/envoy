@@ -97,7 +97,7 @@ public:
                               0 == file.name().compare(file.name().length() - file_name.length(),
                                                        ProtobufTypes::String::npos, file_name);
                      });
-    RELEASE_ASSERT(file_itr != descriptor_set.file().end());
+    RELEASE_ASSERT(file_itr != descriptor_set.file().end(), "");
     file_descriptor = *file_itr;
 
     descriptor_set.clear_file();

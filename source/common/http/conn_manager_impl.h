@@ -361,7 +361,7 @@ private:
     // Possibly increases buffer_limit_ to the value of limit.
     void setBufferLimit(uint32_t limit);
     // Set up the Encoder/Decoder filter chain.
-    void createFilterChain();
+    bool createFilterChain();
     // Per-stream idle timeout callback.
     void onIdleTimeout();
     // Reset per-stream idle timer.

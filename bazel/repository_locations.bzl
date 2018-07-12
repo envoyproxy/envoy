@@ -10,7 +10,7 @@ REPOSITORY_LOCATIONS = dict(
     ),
     com_github_apache_thrift = dict(
         sha256 = "7d59ac4fdcb2c58037ebd4a9da5f9a49e3e034bf75b3f26d9fe48ba3d8806e6b",
-        urls = ["https://files.pythonhosted.org/packages/c6/b4/510617906f8e0c5660e7d96fbc5585113f83ad547a3989b80297ac72a74c/thrift-0.11.0.tar.gz"], # 0.11.0
+        urls = ["https://files.pythonhosted.org/packages/c6/b4/510617906f8e0c5660e7d96fbc5585113f83ad547a3989b80297ac72a74c/thrift-0.11.0.tar.gz"],  # 0.11.0
         strip_prefix = "thrift-0.11.0",
     ),
     com_github_bombela_backward = dict(
@@ -48,16 +48,16 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/libprotobuf-mutator",
     ),
     com_github_grpc_grpc = dict(
-        commit = "bec3b5ada2c5e5d782dff0b7b5018df646b65cb0", # v1.12.0
+        commit = "bec3b5ada2c5e5d782dff0b7b5018df646b65cb0",  # v1.12.0
         remote = "https://github.com/grpc/grpc.git",
     ),
     io_opentracing_cpp = dict(
-        commit = "3b36b084a4d7fffc196eac83203cf24dfb8696b3", # v1.4.2
+        commit = "3b36b084a4d7fffc196eac83203cf24dfb8696b3",  # v1.4.2
         remote = "https://github.com/opentracing/opentracing-cpp",
     ),
     com_lightstep_tracer_cpp = dict(
         commit = "ae6a6bba65f8c4d438a6a3ac855751ca8f52e1dc",
-        remote = "https://github.com/lightstep/lightstep-tracer-cpp", # v0.7.1
+        remote = "https://github.com/lightstep/lightstep-tracer-cpp",  # v0.7.1
     ),
     lightstep_vendored_googleapis = dict(
         commit = "d6f78d948c53f3b400bb46996eb3084359914f9b",
@@ -97,7 +97,7 @@ REPOSITORY_LOCATIONS = dict(
     ),
     com_github_twitter_common_finagle_thrift = dict(
         sha256 = "1e3a57d11f94f58745e6b83348ecd4fa74194618704f45444a15bc391fde497a",
-        urls = ["https://files.pythonhosted.org/packages/f9/e7/4f80d582578f8489226370762d2cf6bc9381175d1929eba1754e03f70708/twitter.common.finagle-thrift-0.3.9.tar.gz"], # 0.3.9
+        urls = ["https://files.pythonhosted.org/packages/f9/e7/4f80d582578f8489226370762d2cf6bc9381175d1929eba1754e03f70708/twitter.common.finagle-thrift-0.3.9.tar.gz"],  # 0.3.9
         strip_prefix = "twitter.common.finagle-thrift-0.3.9/src",
     ),
     com_google_googletest = dict(

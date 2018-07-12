@@ -15,6 +15,15 @@ envoy_cc_test(
     srcs = ["backoff_strategy_test.cc"],
     deps = [
         "//source/common/common:backoff_lib",
+        "//test/mocks/runtime:runtime_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "assert_test",
+    srcs = ["assert_test.cc"],
+    deps = [
+        "//source/common/common:assert_lib",
     ],
 )
 

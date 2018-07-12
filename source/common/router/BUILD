@@ -123,6 +123,7 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:backoff_lib",
         "//source/common/common:utility_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",
