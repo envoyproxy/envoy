@@ -18,7 +18,7 @@ TEST(FixedHeapMonitorTest, SaneUsage) {
     EXPECT_EQ(error, nullptr);
     usage = *u;
   });
-  EXPECT_GT(usage.resource_pressure_, 0.0);
+  EXPECT_GE(usage.resource_pressure_, 0.0);
   EXPECT_LT(usage.resource_pressure_, 1.0);
 }
 
