@@ -420,11 +420,12 @@ ListenerImpl::findFilterChain(const Network::ConnectionSocket& socket) const {
 const Network::FilterChain*
 ListenerImpl::findFilterChainForDestinationIP(const DestinationIPsTrie& destination_ips_trie,
                                               const Network::ConnectionSocket& socket) const {
-  auto address = socket.localAddress();
-
   // Use invalid IP address (matching only filter chains without IP requirements) for UDS.
+  static const auto& fake_address = Network::Utility::parseInternetAddress("255.255.255.255");
+
+  auto address = socket.localAddress();
   if (address->type() != Network::Address::Type::Ip) {
-    address = Network::Utility::parseInternetAddress("255.255.255.255");
+    address = fake_address;
   }
 
   // Match on both: exact IP and wider CIDR ranges using LcTrie.
