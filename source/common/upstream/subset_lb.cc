@@ -31,18 +31,35 @@ SubsetLoadBalancer::SubsetLoadBalancer(
   ASSERT(subsets.isEnabled());
 
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
-  for (auto& host_set : priority_set.hostSetsPerPriority()) {
-    update(host_set->priority(), host_set->hosts(), {});
-  }
+  refreshSubsets();
 
   // Configure future updates.
   original_priority_set_callback_handle_ = priority_set.addMemberUpdateCb(
       [this](uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed) {
-        update(priority, hosts_added, hosts_removed);
+        if (!hosts_added.size() && !hosts_removed.size()) {
+          // It's possible that metadata changed, without hosts being added nor removed.
+          // If so we need to add any new subsets, remove unused ones, and regroup hosts into
+          // the right subsets.
+          //
+          // Note, note, note: if metadata for existing endpoints changed _and_ hosts were also
+          // added or removed, we don't need to hit this path. That's fine, given that
+          // findOrCreateSubset() will be called from processSubsets because it'll be triggered by
+          // either hosts_added or hosts_removed. That's where the new subsets will be created.
+          refreshSubsets();
+        } else {
+          // This is a regular update with deltas.
+          update(priority, hosts_added, hosts_removed);
+        }
       });
 }
 
 SubsetLoadBalancer::~SubsetLoadBalancer() { original_priority_set_callback_handle_->remove(); }
+
+void SubsetLoadBalancer::refreshSubsets() {
+  for (auto& host_set : original_priority_set_.hostSetsPerPriority()) {
+    update(host_set->priority(), host_set->hosts(), {});
+  }
+}
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
   if (context) {
@@ -215,29 +232,6 @@ void SubsetLoadBalancer::processSubsets(
 // new subsets as necessary.
 void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added,
                                 const HostVector& hosts_removed) {
-  // It's possible that metadata changed, without hosts being added nor removed.
-  // If so we need to add any new subsets, remove unused ones, and regroup hosts into
-  // the right subsets.
-  //
-  // Note, note, note: if metadata for existing endpoints changed _and_ hosts were also added
-  // or removed, we don't need to hit this path. That's fine, given that findOrCreateSubset()
-  // will be called from processSubsets because it'll be triggered by either hosts_added or
-  // hosts_removed. That's where the new subsets will be created.
-  //
-  // Finally, if metadata changed hosts will be regrouped into their new subsets from
-  // SubsetLoadBalancer::HostSubsetImpl::update().
-  if (!hosts_added.size() && !hosts_removed.size()) {
-    for (auto& host_set : original_priority_set_.hostSetsPerPriority()) {
-      // Prevent endless recursion.
-      if (!host_set->hosts().size()) {
-        continue;
-      }
-      update(host_set->priority(), host_set->hosts(), {});
-    }
-
-    return;
-  }
-
   updateFallbackSubset(priority, hosts_added, hosts_removed);
 
   processSubsets(hosts_added, hosts_removed,
