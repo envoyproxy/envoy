@@ -60,13 +60,13 @@ SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, Options& options
 
   if (options.restartEpoch() == 0) {
     int rc = os_sys_calls.ftruncate(shmem_fd, total_size);
-    RELEASE_ASSERT(rc != -1);
+    RELEASE_ASSERT(rc != -1, "");
   }
 
   SharedMemory* shmem = reinterpret_cast<SharedMemory*>(
       os_sys_calls.mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_SHARED, shmem_fd, 0));
-  RELEASE_ASSERT(shmem != MAP_FAILED);
-  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem) % alignof(decltype(shmem))) == 0);
+  RELEASE_ASSERT(shmem != MAP_FAILED, "");
+  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem) % alignof(decltype(shmem))) == 0, "");
 
   if (options.restartEpoch() == 0) {
     shmem->size_ = total_size;
@@ -78,15 +78,15 @@ SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, Options& options
     shmem->initializeMutex(shmem->stat_lock_);
     shmem->initializeMutex(shmem->init_lock_);
   } else {
-    RELEASE_ASSERT(shmem->size_ == total_size);
-    RELEASE_ASSERT(shmem->version_ == VERSION);
-    RELEASE_ASSERT(shmem->max_stats_ == options.maxStats());
-    RELEASE_ASSERT(shmem->entry_size_ == entry_size);
+    RELEASE_ASSERT(shmem->size_ == total_size, "");
+    RELEASE_ASSERT(shmem->version_ == VERSION, "");
+    RELEASE_ASSERT(shmem->max_stats_ == options.maxStats(), "");
+    RELEASE_ASSERT(shmem->entry_size_ == entry_size, "");
   }
 
   // Stats::RawStatData must be naturally aligned for atomics to work properly.
-  RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem->stats_set_data_) % alignof(RawStatDataSet)) ==
-                 0);
+  RELEASE_ASSERT(
+      (reinterpret_cast<uintptr_t>(shmem->stats_set_data_) % alignof(RawStatDataSet)) == 0, "");
 
   // Here we catch the case where a new Envoy starts up when the current Envoy has not yet fully
   // initialized. The startup logic is quite complicated, and it's not worth trying to handle this
@@ -136,7 +136,7 @@ HotRestartImpl::HotRestartImpl(Options& options)
   // If our parent ever goes away just terminate us so that we don't have to rely on ops/launching
   // logic killing the entire process tree. We should never exist without our parent.
   int rc = prctl(PR_SET_PDEATHSIG, SIGTERM);
-  RELEASE_ASSERT(rc != -1);
+  RELEASE_ASSERT(rc != -1, "");
 }
 
 Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
@@ -280,7 +280,7 @@ HotRestartImpl::RpcBase* HotRestartImpl::receiveRpc(bool block) {
   // By default the domain socket is non blocking. If we need to block, make it blocking first.
   if (block) {
     int rc = fcntl(my_domain_socket_, F_SETFL, 0);
-    RELEASE_ASSERT(rc != -1);
+    RELEASE_ASSERT(rc != -1, "");
   }
 
   iovec iov[1];
@@ -303,17 +303,17 @@ HotRestartImpl::RpcBase* HotRestartImpl::receiveRpc(bool block) {
     return nullptr;
   }
 
-  RELEASE_ASSERT(rc != -1);
-  RELEASE_ASSERT(message.msg_flags == 0);
+  RELEASE_ASSERT(rc != -1, "");
+  RELEASE_ASSERT(message.msg_flags == 0, "");
 
   // Turn non-blocking back on if we made it blocking.
   if (block) {
     int rc = fcntl(my_domain_socket_, F_SETFL, O_NONBLOCK);
-    RELEASE_ASSERT(rc != -1);
+    RELEASE_ASSERT(rc != -1, "");
   }
 
   RpcBase* rpc = reinterpret_cast<RpcBase*>(&rpc_buffer_[0]);
-  RELEASE_ASSERT(static_cast<uint64_t>(rc) == rpc->length_);
+  RELEASE_ASSERT(static_cast<uint64_t>(rc) == rpc->length_, "");
 
   // We should only get control data in a GetListenSocketReply. If that's the case, pull the
   // cloned fd out of the control data and stick it into the RPC so that higher level code does
@@ -327,7 +327,7 @@ HotRestartImpl::RpcBase* HotRestartImpl::receiveRpc(bool block) {
       reinterpret_cast<RpcGetListenSocketReply*>(rpc)->fd_ =
           *reinterpret_cast<int*>(CMSG_DATA(cmsg));
     } else {
-      RELEASE_ASSERT(false);
+      RELEASE_ASSERT(false, "");
     }
   }
 
@@ -346,7 +346,7 @@ void HotRestartImpl::sendMessage(sockaddr_un& address, RpcBase& rpc) {
   message.msg_iov = iov;
   message.msg_iovlen = 1;
   int rc = sendmsg(my_domain_socket_, &message, 0);
-  RELEASE_ASSERT(rc != -1);
+  RELEASE_ASSERT(rc != -1, "");
 }
 
 void HotRestartImpl::onGetListenSocket(RpcGetListenSocketRequest& rpc) {
@@ -389,7 +389,7 @@ void HotRestartImpl::onGetListenSocket(RpcGetListenSocketRequest& rpc) {
     *reinterpret_cast<int*>(CMSG_DATA(control_message)) = reply.fd_;
 
     int rc = sendmsg(my_domain_socket_, &message, 0);
-    RELEASE_ASSERT(rc != -1);
+    RELEASE_ASSERT(rc != -1, "");
   }
 }
 

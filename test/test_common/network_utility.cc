@@ -154,10 +154,10 @@ bool supportsIpVersion(const Address::IpVersion version) {
   }
   if (0 != addr->bind(fd)) {
     // Socket bind failed.
-    RELEASE_ASSERT(::close(fd) == 0);
+    RELEASE_ASSERT(::close(fd) == 0, "");
     return false;
   }
-  RELEASE_ASSERT(::close(fd) == 0);
+  RELEASE_ASSERT(::close(fd) == 0, "");
   return true;
 }
 

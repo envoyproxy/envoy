@@ -52,7 +52,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       dispatcher_(dispatcher), id_(next_global_id_++) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
-  RELEASE_ASSERT(fd() != -1);
+  RELEASE_ASSERT(fd() != -1, "");
 
   if (!connected) {
     connecting_ = true;
@@ -162,7 +162,7 @@ void ConnectionImpl::noDelay(bool enable) {
   sockaddr addr;
   socklen_t len = sizeof(addr);
   int rc = getsockname(fd(), &addr, &len);
-  RELEASE_ASSERT(rc == 0);
+  RELEASE_ASSERT(rc == 0, "");
 
   if (addr.sa_family == AF_UNIX) {
     return;
@@ -179,7 +179,7 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 #endif
 
-  RELEASE_ASSERT(0 == rc);
+  RELEASE_ASSERT(0 == rc, "");
 }
 
 uint64_t ConnectionImpl::id() const { return id_; }
