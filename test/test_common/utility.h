@@ -347,7 +347,7 @@ public:
     CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[name];
     if (!stat_ref) {
       stat_ref.reset(static_cast<RawStatData*>(
-          ::calloc(RawStatData::sizeGivenStatsOptions(stats_options), 1)));
+          ::calloc(RawStatData::structSizeWithOptions(stats_options), 1)));
       stat_ref->truncateAndInit(name, stats_options);
     } else {
       stat_ref->ref_count_++;

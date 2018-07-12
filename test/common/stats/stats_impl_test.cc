@@ -528,7 +528,7 @@ TEST(RawStatDataTest, Truncate) {
   Stats::StatsOptionsImpl stats_options;
   const std::string long_string(stats_options.maxNameLength() + 1, 'A');
   RawStatData* stat =
-      static_cast<RawStatData*>(::calloc(RawStatData::sizeGivenStatsOptions(stats_options), 1));
+      static_cast<RawStatData*>(::calloc(RawStatData::structSizeWithOptions(stats_options), 1));
   EXPECT_LOG_CONTAINS("warning", "is too long with",
                       stat->truncateAndInit(long_string, stats_options));
   ::free(stat);

@@ -330,7 +330,7 @@ private:
     // sizeof(Cell) includes 'sizeof Value' which may not be accurate. So we need to
     // subtract that off, and add the template method's view of the actual value-size.
     uint64_t cell_size =
-        align(sizeof(Cell) + Value::sizeGivenStatsOptions(stats_options) - sizeof(Value));
+        align(sizeof(Cell) + Value::structSizeWithOptions(stats_options) - sizeof(Value));
     return cell_index * cell_size;
   }
 

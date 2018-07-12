@@ -40,7 +40,7 @@ static BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
 SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, Options& options) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
 
-  const uint64_t entry_size = Stats::RawStatData::sizeGivenStatsOptions(options.statsOptions());
+  const uint64_t entry_size = Stats::RawStatData::structSizeWithOptions(options.statsOptions());
   const uint64_t total_size = sizeof(SharedMemory) + stats_set_size;
 
   int flags = O_RDWR;
@@ -172,7 +172,7 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
   bool key_removed = stats_set_->remove(data.key());
   ASSERT(key_removed);
   memset(static_cast<void*>(&data), 0,
-         Stats::RawStatData::sizeGivenStatsOptions(options_.statsOptions()));
+         Stats::RawStatData::structSizeWithOptions(options_.statsOptions()));
 }
 
 int HotRestartImpl::bindDomainSocket(uint64_t id) {

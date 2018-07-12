@@ -27,7 +27,7 @@ protected:
       memcpy(name, key.data(), xfer);
       name[xfer] = '\0';
     }
-    static uint64_t sizeGivenStatsOptions(const Stats::StatsOptions& stats_options) {
+    static uint64_t structSizeWithOptions(const Stats::StatsOptions& stats_options) {
       UNREFERENCED_PARAMETER(stats_options);
       return sizeof(TestValue);
     }

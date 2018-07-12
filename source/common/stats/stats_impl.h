@@ -191,7 +191,7 @@ public:
  * it can be allocated from shared memory if needed.
  *
  * @note Due to name_ being variable size, sizeof(RawStatData) probably isn't useful. Use
- * RawStatData::sizeGivenName() or RawStatData::sizeGivenStatsOptions() instead.
+ * RawStatData::structSize() or RawStatData::structSizeWithOptions() instead.
  */
 struct RawStatData {
 
@@ -207,14 +207,13 @@ struct RawStatData {
    * and padding for alignment. Required for the HeapRawStatDataAllocator, which does not truncate
    * at a maximum stat name length.
    */
-  static uint64_t sizeGivenName(const absl::string_view name);
+  static uint64_t structSize(uint64_t name_size);
 
   /**
-   * Returns the size of this struct, accounting for the length of name_
-   * and padding for alignment. Required by BlockMemoryHashSet, which has the context to report
-   * StatsOptions.
+   * Wrapper for structSize, taking a StatsOptions struct.
+   * Required by BlockMemoryHashSet, which has the context to supply StatsOptions.
    */
-  static uint64_t sizeGivenStatsOptions(const StatsOptions& stats_options);
+  static uint64_t structSizeWithOptions(const StatsOptions& stats_options);
 
   /**
    * Initializes this object to have the specified key,

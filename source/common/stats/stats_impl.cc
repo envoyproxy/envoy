@@ -40,12 +40,12 @@ bool regexStartsWithDot(absl::string_view regex) {
 // Normally the compiler would do this, but because name_ is a flexible-array-length
 // element, the compiler can't. RawStatData is put into an array in HotRestartImpl, so
 // it's important that each element starts on the required alignment for the type.
-uint64_t RawStatData::sizeGivenName(const absl::string_view name) {
-  return roundUpMultipleNaturalAlignment(sizeof(RawStatData) + name.size() + 1);
+uint64_t RawStatData::structSize(uint64_t name_size) {
+  return roundUpMultipleNaturalAlignment(sizeof(RawStatData) + name_size + 1);
 }
 
-uint64_t RawStatData::sizeGivenStatsOptions(const StatsOptions& stats_options) {
-  return roundUpMultipleNaturalAlignment(sizeof(RawStatData) + stats_options.maxNameLength() + 1);
+uint64_t RawStatData::structSizeWithOptions(const StatsOptions& stats_options) {
+  return structSize(stats_options.maxNameLength());
 }
 
 std::string Utility::sanitizeStatsName(const std::string& name) {
@@ -136,7 +136,7 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
-  uint64_t num_bytes_to_allocate = RawStatData::sizeGivenName(name);
+  uint64_t num_bytes_to_allocate = RawStatData::structSize(name.size());
   RawStatData* data = static_cast<RawStatData*>(::calloc(num_bytes_to_allocate, 1));
   if (data == nullptr) {
     throw EnvoyException("HeapRawStatDataAllocator: unable to allocate a new stat");
@@ -344,7 +344,7 @@ void RawStatData::initialize(absl::string_view key, uint64_t xfer_size) {
 
 void RawStatData::checkAndInit(absl::string_view key, uint64_t num_bytes_allocated) {
   uint64_t xfer_size = key.size();
-  ASSERT(sizeof(RawStatData) + xfer_size + 1 <= num_bytes_allocated);
+  ASSERT(structSize(xfer_size) <= num_bytes_allocated);
 
   initialize(key, xfer_size);
 }
