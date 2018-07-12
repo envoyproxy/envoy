@@ -17,6 +17,7 @@ def api_dependencies():
         name = "googleapis",
         strip_prefix = "googleapis-" + GOOGLEAPIS_SHA,
         url = "https://github.com/googleapis/googleapis/archive/" + GOOGLEAPIS_SHA + ".tar.gz",
+        # TODO(dio): Consider writing a Skylark macro for importing Google API proto.
         build_file_content = """
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
