@@ -137,8 +137,8 @@ TEST_P(IntegrationTest, IdleTimoutBasic) { testIdleTimeoutBasic(); }
 TEST_P(IntegrationTest, IdleTimeoutWithTwoRequests) { testIdleTimeoutWithTwoRequests(); }
 
 // Test hitting the bridge filter with too many response bytes to buffer. Given
-// the headers are not proxied, the connection manager will send a 500.
-TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
+// the headers are not proxied, the connection manager will send a local error reply.
+TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
   config_helper_.addFilter("{ name: envoy.grpc_http1_bridge, config: {} }");
   config_helper_.setBufferLimits(1024, 1024);
 
@@ -155,9 +155,11 @@ TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
   waitForNextUpstreamRequest();
 
   // Send the overly large response. Because the grpc_http1_bridge filter buffers and buffer
-  // limits are exceeded, this will be translated into a 500 from Envoy.
+  // limits are exceeded, this will be translated into an unknown gRPC error.
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   upstream_request_->encodeData(1024 * 65, false);
+  fake_upstream_connection_->waitForDisconnect();
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
