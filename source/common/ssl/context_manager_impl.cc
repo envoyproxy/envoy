@@ -15,7 +15,7 @@ ContextManagerImpl::~ContextManagerImpl() {
 }
 
 void ContextManagerImpl::removeEmptyContexts() {
-  contexts_.remove_if([](std::weak_ptr<Context> n) { return n.expired(); });
+  contexts_.remove_if([](const std::weak_ptr<Context>& n) { return n.expired(); });
 }
 
 ClientContextSharedPtr
@@ -52,7 +52,6 @@ size_t ContextManagerImpl::daysUntilFirstCertExpires() const {
 
 void ContextManagerImpl::iterateContexts(std::function<void(const Context&)> callback) {
   std::shared_lock<std::shared_timed_mutex> lock(contexts_lock_);
-  removeEmptyContexts();
   for (const auto& ctx_weak_ptr : contexts_) {
     ContextSharedPtr context = ctx_weak_ptr.lock();
     if (context) {
