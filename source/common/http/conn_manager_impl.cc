@@ -447,7 +447,7 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   request_headers_ = std::move(headers);
-  createFilterChain();
+  const bool upgrade_rejected = createFilterChain() == false;
 
   maybeEndDecode(end_stream);
 
@@ -569,7 +569,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       connection_manager_.stats_.named_.downstream_cx_http1_active_.dec();
       connection_manager_.stats_.named_.downstream_cx_websocket_total_.inc();
       return;
-    } else if (websocket_requested) {
+    } else if (upgrade_rejected) {
       // Do not allow WebSocket upgrades if the route does not support it.
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
       sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::Forbidden, "",
@@ -942,7 +942,12 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   if (connection_manager_.drain_state_ == DrainState::Closing &&
       connection_manager_.codec_->protocol() != Protocol::Http2) {
-    headers.insertConnection().value().setReference(Headers::get().ConnectionValues.Close);
+    // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
+    // Do not do this for H2 (which drains via GOAWA) or Upgrade (as the upgrade
+    // payload is no longer HTTP/1.1)
+    if (headers.Connection() == nullptr || headers.Connection()->value() != "Upgrade") {
+      headers.insertConnection().value().setReference(Headers::get().ConnectionValues.Close);
+    }
   }
 
   if (connection_manager_.config_.tracingConfig()) {
@@ -1118,8 +1123,22 @@ void ConnectionManagerImpl::ActiveStream::setBufferLimit(uint32_t new_limit) {
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::createFilterChain() {
+bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
+  bool upgrade_rejected = false;
+  auto upgrade = request_headers_->Upgrade();
+  if (upgrade != nullptr) {
+    if (connection_manager_.config_.filterFactory().createUpgradeFilterChain(
+            upgrade->value().c_str(), *this)) {
+      return true;
+    } else {
+      upgrade_rejected = true;
+      // Fall through to the default filter chain. The function calling this
+      // will send a local reply indicating that the upgrade failed.
+    }
+  }
+
   connection_manager_.config_.filterFactory().createFilterChain(*this);
+  return !upgrade_rejected;
 }
 
 void ConnectionManagerImpl::ActiveStreamFilterBase::commonContinue() {

@@ -390,7 +390,7 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& resp
   auto& config_dump_map = *(dump.mutable_configs());
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
-    RELEASE_ASSERT(message);
+    RELEASE_ASSERT(message, "");
     ProtobufWkt::Any any_message;
     any_message.PackFrom(*message);
     config_dump_map[key_callback_pair.first] = any_message;
@@ -842,7 +842,7 @@ void AdminFilter::onComplete() {
 
   Buffer::OwnedImpl response;
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
-  RELEASE_ASSERT(request_headers_);
+  RELEASE_ASSERT(request_headers_, "");
   Http::Code code = parent_.runCallback(path, *header_map, response, *this);
   populateFallbackResponseHeaders(code, *header_map);
   callbacks_->encodeHeaders(std::move(header_map),

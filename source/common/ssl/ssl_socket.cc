@@ -247,7 +247,7 @@ const std::string& SslSocket::sha256PeerCertificateDigest() const {
   std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
   unsigned int n;
   X509_digest(cert.get(), EVP_sha256(), computed_hash.data(), &n);
-  RELEASE_ASSERT(n == computed_hash.size());
+  RELEASE_ASSERT(n == computed_hash.size(), "");
   cached_sha_256_peer_certificate_digest_ = Hex::encode(computed_hash);
   return cached_sha_256_peer_certificate_digest_;
 }
@@ -263,11 +263,11 @@ const std::string& SslSocket::urlEncodedPemEncodedPeerCertificate() const {
   }
 
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-  RELEASE_ASSERT(buf != nullptr);
-  RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert.get()) == 1);
+  RELEASE_ASSERT(buf != nullptr, "");
+  RELEASE_ASSERT(PEM_write_bio_X509(buf.get(), cert.get()) == 1, "");
   const uint8_t* output;
   size_t length;
-  RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1);
+  RELEASE_ASSERT(BIO_mem_contents(buf.get(), &output, &length) == 1, "");
   absl::string_view pem(reinterpret_cast<const char*>(output), length);
   cached_url_encoded_pem_encoded_peer_certificate_ = absl::StrReplaceAll(
       pem, {{"\n", "%0A"}, {" ", "%20"}, {"+", "%2B"}, {"/", "%2F"}, {"=", "%3D"}});
@@ -350,7 +350,7 @@ std::string SslSocket::serialNumberPeerCertificate() const {
 
 std::string SslSocket::getSubjectFromCertificate(X509* cert) const {
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
-  RELEASE_ASSERT(buf != nullptr);
+  RELEASE_ASSERT(buf != nullptr, "");
 
   // flags=XN_FLAG_RFC2253 is the documented parameter for single-line output in RFC 2253 format.
   // Example from the RFC:

@@ -481,7 +481,7 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
 }
 
 HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(uint32_t priority) {
-  RELEASE_ASSERT(priority < original_priority_set_.hostSetsPerPriority().size());
+  RELEASE_ASSERT(priority < original_priority_set_.hostSetsPerPriority().size(), "");
   return HostSetImplPtr{
       new HostSubsetImpl(*original_priority_set_.hostSetsPerPriority()[priority])};
 }

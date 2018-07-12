@@ -759,9 +759,10 @@ Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
 
 int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   // The client code explicitly does not currently suport push promise.
-  RELEASE_ASSERT(frame->hd.type == NGHTTP2_HEADERS);
+  RELEASE_ASSERT(frame->hd.type == NGHTTP2_HEADERS, "");
   RELEASE_ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE ||
-                 frame->headers.cat == NGHTTP2_HCAT_HEADERS);
+                     frame->headers.cat == NGHTTP2_HCAT_HEADERS,
+                 "");
   if (frame->headers.cat == NGHTTP2_HCAT_HEADERS) {
     StreamImpl* stream = getStream(frame->hd.stream_id);
     ASSERT(!stream->headers_);

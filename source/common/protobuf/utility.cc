@@ -107,7 +107,7 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   ProtobufTypes::String json;
   const auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
   // This should always succeed unless something crash-worthy such as out-of-memory.
-  RELEASE_ASSERT(status.ok());
+  RELEASE_ASSERT(status.ok(), "");
   return json;
 }
 

@@ -17,9 +17,9 @@ class JitteredBackOffStrategy : public BackOffStrategy {
 
 public:
   /**
-   * Use this constructor if max_interval need to be enforced.
+   * Constructs fully jittered backoff strategy.
    * @param base_interval the base_interval to be used for next backoff computation.
-   * @param max_interval if the computed next backoff is more than this, this will be returned.
+   * @param max_interval the cap on the next backoff value.
    * @param random the random generator
    */
   JitteredBackOffStrategy(uint64_t base_interval, uint64_t max_interval,

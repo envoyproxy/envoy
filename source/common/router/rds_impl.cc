@@ -150,7 +150,7 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& ad
       admin.getConfigTracker().add("routes", [this] { return dumpRouteConfigs(); });
   // ConfigTracker keys must be unique. We are asserting that no one has stolen the "routes" key
   // from us, since the returned entry will be nullptr if the key already exists.
-  RELEASE_ASSERT(config_tracker_entry_);
+  RELEASE_ASSERT(config_tracker_entry_, "");
 }
 
 std::vector<RouteConfigProviderSharedPtr>
