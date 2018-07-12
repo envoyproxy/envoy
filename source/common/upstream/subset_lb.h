@@ -110,6 +110,7 @@ private:
 
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
   void refreshSubsets();
+  void refreshSubsets(uint32_t priority);
 
   // Called by HostSet::MemberUpdateCb
   void update(uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed);

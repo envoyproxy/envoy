@@ -45,7 +45,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
           // added or removed, we don't need to hit this path. That's fine, given that
           // findOrCreateSubset() will be called from processSubsets because it'll be triggered by
           // either hosts_added or hosts_removed. That's where the new subsets will be created.
-          refreshSubsets();
+          refreshSubsets(priority);
         } else {
           // This is a regular update with deltas.
           update(priority, hosts_added, hosts_removed);
@@ -59,6 +59,17 @@ void SubsetLoadBalancer::refreshSubsets() {
   for (auto& host_set : original_priority_set_.hostSetsPerPriority()) {
     update(host_set->priority(), host_set->hosts(), {});
   }
+}
+
+void SubsetLoadBalancer::refreshSubsets(uint32_t priority) {
+  const auto& host_sets = original_priority_set_.hostSetsPerPriority();
+
+  if (priority >= host_sets.size()) {
+    ENVOY_LOG(debug, "subset lb: refreshSubsets() called with unknown priority");
+    return;
+  }
+
+  update(priority, host_sets[priority]->hosts(), {});
 }
 
 HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) {
