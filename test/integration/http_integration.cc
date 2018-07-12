@@ -192,8 +192,9 @@ void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstre
 }
 
 IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
-    Http::TestHeaderMapImpl& request_headers, uint32_t request_body_size,
-    Http::TestHeaderMapImpl& response_headers, uint32_t response_size) {
+    const Http::TestHeaderMapImpl& request_headers, uint32_t request_body_size,
+    const Http::TestHeaderMapImpl& response_headers, uint32_t response_size) {
+  ASSERT(codec_client_ != nullptr);
   // Send the request to Envoy.
   IntegrationStreamDecoderPtr response;
   if (request_body_size) {
