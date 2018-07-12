@@ -439,19 +439,24 @@ message RouteAction {
     google.protobuf.Duration per_try_timeout = 3 [(gogoproto.stdduration) = true];
   }
 
-  // Specifies the idle timeout for the route. If not specified, there is no
-  // stream level timeout. This is distinct to :ref:`timeout
+  // Specifies the idle timeout for the route. If not specified, this defaults
+  // to 5 minutes. The default value was select so as not to interfere with any
+  // smaller configured timeouts that may have existed in configurations prior
+  // to the introduction of this feature, while introducing robustness to TCP
+  // connections that terminate without FIN.
+  //
+  // The idle timeout is distinct to :ref:`timeout
   // <envoy_api_field_route.RouteAction.timeout>`, which provides an upper bound
   // on the upstream response time; :ref:`idle_timeout
   // <envoy_api_field_route.RouteAction.idle_timeout>` instead bounds the amount
   // of time the request's stream may be idle.
   //
-  // After header decoding, and assuming that this is not a WebSocket upgrade,
-  // the idle timeout will apply on downstream and upstream request events. Each
-  // time an encode/decode event for headers or data is processed for the
-  // stream, the timer will be reset. If the timeout fires, the stream is
-  // terminated with a 408 Request Timeout error code if no upstream response
-  // header has been received, otherwise a stream reset occurs.
+  // After header decoding, the idle timeout will apply on downstream and
+  // upstream request events. Each time an encode/decode event for headers or
+  // data is processed for the stream, the timer will be reset. If the timeout
+  // fires, the stream is terminated with a 408 Request Timeout error code if no
+  // upstream response header has been received, otherwise a stream reset
+  // occurs.
   google.protobuf.Duration idle_timeout = 24
       [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
 

@@ -507,6 +507,9 @@ private:
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
+  // Default idle timeout is 5 minutes if nothing is specified in the route config.
+  static const uint64_t DEFAULT_ROUTE_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+
   std::unique_ptr<const CorsPolicyImpl> cors_policy_;
   const VirtualHostImpl& vhost_; // See note in RouteEntryImplBase::clusterEntry() on why raw ref
                                  // to virtual host is currently safe.

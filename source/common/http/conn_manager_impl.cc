@@ -398,6 +398,9 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
 
 void ConnectionManagerImpl::ActiveStream::resetIdleTimer() {
   if (idle_timer_ != nullptr) {
+    // TODO(htuch): If this shows up in performance profiles, optimize by only
+    // updating a timestamp here and doing periodic checks for idle timeouts
+    // instead, or reducing the accuracy of timers.
     idle_timer_->enableTimer(idle_timeout_ms_);
   }
 }
@@ -407,8 +410,8 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   // If headers have not been sent to the user, send a 408.
   if (response_headers_ != nullptr) {
     // TODO(htuch): We could send trailers here with an x-envoy timeout header
-    // or gRPC status code.
-    maybeEndEncode(true);
+    // or gRPC status code, and/or set H2 RST_STREAM error.
+    connection_manager_.doEndStream(*this);
   } else {
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Http::Code::RequestTimeout,
                    "stream timeout", nullptr);
@@ -878,6 +881,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     ActiveStreamEncoderFilter* filter, HeaderMap& headers) {
+  resetIdleTimer();
   ASSERT(connection_manager_.config_.proxy100Continue());
   // Make sure commonContinue continues encode100ContinueHeaders.
   has_continue_headers_ = true;
@@ -1077,6 +1081,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
 
 void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilter* filter,
                                                          HeaderMap& trailers) {
+  resetIdleTimer();
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, true);
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeTrailers));

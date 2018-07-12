@@ -159,11 +159,6 @@ protected:
   void testDrainClose();
   void testRetry();
   void testRetryHittingBufferLimit();
-  IntegrationStreamDecoderPtr setupPerStreamIdleTimeoutTest();
-  void testPerStreamIdleTimeoutBeforeUpstreamHeaders();
-  void testPerStreamIdleTimeoutAfterUpstreamHeaders();
-  void testPerStreamIdleTimeoutAfterData();
-  void testPerStreamIdleTimeoutRequestAndResponse();
   void testGrpcRouterNotFound();
   void testGrpcRetry();
   void testHittingDecoderFilterLimit();

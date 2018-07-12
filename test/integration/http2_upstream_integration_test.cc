@@ -60,22 +60,6 @@ TEST_P(Http2UpstreamIntegrationTest, TwoRequests) { testTwoRequests(); }
 
 TEST_P(Http2UpstreamIntegrationTest, Retry) { testRetry(); }
 
-TEST_P(Http2UpstreamIntegrationTest, PerStreamIdleTimeoutBeforeUpstreamHeaders) {
-  testPerStreamIdleTimeoutBeforeUpstreamHeaders();
-}
-
-TEST_P(Http2UpstreamIntegrationTest, PerStreamIdleTimeoutAfterUpstreamHeaders) {
-  testPerStreamIdleTimeoutAfterUpstreamHeaders();
-}
-
-TEST_P(Http2UpstreamIntegrationTest, PerStreamIdleTimeoutAfterData) {
-  testPerStreamIdleTimeoutAfterData();
-}
-
-TEST_P(Http2UpstreamIntegrationTest, PerStreamIdleTimeoutRequestAndResponse) {
-  testPerStreamIdleTimeoutRequestAndResponse();
-}
-
 TEST_P(Http2UpstreamIntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
 
 TEST_P(Http2UpstreamIntegrationTest, EnvoyHandlingDuplicate100Continue) {
