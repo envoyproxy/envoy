@@ -488,6 +488,78 @@ TEST_F(Http1ServerConnectionImplTest, RequestWithTrailers) {
   EXPECT_EQ(0U, buffer.length());
 }
 
+TEST_F(Http1ServerConnectionImplTest, UpgradeRequest) {
+  initialize();
+
+  InSequence sequence;
+  NiceMock<Http::MockStreamDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+
+  EXPECT_CALL(decoder, decodeHeaders_(_, false)).Times(1);
+  Buffer::OwnedImpl buffer(
+      "POST / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: foo\r\ncontent-length:5\r\n\r\n");
+  codec_->dispatch(buffer);
+
+  Buffer::OwnedImpl expected_data1("12345");
+  Buffer::OwnedImpl body("12345");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data1), false)).Times(1);
+  codec_->dispatch(body);
+
+  Buffer::OwnedImpl expected_data2("abcd");
+  Buffer::OwnedImpl websocket_payload("abcd");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data2), false)).Times(1);
+  codec_->dispatch(websocket_payload);
+}
+
+TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithEarlyData) {
+  initialize();
+
+  InSequence sequence;
+  NiceMock<Http::MockStreamDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl expected_data("12345abcd");
+  EXPECT_CALL(decoder, decodeHeaders_(_, false)).Times(1);
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: "
+                           "foo\r\ncontent-length:5\r\n\r\n12345abcd");
+  codec_->dispatch(buffer);
+}
+
+TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithTEChunked) {
+  initialize();
+
+  InSequence sequence;
+  NiceMock<Http::MockStreamDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+
+  // Even with T-E chunked, the data should neither be inspected for (the not
+  // present in this unit test) chunks, but simply passed through.
+  Buffer::OwnedImpl expected_data("12345abcd");
+  EXPECT_CALL(decoder, decodeHeaders_(_, false)).Times(1);
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: "
+                           "foo\r\ntransfer-encoding: chunked\r\n\r\n12345abcd");
+  codec_->dispatch(buffer);
+}
+
+TEST_F(Http1ServerConnectionImplTest, UpgradeRequestWithNoBody) {
+  initialize();
+
+  InSequence sequence;
+  NiceMock<Http::MockStreamDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_)).WillOnce(ReturnRef(decoder));
+
+  // Make sure we avoid the deferred_end_stream_headers_ optimization for
+  // requests-with-no-body.
+  Buffer::OwnedImpl expected_data("abcd");
+  EXPECT_CALL(decoder, decodeHeaders_(_, false)).Times(1);
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
+  Buffer::OwnedImpl buffer(
+      "GET / HTTP/1.1\r\nConnection: upgrade\r\nUpgrade: foo\r\ncontent-length: 0\r\n\r\nabcd");
+  codec_->dispatch(buffer);
+}
+
 TEST_F(Http1ServerConnectionImplTest, WatermarkTest) {
   EXPECT_CALL(connection_, bufferLimit()).Times(1).WillOnce(Return(10));
   initialize();
@@ -713,6 +785,56 @@ TEST_F(Http1ClientConnectionImplTest, GiantPath) {
 
   EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
   Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 20\r\n\r\n");
+  codec_->dispatch(response);
+}
+
+TEST_F(Http1ClientConnectionImplTest, UpgradeResponse) {
+  initialize();
+
+  InSequence s;
+
+  NiceMock<Http::MockStreamDecoder> response_decoder;
+  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  // Send upgrade headers
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  Buffer::OwnedImpl response(
+      "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: upgrade\r\nUpgrade: websocket\r\n\r\n");
+  codec_->dispatch(response);
+
+  // Send body payload
+  Buffer::OwnedImpl expected_data1("12345");
+  Buffer::OwnedImpl body("12345");
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data1), false)).Times(1);
+  codec_->dispatch(body);
+
+  // Send websocket payload
+  Buffer::OwnedImpl expected_data2("abcd");
+  Buffer::OwnedImpl websocket_payload("abcd");
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data2), false)).Times(1);
+  codec_->dispatch(websocket_payload);
+}
+
+// Same data as above, but make sure directDispatch immediately hands off any
+// outstanding data.
+TEST_F(Http1ClientConnectionImplTest, UpgradeResponseWithEarlyData) {
+  initialize();
+
+  InSequence s;
+
+  NiceMock<Http::MockStreamDecoder> response_decoder;
+  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {":authority", "host"}};
+  request_encoder.encodeHeaders(headers, true);
+
+  // Send upgrade headers
+  EXPECT_CALL(response_decoder, decodeHeaders_(_, false));
+  Buffer::OwnedImpl expected_data("12345abcd");
+  EXPECT_CALL(response_decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
+  Buffer::OwnedImpl response("HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: "
+                             "upgrade\r\nUpgrade: websocket\r\n\r\n12345abcd");
   codec_->dispatch(response);
 }
 
