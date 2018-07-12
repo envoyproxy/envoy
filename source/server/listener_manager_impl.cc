@@ -392,8 +392,7 @@ void ListenerImpl::finishFilterChain() {
                 {Network::Address::CidrRange::create(entry.first)}));
       }
     }
-    destination_ips_pair.second.reset(
-        new Network::LcTrie::LcTrie<ServerNamesMapSharedPtr>(list, true));
+    destination_ips_pair.second = std::make_unique<DestinationIPsTrie>(list, true);
   }
 }
 
