@@ -34,7 +34,7 @@ public:
 
   void initialize() override {
     setUpstreamCount(upstream_endpoints_);
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       // Setup hds and corresponding gRPC cluster.
       auto* hds_config = bootstrap.mutable_hds_config();
       hds_config->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
@@ -44,13 +44,8 @@ public:
       hds_cluster->mutable_circuit_breakers()->Clear();
       hds_cluster->set_name("hds_cluster");
       hds_cluster->mutable_http2_protocol_options();
-      // Switch predefined cluster_0 to EDS filesystem sourcing.
-      // TODO(lilika): Remove eds dependency
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       cluster_0->mutable_hosts()->Clear();
-      cluster_0->set_type(envoy::api::v2::Cluster::EDS);
-      auto* eds_cluster_config = cluster_0->mutable_eds_cluster_config();
-      eds_cluster_config->mutable_eds_config()->set_path(eds_helper_.eds_path());
     });
 
     HttpIntegrationTest::initialize();
@@ -109,7 +104,7 @@ public:
     return server_health_check_specifier;
   }
 
-  static constexpr uint32_t upstream_endpoints_ = 5;
+  static constexpr uint32_t upstream_endpoints_ = 0;
 
   IntegrationStreamDecoderPtr response_;
   std::string sub_zone_{"winter"};
@@ -119,7 +114,6 @@ public:
   FakeUpstream* host_upstream_{};
   FakeUpstream* service_upstream_[upstream_endpoints_]{};
   uint32_t hds_requests_{};
-  EdsHelper eds_helper_;
   FakeHttpConnectionPtr host_fake_connection;
   FakeStreamPtr host_stream;
 };
