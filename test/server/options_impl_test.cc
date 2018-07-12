@@ -60,12 +60,32 @@ TEST(OptionsImplTest, InvalidCommandLine) {
                           "Couldn't find match for argument");
 }
 
+TEST(OptionsImplTest, v2True) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl(
+      "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
+      "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
+      "--service-zone zone --file-flush-interval-msec 9000 --drain-time-s 60 --log-format [%v] "
+      "--parent-shutdown-time-s 90 --log-path /foo/bar --v2-config-only 1 --disable-hot-restart");
+  EXPECT_EQ(Server::Mode::Validate, options->mode());
+  EXPECT_TRUE(options->v2ConfigOnly());
+}
+
+TEST(OptionsImplTest, v2False) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl(
+      "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
+      "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
+      "--service-zone zone --file-flush-interval-msec 9000 --drain-time-s 60 --log-format [%v] "
+      "--parent-shutdown-time-s 90 --log-path /foo/bar --v2-config-only 0 --disable-hot-restart");
+  EXPECT_EQ(Server::Mode::Validate, options->mode());
+  EXPECT_FALSE(options->v2ConfigOnly());
+}
+
 TEST(OptionsImplTest, All) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
       "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
       "--service-zone zone --file-flush-interval-msec 9000 --drain-time-s 60 --log-format [%v] "
-      "--parent-shutdown-time-s 90 --log-path /foo/bar --v2-config-only --disable-hot-restart");
+      "--parent-shutdown-time-s 90 --log-path /foo/bar --v2-config-only 0 --disable-hot-restart");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());

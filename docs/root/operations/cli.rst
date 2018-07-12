@@ -32,11 +32,11 @@ following are the command line options that Envoy supports.
 
       ./envoy -c bootstrap.yaml --config-yaml "node: {id: 'node1'}"
 
-.. option:: --v2-config-only
+.. option:: --v2-config-only <bool>
 
   *(optional)* This flag determines whether the configuration file should only
   be parsed as a :ref:`v2 bootstrap configuration file
-  <config_overview_v2_bootstrap>`. If false (default), when a v2 bootstrap
+  <config_overview_v2_bootstrap>`. If false when a v2 bootstrap
   config parse fails, a second attempt to parse the config as a :ref:`v1 JSON
   configuration file <config_overview_v1>` will be made.
 
