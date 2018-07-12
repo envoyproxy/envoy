@@ -379,7 +379,7 @@ void ListenerImpl::finishFilterChain() {
     std::vector<std::pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>> list;
     for (const auto& entry : destination_ips_map) {
       std::vector<Network::Address::CidrRange> subnets;
-      if (entry.first == EMPTY_STRING) {
+      if (entry.first.empty()) {
         list.push_back(
             std::make_pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>(
                 std::make_shared<ServerNamesMap>(entry.second),
