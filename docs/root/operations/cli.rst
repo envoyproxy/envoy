@@ -44,6 +44,7 @@ following are the command line options that Envoy supports.
   <config_overview_v2_bootstrap>`. If specified when a v2 bootstrap
   config parse fails, a second attempt to parse the config as a :ref:`v1 JSON
   configuration file <config_overview_v1>` will be made.
+
 .. option:: --mode <string>
 
   *(optional)* One of the operating modes for Envoy:
