@@ -104,7 +104,7 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
       // We do not aply chunk encoding for HTTP upgrades.
       // If there is a body in a WebSocket Upgrade response, the chunks will be
       // passed through via maybeDirectDispatch so we need to avoid appending
-      // extra chunk boundaries endEncode.
+      // extra chunk boundaries.
       //
       // When sending a response to a HEAD request Envoy may send an informational
       // "Transfer-Encoding: chunked" header, but should not send a chunk encoded body.
