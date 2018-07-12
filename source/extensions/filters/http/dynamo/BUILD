@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # AWS DynamoDB L7 HTTP filter (observability): https://aws.amazon.com/dynamodb/
 # Public docs: docs/root/configuration/http_filters/dynamodb_filter.rst
 

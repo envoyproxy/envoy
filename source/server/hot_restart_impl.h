@@ -191,8 +191,8 @@ private:
 
   template <class rpc_class, RpcMessageType rpc_type> rpc_class* receiveTypedRpc() {
     RpcBase* base_message = receiveRpc(true);
-    RELEASE_ASSERT(base_message->length_ == sizeof(rpc_class));
-    RELEASE_ASSERT(base_message->type_ == rpc_type);
+    RELEASE_ASSERT(base_message->length_ == sizeof(rpc_class), "");
+    RELEASE_ASSERT(base_message->type_ == rpc_type, "");
     return reinterpret_cast<rpc_class*>(base_message);
   }
 

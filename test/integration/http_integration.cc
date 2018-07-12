@@ -65,7 +65,7 @@ typeToCodecType(Http::CodecClient::Type type) {
     return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
         HTTP2;
   default:
-    RELEASE_ASSERT(0);
+    RELEASE_ASSERT(0, "");
   }
 }
 
@@ -214,12 +214,16 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
 }
 
 void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
-  if (codec_client_) {
-    codec_client_->close();
-  }
+  // Close the upstream connection first. If there's an outstanding request,
+  // closing the client may result in a FIN being sent upstream, and FakeConnectionBase::close
+  // will interpret that as an unexpected disconnect. The codec client is not
+  // subject to the same failure mode.
   if (fake_upstream_connection_) {
     fake_upstream_connection_->close();
     fake_upstream_connection_->waitForDisconnect();
+  }
+  if (codec_client_) {
+    codec_client_->close();
   }
 }
 

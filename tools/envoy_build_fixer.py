@@ -10,14 +10,20 @@ ENVOY_PACKAGE_STRING = (
     '\n'
     'envoy_package()\n')
 
-
 def FixBuild(path):
   with open(path, 'r') as f:
     outlines = [LICENSE_STRING]
+    first = True
     in_load = False
     seen_ebs = False
     seen_epkg = False
     for line in f:
+      if line.startswith('licenses'):
+        continue
+      if first:
+        if line != '\n':
+          outlines.append('\n')
+        first = False
       if line.startswith('package(') and not path.endswith(
           'bazel/BUILD') and not path.endswith(
           'ci/prebuilt/BUILD') and not path.endswith(
@@ -41,8 +47,7 @@ def FixBuild(path):
             outlines.append(line)
             outlines.append(ENVOY_PACKAGE_STRING)
             continue
-      if not line.startswith('licenses'):
-        outlines.append(line)
+      outlines.append(line)
 
   return ''.join(outlines)
 

@@ -248,7 +248,7 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
 }
 
 bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host) {
-  const envoy::api::v2::core::Metadata& host_metadata = host.metadata();
+  const envoy::api::v2::core::Metadata& host_metadata = *host.metadata();
 
   for (const auto& kv : kvs) {
     const ProtobufWkt::Value& host_value = Config::Metadata::metadataValue(
@@ -269,7 +269,7 @@ SubsetLoadBalancer::extractSubsetMetadata(const std::set<std::string>& subset_ke
                                           const Host& host) {
   SubsetMetadata kvs;
 
-  const envoy::api::v2::core::Metadata& metadata = host.metadata();
+  const envoy::api::v2::core::Metadata& metadata = *host.metadata();
   const auto& filter_it = metadata.filter_metadata().find(Config::MetadataFilters::get().ENVOY_LB);
   if (filter_it == metadata.filter_metadata().end()) {
     return kvs;
@@ -481,7 +481,7 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
 }
 
 HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(uint32_t priority) {
-  RELEASE_ASSERT(priority < original_priority_set_.hostSetsPerPriority().size());
+  RELEASE_ASSERT(priority < original_priority_set_.hostSetsPerPriority().size(), "");
   return HostSetImplPtr{
       new HostSubsetImpl(*original_priority_set_.hostSetsPerPriority()[priority])};
 }

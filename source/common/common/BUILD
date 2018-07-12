@@ -23,6 +23,7 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         "//include/envoy/common:backoff_strategy_interface",
+        "//include/envoy/runtime:runtime_interface",
     ],
 )
 

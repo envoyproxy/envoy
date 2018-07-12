@@ -41,7 +41,7 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
 MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
-  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors());
+  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
 
   switch (options_.mode()) {
   case Server::Mode::InitOnly:

@@ -368,11 +368,11 @@ void Http2IntegrationTest::simultaneousRequest(int32_t request1_bytes, int32_t r
   EXPECT_EQ(request2_bytes, response1->body().size());
 
   // Cleanup both downstream and upstream
-  codec_client_->close();
   fake_upstream_connection1->close();
   fake_upstream_connection1->waitForDisconnect();
   fake_upstream_connection2->close();
   fake_upstream_connection2->waitForDisconnect();
+  codec_client_->close();
 }
 
 TEST_P(Http2IntegrationTest, SimultaneousRequest) { simultaneousRequest(1024, 512); }
