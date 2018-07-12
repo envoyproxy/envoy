@@ -350,7 +350,7 @@ private:
                                              const std::vector<std::string>& application_protocols,
                                              const Network::FilterChainSharedPtr& filter_chain);
 
-  void finishFilterChain();
+  void convertDestinationIPsMapToTrie();
 
   const Network::FilterChain*
   findFilterChainForDestinationIP(const DestinationIPsTrie& destination_ips_trie,

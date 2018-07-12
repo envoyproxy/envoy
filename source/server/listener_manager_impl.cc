@@ -252,7 +252,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   }
 
   // Convert DestinationIPsMap to DestinationIPsTrie for faster lookups.
-  finishFilterChain();
+  convertDestinationIPsMapToTrie();
 
   // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
   if (need_tls_inspector) {
@@ -372,7 +372,7 @@ void ListenerImpl::addFilterChainForApplicationProtocols(
   }
 }
 
-void ListenerImpl::finishFilterChain() {
+void ListenerImpl::convertDestinationIPsMapToTrie() {
   for (auto& port : destination_ports_map_) {
     auto& destination_ips_pair = port.second;
     auto& destination_ips_map = destination_ips_pair.first;
