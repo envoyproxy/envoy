@@ -221,7 +221,7 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
   //
   // Note, note, note: if metadata for existing endpoints changed _and_ hosts were also added
   // or removed, we don't need to hit this path. That's fine, given that findOrCreateSubset()
-  // will be called from processSubsets because it'll be trigger by either hosts_added or
+  // will be called from processSubsets because it'll be triggered by either hosts_added or
   // hosts_removed. That's where the new subsets will be created.
   //
   // Finally, if metadata changed hosts will be regrouped into their new subsets from
