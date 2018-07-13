@@ -134,6 +134,31 @@ public:
     host_set.healthy_hosts_per_locality_ = host_set.hosts_per_locality_;
   }
 
+  void configureWeightedHostSet(const HostURLMetadataMap& first_locality_host_metadata,
+                                const HostURLMetadataMap& second_locality_host_metadata,
+                                MockHostSet& host_set, LocalityWeights locality_weights) {
+    HostVector first_locality;
+    HostVector all_hosts;
+    for (const auto& it : first_locality_host_metadata) {
+      auto host = makeHost(it.first, it.second);
+      first_locality.emplace_back(host);
+      all_hosts.emplace_back(host);
+    }
+
+    HostVector second_locality;
+    for (const auto& it : second_locality_host_metadata) {
+      auto host = makeHost(it.first, it.second);
+      second_locality.emplace_back(host);
+      all_hosts.emplace_back(host);
+    }
+
+    host_set.hosts_ = all_hosts;
+    host_set.hosts_per_locality_ = makeHostsPerLocality({first_locality, second_locality});
+    host_set.healthy_hosts_ = host_set.hosts_;
+    host_set.healthy_hosts_per_locality_ = host_set.hosts_per_locality_;
+    host_set.locality_weights_ = std::make_shared<const LocalityWeights>(locality_weights);
+  }
+
   void init(const HostURLMetadataMap& host_metadata) {
     HostURLMetadataMap failover;
     init(host_metadata, failover);
@@ -1351,6 +1376,61 @@ TEST_F(SubsetLoadBalancerTest, DescribeMetadata) {
   tester.test("x=\"abc\", y=100", {{"x", str_value}, {"y", num_value}});
   tester.test("y=100, x=\"abc\"", {{"y", num_value}, {"x", str_value}});
   tester.test("<no metadata>", {});
+}
+
+TEST_F(SubsetLoadBalancerTest, DisabledLocalityWeightAwareness) {
+  EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
+
+  // We configure a weighted host set that heavily favors the second locality.
+  configureWeightedHostSet(
+      {
+          {"tcp://127.0.0.1:80", {{"version", "1.0"}}},
+          {"tcp://127.0.0.1:81", {{"version", "1.1"}}},
+      },
+      {
+          {"tcp://127.0.0.1:82", {{"version", "1.0"}}},
+          {"tcp://127.0.0.1:83", {{"version", "1.1"}}},
+          {"tcp://127.0.0.1:84", {{"version", "1.0"}}},
+          {"tcp://127.0.0.1:85", {{"version", "1.1"}}},
+      },
+      host_set_, {1, 100});
+
+  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
+                                   subset_info_, ring_hash_lb_config_, common_config_));
+
+  TestLoadBalancerContext context({{"version", "1.1"}});
+
+  // Since we don't respect locality weights, the first locality is selected.
+  EXPECT_CALL(random_, random()).WillOnce(Return(0));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(&context));
+}
+
+TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
+  EXPECT_CALL(subset_info_, isEnabled()).WillRepeatedly(Return(true));
+  EXPECT_CALL(subset_info_, localityWeightAware()).WillRepeatedly(Return(true));
+
+  // We configure a weighted host set that heavily favors the second locality.
+  configureWeightedHostSet(
+      {
+          {"tcp://127.0.0.1:80", {{"version", "1.0"}}},
+          {"tcp://127.0.0.1:81", {{"version", "1.1"}}},
+      },
+      {
+          {"tcp://127.0.0.1:82", {{"version", "1.0"}}},
+          {"tcp://127.0.0.1:83", {{"version", "1.1"}}},
+          {"tcp://127.0.0.1:84", {{"version", "1.0"}}},
+          {"tcp://127.0.0.1:85", {{"version", "1.1"}}},
+      },
+      host_set_, {1, 100});
+
+  lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
+                                   subset_info_, ring_hash_lb_config_, common_config_));
+
+  TestLoadBalancerContext context({{"version", "1.1"}});
+
+  // Since we respect locality weights, the second locality is selected.
+  EXPECT_CALL(random_, random()).WillOnce(Return(0));
+  EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(&context));
 }
 
 INSTANTIATE_TEST_CASE_P(UpdateOrderings, SubsetLoadBalancerTest,
