@@ -696,6 +696,7 @@ void PriorityStateManager::updateClusterPrioritySet(
   LocalityWeightsMap empty_locality_map;
   LocalityWeightsMap& locality_weights_map =
       priority_state_.empty() ? empty_locality_map : priority_state_[priority].second;
+  ASSERT(priority_state_.empty() || priority_state_.size() > priority);
   LocalityWeightsSharedPtr locality_weights;
   std::vector<HostVector> per_locality;
 
