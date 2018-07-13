@@ -274,7 +274,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       route_action_response_headers_parser_(
           HeaderParser::configure(route.route().response_headers_to_add(),
                                   route.route().response_headers_to_remove())),
-      request_headers_parser_(HeaderParser::configure(route.route().request_headers_to_add())),
+      request_headers_parser_(HeaderParser::configure(route.request_headers_to_add())),
       response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
                                                        route.response_headers_to_remove())),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
@@ -373,10 +373,11 @@ Http::WebSocketProxyPtr RouteEntryImplBase::createWebSocketProxy(
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
                                                 const RequestInfo::RequestInfo& request_info,
                                                 bool insert_envoy_original_path) const {
-  // Append user-specified request headers in the following order: route-level headers,
-  // virtual host level headers and finally global connection manager level headers.
-  request_headers_parser_->evaluateHeaders(headers, request_info);
+  // Append user-specified request headers in the following order: route-action-level headers,
+  // route-level headers, virtual host level headers and finally global connection manager level
+  // headers.
   route_action_request_headers_parser_->evaluateHeaders(headers, request_info);
+  request_headers_parser_->evaluateHeaders(headers, request_info);
   vhost_.requestHeaderParser().evaluateHeaders(headers, request_info);
   vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, request_info);
   if (!host_rewrite_.empty()) {
@@ -391,6 +392,9 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
 
 void RouteEntryImplBase::finalizeResponseHeaders(
     Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
+  // Append user-specified response headers in the following order: route-action-level headers,
+  // route-level headers, virtual host level headers and finally global connection manager level
+  // headers.
   route_action_response_headers_parser_->evaluateHeaders(headers, request_info);
   response_headers_parser_->evaluateHeaders(headers, request_info);
   vhost_.responseHeaderParser().evaluateHeaders(headers, request_info);
