@@ -660,8 +660,8 @@ TEST(RouteMatcherTest, TestAddRemoveRequestHeaders) {
   }
 }
 
-// Validates behavior of request_headers_to_add at router, vhost, and route action levels when
-// append is disabled.
+// Validates behavior of request_headers_to_add at router, vhost, route, and route action levels
+// when append is disabled.
 TEST(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalse) {
   std::string yaml = R"EOF(
 name: foo
@@ -679,20 +679,28 @@ virtual_hosts:
         append: false
     routes:
       - match: { prefix: "/endpoint" }
+        request_headers_to_add:
+          - header:
+              key: x-route-header
+              value: route-endpoint
+            append: false
         route:
           cluster: www2
           request_headers_to_add:
             - header:
                 key: x-global-header
-                value: route-endpoint
+                value: route-action-endpoint
               append: false
             - header:
                 key: x-vhost-header
-                value: route-endpoint
+                value: route-action-endpoint
               append: false
             - header:
+                key: x-route-header
+                value: route-action-endpoint
+            - header:
                 key: x-route-action-header
-                value: route-endpoint
+                value: route-action-endpoint
               append: false
       - match: { prefix: "/" }
         route: { cluster: www2 }
@@ -712,14 +720,15 @@ request_headers_to_add:
 
   // Request header manipulation testing.
   {
-    // Global and virtual host override route.
+    // Global and virtual host override route, route overrides route action.
     {
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/endpoint", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
       route->finalizeRequestHeaders(headers, request_info, true);
       EXPECT_EQ("global", headers.get_("x-global-header"));
       EXPECT_EQ("vhost-www2", headers.get_("x-vhost-header"));
-      EXPECT_EQ("route-endpoint", headers.get_("x-route-action-header"));
+      EXPECT_EQ("route-endpoint", headers.get_("x-route-header"));
+      EXPECT_EQ("route-action-endpoint", headers.get_("x-route-action-header"));
     }
 
     // Global overrides virtual host.
