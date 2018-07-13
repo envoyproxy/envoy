@@ -744,8 +744,16 @@ void HttpIntegrationTest::testHittingDecoderFilterLimit() {
                                          1024 * 65);
 
   response->waitForEndStream();
-  ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("413", response->headers().Status()->value().c_str());
+  // With HTTP/1 there's a possible race where if the connection backs up early,
+  // the 413-and-connection-close may be sent while the body is still being
+  // sent, resulting in a write error and the connection being closed before the
+  // response is read.
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
+    ASSERT_TRUE(response->complete());
+  }
+  if (response->complete()) {
+    EXPECT_STREQ("413", response->headers().Status()->value().c_str());
+  }
 }
 
 // Test hitting the dynamo filter with too many response bytes to buffer. Given the request headers
@@ -768,8 +776,11 @@ void HttpIntegrationTest::testHittingEncoderFilterLimit() {
   // Send the respone headers.
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
 
-  // Now send an overly large response body.
+  // Now send an overly large response body. At some point, too much data will
+  // be buffered, the stream will be reset, and the connection will disconnect.
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   upstream_request_->encodeData(1024 * 65, false);
+  fake_upstream_connection_->waitForDisconnect();
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
@@ -1449,7 +1460,6 @@ void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
 }
 
 void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_size) {
-  config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
   Http::TestHeaderMapImpl request_trailers{{"request1", "trailer1"}, {"request2", "trailer2"}};
   Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"response2", "trailer2"}};
 

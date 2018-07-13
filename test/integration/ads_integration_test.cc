@@ -59,20 +59,47 @@ admin:
       port_value: 0
 )EOF";
 
-class AdsIntegrationTest : public HttpIntegrationTest, public Grpc::GrpcClientIntegrationParamTest {
+class AdsIntegrationBaseTest : public HttpIntegrationTest {
 public:
-  AdsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
+  AdsIntegrationBaseTest(Http::CodecClient::Type downstream_protocol,
+                         Network::Address::IpVersion version,
+                         const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
+      : HttpIntegrationTest(downstream_protocol, version, config) {}
 
-  void TearDown() override {
+  void createAdsConnection(FakeUpstream& upstream) {
+    ads_upstream_ = &upstream;
+    ads_connection_ = ads_upstream_->waitForHttpConnection(*dispatcher_);
+  }
+
+  void cleanUpAdsConnection() {
+    ASSERT(ads_upstream_ != nullptr);
+
+    // Don't ASSERT fail if an ADS reconnect ends up unparented.
+    ads_upstream_->set_allow_unexpected_disconnects(true);
     ads_connection_->close();
     ads_connection_->waitForDisconnect();
     ads_connection_.reset();
+  }
+
+protected:
+  FakeHttpConnectionPtr ads_connection_;
+  FakeUpstream* ads_upstream_{};
+};
+
+class AdsIntegrationTest : public AdsIntegrationBaseTest,
+                           public Grpc::GrpcClientIntegrationParamTest {
+public:
+  AdsIntegrationTest()
+      : AdsIntegrationBaseTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
+
+  void TearDown() override {
+    cleanUpAdsConnection();
     test_server_.reset();
     fake_upstreams_.clear();
   }
 
   void createUpstreams() override {
-    HttpIntegrationTest::createUpstreams();
+    AdsIntegrationBaseTest::createUpstreams();
     fake_upstreams_.emplace_back(
         new FakeUpstream(createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP2, version_));
   }
@@ -236,9 +263,9 @@ public:
       }
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    HttpIntegrationTest::initialize();
+    AdsIntegrationBaseTest::initialize();
     if (ads_stream_ == nullptr) {
-      ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
+      createAdsConnection(*(fake_upstreams_[1]));
       ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
       ads_stream_->startGrpcStream();
     }
@@ -265,7 +292,6 @@ public:
   Secret::MockSecretManager secret_manager_;
   Runtime::MockLoader runtime_;
   Ssl::ContextManagerImpl context_manager_{runtime_};
-  FakeHttpConnectionPtr ads_connection_;
   FakeStreamPtr ads_stream_;
 };
 
@@ -445,22 +471,20 @@ TEST_P(AdsIntegrationTest, Failure) {
   makeSingleRequest();
 }
 
-class AdsFailIntegrationTest : public HttpIntegrationTest,
+class AdsFailIntegrationTest : public AdsIntegrationBaseTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 public:
   AdsFailIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
+      : AdsIntegrationBaseTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
 
   void TearDown() override {
-    ads_connection_->close();
-    ads_connection_->waitForDisconnect();
-    ads_connection_.reset();
+    cleanUpAdsConnection();
     test_server_.reset();
     fake_upstreams_.clear();
   }
 
   void createUpstreams() override {
-    HttpIntegrationTest::createUpstreams();
+    AdsIntegrationBaseTest::createUpstreams();
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
   }
 
@@ -474,10 +498,9 @@ public:
       ads_cluster->set_name("ads_cluster");
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    HttpIntegrationTest::initialize();
+    AdsIntegrationBaseTest::initialize();
   }
 
-  FakeHttpConnectionPtr ads_connection_;
   FakeStreamPtr ads_stream_;
 };
 
@@ -487,28 +510,26 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsFailIntegrationTest,
 // Validate that we don't crash on failed ADS stream.
 TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
   initialize();
-  ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
+  createAdsConnection(*fake_upstreams_[1]);
   ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
   ads_stream_->startGrpcStream();
   ads_stream_->finishGrpcStream(Grpc::Status::Internal);
 }
 
-class AdsConfigIntegrationTest : public HttpIntegrationTest,
+class AdsConfigIntegrationTest : public AdsIntegrationBaseTest,
                                  public Grpc::GrpcClientIntegrationParamTest {
 public:
   AdsConfigIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
+      : AdsIntegrationBaseTest(Http::CodecClient::Type::HTTP2, ipVersion(), config) {}
 
   void TearDown() override {
-    ads_connection_->close();
-    ads_connection_->waitForDisconnect();
-    ads_connection_.reset();
+    cleanUpAdsConnection();
     test_server_.reset();
     fake_upstreams_.clear();
   }
 
   void createUpstreams() override {
-    HttpIntegrationTest::createUpstreams();
+    AdsIntegrationBaseTest::createUpstreams();
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
   }
 
@@ -530,10 +551,9 @@ public:
       eds_config->mutable_ads();
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
-    HttpIntegrationTest::initialize();
+    AdsIntegrationBaseTest::initialize();
   }
 
-  FakeHttpConnectionPtr ads_connection_;
   FakeStreamPtr ads_stream_;
 };
 
@@ -543,7 +563,7 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsConfigIntegrationTest,
 // This is s regression validating that we don't crash on EDS static Cluster that uses ADS.
 TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {
   initialize();
-  ads_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
+  createAdsConnection(*fake_upstreams_[1]);
   ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
   ads_stream_->startGrpcStream();
   ads_stream_->finishGrpcStream(Grpc::Status::Ok);
@@ -564,7 +584,7 @@ TEST_P(AdsIntegrationTest, XdsBatching) {
   });
 
   pre_worker_start_test_steps_ = [this]() {
-    ads_connection_ = fake_upstreams_.back()->waitForHttpConnection(*dispatcher_);
+    createAdsConnection(*fake_upstreams_.back());
     ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
     ads_stream_->startGrpcStream();
 
