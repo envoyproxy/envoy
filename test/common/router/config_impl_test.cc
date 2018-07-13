@@ -681,6 +681,14 @@ virtual_hosts:
       - match: { prefix: "/endpoint" }
         request_headers_to_add:
           - header:
+              key: x-global-header
+              value: route-endpoint
+            append: false
+          - header:
+              key: x-vhost-header
+              value: route-endpoint
+            append: false
+          - header:
               key: x-route-header
               value: route-endpoint
             append: false
