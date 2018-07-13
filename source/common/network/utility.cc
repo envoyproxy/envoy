@@ -308,14 +308,14 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
     return nullptr;
   }
 
-  if ( socket_domain == AF_INET ) {
+  if (socket_domain == AF_INET) {
     status = os_syscalls.getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
-  } else if ( socket_domain == AF_INET6 ){
+  } else if (socket_domain == AF_INET6) {
     status = os_syscalls.getsockopt(fd, SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len);
   } else {
     return nullptr;
   }
-  
+
   if (status != 0) {
     return nullptr;
   }
