@@ -128,7 +128,7 @@ Tracing::SpanPtr OpenTracingSpan::spawnChild(const Tracing::Config&, const std::
                                              SystemTime start_time) {
   std::unique_ptr<opentracing::Span> ot_span = span_->tracer().StartSpan(
       name, {opentracing::ChildOf(&span_->context()), opentracing::StartTimestamp(start_time)});
-  RELEASE_ASSERT(ot_span != nullptr);
+  RELEASE_ASSERT(ot_span != nullptr, "");
   return Tracing::SpanPtr{new OpenTracingSpan{driver_, std::move(ot_span)}};
 }
 
@@ -183,7 +183,7 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
     options.tags.emplace_back(opentracing::ext::sampling_priority, 0);
   }
   active_span = tracer.StartSpanWithOptions(operation_name, options);
-  RELEASE_ASSERT(active_span != nullptr);
+  RELEASE_ASSERT(active_span != nullptr, "");
   active_span->SetTag(opentracing::ext::span_kind,
                       config.operationName() == Tracing::OperationName::Egress
                           ? opentracing::ext::span_kind_rpc_client

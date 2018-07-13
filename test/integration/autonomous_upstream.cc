@@ -9,7 +9,8 @@ void HeaderToInt(const char header_name[], int32_t& return_int, Http::TestHeader
   if (!header_value.empty()) {
     uint64_t parsed_value;
     RELEASE_ASSERT(StringUtil::atoul(header_value.c_str(), parsed_value, 10) &&
-                   parsed_value < std::numeric_limits<int32_t>::max());
+                       parsed_value < std::numeric_limits<int32_t>::max(),
+                   "");
     return_int = parsed_value;
   }
 }
@@ -22,7 +23,7 @@ const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset_after_request";
 
 // For now, assert all streams which are started are completed.
 // Support for incomplete streams can be added when needed.
-AutonomousStream::~AutonomousStream() { RELEASE_ASSERT(complete()); }
+AutonomousStream::~AutonomousStream() { RELEASE_ASSERT(complete(), ""); }
 
 // By default, automatically send a response when the request is complete.
 void AutonomousStream::setEndStream(bool end_stream) {

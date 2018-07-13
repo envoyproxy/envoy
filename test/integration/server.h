@@ -219,7 +219,7 @@ public:
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
   Server::InstanceImpl& server() {
-    RELEASE_ASSERT(server_ != nullptr);
+    RELEASE_ASSERT(server_ != nullptr, "");
     return *server_;
   }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {

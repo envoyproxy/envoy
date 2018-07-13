@@ -643,6 +643,114 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries)};
 }
 
+PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
+                                           const LocalInfo::LocalInfo& local_info)
+    : parent_(cluster), local_info_node_(local_info.node()) {}
+
+void PriorityStateManager::initializePriorityFor(
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint) {
+  const uint32_t priority = locality_lb_endpoint.priority();
+  if (priority_state_.size() <= priority) {
+    priority_state_.resize(priority + 1);
+  }
+  if (priority_state_[priority].first == nullptr) {
+    priority_state_[priority].first.reset(new HostVector());
+  }
+  if (locality_lb_endpoint.has_locality() && locality_lb_endpoint.has_load_balancing_weight()) {
+    priority_state_[priority].second[locality_lb_endpoint.locality()] =
+        locality_lb_endpoint.load_balancing_weight().value();
+  }
+}
+
+void PriorityStateManager::registerHostForPriority(
+    const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
+    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
+    const Upstream::Host::HealthFlag health_checker_flag) {
+  const uint32_t priority = locality_lb_endpoint.priority();
+  // Should be called after initializePriorityFor.
+  ASSERT(priority_state_[priority].first);
+  priority_state_[priority].first->emplace_back(
+      new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
+                   lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
+                   lb_endpoint.endpoint().health_check_config()));
+
+  const auto& health_status = lb_endpoint.health_status();
+  if (health_status == envoy::api::v2::core::HealthStatus::UNHEALTHY ||
+      health_status == envoy::api::v2::core::HealthStatus::DRAINING ||
+      health_status == envoy::api::v2::core::HealthStatus::TIMEOUT) {
+    priority_state_[priority].first->back()->healthFlagSet(health_checker_flag);
+  }
+}
+
+void PriorityStateManager::updateClusterPrioritySet(
+    const uint32_t priority, HostVectorSharedPtr&& current_hosts,
+    const absl::optional<HostVector>& hosts_added,
+    const absl::optional<HostVector>& hosts_removed) {
+  // If local locality is not defined then skip populating per locality hosts.
+  const auto& local_locality = local_info_node_.locality();
+  ENVOY_LOG(trace, "Local locality: {}", local_locality.DebugString());
+
+  // For non-EDS, most likely the current hosts are from priority_state_[priority].first.
+  HostVectorSharedPtr hosts(std::move(current_hosts));
+  LocalityWeightsMap empty_locality_map;
+  LocalityWeightsMap& locality_weights_map =
+      priority_state_.empty() ? empty_locality_map : priority_state_[priority].second;
+  LocalityWeightsSharedPtr locality_weights;
+  std::vector<HostVector> per_locality;
+
+  // If we are configured for locality weighted LB we populate the locality weights.
+  const bool locality_weighted_lb = parent_.info()->lbConfig().has_locality_weighted_lb_config();
+  if (locality_weighted_lb) {
+    locality_weights = std::make_shared<LocalityWeights>();
+  }
+
+  // We use std::map to guarantee a stable ordering for zone aware routing.
+  std::map<envoy::api::v2::core::Locality, HostVector, LocalityLess> hosts_per_locality;
+
+  for (const HostSharedPtr& host : *hosts) {
+    // TODO(dio): Take into consideration when a non-EDS cluster has active health checking, i.e. to
+    // mark all the hosts unhealthy (host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC)) and
+    // then fire update callbacks to start the health checking process.
+    hosts_per_locality[host->locality()].push_back(host);
+  }
+
+  // Do we have hosts for the local locality?
+  const bool non_empty_local_locality =
+      local_info_node_.has_locality() &&
+      hosts_per_locality.find(local_locality) != hosts_per_locality.end();
+
+  // As per HostsPerLocality::get(), the per_locality vector must have the local locality hosts
+  // first if non_empty_local_locality.
+  if (non_empty_local_locality) {
+    per_locality.emplace_back(hosts_per_locality[local_locality]);
+    if (locality_weighted_lb) {
+      locality_weights->emplace_back(locality_weights_map[local_locality]);
+    }
+  }
+
+  // After the local locality hosts (if any), we place the remaining locality host groups in
+  // lexicographic order. This provides a stable ordering for zone aware routing.
+  for (auto& entry : hosts_per_locality) {
+    if (!non_empty_local_locality || !LocalityEqualTo()(local_locality, entry.first)) {
+      per_locality.emplace_back(entry.second);
+      if (locality_weighted_lb) {
+        locality_weights->emplace_back(locality_weights_map[entry.first]);
+      }
+    }
+  }
+
+  auto per_locality_shared =
+      std::make_shared<HostsPerLocalityImpl>(std::move(per_locality), non_empty_local_locality);
+
+  auto& host_set =
+      static_cast<PrioritySetImpl&>(parent_.prioritySet()).getOrCreateHostSet(priority);
+  host_set.updateHosts(hosts, ClusterImplBase::createHealthyHostList(*hosts), per_locality_shared,
+                       ClusterImplBase::createHealthyHostLists(*per_locality_shared),
+                       std::move(locality_weights), hosts_added.value_or(*hosts),
+                       hosts_removed.value_or<HostVector>({}));
+}
+
 StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,

@@ -140,10 +140,13 @@ public:
 
   void TearDown() override {
     if (eds_connection_ != nullptr) {
+      // Don't ASSERT fail if an EDS reconnect ends up unparented.
+      fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
       eds_connection_->close();
       eds_connection_->waitForDisconnect();
       eds_connection_.reset();
     }
+    cleanupUpstreamAndDownstream();
     test_server_.reset();
     fake_upstream_connection_.reset();
     fake_upstreams_.clear();
@@ -353,13 +356,8 @@ protected:
                       Http::TestHeaderMapImpl&& response_headers,
                       Http::TestHeaderMapImpl&& expected_response_headers) {
     registerTestServerPorts({"http"});
-
     codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
-    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
-    waitForNextUpstreamRequest();
-
-    upstream_request_->encodeHeaders(response_headers, true);
-    response->waitForEndStream();
+    auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 0);
 
     compareHeaders(upstream_request_->headers(), expected_request_headers);
     compareHeaders(response->headers(), expected_response_headers);

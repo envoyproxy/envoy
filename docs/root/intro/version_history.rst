@@ -10,11 +10,15 @@ Version history
 * grpc-json: added support for building HTTP response from
   `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
 * config: v1 disabled by default. v1 support remains available until October via flipping --v2-config-only=false.
+* config: v1 disabled by default. v1 support remains available until October via setting :option:`--allow-deprecated-v1-api`.
 * health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
 * health check: added support for :ref:`specifying jitter as a percentage <envoy_api_field_core.HealthCheck.interval_jitter_percent>`.
 * health_check: added support for :ref:`health check event logging <arch_overview_health_check_logging>`.
 * http: better handling of HEAD requests. Now sending transfer-encoding: chunked rather than content-length: 0.
 * http: response filters not applied to early error paths such as http_parser generated 400s.
+* proxy_protocol: added support for HAProxy Proxy Protocol v2 (AF_INET/AF_INET6 only).
+* http: added generic +:ref:`Upgrade support 
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`
 * lua: added :ref:`connection() <config_http_filters_lua_connection_wrapper>` wrapper and *ssl()* API.
 * lua: added :ref:`requestInfo() <config_http_filters_lua_request_info_wrapper>` wrapper and *protocol()* API.
 * ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`.

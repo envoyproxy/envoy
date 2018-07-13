@@ -155,6 +155,8 @@ public:
   uint32_t bufferLimit() { return connection_.bufferLimit(); }
   virtual bool supports_http_10() { return false; }
 
+  bool maybeDirectDispatch(Buffer::Instance& data);
+
 protected:
   ConnectionImpl(Network::Connection& connection, http_parser_type type);
 
@@ -164,6 +166,7 @@ protected:
   http_parser parser_;
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
+  bool handling_upgrade_{};
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -226,6 +229,7 @@ private:
   /**
    * Called when the request/response is complete.
    */
+  void onMessageCompleteBase();
   virtual void onMessageComplete() PURE;
 
   /**
