@@ -577,13 +577,10 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutput) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_.encodeData(*response_data, false));
 
-  const std::string response_html = response_data->toString();
-
-  EXPECT_EQ("text/html", response_headers.get_("content-type"));
-  EXPECT_EQ("<h1>Hello, world!</h1>", response_html);
+  EXPECT_EQ(response.content_type(), response_headers.get_("content-type"));
+  EXPECT_EQ(response.data(), response_data->toString());
 
   Http::TestHeaderMapImpl response_trailers{{"grpc-status", "0"}, {"grpc-message", ""}};
-
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(response_trailers));
 }
 
@@ -624,13 +621,10 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutputAndSpli
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_.encodeData(*response_data, false));
 
-  const std::string response_html = response_data->toString();
-
-  EXPECT_EQ("text/html", response_headers.get_("content-type"));
-  EXPECT_EQ("<h1>Hello, world!</h1>", response_html);
+  EXPECT_EQ(response.content_type(), response_headers.get_("content-type"));
+  EXPECT_EQ(response.data(), response_data->toString());
 
   Http::TestHeaderMapImpl response_trailers{{"grpc-status", "0"}, {"grpc-message", ""}};
-
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(response_trailers));
 }
 
