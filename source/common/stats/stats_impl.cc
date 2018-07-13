@@ -139,7 +139,7 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
   uint64_t num_bytes_to_allocate = RawStatData::structSize(name.size());
   RawStatData* data = static_cast<RawStatData*>(::calloc(num_bytes_to_allocate, 1));
   if (data == nullptr) {
-    throw EnvoyException("HeapRawStatDataAllocator: unable to allocate a new stat");
+    throw std::bad_alloc();
   }
   data->checkAndInit(name, num_bytes_to_allocate);
 
