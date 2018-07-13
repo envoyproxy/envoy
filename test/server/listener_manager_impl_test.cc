@@ -1903,7 +1903,7 @@ class OriginalDstTestFilterIPv6
     : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
   Network::Address::InstanceConstSharedPtr getOriginalDst(int) override {
     return Network::Address::InstanceConstSharedPtr{
-        new Network::Address::Ipv6Instance("::0002", 2345)};
+        new Network::Address::Ipv6Instance("1::2", 2345)};
   }
 };
 
@@ -1982,7 +1982,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
 
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
   EXPECT_TRUE(socket.localAddressRestored());
-  EXPECT_EQ("[::2]:2345", socket.localAddress()->asString());
+  EXPECT_EQ("[1::2]:2345", socket.localAddress()->asString());
   EXPECT_NE(fd, -1);
 }
 
