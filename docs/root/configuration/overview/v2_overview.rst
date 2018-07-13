@@ -37,12 +37,9 @@ flag, i.e.:
 
 .. code-block:: console
 
-  ./envoy -c <path to config>.{json,yaml,pb,pb_text} --v2-config-only
+  ./envoy -c <path to config>.{json,yaml,pb,pb_text}
 
-where the extension reflects the underlying v2 config representation. The
-:option:`--v2-config-only` flag is not strictly required as Envoy will attempt
-to autodetect the config file version, but this option provides an enhanced
-debug experience when configuration parsing fails.
+where the extension reflects the underlying v2 config representation.
 
 The :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` message is the root of the
 configuration. A key concept in the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>`
