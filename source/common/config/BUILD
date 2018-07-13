@@ -242,6 +242,7 @@ envoy_cc_library(
     hdrs = ["protobuf_link_hacks.h"],
     deps = [
         "@envoy_api//envoy/service/discovery/v2:ads_cc",
+        "@envoy_api//envoy/service/discovery/v2:sds_cc",
         "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
     ],
 )
