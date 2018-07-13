@@ -386,7 +386,7 @@ private:
   // the coroutine holds a reference to the stream wrapper. I'm not completely sure why this is,
   // but I think it is because the yield happens via a stream handle method, so the runtime must
   // hold a reference so that it can return out of the yield through the object. So now we hold
-  // the coroutine references at the same level as the steam handles so that when the filter is
+  // the coroutine references at the same level as the stream handles so that when the filter is
   // destroyed the circular reference is broken and both objects are cleaned up.
   //
   // Note that the above explanation probably means that we don't need to hold a reference to the
