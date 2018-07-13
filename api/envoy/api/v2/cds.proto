@@ -345,6 +345,18 @@ message Cluster {
     // weighted cluster contains the same keys and values as the subset's
     // metadata. The same host may appear in multiple subsets.
     repeated LbSubsetSelector subset_selectors = 3;
+
+    // If true, routing to subsets will take into account the localities and locality weights of the
+    // endpoints when making the routing decision.
+    //
+    // There are some potential pitfalls associated with enabling this feature, as the resulting
+    // traffic split after applying both a subset match and locality weights might be undesirable.
+    //
+    // Consider for example a situation in which you have 50/50 split across two localities X/Y
+    // which have 100 hosts each without subsetting. If the subset LB results in X having only 1
+    // host selected but Y having 100, then a lot more load is being dumped on the single host in X
+    // than originally anticipated in the load balancing assignment delivered via EDS.
+    bool locality_weight_aware = 4;
   }
 
   // Configuration for load balancing subsetting.

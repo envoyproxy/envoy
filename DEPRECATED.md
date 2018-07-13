@@ -17,6 +17,7 @@ A logged warning is expected for each deprecated item that is in deprecation win
   Prior to 1.8.0, Envoy can use either proto to send client requests to a ratelimit server with the use of the
   `use_data_plane_proto` boolean flag in the [ratelimit configuration](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/ratelimit/v2/rls.proto).
   However, when using the deprecated client a warning is logged.
+* Use of the --v2-config-only flag.
 
 ## Version 1.7.0
 

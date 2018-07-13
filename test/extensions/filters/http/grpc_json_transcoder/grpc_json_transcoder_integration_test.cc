@@ -172,6 +172,17 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGet) {
       R"({"shelves":[{"id":"20","theme":"Children"},{"id":"1","theme":"Foo"}]})");
 }
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetHttpBody) {
+  testTranscoding<Empty, google::api::HttpBody>(
+      Http::TestHeaderMapImpl{{":method", "GET"}, {":path", "/index"}, {":authority", "host"}}, "",
+      {""}, {R"(content_type: "text/html" data: "<h1>Hello!</h1>" )"}, Status(),
+      Http::TestHeaderMapImpl{{":status", "200"},
+                              {"content-type", "text/html"},
+                              {"content-length", "15"},
+                              {"grpc-status", "0"}},
+      R"(<h1>Hello!</h1>)");
+}
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGetError) {
   testTranscoding<bookstore::GetShelfRequest, bookstore::Shelf>(
       Http::TestHeaderMapImpl{

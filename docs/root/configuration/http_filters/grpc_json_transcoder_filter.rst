@@ -62,3 +62,16 @@ match the incoming request path, set `match_incoming_request_route` to true.
       };
     }
   }
+
+Sending arbitrary content
+-------------------------
+
+By default, when transcoding occurs, gRPC-JSON encodes the message output of a gRPC service method into
+JSON and sets the HTTP response `Content-Type` header to `application/json`. To send abritrary content,
+a gRPC service method can use
+`google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_
+as its output message type. The implementation needs to set
+`content_type <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto#L68>`_
+(which sets the value of the HTTP response `Content-Type` header) and
+`data <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto#L71>`_
+(which sets the HTTP response body) accordingly.

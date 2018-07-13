@@ -20,11 +20,11 @@ envoy_cc_library(
         "path_matcher",
         "grpc_transcoding",
         "http_api_protos",
+        "api_httpbody_protos",
     ],
     deps = [
         ":transcoder_input_stream_lib",
         "//include/envoy/http:filter_interface",
-        "//source/common/common:base64_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
