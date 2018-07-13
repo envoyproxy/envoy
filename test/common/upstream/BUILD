@@ -30,6 +30,7 @@ envoy_cc_test(
     srcs = ["cluster_manager_impl_test.cc"],
     deps = [
         ":utility_lib",
+        "//include/envoy/stats:stats_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/config:bootstrap_json_lib",
         "//source/common/config:utility_lib",
@@ -337,9 +338,11 @@ envoy_cc_test_library(
     name = "utility_lib",
     hdrs = ["utility.h"],
     deps = [
+        "//include/envoy/stats:stats_interface",
         "//source/common/config:cds_json_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
+        "//source/common/stats:stats_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
     ],

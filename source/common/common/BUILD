@@ -235,6 +235,8 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         ":logger_lib",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/stats:stats_lib",
     ],
 )
 

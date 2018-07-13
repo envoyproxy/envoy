@@ -16,10 +16,11 @@ LdsSubscription::LdsSubscription(Config::SubscriptionStats stats,
                                  const envoy::api::v2::core::ConfigSource& lds_config,
                                  Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
                                  Runtime::RandomGenerator& random,
-                                 const LocalInfo::LocalInfo& local_info)
+                                 const LocalInfo::LocalInfo& local_info,
+                                 const Stats::StatsOptions& stats_options)
     : RestApiFetcher(cm, lds_config.api_config_source().cluster_names()[0], dispatcher, random,
                      Config::Utility::apiConfigSourceRefreshDelay(lds_config.api_config_source())),
-      local_info_(local_info), stats_(stats) {
+      local_info_(local_info), stats_(stats), stats_options_(stats_options) {
   const auto& api_config_source = lds_config.api_config_source();
   UNREFERENCED_PARAMETER(lds_config);
   // If we are building an LdsSubscription, the ConfigSource should be REST_LEGACY.
@@ -48,7 +49,7 @@ void LdsSubscription::parseResponse(const Http::Message& response) {
 
   Protobuf::RepeatedPtrField<envoy::api::v2::Listener> resources;
   for (const Json::ObjectSharedPtr& json_listener : json_listeners) {
-    Config::LdsJson::translateListener(*json_listener, *resources.Add());
+    Config::LdsJson::translateListener(*json_listener, *resources.Add(), stats_options_);
   }
 
   std::pair<std::string, uint64_t> hash =

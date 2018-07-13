@@ -5,10 +5,12 @@
 #include <utility>
 
 #include "envoy/common/exception.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
+#include "common/stats/stats_impl.h"
 
 #include "absl/strings/string_view.h"
 
@@ -57,21 +59,24 @@ public:
 
   /**
    * Constructs a map control structure given a set of options, which cannot be changed.
-   * @param options describes the parameters comtrolling set layout.
+   * @param hash_set_options describes the parameters comtrolling set layout.
    * @param init true if the memory should be initialized on construction. If false,
    *             the data in the table will be sanity checked, and an exception thrown if
    *             it is incoherent or mismatches the passed-in options.
    * @param memory the memory buffer for the set data.
+   * @param stats_options a reference to the top-level StatsOptions struct containing
+   *                      information about max allowable stat name lengths.
    *
    * Note that no locking of any kind is done by this class; this must be done at the
    * call-site to support concurrent access.
    */
-  BlockMemoryHashSet(const BlockMemoryHashSetOptions& options, bool init, uint8_t* memory)
-      : cells_(nullptr), control_(nullptr), slots_(nullptr) {
-    mapMemorySegments(options, memory);
+  BlockMemoryHashSet(const BlockMemoryHashSetOptions& hash_set_options, bool init, uint8_t* memory,
+                     const Stats::StatsOptions& stats_options)
+      : cells_(nullptr), control_(nullptr), slots_(nullptr), stats_options_(stats_options) {
+    mapMemorySegments(hash_set_options, memory);
     if (init) {
-      initialize(options);
-    } else if (!attach(options)) {
+      initialize(hash_set_options);
+    } else if (!attach(hash_set_options)) {
       throw EnvoyException("BlockMemoryHashSet: Incompatible memory block");
     }
   }
@@ -82,22 +87,20 @@ public:
    * backing-store (eg) in memory, which we do after
    * constructing the object with the desired sizing.
    */
-  static uint64_t numBytes(const BlockMemoryHashSetOptions& options) {
-    uint64_t size =
-        cellOffset(options.capacity) + sizeof(Control) + options.num_slots * sizeof(uint32_t);
+  static uint64_t numBytes(const BlockMemoryHashSetOptions& hash_set_options,
+                           const Stats::StatsOptions& stats_options) {
+    uint64_t size = cellOffset(hash_set_options.capacity, stats_options) + sizeof(Control) +
+                    hash_set_options.num_slots * sizeof(uint32_t);
     return align(size);
   }
 
-  uint64_t numBytes() const { return numBytes(control_->options); }
-
-  /**
-   * Returns the options structure that was used to construct the set.
-   */
-  const BlockMemoryHashSetOptions& options() const { return control_->options; }
+  uint64_t numBytes(const Stats::StatsOptions& stats_options) const {
+    return numBytes(control_->hash_set_options, stats_options);
+  }
 
   /** Examines the data structures to see if they are sane, assert-failing on any trouble. */
   void sanityCheck() {
-    RELEASE_ASSERT(control_->size <= control_->options.capacity, "");
+    RELEASE_ASSERT(control_->size <= control_->hash_set_options.capacity, "");
 
     // As a sanity check, make sure there are control_->size values
     // reachable from the slots, each of which has a valid
@@ -107,11 +110,11 @@ public:
     // slot. Note that the num_values message will be emitted outside
     // the loop.
     uint32_t num_values = 0;
-    for (uint32_t slot = 0; slot < control_->options.num_slots; ++slot) {
+    for (uint32_t slot = 0; slot < control_->hash_set_options.num_slots; ++slot) {
       uint32_t next = 0; // initialized to silence compilers.
       for (uint32_t cell_index = slots_[slot];
            (cell_index != Sentinal) && (num_values <= control_->size); cell_index = next) {
-        RELEASE_ASSERT(cell_index < control_->options.capacity, "");
+        RELEASE_ASSERT(cell_index < control_->hash_set_options.capacity, "");
         Cell& cell = getCell(cell_index);
         absl::string_view key = cell.value.key();
         RELEASE_ASSERT(computeSlot(key) == slot, "");
@@ -122,7 +125,7 @@ public:
     RELEASE_ASSERT(num_values == control_->size, "");
 
     uint32_t num_free_entries = 0;
-    uint32_t expected_free_entries = control_->options.capacity - control_->size;
+    uint32_t expected_free_entries = control_->hash_set_options.capacity - control_->size;
 
     // Don't infinite-loop with a corruption; break when we see there's a problem.
     for (uint32_t cell_index = control_->free_cell_index;
@@ -152,7 +155,7 @@ public:
     if (value != nullptr) {
       return ValueCreatedPair(value, false);
     }
-    if (control_->size >= control_->options.capacity) {
+    if (control_->size >= control_->hash_set_options.capacity) {
       return ValueCreatedPair(nullptr, false);
     }
     const uint32_t slot = computeSlot(key);
@@ -162,7 +165,7 @@ public:
     cell.next_cell_index = slots_[slot];
     slots_[slot] = cell_index;
     value = &cell.value;
-    value->initialize(key);
+    value->truncateAndInit(key, stats_options_);
     ++control_->size;
     return ValueCreatedPair(value, true);
   }
@@ -215,9 +218,9 @@ public:
   /**
    * Computes a version signature based on the options and the hash function.
    */
-  std::string version() {
-    return fmt::format("options={} hash={} size={}", control_->options.toString(),
-                       control_->hash_signature, numBytes());
+  std::string version(const Stats::StatsOptions& stats_options) {
+    return fmt::format("options={} hash={} size={}", control_->hash_set_options.toString(),
+                       control_->hash_signature, numBytes(stats_options));
   }
 
 private:
@@ -228,20 +231,20 @@ private:
    * coming in.
    * @param memory
    */
-  void initialize(const BlockMemoryHashSetOptions& options) {
+  void initialize(const BlockMemoryHashSetOptions& hash_set_options) {
     control_->hash_signature = Value::hash(signatureStringToHash());
-    control_->num_bytes = numBytes(options);
-    control_->options = options;
+    control_->num_bytes = numBytes(hash_set_options, stats_options_);
+    control_->hash_set_options = hash_set_options;
     control_->size = 0;
     control_->free_cell_index = 0;
 
     // Initialize all the slots;
-    for (uint32_t slot = 0; slot < options.num_slots; ++slot) {
+    for (uint32_t slot = 0; slot < hash_set_options.num_slots; ++slot) {
       slots_[slot] = Sentinal;
     }
 
     // Initialize the free-cell list.
-    const uint32_t last_cell = options.capacity - 1;
+    const uint32_t last_cell = hash_set_options.capacity - 1;
     for (uint32_t cell_index = 0; cell_index < last_cell; ++cell_index) {
       Cell& cell = getCell(cell_index);
       cell.next_cell_index = cell_index + 1;
@@ -254,10 +257,10 @@ private:
    * sanity check to make sure the options copied to the provided memory match, and also
    * that the slot, cell, and key-string structures look sane.
    */
-  bool attach(const BlockMemoryHashSetOptions& options) {
-    if (numBytes(options) != control_->num_bytes) {
-      ENVOY_LOG(error, "BlockMemoryHashSet unexpected memory size {} != {}", numBytes(options),
-                control_->num_bytes);
+  bool attach(const BlockMemoryHashSetOptions& hash_set_options) {
+    if (numBytes(hash_set_options, stats_options_) != control_->num_bytes) {
+      ENVOY_LOG(error, "BlockMemoryHashSet unexpected memory size {} != {}",
+                numBytes(hash_set_options, stats_options_), control_->num_bytes);
       return false;
     }
     if (Value::hash(signatureStringToHash()) != control_->hash_signature) {
@@ -269,7 +272,7 @@ private:
   }
 
   uint32_t computeSlot(absl::string_view key) {
-    return Value::hash(key) % control_->options.num_slots;
+    return Value::hash(key) % control_->hash_set_options.num_slots;
   }
 
   /**
@@ -290,11 +293,11 @@ private:
    * Represents control-values for the hash-table.
    */
   struct Control {
-    BlockMemoryHashSetOptions options; // Options established at map construction time.
-    uint64_t hash_signature;           // Hash of a constant signature string.
-    uint64_t num_bytes;                // Bytes allocated on behalf of the map.
-    uint32_t size;                     // Number of values currently stored.
-    uint32_t free_cell_index;          // Offset of first free cell.
+    BlockMemoryHashSetOptions hash_set_options; // Options established at map construction time.
+    uint64_t hash_signature;                    // Hash of a constant signature string.
+    uint64_t num_bytes;                         // Bytes allocated on behalf of the map.
+    uint32_t size;                              // Number of values currently stored.
+    uint32_t free_cell_index;                   // Offset of first free cell.
   };
 
   /**
@@ -323,10 +326,11 @@ private:
    * simply an array index because we don't know the size of a key at
    * compile-time.
    */
-  static uint64_t cellOffset(uint32_t cell_index) {
+  static uint64_t cellOffset(uint32_t cell_index, const Stats::StatsOptions& stats_options) {
     // sizeof(Cell) includes 'sizeof Value' which may not be accurate. So we need to
     // subtract that off, and add the template method's view of the actual value-size.
-    uint64_t cell_size = align(sizeof(Cell) + Value::size() - sizeof(Value));
+    uint64_t cell_size =
+        align(sizeof(Cell) + Value::structSizeWithOptions(stats_options) - sizeof(Value));
     return cell_index * cell_size;
   }
 
@@ -335,17 +339,17 @@ private:
    */
   Cell& getCell(uint32_t cell_index) {
     // Because the key-size is parameteriziable, an array-lookup on sizeof(Cell) does not work.
-    char* ptr = reinterpret_cast<char*>(cells_) + cellOffset(cell_index);
+    char* ptr = reinterpret_cast<char*>(cells_) + cellOffset(cell_index, stats_options_);
     RELEASE_ASSERT((reinterpret_cast<uint64_t>(ptr) & (calculateAlignment() - 1)) == 0, "");
     return *reinterpret_cast<Cell*>(ptr);
   }
 
   /** Maps out the segments of memory for us to work with. */
-  void mapMemorySegments(const BlockMemoryHashSetOptions& options, uint8_t* memory) {
+  void mapMemorySegments(const BlockMemoryHashSetOptions& hash_set_options, uint8_t* memory) {
     // Note that we are not examining or mutating memory here, just looking at the pointer,
     // so we don't need to hold any locks.
     cells_ = reinterpret_cast<Cell*>(memory); // First because Value may need to be aligned.
-    memory += cellOffset(options.capacity);
+    memory += cellOffset(hash_set_options.capacity, stats_options_);
     control_ = reinterpret_cast<Control*>(memory);
     memory += sizeof(Control);
     slots_ = reinterpret_cast<uint32_t*>(memory);
@@ -356,6 +360,7 @@ private:
   Cell* cells_;
   Control* control_;
   uint32_t* slots_;
+  const Stats::StatsOptions& stats_options_;
 };
 
 } // namespace Envoy
