@@ -271,9 +271,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route().weighted_clusters(), total_weight, 100UL)),
       route_action_request_headers_parser_(
           HeaderParser::configure(route.route().request_headers_to_add())),
-      route_action_response_headers_parser_(
-          HeaderParser::configure(route.route().response_headers_to_add(),
-                                  route.route().response_headers_to_remove())),
+      route_action_response_headers_parser_(HeaderParser::configure(
+          route.route().response_headers_to_add(), route.route().response_headers_to_remove())),
       request_headers_parser_(HeaderParser::configure(route.request_headers_to_add())),
       response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
                                                        route.response_headers_to_remove())),

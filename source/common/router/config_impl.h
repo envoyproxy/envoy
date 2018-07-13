@@ -359,7 +359,9 @@ protected:
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path,
                           bool insert_envoy_original_path) const;
   const HeaderParser& requestHeaderParser() const { return *route_action_request_headers_parser_; };
-  const HeaderParser& responseHeaderParser() const { return *route_action_response_headers_parser_; };
+  const HeaderParser& responseHeaderParser() const {
+    return *route_action_response_headers_parser_;
+  };
 
 private:
   struct RuntimeData {
