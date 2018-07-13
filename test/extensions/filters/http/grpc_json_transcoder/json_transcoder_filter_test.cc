@@ -610,21 +610,21 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutputAndSpli
   response.set_data("<h1>Hello, world!</h1>");
 
   auto response_data = Grpc::Common::serializeBody(response);
-  EXPECT_EQ(40, response_data->length());
 
-  // The response data buffer is splitted into two parts.
-  std::array<char, 20> out;
-  Buffer::OwnedImpl part1;
-  response_data->copyOut(0, 20, out.data());
-  part1.add(std::string(out.begin(), out.end()));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(part1, false));
+  // Firstly, the response data buffer is splitted into two parts.
+  Buffer::OwnedImpl response_data_first_part;
+  response_data_first_part.move(*response_data, response_data->length() / 2);
 
-  Buffer::OwnedImpl part2;
-  response_data->copyOut(20, 20, out.data());
-  part2.add(std::string(out.begin(), out.end()));
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_.encodeData(part2, false));
+  // Secondly, we send the first part of response data to the data encoding step.
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
+            filter_.encodeData(response_data_first_part, false));
 
-  const std::string response_html = part2.toString();
+  // Finaly, since half of the response data buffer is moved already, here we can send the rest
+  // of it to the next data encoding step.
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
+            filter_.encodeData(*response_data, false));
+
+  const std::string response_html = response_data->toString();
 
   EXPECT_EQ("text/html", response_headers.get_("content-type"));
   EXPECT_EQ("<h1>Hello, world!</h1>", response_html);
