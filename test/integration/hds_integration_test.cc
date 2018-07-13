@@ -49,8 +49,7 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    hds_upstream_ = fake_upstreams_[0].get();
-    host_upstream_ = new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_);
+    host_upstream_.reset(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
   }
 
   void waitForHdsStream() {
@@ -111,8 +110,7 @@ public:
   FakeHttpConnectionPtr hds_fake_connection_;
   FakeStreamPtr hds_stream_;
   FakeUpstream* hds_upstream_{};
-  FakeUpstream* host_upstream_{};
-  FakeUpstream* service_upstream_[upstream_endpoints_]{};
+  FakeUpstreamPtr host_upstream_{};
   uint32_t hds_requests_{};
   FakeHttpConnectionPtr host_fake_connection_;
   FakeStreamPtr host_stream;
@@ -127,6 +125,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthy) {
 
   // Messages
   envoy::service::discovery::v2::HealthCheckRequest envoy_msg;
+  envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse response;
   envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier =
       makeHealthCheckSpecifier();
 
@@ -152,6 +151,10 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthy) {
   // Endpoint reponds to the healthcheck
   host_stream->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   host_stream->encodeData(1024, true);
+  hds_stream_->waitForGrpcMessage(*dispatcher_, response);
+  EXPECT_EQ(
+      envoy::api::v2::core::HealthStatus::HEALTHY,
+      response.mutable_endpoint_health_response()->mutable_endpoints_health(0)->health_status());
   test_server_->waitForCounterGe("cluster.anna.health_check.success", 1);
 
   // Clean up connections
@@ -160,7 +163,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthy) {
   cleanupHdsConnection();
 
   EXPECT_EQ(1, test_server_->counter("hds_delegate.requests")->value());
-  EXPECT_EQ(1, test_server_->counter("hds_delegate.responses")->value());
+  EXPECT_EQ(2, test_server_->counter("hds_delegate.responses")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.anna.health_check.success")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.anna.health_check.failure")->value());
 }
@@ -170,6 +173,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthy) {
 
   // Messages
   envoy::service::discovery::v2::HealthCheckRequest envoy_msg;
+  envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse response;
   envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier =
       makeHealthCheckSpecifier();
 
@@ -195,6 +199,10 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthy) {
   // Endpoint reponds to the healthcheck
   host_stream->encodeHeaders(Http::TestHeaderMapImpl{{":status", "404"}}, false);
   host_stream->encodeData(1024, true);
+  hds_stream_->waitForGrpcMessage(*dispatcher_, response);
+  EXPECT_EQ(
+      envoy::api::v2::core::HealthStatus::UNHEALTHY,
+      response.mutable_endpoint_health_response()->mutable_endpoints_health(0)->health_status());
   test_server_->waitForCounterGe("cluster.anna.health_check.failure", 1);
 
   // Clean up connections
@@ -203,7 +211,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthy) {
   cleanupHdsConnection();
 
   EXPECT_EQ(1, test_server_->counter("hds_delegate.requests")->value());
-  EXPECT_EQ(1, test_server_->counter("hds_delegate.responses")->value());
+  EXPECT_EQ(2, test_server_->counter("hds_delegate.responses")->value());
   EXPECT_EQ(0, test_server_->counter("cluster.anna.health_check.success")->value());
   EXPECT_EQ(1, test_server_->counter("cluster.anna.health_check.failure")->value());
 }

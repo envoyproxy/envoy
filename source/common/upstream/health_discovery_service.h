@@ -93,7 +93,7 @@ public:
       std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) override;
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
-
+  void sendResponse();
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_DELAY_MS = 5000;
 

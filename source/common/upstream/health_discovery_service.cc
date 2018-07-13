@@ -51,6 +51,29 @@ void HdsDelegate::handleFailure() {
   setRetryTimer();
 }
 
+void HdsDelegate::sendResponse() {
+  envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse response;
+  for (const auto& hosts : cluster_->prioritySet().hostSetsPerPriority()) {
+    for (const auto& host : hosts->hosts()) {
+      auto* endpoint = response.mutable_endpoint_health_response()->add_endpoints_health();
+      auto address = host->address()->asString();
+      endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
+          address.substr(0, address.find_last_of(":")));
+      endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
+          stoul(address.substr(address.find_last_of(":") + 1, address.length() - 1)));
+      if (host->healthy()) {
+        endpoint->set_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
+      } else {
+        endpoint->set_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
+      }
+    }
+  }
+
+  ENVOY_LOG(debug, "Sending EndpointHealthResponse to server {}", response.DebugString());
+  stream_->sendMessage(response, false);
+  stats_.responses_.inc();
+}
+
 void HdsDelegate::onCreateInitialMetadata(Http::HeaderMap& metadata) {
   UNREFERENCED_PARAMETER(metadata);
 }
@@ -102,6 +125,8 @@ void HdsDelegate::onReceiveMessage(
   // Initializing Cluster & HealthChecker
   cluster_->setHealthChecker(health_checker_ptr);
   cluster_->initialize([] {});
+  health_checker_ptr->addHostCheckCompleteCb(
+      [this](HostSharedPtr, HealthTransition) -> void { sendResponse(); });
 }
 
 void HdsDelegate::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
