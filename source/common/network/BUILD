@@ -226,6 +226,7 @@ envoy_cc_library(
         ":address_lib",
         "//include/envoy/network:connection_interface",
         "//include/envoy/stats:stats_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf",
