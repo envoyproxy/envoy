@@ -483,6 +483,23 @@ def _com_github_grpc_grpc():
         actual = "@envoy//bazel:grpc_health_proto",
     )
 
+    # cc_proto_library via pgv_cc_proto_library requires these binds
+    # Once https://github.com/bazelbuild/bazel/issues/1943 is fixed, we can just call grpc_deps()
+    native.bind(
+        name = "grpc_lib",
+        actual = "@com_github_grpc_grpc//:grpc++",
+    )
+
+    native.bind(
+        name = "grpc_cpp_plugin",
+        actual = "@com_github_grpc_grpc//:grpc_cpp_plugin",
+    )
+
+    native.bind(
+        name = "protobuf_clib",
+        actual = "@com_google_protobuf//:protoc_lib",
+    )
+
 def _com_github_google_jwt_verify():
     _repository_impl("com_github_google_jwt_verify")
 
