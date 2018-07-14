@@ -41,6 +41,7 @@ envoy_cc_binary(
         "//source/common/config:bootstrap_json_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:stats_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
 )

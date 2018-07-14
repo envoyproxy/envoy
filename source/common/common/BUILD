@@ -23,6 +23,7 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         "//include/envoy/common:backoff_strategy_interface",
+        "//include/envoy/runtime:runtime_interface",
     ],
 )
 
@@ -234,6 +235,8 @@ envoy_cc_library(
     deps = [
         ":assert_lib",
         ":logger_lib",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/stats:stats_lib",
     ],
 )
 

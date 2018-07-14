@@ -8,6 +8,8 @@ A logged warning is expected for each deprecated item that is in deprecation win
 
 ## Version 1.8.0 (pending)
 
+* Use of the v1 API is deprecated. See envoy-announce
+  [email](https://groups.google.com/forum/#!topic/envoy-announce/oPnYMZw8H4U).
 * Use of the legacy 
   [ratelimit.proto](https://github.com/envoyproxy/envoy/blob/b0a518d064c8255e0e20557a8f909b6ff457558f/source/common/ratelimit/ratelimit.proto)
   is deprecated, in favor of the proto defined in
@@ -15,6 +17,7 @@ A logged warning is expected for each deprecated item that is in deprecation win
   Prior to 1.8.0, Envoy can use either proto to send client requests to a ratelimit server with the use of the
   `use_data_plane_proto` boolean flag in the [ratelimit configuration](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/ratelimit/v2/rls.proto).
   However, when using the deprecated client a warning is logged.
+* Use of the --v2-config-only flag.
 
 ## Version 1.7.0
 

@@ -20,8 +20,9 @@ envoy_proto_library(
     name = "bookstore_proto",
     srcs = [":bookstore.proto"],
     external_deps = [
-        "well_known_protos",
+        "api_httpbody_protos",
         "http_api_protos",
+        "well_known_protos",
     ],
 )
 
@@ -32,6 +33,7 @@ envoy_proto_descriptor(
     ],
     out = "bookstore.descriptor",
     external_deps = [
+        "api_httpbody_protos",
         "http_api_protos",
         "well_known_protos",
     ],

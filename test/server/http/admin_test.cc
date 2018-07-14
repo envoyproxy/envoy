@@ -53,7 +53,7 @@ public:
     }));
 
     EXPECT_CALL(*this, alloc("stats.overflow"));
-    store_.reset(new Stats::ThreadLocalStoreImpl(*this));
+    store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_, *this);
     store_->addSink(sink_);
   }
 
@@ -71,6 +71,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::TestAllocator alloc_;
   Stats::MockSink sink_;
+  Stats::StatsOptionsImpl options_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
 };
 
@@ -817,13 +818,12 @@ TEST_F(PrometheusStatsFormatterTest, MetricName) {
 }
 
 TEST_F(PrometheusStatsFormatterTest, FormattedTags) {
-  // If value has - then it should be replaced by _ .
   std::vector<Stats::Tag> tags;
   Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};
-  Stats::Tag tag2 = {"another_tag_name", "another.tag-value"};
+  Stats::Tag tag2 = {"another_tag_name", "another_tag-value"};
   tags.push_back(tag1);
   tags.push_back(tag2);
-  std::string expected = "a_tag_name=\"a_tag_value\",another_tag_name=\"another_tag_value\"";
+  std::string expected = "a_tag_name=\"a.tag-value\",another_tag_name=\"another_tag-value\"";
   auto actual = PrometheusStatsFormatter::formattedTags(tags);
   EXPECT_EQ(expected, actual);
 }

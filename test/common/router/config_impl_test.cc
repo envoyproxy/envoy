@@ -47,7 +47,9 @@ Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& p
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromJson(const std::string& json_string) {
   envoy::api::v2::RouteConfiguration route_config;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config);
+  Stats::StatsOptionsImpl stats_options;
+  Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config,
+                                                      stats_options);
   return route_config;
 }
 
@@ -1074,7 +1076,7 @@ virtual_hosts:
           prefix: "/"
           headers:
             - name: test_header
-              value: "(+not a regex)"
+              exact_match: "(+not a regex)"
         route: { cluster: "local_service" }
   )EOF";
 
@@ -1087,8 +1089,7 @@ virtual_hosts:
           prefix: "/"
           headers:
             - name: test_header
-              value: "(+invalid regex)"
-              regex: true
+              regex_match: "(+invalid regex)"
         route: { cluster: "local_service" }
   )EOF";
 

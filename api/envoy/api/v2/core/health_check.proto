@@ -33,8 +33,16 @@ message HealthCheck {
   ];
 
   // An optional jitter amount in millseconds. If specified, during every
-  // internal Envoy will add 0 to interval_jitter to the wait time.
+  // interval Envoy will add 0 to interval_jitter to the wait time.
   google.protobuf.Duration interval_jitter = 3;
+
+  // An optional jitter amount as a percentage of interval_ms. If specified,
+  // during every interval Envoy will add 0 to interval_ms *
+  // interval_jitter_percent / 100 to the wait time.
+  //
+  // If interval_jitter_ms and interval_jitter_percent are both set, both of
+  // them will be used to increase the wait time.
+  uint32 interval_jitter_percent = 18;
 
   // The number of unhealthy health checks required before a host is marked
   // unhealthy. Note that for *http* health checking if a host responds with 503

@@ -32,6 +32,27 @@
 namespace Envoy {
 namespace Stats {
 
+// The max name length is based on current set of stats.
+// As of now, the longest stat is
+// cluster.<cluster_name>.outlier_detection.ejections_consecutive_5xx
+// which is 52 characters long without the cluster name.
+// The max stat name length is 127 (default). So, in order to give room
+// for growth to both the envoy generated stat characters
+// (e.g., outlier_detection...) and user supplied names (e.g., cluster name),
+// we set the max user supplied name length to 60, and the max internally
+// generated stat suffixes to 67 (15 more characters to grow).
+// If you want to increase the max user supplied name length, use the compiler
+// option ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH or the CLI option
+// max-obj-name-len
+struct StatsOptionsImpl : public StatsOptions {
+  size_t maxNameLength() const override { return max_obj_name_length_ + max_stat_suffix_length_; }
+  size_t maxObjNameLength() const override { return max_obj_name_length_; }
+  size_t maxStatSuffixLength() const override { return max_stat_suffix_length_; }
+
+  size_t max_obj_name_length_ = 60;
+  size_t max_stat_suffix_length_ = 67;
+};
+
 class TagExtractorImpl : public TagExtractor {
 public:
   /**
@@ -170,7 +191,7 @@ public:
  * it can be allocated from shared memory if needed.
  *
  * @note Due to name_ being variable size, sizeof(RawStatData) probably isn't useful. Use
- * RawStatData::size() instead.
+ * RawStatData::structSize() or RawStatData::structSizeWithOptions() instead.
  */
 struct RawStatData {
 
@@ -182,54 +203,32 @@ struct RawStatData {
   ~RawStatData() = delete;
 
   /**
-   * Configure static settings. This MUST be called
-   * before any other static or instance methods.
-   */
-  static void configure(Server::Options& options);
-
-  /**
-   * Allow tests to re-configure this value after it has been set.
-   * This is unsafe in a non-test context.
-   */
-  static void configureForTestsOnly(Server::Options& options);
-
-  /**
-   * Returns the maximum length of the name of a stat. This length
-   * does not include a trailing NULL-terminator.
-   */
-  static size_t maxNameLength() { return maxObjNameLength() + MAX_STAT_SUFFIX_LENGTH; }
-
-  /**
-   * Returns the maximum length of a user supplied object (route/cluster/listener)
-   * name field in a stat. This length does not include a trailing NULL-terminator.
-   */
-  static size_t maxObjNameLength() {
-    return initializeAndGetMutableMaxObjNameLength(DEFAULT_MAX_OBJ_NAME_LENGTH);
-  }
-
-  /**
-   * Returns the maximum length of a stat suffix that Envoy generates (over the user supplied name).
-   * This length does not include a trailing NULL-terminator.
-   */
-  static size_t maxStatSuffixLength() { return MAX_STAT_SUFFIX_LENGTH; }
-
-  /**
-   * size in bytes of name_
-   */
-  static size_t nameSize() { return maxNameLength() + 1; }
-
-  /**
    * Returns the size of this struct, accounting for the length of name_
-   * and padding for alignment. This is required by BlockMemoryHashSet.
+   * and padding for alignment. Required for the HeapRawStatDataAllocator, which does not truncate
+   * at a maximum stat name length.
    */
-  static uint64_t size();
+  static uint64_t structSize(uint64_t name_size);
+
+  /**
+   * Wrapper for structSize, taking a StatsOptions struct.
+   * Required by BlockMemoryHashSet, which has the context to supply StatsOptions.
+   */
+  static uint64_t structSizeWithOptions(const StatsOptions& stats_options);
 
   /**
    * Initializes this object to have the specified key,
-   * a refcount of 1, and all other values zero. This is required by
-   * BlockMemoryHashSet.
+   * a refcount of 1, and all other values zero. Required for the HeapRawStatDataAllocator, which
+   * does not expect stat name truncation. We pass in the number of bytes allocated in order to
+   * assert the copy is safe inline.
    */
-  void initialize(absl::string_view key);
+  void checkAndInit(absl::string_view key, uint64_t num_bytes_allocated);
+
+  /**
+   * Initializes this object to have the specified key,
+   * a refcount of 1, and all other values zero. Required by the BlockMemoryHashSet. StatsOptions is
+   * used to truncate key inline, if necessary.
+   */
+  void truncateAndInit(absl::string_view key, const StatsOptions& stats_options);
 
   /**
    * Returns a hash of the key. This is required by BlockMemoryHashSet.
@@ -242,11 +241,9 @@ struct RawStatData {
   bool initialized() { return name_[0] != '\0'; }
 
   /**
-   * Returns the name as a string_view. This is required by BlockMemoryHashSet.
+   * Returns the name as a string_view with no truncation.
    */
-  absl::string_view key() const {
-    return absl::string_view(name_, strnlen(name_, maxNameLength()));
-  }
+  absl::string_view key() const { return absl::string_view(name_); }
 
   std::atomic<uint64_t> value_;
   std::atomic<uint64_t> pending_increment_;
@@ -256,26 +253,7 @@ struct RawStatData {
   char name_[];
 
 private:
-  // The max name length is based on current set of stats.
-  // As of now, the longest stat is
-  // cluster.<cluster_name>.outlier_detection.ejections_consecutive_5xx
-  // which is 52 characters long without the cluster name.
-  // The max stat name length is 127 (default). So, in order to give room
-  // for growth to both the envoy generated stat characters
-  // (e.g., outlier_detection...) and user supplied names (e.g., cluster name),
-  // we set the max user supplied name length to 60, and the max internally
-  // generated stat suffixes to 67 (15 more characters to grow).
-  // If you want to increase the max user supplied name length, use the compiler
-  // option ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH or the CLI option
-  // max-obj-name-len
-  static const size_t DEFAULT_MAX_OBJ_NAME_LENGTH = 60;
-  static const size_t MAX_STAT_SUFFIX_LENGTH = 67;
-
-  /**
-   * @return uint64_t& a reference to the configured size, which can then be changed
-   * by callers.
-   */
-  static uint64_t& initializeAndGetMutableMaxObjNameLength(uint64_t configured_size);
+  void initialize(absl::string_view key, uint64_t num_bytes_allocated);
 };
 
 /**
@@ -492,6 +470,7 @@ public:
     Histogram& histogram = histograms_.get(name);
     return histogram;
   }
+  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
@@ -515,6 +494,7 @@ private:
     Histogram& histogram(const std::string& name) override {
       return parent_.histogram(prefix_ + name);
     }
+    const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
 
     IsolatedStoreImpl& parent_;
     const std::string prefix_;
@@ -524,6 +504,7 @@ private:
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
+  const Stats::StatsOptionsImpl stats_options_;
 };
 
 } // namespace Stats

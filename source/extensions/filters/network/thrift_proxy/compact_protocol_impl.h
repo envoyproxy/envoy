@@ -48,12 +48,54 @@ public:
   bool readDouble(Buffer::Instance& buffer, double& value) override;
   bool readString(Buffer::Instance& buffer, std::string& value) override;
   bool readBinary(Buffer::Instance& buffer, std::string& value) override;
+  void writeMessageBegin(Buffer::Instance& buffer, const std::string& name, MessageType msg_type,
+                         int32_t seq_id) override;
+  void writeMessageEnd(Buffer::Instance& buffer) override;
+  void writeStructBegin(Buffer::Instance& buffer, const std::string& name) override;
+  void writeStructEnd(Buffer::Instance& buffer) override;
+  void writeFieldBegin(Buffer::Instance& buffer, const std::string& name, FieldType field_type,
+                       int16_t field_id) override;
+  void writeFieldEnd(Buffer::Instance& buffer) override;
+  void writeMapBegin(Buffer::Instance& buffer, FieldType key_type, FieldType value_type,
+                     uint32_t size) override;
+  void writeMapEnd(Buffer::Instance& buffer) override;
+  void writeListBegin(Buffer::Instance& buffer, FieldType elem_type, uint32_t size) override;
+  void writeListEnd(Buffer::Instance& buffer) override;
+  void writeSetBegin(Buffer::Instance& buffer, FieldType elem_type, uint32_t size) override;
+  void writeSetEnd(Buffer::Instance& buffer) override;
+  void writeBool(Buffer::Instance& buffer, bool value) override;
+  void writeByte(Buffer::Instance& buffer, uint8_t value) override;
+  void writeInt16(Buffer::Instance& buffer, int16_t value) override;
+  void writeInt32(Buffer::Instance& buffer, int32_t value) override;
+  void writeInt64(Buffer::Instance& buffer, int64_t value) override;
+  void writeDouble(Buffer::Instance& buffer, double value) override;
+  void writeString(Buffer::Instance& buffer, const std::string& value) override;
+  void writeBinary(Buffer::Instance& buffer, const std::string& value) override;
 
   static bool isMagic(uint16_t word) { return (word & MagicMask) == Magic; }
 
 private:
-  // Translates compact field type IDs to FieldType.
-  FieldType convertCompactFieldType(uint8_t compact_field_type);
+  enum class CompactFieldType {
+    Stop = 0,
+    BoolTrue = 1,
+    BoolFalse = 2,
+    Byte = 3,
+    I16 = 4,
+    I32 = 5,
+    I64 = 6,
+    Double = 7,
+    String = 8,
+    List = 9,
+    Set = 10,
+    Map = 11,
+    Struct = 12,
+  };
+
+  FieldType convertCompactFieldType(CompactFieldType compact_field_type);
+  CompactFieldType convertFieldType(FieldType field_type);
+
+  void writeFieldBeginInternal(Buffer::Instance& buffer, FieldType field_type, int16_t field_id,
+                               absl::optional<CompactFieldType> field_type_override);
 
   std::stack<int16_t> last_field_id_stack_{};
   int16_t last_field_id_{0};
@@ -61,6 +103,9 @@ private:
   // Compact protocol encodes boolean struct fields as true/false *types* with no data.
   // This tracks the last boolean struct field's value for readBool.
   absl::optional<bool> bool_value_{};
+
+  // Similarly, track the field id for writeBool.
+  absl::optional<int16_t> bool_field_id_{};
 
   const static uint16_t Magic;
   const static uint16_t MagicMask;
