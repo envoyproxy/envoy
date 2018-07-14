@@ -22,6 +22,7 @@ public:
   const std::string& cipherSuites() const override { return cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
   const std::string& caCert() const override { return ca_cert_; }
+  const std::string& subjectAltNameRegex() const override { return subject_alt_name_regex_; }
   const std::string& caCertPath() const override {
     return (ca_cert_path_.empty() && !ca_cert_.empty()) ? INLINE_STRING : ca_cert_path_;
   }
@@ -84,6 +85,7 @@ private:
   const bool allow_expired_certificate_;
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
+  const std::string subject_alt_name_regex_;
 };
 
 class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {

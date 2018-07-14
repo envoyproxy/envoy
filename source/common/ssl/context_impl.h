@@ -9,6 +9,7 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/common/utility.h"
 #include "common/ssl/context_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
@@ -51,12 +52,16 @@ public:
   void logHandshake(SSL* ssl) const;
 
   /**
-   * Performs subjectAltName verification
+   * Performs subjectAltName verification with configured reg ex
    * @param ssl the certificate to verify
    * @param subject_alt_names the configured subject_alt_names to match
+   * @param is_san_regex_validation whether to match subject alt name using configured regex
+   * @param regex_pattern the configured reg_ex pattern to be used for matching
    * @return true if the verification succeeds
    */
-  static bool verifySubjectAltName(X509* cert, const std::vector<std::string>& subject_alt_names);
+  static bool verifySubjectAltName(X509* cert, const std::vector<std::string>& subject_alt_names,
+                                   const bool is_san_regex_validation,
+                                   const std::regex& regex_pattern);
 
   /**
    * Determines whether the given name matches 'pattern' which may optionally begin with a wildcard.
@@ -124,6 +129,8 @@ protected:
   ContextManagerImpl& parent_;
   bssl::UniquePtr<SSL_CTX> ctx_;
   bool verify_trusted_ca_{false};
+  std::regex san_validation_regex_{};
+  bool is_san_regex_validation_{false};
   std::vector<std::string> verify_subject_alt_name_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_spki_list_;

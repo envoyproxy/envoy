@@ -41,7 +41,8 @@ TEST_F(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
   EXPECT_NE(cert, nullptr);
   std::vector<std::string> verify_subject_alt_name_list = {"server1.example.com",
                                                            "server2.example.com"};
-  EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list));
+  EXPECT_TRUE(
+      ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list, false, std::regex()));
   X509_free(cert);
   fclose(fp);
 }
@@ -54,7 +55,8 @@ TEST_F(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
   EXPECT_NE(cert, nullptr);
   std::vector<std::string> verify_subject_alt_name_list = {"spiffe://lyft.com/fake-team",
                                                            "spiffe://lyft.com/test-team"};
-  EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list));
+  EXPECT_TRUE(
+      ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list, false, std::regex()));
   X509_free(cert);
   fclose(fp);
 }
@@ -66,7 +68,54 @@ TEST_F(SslContextImplTest, TestVerifySubjectAltNameNotMatched) {
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
   EXPECT_NE(cert, nullptr);
   std::vector<std::string> verify_subject_alt_name_list = {"foo", "bar"};
-  EXPECT_FALSE(ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list));
+  EXPECT_FALSE(
+      ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list, false, std::regex()));
+  X509_free(cert);
+  fclose(fp);
+}
+
+TEST_F(SslContextImplTest, TestVerifySubjectAltNameURIRegExMatched) {
+  FILE* fp = fopen(
+      TestEnvironment::runfilesPath("test/common/ssl/test_data/san_uri_cert.pem").c_str(), "r");
+  EXPECT_NE(fp, nullptr);
+  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
+  EXPECT_NE(cert, nullptr);
+  std::vector<std::string> verify_subject_alt_name_list = {"spiffe://lyft.com/fake-team",
+                                                           "spiffe://lyft.com/test-team"};
+  std::regex regex_pattern = RegexUtil::parseRegex("^spiffe.//lyft.com.*");
+  EXPECT_TRUE(
+      ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list, true, regex_pattern));
+  X509_free(cert);
+  fclose(fp);
+}
+
+TEST_F(SslContextImplTest, TestVerifySubjectAltNameURIRegExNotMatched) {
+  FILE* fp = fopen(
+      TestEnvironment::runfilesPath("test/common/ssl/test_data/san_uri_cert.pem").c_str(), "r");
+  EXPECT_NE(fp, nullptr);
+  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
+  EXPECT_NE(cert, nullptr);
+  std::vector<std::string> verify_subject_alt_name_list = {"spiffe://lyft.com/fake-team",
+                                                           "spiffe://lyft.com/test-team"};
+  std::regex regex_pattern = RegexUtil::parseRegex("^blah");
+  EXPECT_FALSE(
+      ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list, true, regex_pattern));
+  X509_free(cert);
+  fclose(fp);
+}
+
+TEST_F(SslContextImplTest, TestVerifySubjectAltNameURIRegExOneNotMatched) {
+  FILE* fp = fopen(
+      TestEnvironment::runfilesPath("test/common/ssl/test_data/san_uri_cert.pem").c_str(), "r");
+  EXPECT_NE(fp, nullptr);
+  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
+  EXPECT_NE(cert, nullptr);
+  std::vector<std::string> verify_subject_alt_name_list = {"spiffe1://lyft.com/fake-team",
+                                                           "spiffe://lyft.com/test-team"};
+
+  std::regex regex_pattern = RegexUtil::parseRegex("^spiffe.//lyft.com.*");
+  EXPECT_TRUE(
+      ContextImpl::verifySubjectAltName(cert, verify_subject_alt_name_list, true, regex_pattern));
   X509_free(cert);
   fclose(fp);
 }

@@ -88,6 +88,11 @@ public:
   virtual const std::vector<std::string>& verifySubjectAltNameList() const PURE;
 
   /**
+   * @return The regex configured to be used for subject alt name validation. Otherwise, ""
+   */
+  virtual const std::string& subjectAltNameRegex() const PURE;
+
+  /**
    * @return A list of a hex-encoded SHA-256 certificate hashes to be verified.
    */
   virtual const std::vector<std::string>& verifyCertificateHashList() const PURE;

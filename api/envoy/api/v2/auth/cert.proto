@@ -216,6 +216,10 @@ message CertificateValidationContext {
 
   // If specified, Envoy will not reject expired certificates.
   bool allow_expired_certificate = 8;
+
+  // If specified, Envoy will use this regular expression while matching :ref:`Subject Alternative Names
+  // <envoy_api_field_auth.CertificateValidationContext.verify_subject_alt_name>`.
+  string san_validation_regex = 9;
 }
 
 // TLS context shared by both client and server TLS contexts.
