@@ -485,7 +485,8 @@ TEST(RawStatDataTest, Consistency) {
   // vary only when the internal representation of a stat has been intentionally changed, in which
   // case SharedMemory::VERSION should be incremented as well.
   uint64_t expected_hash = 1874506077228772558;
-  uint64_t max_name_length = RawStatData::maxNameLength();
+  Stats::StatsOptionsImpl stats_options;
+  uint64_t max_name_length = stats_options.maxNameLength();
 
   const std::string name_1(max_name_length, 'A');
   RawStatData* stat_1 = alloc.alloc(name_1);
@@ -504,15 +505,6 @@ TEST(RawStatDataTest, Consistency) {
   alloc.free(*stat_2);
 }
 
-// Validate truncation behavior of RawStatData.
-TEST(RawStatDataTest, Truncate) {
-  HeapRawStatDataAllocator alloc;
-  const std::string long_string(RawStatData::maxNameLength() + 1, 'A');
-  RawStatData* stat{};
-  EXPECT_LOG_CONTAINS("warning", "is too long with", stat = alloc.alloc(long_string));
-  alloc.free(*stat);
-}
-
 TEST(RawStatDataTest, HeapAlloc) {
   HeapRawStatDataAllocator alloc;
   RawStatData* stat_1 = alloc.alloc("ref_name");
@@ -527,6 +519,19 @@ TEST(RawStatDataTest, HeapAlloc) {
   alloc.free(*stat_1);
   alloc.free(*stat_2);
   alloc.free(*stat_3);
+}
+
+TEST(RawStatDataTest, Truncate) {
+  // RawStatData::truncateAndInit(absl::string_view key, const StatsOptions& stats_options) will
+  // truncate and log to ENVOY_LOG_MISC if given a key longer than the allowed
+  // stats_options.maxNameLength(). This mechanism is also tested in HotRestartImplTest.truncateKey.
+  Stats::StatsOptionsImpl stats_options;
+  const std::string long_string(stats_options.maxNameLength() + 1, 'A');
+  RawStatData* stat =
+      static_cast<RawStatData*>(::calloc(RawStatData::structSizeWithOptions(stats_options), 1));
+  EXPECT_LOG_CONTAINS("warning", "is too long with",
+                      stat->truncateAndInit(long_string, stats_options));
+  ::free(stat);
 }
 
 TEST(SourceImplTest, Caching) {

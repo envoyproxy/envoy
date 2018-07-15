@@ -3,6 +3,7 @@
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/config/bootstrap_json.h"
@@ -164,7 +165,9 @@ public:
 envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::BootstrapJson::translateClusterManagerBootstrap(*json_object_ptr, bootstrap);
+  Stats::StatsOptionsImpl stats_options;
+  Config::BootstrapJson::translateClusterManagerBootstrap(*json_object_ptr, bootstrap,
+                                                          stats_options);
   return bootstrap;
 }
 

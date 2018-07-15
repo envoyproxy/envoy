@@ -40,7 +40,7 @@ static BlockMemoryHashSetOptions blockMemHashOptions(uint64_t max_stats) {
 SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, Options& options) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
 
-  const uint64_t entry_size = Stats::RawStatData::size();
+  const uint64_t entry_size = Stats::RawStatData::structSizeWithOptions(options.statsOptions());
   const uint64_t total_size = sizeof(SharedMemory) + stats_set_size;
 
   int flags = O_RDWR;
@@ -109,14 +109,16 @@ void SharedMemory::initializeMutex(pthread_mutex_t& mutex) {
   pthread_mutex_init(&mutex, &attribute);
 }
 
-std::string SharedMemory::version(uint64_t max_num_stats, uint64_t max_stat_name_len) {
+std::string SharedMemory::version(uint64_t max_num_stats,
+                                  const Stats::StatsOptions& stats_options) {
   return fmt::format("{}.{}.{}.{}", VERSION, sizeof(SharedMemory), max_num_stats,
-                     max_stat_name_len);
+                     stats_options.maxNameLength());
 }
 
 HotRestartImpl::HotRestartImpl(Options& options)
     : options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())),
-      shmem_(SharedMemory::initialize(RawStatDataSet::numBytes(stats_set_options_), options)),
+      shmem_(SharedMemory::initialize(
+          RawStatDataSet::numBytes(stats_set_options_, options_.statsOptions()), options_)),
       log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
       stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
   {
@@ -124,7 +126,7 @@ HotRestartImpl::HotRestartImpl(Options& options)
     // because it might be actively written to while we sanityCheck it.
     Thread::LockGuard lock(stat_lock_);
     stats_set_.reset(new RawStatDataSet(stats_set_options_, options.restartEpoch() == 0,
-                                        shmem_.stats_set_data_));
+                                        shmem_.stats_set_data_, options_.statsOptions()));
   }
   my_domain_socket_ = bindDomainSocket(options.restartEpoch());
   child_address_ = createDomainSocketAddress((options.restartEpoch() + 1));
@@ -143,8 +145,8 @@ Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
   Thread::LockGuard lock(stat_lock_);
   absl::string_view key = name;
-  if (key.size() > Stats::RawStatData::maxNameLength()) {
-    key.remove_suffix(key.size() - Stats::RawStatData::maxNameLength());
+  if (key.size() > options_.statsOptions().maxNameLength()) {
+    key.remove_suffix(key.size() - options_.statsOptions().maxNameLength());
   }
   auto value_created = stats_set_->insert(key);
   Stats::RawStatData* data = value_created.first;
@@ -169,7 +171,8 @@ void HotRestartImpl::free(Stats::RawStatData& data) {
   }
   bool key_removed = stats_set_->remove(data.key());
   ASSERT(key_removed);
-  memset(static_cast<void*>(&data), 0, Stats::RawStatData::size());
+  memset(static_cast<void*>(&data), 0,
+         Stats::RawStatData::structSizeWithOptions(options_.statsOptions()));
 }
 
 int HotRestartImpl::bindDomainSocket(uint64_t id) {
@@ -474,23 +477,30 @@ void HotRestartImpl::shutdown() { socket_event_.reset(); }
 
 std::string HotRestartImpl::version() {
   Thread::LockGuard lock(stat_lock_);
-  return versionHelper(shmem_.maxStats(), Stats::RawStatData::maxNameLength(), *stats_set_);
+  return versionHelper(shmem_.maxStats(), options_.statsOptions(), *stats_set_);
 }
 
 // Called from envoy --hot-restart-version -- needs to instantiate a RawStatDataSet so it
 // can generate the version string.
 std::string HotRestartImpl::hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len) {
-  const BlockMemoryHashSetOptions options = blockMemHashOptions(max_num_stats);
-  const uint64_t bytes = RawStatDataSet::numBytes(options);
-  std::unique_ptr<uint8_t[]> mem_buffer_for_dry_run_(new uint8_t[bytes]);
-  RawStatDataSet stats_set(options, true /* init */, mem_buffer_for_dry_run_.get());
+  Stats::StatsOptionsImpl stats_options;
+  stats_options.max_obj_name_length_ = max_stat_name_len - stats_options.maxStatSuffixLength();
 
-  return versionHelper(max_num_stats, max_stat_name_len, stats_set);
+  const BlockMemoryHashSetOptions hash_set_options = blockMemHashOptions(max_num_stats);
+  const uint64_t bytes = RawStatDataSet::numBytes(hash_set_options, stats_options);
+  std::unique_ptr<uint8_t[]> mem_buffer_for_dry_run_(new uint8_t[bytes]);
+
+  RawStatDataSet stats_set(hash_set_options, true /* init */, mem_buffer_for_dry_run_.get(),
+                           stats_options);
+
+  return versionHelper(max_num_stats, stats_options, stats_set);
 }
 
-std::string HotRestartImpl::versionHelper(uint64_t max_num_stats, uint64_t max_stat_name_len,
+std::string HotRestartImpl::versionHelper(uint64_t max_num_stats,
+                                          const Stats::StatsOptions& stats_options,
                                           RawStatDataSet& stats_set) {
-  return SharedMemory::version(max_num_stats, max_stat_name_len) + "." + stats_set.version();
+  return SharedMemory::version(max_num_stats, stats_options) + "." +
+         stats_set.version(stats_options);
 }
 
 } // namespace Server

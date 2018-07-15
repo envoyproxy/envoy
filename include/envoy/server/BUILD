@@ -111,6 +111,7 @@ envoy_cc_library(
     hdrs = ["options.h"],
     deps = [
         "//include/envoy/network:address_interface",
+        "//include/envoy/stats:stats_interface",
     ],
 )
 

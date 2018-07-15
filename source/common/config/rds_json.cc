@@ -116,12 +116,13 @@ void RdsJson::translateQueryParameterMatcher(
 }
 
 void RdsJson::translateRouteConfiguration(const Json::Object& json_route_config,
-                                          envoy::api::v2::RouteConfiguration& route_config) {
+                                          envoy::api::v2::RouteConfiguration& route_config,
+                                          const Stats::StatsOptions& stats_options) {
   json_route_config.validateSchema(Json::Schema::ROUTE_CONFIGURATION_SCHEMA);
 
   for (const auto json_virtual_host : json_route_config.getObjectArray("virtual_hosts", true)) {
     auto* virtual_host = route_config.mutable_virtual_hosts()->Add();
-    translateVirtualHost(*json_virtual_host, *virtual_host);
+    translateVirtualHost(*json_virtual_host, *virtual_host, stats_options);
   }
 
   for (const std::string& header :
@@ -149,11 +150,12 @@ void RdsJson::translateRouteConfiguration(const Json::Object& json_route_config,
 }
 
 void RdsJson::translateVirtualHost(const Json::Object& json_virtual_host,
-                                   envoy::api::v2::route::VirtualHost& virtual_host) {
+                                   envoy::api::v2::route::VirtualHost& virtual_host,
+                                   const Stats::StatsOptions& stats_options) {
   json_virtual_host.validateSchema(Json::Schema::VIRTUAL_HOST_CONFIGURATION_SCHEMA);
 
   const std::string name = json_virtual_host.getString("name", "");
-  Utility::checkObjNameLength("Invalid virtual host name", name);
+  Utility::checkObjNameLength("Invalid virtual host name", name, stats_options);
   virtual_host.set_name(name);
 
   for (const std::string& domain : json_virtual_host.getStringArray("domains", true)) {

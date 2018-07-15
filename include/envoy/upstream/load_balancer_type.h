@@ -46,6 +46,11 @@ public:
    * sorted keys used to define load balancer subsets.
    */
   virtual const std::vector<std::set<std::string>>& subsetKeys() const PURE;
+
+  /*
+   * @return bool whether routing to subsets should take locality weights into account.
+   */
+  virtual bool localityWeightAware() const PURE;
 };
 
 } // namespace Upstream

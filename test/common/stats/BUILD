@@ -27,6 +27,7 @@ envoy_cc_test(
     deps = [
         "//source/common/stats:thread_local_store_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:utility_lib",
