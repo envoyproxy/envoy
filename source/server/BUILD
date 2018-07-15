@@ -152,6 +152,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/network:address_interface",
         "//include/envoy/server:options_interface",
+        "//include/envoy/stats:stats_interface",
         "//source/common/common:macros",
         "//source/common/common:version_lib",
         "//source/common/stats:stats_lib",
@@ -208,6 +209,8 @@ envoy_cc_library(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
+        "//source/common/network:cidr_range_lib",
+        "//source/common/network:lc_trie_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:resolver_lib",
         "//source/common/network:socket_option_factory_lib",

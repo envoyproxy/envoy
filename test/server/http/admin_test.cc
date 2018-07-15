@@ -53,7 +53,7 @@ public:
     }));
 
     EXPECT_CALL(*this, alloc("stats.overflow"));
-    store_.reset(new Stats::ThreadLocalStoreImpl(*this));
+    store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_, *this);
     store_->addSink(sink_);
   }
 
@@ -71,6 +71,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::TestAllocator alloc_;
   Stats::MockSink sink_;
+  Stats::StatsOptionsImpl options_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
 };
 

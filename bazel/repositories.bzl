@@ -193,6 +193,10 @@ def _envoy_api_deps():
         _default_envoy_api(name = "envoy_api")
 
     native.bind(
+        name = "api_httpbody_protos",
+        actual = "@googleapis//:api_httpbody_protos",
+    )
+    native.bind(
         name = "http_api_protos",
         actual = "@googleapis//:http_api_protos",
     )

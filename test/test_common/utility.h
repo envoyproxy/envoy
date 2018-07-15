@@ -342,10 +342,13 @@ public:
   ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
 
   RawStatData* alloc(const std::string& name) override {
+    Stats::StatsOptionsImpl stats_options;
+    stats_options.max_obj_name_length_ = 127;
     CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[name];
     if (!stat_ref) {
-      stat_ref.reset(static_cast<RawStatData*>(::calloc(RawStatData::size(), 1)));
-      stat_ref->initialize(name);
+      stat_ref.reset(static_cast<RawStatData*>(
+          ::calloc(RawStatData::structSizeWithOptions(stats_options), 1)));
+      stat_ref->truncateAndInit(name, stats_options);
     } else {
       stat_ref->ref_count_++;
     }

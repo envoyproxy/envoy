@@ -99,11 +99,12 @@ void CdsJson::translateOutlierDetection(
 
 void CdsJson::translateCluster(const Json::Object& json_cluster,
                                const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
-                               envoy::api::v2::Cluster& cluster) {
+                               envoy::api::v2::Cluster& cluster,
+                               const Stats::StatsOptions& stats_options) {
   json_cluster.validateSchema(Json::Schema::CLUSTER_SCHEMA);
 
   const std::string name = json_cluster.getString("name");
-  Utility::checkObjNameLength("Invalid cluster name", name);
+  Utility::checkObjNameLength("Invalid cluster name", name, stats_options);
   cluster.set_name(name);
 
   const std::string string_type = json_cluster.getString("type");

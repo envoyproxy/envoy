@@ -13,6 +13,7 @@
 #include "common/config/bootstrap_json.h"
 #include "common/json/json_loader.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/stats_impl.h"
 
 // NOLINT(namespace-envoy)
 int main(int argc, char** argv) {
@@ -23,7 +24,8 @@ int main(int argc, char** argv) {
 
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   auto config_json = Envoy::Json::Factory::loadFromFile(argv[1]);
-  Envoy::Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
+  Envoy::Stats::StatsOptionsImpl stats_options;
+  Envoy::Config::BootstrapJson::translateBootstrap(*config_json, bootstrap, stats_options);
   Envoy::MessageUtil::validate(bootstrap);
   std::cout << Envoy::MessageUtil::getJsonStringFromMessage(bootstrap, true);
 

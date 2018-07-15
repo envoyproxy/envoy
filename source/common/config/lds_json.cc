@@ -14,11 +14,12 @@ namespace Envoy {
 namespace Config {
 
 void LdsJson::translateListener(const Json::Object& json_listener,
-                                envoy::api::v2::Listener& listener) {
+                                envoy::api::v2::Listener& listener,
+                                const Stats::StatsOptions& stats_options) {
   json_listener.validateSchema(Json::Schema::LISTENER_SCHEMA);
 
   const std::string name = json_listener.getString("name", "");
-  Utility::checkObjNameLength("Invalid listener name", name);
+  Utility::checkObjNameLength("Invalid listener name", name, stats_options);
   listener.set_name(name);
 
   AddressJson::translateAddress(json_listener.getString("address"), true, true,
