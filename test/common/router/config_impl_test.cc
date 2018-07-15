@@ -4373,6 +4373,65 @@ virtual_hosts:
   }
 }
 
+TEST(RouteConfigurationV2, NoIdleTimeout) {
+  const std::string NoIdleTimeot = R"EOF(
+name: NoIdleTimeout
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          idle_timeout: 0s
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(NoIdleTimeot), factory_context, true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(absl::nullopt, route_entry->idleTimeout());
+}
+
+TEST(RouteConfigurationV2, DefaultIdleTimeout) {
+  const std::string DefaultIdleTimeot = R"EOF(
+name: NoIdleTimeout
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(DefaultIdleTimeot), factory_context, true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(5 * 60 * 1000, route_entry->idleTimeout().value().count());
+}
+
+TEST(RouteConfigurationV2, ExplicitIdleTimeout) {
+  const std::string ExplicitIdleTimeot = R"EOF(
+name: NoIdleTimeout
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          idle_timeout: 7s
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(ExplicitIdleTimeot), factory_context, true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(7 * 1000, route_entry->idleTimeout().value().count());
+}
+
 class PerFilterConfigsTest : public testing::Test {
 public:
   PerFilterConfigsTest() : factory_(), registered_factory_(factory_) {}
@@ -4499,6 +4558,7 @@ virtual_hosts:
 
   checkEach(yaml, 1213, 1213, 1415);
 }
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

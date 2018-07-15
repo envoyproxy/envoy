@@ -443,7 +443,8 @@ message RouteAction {
   // to 5 minutes. The default value was select so as not to interfere with any
   // smaller configured timeouts that may have existed in configurations prior
   // to the introduction of this feature, while introducing robustness to TCP
-  // connections that terminate without FIN.
+  // connections that terminate without FIN. A value of 0 will completely
+  // disable the idle timeout.
   //
   // The idle timeout is distinct to :ref:`timeout
   // <envoy_api_field_route.RouteAction.timeout>`, which provides an upper bound
