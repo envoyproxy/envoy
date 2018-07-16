@@ -112,7 +112,7 @@ public:
     Responded
   };
 
-  StreamHandleWrapper(Filters::Common::Lua::CoroutinePtr&& coroutine, Http::HeaderMap& headers,
+  StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine, Http::HeaderMap& headers,
                       bool end_stream, Filter& filter, FilterCallbacks& callbacks);
 
   Http::FilterHeadersStatus start(int function_ref);
@@ -232,7 +232,7 @@ private:
   void onSuccess(Http::MessagePtr&&) override;
   void onFailure(Http::AsyncClient::FailureReason) override;
 
-  Filters::Common::Lua::CoroutinePtr coroutine_;
+  Filters::Common::Lua::Coroutine& coroutine_;
   Http::HeaderMap& headers_;
   bool end_stream_;
   bool headers_continued_{};
@@ -262,6 +262,8 @@ public:
   Filters::Common::Lua::CoroutinePtr createCoroutine() { return lua_state_.createCoroutine(); }
   int requestFunctionRef() { return lua_state_.getGlobalRef(request_function_slot_); }
   int responseFunctionRef() { return lua_state_.getGlobalRef(response_function_slot_); }
+  uint64_t runtimeBytesUsed() { return lua_state_.runtimeBytesUsed(); }
+  void runtimeGC() { return lua_state_.runtimeGC(); }
 
   Upstream::ClusterManager& cluster_manager_;
 
@@ -291,8 +293,8 @@ public:
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
-    return doHeaders(request_stream_wrapper_, decoder_callbacks_, config_->requestFunctionRef(),
-                     headers, end_stream);
+    return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_,
+                     config_->requestFunctionRef(), headers, end_stream);
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(request_stream_wrapper_, data, end_stream);
@@ -309,8 +311,8 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
-    return doHeaders(response_stream_wrapper_, encoder_callbacks_, config_->responseFunctionRef(),
-                     headers, end_stream);
+    return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
+                     config_->responseFunctionRef(), headers, end_stream);
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(response_stream_wrapper_, data, end_stream);
@@ -365,8 +367,10 @@ private:
 
   typedef Filters::Common::Lua::LuaDeathRef<StreamHandleWrapper> StreamHandleRef;
 
-  Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle, FilterCallbacks& callbacks,
-                                      int function_ref, Http::HeaderMap& headers, bool end_stream);
+  Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle,
+                                      Filters::Common::Lua::CoroutinePtr& coroutine,
+                                      FilterCallbacks& callbacks, int function_ref,
+                                      Http::HeaderMap& headers, bool end_stream);
   Http::FilterDataStatus doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
 
@@ -376,6 +380,21 @@ private:
   StreamHandleRef request_stream_wrapper_;
   StreamHandleRef response_stream_wrapper_;
   bool destroyed_{};
+
+  // These coroutines used to be owned by the stream handles. After investigating #3570, it
+  // became clear that there is a circular memory reference when a coroutine yields. Basically,
+  // the coroutine holds a reference to the stream wrapper. I'm not completely sure why this is,
+  // but I think it is because the yield happens via a stream handle method, so the runtime must
+  // hold a reference so that it can return out of the yield through the object. So now we hold
+  // the coroutine references at the same level as the stream handles so that when the filter is
+  // destroyed the circular reference is broken and both objects are cleaned up.
+  //
+  // Note that the above explanation probably means that we don't need to hold a reference to the
+  // coroutine at all and it would be taken care of automatically via a runtime internal reference
+  // when a yield happens. However, given that I don't fully understand the runtime internals, this
+  // seems like a safer fix for now.
+  Filters::Common::Lua::CoroutinePtr request_coroutine_;
+  Filters::Common::Lua::CoroutinePtr response_coroutine_;
 };
 
 } // namespace Lua
