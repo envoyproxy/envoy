@@ -348,7 +348,7 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
    *
    *  Example:
    *  uri  = "https://example.com:8443/certs"
-   *  pos:          ^
+   *  pos:         ^
    *  host_pos:       ^
    *  path_pos:                       ^
    *  host = "example.com:8443"
