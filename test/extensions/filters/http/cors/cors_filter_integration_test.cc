@@ -73,7 +73,7 @@ public:
             route->mutable_route()->set_cluster("cluster_0");
             auto* cors = route->mutable_route()->mutable_cors();
             cors->add_allow_origin("test-origin-1");
-            cors->set_expose_headers("custom-header-1");
+            cors->set_expose_headers("custom-header-1,custom-header-2");
           }
         });
     HttpIntegrationTest::initialize();
@@ -252,7 +252,7 @@ TEST_P(CorsFilterIntegrationTest, TestExposeHeaders) {
       },
       Http::TestHeaderMapImpl{
           {"access-control-allow-origin", "test-origin-1"},
-          {"access-control-expose-headers", "custom-header-1"},
+          {"access-control-expose-headers", "custom-header-1,custom-header-2"},
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
