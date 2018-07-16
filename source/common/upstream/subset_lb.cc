@@ -499,7 +499,7 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   HostsPerLocalityConstSharedPtr hosts_per_locality =
       original_host_set_.hostsPerLocality().filter(predicate);
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
-      hosts_per_locality->filter([&predicate](const Host& host) { return host.healthy(); });
+      hosts_per_locality->filter([](const Host& host) { return host.healthy(); });
 
   if (locality_weight_aware_) {
     HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
