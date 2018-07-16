@@ -35,7 +35,6 @@ private:
   void removeEmptyContexts();
   Runtime::Loader& runtime_;
   std::list<std::weak_ptr<Context>> contexts_;
-  mutable std::shared_timed_mutex contexts_lock_;
 };
 
 } // namespace Ssl

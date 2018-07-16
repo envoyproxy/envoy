@@ -21,7 +21,6 @@ void ContextManagerImpl::removeEmptyContexts() {
 ClientContextSharedPtr
 ContextManagerImpl::createSslClientContext(Stats::Scope& scope, const ClientContextConfig& config) {
   ClientContextSharedPtr context = std::make_shared<ClientContextImpl>(scope, config);
-  std::unique_lock<std::shared_timed_mutex> lock(contexts_lock_);
   removeEmptyContexts();
   contexts_.emplace_back(context);
   return context;
@@ -32,14 +31,12 @@ ContextManagerImpl::createSslServerContext(Stats::Scope& scope, const ServerCont
                                            const std::vector<std::string>& server_names) {
   ServerContextSharedPtr context =
       std::make_shared<ServerContextImpl>(scope, config, server_names, runtime_);
-  std::unique_lock<std::shared_timed_mutex> lock(contexts_lock_);
   removeEmptyContexts();
   contexts_.emplace_back(context);
   return context;
 }
 
 size_t ContextManagerImpl::daysUntilFirstCertExpires() const {
-  std::shared_lock<std::shared_timed_mutex> lock(contexts_lock_);
   size_t ret = std::numeric_limits<int>::max();
   for (const auto& ctx_weak_ptr : contexts_) {
     ContextSharedPtr context = ctx_weak_ptr.lock();
@@ -51,7 +48,6 @@ size_t ContextManagerImpl::daysUntilFirstCertExpires() const {
 }
 
 void ContextManagerImpl::iterateContexts(std::function<void(const Context&)> callback) {
-  std::shared_lock<std::shared_timed_mutex> lock(contexts_lock_);
   for (const auto& ctx_weak_ptr : contexts_) {
     ContextSharedPtr context = ctx_weak_ptr.lock();
     if (context) {
