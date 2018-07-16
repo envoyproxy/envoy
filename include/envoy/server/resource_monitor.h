@@ -1,6 +1,5 @@
 #pragma once
 
-#include <functional>
 #include <memory>
 
 #include "envoy/common/exception.h"
@@ -19,16 +18,32 @@ class ResourceMonitor {
 public:
   virtual ~ResourceMonitor() {}
 
-  // Callback for handling updated usage information for this resource.
-  // Exactly one of 'usage' or 'error' will be non-null.
-  typedef std::function<void(const ResourceUsage* usage, const EnvoyException* error)> UpdateCb;
+  /**
+   * Notifies caller of updated resource usage.
+   */
+  class Callbacks {
+  public:
+    virtual ~Callbacks() {}
+
+    /**
+     * Called when the request for updated resource usage succeeds.
+     * @param usage the updated resource usage
+     */
+    virtual void onSuccess(const ResourceUsage& usage) PURE;
+
+    /**
+     * Called when the request for updated resource usage fails.
+     * @param error the exception caught when trying to get updated resource usage
+     */
+    virtual void onFailure(const EnvoyException& error) PURE;
+  };
 
   /**
    * Recalculate resource usage.
    * This must be non-blocking so if RPCs need to be made they should be
    * done asynchronously and invoke the callback when finished.
    */
-  virtual void updateResourceUsage(const UpdateCb& completionCb) PURE;
+  virtual void updateResourceUsage(Callbacks& callbacks) PURE;
 };
 
 typedef std::unique_ptr<ResourceMonitor> ResourceMonitorPtr;

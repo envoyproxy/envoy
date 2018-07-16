@@ -11,12 +11,10 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace FixedHeapMonitor {
 
-Server::ResourceMonitorPtr FixedHeapMonitorFactory::createResourceMonitor(
-    const Protobuf::Message& config,
-    Server::Configuration::ResourceMonitorFactoryContext& /*unused_context*/) {
-  return std::make_unique<FixedHeapMonitor>(
-      MessageUtil::downcastAndValidate<
-          const envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig&>(config));
+Server::ResourceMonitorPtr FixedHeapMonitorFactory::createResourceMonitorFromProtoTyped(
+    const envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig& config,
+    Event::Dispatcher& /*unused_context*/) {
+  return std::make_unique<FixedHeapMonitor>(config);
 }
 
 /**

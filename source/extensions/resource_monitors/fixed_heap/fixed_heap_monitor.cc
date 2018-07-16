@@ -8,21 +8,26 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace FixedHeapMonitor {
 
+uint64_t MemoryStatsReader::reservedHeapBytes() { return Memory::Stats::totalCurrentlyReserved(); }
+
+uint64_t MemoryStatsReader::unmappedHeapBytes() { return Memory::Stats::totalPageHeapUnmapped(); }
+
 FixedHeapMonitor::FixedHeapMonitor(
-    const envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig& config)
-    : max_heap_(config.max_heap_size_bytes()) {
+    const envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig& config,
+    std::unique_ptr<MemoryStatsReader> stats)
+    : max_heap_(config.max_heap_size_bytes()), stats_(std::move(stats)) {
   ASSERT(max_heap_ > 0);
 }
 
-void FixedHeapMonitor::updateResourceUsage(const Server::ResourceMonitor::UpdateCb& completionCb) {
-  size_t physical = Memory::Stats::totalCurrentlyReserved();
-  size_t unmapped = Memory::Stats::totalPageHeapUnmapped();
-  size_t used = std::max<size_t>(physical - unmapped, 0);
+void FixedHeapMonitor::updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) {
+  const size_t physical = stats_->reservedHeapBytes();
+  const size_t unmapped = stats_->unmappedHeapBytes();
+  const size_t used = physical - unmapped;
 
   Server::ResourceUsage usage;
   usage.resource_pressure_ = used / static_cast<double>(max_heap_);
 
-  completionCb(&usage, nullptr);
+  callbacks.onSuccess(usage);
 }
 
 } // namespace FixedHeapMonitor

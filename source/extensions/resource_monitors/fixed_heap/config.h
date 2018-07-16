@@ -1,7 +1,9 @@
 #pragma once
 
+#include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.validate.h"
 #include "envoy/server/resource_monitor_config.h"
 
+#include "extensions/resource_monitors/common/factory_base.h"
 #include "extensions/resource_monitors/well_known_names.h"
 
 namespace Envoy {
@@ -9,13 +11,17 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace FixedHeapMonitor {
 
-class FixedHeapMonitorFactory : public Server::Configuration::ResourceMonitorFactory {
+class FixedHeapMonitorFactory
+    : public Common::FactoryBase<
+          envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig> {
 public:
-  Server::ResourceMonitorPtr
-  createResourceMonitor(const Protobuf::Message& config,
-                        Server::Configuration::ResourceMonitorFactoryContext& context) override;
+  FixedHeapMonitorFactory()
+      : FactoryBase(ResourceMonitorNames::get().FIXED_HEAP_RESOURCE_MONITOR) {}
 
-  std::string name() override { return ResourceMonitorNames::get().FIXED_HEAP_RESOURCE_MONITOR; }
+private:
+  Server::ResourceMonitorPtr createResourceMonitorFromProtoTyped(
+      const envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig& config,
+      Event::Dispatcher& dispatcher) override;
 };
 
 } // namespace FixedHeapMonitor
