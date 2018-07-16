@@ -57,7 +57,7 @@ private:
   HostVectorSharedPtr initial_hosts_;
 };
 
-typedef std::unique_ptr<HdsCluster> HdsClusterPtr;
+typedef std::shared_ptr<HdsCluster> HdsClusterPtr;
 
 /**
  * All hds stats. @see stats_macros.h
@@ -96,9 +96,11 @@ public:
   void sendResponse();
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_DELAY_MS = 5000;
+  uint32_t SERVER_RESPONSE_S = 1;
 
 private:
   void setRetryTimer();
+  void setServerResponseTimer();
   void establishNewStream();
   void sendHealthCheckRequest();
   void handleFailure();
@@ -120,9 +122,13 @@ private:
   Secret::SecretManager& secret_manager_;
   Runtime::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
-  Upstream::HealthCheckerSharedPtr health_checker_ptr;
-  envoy::api::v2::Cluster cluster_config_;
+
+  Event::TimerPtr server_responce_timer_;
+
+  std::vector<std::vector<Upstream::HealthCheckerSharedPtr>> health_checkers_ptr;
+  std::vector<envoy::api::v2::Cluster> clusters_config_;
   HdsClusterPtr cluster_;
+  std::vector<HdsClusterPtr> hds_clusters_;
 };
 
 typedef std::unique_ptr<HdsDelegate> HdsDelegatePtr;
