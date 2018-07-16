@@ -668,6 +668,9 @@ TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
 class Http2CodecImplStreamLimitTest : public Http2CodecImplTest {};
 
 // Regression test for issue #3076.
+//
+// TODO(PiotrSikora): add tests that exercise both scenarios: before and after receiving
+// the HTTP/2 SETTINGS frame.
 TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
   for (int i = 0; i < 101; ++i) {
     request_encoder_ = &client_.newStream(response_decoder_);
