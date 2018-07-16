@@ -177,11 +177,12 @@ void Utility::translateCdsConfig(const Json::Object& json_config,
 
 void Utility::translateRdsConfig(
     const Json::Object& json_rds,
-    envoy::config::filter::network::http_connection_manager::v2::Rds& rds) {
+    envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
+    const Stats::StatsOptions& stats_options) {
   json_rds.validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
 
   const std::string name = json_rds.getString("route_config_name", "");
-  checkObjNameLength("Invalid route_config name", name);
+  checkObjNameLength("Invalid route_config name", name, stats_options);
   rds.set_route_config_name(name);
 
   translateApiConfigSource(json_rds.getString("cluster"),
@@ -204,11 +205,12 @@ Utility::createTagProducer(const envoy::config::bootstrap::v2::Bootstrap& bootst
   return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());
 }
 
-void Utility::checkObjNameLength(const std::string& error_prefix, const std::string& name) {
-  if (name.length() > Stats::RawStatData::maxObjNameLength()) {
+void Utility::checkObjNameLength(const std::string& error_prefix, const std::string& name,
+                                 const Stats::StatsOptions& stats_options) {
+  if (name.length() > stats_options.maxNameLength()) {
     throw EnvoyException(fmt::format("{}: Length of {} ({}) exceeds allowed maximum length ({})",
                                      error_prefix, name, name.length(),
-                                     Stats::RawStatData::maxObjNameLength()));
+                                     stats_options.maxNameLength()));
   }
 }
 

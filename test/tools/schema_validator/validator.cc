@@ -1,6 +1,7 @@
 #include "test/tools/schema_validator/validator.h"
 
 #include "common/router/config_impl.h"
+#include "common/stats/stats_impl.h"
 
 #include "test/test_common/printers.h"
 
@@ -55,7 +56,10 @@ void Validator::validate(const std::string& json_path, Schema::Type schema_type)
     // Construct a envoy::api::v2::RouteConfiguration to validate the Route configuration and
     // ignore the output since nothing will consume it.
     envoy::api::v2::RouteConfiguration route_config;
-    Config::RdsJson::translateRouteConfiguration(*loader, route_config);
+    // TODO(ambuc): Add a CLI option to the schema_validator to allow for a maxStatNameLength
+    // constraint
+    Stats::StatsOptionsImpl stats_options;
+    Config::RdsJson::translateRouteConfiguration(*loader, route_config, stats_options);
     break;
   }
   default:

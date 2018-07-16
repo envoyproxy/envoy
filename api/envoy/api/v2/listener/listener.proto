@@ -55,10 +55,11 @@ message Filter {
 //
 // The following order applies:
 //
-// [#comment:TODO(PiotrSikora): destination IP / ranges are going to be 1.]
-// 1. Server name (e.g. SNI for TLS protocol),
-// 2. Transport protocol.
-// 3. Application protocols (e.g. ALPN for TLS protocol).
+// 1. Destination port.
+// 2. Destination IP address.
+// 3. Server name (e.g. SNI for TLS protocol),
+// 4. Transport protocol.
+// 5. Application protocols (e.g. ALPN for TLS protocol).
 //
 // For criterias that allow ranges or wildcards, the most specific value in any
 // of the configured filter chains that matches the incoming connection is going
@@ -71,9 +72,12 @@ message Filter {
 //
 // [#comment:TODO(PiotrSikora): Add support for configurable precedence of the rules]
 message FilterChainMatch {
+  // Optional destination port to consider when use_original_dst is set on the
+  // listener in determining a filter chain match.
+  google.protobuf.UInt32Value destination_port = 8 [(validate.rules).uint32 = {gte: 1, lte: 65535}];
+
   // If non-empty, an IP address and prefix length to match addresses when the
   // listener is bound to 0.0.0.0/:: or when use_original_dst is specified.
-  // [#not-implemented-hide:]
   repeated core.CidrRange prefix_ranges = 3;
 
   // If non-empty, an IP address and suffix length to match addresses when the
@@ -96,11 +100,6 @@ message FilterChainMatch {
   // not specified, the source port is ignored.
   // [#not-implemented-hide:]
   repeated google.protobuf.UInt32Value source_ports = 7;
-
-  // Optional destination port to consider when use_original_dst is set on the
-  // listener in determining a filter chain match.
-  // [#not-implemented-hide:]
-  google.protobuf.UInt32Value destination_port = 8;
 
   // If non-empty, a list of server names (e.g. SNI for TLS protocol) to consider when determining
   // a filter chain match. Those values will be compared against the server names of a new

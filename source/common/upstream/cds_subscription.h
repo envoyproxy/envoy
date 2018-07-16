@@ -26,7 +26,8 @@ public:
                   const envoy::api::v2::core::ConfigSource& cds_config,
                   const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                   ClusterManager& cm, Event::Dispatcher& dispatcher,
-                  Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info);
+                  Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                  const Stats::StatsOptions& stats_options);
 
 private:
   // Config::Subscription
@@ -55,6 +56,7 @@ private:
   Config::SubscriptionCallbacks<envoy::api::v2::Cluster>* callbacks_ = nullptr;
   Config::SubscriptionStats stats_;
   const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config_;
+  const Stats::StatsOptions& stats_options_;
 };
 
 } // namespace Upstream

@@ -236,8 +236,9 @@ void DynamoFilter::chargeTablePartitionIdStats(const Json::Object& json_body) {
   std::vector<RequestParser::PartitionDescriptor> partitions =
       RequestParser::parsePartitions(json_body);
   for (const RequestParser::PartitionDescriptor& partition : partitions) {
-    std::string scope_string = Utility::buildPartitionStatString(
-        stat_prefix_, table_descriptor_.table_name, operation_, partition.partition_id_);
+    std::string scope_string =
+        Utility::buildPartitionStatString(stat_prefix_, table_descriptor_.table_name, operation_,
+                                          partition.partition_id_, scope_.statsOptions());
     scope_.counter(scope_string).add(partition.capacity_);
   }
 }

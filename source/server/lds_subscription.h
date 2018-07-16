@@ -23,7 +23,8 @@ public:
   LdsSubscription(Config::SubscriptionStats stats,
                   const envoy::api::v2::core::ConfigSource& lds_config,
                   Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                  Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info);
+                  Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                  const Stats::StatsOptions& stats_options);
 
 private:
   // Config::Subscription
@@ -51,6 +52,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Config::SubscriptionCallbacks<envoy::api::v2::Listener>* callbacks_ = nullptr;
   Config::SubscriptionStats stats_;
+  const Stats::StatsOptions& stats_options_;
 };
 
 } // namespace Server

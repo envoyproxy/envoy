@@ -7,6 +7,7 @@
 
 #include "common/network/utility.h"
 #include "common/request_info/request_info_impl.h"
+#include "common/stats/stats_impl.h"
 
 #include "test/test_common/printers.h"
 
@@ -44,7 +45,9 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_json) {
   // TODO(hennna): Allow users to load a full config and extract the route configuration from it.
   Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(router_config_json);
   envoy::api::v2::RouteConfiguration route_config;
-  Config::RdsJson::translateRouteConfiguration(*loader, route_config);
+  // TODO(ambuc): Add a CLI option to allow for a maxStatNameLength constraint
+  Stats::StatsOptionsImpl stats_options;
+  Config::RdsJson::translateRouteConfiguration(*loader, route_config, stats_options);
 
   std::unique_ptr<NiceMock<Server::Configuration::MockFactoryContext>> factory_context(
       std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>());

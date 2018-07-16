@@ -194,13 +194,10 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   max_stats_ = max_stats.getValue();
-  max_obj_name_length_ = max_obj_name_len.getValue();
+  stats_options_.max_obj_name_length_ = max_obj_name_len.getValue();
 
   if (hot_restart_version_option.getValue()) {
-    Stats::RawStatData::configure(*this);
-    std::cerr << hot_restart_version_cb(max_stats.getValue(),
-                                        max_obj_name_len.getValue() +
-                                            Stats::RawStatData::maxStatSuffixLength(),
+    std::cerr << hot_restart_version_cb(max_stats.getValue(), stats_options_.maxNameLength(),
                                         !hot_restart_disabled_);
     throw NoServingException();
   }
