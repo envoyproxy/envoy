@@ -96,13 +96,12 @@ public:
   void sendResponse();
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_DELAY_MS = 5000;
-  uint32_t SERVER_RESPONSE_S = 1;
+  uint32_t SERVER_RESPONSE_MS = 1000;
 
 private:
   void setRetryTimer();
   void setServerResponseTimer();
   void establishNewStream();
-  void sendHealthCheckRequest();
   void handleFailure();
   void
   processMessage(std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message);
@@ -112,7 +111,6 @@ private:
   Grpc::AsyncStream* stream_{};
   const Protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
-  Event::TimerPtr response_timer_;
   envoy::service::discovery::v2::HealthCheckRequest health_check_request_;
   std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier> health_check_message_;
   std::vector<std::string> clusters_;
@@ -123,7 +121,7 @@ private:
   Runtime::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
 
-  Event::TimerPtr server_responce_timer_;
+  Event::TimerPtr server_response_timer_;
 
   std::vector<std::vector<Upstream::HealthCheckerSharedPtr>> health_checkers_ptr;
   std::vector<envoy::api::v2::Cluster> clusters_config_;

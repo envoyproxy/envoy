@@ -138,6 +138,9 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthy) {
   hds_stream_ = hds_fake_connection_->waitForNewStream(*dispatcher_);
   hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg);
 
+  EXPECT_EQ(envoy::service::discovery::v2::Capability::HTTP,
+            envoy_msg.mutable_capability()->health_check_protocol(0));
+
   // Server asks for healthchecking
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier);

@@ -18,8 +18,7 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
       secret_manager_(secret_manager), random_(random), dispatcher_(dispatcher) {
   health_check_request_.mutable_node()->MergeFrom(node);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
-  response_timer_ = dispatcher.createTimer([this]() -> void { sendHealthCheckRequest(); });
-  server_responce_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
+  server_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
   establishNewStream();
 }
 
@@ -28,7 +27,7 @@ void HdsDelegate::setRetryTimer() {
 }
 
 void HdsDelegate::setServerResponseTimer() {
-  server_responce_timer_->enableTimer(std::chrono::seconds(SERVER_RESPONSE_S));
+  server_response_timer_->enableTimer(std::chrono::milliseconds(SERVER_RESPONSE_MS));
 }
 
 void HdsDelegate::establishNewStream() {
@@ -40,10 +39,9 @@ void HdsDelegate::establishNewStream() {
     return;
   }
 
-  sendHealthCheckRequest();
-}
-
-void HdsDelegate::sendHealthCheckRequest() {
+  // TODO(lilika): Add support for other types of healthchecks
+  health_check_request_.mutable_capability()->add_health_check_protocol(
+      envoy::service::discovery::v2::Capability::HTTP);
   ENVOY_LOG(debug, "Sending HealthCheckRequest");
   stream_->sendMessage(health_check_request_, false);
   stats_.responses_.inc();
@@ -152,7 +150,7 @@ void HdsDelegate::onReceiveMessage(
       hds_clusters_[i]->setHealthChecker(health_checkers_ptr[i][l]);
     }
     hds_clusters_[i]->initialize([] {});
-    SERVER_RESPONSE_S = message->mutable_interval()->seconds();
+    SERVER_RESPONSE_MS = 1000 * message->mutable_interval()->seconds();
     setServerResponseTimer();
   }
 }
@@ -163,7 +161,7 @@ void HdsDelegate::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
 
 void HdsDelegate::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
   ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
-  response_timer_->disableTimer();
+  server_response_timer_->disableTimer();
   stream_ = nullptr;
   handleFailure();
 }
