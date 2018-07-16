@@ -101,7 +101,8 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
       min_protocol_version_(
           tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(), TLS1_VERSION)),
       max_protocol_version_(
-          tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(), TLS1_2_VERSION)) {
+          tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(), TLS1_2_VERSION)),
+      subject_alt_name_regex_(config.validation_context().san_validation_regex()) {
   if (ca_cert_.empty()) {
     if (!certificate_revocation_list_.empty()) {
       throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",

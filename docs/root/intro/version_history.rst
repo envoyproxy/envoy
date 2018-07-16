@@ -36,6 +36,8 @@ Version history
   Support for the legacy proto :repo:`source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
 * tracing: added support for configuration of :ref:`tracing sampling
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
+* ssl: added :ref:`regex validation support
+  <envoy_api_field_auth.CertificateValidationContext.san_validation_regex>` for subject alternate names.
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
   selecting a host from a subset.
 

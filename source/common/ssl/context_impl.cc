@@ -121,6 +121,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
 
   if (!config.verifySubjectAltNameList().empty()) {
     verify_subject_alt_name_list_ = config.verifySubjectAltNameList();
+    if (!config.subjectAltNameRegex().empty()) {
+      san_validation_regex_ = RegexUtil::parseRegex(config.subjectAltNameRegex());
+      is_san_regex_validation_ = true;
+    }
     verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
   }
 
@@ -291,7 +295,8 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
 
 int ContextImpl::verifyCertificate(X509* cert) {
   if (!verify_subject_alt_name_list_.empty() &&
-      !verifySubjectAltName(cert, verify_subject_alt_name_list_)) {
+      !verifySubjectAltName(cert, verify_subject_alt_name_list_, is_san_regex_validation_,
+                            san_validation_regex_)) {
     stats_.fail_verify_san_.inc();
     return 0;
   }
@@ -330,7 +335,9 @@ void ContextImpl::logHandshake(SSL* ssl) const {
 }
 
 bool ContextImpl::verifySubjectAltName(X509* cert,
-                                       const std::vector<std::string>& subject_alt_names) {
+                                       const std::vector<std::string>& subject_alt_names,
+                                       const bool is_san_regex_validation,
+                                       const std::regex& regex_pattern) {
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names == nullptr) {
@@ -349,8 +356,14 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
       ASN1_STRING* str = san->d.uniformResourceIdentifier;
       const char* uri = reinterpret_cast<const char*>(ASN1_STRING_data(str));
       for (auto& config_san : subject_alt_names) {
-        if (config_san.compare(uri) == 0) {
-          return true;
+        if (is_san_regex_validation) {
+          if (std::regex_match(config_san, regex_pattern)) {
+            return true;
+          }
+        } else {
+          if (config_san.compare(uri) == 0) {
+            return true;
+          }
         }
       }
     }

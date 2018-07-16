@@ -38,7 +38,8 @@ createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& conte
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
   "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
   "private_key_file": "{{ test_rundir }}/test/config/integration/certs/clientkey.pem",
-  "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team" ]
+  "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team" ],
+  "san_validation_regex" : "^spiffe.//lyft.com.*"
 }
 )EOF";
 
