@@ -50,7 +50,7 @@ const std::string& HttpTracerUtility::toString(OperationName operation_name) {
     return EGRESS_OPERATION;
   }
 
-  NOT_REACHED
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Decision HttpTracerUtility::isTracing(const RequestInfo::RequestInfo& request_info,

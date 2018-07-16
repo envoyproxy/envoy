@@ -206,11 +206,9 @@ public:
    */
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                                 FactoryContext& context) {
-    // GCOVR_EXCL_START
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(context);
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    // GCOVR_EXCL_STOP
   }
 
   /**
@@ -219,7 +217,7 @@ public:
    *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
    *         is deprecated.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; } // GCOVR_EXCL_LINE
 
   /**
    * @return std::string the identifying name for a particular implementation of a network filter
@@ -259,12 +257,10 @@ public:
   virtual Http::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                              const std::string& stat_prefix,
                                                              FactoryContext& context) {
-    // GCOVR_EXCL_START
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(stat_prefix);
     UNREFERENCED_PARAMETER(context);
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    // GCOVR_EXCL_STOP
   }
 
   /**
@@ -273,7 +269,7 @@ public:
    *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
    *         is deprecated.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; } // GCOVR_EXCL_LINE
 
   /**
    * @return ProtobufTypes::MessagePtr create an empty virtual host, route, or weighted
@@ -283,7 +279,7 @@ public:
    *         in implementations.
    */
   virtual ProtobufTypes::MessagePtr createEmptyRouteConfigProto() {
-    return createEmptyConfigProto();
+    return createEmptyConfigProto(); // GCOVR_EXCL_LINE
   }
 
   /**
@@ -292,7 +288,7 @@ public:
    */
   virtual Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const Protobuf::Message&, FactoryContext&) {
-    return nullptr;
+    return nullptr; // GCOVR_EXCL_LINE
   }
 
   /**
