@@ -42,7 +42,7 @@ void HdsDelegate::establishNewStream() {
   // TODO(lilika): Add support for other types of healthchecks
   health_check_request_.mutable_capability()->add_health_check_protocol(
       envoy::service::discovery::v2::Capability::HTTP);
-  ENVOY_LOG(debug, "Sending HealthCheckRequest");
+  ENVOY_LOG(debug, "Sending HealthCheckRequest {} ", health_check_request_.DebugString());
   stream_->sendMessage(health_check_request_, false);
   stats_.responses_.inc();
 }
@@ -89,9 +89,7 @@ void HdsDelegate::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
 
 void HdsDelegate::processMessage(
     std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
-
   for (int i = 0; i < message->health_check_size(); i++) {
-
     // Create HdsCluster config
     ENVOY_LOG(debug, "Creating HdsCluster config");
     envoy::api::v2::core::BindConfig bind_config;
@@ -136,6 +134,9 @@ void HdsDelegate::processMessage(
     health_checkers_ptr.push_back(cluster_health_checkers);
   }
 }
+
+// TODO(lilika): Add support for subsequent HealthCheckSpecifier messages that
+// might modify the HdsClusters
 void HdsDelegate::onReceiveMessage(
     std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
   stats_.requests_.inc();

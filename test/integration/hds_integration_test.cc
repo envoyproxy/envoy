@@ -106,8 +106,6 @@ public:
 
   static constexpr uint32_t upstream_endpoints_ = 0;
 
-  IntegrationStreamDecoderPtr response_;
-  std::string sub_zone_{"winter"};
   FakeHttpConnectionPtr hds_fake_connection_;
   FakeStreamPtr hds_stream_;
   FakeUpstream* hds_upstream_{};
@@ -204,6 +202,10 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeout) {
   EXPECT_STREQ(host_stream->headers().Method()->value().c_str(), "GET");
 
   // Endpoint doesn't repond to the healthcheck
+  hds_stream_->waitForGrpcMessage(*dispatcher_, response);
+  EXPECT_EQ(
+      envoy::api::v2::core::HealthStatus::UNHEALTHY,
+      response.mutable_endpoint_health_response()->mutable_endpoints_health(0)->health_status());
   test_server_->waitForCounterGe("cluster.anna0.health_check.failure", 1);
 
   // Clean up connections
@@ -274,6 +276,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
   envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier =
       makeHealthCheckSpecifier();
 
+  // Add endpoint
   auto* endpoint = server_health_check_specifier.mutable_health_check(0)->mutable_endpoints(0);
 
   endpoint->add_endpoints()->mutable_address()->mutable_socket_address()->set_address(
@@ -304,7 +307,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
   host2_stream = host2_fake_connection_->waitForNewStream(*dispatcher_);
   host2_stream->waitForEndStream(*dispatcher_);
 
-  // Endpoint reponds to the healthcheck
+  // Endpoints repond to the healthcheck
   host_stream->encodeHeaders(Http::TestHeaderMapImpl{{":status", "404"}}, false);
   host_stream->encodeData(1024, true);
   host2_stream->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
@@ -319,6 +322,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
       response.mutable_endpoint_health_response()->mutable_endpoints_health(1)->health_status());
   test_server_->waitForCounterGe("cluster.anna0.health_check.failure", 1);
   test_server_->waitForCounterGe("cluster.anna0.health_check.success", 1);
+
   // Clean up connections
   host_fake_connection_->close();
   host_fake_connection_->waitForDisconnect();
@@ -337,6 +341,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
   envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier =
       makeHealthCheckSpecifier();
 
+  // Add endpoint
   auto* health_check = server_health_check_specifier.mutable_health_check(0);
 
   health_check->add_endpoints()
@@ -390,6 +395,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
       response.mutable_endpoint_health_response()->mutable_endpoints_health(1)->health_status());
   test_server_->waitForCounterGe("cluster.anna0.health_check.failure", 1);
   test_server_->waitForCounterGe("cluster.anna0.health_check.success", 1);
+
   // Clean up connections
   host_fake_connection_->close();
   host_fake_connection_->waitForDisconnect();
@@ -408,6 +414,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier =
       makeHealthCheckSpecifier();
 
+  // Add endpoint
   auto* health_check = server_health_check_specifier.add_health_check();
 
   health_check->add_endpoints()
