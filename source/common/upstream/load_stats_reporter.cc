@@ -109,6 +109,14 @@ void LoadStatsReporter::onReceiveMessage(
 }
 
 void LoadStatsReporter::startLoadReportPeriod() {
+  // Once a cluster is tracked, we don't want to reset its stats between reports
+  // to avoid racing between request/response.
+  std::set<std::string> existing_clusters;
+  for (const std::string& cluster_name : message_->clusters()) {
+    if (std::find(clusters_.begin(), clusters_.end(), cluster_name) != clusters_.end()) {
+      existing_clusters.emplace(cluster_name);
+    }
+  }
   clusters_.clear();
   // Reset stats for all hosts in clusters we are tracking.
   for (const std::string& cluster_name : message_->clusters()) {
@@ -116,6 +124,10 @@ void LoadStatsReporter::startLoadReportPeriod() {
     auto cluster_info_map = cm_.clusters();
     auto it = cluster_info_map.find(cluster_name);
     if (it == cluster_info_map.end()) {
+      continue;
+    }
+    // Don't reset stats for existing tracked clusters.
+    if (existing_clusters.count(cluster_name) > 0) {
       continue;
     }
     auto& cluster = it->second.get();

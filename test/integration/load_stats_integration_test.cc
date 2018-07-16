@@ -382,8 +382,23 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   EXPECT_LE(5, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
 
-  // A LoadStatsResponse arrives before the expiration of the reporting interval.
+  // A LoadStatsResponse arrives before the expiration of the reporting
+  // interval. Since we are keep tracking cluster_0, stats rollover.
   requestLoadStatsResponse({"cluster_0"});
+  sendAndReceiveUpstream(1);
+  requestLoadStatsResponse({"cluster_0"});
+  sendAndReceiveUpstream(1);
+  sendAndReceiveUpstream(1);
+
+  waitForLoadStatsRequest({localityStats("winter", 3, 0, 0)});
+
+  EXPECT_EQ(6, test_server_->counter("load_reporter.requests")->value());
+  EXPECT_LE(6, test_server_->counter("load_reporter.responses")->value());
+  EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
+
+  // As above, but stop tracking cluster_0 and only get the requests since the
+  // response.
+  requestLoadStatsResponse({});
   sendAndReceiveUpstream(1);
   requestLoadStatsResponse({"cluster_0"});
   sendAndReceiveUpstream(1);
@@ -391,8 +406,8 @@ TEST_P(LoadStatsIntegrationTest, Success) {
 
   waitForLoadStatsRequest({localityStats("winter", 2, 0, 0)});
 
-  EXPECT_EQ(6, test_server_->counter("load_reporter.requests")->value());
-  EXPECT_LE(6, test_server_->counter("load_reporter.responses")->value());
+  EXPECT_EQ(8, test_server_->counter("load_reporter.requests")->value());
+  EXPECT_LE(7, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
 
   cleanupLoadStatsConnection();
