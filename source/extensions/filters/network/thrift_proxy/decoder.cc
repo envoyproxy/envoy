@@ -219,42 +219,42 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::handleValue(Buffer::Inst
                                                                     ProtocolState return_state) {
   switch (elem_type) {
   case FieldType::Bool: {
-    bool value;
+    bool value{};
     if (proto_.readBool(buffer, value)) {
       return DecoderStatus(return_state, filter_.boolValue(value));
     }
     break;
   }
   case FieldType::Byte: {
-    uint8_t value;
+    uint8_t value{};
     if (proto_.readByte(buffer, value)) {
       return DecoderStatus(return_state, filter_.byteValue(value));
     }
     break;
   }
   case FieldType::I16: {
-    int16_t value;
+    int16_t value{};
     if (proto_.readInt16(buffer, value)) {
       return DecoderStatus(return_state, filter_.int16Value(value));
     }
     break;
   }
   case FieldType::I32: {
-    int32_t value;
+    int32_t value{};
     if (proto_.readInt32(buffer, value)) {
       return DecoderStatus(return_state, filter_.int32Value(value));
     }
     break;
   }
   case FieldType::I64: {
-    int64_t value;
+    int64_t value{};
     if (proto_.readInt64(buffer, value)) {
       return DecoderStatus(return_state, filter_.int64Value(value));
     }
     break;
   }
   case FieldType::Double: {
-    double value;
+    double value{};
     if (proto_.readDouble(buffer, value)) {
       return DecoderStatus(return_state, filter_.doubleValue(value));
     }
