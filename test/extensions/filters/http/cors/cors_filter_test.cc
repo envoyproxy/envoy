@@ -164,7 +164,6 @@ TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByWildcard) {
       {"access-control-allow-origin", "test-host"},
       {"access-control-allow-methods", "GET"},
       {"access-control-allow-headers", "content-type"},
-      {"access-control-expose-headers", "content-type"},
       {"access-control-max-age", "0"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -229,7 +228,6 @@ TEST_F(CorsFilterTest, ValidOptionsRequestWithAllowCredentialsTrue) {
       {"access-control-allow-credentials", "true"},
       {"access-control-allow-methods", "GET"},
       {"access-control-allow-headers", "content-type"},
-      {"access-control-expose-headers", "content-type"},
       {"access-control-max-age", "0"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -254,7 +252,6 @@ TEST_F(CorsFilterTest, ValidOptionsRequestWithAllowCredentialsFalse) {
       {"access-control-allow-origin", "localhost"},
       {"access-control-allow-methods", "GET"},
       {"access-control-allow-headers", "content-type"},
-      {"access-control-expose-headers", "content-type"},
       {"access-control-max-age", "0"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -458,7 +455,6 @@ TEST_F(CorsFilterTest, NoRouteCorsEntry) {
       {"access-control-allow-origin", "localhost"},
       {"access-control-allow-methods", "GET"},
       {"access-control-allow-headers", "content-type"},
-      {"access-control-expose-headers", "content-type"},
       {"access-control-max-age", "0"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -487,7 +483,6 @@ TEST_F(CorsFilterTest, NoVHostCorsEntry) {
       {":status", "200"},
       {"access-control-allow-origin", "localhost"},
       {"access-control-allow-headers", "content-type"},
-      {"access-control-expose-headers", "content-type"},
       {"access-control-max-age", "0"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -513,7 +508,6 @@ TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByRegex) {
       {"access-control-allow-origin", "www.envoyproxy.io"},
       {"access-control-allow-methods", "GET"},
       {"access-control-allow-headers", "content-type"},
-      {"access-control-expose-headers", "content-type"},
       {"access-control-max-age", "0"},
   };
 

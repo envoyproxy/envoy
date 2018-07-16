@@ -70,10 +70,6 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
     response_headers->insertAccessControlAllowHeaders().value(allowHeaders());
   }
 
-  if (!exposeHeaders().empty()) {
-    response_headers->insertAccessControlExposeHeaders().value(exposeHeaders());
-  }
-
   if (!maxAge().empty()) {
     response_headers->insertAccessControlMaxAge().value(maxAge());
   }

@@ -46,7 +46,6 @@ public:
             cors->add_allow_origin("test-host-2");
             cors->set_allow_headers("content-type");
             cors->set_allow_methods("POST");
-            cors->set_expose_headers("content-type");
             cors->set_max_age("100");
           }
 
@@ -146,7 +145,6 @@ TEST_P(CorsFilterIntegrationTest, TestRouteConfigSuccess) {
           {"access-control-allow-origin", "test-origin-1"},
           {"access-control-allow-methods", "POST"},
           {"access-control-allow-headers", "content-type"},
-          {"access-control-expose-headers", "content-type"},
           {"access-control-max-age", "100"},
           {"server", "envoy"},
           {"content-length", "0"},
