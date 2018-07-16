@@ -54,7 +54,7 @@ public:
     case Http::HeaderMap::Lookup::NotSupported:
       return opentracing::make_unexpected(opentracing::lookup_key_not_supported_error);
     }
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   opentracing::expected<void> ForeachKey(OpenTracingCb f) const override {

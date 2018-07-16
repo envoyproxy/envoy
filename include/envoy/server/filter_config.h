@@ -206,9 +206,11 @@ public:
    */
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                                 FactoryContext& context) {
+    // GCOVR_EXCL_START
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(context);
-    NOT_IMPLEMENTED;
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    // GCOVR_EXCL_STOP
   }
 
   /**
@@ -257,10 +259,12 @@ public:
   virtual Http::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                              const std::string& stat_prefix,
                                                              FactoryContext& context) {
+    // GCOVR_EXCL_START
     UNREFERENCED_PARAMETER(config);
     UNREFERENCED_PARAMETER(stat_prefix);
     UNREFERENCED_PARAMETER(context);
-    NOT_IMPLEMENTED;
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    // GCOVR_EXCL_STOP
   }
 
   /**

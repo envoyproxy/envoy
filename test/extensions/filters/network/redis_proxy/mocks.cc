@@ -50,7 +50,7 @@ bool operator==(const RespValue& lhs, const RespValue& rhs) {
   }
   }
 
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 MockEncoder::MockEncoder() {
