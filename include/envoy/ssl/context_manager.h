@@ -19,13 +19,13 @@ public:
   /**
    * Builds a ClientContext from a ClientContextConfig.
    */
-  virtual ClientContextPtr createSslClientContext(Stats::Scope& scope,
-                                                  const ClientContextConfig& config) PURE;
+  virtual ClientContextSharedPtr createSslClientContext(Stats::Scope& scope,
+                                                        const ClientContextConfig& config) PURE;
 
   /**
    * Builds a ServerContext from a ServerContextConfig.
    */
-  virtual ServerContextPtr
+  virtual ServerContextSharedPtr
   createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
                          const std::vector<std::string>& server_names) PURE;
 

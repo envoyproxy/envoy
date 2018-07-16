@@ -399,6 +399,7 @@ public:
   Upstream::MockThreadLocalCluster thread_local_cluster_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Runtime::MockLoader runtime_;
+  Ssl::ContextManagerImpl context_manager_{runtime_};
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
@@ -421,6 +422,7 @@ public:
     // doesn't like dangling contexts at destruction.
     GrpcClientIntegrationTest::TearDown();
     fake_upstream_.reset();
+    async_client_transport_socket_.reset();
     client_connection_.reset();
     mock_cluster_info_->transport_socket_factory_.reset();
   }
@@ -483,7 +485,6 @@ public:
 
   bool use_client_cert_{};
   Secret::MockSecretManager secret_manager_;
-  Ssl::ContextManagerImpl context_manager_{runtime_};
 };
 
 } // namespace
