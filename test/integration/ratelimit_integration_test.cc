@@ -131,7 +131,10 @@ public:
 
   void cleanup() {
     if (fake_ratelimit_connection_ != nullptr) {
-      fake_ratelimit_connection_->close();
+      if (clientType() != Grpc::ClientType::GoogleGrpc) {
+        // TODO(htuch) we should document the underlying cause of this difference and/or fix it.
+        fake_ratelimit_connection_->close();
+      }
       fake_ratelimit_connection_->waitForDisconnect();
     }
     cleanupUpstreamAndDownstream();
@@ -220,7 +223,11 @@ TEST_P(RatelimitIntegrationTest, ConnectImmediateDisconnect) {
 }
 
 TEST_P(RatelimitIntegrationTest, FailedConnect) {
-  fake_upstreams_[1].reset();
+  // Do not reset the fake upstream for the ratelimiter, but have it stop listening.
+  // If we reset, the Envoy will continue to send H2 to the original rate limiter port, which may
+  // be used by another test, and data sent to that port "unexpectedly" will cause problems for
+  // that test.
+  fake_upstreams_[1]->cleanUp();
   initiateClientConnection();
   // Rate limiter fails open
   waitForSuccessfulUpstreamResponse();
