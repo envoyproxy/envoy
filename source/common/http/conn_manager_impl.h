@@ -362,6 +362,10 @@ private:
     void setBufferLimit(uint32_t limit);
     // Set up the Encoder/Decoder filter chain.
     bool createFilterChain();
+    // Per-stream idle timeout callback.
+    void onIdleTimeout();
+    // Reset per-stream idle timer.
+    void resetIdleTimer();
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
@@ -379,6 +383,9 @@ private:
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
     Stats::TimespanPtr request_timer_;
+    // Per-stream idle timeout.
+    Event::TimerPtr idle_timer_;
+    std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
     RequestInfo::RequestInfoImpl request_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;

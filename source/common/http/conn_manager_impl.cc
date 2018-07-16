@@ -396,6 +396,28 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   ASSERT(state_.filter_call_state_ == 0);
 }
 
+void ConnectionManagerImpl::ActiveStream::resetIdleTimer() {
+  if (idle_timer_ != nullptr) {
+    // TODO(htuch): If this shows up in performance profiles, optimize by only
+    // updating a timestamp here and doing periodic checks for idle timeouts
+    // instead, or reducing the accuracy of timers.
+    idle_timer_->enableTimer(idle_timeout_ms_);
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
+  connection_manager_.stats_.named_.downstream_rq_idle_timeout_.inc();
+  // If headers have not been sent to the user, send a 408.
+  if (response_headers_ != nullptr) {
+    // TODO(htuch): We could send trailers here with an x-envoy timeout header
+    // or gRPC status code, and/or set H2 RST_STREAM error.
+    connection_manager_.doEndStream(*this);
+  } else {
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Http::Code::RequestTimeout,
+                   "stream timeout", nullptr);
+  }
+}
+
 void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
     StreamDecoderFilterSharedPtr filter, bool dual_filter) {
   ActiveStreamDecoderFilterPtr wrapper(new ActiveStreamDecoderFilter(*this, filter, dual_filter));
@@ -579,6 +601,16 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     // Allow non websocket requests to go through websocket enabled routes.
   }
 
+  if (cached_route_.value()) {
+    const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
+    if (route_entry != nullptr && route_entry->idleTimeout()) {
+      idle_timeout_ms_ = route_entry->idleTimeout().value();
+      idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+          [this]() -> void { onIdleTimeout(); });
+      resetIdleTimer();
+    }
+  }
+
   // Check if tracing is enabled at all.
   if (connection_manager_.config_.tracingConfig()) {
     traceRequest();
@@ -702,6 +734,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, boo
 
 void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* filter,
                                                      Buffer::Instance& data, bool end_stream) {
+  resetIdleTimer();
+
   // If a response is complete or a reset has been sent, filters do not care about further body
   // data. Just drop it.
   if (state_.local_complete_) {
@@ -750,6 +784,7 @@ void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilt
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeTrailers(HeaderMapPtr&& trailers) {
+  resetIdleTimer();
   maybeEndDecode(true);
   request_trailers_ = std::move(trailers);
   decodeTrailers(nullptr, *request_trailers_);
@@ -846,6 +881,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     ActiveStreamEncoderFilter* filter, HeaderMap& headers) {
+  resetIdleTimer();
   ASSERT(connection_manager_.config_.proxy100Continue());
   // Make sure commonContinue continues encode100ContinueHeaders.
   has_continue_headers_ = true;
@@ -882,6 +918,8 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
 
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
                                                         HeaderMap& headers, bool end_stream) {
+  resetIdleTimer();
+
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   std::list<ActiveStreamEncoderFilterPtr>::iterator continue_data_entry = encoder_filters_.end();
 
@@ -1019,6 +1057,7 @@ void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilt
 
 void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* filter,
                                                      Buffer::Instance& data, bool end_stream) {
+  resetIdleTimer();
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeData));
@@ -1042,6 +1081,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
 
 void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilter* filter,
                                                          HeaderMap& trailers) {
+  resetIdleTimer();
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, true);
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeTrailers));

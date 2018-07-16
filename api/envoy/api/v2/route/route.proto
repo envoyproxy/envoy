@@ -313,7 +313,7 @@ message CorsPolicy {
   google.protobuf.BoolValue enabled = 7;
 }
 
-// [#comment:next free field: 24]
+// [#comment:next free field: 25]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -401,7 +401,9 @@ message RouteAction {
     google.protobuf.BoolValue auto_host_rewrite = 7;
   }
 
-  // Specifies the timeout for the route. If not specified, the default is 15s.
+  // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
+  // spans between the point at which the entire downstream request (i.e. end-of-stream) has been
+  // processed and when the upstream response has been completely processed.
   //
   // .. note::
   //
@@ -423,8 +425,8 @@ message RouteAction {
     // :ref:`config_http_filters_router_x-envoy-max-retries`.
     google.protobuf.UInt32Value num_retries = 2;
 
-    // Specifies a non-zero timeout per retry attempt. This parameter is optional.
-    // The same conditions documented for
+    // Specifies a non-zero upstream timeout per retry attempt. This parameter is optional. The
+    // same conditions documented for
     // :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms` apply.
     //
     // .. note::
@@ -436,6 +438,28 @@ message RouteAction {
     //   would have been exhausted.
     google.protobuf.Duration per_try_timeout = 3 [(gogoproto.stdduration) = true];
   }
+
+  // Specifies the idle timeout for the route. If not specified, this defaults
+  // to 5 minutes. The default value was select so as not to interfere with any
+  // smaller configured timeouts that may have existed in configurations prior
+  // to the introduction of this feature, while introducing robustness to TCP
+  // connections that terminate without FIN. A value of 0 will completely
+  // disable the idle timeout.
+  //
+  // The idle timeout is distinct to :ref:`timeout
+  // <envoy_api_field_route.RouteAction.timeout>`, which provides an upper bound
+  // on the upstream response time; :ref:`idle_timeout
+  // <envoy_api_field_route.RouteAction.idle_timeout>` instead bounds the amount
+  // of time the request's stream may be idle.
+  //
+  // After header decoding, the idle timeout will apply on downstream and
+  // upstream request events. Each time an encode/decode event for headers or
+  // data is processed for the stream, the timer will be reset. If the timeout
+  // fires, the stream is terminated with a 408 Request Timeout error code if no
+  // upstream response header has been received, otherwise a stream reset
+  // occurs.
+  google.protobuf.Duration idle_timeout = 24
+      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
 
   // Indicates that the route has a retry policy.
   RetryPolicy retry_policy = 9;
