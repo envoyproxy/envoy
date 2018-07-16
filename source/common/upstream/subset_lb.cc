@@ -494,8 +494,10 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   }
 
   // Calling predicate() is expensive since it involves metadata lookups; so we
-  // can take a shortcut and just filter healthy hosts in a follow-up call.
-  // Ideally, we would merge these two calls.
+  // avoid it in the 2nd call to filter() by using the result from the first call
+  // to filter() as the starting point.
+  //
+  // TODO(rgs1): merge these two filter() calls in one loop.
   HostsPerLocalityConstSharedPtr hosts_per_locality =
       original_host_set_.hostsPerLocality().filter(predicate);
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
