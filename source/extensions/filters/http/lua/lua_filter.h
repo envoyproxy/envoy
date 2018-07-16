@@ -381,7 +381,7 @@ private:
   StreamHandleRef response_stream_wrapper_;
   bool destroyed_{};
 
-  // These coroutines used to by owned by the stream handles. After investigating #3570, it
+  // These coroutines used to be owned by the stream handles. After investigating #3570, it
   // became clear that there is a circular memory reference when a coroutine yields. Basically,
   // the coroutine holds a reference to the stream wrapper. I'm not completely sure why this is,
   // but I think it is because the yield happens via a stream handle method, so the runtime must
