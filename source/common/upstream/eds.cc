@@ -140,7 +140,7 @@ bool EdsClusterImpl::updateHostsPerLocality(const uint32_t priority, const HostV
               info_->name(), host_set.hosts().size(), host_set.priority());
 
     priority_state_manager.updateClusterPrioritySet(priority, std::move(current_hosts_copy),
-                                                    hosts_added, hosts_removed);
+                                                    hosts_added, hosts_removed, absl::nullopt);
     return true;
   }
   return false;
