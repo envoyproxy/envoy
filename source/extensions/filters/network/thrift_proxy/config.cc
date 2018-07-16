@@ -117,19 +117,14 @@ DecoderPtr ConfigImpl::createDecoder(DecoderCallbacks& callbacks) {
 
 TransportPtr ConfigImpl::createTransport() {
   TransportTypeMap::const_iterator i = transportTypeMap().find(transport_);
-  if (i == transportTypeMap().end()) {
-    throw new EnvoyException(fmt::format("unknown transport type: {}", transport_));
-  }
+  RELEASE_ASSERT(i != transportTypeMap().end(), "invalid transport type");
 
   return NamedTransportConfigFactory::getFactory(i->second).createTransport();
 }
 
 ProtocolPtr ConfigImpl::createProtocol() {
   ProtocolTypeMap::const_iterator i = protocolTypeMap().find(proto_);
-  if (i == protocolTypeMap().end()) {
-    throw new EnvoyException(fmt::format("unknown protocol type: {}", proto_));
-  }
-
+  RELEASE_ASSERT(i != protocolTypeMap().end(), "invalid protocol type");
   return NamedProtocolConfigFactory::getFactory(i->second).createProtocol();
 }
 

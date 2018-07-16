@@ -49,7 +49,7 @@ public:
     return route_matcher_->route(method_name);
   }
 
-  // Config:
+  // Config
   ThriftFilterStats& stats() override { return stats_; }
   ThriftFilters::FilterChainFactory& filterFactory() override { return *this; }
   DecoderPtr createDecoder(DecoderCallbacks& callbacks) override;
