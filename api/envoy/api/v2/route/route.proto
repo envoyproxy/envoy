@@ -605,7 +605,7 @@ message RouteAction {
   //   proxy data from the client to the upstream server.
   //
   //   Redirects are not supported on routes where WebSocket upgrades are allowed.
-  google.protobuf.BoolValue use_websocket = 16;
+  google.protobuf.BoolValue use_websocket = 16 [deprecated = true];
 
   message WebSocketProxyConfig {
     // See :ref:`stat_prefix
