@@ -27,6 +27,7 @@ envoy_cc_test_library(
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/router:config_lib",
+        "//source/common/stats:stats_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",

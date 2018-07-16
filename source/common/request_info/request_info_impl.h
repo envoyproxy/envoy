@@ -125,7 +125,13 @@ struct RequestInfoImpl : public RequestInfo {
 
   void setResponseFlag(ResponseFlag response_flag) override { response_flags_ |= response_flag; }
 
-  bool getResponseFlag(ResponseFlag flag) const override { return response_flags_ & flag; }
+  bool intersectResponseFlags(uint64_t response_flags) const override {
+    return (response_flags_ & response_flags) != 0;
+  }
+
+  bool hasResponseFlag(ResponseFlag flag) const override { return response_flags_ & flag; }
+
+  bool hasAnyResponseFlag() const override { return response_flags_ != 0; }
 
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_host_ = host;

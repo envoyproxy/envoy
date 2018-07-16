@@ -94,7 +94,7 @@ TEST_F(AuthenticatorTest, TestOkJWTandCache) {
 // This test verifies the Jwt is forwarded if "forward" flag is set.
 TEST_F(AuthenticatorTest, TestForwardJwt) {
   // Confit forward_jwt flag
-  proto_config_.mutable_rules(0)->set_forward(true);
+  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_forward(true);
   CreateAuthenticator();
 
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
@@ -138,41 +138,6 @@ TEST_F(AuthenticatorTest, TestMissedJWT) {
 
   // Empty headers.
   auto headers = Http::TestHeaderMapImpl{};
-  auth_->verify(headers, &mock_cb_);
-}
-
-// This test verifies if Jwt is missing but allow_missing_or_fail is true, Status::OK is returned.
-TEST_F(AuthenticatorTest, TestMissingJwtWhenAllowMissingOrFailedIsTrue) {
-  // In this test, when JWT is missing, the status should still be OK
-  // because allow_missing_or_failed is true.
-  proto_config_.set_allow_missing_or_failed(true);
-  CreateAuthenticator();
-
-  EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
-
-  // Empty headers.
-  auto headers = Http::TestHeaderMapImpl{};
-  auth_->verify(headers, &mock_cb_);
-}
-
-// This test verifies if Jwt verifiecation fails but allow_missing_or_fail is true, Status::OK is
-// returned.
-TEST_F(AuthenticatorTest, TestInValidJwtWhenAllowMissingOrFailedIsTrue) {
-  // In this test, when JWT is invalid, the status should still be OK
-  // because allow_missing_or_failed is true.
-  proto_config_.set_allow_missing_or_failed(true);
-  CreateAuthenticator();
-
-  EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
-
-  std::string token = "invalidToken";
-  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + token}};
   auth_->verify(headers, &mock_cb_);
 }
 
@@ -243,7 +208,7 @@ TEST_F(AuthenticatorTest, TestWrongCluster) {
 // This test verifies when Jwt issuer is not configured, JwtUnknownIssuer is returned.
 TEST_F(AuthenticatorTest, TestIssuerNotFound) {
   // Create a config with an other issuer.
-  proto_config_.mutable_rules(0)->set_issuer("other_issuer");
+  (*proto_config_.mutable_providers())[std::string(ProviderName)].set_issuer("other_issuer");
   CreateAuthenticator();
 
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
@@ -419,8 +384,8 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
 // This test verifies if "forward_playload_header" is empty, payload is not forwarded.
 TEST_F(AuthenticatorTest, TestNoForwardPayloadHeader) {
   // In this config, there is no forward_payload_header
-  auto rule0 = proto_config_.mutable_rules(0);
-  rule0->clear_forward_payload_header();
+  auto& provider0 = (*proto_config_.mutable_providers())[std::string(ProviderName)];
+  provider0.clear_forward_payload_header();
   CreateAuthenticator();
 
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);

@@ -1,7 +1,27 @@
 .. _arch_overview_websocket:
 
-WebSocket support
-=================
+Envoy currently supports two modes of Upgrade behavior, the new generic upgrade mode, and
+the old WebSocket-only TCP proxy mode.
+
+
+New style Upgrade support
+=========================
+
+The new style Upgrade support is intended mainly for WebSocket but may be used for non-WebSocket
+upgrades as well. The new style of upgrades pass both the HTTP headers and the upgrade payload
+through an HTTP filter chain. One may configure the
+:ref:`upgrade_configs <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`
+in one of two ways. If only the
+`upgrade_type <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.UpgradeConfigs.upgrade_type>`
+is specified, both the upgrade headers, any request and response body, and WebSocket payload will
+pass through the default HTTP filter chain. To avoid the use of HTTP-only filters for upgrade payload,
+one can set up custom
+`filters <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.UpgradeConfigs.upgrade_type>`
+for the given upgrade type, up to and including only using the router filter to send the WebSocket
+data upstream.
+
+Old style WebSocket support
+===========================
 
 Envoy supports upgrading a HTTP/1.1 connection to a WebSocket connection.
 Connection upgrade will be allowed only if the downstream client
@@ -18,8 +38,8 @@ retries, rate limits and shadowing are not supported for WebSocket routes.
 However, prefix rewriting, explicit and automatic host rewriting, traffic
 shifting and splitting are supported.
 
-Connection semantics
---------------------
+Old style Connection semantics
+------------------------------
 
 Even though WebSocket upgrades occur over HTTP/1.1 connections, WebSockets
 proxying works similarly to plain TCP proxy, i.e., Envoy does not interpret

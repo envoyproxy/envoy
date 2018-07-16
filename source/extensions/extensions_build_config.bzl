@@ -33,6 +33,7 @@ EXTENSIONS = {
     "envoy.filters.http.grpc_web":                      "//source/extensions/filters/http/grpc_web:config",
     "envoy.filters.http.gzip":                          "//source/extensions/filters/http/gzip:config",
     "envoy.filters.http.health_check":                  "//source/extensions/filters/http/health_check:config",
+    "envoy.filters.http.header_to_metadata":            "//source/extensions/filters/http/header_to_metadata:config",
     "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
     "envoy.filters.http.lua":                           "//source/extensions/filters/http/lua:config",
@@ -67,14 +68,14 @@ EXTENSIONS = {
     "envoy.filters.network.redis_proxy":                "//source/extensions/filters/network/redis_proxy:config",
     "envoy.filters.network.ratelimit":                  "//source/extensions/filters/network/ratelimit:config",
     "envoy.filters.network.tcp_proxy":                  "//source/extensions/filters/network/tcp_proxy:config",
-    # TODO(zuercher): switch to config target once a filter exists
-    "envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:transport_lib",
+    "envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
 
     #
     # Stat sinks
     #
 
     "envoy.stat_sinks.dog_statsd":                      "//source/extensions/stat_sinks/dog_statsd:config",
+    "envoy.stat_sinks.hystrix":                         "//source/extensions/stat_sinks/hystrix:config",
     "envoy.stat_sinks.metrics_service":                 "//source/extensions/stat_sinks/metrics_service:config",
     "envoy.stat_sinks.statsd":                          "//source/extensions/stat_sinks/statsd:config",
 
@@ -90,5 +91,7 @@ EXTENSIONS = {
     # Transport sockets
     #
 
+    # TODO(lizan): switch to config target once a transport socket exists
+    "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:tsi_handshaker",
     "envoy.transport_sockets.capture":                  "//source/extensions/transport_sockets/capture:config",
 }

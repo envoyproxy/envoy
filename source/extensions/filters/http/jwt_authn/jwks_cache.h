@@ -22,7 +22,7 @@ typedef std::unique_ptr<JwksCache> JwksCachePtr;
  *
  *     // for a given jwt
  *     auto jwks_data = jwks_cache->findByIssuer(jwt->getIssuer());
- *     if (!jwks_data->isAudidenceAllowed(jwt->getAudiences())) reject;
+ *     if (!jwks_data->areAudiencesAllowed(jwt->getAudiences())) reject;
  *
  *     if (jwks_data->getJwksObj() == nullptr || jwks_data->isExpired()) {
  *        // Fetch remote Jwks.
@@ -42,8 +42,8 @@ public:
     virtual ~JwksData() {}
 
     // Get the cached config: JWT rule.
-    virtual const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRule&
-    getJwtRule() const PURE;
+    virtual const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider&
+    getJwtProvider() const PURE;
 
     // Check if a list of audiences are allowed.
     virtual bool areAudiencesAllowed(const std::vector<std::string>& audiences) const PURE;

@@ -11,6 +11,7 @@
 #include "envoy/grpc/status.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/backoff_strategy.h"
 #include "common/common/logger.h"
 
 namespace Envoy {
@@ -25,6 +26,7 @@ class GrpcMuxImpl : public GrpcMux,
 public:
   GrpcMuxImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
+              Runtime::RandomGenerator& random,
               MonotonicTimeSource& time_source = ProdMonotonicTimeSource::instance_);
   ~GrpcMuxImpl();
 
@@ -42,7 +44,8 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
   // TODO(htuch): Make this configurable or some static.
-  const uint32_t RETRY_DELAY_MS = 5000;
+  const uint32_t RETRY_INITIAL_DELAY_MS = 500;
+  const uint32_t RETRY_MAX_DELAY_MS = 30000; // Do not cross more than 30s
 
 private:
   void setRetryTimer();
@@ -100,7 +103,9 @@ private:
   // Envoy's dependendency ordering.
   std::list<std::string> subscriptions_;
   Event::TimerPtr retry_timer_;
+  Runtime::RandomGenerator& random_;
   MonotonicTimeSource& time_source_;
+  BackOffStrategyPtr backoff_strategy_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {

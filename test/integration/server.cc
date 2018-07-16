@@ -15,6 +15,7 @@
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 
 #include "gtest/gtest.h"
@@ -92,7 +93,8 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
 
   ThreadLocal::InstanceImpl tls;
   Stats::HeapRawStatDataAllocator stats_allocator;
-  Stats::ThreadLocalStoreImpl stats_store(stats_allocator);
+  Stats::StatsOptionsImpl options_;
+  Stats::ThreadLocalStoreImpl stats_store(options_, stats_allocator);
   stat_store_ = &stats_store;
   Runtime::RandomGeneratorPtr random_generator;
   if (deterministic) {

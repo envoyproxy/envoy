@@ -74,7 +74,8 @@ TEST_F(OpenTracingDriverTest, FlushSpanWithTag) {
   first_span->finishSpan();
 
   const std::unordered_map<std::string, opentracing::Value> expected_tags = {
-      {"abc", std::string{"123"}}};
+      {"abc", std::string{"123"}},
+      {opentracing::ext::span_kind, std::string{opentracing::ext::span_kind_rpc_server}}};
 
   EXPECT_EQ(1, driver_->recorder().spans().size());
   EXPECT_EQ(expected_tags, driver_->recorder().top().tags);
@@ -88,7 +89,8 @@ TEST_F(OpenTracingDriverTest, TagSamplingFalseByDecision) {
   first_span->finishSpan();
 
   const std::unordered_map<std::string, opentracing::Value> expected_tags = {
-      {opentracing::ext::sampling_priority, 0}};
+      {opentracing::ext::sampling_priority, 0},
+      {opentracing::ext::span_kind, std::string{opentracing::ext::span_kind_rpc_server}}};
 
   EXPECT_EQ(1, driver_->recorder().spans().size());
   EXPECT_EQ(expected_tags, driver_->recorder().top().tags);
@@ -103,7 +105,40 @@ TEST_F(OpenTracingDriverTest, TagSamplingFalseByFlag) {
   first_span->finishSpan();
 
   const std::unordered_map<std::string, opentracing::Value> expected_tags = {
-      {opentracing::ext::sampling_priority, 0}};
+      {opentracing::ext::sampling_priority, 0},
+      {opentracing::ext::span_kind, std::string{opentracing::ext::span_kind_rpc_server}}};
+
+  EXPECT_EQ(1, driver_->recorder().spans().size());
+  EXPECT_EQ(expected_tags, driver_->recorder().top().tags);
+}
+
+TEST_F(OpenTracingDriverTest, TagSpanKindClient) {
+  setupValidDriver(OpenTracingDriver::PropagationMode::TracerNative, {});
+
+  ON_CALL(config_, operationName()).WillByDefault(testing::Return(Tracing::OperationName::Egress));
+
+  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                                   start_time_, {Tracing::Reason::Sampling, true});
+  first_span->finishSpan();
+
+  const std::unordered_map<std::string, opentracing::Value> expected_tags = {
+      {opentracing::ext::span_kind, std::string{opentracing::ext::span_kind_rpc_client}}};
+
+  EXPECT_EQ(1, driver_->recorder().spans().size());
+  EXPECT_EQ(expected_tags, driver_->recorder().top().tags);
+}
+
+TEST_F(OpenTracingDriverTest, TagSpanKindServer) {
+  setupValidDriver(OpenTracingDriver::PropagationMode::TracerNative, {});
+
+  ON_CALL(config_, operationName()).WillByDefault(testing::Return(Tracing::OperationName::Ingress));
+
+  Tracing::SpanPtr first_span = driver_->startSpan(config_, request_headers_, operation_name_,
+                                                   start_time_, {Tracing::Reason::Sampling, true});
+  first_span->finishSpan();
+
+  const std::unordered_map<std::string, opentracing::Value> expected_tags = {
+      {opentracing::ext::span_kind, std::string{opentracing::ext::span_kind_rpc_server}}};
 
   EXPECT_EQ(1, driver_->recorder().spans().size());
   EXPECT_EQ(expected_tags, driver_->recorder().top().tags);

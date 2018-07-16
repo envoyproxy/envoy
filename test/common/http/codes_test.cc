@@ -101,6 +101,7 @@ TEST_F(CodeUtilityTest, Canary) {
 TEST_F(CodeUtilityTest, All) {
   const std::vector<std::pair<Code, std::string>> test_set = {
       std::make_pair(Code::Continue, "Continue"),
+      std::make_pair(Code::SwitchingProtocols, "Switching Protocols"),
       std::make_pair(Code::OK, "OK"),
       std::make_pair(Code::Created, "Created"),
       std::make_pair(Code::Accepted, "Accepted"),

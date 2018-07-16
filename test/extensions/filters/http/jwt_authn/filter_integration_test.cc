@@ -19,9 +19,9 @@ std::string getFilterConfig(bool use_local_jwks) {
   MessageUtil::loadFromYaml(ExampleConfig, proto_config);
 
   if (use_local_jwks) {
-    auto rule0 = proto_config.mutable_rules(0);
-    rule0->clear_remote_jwks();
-    auto local_jwks = rule0->mutable_local_jwks();
+    auto& provider0 = (*proto_config.mutable_providers())[std::string(ProviderName)];
+    provider0.clear_remote_jwks();
+    auto local_jwks = provider0.mutable_local_jwks();
     local_jwks->set_inline_string(PublicKey);
   }
 

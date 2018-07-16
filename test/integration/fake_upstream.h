@@ -206,7 +206,9 @@ public:
       if (connected()) {
         f(connection_);
       } else {
-        RELEASE_ASSERT(allow_unexpected_disconnects_);
+        RELEASE_ASSERT(
+            allow_unexpected_disconnects_,
+            "The connection disconnected unexpectedly, and allow_unexpected_disconnects_ is false");
       }
       callback_ready_event.notifyOne();
     });
@@ -242,7 +244,11 @@ public:
         allow_unexpected_disconnects_(allow_unexpected_disconnects) {
     shared_connection_.addDisconnectCallback([this] {
       Thread::LockGuard lock(lock_);
-      RELEASE_ASSERT(parented_ || allow_unexpected_disconnects_);
+      RELEASE_ASSERT(parented_ || allow_unexpected_disconnects_,
+                     "An queued upstream connection was torn down without being associated "
+                     "with a fake connection. Either manage the connection via "
+                     "waitForRawConnection() or waitForHttpConnection(), or "
+                     "set_allow_unexpected_disconnects(true).");
     });
   }
 
@@ -263,7 +269,7 @@ private:
 /**
  * Base class for both fake raw connections and fake HTTP connections.
  */
-class FakeConnectionBase {
+class FakeConnectionBase : public Logger::Loggable<Logger::Id::testing> {
 public:
   virtual ~FakeConnectionBase() {
     ASSERT(initialized_);
@@ -341,12 +347,16 @@ typedef std::unique_ptr<FakeHttpConnection> FakeHttpConnectionPtr;
 /**
  * Fake raw connection for integration testing.
  */
-class FakeRawConnection : Logger::Loggable<Logger::Id::testing>, public FakeConnectionBase {
+class FakeRawConnection : public FakeConnectionBase {
 public:
   FakeRawConnection(SharedConnectionWrapper& shared_connection)
       : FakeConnectionBase(shared_connection) {}
+  typedef const std::function<bool(const std::string&)> ValidatorFunction;
 
   std::string waitForData(uint64_t num_bytes);
+  // Wait until data_validator returns true.
+  // example usage: waitForData(FakeRawConnection::waitForInexactMatch("foo"));
+  std::string waitForData(const ValidatorFunction& data_validator);
   void write(const std::string& data, bool end_stream = false);
 
   void initialize() override {
@@ -354,6 +364,15 @@ public:
       connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
     });
     FakeConnectionBase::initialize();
+  }
+
+  // Creates a ValidatorFunction which returns true when data_to_wait_for is
+  // contained in the incoming data string. Unlike many of Envoy waitFor functions,
+  // it does not expect an exact match, simply the presence of data_to_wait_for.
+  static ValidatorFunction waitForInexactMatch(const char* data_to_wait_for) {
+    return [data_to_wait_for](const std::string& data) -> bool {
+      return data.find(data_to_wait_for) != std::string::npos;
+    };
   }
 
 private:
@@ -408,10 +427,12 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
 
+  // Stops the dispatcher loop and joins the listening thread.
+  void cleanUp();
+
 protected:
   Stats::IsolatedStoreImpl stats_store_;
   const FakeHttpConnection::Type http_type_;
-  void cleanUp();
 
 private:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,

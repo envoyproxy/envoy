@@ -34,10 +34,8 @@ public:
    * RouteConfigProvider if there isn't one with the same (route_config_name, cluster) already.
    * Otherwise, it returns a RouteConfigProviderSharedPtr created from the manager held weak_ptr.
    * @param rds supplies the proto configuration of an RDS-configured RouteConfigProvider.
-   * @param cm supplies the ClusterManager.
-   * @param scope supplies the scope to use for the route config provider.
+   * @param factory_context is the context to use for the route config provider.
    * @param stat_prefix supplies the stat_prefix to use for the provider stats.
-   * @param init_manager supplies the init manager.
    */
   virtual RouteConfigProviderSharedPtr getRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,

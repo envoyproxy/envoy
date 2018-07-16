@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/stats/stats.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -23,7 +25,8 @@ public:
   static std::string buildPartitionStatString(const std::string& stat_prefix,
                                               const std::string& table_name,
                                               const std::string& operation,
-                                              const std::string& partition_id);
+                                              const std::string& partition_id,
+                                              const Stats::StatsOptions& stats_options);
 };
 
 } // namespace Dynamo

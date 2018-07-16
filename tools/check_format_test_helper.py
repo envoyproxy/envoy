@@ -133,6 +133,7 @@ if __name__ == "__main__":
   errors += fixFileExpectingSuccess("long_line.cc")
   errors += fixFileExpectingSuccess("header_order.cc")
   errors += fixFileExpectingSuccess("license.BUILD")
+  errors += fixFileExpectingSuccess("bad_envoy_build_sys_ref.BUILD")
   errors += fixFileExpectingFailure("no_namespace_envoy.cc",
                                     "Unable to find Envoy namespace or NOLINT(namespace-envoy)")
   errors += fixFileExpectingFailure("mutex.cc",
@@ -158,6 +159,8 @@ if __name__ == "__main__":
   errors += checkFileExpectingError("long_line.cc", "clang-format check failed")
   errors += checkFileExpectingError("header_order.cc", "header_order.py check failed")
   errors += checkFileExpectingError("license.BUILD", "envoy_build_fixer check failed")
+  errors += checkFileExpectingError("bad_envoy_build_sys_ref.BUILD",
+                                    "Superfluous '@envoy//' prefix")
   errors += checkFileExpectingOK("ok_file.cc")
 
   errors += fixFileExpectingFailure("proto.BUILD",

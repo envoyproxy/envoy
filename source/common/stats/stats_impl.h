@@ -32,6 +32,27 @@
 namespace Envoy {
 namespace Stats {
 
+// The max name length is based on current set of stats.
+// As of now, the longest stat is
+// cluster.<cluster_name>.outlier_detection.ejections_consecutive_5xx
+// which is 52 characters long without the cluster name.
+// The max stat name length is 127 (default). So, in order to give room
+// for growth to both the envoy generated stat characters
+// (e.g., outlier_detection...) and user supplied names (e.g., cluster name),
+// we set the max user supplied name length to 60, and the max internally
+// generated stat suffixes to 67 (15 more characters to grow).
+// If you want to increase the max user supplied name length, use the compiler
+// option ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH or the CLI option
+// max-obj-name-len
+struct StatsOptionsImpl : public StatsOptions {
+  size_t maxNameLength() const override { return max_obj_name_length_ + max_stat_suffix_length_; }
+  size_t maxObjNameLength() const override { return max_obj_name_length_; }
+  size_t maxStatSuffixLength() const override { return max_stat_suffix_length_; }
+
+  size_t max_obj_name_length_ = 60;
+  size_t max_stat_suffix_length_ = 67;
+};
+
 class TagExtractorImpl : public TagExtractor {
 public:
   /**
@@ -170,7 +191,7 @@ public:
  * it can be allocated from shared memory if needed.
  *
  * @note Due to name_ being variable size, sizeof(RawStatData) probably isn't useful. Use
- * RawStatData::size() instead.
+ * RawStatData::structSize() or RawStatData::structSizeWithOptions() instead.
  */
 struct RawStatData {
 
@@ -182,54 +203,32 @@ struct RawStatData {
   ~RawStatData() = delete;
 
   /**
-   * Configure static settings. This MUST be called
-   * before any other static or instance methods.
-   */
-  static void configure(Server::Options& options);
-
-  /**
-   * Allow tests to re-configure this value after it has been set.
-   * This is unsafe in a non-test context.
-   */
-  static void configureForTestsOnly(Server::Options& options);
-
-  /**
-   * Returns the maximum length of the name of a stat. This length
-   * does not include a trailing NULL-terminator.
-   */
-  static size_t maxNameLength() { return maxObjNameLength() + MAX_STAT_SUFFIX_LENGTH; }
-
-  /**
-   * Returns the maximum length of a user supplied object (route/cluster/listener)
-   * name field in a stat. This length does not include a trailing NULL-terminator.
-   */
-  static size_t maxObjNameLength() {
-    return initializeAndGetMutableMaxObjNameLength(DEFAULT_MAX_OBJ_NAME_LENGTH);
-  }
-
-  /**
-   * Returns the maximum length of a stat suffix that Envoy generates (over the user supplied name).
-   * This length does not include a trailing NULL-terminator.
-   */
-  static size_t maxStatSuffixLength() { return MAX_STAT_SUFFIX_LENGTH; }
-
-  /**
-   * size in bytes of name_
-   */
-  static size_t nameSize() { return maxNameLength() + 1; }
-
-  /**
    * Returns the size of this struct, accounting for the length of name_
-   * and padding for alignment. This is required by BlockMemoryHashSet.
+   * and padding for alignment. Required for the HeapRawStatDataAllocator, which does not truncate
+   * at a maximum stat name length.
    */
-  static uint64_t size();
+  static uint64_t structSize(uint64_t name_size);
+
+  /**
+   * Wrapper for structSize, taking a StatsOptions struct.
+   * Required by BlockMemoryHashSet, which has the context to supply StatsOptions.
+   */
+  static uint64_t structSizeWithOptions(const StatsOptions& stats_options);
 
   /**
    * Initializes this object to have the specified key,
-   * a refcount of 1, and all other values zero. This is required by
-   * BlockMemoryHashSet.
+   * a refcount of 1, and all other values zero. Required for the HeapRawStatDataAllocator, which
+   * does not expect stat name truncation. We pass in the number of bytes allocated in order to
+   * assert the copy is safe inline.
    */
-  void initialize(absl::string_view key);
+  void checkAndInit(absl::string_view key, uint64_t num_bytes_allocated);
+
+  /**
+   * Initializes this object to have the specified key,
+   * a refcount of 1, and all other values zero. Required by the BlockMemoryHashSet. StatsOptions is
+   * used to truncate key inline, if necessary.
+   */
+  void truncateAndInit(absl::string_view key, const StatsOptions& stats_options);
 
   /**
    * Returns a hash of the key. This is required by BlockMemoryHashSet.
@@ -242,11 +241,9 @@ struct RawStatData {
   bool initialized() { return name_[0] != '\0'; }
 
   /**
-   * Returns the name as a string_view. This is required by BlockMemoryHashSet.
+   * Returns the name as a string_view with no truncation.
    */
-  absl::string_view key() const {
-    return absl::string_view(name_, strnlen(name_, maxNameLength()));
-  }
+  absl::string_view key() const { return absl::string_view(name_); }
 
   std::atomic<uint64_t> value_;
   std::atomic<uint64_t> pending_increment_;
@@ -256,26 +253,7 @@ struct RawStatData {
   char name_[];
 
 private:
-  // The max name length is based on current set of stats.
-  // As of now, the longest stat is
-  // cluster.<cluster_name>.outlier_detection.ejections_consecutive_5xx
-  // which is 52 characters long without the cluster name.
-  // The max stat name length is 127 (default). So, in order to give room
-  // for growth to both the envoy generated stat characters
-  // (e.g., outlier_detection...) and user supplied names (e.g., cluster name),
-  // we set the max user supplied name length to 60, and the max internally
-  // generated stat suffixes to 67 (15 more characters to grow).
-  // If you want to increase the max user supplied name length, use the compiler
-  // option ENVOY_DEFAULT_MAX_OBJ_NAME_LENGTH or the CLI option
-  // max-obj-name-len
-  static const size_t DEFAULT_MAX_OBJ_NAME_LENGTH = 60;
-  static const size_t MAX_STAT_SUFFIX_LENGTH = 67;
-
-  /**
-   * @return uint64_t& a reference to the configured size, which can then be changed
-   * by callers.
-   */
-  static uint64_t& initializeAndGetMutableMaxObjNameLength(uint64_t configured_size);
+  void initialize(absl::string_view key, uint64_t num_bytes_allocated);
 };
 
 /**
@@ -306,67 +284,32 @@ private:
 };
 
 /**
- * Counter implementation that wraps a RawStatData.
+ * Implements a StatDataAllocator that uses RawStatData -- capable of deploying
+ * in a shared memory block without internal pointers.
  */
-class CounterImpl : public Counter, public MetricImpl {
+class RawStatDataAllocator : public StatDataAllocator {
 public:
-  CounterImpl(RawStatData& data, RawStatDataAllocator& alloc, std::string&& tag_extracted_name,
-              std::vector<Tag>&& tags)
-      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
-        alloc_(alloc) {}
-  ~CounterImpl() { alloc_.free(data_); }
+  // StatDataAllocator
+  CounterSharedPtr makeCounter(const std::string& name, std::string&& tag_extracted_name,
+                               std::vector<Tag>&& tags) override;
+  GaugeSharedPtr makeGauge(const std::string& name, std::string&& tag_extracted_name,
+                           std::vector<Tag>&& tags) override;
 
-  // Stats::Counter
-  void add(uint64_t amount) override {
-    data_.value_ += amount;
-    data_.pending_increment_ += amount;
-    data_.flags_ |= Flags::Used;
-  }
+  /**
+   * @param name the full name of the stat.
+   * @return RawStatData* a raw stat data block for a given stat name or nullptr if there is no
+   *         more memory available for stats. The allocator should return a reference counted
+   *         data location by name if one already exists with the same name. This is used for
+   *         intra-process scope swapping as well as inter-process hot restart.
+   */
+  virtual RawStatData* alloc(const std::string& name) PURE;
 
-  void inc() override { add(1); }
-  uint64_t latch() override { return data_.pending_increment_.exchange(0); }
-  void reset() override { data_.value_ = 0; }
-  bool used() const override { return data_.flags_ & Flags::Used; }
-  uint64_t value() const override { return data_.value_; }
-
-private:
-  RawStatData& data_;
-  RawStatDataAllocator& alloc_;
-};
-
-/**
- * Gauge implementation that wraps a RawStatData.
- */
-class GaugeImpl : public Gauge, public MetricImpl {
-public:
-  GaugeImpl(RawStatData& data, RawStatDataAllocator& alloc, std::string&& tag_extracted_name,
-            std::vector<Tag>&& tags)
-      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
-        alloc_(alloc) {}
-  ~GaugeImpl() { alloc_.free(data_); }
-
-  // Stats::Gauge
-  virtual void add(uint64_t amount) override {
-    data_.value_ += amount;
-    data_.flags_ |= Flags::Used;
-  }
-  virtual void dec() override { sub(1); }
-  virtual void inc() override { add(1); }
-  virtual void set(uint64_t value) override {
-    data_.value_ = value;
-    data_.flags_ |= Flags::Used;
-  }
-  virtual void sub(uint64_t amount) override {
-    ASSERT(data_.value_ >= amount);
-    ASSERT(used());
-    data_.value_ -= amount;
-  }
-  virtual uint64_t value() const override { return data_.value_; }
-  bool used() const override { return data_.flags_ & Flags::Used; }
-
-private:
-  RawStatData& data_;
-  RawStatDataAllocator& alloc_;
+  /**
+   * Free a raw stat data block. The allocator should handle reference counting and only truly
+   * free the block if it is no longer needed.
+   * @param data the data returned by alloc().
+   */
+  virtual void free(RawStatData& data) PURE;
 };
 
 /**
@@ -463,9 +406,9 @@ private:
 /**
  * A stats cache template that is used by the isolated store.
  */
-template <class Base, class Impl> class IsolatedStatsCache {
+template <class Base> class IsolatedStatsCache {
 public:
-  typedef std::function<Impl*(const std::string& name)> Allocator;
+  typedef std::function<std::shared_ptr<Base>(const std::string& name)> Allocator;
 
   IsolatedStatsCache(Allocator alloc) : alloc_(alloc) {}
 
@@ -475,8 +418,8 @@ public:
       return *stat->second;
     }
 
-    Impl* new_stat = alloc_(name);
-    stats_.emplace(name, std::shared_ptr<Impl>{new_stat});
+    std::shared_ptr<Base> new_stat = alloc_(name);
+    stats_.emplace(name, new_stat);
     return *new_stat;
   }
 
@@ -491,7 +434,7 @@ public:
   }
 
 private:
-  std::unordered_map<std::string, std::shared_ptr<Impl>> stats_;
+  std::unordered_map<std::string, std::shared_ptr<Base>> stats_;
   Allocator alloc_;
 };
 
@@ -501,15 +444,19 @@ private:
 class IsolatedStoreImpl : public Store {
 public:
   IsolatedStoreImpl()
-      : counters_([this](const std::string& name) -> CounterImpl* {
-          return new CounterImpl(*alloc_.alloc(name), alloc_, std::string(name),
-                                 std::vector<Tag>());
+      : counters_([this](const std::string& name) -> CounterSharedPtr {
+          std::string tag_extracted_name = name;
+          std::vector<Tag> tags;
+          return alloc_.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
         }),
-        gauges_([this](const std::string& name) -> GaugeImpl* {
-          return new GaugeImpl(*alloc_.alloc(name), alloc_, std::string(name), std::vector<Tag>());
+        gauges_([this](const std::string& name) -> GaugeSharedPtr {
+          std::string tag_extracted_name = name;
+          std::vector<Tag> tags;
+          return alloc_.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
         }),
-        histograms_([this](const std::string& name) -> HistogramImpl* {
-          return new HistogramImpl(name, *this, std::string(name), std::vector<Tag>());
+        histograms_([this](const std::string& name) -> HistogramSharedPtr {
+          return std::make_shared<HistogramImpl>(name, *this, std::string(name),
+                                                 std::vector<Tag>());
         }) {}
 
   // Stats::Scope
@@ -523,6 +470,7 @@ public:
     Histogram& histogram = histograms_.get(name);
     return histogram;
   }
+  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override { return counters_.toVector(); }
@@ -546,15 +494,17 @@ private:
     Histogram& histogram(const std::string& name) override {
       return parent_.histogram(prefix_ + name);
     }
+    const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
 
     IsolatedStoreImpl& parent_;
     const std::string prefix_;
   };
 
   HeapRawStatDataAllocator alloc_;
-  IsolatedStatsCache<Counter, CounterImpl> counters_;
-  IsolatedStatsCache<Gauge, GaugeImpl> gauges_;
-  IsolatedStatsCache<Histogram, HistogramImpl> histograms_;
+  IsolatedStatsCache<Counter> counters_;
+  IsolatedStatsCache<Gauge> gauges_;
+  IsolatedStatsCache<Histogram> histograms_;
+  const Stats::StatsOptionsImpl stats_options_;
 };
 
 } // namespace Stats

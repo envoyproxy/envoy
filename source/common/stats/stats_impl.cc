@@ -37,32 +37,15 @@ bool regexStartsWithDot(absl::string_view regex) {
 
 } // namespace
 
-uint64_t RawStatData::size() {
-  // Normally the compiler would do this, but because name_ is a flexible-array-length
-  // element, the compiler can't. RawStatData is put into an array in HotRestartImpl, so
-  // it's important that each element starts on the required alignment for the type.
-  return roundUpMultipleNaturalAlignment(sizeof(RawStatData) + nameSize());
+// Normally the compiler would do this, but because name_ is a flexible-array-length
+// element, the compiler can't. RawStatData is put into an array in HotRestartImpl, so
+// it's important that each element starts on the required alignment for the type.
+uint64_t RawStatData::structSize(uint64_t name_size) {
+  return roundUpMultipleNaturalAlignment(sizeof(RawStatData) + name_size + 1);
 }
 
-uint64_t& RawStatData::initializeAndGetMutableMaxObjNameLength(uint64_t configured_size) {
-  // Like CONSTRUCT_ON_FIRST_USE, but non-const so that the value can be changed by tests
-  static uint64_t size = configured_size;
-  return size;
-}
-
-void RawStatData::configure(Server::Options& options) {
-  const uint64_t configured = options.maxObjNameLength();
-  RELEASE_ASSERT(configured > 0);
-  uint64_t max_obj_name_length = initializeAndGetMutableMaxObjNameLength(configured);
-
-  // If this fails, it means that this function was called too late during
-  // startup because things were already using this size before it was set.
-  RELEASE_ASSERT(max_obj_name_length == configured);
-}
-
-void RawStatData::configureForTestsOnly(Server::Options& options) {
-  const uint64_t configured = options.maxObjNameLength();
-  initializeAndGetMutableMaxObjNameLength(configured) = configured;
+uint64_t RawStatData::structSizeWithOptions(const StatsOptions& stats_options) {
+  return structSize(stats_options.maxNameLength());
 }
 
 std::string Utility::sanitizeStatsName(const std::string& name) {
@@ -153,14 +136,13 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 }
 
 RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
-  RawStatData* data = static_cast<RawStatData*>(::calloc(RawStatData::size(), 1));
-  data->initialize(name);
+  uint64_t num_bytes_to_allocate = RawStatData::structSize(name.size());
+  RawStatData* data = static_cast<RawStatData*>(::calloc(num_bytes_to_allocate, 1));
+  if (data == nullptr) {
+    throw std::bad_alloc();
+  }
+  data->checkAndInit(name, num_bytes_to_allocate);
 
-  // Because the RawStatData object is initialized with and contains a truncated
-  // version of the std::string name, storing the stats in a map would require
-  // storing the name twice. Performing a lookup on the set is similarly
-  // expensive to performing a map lookup, since both require copying a truncated version of the
-  // string before doing the hash lookup.
   Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data);
   RawStatData* existing_data = *ret.first;
@@ -174,6 +156,70 @@ RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
     return data;
   }
 }
+
+/**
+ * Counter implementation that wraps a RawStatData.
+ */
+class CounterImpl : public Counter, public MetricImpl {
+public:
+  CounterImpl(RawStatData& data, RawStatDataAllocator& alloc, std::string&& tag_extracted_name,
+              std::vector<Tag>&& tags)
+      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
+        alloc_(alloc) {}
+  ~CounterImpl() { alloc_.free(data_); }
+
+  // Stats::Counter
+  void add(uint64_t amount) override {
+    data_.value_ += amount;
+    data_.pending_increment_ += amount;
+    data_.flags_ |= Flags::Used;
+  }
+
+  void inc() override { add(1); }
+  uint64_t latch() override { return data_.pending_increment_.exchange(0); }
+  void reset() override { data_.value_ = 0; }
+  bool used() const override { return data_.flags_ & Flags::Used; }
+  uint64_t value() const override { return data_.value_; }
+
+private:
+  RawStatData& data_;
+  RawStatDataAllocator& alloc_;
+};
+
+/**
+ * Gauge implementation that wraps a RawStatData.
+ */
+class GaugeImpl : public Gauge, public MetricImpl {
+public:
+  GaugeImpl(RawStatData& data, RawStatDataAllocator& alloc, std::string&& tag_extracted_name,
+            std::vector<Tag>&& tags)
+      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
+        alloc_(alloc) {}
+  ~GaugeImpl() { alloc_.free(data_); }
+
+  // Stats::Gauge
+  virtual void add(uint64_t amount) override {
+    data_.value_ += amount;
+    data_.flags_ |= Flags::Used;
+  }
+  virtual void dec() override { sub(1); }
+  virtual void inc() override { add(1); }
+  virtual void set(uint64_t value) override {
+    data_.value_ = value;
+    data_.flags_ |= Flags::Used;
+  }
+  virtual void sub(uint64_t amount) override {
+    ASSERT(data_.value_ >= amount);
+    ASSERT(used());
+    data_.value_ -= amount;
+  }
+  virtual uint64_t value() const override { return data_.value_; }
+  bool used() const override { return data_.flags_ & Flags::Used; }
+
+private:
+  RawStatData& data_;
+  RawStatDataAllocator& alloc_;
+};
 
 TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config) {
   // To check name conflict.
@@ -289,20 +335,31 @@ void HeapRawStatDataAllocator::free(RawStatData& data) {
   ::free(&data);
 }
 
-void RawStatData::initialize(absl::string_view key) {
+void RawStatData::initialize(absl::string_view key, uint64_t xfer_size) {
   ASSERT(!initialized());
-  if (key.size() > Stats::RawStatData::maxNameLength()) {
+  ref_count_ = 1;
+  memcpy(name_, key.data(), xfer_size);
+  name_[xfer_size] = '\0';
+}
+
+void RawStatData::checkAndInit(absl::string_view key, uint64_t num_bytes_allocated) {
+  uint64_t xfer_size = key.size();
+  ASSERT(structSize(xfer_size) <= num_bytes_allocated);
+
+  initialize(key, xfer_size);
+}
+
+void RawStatData::truncateAndInit(absl::string_view key, const StatsOptions& stats_options) {
+  if (key.size() > stats_options.maxNameLength()) {
     ENVOY_LOG_MISC(
         warn,
         "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
-        key.size(), Stats::RawStatData::maxNameLength());
+        key.size(), stats_options.maxNameLength());
   }
-  ref_count_ = 1;
 
   // key is not necessarily nul-terminated, but we want to make sure name_ is.
-  uint64_t xfer_size = std::min(nameSize() - 1, key.size());
-  memcpy(name_, key.data(), xfer_size);
-  name_[xfer_size] = '\0';
+  uint64_t xfer_size = std::min(stats_options.maxNameLength(), key.size());
+  initialize(key, xfer_size);
 }
 
 HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr)
@@ -361,6 +418,27 @@ void SourceImpl::clearCache() {
   counters_.reset();
   gauges_.reset();
   histograms_.reset();
+}
+
+CounterSharedPtr RawStatDataAllocator::makeCounter(const std::string& name,
+                                                   std::string&& tag_extracted_name,
+                                                   std::vector<Tag>&& tags) {
+  RawStatData* data = alloc(name);
+  if (data == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<CounterImpl>(*data, *this, std::move(tag_extracted_name),
+                                       std::move(tags));
+}
+
+GaugeSharedPtr RawStatDataAllocator::makeGauge(const std::string& name,
+                                               std::string&& tag_extracted_name,
+                                               std::vector<Tag>&& tags) {
+  RawStatData* data = alloc(name);
+  if (data == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<GaugeImpl>(*data, *this, std::move(tag_extracted_name), std::move(tags));
 }
 
 } // namespace Stats

@@ -61,6 +61,9 @@ message AccessLogFilter {
 
     // Header filter.
     HeaderFilter header_filter = 8;
+
+    // Response flag filter.
+    ResponseFlagFilter response_flag_filter = 9;
   }
 }
 
@@ -149,4 +152,16 @@ message HeaderFilter {
   // Only requests with a header which matches the specified HeaderMatcher will pass the filter
   // check.
   envoy.api.v2.route.HeaderMatcher header = 1 [(validate.rules).message.required = true];
+}
+
+// Filters requests that received responses with an Envoy response flag set.
+// A list of the response flags can be found
+// in the access log formatter :ref:`documentation<config_access_log_format_response_flags>`.
+message ResponseFlagFilter {
+  // Only responses with the any of the flags listed in this field will be logged.
+  // This field is optional. If it is not specified, then any response flag will pass
+  // the filter check.
+  repeated string flags = 1 [(validate.rules).repeated .items.string = {
+    in: ["LH", "UH", "UT", "LR", "UR", "UF", "UC", "UO", "NR", "DI", "FI", "RL", "UAEX"]
+  }];
 }

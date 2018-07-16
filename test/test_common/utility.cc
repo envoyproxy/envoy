@@ -70,18 +70,6 @@ bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instan
   return true;
 }
 
-std::string TestUtility::bufferToString(const Buffer::Instance& buffer) {
-  std::string output;
-  uint64_t num_slices = buffer.getRawSlices(nullptr, 0);
-  Buffer::RawSlice slices[num_slices];
-  buffer.getRawSlices(slices, num_slices);
-  for (Buffer::RawSlice& slice : slices) {
-    output.append(static_cast<const char*>(slice.mem_), slice.len_);
-  }
-
-  return output;
-}
-
 void TestUtility::feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
                                                  uint64_t seed) {
   const std::string sample = "Neque porro quisquam est qui dolorem ipsum..";
@@ -155,7 +143,8 @@ envoy::config::bootstrap::v2::Bootstrap
 TestUtility::parseBootstrapFromJson(const std::string& json_string) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::BootstrapJson::translateBootstrap(*json_object_ptr, bootstrap);
+  Stats::StatsOptionsImpl stats_options;
+  Config::BootstrapJson::translateBootstrap(*json_object_ptr, bootstrap, stats_options);
   return bootstrap;
 }
 

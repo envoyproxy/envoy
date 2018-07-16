@@ -47,7 +47,9 @@ Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& p
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromJson(const std::string& json_string) {
   envoy::api::v2::RouteConfiguration route_config;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config);
+  Stats::StatsOptionsImpl stats_options;
+  Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config,
+                                                      stats_options);
   return route_config;
 }
 
@@ -1074,7 +1076,7 @@ virtual_hosts:
           prefix: "/"
           headers:
             - name: test_header
-              value: "(+not a regex)"
+              exact_match: "(+not a regex)"
         route: { cluster: "local_service" }
   )EOF";
 
@@ -1087,8 +1089,7 @@ virtual_hosts:
           prefix: "/"
           headers:
             - name: test_header
-              value: "(+invalid regex)"
-              regex: true
+              regex_match: "(+invalid regex)"
         route: { cluster: "local_service" }
   )EOF";
 
@@ -2673,7 +2674,7 @@ virtual_hosts:
     EXPECT_EQ(nullptr, route_entry->hashPolicy());
     EXPECT_TRUE(route_entry->opaqueConfig().empty());
     EXPECT_FALSE(route_entry->autoHostRewrite());
-    EXPECT_FALSE(route_entry->useWebSocket());
+    EXPECT_FALSE(route_entry->useOldStyleWebSocket());
     EXPECT_TRUE(route_entry->includeVirtualHostRateLimits());
     EXPECT_EQ(Http::Code::ServiceUnavailable, route_entry->clusterNotFoundResponseCode());
     EXPECT_EQ(nullptr, route_entry->corsPolicy());
@@ -4372,6 +4373,65 @@ virtual_hosts:
   }
 }
 
+TEST(RouteConfigurationV2, NoIdleTimeout) {
+  const std::string NoIdleTimeot = R"EOF(
+name: NoIdleTimeout
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          idle_timeout: 0s
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(NoIdleTimeot), factory_context, true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(absl::nullopt, route_entry->idleTimeout());
+}
+
+TEST(RouteConfigurationV2, DefaultIdleTimeout) {
+  const std::string DefaultIdleTimeot = R"EOF(
+name: NoIdleTimeout
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(DefaultIdleTimeot), factory_context, true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(5 * 60 * 1000, route_entry->idleTimeout().value().count());
+}
+
+TEST(RouteConfigurationV2, ExplicitIdleTimeout) {
+  const std::string ExplicitIdleTimeot = R"EOF(
+name: NoIdleTimeout
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          idle_timeout: 7s
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(ExplicitIdleTimeot), factory_context, true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(7 * 1000, route_entry->idleTimeout().value().count());
+}
+
 class PerFilterConfigsTest : public testing::Test {
 public:
   PerFilterConfigsTest() : factory_(), registered_factory_(factory_) {}
@@ -4498,6 +4558,7 @@ virtual_hosts:
 
   checkEach(yaml, 1213, 1213, 1415);
 }
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

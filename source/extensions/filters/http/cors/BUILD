@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # L7 HTTP filter which implements CORS processing (https://en.wikipedia.org/wiki/Cross-origin_resource_sharing)
 # Public docs: docs/root/configuration/http_filters/cors_filter.rst
 

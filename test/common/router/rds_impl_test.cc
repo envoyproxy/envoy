@@ -35,12 +35,12 @@ namespace Router {
 namespace {
 
 envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
-parseHttpConnectionManagerFromJson(const std::string& json_string) {
+parseHttpConnectionManagerFromJson(const std::string& json_string, const Stats::Scope& scope) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
       http_connection_manager;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Envoy::Config::FilterJson::translateHttpConnectionManager(*json_object_ptr,
-                                                            http_connection_manager);
+  Envoy::Config::FilterJson::translateHttpConnectionManager(
+      *json_object_ptr, http_connection_manager, scope.statsOptions());
   return http_connection_manager;
 }
 
@@ -68,6 +68,7 @@ public:
   Http::MockAsyncClientRequest request_;
   Http::AsyncClient::Callbacks* callbacks_{};
   Event::MockTimer* interval_timer_{};
+  NiceMock<MockSystemTimeSource> system_time_source_;
 };
 
 class RdsImplTest : public RdsTestBase {
@@ -106,12 +107,13 @@ public:
     interval_timer_ = new Event::MockTimer(&factory_context_.dispatcher_);
     EXPECT_CALL(factory_context_.init_manager_, registerTarget(_));
     rds_ =
-        RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
+        RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json, scope_),
                                         factory_context_, "foo.", *route_config_provider_manager_);
     expectRequest();
     factory_context_.init_manager_.initialize();
   }
 
+  NiceMock<Stats::MockStore> scope_;
   NiceMock<Server::MockInstance> server_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
   RouteConfigProviderSharedPtr rds_;
@@ -130,10 +132,10 @@ TEST_F(RdsImplTest, RdsAndStatic) {
     }
     )EOF";
 
-  EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
-                                               factory_context_, "foo.",
-                                               *route_config_provider_manager_),
-               EnvoyException);
+  EXPECT_THROW(
+      RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json, scope_),
+                                      factory_context_, "foo.", *route_config_provider_manager_),
+      EnvoyException);
 }
 
 TEST_F(RdsImplTest, LocalInfoNotDefined) {
@@ -153,10 +155,10 @@ TEST_F(RdsImplTest, LocalInfoNotDefined) {
 
   factory_context_.local_info_.node_.set_cluster("");
   factory_context_.local_info_.node_.set_id("");
-  EXPECT_THROW(RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
-                                               factory_context_, "foo.",
-                                               *route_config_provider_manager_),
-               EnvoyException);
+  EXPECT_THROW(
+      RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json, scope_),
+                                      factory_context_, "foo.", *route_config_provider_manager_),
+      EnvoyException);
 }
 
 TEST_F(RdsImplTest, UnknownCluster) {
@@ -177,7 +179,7 @@ TEST_F(RdsImplTest, UnknownCluster) {
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
   EXPECT_THROW_WITH_MESSAGE(
-      RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json),
+      RouteConfigProviderUtil::create(parseHttpConnectionManagerFromJson(config_json, scope_),
                                       factory_context_, "foo.", *route_config_provider_manager_),
       EnvoyException,
       "envoy::api::v2::core::ConfigSource must have a statically defined non-EDS "
@@ -361,12 +363,13 @@ public:
       )EOF";
 
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(config_json);
-    Envoy::Config::Utility::translateRdsConfig(*config, rds_);
+    Envoy::Config::Utility::translateRdsConfig(*config, rds_, stats_options_);
 
     // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
     Upstream::MockCluster cluster;
     cluster_map.emplace("foo_cluster", cluster);
+    ON_CALL(factory_context_, systemTimeSource()).WillByDefault(ReturnRef(system_time_source_));
     EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
@@ -384,6 +387,7 @@ public:
 
   ~RouteConfigProviderManagerImplTest() { factory_context_.thread_local_.shutdownThread(); }
 
+  Stats::StatsOptionsImpl stats_options_;
   envoy::config::filter::network::http_connection_manager::v2::Rds rds_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
   RouteConfigProviderSharedPtr provider_;
@@ -401,7 +405,7 @@ TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
       MessageUtil::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
           *message_ptr);
 
-  // No routes at all.
+  // No routes at all, no last_updated timestamp
   envoy::admin::v2alpha::RoutesConfigDump expected_route_config_dump;
   MessageUtil::loadFromYaml(R"EOF(
 static_route_configs:
@@ -420,6 +424,10 @@ virtual_hosts:
         route: { cluster: baz }
 )EOF";
 
+  EXPECT_CALL(system_time_source_, currentTime())
+      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
+  EXPECT_CALL(factory_context_, systemTimeSource()).WillRepeatedly(ReturnRef(system_time_source_));
+
   // Only static route.
   RouteConfigProviderSharedPtr static_config =
       route_config_provider_manager_->getStaticRouteConfigProvider(
@@ -430,13 +438,17 @@ virtual_hosts:
           *message_ptr);
   MessageUtil::loadFromYaml(R"EOF(
 static_route_configs:
-  - name: foo
-    virtual_hosts:
-      - name: bar
-        domains: ["*"]
-        routes:
-          - match: { prefix: "/" }
-            route: { cluster: baz }
+  - route_config:
+      name: foo
+      virtual_hosts:
+        - name: bar
+          domains: ["*"]
+          routes:
+            - match: { prefix: "/" }
+              route: { cluster: baz }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
 dynamic_route_configs:
 )EOF",
                             expected_route_config_dump);
@@ -464,18 +476,25 @@ dynamic_route_configs:
           *message_ptr);
   MessageUtil::loadFromYaml(R"EOF(
 static_route_configs:
-  - name: foo
-    virtual_hosts:
-      - name: bar
-        domains: ["*"]
-        routes:
-          - match: { prefix: "/" }
-            route: { cluster: baz }
+  - route_config:
+      name: foo
+      virtual_hosts:
+        - name: bar
+          domains: ["*"]
+          routes:
+            - match: { prefix: "/" }
+              route: { cluster: baz }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
 dynamic_route_configs:
   - version_info: "hash_15ed54077da94d8b"
     route_config:
       name: foo_route_config
       virtual_hosts:
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
 )EOF",
                             expected_route_config_dump);
   EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump3.DebugString());
@@ -508,7 +527,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 
   Json::ObjectSharedPtr config2 = Json::Factory::loadFromString(config_json2);
   envoy::config::filter::network::http_connection_manager::v2::Rds rds2;
-  Envoy::Config::Utility::translateRdsConfig(*config2, rds2);
+  Envoy::Config::Utility::translateRdsConfig(*config2, rds2, stats_options_);
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;

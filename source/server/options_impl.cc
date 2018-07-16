@@ -57,7 +57,13 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::ValueArg<std::string> config_yaml(
       "", "config-yaml", "Inline YAML configuration, merges with the contents of --config-path",
       false, "", "string", cmd);
-  TCLAP::SwitchArg v2_config_only("", "v2-config-only", "parse config as v2 only", cmd, false);
+
+  // Deprecated and unused.
+  TCLAP::SwitchArg v2_config_only("", "v2-config-only", "deprecated", cmd, true);
+
+  TCLAP::SwitchArg allow_v1_config("", "allow-deprecated-v1-api", "allow use of legacy v1 config",
+                                   cmd, false);
+
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
                                                   false, "", "string", cmd);
   TCLAP::ValueArg<std::string> local_address_ip_version("", "local-address-ip-version",
@@ -177,7 +183,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   concurrency_ = concurrency.getValue();
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
-  v2_config_only_ = v2_config_only.getValue();
+  v2_config_only_ = !allow_v1_config.getValue();
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();
   restart_epoch_ = restart_epoch.getValue();
@@ -188,13 +194,10 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   drain_time_ = std::chrono::seconds(drain_time_s.getValue());
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   max_stats_ = max_stats.getValue();
-  max_obj_name_length_ = max_obj_name_len.getValue();
+  stats_options_.max_obj_name_length_ = max_obj_name_len.getValue();
 
   if (hot_restart_version_option.getValue()) {
-    Stats::RawStatData::configure(*this);
-    std::cerr << hot_restart_version_cb(max_stats.getValue(),
-                                        max_obj_name_len.getValue() +
-                                            Stats::RawStatData::maxStatSuffixLength(),
+    std::cerr << hot_restart_version_cb(max_stats.getValue(), stats_options_.maxNameLength(),
                                         !hot_restart_disabled_);
     throw NoServingException();
   }

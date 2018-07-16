@@ -7,6 +7,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "envoy/common/pure.h"
 
@@ -105,31 +106,6 @@ public:
    * @return whether a substring exists in the string.
    */
   bool find(const char* str) const { return strstr(c_str(), str); }
-
-  /**
-   * HeaderString is in token list form, each token separated by commas or whitespace,
-   * see https://www.w3.org/Protocols/rfc2616/rfc2616-sec2.html#sec2.1 for more information,
-   * header field value's case sensitivity depends on each header.
-   * @return whether contains token in case insensitive manner.
-   */
-  bool caseInsensitiveContains(const char* token) const {
-    // Avoid dead loop if token argument is empty.
-    const int n = strlen(token);
-    if (n == 0) {
-      return false;
-    }
-
-    // Find token substring, skip if it's partial of other token.
-    const char* tokens = c_str();
-    for (const char* p = tokens; (p = strcasestr(p, token)); p += n) {
-      if ((p == tokens || *(p - 1) == ' ' || *(p - 1) == ',') &&
-          (*(p + n) == '\0' || *(p + n) == ' ' || *(p + n) == ',')) {
-        return true;
-      }
-    }
-
-    return false;
-  }
 
   /**
    * Set the value of the string by copying data into it. This overwrites any existing string.
@@ -281,6 +257,7 @@ private:
   HEADER_FUNC(KeepAlive)                                                                           \
   HEADER_FUNC(LastModified)                                                                        \
   HEADER_FUNC(Method)                                                                              \
+  HEADER_FUNC(NoChunks)                                                                            \
   HEADER_FUNC(Origin)                                                                              \
   HEADER_FUNC(OtSpanContext)                                                                       \
   HEADER_FUNC(Path)                                                                                \
@@ -497,6 +474,11 @@ public:
 };
 
 typedef std::unique_ptr<HeaderMap> HeaderMapPtr;
+
+/**
+ * Convenient container type for storing Http::LowerCaseString and std::string key/value pairs.
+ */
+typedef std::vector<std::pair<LowerCaseString, std::string>> HeaderVector;
 
 } // namespace Http
 } // namespace Envoy

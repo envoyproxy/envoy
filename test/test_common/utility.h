@@ -12,6 +12,7 @@
 #include "envoy/network/address.h"
 #include "envoy/stats/stats.h"
 
+#include "common/buffer/buffer_impl.h"
 #include "common/common/c_smart_ptr.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
@@ -98,13 +99,6 @@ public:
   static bool buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs);
 
   /**
-   * Convert a buffer to a string.
-   * @param buffer supplies the buffer to convert.
-   * @return std::string the converted string.
-   */
-  static std::string bufferToString(const Buffer::Instance& buffer);
-
-  /**
    * Feed a buffer with random characters.
    * @param buffer supplies the buffer to be fed.
    * @param n_char number of characters that should be added to the supplied buffer.
@@ -150,12 +144,10 @@ public:
    *
    * @param lhs proto on LHS.
    * @param rhs proto on RHS.
-   * @return bool indicating whether the protos are equal. Type name and string serialization are
-   *         used for equality testing.
+   * @return bool indicating whether the protos are equal.
    */
   static bool protoEqual(const Protobuf::Message& lhs, const Protobuf::Message& rhs) {
-    return lhs.GetTypeName() == rhs.GetTypeName() &&
-           lhs.SerializeAsString() == rhs.SerializeAsString();
+    return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
   }
 
   /**
@@ -350,10 +342,13 @@ public:
   ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
 
   RawStatData* alloc(const std::string& name) override {
+    Stats::StatsOptionsImpl stats_options;
+    stats_options.max_obj_name_length_ = 127;
     CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[name];
     if (!stat_ref) {
-      stat_ref.reset(static_cast<RawStatData*>(::calloc(RawStatData::size(), 1)));
-      stat_ref->initialize(name);
+      stat_ref.reset(static_cast<RawStatData*>(
+          ::calloc(RawStatData::structSizeWithOptions(stats_options), 1)));
+      stat_ref->truncateAndInit(name, stats_options);
     } else {
       stat_ref->ref_count_++;
     }

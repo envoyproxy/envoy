@@ -277,14 +277,6 @@ public:
     return locality_stats;
   }
 
-  void cleanupUpstreamConnection() {
-    codec_client_->close();
-    if (fake_upstream_connection_ != nullptr) {
-      fake_upstream_connection_->close();
-      fake_upstream_connection_->waitForDisconnect();
-    }
-  }
-
   void cleanupLoadStatsConnection() {
     if (fake_loadstats_connection_ != nullptr) {
       fake_loadstats_connection_->close();
@@ -295,7 +287,7 @@ public:
   void sendAndReceiveUpstream(uint32_t endpoint_index, uint32_t response_code = 200) {
     initiateClientConnection();
     waitForUpstreamResponse(endpoint_index, response_code);
-    cleanupUpstreamConnection();
+    cleanupUpstreamAndDownstream();
   }
 
   static constexpr uint32_t upstream_endpoints_ = 5;
@@ -515,7 +507,7 @@ TEST_P(LoadStatsIntegrationTest, InProgress) {
   waitForLoadStatsRequest({localityStats("winter", 0, 0, 1)});
 
   waitForUpstreamResponse(0, 503);
-  cleanupUpstreamConnection();
+  cleanupUpstreamAndDownstream();
 
   EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
   EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());
@@ -544,7 +536,7 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
   response_->waitForEndStream();
   ASSERT_TRUE(response_->complete());
   EXPECT_STREQ("503", response_->headers().Status()->value().c_str());
-  cleanupUpstreamConnection();
+  cleanupUpstreamAndDownstream();
 
   waitForLoadStatsRequest({}, 1);
 

@@ -282,9 +282,17 @@ message RouteMatch {
   repeated QueryParameterMatcher query_parameters = 7;
 }
 
+// [#comment:next free field: 9]
 message CorsPolicy {
   // Specifies the origins that will be allowed to do CORS requests.
+  //
+  // An origin is allowed if either allow_origin or allow_origin_regex match.
   repeated string allow_origin = 1;
+
+  // Specifies regex patterns that match allowed origins.
+  //
+  // An origin is allowed if either allow_origin or allow_origin_regex match.
+  repeated string allow_origin_regex = 8;
 
   // Specifies the content for the *access-control-allow-methods* header.
   string allow_methods = 2;
@@ -305,7 +313,7 @@ message CorsPolicy {
   google.protobuf.BoolValue enabled = 7;
 }
 
-// [#comment:next free field: 24]
+// [#comment:next free field: 25]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -393,7 +401,9 @@ message RouteAction {
     google.protobuf.BoolValue auto_host_rewrite = 7;
   }
 
-  // Specifies the timeout for the route. If not specified, the default is 15s.
+  // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
+  // spans between the point at which the entire downstream request (i.e. end-of-stream) has been
+  // processed and when the upstream response has been completely processed.
   //
   // .. note::
   //
@@ -415,8 +425,8 @@ message RouteAction {
     // :ref:`config_http_filters_router_x-envoy-max-retries`.
     google.protobuf.UInt32Value num_retries = 2;
 
-    // Specifies a non-zero timeout per retry attempt. This parameter is optional.
-    // The same conditions documented for
+    // Specifies a non-zero upstream timeout per retry attempt. This parameter is optional. The
+    // same conditions documented for
     // :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms` apply.
     //
     // .. note::
@@ -428,6 +438,28 @@ message RouteAction {
     //   would have been exhausted.
     google.protobuf.Duration per_try_timeout = 3 [(gogoproto.stdduration) = true];
   }
+
+  // Specifies the idle timeout for the route. If not specified, this defaults
+  // to 5 minutes. The default value was select so as not to interfere with any
+  // smaller configured timeouts that may have existed in configurations prior
+  // to the introduction of this feature, while introducing robustness to TCP
+  // connections that terminate without FIN. A value of 0 will completely
+  // disable the idle timeout.
+  //
+  // The idle timeout is distinct to :ref:`timeout
+  // <envoy_api_field_route.RouteAction.timeout>`, which provides an upper bound
+  // on the upstream response time; :ref:`idle_timeout
+  // <envoy_api_field_route.RouteAction.idle_timeout>` instead bounds the amount
+  // of time the request's stream may be idle.
+  //
+  // After header decoding, the idle timeout will apply on downstream and
+  // upstream request events. Each time an encode/decode event for headers or
+  // data is processed for the stream, the timer will be reset. If the timeout
+  // fires, the stream is terminated with a 408 Request Timeout error code if no
+  // upstream response header has been received, otherwise a stream reset
+  // occurs.
+  google.protobuf.Duration idle_timeout = 24
+      [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
 
   // Indicates that the route has a retry policy.
   RetryPolicy retry_policy = 9;
@@ -888,37 +920,24 @@ message RateLimit {
 //       "name": ":method",
 //       "value": "POST"
 //     }
+//
+// .. attention::
+//   In the absence of any header match specifier, match will default to :ref:`present_match
+//   <envoy_api_field_route.HeaderMatcher.present_match>`. i.e, a request that has the :ref:`name
+//   <envoy_api_field_route.HeaderMatcher.name>` header will match, regardless of the header's
+//   value.
+//
 message HeaderMatcher {
   // Specifies the name of the header in the request.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
-  // Specifies the value of the header. If the value is absent a request that
-  // has the name header will match, regardless of the header’s value.
-  //
-  // .. attention::
-  //   Deprecated. Use :ref:`exact_match <envoy_api_field_route.HeaderMatcher.exact_match>` instead.
-  string value = 2 [deprecated = true];
+  reserved 2; // value deprecated by :ref:`exact_match
+              // <envoy_api_field_route.HeaderMatcher.exact_match>`
 
-  // Specifies whether the header value is a regular
-  // expression or not. Defaults to false. The entire request header value must match the regex. The
-  // rule will not match if only a subsequence of the request header value matches the regex. The
-  // regex grammar used in the value field is defined
-  // `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
-  //
-  // Examples:
-  //
-  // * The regex *\d{3}* matches the value *123*
-  // * The regex *\d{3}* does not match the value *1234*
-  // * The regex *\d{3}* does not match the value *123.456*
-  //
-  // .. attention::
-  //   Deprecated. Use :ref:`regex_match <envoy_api_field_route.HeaderMatcher.regex_match>` instead.
-  google.protobuf.BoolValue regex = 3 [deprecated = true];
+  reserved 3; // regex deprecated by :ref:`regex_match
+              // <envoy_api_field_route.HeaderMatcher.regex_match>`
 
   // Specifies how the header match will be performed to route the request.
-  // If header_match_specifier is absent, a request that has the
-  // :ref:`envoy_api_msg_route.HeaderMatcher.name` header will match, regardless of the header's
-  // value.
   oneof header_match_specifier {
     // If specified, header match will be performed based on the value of the header.
     string exact_match = 4;

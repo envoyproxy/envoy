@@ -6,7 +6,6 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
-#include "envoy/request_info/request_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 
@@ -164,6 +163,21 @@ public:
 
 private:
   std::vector<Http::HeaderUtility::HeaderData> header_data_;
+};
+
+/**
+ * Filter requests that had a response with an Envoy response flag set.
+ */
+class ResponseFlagFilter : public Filter {
+public:
+  ResponseFlagFilter(const envoy::config::filter::accesslog::v2::ResponseFlagFilter& config);
+
+  // AccessLog::Filter
+  bool evaluate(const RequestInfo::RequestInfo& info,
+                const Http::HeaderMap& request_headers) override;
+
+private:
+  uint64_t configured_flags_{};
 };
 
 /**

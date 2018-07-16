@@ -10,6 +10,7 @@ envoy_package()
 exports_files([
     "echo_server.json",
     "server.json",
+    "server.yaml",
     "server_ads.yaml",
     "server_cors_filter.json",
     "server_grpc_json_transcoder.json",
@@ -19,6 +20,7 @@ exports_files([
     "server_ssl.json",
     "server_uds.json",
     "server_unix_listener.json",
+    "server_unix_listener.yaml",
     "server_xfcc.json",
     "tcp_proxy.json",
 ])
@@ -37,8 +39,8 @@ filegroup(
 filegroup(
     name = "server_config_files",
     srcs = [
-        "server.json",
-        "server_unix_listener.json",
+        "server.yaml",
+        "server_unix_listener.yaml",
     ],
 )
 
