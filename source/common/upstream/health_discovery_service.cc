@@ -54,6 +54,7 @@ void HdsDelegate::handleFailure() {
   setRetryTimer();
 }
 
+// TODO(lilika): Add support for the same endpoint in different clusters/ports
 void HdsDelegate::sendResponse() {
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse response;
   for (uint i = 0; i < hds_clusters_.size(); i++) {
