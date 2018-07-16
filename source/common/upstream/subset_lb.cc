@@ -460,9 +460,12 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
 void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
                                                 const HostVector& hosts_removed,
                                                 std::function<bool(const Host&)> predicate) {
+  std::unordered_set<HostSharedPtr> predicate_added;
+
   HostVector filtered_added;
   for (const auto host : hosts_added) {
     if (predicate(*host)) {
+      predicate_added.insert(host);
       filtered_added.emplace_back(host);
     }
   }
@@ -477,8 +480,12 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   HostVectorSharedPtr hosts(new HostVector());
   HostVectorSharedPtr healthy_hosts(new HostVector());
 
+  // It's possible that hosts_added == original_host_set_.hosts(), e.g.: when
+  // calling refreshSubsets() if only metadata change. If so, we can avoid the
+  // predicate() call.
   for (const auto host : original_host_set_.hosts()) {
-    if (predicate(*host)) {
+    bool host_seen = predicate_added.count(host) == 1;
+    if (host_seen || predicate(*host)) {
       hosts->emplace_back(host);
       if (host->healthy()) {
         healthy_hosts->emplace_back(host);
@@ -486,11 +493,13 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     }
   }
 
+  // Calling predicate() is expensive since it involves metadata lookups; so we
+  // can take a shortcut and just filter healthy hosts in a follow-up call.
+  // Ideally, we would merge these two calls.
   HostsPerLocalityConstSharedPtr hosts_per_locality =
       original_host_set_.hostsPerLocality().filter(predicate);
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
-      original_host_set_.hostsPerLocality().filter(
-          [&predicate](const Host& host) { return predicate(host) && host.healthy(); });
+      hosts_per_locality->filter([&predicate](const Host& host) { return host.healthy(); });
 
   if (locality_weight_aware_) {
     HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
