@@ -143,7 +143,8 @@ envoy::config::bootstrap::v2::Bootstrap
 TestUtility::parseBootstrapFromJson(const std::string& json_string) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::BootstrapJson::translateBootstrap(*json_object_ptr, bootstrap);
+  Stats::StatsOptionsImpl stats_options;
+  Config::BootstrapJson::translateBootstrap(*json_object_ptr, bootstrap, stats_options);
   return bootstrap;
 }
 

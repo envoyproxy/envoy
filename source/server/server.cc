@@ -171,7 +171,7 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
     throw EnvoyException("V1 config (detected) with --config-yaml is not supported");
   }
   Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
-  Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
+  Config::BootstrapJson::translateBootstrap(*config_json, bootstrap, options.statsOptions());
   MessageUtil::validate(bootstrap);
   return BootstrapVersion::V1;
 }

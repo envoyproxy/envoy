@@ -7,6 +7,7 @@
 #include "common/stats/thread_local_store.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/utility.h"
@@ -37,7 +38,7 @@ public:
     }));
 
     EXPECT_CALL(*this, alloc("stats.overflow"));
-    store_.reset(new ThreadLocalStoreImpl(*this));
+    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, *this);
     store_->addSink(sink_);
   }
 
@@ -46,6 +47,7 @@ public:
 
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::StatsOptionsImpl options_;
   TestAllocator alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
@@ -65,7 +67,7 @@ public:
     }));
 
     EXPECT_CALL(*this, alloc("stats.overflow"));
-    store_.reset(new ThreadLocalStoreImpl(*this));
+    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, *this);
     store_->addSink(sink_);
     store_->initializeThreading(main_thread_dispatcher_, tls_);
   }
@@ -157,6 +159,7 @@ public:
 
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
+  Stats::StatsOptionsImpl options_;
   TestAllocator alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;

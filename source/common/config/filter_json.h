@@ -15,6 +15,7 @@
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/json/json_object.h"
+#include "envoy/stats/stats.h"
 
 namespace Envoy {
 namespace Config {
@@ -49,7 +50,8 @@ public:
   static void translateHttpConnectionManager(
       const Json::Object& json_config,
       envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-          proto_config);
+          proto_config,
+      const Stats::StatsOptions& stats_options);
 
   /**
    * Translate a v1 JSON Redis proxy object to v2

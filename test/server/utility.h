@@ -10,7 +10,8 @@ namespace {
 inline envoy::api::v2::Listener parseListenerFromJson(const std::string& json_string) {
   envoy::api::v2::Listener listener;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::LdsJson::translateListener(*json_object_ptr, listener);
+  Stats::StatsOptionsImpl stats_options;
+  Config::LdsJson::translateListener(*json_object_ptr, listener, stats_options);
   return listener;
 }
 

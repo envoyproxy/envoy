@@ -37,16 +37,6 @@ std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
 } // namespace
 
 TEST(OptionsImplTest, HotRestartVersion) {
-  // There's an evil static local in
-  // Stats::RawStatsData::initializeAndGetMutableMaxObjNameLength, which causes
-  // problems when all test.cc files are linked together for coverage-testing.
-  // This resets the static to the default options-value of 60. Note; this is only
-  // needed in coverage tests.
-  {
-    auto options = createOptionsImpl("envoy");
-    Stats::RawStatData::configureForTestsOnly(*options);
-  }
-
   EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --hot-restart-version"), NoServingException,
                           "NoServingException");
 }
@@ -113,6 +103,10 @@ TEST(OptionsImplTest, SetAll) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
   bool v2_config_only = options->v2ConfigOnly();
   bool hot_restart_disabled = options->hotRestartDisabled();
+  Stats::StatsOptionsImpl stats_options;
+  stats_options.max_obj_name_length_ = 54321;
+  stats_options.max_stat_suffix_length_ = 1234;
+
   options->setBaseId(109876);
   options->setConcurrency(42);
   options->setConfigPath("foo");
@@ -132,7 +126,7 @@ TEST(OptionsImplTest, SetAll) {
   options->setServiceNodeName("node_foo");
   options->setServiceZone("zone_foo");
   options->setMaxStats(12345);
-  options->setMaxObjNameLength(54321);
+  options->setStatsOptions(stats_options);
   options->setHotRestartDisabled(!options->hotRestartDisabled());
 
   EXPECT_EQ(109876, options->baseId());
@@ -154,7 +148,8 @@ TEST(OptionsImplTest, SetAll) {
   EXPECT_EQ("node_foo", options->serviceNodeName());
   EXPECT_EQ("zone_foo", options->serviceZone());
   EXPECT_EQ(12345U, options->maxStats());
-  EXPECT_EQ(54321U, options->maxObjNameLength());
+  EXPECT_EQ(stats_options.max_obj_name_length_, options->statsOptions().maxObjNameLength());
+  EXPECT_EQ(stats_options.max_stat_suffix_length_, options->statsOptions().maxStatSuffixLength());
   EXPECT_EQ(!hot_restart_disabled, options->hotRestartDisabled());
 }
 

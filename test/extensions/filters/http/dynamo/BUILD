@@ -46,6 +46,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/stats:stats_lib",
         "//source/extensions/filters/http/dynamo:dynamo_utility_lib",
+        "//test/mocks/stats:stats_mocks",
     ],
 )
 

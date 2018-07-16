@@ -47,7 +47,9 @@ Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& p
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromJson(const std::string& json_string) {
   envoy::api::v2::RouteConfiguration route_config;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config);
+  Stats::StatsOptionsImpl stats_options;
+  Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config,
+                                                      stats_options);
   return route_config;
 }
 
