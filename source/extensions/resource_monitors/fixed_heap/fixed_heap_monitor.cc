@@ -22,6 +22,7 @@ FixedHeapMonitor::FixedHeapMonitor(
 void FixedHeapMonitor::updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) {
   const size_t physical = stats_->reservedHeapBytes();
   const size_t unmapped = stats_->unmappedHeapBytes();
+  ASSERT(physical >= unmapped);
   const size_t used = physical - unmapped;
 
   Server::ResourceUsage usage;
