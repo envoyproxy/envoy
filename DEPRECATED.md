@@ -18,6 +18,11 @@ A logged warning is expected for each deprecated item that is in deprecation win
   `use_data_plane_proto` boolean flag in the [ratelimit configuration](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/ratelimit/v2/rls.proto).
   However, when using the deprecated client a warning is logged.
 * Use of the --v2-config-only flag.
+* Use of both `use_websocket` and `websocket_config` in
+  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto)
+  is deprecated. Please use the new `upgrade_configs` in the
+  [HttpConnectionManager](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto)
+  instead.
 
 ## Version 1.7.0
 
