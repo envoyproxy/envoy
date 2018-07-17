@@ -109,6 +109,12 @@ config:
       request_handle:headers():add("request_body_size", body_length)
       request_handle:headers():add("request_metadata_foo", metadata["foo"])
       request_handle:headers():add("request_metadata_baz", metadata["baz"])
+      if request_handle:connection():ssl() == nil then
+        request_handle:headers():add("request_secure", "false")
+      else
+        request_handle:headers():add("request_secure", "true")
+      end
+      request_handle:headers():add("request_protocol", request_handle:requestInfo():protocol())
     end
 
     function envoy_on_response(response_handle)
@@ -117,6 +123,7 @@ config:
       response_handle:headers():add("response_metadata_foo", metadata["foo"])
       response_handle:headers():add("response_metadata_baz", metadata["baz"])
       response_handle:headers():add("response_body_size", body_length)
+      response_handle:headers():add("request_protocol", response_handle:requestInfo():protocol())
       response_handle:headers():remove("foo")
     end
 )EOF";
@@ -152,6 +159,13 @@ config:
                           .get(Http::LowerCaseString("request_metadata_baz"))
                           ->value()
                           .c_str());
+  EXPECT_STREQ(
+      "false",
+      upstream_request_->headers().get(Http::LowerCaseString("request_secure"))->value().c_str());
+
+  EXPECT_STREQ(
+      "HTTP/1.1",
+      upstream_request_->headers().get(Http::LowerCaseString("request_protocol"))->value().c_str());
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   upstream_request_->encodeHeaders(response_headers, false);
@@ -170,6 +184,8 @@ config:
   EXPECT_STREQ(
       "bat",
       response->headers().get(Http::LowerCaseString("response_metadata_baz"))->value().c_str());
+  EXPECT_STREQ("HTTP/1.1",
+               response->headers().get(Http::LowerCaseString("request_protocol"))->value().c_str());
   EXPECT_EQ(nullptr, response->headers().get(Http::LowerCaseString("foo")));
 
   cleanup();

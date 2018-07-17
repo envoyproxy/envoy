@@ -5,6 +5,7 @@
 
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/subscription.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
 #include "common/http/rest_api_fetcher.h"
@@ -23,7 +24,8 @@ public:
   RdsSubscription(Envoy::Config::SubscriptionStats stats,
                   const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
                   Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
-                  Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info);
+                  Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                  const Stats::Scope& scope);
 
 private:
   // Config::Subscription
@@ -55,6 +57,7 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>* callbacks_ = nullptr;
   Envoy::Config::SubscriptionStats stats_;
+  const Stats::Scope& scope_;
 };
 
 } // namespace Router

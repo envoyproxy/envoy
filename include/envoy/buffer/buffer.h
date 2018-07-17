@@ -165,6 +165,12 @@ public:
   virtual ssize_t search(const void* data, uint64_t size, size_t start) const PURE;
 
   /**
+   * Constructs a flattened string from a buffer.
+   * @return the flattened string.
+   */
+  virtual std::string toString() const PURE;
+
+  /**
    * Write the buffer out to a file descriptor.
    * @param fd supplies the descriptor to write to.
    * @return the number of bytes written or -1 if there was an error.

@@ -15,7 +15,10 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/secret/secret_manager.h"
 #include "envoy/server/admin.h"
+#include "envoy/tcp/conn_pool.h"
+#include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/thread_local_cluster.h"
 #include "envoy/upstream/upstream.h"
@@ -56,6 +59,8 @@ public:
 };
 
 typedef std::unique_ptr<ClusterUpdateCallbacksHandle> ClusterUpdateCallbacksHandlePtr;
+
+class ClusterManagerFactory;
 
 /**
  * Manages connection pools and load balancing for upstream clusters. The cluster manager is
@@ -115,6 +120,18 @@ public:
                                                                  ResourcePriority priority,
                                                                  Http::Protocol protocol,
                                                                  LoadBalancerContext* context) PURE;
+
+  /**
+   * Allocate a load balanced TCP connection pool for a cluster. This is *per-thread* so that
+   * callers do not need to worry about per thread synchronization. The load balancing policy that
+   * is used is the one defined on the cluster when it was created.
+   *
+   * Can return nullptr if there is no host available in the cluster or if the cluster does not
+   * exist.
+   */
+  virtual Tcp::ConnectionPool::Instance* tcpConnPoolForCluster(const std::string& cluster,
+                                                               ResourcePriority priority,
+                                                               LoadBalancerContext* context) PURE;
 
   /**
    * Allocate a load balanced TCP connection for a cluster. The created connection is already
@@ -188,6 +205,8 @@ public:
    */
   virtual ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
+
+  virtual ClusterManagerFactory& clusterManagerFactory() PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;
@@ -244,11 +263,21 @@ public:
                    const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
 
   /**
+   * Allocate a TCP connection pool for the host. Pools are separated by 'priority' and
+   * 'options->hashKey()', if any.
+   */
+  virtual Tcp::ConnectionPool::InstancePtr
+  allocateTcpConnPool(Event::Dispatcher& dispatcher, HostConstSharedPtr host,
+                      ResourcePriority priority,
+                      const Network::ConnectionSocket::OptionsSharedPtr& options) PURE;
+
+  /**
    * Allocate a cluster from configuration proto.
    */
   virtual ClusterSharedPtr clusterFromProto(const envoy::api::v2::Cluster& cluster,
                                             ClusterManager& cm,
                                             Outlier::EventLoggerSharedPtr outlier_event_logger,
+                                            AccessLog::AccessLogManager& log_manager,
                                             bool added_via_api) PURE;
 
   /**
@@ -257,6 +286,11 @@ public:
   virtual CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
                               const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                               ClusterManager& cm) PURE;
+
+  /**
+   * Returns the secret manager.
+   */
+  virtual Secret::SecretManager& secretManager() PURE;
 };
 
 } // namespace Upstream

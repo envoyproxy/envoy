@@ -20,6 +20,9 @@ envoy_cc_test_library(
         "main.cc",
         "test_runner.h",
     ],
+    external_deps = [
+        "abseil_symbolize",
+    ],
     deps = [
         "//source/common/common:logger_lib",
         "//source/common/common:thread_lib",

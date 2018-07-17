@@ -14,6 +14,7 @@
 
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
+#include "google/api/httpbody.pb.h"
 #include "grpc_transcoding/json_request_translator.h"
 #include "grpc_transcoding/path_matcher_utility.h"
 #include "grpc_transcoding/response_to_json_translator.h"
@@ -141,6 +142,10 @@ ProtobufUtil::Status JsonTranscoderConfig::createTranscoder(
     const Http::HeaderMap& headers, ZeroCopyInputStream& request_input,
     google::grpc::transcoding::TranscoderInputStream& response_input,
     std::unique_ptr<Transcoder>& transcoder, const Protobuf::MethodDescriptor*& method_descriptor) {
+  if (Grpc::Common::hasGrpcContentType(headers)) {
+    return ProtobufUtil::Status(Code::INVALID_ARGUMENT,
+                                "Request headers has application/grpc content-type");
+  }
   const ProtobufTypes::String method = headers.Method()->value().c_str();
   ProtobufTypes::String path = headers.Path()->value().c_str();
   ProtobufTypes::String args;
@@ -218,6 +223,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
     // just pass-through the request to upstream.
     return Http::FilterHeadersStatus::Continue;
   }
+  has_http_body_output_ = !method_->server_streaming() && hasHttpBodyAsOutputType();
 
   headers.removeContentLength();
   headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Grpc);
@@ -336,6 +342,12 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
     return Http::FilterDataStatus::Continue;
   }
 
+  // TODO(dio): Add support for streaming case.
+  if (has_http_body_output_) {
+    buildResponseFromHttpBodyOutput(*response_headers_, data);
+    return Http::FilterDataStatus::StopIterationAndBuffer;
+  }
+
   response_in_.move(data);
 
   if (end_stream) {
@@ -409,6 +421,32 @@ bool JsonTranscoderFilter::readToBuffer(Protobuf::io::ZeroCopyInputStream& strea
     }
   }
   return false;
+}
+
+void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& response_headers,
+                                                           Buffer::Instance& data) {
+  std::vector<Grpc::Frame> frames;
+  decoder_.decode(data, frames);
+  if (frames.empty()) {
+    return;
+  }
+
+  google::api::HttpBody http_body;
+  for (auto& frame : frames) {
+    if (frame.length_ > 0) {
+      Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
+      http_body.ParseFromZeroCopyStream(&stream);
+      const auto& body = http_body.data();
+      data.add(body);
+      response_headers.insertContentType().value(http_body.content_type());
+      response_headers.insertContentLength().value(body.length());
+      return;
+    }
+  }
+}
+
+bool JsonTranscoderFilter::hasHttpBodyAsOutputType() {
+  return method_->output_type()->full_name() == google::api::HttpBody::descriptor()->full_name();
 }
 
 } // namespace GrpcJsonTranscoder

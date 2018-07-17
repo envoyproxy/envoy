@@ -6,6 +6,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
+#include "envoy/stats/stats.h"
 
 #include "spdlog/spdlog.h"
 
@@ -149,10 +150,10 @@ public:
   virtual uint64_t maxStats() const PURE;
 
   /**
-   * @return uint64_t the maximum name length of the name field in
+   * @return StatsOptions& the max stat name / suffix lengths for stats.
    * router/cluster/listener.
    */
-  virtual uint64_t maxObjNameLength() const PURE;
+  virtual const Stats::StatsOptions& statsOptions() const PURE;
 
   /**
    * @return bool indicating whether the hot restart functionality has been disabled via cli flags.

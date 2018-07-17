@@ -15,8 +15,8 @@ class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine {
 public:
   RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v2alpha::RBAC& rules);
 
-  bool allowed(const Network::Connection& connection,
-               const Envoy::Http::HeaderMap& headers) const override;
+  bool allowed(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+               const envoy::api::v2::core::Metadata& metadata) const override;
 
 private:
   const bool allowed_if_matched_;

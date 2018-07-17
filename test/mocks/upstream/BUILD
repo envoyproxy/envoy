@@ -50,6 +50,8 @@ envoy_cc_mock(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
         "//test/mocks/stats:stats_mocks",
+        "//test/mocks/tcp:tcp_mocks",
     ],
 )

@@ -27,7 +27,7 @@ typedef BlockMemoryHashSet<Stats::RawStatData> RawStatDataSet;
 class SharedMemory {
 public:
   static void configure(uint64_t max_num_stats, uint64_t max_stat_name_len);
-  static std::string version(uint64_t max_num_stats, uint64_t max_stat_name_len);
+  static std::string version(uint64_t max_num_stats, const Stats::StatsOptions& stats_options);
 
   // Made public for testing.
   static const uint64_t VERSION;
@@ -130,7 +130,7 @@ public:
   std::string version() override;
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
-  Stats::RawStatDataAllocator& statsAllocator() override { return *this; }
+  Stats::StatDataAllocator& statsAllocator() override { return *this; }
 
   /**
    * envoy --hot_restart_version doesn't initialize Envoy, but computes the version string
@@ -191,8 +191,8 @@ private:
 
   template <class rpc_class, RpcMessageType rpc_type> rpc_class* receiveTypedRpc() {
     RpcBase* base_message = receiveRpc(true);
-    RELEASE_ASSERT(base_message->length_ == sizeof(rpc_class));
-    RELEASE_ASSERT(base_message->type_ == rpc_type);
+    RELEASE_ASSERT(base_message->length_ == sizeof(rpc_class), "");
+    RELEASE_ASSERT(base_message->type_ == rpc_type, "");
     return reinterpret_cast<rpc_class*>(base_message);
   }
 
@@ -203,7 +203,7 @@ private:
   void onSocketEvent();
   RpcBase* receiveRpc(bool block);
   void sendMessage(sockaddr_un& address, RpcBase& rpc);
-  static std::string versionHelper(uint64_t max_num_stats, uint64_t max_stat_name_len,
+  static std::string versionHelper(uint64_t max_num_stats, const Stats::StatsOptions& stats_options,
                                    RawStatDataSet& stats_set);
 
   Options& options_;

@@ -37,12 +37,9 @@ flag, i.e.:
 
 .. code-block:: console
 
-  ./envoy -c <path to config>.{json,yaml,pb,pb_text} --v2-config-only
+  ./envoy -c <path to config>.{json,yaml,pb,pb_text}
 
-where the extension reflects the underlying v2 config representation. The
-:option:`--v2-config-only` flag is not strictly required as Envoy will attempt
-to autodetect the config file version, but this option provides an enhanced
-debug experience when configuration parsing fails.
+where the extension reflects the underlying v2 config representation.
 
 The :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` message is the root of the
 configuration. A key concept in the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>`
@@ -145,7 +142,9 @@ on 127.0.0.3:5678 is provided below:
         eds_config:
           api_config_source:
             api_type: GRPC
-            cluster_names: [xds_cluster]
+            grpc_services:
+              envoy_grpc:
+                cluster_name: xds_cluster
     - name: xds_cluster
       connect_timeout: 0.25s
       type: STATIC
@@ -198,11 +197,15 @@ below:
     lds_config:
       api_config_source:
         api_type: GRPC
-        cluster_names: [xds_cluster]
+        grpc_services:
+          envoy_grpc:
+            cluster_name: xds_cluster
     cds_config:
       api_config_source:
         api_type: GRPC
-        cluster_names: [xds_cluster]
+        grpc_services:
+          envoy_grpc:
+            cluster_name: xds_cluster
 
   static_resources:
     clusters:
@@ -236,7 +239,9 @@ The management server could respond to LDS requests with:
             config_source:
               api_config_source:
                 api_type: GRPC
-                cluster_names: [xds_cluster]
+                grpc_services:
+                  envoy_grpc:
+                    cluster_name: xds_cluster
           http_filters:
           - name: envoy.router
 
@@ -270,7 +275,9 @@ The management server could respond to CDS requests with:
       eds_config:
         api_config_source:
           api_type: GRPC
-          cluster_names: [xds_cluster]
+          grpc_services:
+            envoy_grpc:
+              cluster_name: xds_cluster
 
 The management server could respond to EDS requests with:
 
@@ -287,6 +294,17 @@ The management server could respond to EDS requests with:
             socket_address:
               address: 127.0.0.2
               port_value: 1234
+
+Upgrading from v1 configuration
+-------------------------------
+
+While new v2 bootstrap JSON/YAML can be written, it might be expedient to upgrade an existing
+:ref:`v1 JSON/YAML configuration <config_overview_v1>` to v2. To do this (in an Envoy source tree),
+you can run:
+
+.. code-block:: console
+
+  bazel run //tools:v1_to_bootstrap <path to v1 JSON/YAML configuration file>
 
 Management server
 -----------------
@@ -313,7 +331,9 @@ for the service definition. This is used by Envoy as a client when
     cds_config:
       api_config_source:
         api_type: GRPC
-        cluster_names: [some_xds_cluster]
+        grpc_services:
+          envoy_grpc:
+            cluster_name: some_xds_cluster
 
 is set in the :ref:`dynamic_resources
 <envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
@@ -330,7 +350,9 @@ for the service definition. This is used by Envoy as a client when
     eds_config:
       api_config_source:
         api_type: GRPC
-        cluster_names: [some_xds_cluster]
+        grpc_services:
+          envoy_grpc:
+            cluster_name: some_xds_cluster
 
 is set in the :ref:`eds_cluster_config
 <envoy_api_field_Cluster.eds_cluster_config>` field of the :ref:`Cluster
@@ -347,7 +369,9 @@ for the service definition. This is used by Envoy as a client when
     lds_config:
       api_config_source:
         api_type: GRPC
-        cluster_names: [some_xds_cluster]
+        grpc_services:
+          envoy_grpc:
+            cluster_name: some_xds_cluster
 
 is set in the :ref:`dynamic_resources
 <envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap
@@ -365,7 +389,9 @@ for the service definition. This is used by Envoy as a client when
     config_source:
       api_config_source:
         api_type: GRPC
-        cluster_names: [some_xds_cluster]
+        grpc_services:
+          envoy_grpc:
+            cluster_name: some_xds_cluster
 
 is set in the :ref:`rds
 <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.rds>` field of the :ref:`HttpConnectionManager
@@ -485,7 +511,9 @@ for the service definition. This is used by Envoy as a client when
 
     ads_config:
       api_type: GRPC
-      cluster_names: [some_ads_cluster]
+      grpc_services:
+        envoy_grpc:
+          cluster_name: some_ads_cluster
 
 is set in the :ref:`dynamic_resources
 <envoy_api_field_config.bootstrap.v2.Bootstrap.dynamic_resources>` of the :ref:`Bootstrap

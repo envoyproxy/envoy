@@ -10,11 +10,11 @@ namespace Grpc {
 // Support paramaterizing over gRPC client type.
 enum class ClientType { EnvoyGrpc, GoogleGrpc };
 
-class GrpcClientIntegrationParamTest
-    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, ClientType>> {
+class BaseGrpcClientIntegrationParamTest {
 public:
-  Network::Address::IpVersion ipVersion() const { return std::get<0>(GetParam()); }
-  ClientType clientType() const { return std::get<1>(GetParam()); }
+  virtual ~BaseGrpcClientIntegrationParamTest(){};
+  virtual Network::Address::IpVersion ipVersion() const PURE;
+  virtual ClientType clientType() const PURE;
 
   void setGrpcService(envoy::api::v2::core::GrpcService& grpc_service,
                       const std::string& cluster_name,
@@ -35,6 +35,15 @@ public:
   }
 };
 
+class GrpcClientIntegrationParamTest
+    : public BaseGrpcClientIntegrationParamTest,
+      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, ClientType>> {
+public:
+  ~GrpcClientIntegrationParamTest() {}
+  Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
+  ClientType clientType() const override { return std::get<1>(GetParam()); }
+};
+
 // Skip tests based on gRPC client type.
 #define SKIP_IF_GRPC_CLIENT(client_type)                                                           \
   if (clientType() == (client_type)) {                                                             \
@@ -45,10 +54,17 @@ public:
 #define GRPC_CLIENT_INTEGRATION_PARAMS                                                             \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc))
+#define RATELIMIT_GRPC_CLIENT_INTEGRATION_PARAMS                                                   \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::Values(Grpc::ClientType::EnvoyGrpc, Grpc::ClientType::GoogleGrpc),     \
+                   testing::Values(true, false))
 #else
 #define GRPC_CLIENT_INTEGRATION_PARAMS                                                             \
   testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
                    testing::Values(Grpc::ClientType::EnvoyGrpc))
+#define RATELIMIT_GRPC_CLIENT_INTEGRATION_PARAMS                                                   \
+  testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),                     \
+                   testing::Values(Grpc::ClientType::EnvoyGrpc), testing::Values(true, false))
 #endif
 
 } // namespace Grpc

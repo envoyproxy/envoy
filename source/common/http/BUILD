@@ -80,6 +80,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "@envoy_api//envoy/type:http_status_cc",
     ],
 )
 
@@ -243,6 +244,7 @@ envoy_cc_library(
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
+        "//include/envoy/http:query_params_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",

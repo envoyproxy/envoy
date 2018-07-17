@@ -28,7 +28,7 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, serviceZone()).WillByDefault(ReturnRef(service_zone_name_));
   ON_CALL(*this, logPath()).WillByDefault(ReturnRef(log_path_));
   ON_CALL(*this, maxStats()).WillByDefault(Return(1000));
-  ON_CALL(*this, maxObjNameLength()).WillByDefault(Return(150));
+  ON_CALL(*this, statsOptions()).WillByDefault(ReturnRef(stats_options_));
   ON_CALL(*this, hotRestartDisabled()).WillByDefault(ReturnPointee(&hot_restart_disabled_));
 }
 MockOptions::~MockOptions() {}
@@ -75,7 +75,7 @@ MockListenerComponentFactory::MockListenerComponentFactory()
                                 const Network::Socket::OptionsSharedPtr& options,
                                 bool) -> Network::SocketSharedPtr {
         if (!Network::Socket::applyOptions(options, *socket_,
-                                           Network::Socket::SocketState::PreBind)) {
+                                           envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
           throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
         }
         return socket_;
@@ -107,7 +107,8 @@ MockWorker::MockWorker() {
 MockWorker::~MockWorker() {}
 
 MockInstance::MockInstance()
-    : ssl_context_manager_(runtime_loader_), singleton_manager_(new Singleton::ManagerImpl()) {
+    : secret_manager_(new Secret::SecretManagerImpl()), ssl_context_manager_(runtime_loader_),
+      singleton_manager_(new Singleton::ManagerImpl()) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, httpTracer()).WillByDefault(ReturnRef(http_tracer_));
@@ -156,6 +157,7 @@ MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::Man
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(listener_scope_));
+  ON_CALL(*this, systemTimeSource()).WillByDefault(ReturnRef(system_time_source_));
 }
 
 MockFactoryContext::~MockFactoryContext() {}
@@ -167,10 +169,12 @@ MockListenerFactoryContext::MockListenerFactoryContext() {}
 MockListenerFactoryContext::~MockListenerFactoryContext() {}
 
 MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
+  event_logger_ = new NiceMock<Upstream::MockHealthCheckEventLogger>();
   ON_CALL(*this, cluster()).WillByDefault(ReturnRef(cluster_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
   ON_CALL(*this, runtime()).WillByDefault(ReturnRef(runtime_));
+  ON_CALL(*this, eventLogger_()).WillByDefault(Return(event_logger_));
 }
 
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() {}

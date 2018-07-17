@@ -49,7 +49,9 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
 }
 
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message) {
-  const auto status = Protobuf::util::JsonStringToMessage(json, &message);
+  Protobuf::util::JsonParseOptions options;
+  options.ignore_unknown_fields = true;
+  const auto status = Protobuf::util::JsonStringToMessage(json, &message, options);
   if (!status.ok()) {
     throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
   }
@@ -87,7 +89,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
 }
 
 std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message,
-                                                  const bool pretty_print) {
+                                                  const bool pretty_print,
+                                                  const bool always_print_primitive_fields) {
   Protobuf::util::JsonPrintOptions json_options;
   // By default, proto field names are converted to camelCase when the message is converted to JSON.
   // Setting this option makes debugging easier because it keeps field names consistent in JSON
@@ -96,16 +99,22 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   if (pretty_print) {
     json_options.add_whitespace = true;
   }
+  // Primitive types such as int32s and enums will not be serialized if they have the default value.
+  // This flag disables that behavior.
+  if (always_print_primitive_fields) {
+    json_options.always_print_primitive_fields = true;
+  }
   ProtobufTypes::String json;
   const auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
   // This should always succeed unless something crash-worthy such as out-of-memory.
-  RELEASE_ASSERT(status.ok());
+  RELEASE_ASSERT(status.ok(), "");
   return json;
 }
 
 void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
   // TODO(htuch): Consolidate with the inflight cleanups here.
-  Protobuf::util::JsonOptions json_options;
+  Protobuf::util::JsonPrintOptions json_options;
+  json_options.preserve_proto_field_names = true;
   ProtobufTypes::String json;
   const auto status = Protobuf::util::MessageToJsonString(source, &json, json_options);
   if (!status.ok()) {
@@ -207,6 +216,16 @@ uint64_t DurationUtil::durationToMilliseconds(const ProtobufWkt::Duration& durat
 uint64_t DurationUtil::durationToSeconds(const ProtobufWkt::Duration& duration) {
   validateDuration(duration);
   return Protobuf::util::TimeUtil::DurationToSeconds(duration);
+}
+
+void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
+                                           ProtobufWkt::Timestamp& timestamp) {
+  // Converts to millisecond-precision Timestamp by explicitly casting to millisecond-precision
+  // time_point.
+  timestamp.MergeFrom(Protobuf::util::TimeUtil::MillisecondsToTimestamp(
+      std::chrono::time_point_cast<std::chrono::milliseconds>(system_clock_time)
+          .time_since_epoch()
+          .count()));
 }
 
 } // namespace Envoy

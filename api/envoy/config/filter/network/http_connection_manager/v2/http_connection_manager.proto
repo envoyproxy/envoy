@@ -19,7 +19,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 23]
+// [#comment:next free field: 24]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -87,7 +87,6 @@ message HttpConnectionManager {
     // created if the specified header name is present in the request's headers.
     repeated string request_headers_for_tags = 2;
 
-    // [#not-implemented-hide:]
     // Target percentage of requests managed by this HTTP connection manager that will be force
     // traced if the :ref:`x-client-trace-id <config_http_conn_man_headers_x-client-trace-id>`
     // header is set. This field is a direct analog for the runtime variable
@@ -96,7 +95,6 @@ message HttpConnectionManager {
     // Default: 100%
     envoy.type.Percent client_sampling = 3;
 
-    // [#not-implemented-hide:]
     // Target percentage of requests managed by this HTTP connection manager that will be randomly
     // selected for trace generation, if not requested by the client or not forced. This field is
     // a direct analog for the runtime variable 'tracing.random_sampling' in the
@@ -104,7 +102,6 @@ message HttpConnectionManager {
     // Default: 100%
     envoy.type.Percent random_sampling = 4;
 
-    // [#not-implemented-hide:]
     // Target percentage of requests managed by this HTTP connection manager that will be traced
     // after all other sampling checks have been applied (client-directed, force tracing, random
     // sampling). This field functions as an upper limit on the total configured sampling rate. For
@@ -224,9 +221,7 @@ message HttpConnectionManager {
     // Whether to forward the subject of the client cert. Defaults to false.
     google.protobuf.BoolValue subject = 1;
 
-    // Whether to forward the URI type Subject Alternative Name of the client cert. Defaults to
-    // false. This field is deprecated, use URI field instead.
-    google.protobuf.BoolValue san = 2 [deprecated = true];
+    reserved 2; // san deprecated by uri
 
     // Whether to forward the entire client cert in URL encoded PEM format. This will appear in the
     // XFCC header comma separated from other values with the value Cert="PEM".
@@ -270,6 +265,31 @@ message HttpConnectionManager {
   // <config_http_conn_man_runtime_represent_ipv4_remote_address_as_ipv4_mapped_ipv6>` for runtime
   // control.
   bool represent_ipv4_remote_address_as_ipv4_mapped_ipv6 = 20;
+
+  // The configuration for HTTP upgrades.
+  // For each upgrade type desired, an UpgradeConfig must be added.
+  //
+  // .. warning::
+  //
+  //    The current implementation of upgrade headers does not handle
+  //    multi-valued upgrade headers. Support for multi-valued headers may be
+  //    added in the future if needed.
+  //
+  // .. warning::
+  //    The current implementation of upgrade headers does not work with HTTP/2
+  //    upstreams.
+  message UpgradeConfig {
+    // The case-insensitive name of this upgrade, e.g. "websocket".
+    // For each upgrade type present in upgrade_configs, requests with
+    // Upgrade: [upgrade_type]
+    // will be proxied upstream.
+    string upgrade_type = 1;
+    // If present, this represents the filter chain which will be created for
+    // this type of upgrade. If no filters are present, the filter chain for
+    // HTTP connections will be used for this upgrade type.
+    repeated HttpFilter filters = 2;
+  };
+  repeated UpgradeConfig upgrade_configs = 23;
 }
 
 message Rds {
@@ -298,6 +318,7 @@ message HttpFilter {
   // * :ref:`envoy.grpc_json_transcoder <config_http_filters_grpc_json_transcoder>`
   // * :ref:`envoy.grpc_web <config_http_filters_grpc_web>`
   // * :ref:`envoy.health_check <config_http_filters_health_check>`
+  // * :ref:`envoy.header_to_metadata <config_http_filters_header_to_metadata>`
   // * :ref:`envoy.ip_tagging <config_http_filters_ip_tagging>`
   // * :ref:`envoy.lua <config_http_filters_lua>`
   // * :ref:`envoy.rate_limit <config_http_filters_rate_limit>`

@@ -1,9 +1,9 @@
-GOOGLEAPIS_SHA = "d642131a6e6582fc226caf9893cb7fe7885b3411" # May 23, 2018
-GOGOPROTO_SHA = "1adfc126b41513cc696b209667c8656ea7aac67c" # v1.0.0
-PROMETHEUS_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c" # Nov 17, 2017
-OPENCENSUS_SHA = "ab82e5fdec8267dc2a726544b10af97675970847" # May 23, 2018
+GOOGLEAPIS_SHA = "d642131a6e6582fc226caf9893cb7fe7885b3411"  # May 23, 2018
+GOGOPROTO_SHA = "1adfc126b41513cc696b209667c8656ea7aac67c"  # v1.0.0
+PROMETHEUS_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
+OPENCENSUS_SHA = "ab82e5fdec8267dc2a726544b10af97675970847"  # May 23, 2018
 
-PGV_GIT_SHA = "9f600c2cd2d7031fdc8e25e1c9f5ad81c8cab4fe"
+PGV_GIT_SHA = "f9d2b11e44149635b23a002693b76512b01ae515"
 
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
@@ -17,9 +17,58 @@ def api_dependencies():
         name = "googleapis",
         strip_prefix = "googleapis-" + GOOGLEAPIS_SHA,
         url = "https://github.com/googleapis/googleapis/archive/" + GOOGLEAPIS_SHA + ".tar.gz",
+        # TODO(dio): Consider writing a Skylark macro for importing Google API proto.
         build_file_content = """
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+
+filegroup(
+    name = "api_httpbody_protos_src",
+    srcs = [
+        "google/api/httpbody.proto",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+proto_library(
+    name = "api_httpbody_protos_proto",
+    srcs = [":api_httpbody_protos_src"],
+    deps = ["@com_google_protobuf//:descriptor_proto"],
+    visibility = ["//visibility:public"],
+)
+
+cc_proto_library(
+    name = "api_httpbody_protos",
+    srcs = [
+        "google/api/httpbody.proto",
+    ],
+    default_runtime = "@com_google_protobuf//:protobuf",
+    protoc = "@com_google_protobuf//:protoc",
+    deps = ["@com_google_protobuf//:cc_wkt_protos"],
+    visibility = ["//visibility:public"],
+)
+
+py_proto_library(
+    name = "api_httpbody_protos_py",
+    srcs = [
+        "google/api/httpbody.proto",
+    ],
+    include = ".",
+    default_runtime = "@com_google_protobuf//:protobuf_python",
+    protoc = "@com_google_protobuf//:protoc",
+    visibility = ["//visibility:public"],
+    deps = ["@com_google_protobuf//:protobuf_python"],
+)
+
+go_proto_library(
+    name = "api_httpbody_go_proto",
+    importpath = "google.golang.org/genproto/googleapis/api/httpbody",
+    proto = ":api_httpbody_protos_proto",
+    visibility = ["//visibility:public"],
+    deps = [
+      ":descriptor_go_proto",
+    ],
+)
 
 filegroup(
     name = "http_api_protos_src",
@@ -28,7 +77,7 @@ filegroup(
         "google/api/http.proto",
     ],
     visibility = ["//visibility:public"],
- )
+)
 
 go_proto_library(
     name = "descriptor_go_proto",
@@ -93,6 +142,7 @@ proto_library(
      deps = ["@com_google_protobuf//:any_proto"],
      visibility = ["//visibility:public"],
 )
+
 cc_proto_library(
      name = "rpc_status_protos",
      srcs = ["google/rpc/status.proto"],

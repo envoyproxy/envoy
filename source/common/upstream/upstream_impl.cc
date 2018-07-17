@@ -11,6 +11,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
+#include "envoy/secret/secret_manager.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/upstream/health_checker.h"
@@ -92,6 +93,15 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
     Network::Socket::appendOptions(
         cluster_options,
         Network::SocketOptionFactory::buildTcpKeepaliveOptions(parseTcpKeepaliveConfig(config)));
+  }
+  // Cluster socket_options trump cluster manager wide.
+  if (bind_config.socket_options().size() + config.upstream_bind_config().socket_options().size() >
+      0) {
+    auto socket_options = config.upstream_bind_config().socket_options().size() > 0
+                              ? config.upstream_bind_config().socket_options()
+                              : bind_config.socket_options();
+    Network::Socket::appendOptions(
+        cluster_options, Network::SocketOptionFactory::buildLiteralOptions(socket_options));
   }
   if (cluster_options->empty()) {
     return nullptr;
@@ -256,7 +266,8 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
 ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                                  const envoy::api::v2::core::BindConfig& bind_config,
                                  Runtime::Loader& runtime, Stats::Store& stats,
-                                 Ssl::ContextManager& ssl_context_manager, bool added_via_api)
+                                 Ssl::ContextManager& ssl_context_manager,
+                                 Secret::SecretManager& secret_manager, bool added_via_api)
     : runtime_(runtime), name_(config.name()), type_(config.type()),
       max_requests_per_connection_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_requests_per_connection, 0)),
@@ -279,7 +290,8 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), common_lb_config_(config.common_lb_config()),
       cluster_socket_options_(parseClusterSocketOptions(config, bind_config)),
-      drain_connections_on_host_removal_(config.drain_connections_on_host_removal()) {
+      drain_connections_on_host_removal_(config.drain_connections_on_host_removal()),
+      secret_manager_(secret_manager) {
 
   // If the cluster doesn't have a transport socket configured, override with the default transport
   // socket implementation based on the tls_context. We copy by value first then override if
@@ -342,15 +354,13 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   }
 }
 
-ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
-                                         Stats::Store& stats, ThreadLocal::Instance& tls,
-                                         Network::DnsResolverSharedPtr dns_resolver,
-                                         Ssl::ContextManager& ssl_context_manager,
-                                         Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                                         Event::Dispatcher& dispatcher,
-                                         const LocalInfo::LocalInfo& local_info,
-                                         Outlier::EventLoggerSharedPtr outlier_event_logger,
-                                         bool added_via_api) {
+ClusterSharedPtr ClusterImplBase::create(
+    const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
+    ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
+    Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
+    Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+    AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
+    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   std::unique_ptr<ClusterImplBase> new_cluster;
 
   // We make this a shared pointer to deal with the distinct ownership
@@ -414,7 +424,7 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
     // TODO(htuch): Need to support multiple health checks in v2.
     ASSERT(cluster.health_checks().size() == 1);
     new_cluster->setHealthChecker(HealthCheckerFactory::create(
-        cluster.health_checks()[0], *new_cluster, runtime, random, dispatcher));
+        cluster.health_checks()[0], *new_cluster, runtime, random, dispatcher, log_manager));
   }
 
   new_cluster->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(
@@ -425,9 +435,11 @@ ClusterSharedPtr ClusterImplBase::create(const envoy::api::v2::Cluster& cluster,
 ClusterImplBase::ClusterImplBase(const envoy::api::v2::Cluster& cluster,
                                  const envoy::api::v2::core::BindConfig& bind_config,
                                  Runtime::Loader& runtime, Stats::Store& stats,
-                                 Ssl::ContextManager& ssl_context_manager, bool added_via_api)
-    : runtime_(runtime), info_(new ClusterInfoImpl(cluster, bind_config, runtime, stats,
-                                                   ssl_context_manager, added_via_api)) {
+                                 Ssl::ContextManager& ssl_context_manager,
+                                 Secret::SecretManager& secret_manager, bool added_via_api)
+    : runtime_(runtime),
+      info_(new ClusterInfoImpl(cluster, bind_config, runtime, stats, ssl_context_manager,
+                                secret_manager, added_via_api)) {
   // Create the default (empty) priority set before registering callbacks to
   // avoid getting an update the first time it is accessed.
   priority_set_.getOrCreateHostSet(0);
@@ -631,11 +643,121 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries)};
 }
 
+PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
+                                           const LocalInfo::LocalInfo& local_info)
+    : parent_(cluster), local_info_node_(local_info.node()) {}
+
+void PriorityStateManager::initializePriorityFor(
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint) {
+  const uint32_t priority = locality_lb_endpoint.priority();
+  if (priority_state_.size() <= priority) {
+    priority_state_.resize(priority + 1);
+  }
+  if (priority_state_[priority].first == nullptr) {
+    priority_state_[priority].first.reset(new HostVector());
+  }
+  if (locality_lb_endpoint.has_locality() && locality_lb_endpoint.has_load_balancing_weight()) {
+    priority_state_[priority].second[locality_lb_endpoint.locality()] =
+        locality_lb_endpoint.load_balancing_weight().value();
+  }
+}
+
+void PriorityStateManager::registerHostForPriority(
+    const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
+    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
+    const Upstream::Host::HealthFlag health_checker_flag) {
+  const uint32_t priority = locality_lb_endpoint.priority();
+  // Should be called after initializePriorityFor.
+  ASSERT(priority_state_[priority].first);
+  priority_state_[priority].first->emplace_back(
+      new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
+                   lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
+                   lb_endpoint.endpoint().health_check_config()));
+
+  const auto& health_status = lb_endpoint.health_status();
+  if (health_status == envoy::api::v2::core::HealthStatus::UNHEALTHY ||
+      health_status == envoy::api::v2::core::HealthStatus::DRAINING ||
+      health_status == envoy::api::v2::core::HealthStatus::TIMEOUT) {
+    priority_state_[priority].first->back()->healthFlagSet(health_checker_flag);
+  }
+}
+
+void PriorityStateManager::updateClusterPrioritySet(
+    const uint32_t priority, HostVectorSharedPtr&& current_hosts,
+    const absl::optional<HostVector>& hosts_added,
+    const absl::optional<HostVector>& hosts_removed) {
+  // If local locality is not defined then skip populating per locality hosts.
+  const auto& local_locality = local_info_node_.locality();
+  ENVOY_LOG(trace, "Local locality: {}", local_locality.DebugString());
+
+  // For non-EDS, most likely the current hosts are from priority_state_[priority].first.
+  HostVectorSharedPtr hosts(std::move(current_hosts));
+  LocalityWeightsMap empty_locality_map;
+  LocalityWeightsMap& locality_weights_map =
+      priority_state_.size() > priority ? priority_state_[priority].second : empty_locality_map;
+  ASSERT(priority_state_.size() > priority || locality_weights_map.empty());
+  LocalityWeightsSharedPtr locality_weights;
+  std::vector<HostVector> per_locality;
+
+  // If we are configured for locality weighted LB we populate the locality weights.
+  const bool locality_weighted_lb = parent_.info()->lbConfig().has_locality_weighted_lb_config();
+  if (locality_weighted_lb) {
+    locality_weights = std::make_shared<LocalityWeights>();
+  }
+
+  // We use std::map to guarantee a stable ordering for zone aware routing.
+  std::map<envoy::api::v2::core::Locality, HostVector, LocalityLess> hosts_per_locality;
+
+  for (const HostSharedPtr& host : *hosts) {
+    // TODO(dio): Take into consideration when a non-EDS cluster has active health checking, i.e. to
+    // mark all the hosts unhealthy (host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC)) and
+    // then fire update callbacks to start the health checking process.
+    hosts_per_locality[host->locality()].push_back(host);
+  }
+
+  // Do we have hosts for the local locality?
+  const bool non_empty_local_locality =
+      local_info_node_.has_locality() &&
+      hosts_per_locality.find(local_locality) != hosts_per_locality.end();
+
+  // As per HostsPerLocality::get(), the per_locality vector must have the local locality hosts
+  // first if non_empty_local_locality.
+  if (non_empty_local_locality) {
+    per_locality.emplace_back(hosts_per_locality[local_locality]);
+    if (locality_weighted_lb) {
+      locality_weights->emplace_back(locality_weights_map[local_locality]);
+    }
+  }
+
+  // After the local locality hosts (if any), we place the remaining locality host groups in
+  // lexicographic order. This provides a stable ordering for zone aware routing.
+  for (auto& entry : hosts_per_locality) {
+    if (!non_empty_local_locality || !LocalityEqualTo()(local_locality, entry.first)) {
+      per_locality.emplace_back(entry.second);
+      if (locality_weighted_lb) {
+        locality_weights->emplace_back(locality_weights_map[entry.first]);
+      }
+    }
+  }
+
+  auto per_locality_shared =
+      std::make_shared<HostsPerLocalityImpl>(std::move(per_locality), non_empty_local_locality);
+
+  auto& host_set =
+      static_cast<PrioritySetImpl&>(parent_.prioritySet()).getOrCreateHostSet(priority);
+  host_set.updateHosts(hosts, ClusterImplBase::createHealthyHostList(*hosts), per_locality_shared,
+                       ClusterImplBase::createHealthyHostLists(*per_locality_shared),
+                       std::move(locality_weights), hosts_added.value_or(*hosts),
+                       hosts_removed.value_or<HostVector>({}));
+}
+
 StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
                                      Runtime::Loader& runtime, Stats::Store& stats,
                                      Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
                                      bool added_via_api)
-    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager, added_via_api),
+    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
+                      cm.clusterManagerFactory().secretManager(), added_via_api),
       initial_hosts_(new HostVector()) {
 
   for (const auto& host : cluster.hosts()) {
@@ -671,16 +793,22 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
                                                    HostVector& hosts_added,
                                                    HostVector& hosts_removed) {
   uint64_t max_host_weight = 1;
+
+  // Did hosts change?
+  //
   // Has the EDS health status changed the health of any endpoint? If so, we
   // rebuild the hosts vectors. We only do this if the health status of an
   // endpoint has materially changed (e.g. if previously failing active health
   // checks, we just note it's now failing EDS health status but don't rebuild).
+  //
+  // Likewise, if metadata for an endpoint changed we rebuild the hosts vectors.
+  //
   // TODO(htuch): We can be smarter about this potentially, and not force a full
   // host set update on health status change. The way this would work is to
   // implement a HealthChecker subclass that provides thread local health
-  // updates to the Cluster objeect. This will probably make sense to do in
+  // updates to the Cluster object. This will probably make sense to do in
   // conjunction with https://github.com/envoyproxy/envoy/issues/2874.
-  bool health_changed = false;
+  bool hosts_changed = false;
 
   // Go through and see if the list we have is different from what we just got. If it is, we make a
   // new host list and raise a change notification. This uses an N^2 search given that this does not
@@ -712,13 +840,30 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
             (*i)->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
             // If the host was previously healthy and we're now unhealthy, we need to
             // rebuild.
-            health_changed |= previously_healthy;
+            hosts_changed |= previously_healthy;
           } else {
             (*i)->healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
             // If the host was previously unhealthy and now healthy, we need to
             // rebuild.
-            health_changed |= !previously_healthy && (*i)->healthy();
+            hosts_changed |= !previously_healthy && (*i)->healthy();
           }
+        }
+
+        // Did metadata change?
+        const bool metadata_changed =
+            !Protobuf::util::MessageDifferencer::Equivalent(*host->metadata(), *(*i)->metadata());
+        if (metadata_changed) {
+          // First, update the entire metadata for the endpoint.
+          (*i)->metadata(*host->metadata());
+
+          // Also, given that the canary attribute of an endpoint is derived from its metadata
+          // (e.g.: from envoy.lb/canary), we do a blind update here since it's cheaper than testing
+          // to see if it actually changed. We must update this besides just updating the metadata,
+          // because it'll be used by the router filter to compute upstream stats.
+          (*i)->canary(host->canary());
+
+          // If metadata changed, we need to rebuild. See github issue #3810.
+          hosts_changed = true;
         }
 
         (*i)->weight(host->weight());
@@ -778,11 +923,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     // During the search we moved all of the hosts from hosts_ into final_hosts so just
     // move them back.
     current_hosts = std::move(final_hosts);
-    // We return false here in the absence of EDS health status, because we
+    // We return false here in the absence of EDS health status or metadata changes, because we
     // have no changes to host vector status (modulo weights). When we have EDS
-    // health status, we return true, causing updateHosts() to fire in the
+    // health status or metadata changed, we return true, causing updateHosts() to fire in the
     // caller.
-    return health_changed;
+    return hosts_changed;
   }
 }
 
@@ -793,7 +938,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
                                            ClusterManager& cm, Event::Dispatcher& dispatcher,
                                            bool added_via_api)
     : BaseDynamicClusterImpl(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
-                             added_via_api),
+                             cm.clusterManagerFactory().secretManager(), added_via_api),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {

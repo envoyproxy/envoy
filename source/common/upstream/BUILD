@@ -81,6 +81,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/router:shadow_writer_lib",
+        "//source/common/tcp:conn_pool_lib",
         "//source/common/upstream:upstream_lib",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
         "@envoy_api//envoy/api/v2/core:base_cc",
@@ -101,6 +102,7 @@ envoy_cc_library(
         "//include/envoy/upstream:health_checker_interface",
         "//source/common/router:router_lib",
         "@envoy_api//envoy/api/v2/core:health_check_cc",
+        "@envoy_api//envoy/data/core/v2alpha:health_check_event_cc",
     ],
 )
 
@@ -160,6 +162,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "health_discovery_service_lib",
+    srcs = ["health_discovery_service.cc"],
+    hdrs = ["health_discovery_service.h"],
+    deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/stats:stats_macros",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/grpc:async_client_lib",
+        "@envoy_api//envoy/service/discovery/v2:hds_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "locality_lib",
     hdrs = ["locality.h"],
     deps = [
@@ -190,6 +205,7 @@ envoy_cc_library(
     hdrs = ["original_dst_cluster.h"],
     deps = [
         ":upstream_includes",
+        "//include/envoy/secret:secret_manager_interface",
         "//source/common/common:empty_string",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
@@ -265,6 +281,7 @@ envoy_cc_library(
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/secret:secret_manager_interface",
         "//source/common/config:metadata_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",

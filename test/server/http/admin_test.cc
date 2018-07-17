@@ -7,6 +7,8 @@
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
 #include "common/profiler/profiler.h"
+#include "common/protobuf/protobuf.h"
+#include "common/protobuf/utility.h"
 #include "common/stats/stats_impl.h"
 #include "common/stats/thread_local_store.h"
 
@@ -24,10 +26,14 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
+using testing::Return;
+using testing::ReturnPointee;
+using testing::ReturnRef;
 using testing::_;
 
 namespace Envoy {
@@ -47,7 +53,7 @@ public:
     }));
 
     EXPECT_CALL(*this, alloc("stats.overflow"));
-    store_.reset(new Stats::ThreadLocalStoreImpl(*this));
+    store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_, *this);
     store_->addSink(sink_);
   }
 
@@ -65,6 +71,7 @@ public:
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::TestAllocator alloc_;
   Stats::MockSink sink_;
+  Stats::StatsOptionsImpl options_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
 };
 
@@ -548,7 +555,7 @@ TEST_P(AdminInstanceTest, ConfigDump) {
 }
 )EOF";
   EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
-  std::string output = TestUtility::bufferToString(response);
+  std::string output = response.toString();
   EXPECT_EQ(expected_json, output);
 }
 
@@ -615,7 +622,7 @@ TEST_P(AdminInstanceTest, Runtime) {
   EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
   EXPECT_EQ(Http::Code::OK, getCallback("/runtime", header_map, response));
-  EXPECT_EQ(expected_json, TestUtility::bufferToString(response));
+  EXPECT_EQ(expected_json, response.toString());
 }
 
 TEST_P(AdminInstanceTest, RuntimeModify) {
@@ -632,7 +639,7 @@ TEST_P(AdminInstanceTest, RuntimeModify) {
   EXPECT_CALL(loader, mergeValues(overrides)).Times(1);
   EXPECT_EQ(Http::Code::OK,
             getCallback("/runtime_modify?foo=bar&x=42&nothing=", header_map, response));
-  EXPECT_EQ("OK\n", TestUtility::bufferToString(response));
+  EXPECT_EQ("OK\n", response.toString());
 }
 
 TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
@@ -640,7 +647,7 @@ TEST_P(AdminInstanceTest, RuntimeModifyNoArguments) {
   Buffer::OwnedImpl response;
 
   EXPECT_EQ(Http::Code::BadRequest, getCallback("/runtime_modify", header_map, response));
-  EXPECT_TRUE(absl::StartsWith(TestUtility::bufferToString(response), "usage:"));
+  EXPECT_TRUE(absl::StartsWith(response.toString(), "usage:"));
 }
 
 TEST_P(AdminInstanceTest, TracingStatsDisabled) {
@@ -650,139 +657,211 @@ TEST_P(AdminInstanceTest, TracingStatsDisabled) {
   }
 }
 
-TEST(PrometheusStatsFormatter, MetricName) {
+TEST_P(AdminInstanceTest, ClustersJson) {
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  ON_CALL(server_.cluster_manager_, clusters()).WillByDefault(ReturnPointee(&cluster_map));
+
+  NiceMock<Upstream::MockCluster> cluster;
+  cluster_map.emplace(cluster.info_->name_, cluster);
+
+  NiceMock<Upstream::Outlier::MockDetector> outlier_detector;
+  ON_CALL(Const(cluster), outlierDetector()).WillByDefault(Return(&outlier_detector));
+  ON_CALL(outlier_detector, successRateEjectionThreshold()).WillByDefault(Return(6.0));
+
+  ON_CALL(*cluster.info_, addedViaApi()).WillByDefault(Return(true));
+
+  Upstream::MockHostSet* host_set = cluster.priority_set_.getMockHostSet(0);
+  auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
+
+  envoy::api::v2::core::Locality locality;
+  locality.set_region("test_region");
+  locality.set_zone("test_zone");
+  locality.set_sub_zone("test_sub_zone");
+  ON_CALL(*host, locality()).WillByDefault(ReturnRef(locality));
+
+  host_set->hosts_.emplace_back(host);
+  Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::resolveUrl("tcp://1.2.3.4:80");
+  ON_CALL(*host, address()).WillByDefault(Return(address));
+
+  Stats::IsolatedStoreImpl store;
+  store.counter("test_counter").add(10);
+  store.gauge("test_gauge").set(11);
+  ON_CALL(*host, gauges()).WillByDefault(Invoke([&store]() { return store.gauges(); }));
+  ON_CALL(*host, counters()).WillByDefault(Invoke([&store]() { return store.counters(); }));
+
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC))
+      .WillByDefault(Return(true));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK))
+      .WillByDefault(Return(true));
+  ON_CALL(*host, healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH))
+      .WillByDefault(Return(false));
+
+  ON_CALL(host->outlier_detector_, successRate()).WillByDefault(Return(43.2));
+
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json", header_map, response));
+  std::string output_json = response.toString();
+  envoy::admin::v2alpha::Clusters output_proto;
+  MessageUtil::loadFromJson(output_json, output_proto);
+
+  const std::string expected_json = R"EOF({
+ "cluster_statuses": [
+  {
+   "name": "fake_cluster",
+   "success_rate_ejection_threshold": {
+    "value": 6
+   },
+   "added_via_api": true,
+   "host_statuses": [
+    {
+     "address": {
+      "socket_address": {
+       "protocol": "TCP",
+       "address": "1.2.3.4",
+       "port_value": 80
+      }
+     },
+     "stats": {
+      "test_counter": {
+       "value": "10",
+       "type": "COUNTER"
+      },
+      "test_gauge": {
+       "value": "11",
+       "type": "GAUGE"
+      },
+     },
+     "health_status": {
+      "eds_health_status": "HEALTHY",
+      "failed_active_health_check": true,
+      "failed_outlier_check": true
+     },
+     "success_rate": {
+      "value": 43.2
+     }
+    }
+   ]
+  }
+ ]
+}
+)EOF";
+
+  envoy::admin::v2alpha::Clusters expected_proto;
+  MessageUtil::loadFromJson(expected_json, expected_proto);
+
+  // Ensure the protos created from each JSON are equivalent.
+  EXPECT_THAT(output_proto, ProtoEq(expected_proto));
+
+  // Ensure that the normal text format is used by default.
+  EXPECT_EQ(Http::Code::OK, getCallback("/clusters", header_map, response));
+  std::string text_output = response.toString();
+  envoy::admin::v2alpha::Clusters failed_conversion_proto;
+  EXPECT_THROW(MessageUtil::loadFromJson(text_output, failed_conversion_proto), EnvoyException);
+}
+
+TEST_P(AdminInstanceTest, GetRequest) {
+  Http::HeaderMapImpl response_headers;
+  std::string body;
+  EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", Http::Utility::QueryParams(), "GET",
+                                           response_headers, body));
+  EXPECT_TRUE(absl::StartsWith(body, "envoy ")) << body;
+  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+              HasSubstr("text/plain"));
+}
+
+TEST_P(AdminInstanceTest, GetRequestJson) {
+  Http::HeaderMapImpl response_headers;
+  std::string body;
+  EXPECT_EQ(Http::Code::OK,
+            admin_.request("/stats", Http::Utility::QueryParams({{"format", "json"}}), "GET",
+                           response_headers, body));
+  EXPECT_THAT(body, HasSubstr("{\"stats\":["));
+  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+              HasSubstr("application/json"));
+}
+
+TEST_P(AdminInstanceTest, PostRequest) {
+  Http::HeaderMapImpl response_headers;
+  std::string body;
+  EXPECT_NO_LOGS(
+      EXPECT_EQ(Http::Code::OK, admin_.request("/healthcheck/fail", Http::Utility::QueryParams(),
+                                               "POST", response_headers, body)));
+  EXPECT_EQ(body, "OK\n");
+  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+              HasSubstr("text/plain"));
+}
+
+class PrometheusStatsFormatterTest : public testing::Test {
+protected:
+  void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
+    std::string tname = std::string(name);
+    counters_.push_back(alloc_.makeCounter(name, std::move(tname), std::move(cluster_tags)));
+  }
+
+  void addGauge(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
+    std::string tname = std::string(name);
+    gauges_.push_back(alloc_.makeGauge(name, std::move(tname), std::move(cluster_tags)));
+  }
+
+  Stats::HeapRawStatDataAllocator alloc_;
+  std::vector<Stats::CounterSharedPtr> counters_;
+  std::vector<Stats::GaugeSharedPtr> gauges_;
+};
+
+TEST_F(PrometheusStatsFormatterTest, MetricName) {
   std::string raw = "vulture.eats-liver";
   std::string expected = "envoy_vulture_eats_liver";
   auto actual = PrometheusStatsFormatter::metricName(raw);
   EXPECT_EQ(expected, actual);
 }
 
-TEST(PrometheusStatsFormatter, FormattedTags) {
-  // If value has - then it should be replaced by _ .
+TEST_F(PrometheusStatsFormatterTest, FormattedTags) {
   std::vector<Stats::Tag> tags;
   Stats::Tag tag1 = {"a.tag-name", "a.tag-value"};
-  Stats::Tag tag2 = {"another_tag_name", "another.tag-value"};
+  Stats::Tag tag2 = {"another_tag_name", "another_tag-value"};
   tags.push_back(tag1);
   tags.push_back(tag2);
-  std::string expected = "a_tag_name=\"a_tag_value\",another_tag_name=\"another_tag_value\"";
+  std::string expected = "a_tag_name=\"a.tag-value\",another_tag_name=\"another_tag-value\"";
   auto actual = PrometheusStatsFormatter::formattedTags(tags);
   EXPECT_EQ(expected, actual);
 }
 
-TEST(PrometheusStatsFormatter, MetricNameCollison) {
+TEST_F(PrometheusStatsFormatterTest, MetricNameCollison) {
 
   // Create two counters and two gauges with each pair having the same name,
   // but having different tag names and values.
   //`statsAsPrometheus()` should return two implying it found two unique stat names
 
-  Stats::HeapRawStatDataAllocator alloc;
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-
-  {
-    std::string name = "cluster.test_cluster_1.upstream_cx_total";
-    std::vector<Stats::Tag> cluster_tags;
-    Stats::Tag tag = {"a.tag-name", "a.tag-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
-                                                                     std::move(cluster_tags));
-    counters.push_back(c);
-  }
-
-  {
-    std::string name = "cluster.test_cluster_1.upstream_cx_total";
-    std::vector<Stats::Tag> cluster_tags;
-    Stats::Tag tag = {"another_tag_name", "another_tag-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
-                                                                     std::move(cluster_tags));
-    counters.push_back(c);
-  }
-
-  {
-    std::vector<Stats::Tag> cluster_tags;
-    std::string name = "cluster.test_cluster_2.upstream_cx_total";
-    Stats::Tag tag = {"another_tag_name_3", "another_tag_3-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::GaugeSharedPtr g =
-        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
-    gauges.push_back(g);
-  }
-
-  {
-    std::vector<Stats::Tag> cluster_tags;
-    std::string name = "cluster.test_cluster_2.upstream_cx_total";
-    Stats::Tag tag = {"another_tag_name_4", "another_tag_4-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::GaugeSharedPtr g =
-        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
-    gauges.push_back(g);
-  }
+  addCounter("cluster.test_cluster_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+  addCounter("cluster.test_cluster_1.upstream_cx_total",
+             {{"another_tag_name", "another_tag-value"}});
+  addGauge("cluster.test_cluster_2.upstream_cx_total",
+           {{"another_tag_name_3", "another_tag_3-value"}});
+  addGauge("cluster.test_cluster_2.upstream_cx_total",
+           {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  EXPECT_EQ(2UL, PrometheusStatsFormatter::statsAsPrometheus(counters, gauges, response));
+  EXPECT_EQ(2UL, PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, response));
 }
 
-TEST(PrometheusStatsFormatter, UniqueMetricName) {
+TEST_F(PrometheusStatsFormatterTest, UniqueMetricName) {
 
   // Create two counters and two gauges, all with unique names.
   // statsAsPrometheus() should return four implying it found
   // four unique stat names.
 
-  Stats::HeapRawStatDataAllocator alloc;
-  std::vector<Stats::CounterSharedPtr> counters;
-  std::vector<Stats::GaugeSharedPtr> gauges;
-
-  {
-    std::string name = "cluster.test_cluster_1.upstream_cx_total";
-    std::vector<Stats::Tag> cluster_tags;
-    Stats::Tag tag = {"a.tag-name", "a.tag-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
-                                                                     std::move(cluster_tags));
-    counters.push_back(c);
-  }
-
-  {
-    std::string name = "cluster.test_cluster_2.upstream_cx_total";
-    std::vector<Stats::Tag> cluster_tags;
-    Stats::Tag tag = {"another_tag_name", "another_tag-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::CounterSharedPtr c = std::make_shared<Stats::CounterImpl>(*data, alloc, std::move(name),
-                                                                     std::move(cluster_tags));
-    counters.push_back(c);
-  }
-
-  {
-    std::vector<Stats::Tag> cluster_tags;
-    std::string name = "cluster.test_cluster_3.upstream_cx_total";
-    Stats::Tag tag = {"another_tag_name_3", "another_tag_3-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::GaugeSharedPtr g =
-        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
-    gauges.push_back(g);
-  }
-
-  {
-    std::vector<Stats::Tag> cluster_tags;
-    std::string name = "cluster.test_cluster_4.upstream_cx_total";
-    Stats::Tag tag = {"another_tag_name_4", "another_tag_4-value"};
-    cluster_tags.push_back(tag);
-    Stats::RawStatData* data = alloc.alloc(name);
-    Stats::GaugeSharedPtr g =
-        std::make_shared<Stats::GaugeImpl>(*data, alloc, std::move(name), std::move(cluster_tags));
-    gauges.push_back(g);
-  }
+  addCounter("cluster.test_cluster_1.upstream_cx_total", {{"a.tag-name", "a.tag-value"}});
+  addCounter("cluster.test_cluster_2.upstream_cx_total",
+             {{"another_tag_name", "another_tag-value"}});
+  addGauge("cluster.test_cluster_3.upstream_cx_total",
+           {{"another_tag_name_3", "another_tag_3-value"}});
+  addGauge("cluster.test_cluster_4.upstream_cx_total",
+           {{"another_tag_name_4", "another_tag_4-value"}});
 
   Buffer::OwnedImpl response;
-  EXPECT_EQ(4UL, PrometheusStatsFormatter::statsAsPrometheus(counters, gauges, response));
+  EXPECT_EQ(4UL, PrometheusStatsFormatter::statsAsPrometheus(counters_, gauges_, response));
 }
 
 } // namespace Server

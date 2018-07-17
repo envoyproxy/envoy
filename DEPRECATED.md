@@ -6,7 +6,25 @@ As of release 1.3.0, Envoy will follow a
 The following features have been DEPRECATED and will be removed in the specified release cycle.
 A logged warning is expected for each deprecated item that is in deprecation window.
 
-## Version 1.7.0 (pending)
+## Version 1.8.0 (pending)
+
+* Use of the v1 API is deprecated. See envoy-announce
+  [email](https://groups.google.com/forum/#!topic/envoy-announce/oPnYMZw8H4U).
+* Use of the legacy 
+  [ratelimit.proto](https://github.com/envoyproxy/envoy/blob/b0a518d064c8255e0e20557a8f909b6ff457558f/source/common/ratelimit/ratelimit.proto)
+  is deprecated, in favor of the proto defined in
+  [date-plane-api](https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/ratelimit/v2/rls.proto)
+  Prior to 1.8.0, Envoy can use either proto to send client requests to a ratelimit server with the use of the
+  `use_data_plane_proto` boolean flag in the [ratelimit configuration](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/ratelimit/v2/rls.proto).
+  However, when using the deprecated client a warning is logged.
+* Use of the --v2-config-only flag.
+* Use of both `use_websocket` and `websocket_config` in
+  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto)
+  is deprecated. Please use the new `upgrade_configs` in the
+  [HttpConnectionManager](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto)
+  instead.
+
+## Version 1.7.0
 
 * Admin mutations should be sent as POSTs rather than GETs. HTTP GETs will result in an error
   status code and will not have their intended effect. Prior to 1.7, GETs can be used for
@@ -33,7 +51,7 @@ A logged warning is expected for each deprecated item that is in deprecation win
 * `value` and `regex` fields in the `HeaderMatcher` message is deprecated. Use the `exact_match`
   or `regex_match` oneof instead.
 
-## Version 1.5.0.0 (Dec 4, 2017)
+## Version 1.5.0 (Dec 4, 2017)
 
 * The outlier detection `ejections_total` stats counter has been deprecated and not replaced. Monitor
   the individual `ejections_detected_*` counters for the detectors of interest, or

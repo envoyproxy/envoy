@@ -10,6 +10,8 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/common/backoff_strategy.h"
+
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
@@ -55,10 +57,10 @@ private:
   Event::Dispatcher& dispatcher_;
   uint32_t retry_on_{};
   uint32_t retries_remaining_{1};
-  uint32_t current_retry_{};
   DoRetryCallback callback_;
   Event::TimerPtr retry_timer_;
   Upstream::ResourcePriority priority_;
+  BackOffStrategyPtr backoff_strategy_;
 };
 
 } // namespace Router

@@ -119,6 +119,7 @@ void FakeStream::waitForData(Event::Dispatcher& client_dispatcher, uint64_t body
 }
 
 void FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher) {
+  ENVOY_LOG(trace, "FakeStream waiting for end stream");
   Thread::LockGuard lock(lock_);
   while (!end_stream_) {
     decoder_event_.waitFor(lock_, std::chrono::milliseconds(5));
@@ -127,6 +128,7 @@ void FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher) {
       client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
     }
   }
+  ENVOY_LOG(trace, "FakeStream done waiting for end stream");
 }
 
 void FakeStream::waitForReset() {
@@ -185,6 +187,7 @@ Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder)
 }
 
 void FakeConnectionBase::waitForDisconnect(bool ignore_spurious_events) {
+  ENVOY_LOG(trace, "FakeConnectionBase waiting for disconnect");
   Thread::LockGuard lock(lock_);
   while (shared_connection_.connected()) {
     connection_event_.wait(lock_); // Safe since CondVar::wait won't throw.
@@ -199,6 +202,7 @@ void FakeConnectionBase::waitForDisconnect(bool ignore_spurious_events) {
   }
 
   ASSERT(!shared_connection_.connected());
+  ENVOY_LOG(trace, "FakeConnectionBase done waiting for disconnect");
 }
 
 void FakeConnectionBase::waitForHalfClose(bool ignore_spurious_events) {
@@ -407,6 +411,16 @@ std::string FakeRawConnection::waitForData(uint64_t num_bytes) {
   return data_;
 }
 
+std::string
+FakeRawConnection::waitForData(const std::function<bool(const std::string&)>& data_validator) {
+  Thread::LockGuard lock(lock_);
+  while (!data_validator(data_)) {
+    ENVOY_LOG(debug, "waiting for data");
+    connection_event_.wait(lock_); // Safe since CondVar::wait won't throw.
+  }
+  return data_;
+}
+
 void FakeRawConnection::write(const std::string& data, bool end_stream) {
   shared_connection_.executeOnDispatcher([&data, end_stream](Network::Connection& connection) {
     Buffer::OwnedImpl to_write(data);
@@ -418,7 +432,7 @@ Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& da
                                                             bool end_stream) {
   Thread::LockGuard lock(parent_.lock_);
   ENVOY_LOG(debug, "got {} bytes", data.length());
-  parent_.data_.append(TestUtility::bufferToString(data));
+  parent_.data_.append(data.toString());
   parent_.half_closed_ = end_stream;
   data.drain(data.length());
   parent_.connection_event_.notifyOne();

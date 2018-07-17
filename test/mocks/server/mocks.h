@@ -17,6 +17,7 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread/thread.h"
 
+#include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
 #include "common/stats/stats_impl.h"
 
@@ -29,10 +30,12 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/secret/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
+#include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
@@ -65,7 +68,7 @@ public:
   MOCK_CONST_METHOD0(serviceNodeName, const std::string&());
   MOCK_CONST_METHOD0(serviceZone, const std::string&());
   MOCK_CONST_METHOD0(maxStats, uint64_t());
-  MOCK_CONST_METHOD0(maxObjNameLength, uint64_t());
+  MOCK_CONST_METHOD0(statsOptions, const Stats::StatsOptions&());
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
 
   std::string config_path_;
@@ -76,6 +79,7 @@ public:
   std::string service_node_name_;
   std::string service_zone_name_;
   std::string log_path_;
+  Stats::StatsOptionsImpl stats_options_;
   bool hot_restart_disabled_{};
 };
 
@@ -108,6 +112,10 @@ public:
   MOCK_METHOD1(removeHandler, bool(const std::string& prefix));
   MOCK_METHOD0(socket, Network::Socket&());
   MOCK_METHOD0(getConfigTracker, ConfigTracker&());
+  MOCK_METHOD5(request,
+               Http::Code(absl::string_view path, const Http::Utility::QueryParams& query_params,
+                          absl::string_view method, Http::HeaderMap& response_headers,
+                          std::string& body));
 
   NiceMock<MockConfigTracker> config_tracker_;
 };
@@ -273,6 +281,8 @@ public:
     return RateLimit::ClientPtr{rateLimitClient_()};
   }
 
+  Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
+
   MOCK_METHOD0(admin, Admin&());
   MOCK_METHOD0(api, Api::Api&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
@@ -303,6 +313,7 @@ public:
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
   testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   Stats::IsolatedStoreImpl stats_store_;
   testing::NiceMock<Tracing::MockHttpTracer> http_tracer_;
@@ -375,6 +386,7 @@ public:
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
+  MOCK_METHOD0(systemTimeSource, SystemTimeSource&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -390,6 +402,7 @@ public:
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
+  testing::NiceMock<MockSystemTimeSource> system_time_source_;
 };
 
 class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {
@@ -426,11 +439,16 @@ public:
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
+  MOCK_METHOD0(eventLogger_, Upstream::HealthCheckEventLogger*());
+  Upstream::HealthCheckEventLoggerPtr eventLogger() override {
+    return Upstream::HealthCheckEventLoggerPtr(eventLogger_());
+  }
 
   testing::NiceMock<Upstream::MockCluster> cluster_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
+  testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>* event_logger_{};
 };
 
 } // namespace Configuration

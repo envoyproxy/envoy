@@ -51,7 +51,10 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/request_info:request_info_lib",
         "//source/common/runtime:uuid_util_lib",
         "//source/common/tracing:http_tracer_lib",
+        "@envoy_api//envoy/config/filter/accesslog/v2:accesslog_cc",
     ],
 )

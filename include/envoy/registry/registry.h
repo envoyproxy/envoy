@@ -82,7 +82,7 @@ private:
     }
 
     factories().emplace(factory.name(), &factory);
-    RELEASE_ASSERT(getFactory(factory.name()) == &factory);
+    RELEASE_ASSERT(getFactory(factory.name()) == &factory, "");
     return displaced;
   }
 
@@ -92,7 +92,7 @@ private:
    */
   static void removeFactoryForTest(const std::string& name) {
     auto result = factories().erase(name);
-    RELEASE_ASSERT(result == 1);
+    RELEASE_ASSERT(result == 1, "");
   }
 
   /**

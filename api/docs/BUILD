@@ -12,6 +12,7 @@ package_group(
 proto_library(
     name = "protos",
     deps = [
+        "//envoy/admin/v2alpha:clusters",
         "//envoy/admin/v2alpha:config_dump",
         "//envoy/api/v2:cds",
         "//envoy/api/v2:discovery",
@@ -32,6 +33,7 @@ proto_library(
         "//envoy/config/filter/http/ext_authz/v2alpha:ext_authz",
         "//envoy/config/filter/http/fault/v2:fault",
         "//envoy/config/filter/http/gzip/v2:gzip",
+        "//envoy/config/filter/http/header_to_metadata/v2:header_to_metadata",
         "//envoy/config/filter/http/health_check/v2:health_check",
         "//envoy/config/filter/http/ip_tagging/v2:ip_tagging",
         "//envoy/config/filter/http/lua/v2:lua",
@@ -56,6 +58,7 @@ proto_library(
         "//envoy/config/trace/v2:trace",
         "//envoy/config/transport_socket/capture/v2alpha:capture",
         "//envoy/data/accesslog/v2:accesslog",
+        "//envoy/data/core/v2alpha:health_check_event",
         "//envoy/data/tap/v2alpha:capture",
         "//envoy/service/accesslog/v2:als",
         "//envoy/service/auth/v2alpha:attribute_context",
@@ -65,5 +68,8 @@ proto_library(
         "//envoy/service/metrics/v2:metrics_service",
         "//envoy/type:percent",
         "//envoy/type:range",
+        "//envoy/type/matcher:metadata",
+        "//envoy/type/matcher:number",
+        "//envoy/type/matcher:string",
     ],
 )

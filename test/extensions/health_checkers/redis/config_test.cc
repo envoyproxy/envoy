@@ -57,11 +57,12 @@ TEST(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
-  EXPECT_NE(nullptr,
-            dynamic_cast<CustomRedisHealthChecker*>(
-                Upstream::HealthCheckerFactory::create(Upstream::parseHealthCheckFromV2Yaml(yaml),
-                                                       cluster, runtime, random, dispatcher)
-                    .get()));
+  AccessLog::MockAccessLogManager log_manager;
+  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
+                         Upstream::HealthCheckerFactory::create(
+                             Upstream::parseHealthCheckFromV2Yaml(yaml), cluster, runtime, random,
+                             dispatcher, log_manager)
+                             .get()));
 }
 
 TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedConfig) {
@@ -81,13 +82,14 @@ TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedConfig) {
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
-  EXPECT_NE(nullptr,
-            dynamic_cast<CustomRedisHealthChecker*>(
-                // Always use Upstream's HealthCheckerFactory when creating instance using
-                // deprecated config.
-                Upstream::HealthCheckerFactory::create(Upstream::parseHealthCheckFromV2Yaml(yaml),
-                                                       cluster, runtime, random, dispatcher)
-                    .get()));
+  AccessLog::MockAccessLogManager log_manager;
+  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
+                         // Always use Upstream's HealthCheckerFactory when creating instance using
+                         // deprecated config.
+                         Upstream::HealthCheckerFactory::create(
+                             Upstream::parseHealthCheckFromV2Yaml(yaml), cluster, runtime, random,
+                             dispatcher, log_manager)
+                             .get()));
 }
 
 TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfig) {
@@ -105,13 +107,14 @@ TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfig) {
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
-  EXPECT_NE(nullptr,
-            dynamic_cast<CustomRedisHealthChecker*>(
-                // Always use Upstream's HealthCheckerFactory when creating instance using
-                // deprecated config.
-                Upstream::HealthCheckerFactory::create(Upstream::parseHealthCheckFromV1Json(json),
-                                                       cluster, runtime, random, dispatcher)
-                    .get()));
+  AccessLog::MockAccessLogManager log_manager;
+  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
+                         // Always use Upstream's HealthCheckerFactory when creating instance using
+                         // deprecated config.
+                         Upstream::HealthCheckerFactory::create(
+                             Upstream::parseHealthCheckFromV1Json(json), cluster, runtime, random,
+                             dispatcher, log_manager)
+                             .get()));
 }
 
 TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfigWithKey) {
@@ -130,13 +133,14 @@ TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfigWithKey) {
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
-  EXPECT_NE(nullptr,
-            dynamic_cast<CustomRedisHealthChecker*>(
-                // Always use Upstream's HealthCheckerFactory when creating instance using
-                // deprecated config.
-                Upstream::HealthCheckerFactory::create(Upstream::parseHealthCheckFromV1Json(json),
-                                                       cluster, runtime, random, dispatcher)
-                    .get()));
+  AccessLog::MockAccessLogManager log_manager;
+  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
+                         // Always use Upstream's HealthCheckerFactory when creating instance using
+                         // deprecated config.
+                         Upstream::HealthCheckerFactory::create(
+                             Upstream::parseHealthCheckFromV1Json(json), cluster, runtime, random,
+                             dispatcher, log_manager)
+                             .get()));
 }
 
 } // namespace RedisHealthChecker

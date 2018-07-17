@@ -35,10 +35,14 @@ void SslIntegrationTest::initialize() {
   context_manager_.reset(new ContextManagerImpl(*runtime_));
 
   registerTestServerPorts({"http"});
-  client_ssl_ctx_plain_ = createClientSslTransportSocketFactory(false, false, *context_manager_);
-  client_ssl_ctx_alpn_ = createClientSslTransportSocketFactory(true, false, *context_manager_);
-  client_ssl_ctx_san_ = createClientSslTransportSocketFactory(false, true, *context_manager_);
-  client_ssl_ctx_alpn_san_ = createClientSslTransportSocketFactory(true, true, *context_manager_);
+  client_ssl_ctx_plain_ =
+      createClientSslTransportSocketFactory(false, false, *context_manager_, secret_manager_);
+  client_ssl_ctx_alpn_ =
+      createClientSslTransportSocketFactory(true, false, *context_manager_, secret_manager_);
+  client_ssl_ctx_san_ =
+      createClientSslTransportSocketFactory(false, true, *context_manager_, secret_manager_);
+  client_ssl_ctx_alpn_san_ =
+      createClientSslTransportSocketFactory(true, true, *context_manager_, secret_manager_);
 }
 
 void SslIntegrationTest::TearDown() {
@@ -46,6 +50,8 @@ void SslIntegrationTest::TearDown() {
   client_ssl_ctx_alpn_.reset();
   client_ssl_ctx_san_.reset();
   client_ssl_ctx_alpn_san_.reset();
+  HttpIntegrationTest::cleanupUpstreamAndDownstream();
+  codec_client_.reset();
   context_manager_.reset();
   runtime_.reset();
 }

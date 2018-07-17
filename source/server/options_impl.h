@@ -7,6 +7,8 @@
 #include "envoy/common/exception.h"
 #include "envoy/server/options.h"
 
+#include "common/stats/stats_impl.h"
+
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -60,9 +62,7 @@ public:
   void setServiceNodeName(const std::string& service_node) { service_node_ = service_node; }
   void setServiceZone(const std::string& service_zone) { service_zone_ = service_zone; }
   void setMaxStats(uint64_t max_stats) { max_stats_ = max_stats; }
-  void setMaxObjNameLength(uint64_t max_obj_name_length) {
-    max_obj_name_length_ = max_obj_name_length;
-  }
+  void setStatsOptions(Stats::StatsOptionsImpl stats_options) { stats_options_ = stats_options; }
   void setHotRestartDisabled(bool hot_restart_disabled) {
     hot_restart_disabled_ = hot_restart_disabled;
   }
@@ -91,7 +91,7 @@ public:
   const std::string& serviceNodeName() const override { return service_node_; }
   const std::string& serviceZone() const override { return service_zone_; }
   uint64_t maxStats() const override { return max_stats_; }
-  uint64_t maxObjNameLength() const override { return max_obj_name_length_; }
+  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
   bool hotRestartDisabled() const override { return hot_restart_disabled_; }
 
 private:
@@ -114,7 +114,7 @@ private:
   std::chrono::seconds parent_shutdown_time_;
   Server::Mode mode_;
   uint64_t max_stats_;
-  uint64_t max_obj_name_length_;
+  Stats::StatsOptionsImpl stats_options_;
   bool hot_restart_disabled_;
 };
 

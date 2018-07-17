@@ -47,6 +47,7 @@ envoy_cc_test(
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:discovery_cc",

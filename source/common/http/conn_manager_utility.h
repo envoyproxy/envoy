@@ -37,6 +37,12 @@ public:
                                     const Http::HeaderMap& request_headers, const std::string& via);
 
 private:
+  /**
+   * Mutate request headers if request needs to be traced.
+   */
+  static void mutateTracingRequestHeader(Http::HeaderMap& request_headers, Runtime::Loader& runtime,
+                                         ConnectionManagerConfig& config);
+
   static void mutateXfccRequestHeader(Http::HeaderMap& request_headers,
                                       Network::Connection& connection,
                                       ConnectionManagerConfig& config);
