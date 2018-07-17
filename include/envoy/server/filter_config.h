@@ -217,7 +217,7 @@ public:
    *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
    *         is deprecated.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; } // GCOVR_EXCL_LINE
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
 
   /**
    * @return std::string the identifying name for a particular implementation of a network filter
@@ -269,7 +269,7 @@ public:
    *         JSON and then parsed into this empty proto. Optional today, will be compulsory when v1
    *         is deprecated.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; } // GCOVR_EXCL_LINE
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
 
   /**
    * @return ProtobufTypes::MessagePtr create an empty virtual host, route, or weighted
@@ -279,7 +279,7 @@ public:
    *         in implementations.
    */
   virtual ProtobufTypes::MessagePtr createEmptyRouteConfigProto() {
-    return createEmptyConfigProto(); // GCOVR_EXCL_LINE
+    return createEmptyConfigProto();
   }
 
   /**
@@ -288,7 +288,7 @@ public:
    */
   virtual Router::RouteSpecificFilterConfigConstSharedPtr
   createRouteSpecificFilterConfig(const Protobuf::Message&, FactoryContext&) {
-    return nullptr; // GCOVR_EXCL_LINE
+    return nullptr;
   }
 
   /**
