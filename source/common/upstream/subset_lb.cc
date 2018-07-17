@@ -282,18 +282,16 @@ bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host
     return kvs.size() == 0;
   }
 
-  const ProtobufWkt::Struct* data_struct = &(filter_it->second);
+  const ProtobufWkt::Struct& data_struct = filter_it->second;
+  const auto& fields = data_struct.fields();
 
   for (const auto& kv : kvs) {
-    const ProtobufWkt::Value* val = nullptr;
-
-    const auto entry_it = data_struct->fields().find(kv.first);
-    if (entry_it == data_struct->fields().end()) {
+    const auto entry_it = fields.find(kv.first);
+    if (entry_it == fields.end()) {
       return false;
     }
 
-    val = &(entry_it->second);
-    if (!ValueUtil::equal(*val, kv.second)) {
+    if (!ValueUtil::equal(entry_it->second, kv.second)) {
       return false;
     }
   }
