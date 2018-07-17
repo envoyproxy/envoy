@@ -97,6 +97,9 @@ public:
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_DELAY_MS = 5000;
   uint32_t server_response_ms_ = 1000;
+  uint32_t cluster_connection_buffer_limit_bytes = 12345;
+  uint32_t cluster_timeout_s = 1;
+
   void
   processMessage(std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message);
 

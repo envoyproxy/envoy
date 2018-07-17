@@ -79,11 +79,12 @@ public:
 
     auto* health_check = server_health_check_specifier.add_health_check();
 
+    health_check->set_cluster_name("anna");
     health_check->add_endpoints()
         ->add_endpoints()
         ->mutable_address()
         ->mutable_socket_address()
-        ->set_address(Network::Test::getLoopbackAddressString(version_));
+        ->set_address(host_upstream_->localAddress()->ip()->addressAsString());
     health_check->mutable_endpoints(0)
         ->mutable_endpoints(0)
         ->mutable_address()
@@ -160,7 +161,22 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthy) {
   EXPECT_EQ(
       envoy::api::v2::core::HealthStatus::HEALTHY,
       response.mutable_endpoint_health_response()->mutable_endpoints_health(0)->health_status());
-  test_server_->waitForCounterGe("cluster.anna0.health_check.success", 1);
+  EXPECT_EQ(host_upstream_->localAddress()->ip()->port(),
+            response.mutable_endpoint_health_response()
+                ->mutable_endpoints_health(0)
+                ->mutable_endpoint()
+                ->mutable_address()
+                ->mutable_socket_address()
+                ->port_value());
+  EXPECT_EQ(host_upstream_->localAddress()->ip()->addressAsString(),
+            response.mutable_endpoint_health_response()
+                ->mutable_endpoints_health(0)
+                ->mutable_endpoint()
+                ->mutable_address()
+                ->mutable_socket_address()
+                ->address());
+
+  test_server_->waitForCounterGe("cluster.anna.health_check.success", 1);
 
   // Clean up connections
   host_fake_connection_->close();
@@ -169,8 +185,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthy) {
 
   EXPECT_EQ(1, test_server_->counter("hds_delegate.requests")->value());
   EXPECT_EQ(2, test_server_->counter("hds_delegate.responses")->value());
-  EXPECT_EQ(1, test_server_->counter("cluster.anna0.health_check.success")->value());
-  EXPECT_EQ(0, test_server_->counter("cluster.anna0.health_check.failure")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.anna.health_check.success")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.anna.health_check.failure")->value());
 }
 
 TEST_P(HdsIntegrationTest, SingleEndpointTimeout) {
@@ -206,7 +222,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeout) {
   EXPECT_EQ(
       envoy::api::v2::core::HealthStatus::UNHEALTHY,
       response.mutable_endpoint_health_response()->mutable_endpoints_health(0)->health_status());
-  test_server_->waitForCounterGe("cluster.anna0.health_check.failure", 1);
+  test_server_->waitForCounterGe("cluster.anna.health_check.failure", 1);
 
   // Clean up connections
   host_fake_connection_->close();
@@ -215,8 +231,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeout) {
 
   EXPECT_EQ(1, test_server_->counter("hds_delegate.requests")->value());
   EXPECT_EQ(2, test_server_->counter("hds_delegate.responses")->value());
-  EXPECT_EQ(0, test_server_->counter("cluster.anna0.health_check.success")->value());
-  EXPECT_EQ(1, test_server_->counter("cluster.anna0.health_check.failure")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.anna.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.anna.health_check.failure")->value());
 }
 
 TEST_P(HdsIntegrationTest, SingleEndpointUnhealthy) {
@@ -254,7 +270,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthy) {
   EXPECT_EQ(
       envoy::api::v2::core::HealthStatus::UNHEALTHY,
       response.mutable_endpoint_health_response()->mutable_endpoints_health(0)->health_status());
-  test_server_->waitForCounterGe("cluster.anna0.health_check.failure", 1);
+  test_server_->waitForCounterGe("cluster.anna.health_check.failure", 1);
 
   // Clean up connections
   host_fake_connection_->close();
@@ -263,8 +279,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthy) {
 
   EXPECT_EQ(1, test_server_->counter("hds_delegate.requests")->value());
   EXPECT_EQ(2, test_server_->counter("hds_delegate.responses")->value());
-  EXPECT_EQ(0, test_server_->counter("cluster.anna0.health_check.success")->value());
-  EXPECT_EQ(1, test_server_->counter("cluster.anna0.health_check.failure")->value());
+  EXPECT_EQ(0, test_server_->counter("cluster.anna.health_check.success")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.anna.health_check.failure")->value());
 }
 
 TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
@@ -320,8 +336,8 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
   EXPECT_EQ(
       envoy::api::v2::core::HealthStatus::HEALTHY,
       response.mutable_endpoint_health_response()->mutable_endpoints_health(1)->health_status());
-  test_server_->waitForCounterGe("cluster.anna0.health_check.failure", 1);
-  test_server_->waitForCounterGe("cluster.anna0.health_check.success", 1);
+  test_server_->waitForCounterGe("cluster.anna.health_check.failure", 1);
+  test_server_->waitForCounterGe("cluster.anna.health_check.success", 1);
 
   // Clean up connections
   host_fake_connection_->close();
@@ -393,8 +409,8 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
   EXPECT_EQ(
       envoy::api::v2::core::HealthStatus::HEALTHY,
       response.mutable_endpoint_health_response()->mutable_endpoints_health(1)->health_status());
-  test_server_->waitForCounterGe("cluster.anna0.health_check.failure", 1);
-  test_server_->waitForCounterGe("cluster.anna0.health_check.success", 1);
+  test_server_->waitForCounterGe("cluster.anna.health_check.failure", 1);
+  test_server_->waitForCounterGe("cluster.anna.health_check.success", 1);
 
   // Clean up connections
   host_fake_connection_->close();
@@ -417,6 +433,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   // Add endpoint
   auto* health_check = server_health_check_specifier.add_health_check();
 
+  health_check->set_cluster_name("cat");
   health_check->add_endpoints()
       ->add_endpoints()
       ->mutable_address()
@@ -474,8 +491,8 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   EXPECT_EQ(
       envoy::api::v2::core::HealthStatus::HEALTHY,
       response.mutable_endpoint_health_response()->mutable_endpoints_health(1)->health_status());
-  test_server_->waitForCounterGe("cluster.anna0.health_check.failure", 1);
-  test_server_->waitForCounterGe("cluster.anna1.health_check.success", 1);
+  test_server_->waitForCounterGe("cluster.anna.health_check.failure", 1);
+  test_server_->waitForCounterGe("cluster.cat.health_check.success", 1);
 
   // Clean up connections
   host_fake_connection_->close();

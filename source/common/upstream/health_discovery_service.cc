@@ -96,9 +96,9 @@ void HdsDelegate::processMessage(
     envoy::api::v2::Cluster cluster_config;
     clusters_config_.push_back(cluster_config);
     clusters_config_[i].set_name(message->mutable_health_check(i)->cluster_name());
-    clusters_config_[i].mutable_connect_timeout()->set_seconds(2);
-    clusters_config_[i].mutable_http2_protocol_options();
-    clusters_config_[i].mutable_per_connection_buffer_limit_bytes()->set_value(12345);
+    clusters_config_[i].mutable_connect_timeout()->set_seconds(cluster_timeout_s);
+    clusters_config_[i].mutable_per_connection_buffer_limit_bytes()->set_value(
+        cluster_connection_buffer_limit_bytes);
 
     for (int j = 0; j < message->mutable_health_check(i)->endpoints_size(); j++) {
       for (int k = 0; k < message->mutable_health_check(i)->mutable_endpoints(j)->endpoints_size();
