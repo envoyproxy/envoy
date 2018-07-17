@@ -369,6 +369,13 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   // prevents surprises for logging code in edge cases.
   request_info_.setDownstreamRemoteAddress(
       connection_manager_.read_callbacks_->connection().remoteAddress());
+
+  if (connection_manager_.config_.streamIdleTimeout()) {
+    idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout().value();
+    idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onIdleTimeout(); });
+    resetIdleTimer();
+  }
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
@@ -605,9 +612,10 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     if (route_entry != nullptr && route_entry->idleTimeout()) {
       idle_timeout_ms_ = route_entry->idleTimeout().value();
-      idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
-          [this]() -> void { onIdleTimeout(); });
-      resetIdleTimer();
+      if (idle_timer_ == nullptr) {
+        idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+            [this]() -> void { onIdleTimeout(); });
+      }
     }
   }
 
@@ -617,6 +625,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   decodeHeaders(nullptr, *request_headers_, end_stream);
+
+  // Reset it here for both global and overriden cases.
+  resetIdleTimer();
 }
 
 void ConnectionManagerImpl::ActiveStream::traceRequest() {

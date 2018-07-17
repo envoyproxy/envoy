@@ -89,7 +89,10 @@ public:
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
   bool generateRequestId() override { return false; }
-  const absl::optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
+  const absl::optional<std::chrono::milliseconds> idleTimeout() override { return idle_timeout_; }
+  const absl::optional<std::chrono::milliseconds> streamIdleTimeout() override {
+    return absl::nullopt;
+  }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return Http::DefaultServerString::get(); }
   Http::ConnectionManagerStats& stats() override { return stats_; }
