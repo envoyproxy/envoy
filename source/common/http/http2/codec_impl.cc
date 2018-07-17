@@ -738,13 +738,23 @@ ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings) 
 
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
 
+ConnectionImpl::ClientHttp2Options::ClientHttp2Options(const Http2Settings& http2_settings)
+    : Http2Options(http2_settings) {
+  // Temporarily disable initial max streams limit/protection, since we might want to create
+  // more than 100 streams before receiving the HTTP/2 SETTINGS frame from the server.
+  //
+  // TODO(PiotrSikora): remove this once multiple upstream connections or queuing are implemented.
+  nghttp2_option_set_peer_max_concurrent_streams(options_,
+                                                 Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
+}
+
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
                                            Http::ConnectionCallbacks& callbacks,
                                            Stats::Scope& stats, const Http2Settings& http2_settings)
     : ConnectionImpl(connection, stats, http2_settings), callbacks_(callbacks) {
-  Http2Options http2_options(http2_settings);
+  ClientHttp2Options client_http2_options(http2_settings);
   nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
-                              http2_options.options());
+                              client_http2_options.options());
   sendSettings(http2_settings, true);
 }
 
