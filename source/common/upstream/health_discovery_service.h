@@ -96,16 +96,16 @@ public:
   void sendResponse();
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_DELAY_MS = 5000;
-  uint32_t SERVER_RESPONSE_MS = 1000;
+  uint32_t server_response_ms_ = 1000;
+  void
+  processMessage(std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message);
+
 
 private:
   void setRetryTimer();
   void setServerResponseTimer();
   void establishNewStream();
   void handleFailure();
-  void
-  processMessage(std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message);
-
   HdsDelegateStats stats_;
   Grpc::AsyncClientPtr async_client_;
   Grpc::AsyncStream* stream_{};

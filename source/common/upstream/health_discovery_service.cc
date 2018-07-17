@@ -27,7 +27,7 @@ void HdsDelegate::setRetryTimer() {
 }
 
 void HdsDelegate::setServerResponseTimer() {
-  server_response_timer_->enableTimer(std::chrono::milliseconds(SERVER_RESPONSE_MS));
+  server_response_timer_->enableTimer(std::chrono::milliseconds(server_response_ms_));
 }
 
 void HdsDelegate::establishNewStream() {
@@ -57,15 +57,14 @@ void HdsDelegate::handleFailure() {
 // TODO(lilika): Add support for the same endpoint in different clusters/ports
 void HdsDelegate::sendResponse() {
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse response;
-  for (uint i = 0; i < hds_clusters_.size(); i++) {
+  for (uint32_t i = 0; i < hds_clusters_.size(); i++) {
     for (const auto& hosts : hds_clusters_[i]->prioritySet().hostSetsPerPriority()) {
       for (const auto& host : hosts->hosts()) {
         auto* endpoint = response.mutable_endpoint_health_response()->add_endpoints_health();
-        auto address = host->address()->asString();
         endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
-            address.substr(0, address.find_last_of(":")));
+            host->address()->ip()->addressAsString());
         endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
-            stoul(address.substr(address.find_last_of(":") + 1, address.length() - 1)));
+            host->address()->ip()->port());
         if (host->healthy()) {
           endpoint->set_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
         } else {
@@ -94,42 +93,42 @@ void HdsDelegate::processMessage(
     // Create HdsCluster config
     ENVOY_LOG(debug, "Creating HdsCluster config");
     envoy::api::v2::core::BindConfig bind_config;
-    envoy::api::v2::Cluster cluster_config_;
-    clusters_config_.push_back(cluster_config_);
-    cluster_config_.set_name("anna" + std::to_string(i));
-    cluster_config_.mutable_connect_timeout()->set_seconds(2);
-    cluster_config_.mutable_http2_protocol_options();
-    cluster_config_.mutable_per_connection_buffer_limit_bytes()->set_value(12345);
+    envoy::api::v2::Cluster cluster_config;
+    clusters_config_.push_back(cluster_config);
+    clusters_config_[i].set_name(message->mutable_health_check(i)->cluster_name());
+    clusters_config_[i].mutable_connect_timeout()->set_seconds(2);
+    clusters_config_[i].mutable_http2_protocol_options();
+    clusters_config_[i].mutable_per_connection_buffer_limit_bytes()->set_value(12345);
 
     for (int j = 0; j < message->mutable_health_check(i)->endpoints_size(); j++) {
       for (int k = 0; k < message->mutable_health_check(i)->mutable_endpoints(j)->endpoints_size();
            k++) {
         // Add endpoint to cluster
-        cluster_config_.add_hosts()->MergeFrom(*message->mutable_health_check(i)
+        clusters_config_[i].add_hosts()->MergeFrom(*message->mutable_health_check(i)
                                                     ->mutable_endpoints(j)
                                                     ->mutable_endpoints(k)
                                                     ->mutable_address());
       }
     }
 
-    for (int l = 0; l < message->mutable_health_check(i)->health_checks_size(); l++) {
+    for (int j = 0; j < message->mutable_health_check(i)->health_checks_size(); j++) {
       // Add health checker to cluster
-      cluster_config_.add_health_checks()->MergeFrom(
-          *message->mutable_health_check(i)->mutable_health_checks(l));
+      clusters_config_[i].add_health_checks()->MergeFrom(
+          *message->mutable_health_check(i)->mutable_health_checks(j));
     }
 
-    ENVOY_LOG(debug, "New HdsCluster config {} ", cluster_config_.DebugString());
+    ENVOY_LOG(debug, "New HdsCluster config {} ", clusters_config_[i].DebugString());
 
     // Creating HdsCluster
-    cluster_.reset(new HdsCluster(runtime_, cluster_config_, bind_config, store_stats,
+    cluster_.reset(new HdsCluster(runtime_, clusters_config_[i], bind_config, store_stats,
                                   ssl_context_manager_, secret_manager_, false));
 
     hds_clusters_.push_back(cluster_);
     std::vector<Upstream::HealthCheckerSharedPtr> cluster_health_checkers;
-    for (int l = 0; l < message->mutable_health_check(i)->health_checks_size(); l++) {
+    for (int j = 0; j < message->mutable_health_check(i)->health_checks_size(); j++) {
       // Creating HealthCheckers
       cluster_health_checkers.push_back(Upstream::HealthCheckerFactory::create(
-          *cluster_config_.mutable_health_checks(l), *hds_clusters_[i], runtime_, random_,
+          *clusters_config_[i].mutable_health_checks(j), *hds_clusters_[i], runtime_, random_,
           dispatcher_));
     }
     health_checkers_ptr.push_back(cluster_health_checkers);
@@ -147,12 +146,12 @@ void HdsDelegate::onReceiveMessage(
   processMessage(std::move(message));
 
   // Initializing Clusters & HealthCheckers
-  for (uint i = 0; i < hds_clusters_.size(); i++) {
-    for (uint l = 0; l < health_checkers_ptr[i].size(); l++) {
-      hds_clusters_[i]->setHealthChecker(health_checkers_ptr[i][l]);
+  for (uint32_t i = 0; i < hds_clusters_.size(); i++) {
+    for (uint32_t j = 0; j < health_checkers_ptr[i].size(); j++) {
+      hds_clusters_[i]->setHealthChecker(health_checkers_ptr[i][j]);
     }
     hds_clusters_[i]->initialize([] {});
-    SERVER_RESPONSE_MS = 1000 * message->mutable_interval()->seconds();
+    server_response_ms_ = PROTOBUF_GET_MS_REQUIRED(*message, interval);
     setServerResponseTimer();
   }
 }
