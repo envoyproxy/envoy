@@ -578,7 +578,7 @@ envoy_cc_fuzz_test(
     srcs = [
         "h1_capture_fuzz_test.cc",
     ],
-    corpus = "h1_capture_corpus",
+    corpus = "h1_corpus",
     deps = [
         ":h1_fuzz_lib",
     ],
@@ -589,7 +589,7 @@ envoy_cc_fuzz_test(
     srcs = [
         "h1_capture_direct_response_fuzz_test.cc",
     ],
-    corpus = "h1_capture_direct_response_corpus",
+    corpus = "h1_corpus",
     deps = [
         ":h1_fuzz_lib",
     ],
