@@ -105,9 +105,9 @@ void HdsDelegate::processMessage(
            k++) {
         // Add endpoint to cluster
         clusters_config_[i].add_hosts()->MergeFrom(*message->mutable_health_check(i)
-                                                    ->mutable_endpoints(j)
-                                                    ->mutable_endpoints(k)
-                                                    ->mutable_address());
+                                                        ->mutable_endpoints(j)
+                                                        ->mutable_endpoints(k)
+                                                        ->mutable_address());
       }
     }
 

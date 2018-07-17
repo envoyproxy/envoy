@@ -100,7 +100,6 @@ public:
   void
   processMessage(std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message);
 
-
 private:
   void setRetryTimer();
   void setServerResponseTimer();
