@@ -275,12 +275,25 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
 
 bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host) {
   const envoy::api::v2::core::Metadata& host_metadata = *host.metadata();
+  const auto filter_it =
+      host_metadata.filter_metadata().find(Config::MetadataFilters::get().ENVOY_LB);
+
+  if (filter_it == host_metadata.filter_metadata().end()) {
+    return kvs.size() == 0;
+  }
+
+  const ProtobufWkt::Struct* data_struct = &(filter_it->second);
 
   for (const auto& kv : kvs) {
-    const ProtobufWkt::Value& host_value = Config::Metadata::metadataValue(
-        host_metadata, Config::MetadataFilters::get().ENVOY_LB, kv.first);
+    const ProtobufWkt::Value* val = nullptr;
 
-    if (!ValueUtil::equal(host_value, kv.second)) {
+    const auto entry_it = data_struct->fields().find(kv.first);
+    if (entry_it == data_struct->fields().end()) {
+      return false;
+    }
+
+    val = &(entry_it->second);
+    if (!ValueUtil::equal(*val, kv.second)) {
       return false;
     }
   }
