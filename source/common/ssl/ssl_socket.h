@@ -20,7 +20,7 @@ class SslSocket : public Network::TransportSocket,
                   public Connection,
                   protected Logger::Loggable<Logger::Id::connection> {
 public:
-  SslSocket(Context& ctx, InitialState state);
+  SslSocket(ContextSharedPtr ctx, InitialState state);
 
   // Ssl::Connection
   bool peerCertificatePresented() const override;
@@ -58,7 +58,7 @@ private:
   std::vector<std::string> getDnsSansFromCertificate(X509* cert);
 
   Network::TransportSocketCallbacks* callbacks_{};
-  ContextImpl& ctx_;
+  ContextImplSharedPtr ctx_;
   bssl::UniquePtr<SSL> ssl_;
   bool handshake_complete_{};
   bool shutdown_sent_{};
@@ -71,22 +71,24 @@ class ClientSslSocketFactory : public Network::TransportSocketFactory {
 public:
   ClientSslSocketFactory(const ClientContextConfig& config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope);
+
   Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
 
 private:
-  const ClientContextPtr ssl_ctx_;
+  ClientContextSharedPtr ssl_ctx_;
 };
 
 class ServerSslSocketFactory : public Network::TransportSocketFactory {
 public:
   ServerSslSocketFactory(const ServerContextConfig& config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope, const std::vector<std::string>& server_names);
+
   Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
 
 private:
-  const ServerContextPtr ssl_ctx_;
+  ServerContextSharedPtr ssl_ctx_;
 };
 
 } // namespace Ssl

@@ -50,6 +50,8 @@ void SslIntegrationTest::TearDown() {
   client_ssl_ctx_alpn_.reset();
   client_ssl_ctx_san_.reset();
   client_ssl_ctx_alpn_san_.reset();
+  HttpIntegrationTest::cleanupUpstreamAndDownstream();
+  codec_client_.reset();
   context_manager_.reset();
   runtime_.reset();
 }
