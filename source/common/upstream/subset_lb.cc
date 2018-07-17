@@ -497,9 +497,19 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   // avoid it in the 2nd call to filter() by using the result from the first call
   // to filter() as the starting point.
   //
+  // Also, if we only have one locality we can avoid the first call to filter() by
+  // just creating a new HostsPerLocality from the list of all hosts.
+  //
   // TODO(rgs1): merge these two filter() calls in one loop.
-  HostsPerLocalityConstSharedPtr hosts_per_locality =
-      original_host_set_.hostsPerLocality().filter(predicate);
+  HostsPerLocalityConstSharedPtr hosts_per_locality;
+
+  if (original_host_set_.hostsPerLocality().get().size() == 1) {
+    hosts_per_locality.reset(
+        new HostsPerLocalityImpl(*hosts, original_host_set_.hostsPerLocality().hasLocalLocality()));
+  } else {
+    hosts_per_locality = original_host_set_.hostsPerLocality().filter(predicate);
+  }
+
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
       hosts_per_locality->filter([](const Host& host) { return host.healthy(); });
 
