@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <tuple>
 
 #include "envoy/common/pure.h"
 
@@ -142,9 +143,9 @@ public:
    * Read from a file descriptor directly into the buffer.
    * @param fd supplies the descriptor to read from.
    * @param max_length supplies the maximum length to read.
-   * @return the number of bytes read or -1 if there was an error.
+   * @return a tuple with the number of bytes read or -1 if there was an error, and the errno.
    */
-  virtual int read(int fd, uint64_t max_length) PURE;
+  virtual std::tuple<int, int> read(int fd, uint64_t max_length) PURE;
 
   /**
    * Reserve space in the buffer.
@@ -173,9 +174,9 @@ public:
   /**
    * Write the buffer out to a file descriptor.
    * @param fd supplies the descriptor to write to.
-   * @return the number of bytes written or -1 if there was an error.
+   * @return a tuple with the number of bytes written or -1 if there was an error, and the errno.
    */
-  virtual int write(int fd) PURE;
+  virtual std::tuple<int, int> write(int fd) PURE;
 };
 
 typedef std::unique_ptr<Instance> InstancePtr;
