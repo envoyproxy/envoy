@@ -38,6 +38,7 @@ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderS
 
 ConnectionImpl::Http2Callbacks ConnectionImpl::http2_callbacks_;
 ConnectionImpl::Http2Options ConnectionImpl::http2_options_;
+ConnectionImpl::ClientHttp2Options ConnectionImpl::client_http2_options_;
 
 /**
  * Helper to remove const during a cast. nghttp2 takes non-const pointers for headers even though
@@ -735,12 +736,21 @@ ConnectionImpl::Http2Options::Http2Options() {
 
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
 
+ConnectionImpl::ClientHttp2Options::ClientHttp2Options() : Http2Options() {
+  // Temporarily disable initial max streams limit/protection, since we might want to create
+  // more than 100 streams before receiving the HTTP/2 SETTINGS frame from the server.
+  //
+  // TODO(PiotrSikora): remove this once multiple upstream connections or queuing are implemented.
+  nghttp2_option_set_peer_max_concurrent_streams(options_,
+                                                 Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
+}
+
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
                                            Http::ConnectionCallbacks& callbacks,
                                            Stats::Scope& stats, const Http2Settings& http2_settings)
     : ConnectionImpl(connection, stats, http2_settings), callbacks_(callbacks) {
   nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
-                              http2_options_.options());
+                              client_http2_options_.options());
   sendSettings(http2_settings, true);
 }
 

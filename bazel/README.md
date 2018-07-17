@@ -34,6 +34,7 @@ On Ubuntu, run the following commands:
  apt-get install cmake
  apt-get install realpath
  apt-get install clang-format-5.0
+ apt-get install autoconf
  apt-get install automake
 ```
 
@@ -50,6 +51,7 @@ brew install cmake
 brew install libtool
 brew install go
 brew install bazel
+brew install autoconf
 brew install automake
 ```
 
