@@ -23,6 +23,10 @@ void H1FuzzIntegrationTest::initialize() {
             file_path);
       });
   HttpIntegrationTest::initialize();
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+		        lookupPort("http"), "GET", "/", "", downstream_protocol_, version_, "direct.example.com");
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ(body, response->body());
 }
 
 DEFINE_PROTO_FUZZER(const test::integration::CaptureFuzzTestCase& input) {
