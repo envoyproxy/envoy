@@ -44,7 +44,7 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
     dns_lookup_family_ = Network::DnsLookupFamily::Auto;
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const auto& socket_address = hosts[0].socket_address();
