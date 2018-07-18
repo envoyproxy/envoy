@@ -13,7 +13,7 @@ namespace FixedHeapMonitor {
 
 Server::ResourceMonitorPtr FixedHeapMonitorFactory::createResourceMonitorFromProtoTyped(
     const envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig& config,
-    Event::Dispatcher& /*unused_context*/) {
+    Server::Configuration::ResourceMonitorFactoryContext& /*unused_context*/) {
   return std::make_unique<FixedHeapMonitor>(config);
 }
 

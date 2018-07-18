@@ -21,7 +21,7 @@ public:
 private:
   Server::ResourceMonitorPtr createResourceMonitorFromProtoTyped(
       const envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig& config,
-      Event::Dispatcher& dispatcher) override;
+      Server::Configuration::ResourceMonitorFactoryContext& context) override;
 };
 
 } // namespace FixedHeapMonitor
