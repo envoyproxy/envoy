@@ -39,10 +39,7 @@ public:
   }
 
   // A convenience function to invoke on write() which fails the write with EAGAIN.
-  std::tuple<int, int> failWrite(int) {
-    errno = EAGAIN;
-    return std::make_tuple(-1, errno);
-  }
+  std::tuple<int, int> failWrite(int) { return std::make_tuple(-1, EAGAIN); }
 
   int bytes_written() const { return bytes_written_; }
   uint64_t bytes_drained() const { return bytes_drained_; }

@@ -143,7 +143,8 @@ public:
    * Read from a file descriptor directly into the buffer.
    * @param fd supplies the descriptor to read from.
    * @param max_length supplies the maximum length to read.
-   * @return a tuple with the number of bytes read or -1 if there was an error, and the errno.
+   * @return a tuple with the number of bytes read and the errno. If an error occurs, the number
+   *   of bytes read would indicate -1 and the errno would be non-zero.
    */
   virtual std::tuple<int, int> read(int fd, uint64_t max_length) PURE;
 
@@ -174,7 +175,8 @@ public:
   /**
    * Write the buffer out to a file descriptor.
    * @param fd supplies the descriptor to write to.
-   * @return a tuple with the number of bytes written or -1 if there was an error, and the errno.
+   * @return a tuple with the number of bytes written and the errno. If an error occurs, the
+   *   number of bytes written would indicate -1 and the errno would be non-zero.
    */
   virtual std::tuple<int, int> write(int fd) PURE;
 };
