@@ -95,18 +95,20 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
   void sendResponse();
   // TODO(htuch): Make this configurable or some static.
-  const uint32_t RETRY_DELAY_MS = 5000;
-  uint32_t server_response_ms_ = 1000;
-  uint32_t cluster_connection_buffer_limit_bytes = 12345;
-  uint32_t cluster_timeout_s = 1;
+  const uint32_t RetryDelayMilliseconds = 5000;
+  static constexpr uint32_t ClusterConnectionBufferLimitBytes = 12345;
+  static constexpr uint32_t ClusterTimeoutSeconds = 1;
+  uint32_t ServerResponseMilliseconds = 1000;
 
   void
   processMessage(std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message);
 
+  void establishNewStream();
+  std::vector<HdsClusterPtr> hdsClusters() { return hds_clusters_; };
+
 private:
   void setRetryTimer();
   void setServerResponseTimer();
-  void establishNewStream();
   void handleFailure();
   HdsDelegateStats stats_;
   Grpc::AsyncClientPtr async_client_;

@@ -23,11 +23,11 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
 }
 
 void HdsDelegate::setRetryTimer() {
-  retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS));
+  retry_timer_->enableTimer(std::chrono::milliseconds(RetryDelayMilliseconds));
 }
 
 void HdsDelegate::setServerResponseTimer() {
-  server_response_timer_->enableTimer(std::chrono::milliseconds(server_response_ms_));
+  server_response_timer_->enableTimer(std::chrono::milliseconds(ServerResponseMilliseconds));
 }
 
 void HdsDelegate::establishNewStream() {
@@ -49,7 +49,8 @@ void HdsDelegate::establishNewStream() {
 
 // TODO(lilika) : Use jittered backoff as in https://github.com/envoyproxy/envoy/pull/3791
 void HdsDelegate::handleFailure() {
-  ENVOY_LOG(warn, "HdsDelegate stream/connection failure, will retry in {} ms.", RETRY_DELAY_MS);
+  ENVOY_LOG(warn, "HdsDelegate stream/connection failure, will retry in {} ms.",
+            RetryDelayMilliseconds);
   stats_.errors_.inc();
   setRetryTimer();
 }
@@ -65,6 +66,7 @@ void HdsDelegate::sendResponse() {
             host->address()->ip()->addressAsString());
         endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
             host->address()->ip()->port());
+        // TODO(lilika): Add support for more granular options of envoy::api::v2::core::HealthStatus
         if (host->healthy()) {
           endpoint->set_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
         } else {
@@ -89,46 +91,48 @@ void HdsDelegate::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
 
 void HdsDelegate::processMessage(
     std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
+  // TODO(lilika): What if the message is empty?
   for (int i = 0; i < message->health_check_size(); i++) {
     // Create HdsCluster config
     ENVOY_LOG(debug, "Creating HdsCluster config");
     envoy::api::v2::core::BindConfig bind_config;
-    envoy::api::v2::Cluster cluster_config;
-    clusters_config_.push_back(cluster_config);
-    clusters_config_[i].set_name(message->mutable_health_check(i)->cluster_name());
-    clusters_config_[i].mutable_connect_timeout()->set_seconds(cluster_timeout_s);
-    clusters_config_[i].mutable_per_connection_buffer_limit_bytes()->set_value(
-        cluster_connection_buffer_limit_bytes);
 
-    for (int j = 0; j < message->mutable_health_check(i)->endpoints_size(); j++) {
-      for (int k = 0; k < message->mutable_health_check(i)->mutable_endpoints(j)->endpoints_size();
-           k++) {
-        // Add endpoint to cluster
-        clusters_config_[i].add_hosts()->MergeFrom(*message->mutable_health_check(i)
-                                                        ->mutable_endpoints(j)
-                                                        ->mutable_endpoints(k)
-                                                        ->mutable_address());
+    clusters_config_.emplace_back();
+    envoy::api::v2::Cluster& cluster_config = clusters_config_.back();
+
+    cluster_config.set_name(message->mutable_health_check(i)->cluster_name());
+    cluster_config.mutable_connect_timeout()->set_seconds(ClusterTimeoutSeconds);
+    cluster_config.mutable_per_connection_buffer_limit_bytes()->set_value(
+        ClusterConnectionBufferLimitBytes);
+
+    // Add endpoints to cluster
+    const int localities_size = message->mutable_health_check(i)->endpoints_size();
+    for (int j = 0; j < localities_size; j++) {
+      auto endpoints = message->mutable_health_check(i)->mutable_endpoints(j);
+      for (int k = 0; k < endpoints->endpoints_size(); k++) {
+        cluster_config.add_hosts()->MergeFrom(*endpoints->mutable_endpoints(k)->mutable_address());
       }
     }
 
-    for (int j = 0; j < message->mutable_health_check(i)->health_checks_size(); j++) {
-      // Add health checker to cluster
-      clusters_config_[i].add_health_checks()->MergeFrom(
-          *message->mutable_health_check(i)->mutable_health_checks(j));
+    // Add healthcheckers to cluster
+    auto health_checkers = message->mutable_health_check(i);
+    for (int j = 0; j < health_checkers->health_checks_size(); j++) {
+      cluster_config.add_health_checks()->MergeFrom(*health_checkers->mutable_health_checks(j));
     }
 
-    ENVOY_LOG(debug, "New HdsCluster config {} ", clusters_config_[i].DebugString());
+    ENVOY_LOG(debug, "New HdsCluster config {} ", cluster_config.DebugString());
 
-    // Creating HdsCluster
-    cluster_.reset(new HdsCluster(runtime_, clusters_config_[i], bind_config, store_stats,
+    // Create HdsCluster
+    cluster_.reset(new HdsCluster(runtime_, cluster_config, bind_config, store_stats,
                                   ssl_context_manager_, secret_manager_, false));
 
     hds_clusters_.push_back(cluster_);
+
     std::vector<Upstream::HealthCheckerSharedPtr> cluster_health_checkers;
     for (int j = 0; j < message->mutable_health_check(i)->health_checks_size(); j++) {
       // Creating HealthCheckers
       cluster_health_checkers.push_back(Upstream::HealthCheckerFactory::create(
-          *clusters_config_[i].mutable_health_checks(j), *hds_clusters_[i], runtime_, random_,
+          *cluster_config.mutable_health_checks(j), *hds_clusters_[i], runtime_, random_,
           dispatcher_));
     }
     health_checkers_ptr.push_back(cluster_health_checkers);
@@ -151,7 +155,7 @@ void HdsDelegate::onReceiveMessage(
       hds_clusters_[i]->setHealthChecker(health_checkers_ptr[i][j]);
     }
     hds_clusters_[i]->initialize([] {});
-    server_response_ms_ = PROTOBUF_GET_MS_REQUIRED(*message, interval);
+    ServerResponseMilliseconds = PROTOBUF_GET_MS_REQUIRED(*message, interval);
     setServerResponseTimer();
   }
 }
@@ -176,6 +180,7 @@ HdsCluster::HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& 
       runtime_(runtime), initial_hosts_(new HostVector())
 
 {
+  ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
 
   for (const auto& host : cluster.hosts()) {
