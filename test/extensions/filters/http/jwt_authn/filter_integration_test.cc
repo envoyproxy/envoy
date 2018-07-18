@@ -26,7 +26,7 @@ std::string getFilterConfig(bool use_local_jwks) {
   }
 
   HttpFilter filter;
-  filter.set_name(HttpFilterNames::get().JWT_AUTHN);
+  filter.set_name(HttpFilterNames::get().JwtAuthn);
   MessageUtil::jsonConvert(proto_config, *filter.mutable_config());
   return MessageUtil::getJsonStringFromMessage(filter);
 }

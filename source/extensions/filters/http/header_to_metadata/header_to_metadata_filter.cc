@@ -132,7 +132,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
 }
 
 const std::string& HeaderToMetadataFilter::decideNamespace(const std::string& nspace) const {
-  return nspace.empty() ? HttpFilterNames::get().HEADER_TO_METADATA : nspace;
+  return nspace.empty() ? HttpFilterNames::get().HeaderToMetadata : nspace;
 }
 
 void HeaderToMetadataFilter::writeHeaderToMetadata(Http::HeaderMap& headers,

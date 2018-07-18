@@ -116,7 +116,7 @@ void FilterJson::translateAccessLog(const Json::Object& json_config,
 
   // Statically registered access logs are a v2-only feature, so use the standard internal file
   // access log for json config conversion.
-  proto_config.set_name(Extensions::AccessLoggers::AccessLogNames::get().FILE);
+  proto_config.set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
 
   if (json_config.hasObject("filter")) {
     translateAccessLogFilter(*json_config.getObject("filter"), *proto_config.mutable_filter());

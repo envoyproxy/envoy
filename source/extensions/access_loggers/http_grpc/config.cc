@@ -44,7 +44,7 @@ ProtobufTypes::MessagePtr HttpGrpcAccessLogFactory::createEmptyConfigProto() {
   return ProtobufTypes::MessagePtr{new envoy::config::accesslog::v2::HttpGrpcAccessLogConfig()};
 }
 
-std::string HttpGrpcAccessLogFactory::name() const { return AccessLogNames::get().HTTP_GRPC; }
+std::string HttpGrpcAccessLogFactory::name() const { return AccessLogNames::get().HttpGrpc; }
 
 /**
  * Static registration for the HTTP gRPC access log. @see RegisterFactory.
