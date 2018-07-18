@@ -50,7 +50,7 @@ Expectation expectValue(NiceMock<MockProtocol>& proto, FieldType field_type, boo
   case FieldType::String:
     return EXPECT_CALL(proto, readString(_, _)).WillOnce(Return(result));
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -77,7 +77,7 @@ ExpectationSet expectContainerStart(NiceMock<MockProtocol>& proto, FieldType fie
              .WillOnce(DoAll(SetArgReferee<1>(inner_type), SetArgReferee<2>(1), Return(true)));
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   return s;
 }
@@ -101,7 +101,7 @@ ExpectationSet expectContainerEnd(NiceMock<MockProtocol>& proto, FieldType field
     s += EXPECT_CALL(proto, readSetEnd(_)).WillOnce(Return(true));
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   return s;
 }

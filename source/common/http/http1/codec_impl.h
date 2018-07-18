@@ -341,7 +341,7 @@ private:
   // ConnectionImpl
   void onEncodeComplete() override;
   void onMessageBegin() override {}
-  void onUrl(const char*, size_t) override { NOT_IMPLEMENTED; }
+  void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;
   void onBody(const char* data, size_t length) override;
   void onMessageComplete() override;

@@ -40,7 +40,7 @@ private:
     // We should never hit this at runtime, since this legacy adapter is only used by CdsApiImpl
     // that doesn't do dynamic modification of resources.
     UNREFERENCED_PARAMETER(resources);
-    NOT_IMPLEMENTED;
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   // Http::RestApiFetcher

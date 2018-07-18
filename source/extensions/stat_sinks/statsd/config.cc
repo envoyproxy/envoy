@@ -34,7 +34,7 @@ Stats::SinkPtr StatsdSinkFactory::createStatsSink(const Protobuf::Message& confi
         server.clusterManager(), server.stats(), statsd_sink.prefix());
   default:
     // Verified by schema.
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
