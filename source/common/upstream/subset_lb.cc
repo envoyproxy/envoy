@@ -275,12 +275,23 @@ void SubsetLoadBalancer::update(uint32_t priority, const HostVector& hosts_added
 
 bool SubsetLoadBalancer::hostMatches(const SubsetMetadata& kvs, const Host& host) {
   const envoy::api::v2::core::Metadata& host_metadata = *host.metadata();
+  const auto filter_it =
+      host_metadata.filter_metadata().find(Config::MetadataFilters::get().ENVOY_LB);
+
+  if (filter_it == host_metadata.filter_metadata().end()) {
+    return kvs.size() == 0;
+  }
+
+  const ProtobufWkt::Struct& data_struct = filter_it->second;
+  const auto& fields = data_struct.fields();
 
   for (const auto& kv : kvs) {
-    const ProtobufWkt::Value& host_value = Config::Metadata::metadataValue(
-        host_metadata, Config::MetadataFilters::get().ENVOY_LB, kv.first);
+    const auto entry_it = fields.find(kv.first);
+    if (entry_it == fields.end()) {
+      return false;
+    }
 
-    if (!ValueUtil::equal(host_value, kv.second)) {
+    if (!ValueUtil::equal(entry_it->second, kv.second)) {
       return false;
     }
   }
@@ -460,9 +471,12 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
 void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
                                                 const HostVector& hosts_removed,
                                                 std::function<bool(const Host&)> predicate) {
+  std::unordered_set<HostSharedPtr> predicate_added;
+
   HostVector filtered_added;
   for (const auto host : hosts_added) {
     if (predicate(*host)) {
+      predicate_added.insert(host);
       filtered_added.emplace_back(host);
     }
   }
@@ -477,8 +491,12 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   HostVectorSharedPtr hosts(new HostVector());
   HostVectorSharedPtr healthy_hosts(new HostVector());
 
+  // It's possible that hosts_added == original_host_set_.hosts(), e.g.: when
+  // calling refreshSubsets() if only metadata change. If so, we can avoid the
+  // predicate() call.
   for (const auto host : original_host_set_.hosts()) {
-    if (predicate(*host)) {
+    bool host_seen = predicate_added.count(host) == 1;
+    if (host_seen || predicate(*host)) {
       hosts->emplace_back(host);
       if (host->healthy()) {
         healthy_hosts->emplace_back(host);
@@ -486,11 +504,25 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
     }
   }
 
-  HostsPerLocalityConstSharedPtr hosts_per_locality =
-      original_host_set_.hostsPerLocality().filter(predicate);
+  // Calling predicate() is expensive since it involves metadata lookups; so we
+  // avoid it in the 2nd call to filter() by using the result from the first call
+  // to filter() as the starting point.
+  //
+  // Also, if we only have one locality we can avoid the first call to filter() by
+  // just creating a new HostsPerLocality from the list of all hosts.
+  //
+  // TODO(rgs1): merge these two filter() calls in one loop.
+  HostsPerLocalityConstSharedPtr hosts_per_locality;
+
+  if (original_host_set_.hostsPerLocality().get().size() == 1) {
+    hosts_per_locality.reset(
+        new HostsPerLocalityImpl(*hosts, original_host_set_.hostsPerLocality().hasLocalLocality()));
+  } else {
+    hosts_per_locality = original_host_set_.hostsPerLocality().filter(predicate);
+  }
+
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality =
-      original_host_set_.hostsPerLocality().filter(
-          [&predicate](const Host& host) { return predicate(host) && host.healthy(); });
+      hosts_per_locality->filter([](const Host& host) { return host.healthy(); });
 
   if (locality_weight_aware_) {
     HostSetImpl::updateHosts(hosts, healthy_hosts, hosts_per_locality, healthy_hosts_per_locality,
