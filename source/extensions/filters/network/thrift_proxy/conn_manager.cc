@@ -51,6 +51,7 @@ void ConnectionManager::dispatch() {
     rpcs_.front()->onError(ex.what());
 
     resetAllRpcs();
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
 
@@ -67,8 +68,6 @@ void ConnectionManager::resetAllRpcs() {
   while (!rpcs_.empty()) {
     rpcs_.front()->onReset();
   }
-
-  read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
 }
 
 void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
@@ -76,16 +75,14 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
 }
 
 void ConnectionManager::onEvent(Network::ConnectionEvent event) {
-  if (rpcs_.empty()) {
-    return;
-  }
+  if (!rpcs_.empty()) {
+    if (event == Network::ConnectionEvent::RemoteClose) {
+      stats_.cx_destroy_remote_with_active_rq_.inc();
+    } else if (event == Network::ConnectionEvent::LocalClose) {
+      stats_.cx_destroy_local_with_active_rq_.inc();
+    }
 
-  if (event == Network::ConnectionEvent::RemoteClose) {
-    stats_.cx_destroy_local_with_active_rq_.inc();
-  }
-
-  if (event == Network::ConnectionEvent::LocalClose) {
-    stats_.cx_destroy_remote_with_active_rq_.inc();
+    resetAllRpcs();
   }
 }
 
@@ -202,7 +199,7 @@ void ConnectionManager::ActiveRpc::createFilterChain() {
 }
 
 void ConnectionManager::ActiveRpc::onReset() {
-  // TODO(zuercer): e.g., parent_.stats_.named_.downstream_rq_rx_reset_.inc();
+  // TODO(zuercher): e.g., parent_.stats_.named_.downstream_rq_rx_reset_.inc();
   parent_.doDeferredRpcDestroy(*this);
 }
 

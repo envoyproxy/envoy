@@ -25,7 +25,6 @@ message Route {
 
   // Route request to some upstream cluster.
   RouteAction route = 2 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
-  ;
 }
 
 // [#comment:next free field: 2]

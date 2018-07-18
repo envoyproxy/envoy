@@ -413,7 +413,7 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
     EXPECT_EQ(0U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
   }
 
-  // Close mid-request
+  // Remote close mid-request
   {
     initializeFilter();
     addSeq(buffer_, {
@@ -424,28 +424,65 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
                     });
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
     filter_->onEvent(Network::ConnectionEvent::RemoteClose);
-    EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
 
-    filter_->onEvent(Network::ConnectionEvent::LocalClose);
     EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
 
-    buffer_.drain(buffer_.length());
+    filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
-  // Close before response
+  // Local close mid-request
+  {
+    initializeFilter();
+    addSeq(buffer_, {
+                        0x00, 0x00, 0x00, 0x1d,                     // framed: 29 bytes
+                        0x80, 0x01, 0x00, 0x01,                     // binary proto, call type
+                        0x00, 0x00, 0x00, 0x04, 'n', 'a', 'm', 'e', // message name
+                        0x00, 0x00, 0x00, 0x0F,                     // seq id
+                    });
+    EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+    filter_->onEvent(Network::ConnectionEvent::LocalClose);
+
+    EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
+
+    buffer_.drain(buffer_.length());
+
+    filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+  }
+
+  // Remote close before response
   {
     initializeFilter();
     writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
     filter_->onEvent(Network::ConnectionEvent::RemoteClose);
-    EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
 
-    filter_->onEvent(Network::ConnectionEvent::LocalClose);
     EXPECT_EQ(1U, store_.counter("test.cx_destroy_remote_with_active_rq").value());
 
     buffer_.drain(buffer_.length());
+
+    filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+  }
+
+  // Local close before response
+  {
+    initializeFilter();
+    writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+    EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+    EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+    filter_->onEvent(Network::ConnectionEvent::LocalClose);
+
+    EXPECT_EQ(1U, store_.counter("test.cx_destroy_local_with_active_rq").value());
+
+    buffer_.drain(buffer_.length());
+
+    filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 }
 
