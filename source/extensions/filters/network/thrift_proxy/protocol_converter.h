@@ -26,11 +26,11 @@ public:
   }
 
   // ThiftFilters::DecoderFilter
-  void onDestroy() override { NOT_IMPLEMENTED; }
+  void onDestroy() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks&) override {
-    NOT_IMPLEMENTED;
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  void resetUpstreamConnection() override { NOT_IMPLEMENTED; }
+  void resetUpstreamConnection() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   ThriftFilters::FilterStatus messageBegin(absl::string_view name, MessageType msg_type,
                                            int32_t seq_id) override {
     proto_->writeMessageBegin(*buffer_, std::string(name), msg_type, seq_id);

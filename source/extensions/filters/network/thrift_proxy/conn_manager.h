@@ -135,11 +135,11 @@ private:
     }
 
     // ThriftFilters::DecoderFilter
-    void onDestroy() override { NOT_IMPLEMENTED; }
+    void onDestroy() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
     void setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks&) override {
-      NOT_IMPLEMENTED;
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
-    void resetUpstreamConnection() override { NOT_IMPLEMENTED; }
+    void resetUpstreamConnection() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
     ThriftFilters::FilterStatus transportBegin(absl::optional<uint32_t> size) override {
       return decoder_filter_->transportBegin(size);
     }
