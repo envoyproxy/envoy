@@ -36,6 +36,7 @@ On Ubuntu, run the following commands:
  apt-get install clang-format-5.0
  apt-get install autoconf
  apt-get install automake
+ apt-get install pkg-config
 ```
 
 On Fedora (maybe also other red hat distros), run the following:
@@ -53,6 +54,7 @@ brew install go
 brew install bazel
 brew install autoconf
 brew install automake
+brew install pkg-config
 ```
 
 Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
