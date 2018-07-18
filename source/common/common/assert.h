@@ -48,10 +48,17 @@ namespace Envoy {
                       "panic: {}", X);                                                             \
   abort();
 
-#define NOT_IMPLEMENTED PANIC("not implemented")
+// NOT_IMPLEMENTED_GCOVR_EXCL_LINE is for overridden functions that are expressly not implemented.
+// The macro name includes "GCOVR_EXCL_LINE" to exclude the macro's usage from code coverage
+// reports.
+#define NOT_IMPLEMENTED_GCOVR_EXCL_LINE PANIC("not implemented")
 
-// NOT_REACHED is for spots the compiler insists on having a return, but where we know that it
-// shouldn't be possible to arrive there, assuming no horrendous bugs. For example, after a
-// switch (some_enum) with all enum values included in the cases.
-#define NOT_REACHED PANIC("not reached")
+// Deprecated: use NOT_IMPLEMENTED_GCOVR_EXCL_LINE instead.
+#define NOT_IMPLEMENTED NOT_IMPLEMENTED_GCOVR_EXCL_LINE
+
+// NOT_REACHED_GCOVR_EXCL_LINE is for spots the compiler insists on having a return, but where we
+// know that it shouldn't be possible to arrive there, assuming no horrendous bugs. For example,
+// after a switch (some_enum) with all enum values included in the cases. The macro name includes
+// "GCOVR_EXCL_LINE" to exclude the macro's usage from code coverage reports.
+#define NOT_REACHED_GCOVR_EXCL_LINE PANIC("not reached")
 } // Envoy

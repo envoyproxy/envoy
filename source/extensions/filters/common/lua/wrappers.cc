@@ -72,7 +72,7 @@ void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value& va
   }
 
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

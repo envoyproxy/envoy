@@ -605,7 +605,7 @@ message RouteAction {
   //   proxy data from the client to the upstream server.
   //
   //   Redirects are not supported on routes where WebSocket upgrades are allowed.
-  google.protobuf.BoolValue use_websocket = 16;
+  google.protobuf.BoolValue use_websocket = 16 [deprecated = true];
 
   message WebSocketProxyConfig {
     // See :ref:`stat_prefix
@@ -635,7 +635,7 @@ message RouteAction {
 
   // Proxy configuration used for WebSocket connections. If unset, the default values as specified
   // in :ref:`TcpProxy <envoy_api_msg_config.filter.network.tcp_proxy.v2.TcpProxy>` are used.
-  WebSocketProxyConfig websocket_config = 22;
+  WebSocketProxyConfig websocket_config = 22 [deprecated = true];
 
   // Indicates that the route has a CORS policy.
   CorsPolicy cors = 17;

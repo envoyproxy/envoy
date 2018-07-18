@@ -99,7 +99,7 @@ TEST_F(SslContextImplTest, TestExpiringCert) {
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
-  ClientContextPtr context(manager.createSslClientContext(store, cfg));
+  ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
 
   // This is a total hack, but right now we generate the cert and it expires in 15 days only in the
   // first second that it's valid. This can become invalid and then cause slower tests to fail.
@@ -122,7 +122,7 @@ TEST_F(SslContextImplTest, TestExpiredCert) {
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
-  ClientContextPtr context(manager.createSslClientContext(store, cfg));
+  ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
   EXPECT_EQ(0U, context->daysUntilFirstCertExpires());
 }
 
@@ -141,7 +141,7 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
 
-  ClientContextPtr context(manager.createSslClientContext(store, cfg));
+  ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
   // This is similar to the hack above, but right now we generate the ca_cert and it expires in 15
   // days only in the first second that it's valid. We will partially match for up until Days until
   // Expiration: 1.
@@ -166,7 +166,7 @@ TEST_F(SslContextImplTest, TestNoCert) {
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
-  ClientContextPtr context(manager.createSslClientContext(store, cfg));
+  ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
   EXPECT_EQ("", context->getCaCertInformation());
   EXPECT_EQ("", context->getCertChainInformation());
 }
@@ -178,7 +178,7 @@ public:
     Secret::MockSecretManager secret_manager;
     ContextManagerImpl manager(runtime);
     Stats::IsolatedStoreImpl store;
-    ServerContextPtr server_ctx(
+    ServerContextSharedPtr server_ctx(
         manager.createSslServerContext(store, cfg, std::vector<std::string>{}));
   }
 
@@ -500,7 +500,7 @@ TEST(ServerContextImplTest, TlsCertificateNonEmpty) {
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW_WITH_MESSAGE(ServerContextPtr server_ctx(manager.createSslServerContext(
+  EXPECT_THROW_WITH_MESSAGE(ServerContextSharedPtr server_ctx(manager.createSslServerContext(
                                 store, client_context_config, std::vector<std::string>{})),
                             EnvoyException,
                             "Server TlsCertificates must have a certificate specified");
