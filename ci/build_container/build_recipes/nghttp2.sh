@@ -10,8 +10,11 @@ VERSION=e5b3f9addd49bca27e2f99c5c65a564eb5c0cf6d  # 2018-06-09
 wget -O nghttp2-"$VERSION".tar.gz https://github.com/nghttp2/nghttp2/archive/"$VERSION".tar.gz
 tar xf nghttp2-"$VERSION".tar.gz
 cd nghttp2-"$VERSION"
-autoreconf -i
-automake
-autoconf
-./configure --prefix="$THIRDPARTY_BUILD" --enable-shared=no --enable-lib-only
-make V=1 install
+mkdir build
+cd build
+cmake -G "Ninja" -DCMAKE_INSTALL_PREFIX="$THIRDPARTY_BUILD" \
+  -DENABLE_STATIC_LIB=on \
+  -DENABLE_LIB_ONLY=on \
+  ..
+ninja
+ninja install

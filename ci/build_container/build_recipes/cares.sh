@@ -13,7 +13,13 @@ CFLAGS="$(for f in $CXXFLAGS; do if [[ ! $f =~ -D.* ]]; then echo $f; fi; done |
 wget -O c-ares-"$VERSION".tar.gz https://github.com/c-ares/c-ares/archive/"$VERSION".tar.gz
 tar xf c-ares-"$VERSION".tar.gz
 cd c-ares-"$VERSION"
-./buildconf
-./configure --prefix="$THIRDPARTY_BUILD" --enable-shared=no --enable-lib-only \
-  --enable-debug --enable-optimize
-make V=1 install
+
+mkdir build
+cd build
+cmake -G "Ninja" -DCMAKE_INSTALL_PREFIX="$THIRDPARTY_BUILD" \
+  -DCARES_SHARED=no \
+  -DCARES_STATIC=on \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  ..
+ninja
+ninja install

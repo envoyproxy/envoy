@@ -8,10 +8,10 @@ git clone https://github.com/google/benchmark.git
 mkdir build
 
 cd build
-cmake -G "Unix Makefiles" ../benchmark \
+cmake -G "Ninja" ../benchmark \
   -DCMAKE_BUILD_TYPE=RELEASE \
   -DBENCHMARK_ENABLE_GTEST_TESTS=OFF
-make
+ninja
 cp src/libbenchmark.a "$THIRDPARTY_BUILD"/lib
 cd ../benchmark
 
