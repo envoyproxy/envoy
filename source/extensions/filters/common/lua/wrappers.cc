@@ -72,7 +72,7 @@ void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value& va
   }
 
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -122,6 +122,20 @@ int MetadataMapWrapper::luaPairs(lua_State* state) {
 
   iterator_.reset(MetadataMapIterator::create(state, *this), true);
   lua_pushcclosure(state, MetadataMapIterator::static_luaPairsIterator, 1);
+  return 1;
+}
+
+int ConnectionWrapper::luaSsl(lua_State* state) {
+  const auto& ssl = connection_->ssl();
+  if (ssl != nullptr) {
+    if (ssl_connection_wrapper_.get() != nullptr) {
+      ssl_connection_wrapper_.pushStack();
+    } else {
+      ssl_connection_wrapper_.reset(SslConnectionWrapper::create(state, ssl), true);
+    }
+  } else {
+    lua_pushnil(state);
+  }
   return 1;
 }
 

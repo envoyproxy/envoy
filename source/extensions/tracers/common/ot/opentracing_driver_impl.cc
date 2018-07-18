@@ -54,7 +54,7 @@ public:
     case Http::HeaderMap::Lookup::NotSupported:
       return opentracing::make_unexpected(opentracing::lookup_key_not_supported_error);
     }
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   opentracing::expected<void> ForeachKey(OpenTracingCb f) const override {
@@ -128,14 +128,14 @@ Tracing::SpanPtr OpenTracingSpan::spawnChild(const Tracing::Config&, const std::
                                              SystemTime start_time) {
   std::unique_ptr<opentracing::Span> ot_span = span_->tracer().StartSpan(
       name, {opentracing::ChildOf(&span_->context()), opentracing::StartTimestamp(start_time)});
-  RELEASE_ASSERT(ot_span != nullptr);
+  RELEASE_ASSERT(ot_span != nullptr, "");
   return Tracing::SpanPtr{new OpenTracingSpan{driver_, std::move(ot_span)}};
 }
 
 OpenTracingDriver::OpenTracingDriver(Stats::Store& stats)
     : tracer_stats_{OPENTRACING_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.opentracing."))} {}
 
-Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config&,
+Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config& config,
                                               Http::HeaderMap& request_headers,
                                               const std::string& operation_name,
                                               SystemTime start_time,
@@ -183,7 +183,11 @@ Tracing::SpanPtr OpenTracingDriver::startSpan(const Tracing::Config&,
     options.tags.emplace_back(opentracing::ext::sampling_priority, 0);
   }
   active_span = tracer.StartSpanWithOptions(operation_name, options);
-  RELEASE_ASSERT(active_span != nullptr);
+  RELEASE_ASSERT(active_span != nullptr, "");
+  active_span->SetTag(opentracing::ext::span_kind,
+                      config.operationName() == Tracing::OperationName::Egress
+                          ? opentracing::ext::span_kind_rpc_client
+                          : opentracing::ext::span_kind_rpc_server);
   return Tracing::SpanPtr{new OpenTracingSpan{*this, std::move(active_span)}};
 }
 

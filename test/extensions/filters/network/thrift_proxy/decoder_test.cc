@@ -3,6 +3,7 @@
 #include "extensions/filters/network/thrift_proxy/decoder.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
+#include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
@@ -21,6 +22,7 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::SetArgReferee;
 using testing::StrictMock;
+using testing::TestParamInfo;
 using testing::TestWithParam;
 using testing::Values;
 using testing::_;
@@ -48,7 +50,7 @@ Expectation expectValue(NiceMock<MockProtocol>& proto, FieldType field_type, boo
   case FieldType::String:
     return EXPECT_CALL(proto, readString(_, _)).WillOnce(Return(result));
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -75,7 +77,7 @@ ExpectationSet expectContainerStart(NiceMock<MockProtocol>& proto, FieldType fie
              .WillOnce(DoAll(SetArgReferee<1>(inner_type), SetArgReferee<2>(1), Return(true)));
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   return s;
 }
@@ -99,7 +101,7 @@ ExpectationSet expectContainerEnd(NiceMock<MockProtocol>& proto, FieldType field
     s += EXPECT_CALL(proto, readSetEnd(_)).WillOnce(Return(true));
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   return s;
 }
@@ -108,29 +110,44 @@ ExpectationSet expectContainerEnd(NiceMock<MockProtocol>& proto, FieldType field
 
 class DecoderStateMachineNonValueTest : public TestWithParam<ProtocolState> {};
 
+static std::string protoStateParamToString(const TestParamInfo<ProtocolState>& params) {
+  return ProtocolStateNameValues::name(params.param);
+}
+
 INSTANTIATE_TEST_CASE_P(NonValueProtocolStates, DecoderStateMachineNonValueTest,
                         Values(ProtocolState::MessageBegin, ProtocolState::MessageEnd,
                                ProtocolState::StructBegin, ProtocolState::StructEnd,
                                ProtocolState::FieldBegin, ProtocolState::FieldEnd,
                                ProtocolState::MapBegin, ProtocolState::MapEnd,
                                ProtocolState::ListBegin, ProtocolState::ListEnd,
-                               ProtocolState::SetBegin, ProtocolState::SetEnd));
+                               ProtocolState::SetBegin, ProtocolState::SetEnd),
+                        protoStateParamToString);
 
 class DecoderStateMachineValueTest : public TestWithParam<FieldType> {};
 
 INSTANTIATE_TEST_CASE_P(PrimitiveFieldTypes, DecoderStateMachineValueTest,
                         Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,
-                               FieldType::I32, FieldType::I64, FieldType::String));
+                               FieldType::I32, FieldType::I64, FieldType::String),
+                        fieldTypeParamToString);
 
 class DecoderStateMachineNestingTest
     : public TestWithParam<std::tuple<FieldType, FieldType, FieldType>> {};
+
+static std::string nestedFieldTypesParamToString(
+    const TestParamInfo<std::tuple<FieldType, FieldType, FieldType>>& params) {
+  FieldType outer_field_type, inner_type, value_type;
+  std::tie(outer_field_type, inner_type, value_type) = params.param;
+  return fmt::format("{}Of{}Of{}", fieldTypeToString(outer_field_type),
+                     fieldTypeToString(inner_type), fieldTypeToString(value_type));
+}
 
 INSTANTIATE_TEST_CASE_P(
     NestedTypes, DecoderStateMachineNestingTest,
     Combine(Values(FieldType::Struct, FieldType::List, FieldType::Map, FieldType::Set),
             Values(FieldType::Struct, FieldType::List, FieldType::Map, FieldType::Set),
             Values(FieldType::Bool, FieldType::Byte, FieldType::Double, FieldType::I16,
-                   FieldType::I32, FieldType::I64, FieldType::String)));
+                   FieldType::I32, FieldType::I64, FieldType::String)),
+    nestedFieldTypesParamToString);
 
 TEST_P(DecoderStateMachineNonValueTest, NoData) {
   ProtocolState state = GetParam();

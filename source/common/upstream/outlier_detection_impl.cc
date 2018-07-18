@@ -234,7 +234,7 @@ bool DetectorImpl::enforceEjection(EjectionType type) {
                                               config_.enforcingSuccessRate());
   }
 
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void DetectorImpl::updateEnforcedEjectionStats(EjectionType type) {
@@ -342,7 +342,7 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host, EjectionType typ
     host_monitors_[host]->resetConsecutiveGatewayFailure();
     break;
   case EjectionType::SuccessRate:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -539,7 +539,7 @@ std::string EventLoggerImpl::typeToString(EjectionType type) {
     return "SuccessRate";
   }
 
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 int EventLoggerImpl::secsSinceLastAction(const absl::optional<MonotonicTime>& lastActionTime,

@@ -41,9 +41,8 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
 MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
-  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors());
+  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
 
-  Stats::RawStatData::configure(options_);
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
   case Server::Mode::Serve: {
@@ -62,7 +61,8 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     Logger::Registry::initialize(options_.logLevel(), options_.logFormat(), log_lock);
 
-    stats_store_.reset(new Stats::ThreadLocalStoreImpl(restarter_->statsAllocator()));
+    stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
+                                                                 restarter_->statsAllocator());
     server_.reset(new Server::InstanceImpl(
         options_, local_address, default_test_hooks_, *restarter_, *stats_store_, access_log_lock,
         component_factory_, std::make_unique<Runtime::RandomGeneratorImpl>(), *tls_));
@@ -90,7 +90,7 @@ bool MainCommonBase::run() {
     PERF_DUMP();
     return true;
   }
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 MainCommon::MainCommon(int argc, const char* const* argv)

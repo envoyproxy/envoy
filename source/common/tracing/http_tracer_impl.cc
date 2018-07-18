@@ -39,39 +39,6 @@ static std::string buildUrl(const Http::HeaderMap& request_headers) {
                      valueOrDefault(request_headers.Host(), ""), path);
 }
 
-void HttpTracerUtility::mutateHeaders(Http::HeaderMap& request_headers, Runtime::Loader& runtime) {
-  if (!request_headers.RequestId()) {
-    return;
-  }
-
-  // TODO PERF: Avoid copy.
-  std::string x_request_id = request_headers.RequestId()->value().c_str();
-
-  uint64_t result;
-  // Skip if x-request-id is corrupted.
-  if (!UuidUtils::uuidModBy(x_request_id, result, 10000)) {
-    return;
-  }
-
-  // Do not apply tracing transformations if we are currently tracing.
-  if (UuidTraceStatus::NoTrace == UuidUtils::isTraceableUuid(x_request_id)) {
-    if (request_headers.ClientTraceId() &&
-        runtime.snapshot().featureEnabled("tracing.client_enabled", 100)) {
-      UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
-    } else if (request_headers.EnvoyForceTrace()) {
-      UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
-    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", 10000, result, 10000)) {
-      UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
-    }
-  }
-
-  if (!runtime.snapshot().featureEnabled("tracing.global_enabled", 100, result)) {
-    UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::NoTrace);
-  }
-
-  request_headers.RequestId()->value(x_request_id);
-}
-
 const std::string HttpTracerUtility::INGRESS_OPERATION = "ingress";
 const std::string HttpTracerUtility::EGRESS_OPERATION = "egress";
 
@@ -83,7 +50,7 @@ const std::string& HttpTracerUtility::toString(OperationName operation_name) {
     return EGRESS_OPERATION;
   }
 
-  NOT_REACHED
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Decision HttpTracerUtility::isTracing(const RequestInfo::RequestInfo& request_info,
@@ -112,7 +79,7 @@ Decision HttpTracerUtility::isTracing(const RequestInfo::RequestInfo& request_in
     return {Reason::NotTraceableRequestId, false};
   }
 
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_headers,

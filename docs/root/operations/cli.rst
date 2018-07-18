@@ -11,8 +11,8 @@ following are the command line options that Envoy supports.
   *(optional)* The path to the v1 or v2 :ref:`JSON/YAML/proto3 configuration
   file <config>`. If this flag is missing, :option:`--config-yaml` is required.
   This will be parsed as a :ref:`v2 bootstrap configuration file
-  <config_overview_v2_bootstrap>` and on failure, subject to
-  :option:`--v2-config-only`, will be considered as a :ref:`v1 JSON
+  <config_overview_v2_bootstrap>`. On failure, if :option:`--allow-deprecated-v1-api`,
+  is set, it will be considered as a :ref:`v1 JSON
   configuration file <config_overview_v1>`. For v2 configuration files, valid
   extensions are ``.json``, ``.yaml``, ``.pb`` and ``.pb_text``, which indicate
   JSON, YAML, `binary proto3
@@ -34,9 +34,14 @@ following are the command line options that Envoy supports.
 
 .. option:: --v2-config-only
 
+  *(deprecated)* This flag used to allow opting into only using a
+  :ref:`v2 bootstrap configuration file <config_overview_v2_bootstrap>`. This is now set by default.
+
+.. option:: --allow-deprecated-v1-api
+
   *(optional)* This flag determines whether the configuration file should only
   be parsed as a :ref:`v2 bootstrap configuration file
-  <config_overview_v2_bootstrap>`. If false (default), when a v2 bootstrap
+  <config_overview_v2_bootstrap>`. If specified when a v2 bootstrap
   config parse fails, a second attempt to parse the config as a :ref:`v1 JSON
   configuration file <config_overview_v1>` will be made.
 

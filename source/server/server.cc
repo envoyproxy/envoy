@@ -171,7 +171,7 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
     throw EnvoyException("V1 config (detected) with --config-yaml is not supported");
   }
   Json::ObjectSharedPtr config_json = Json::Factory::loadFromFile(options.configPath());
-  Config::BootstrapJson::translateBootstrap(*config_json, bootstrap);
+  Config::BootstrapJson::translateBootstrap(*config_json, bootstrap, options.statsOptions());
   MessageUtil::validate(bootstrap);
   return BootstrapVersion::V1;
 }
@@ -279,6 +279,17 @@ void InstanceImpl::initialize(Options& options,
   // because various items do not yet exist when the listener manager is created.
   if (bootstrap_.dynamic_resources().has_lds_config()) {
     listener_manager_->createLdsApi(bootstrap_.dynamic_resources().lds_config());
+  }
+
+  if (bootstrap_.has_hds_config()) {
+    const auto& hds_config = bootstrap_.hds_config();
+    async_client_manager_ =
+        std::make_unique<Grpc::AsyncClientManagerImpl>(clusterManager(), thread_local_);
+    hds_delegate_.reset(new Upstream::HdsDelegate(
+        bootstrap_.node(), stats(),
+        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
+            ->create(),
+        dispatcher()));
   }
 
   for (Stats::SinkPtr& sink : main_config->statsSinks()) {

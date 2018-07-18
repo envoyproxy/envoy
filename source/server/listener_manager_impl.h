@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/filter_config.h"
@@ -9,6 +11,8 @@
 #include "envoy/server/worker.h"
 
 #include "common/common/logger.h"
+#include "common/network/cidr_range.h"
+#include "common/network/lc_trie.h"
 
 #include "server/init_manager_impl.h"
 #include "server/lds_api.h"
@@ -305,36 +309,67 @@ public:
   SystemTime last_updated_;
 
 private:
-  void addFilterChain(const std::vector<std::string>& server_names,
+  typedef std::unordered_map<std::string, Network::FilterChainSharedPtr> ApplicationProtocolsMap;
+  typedef std::unordered_map<std::string, ApplicationProtocolsMap> TransportProtocolsMap;
+  // Both exact server names and wildcard domains are part of the same map, in which wildcard
+  // domains are prefixed with "." (i.e. ".example.com" for "*.example.com") to differentiate
+  // between exact and wildcard entries.
+  typedef std::unordered_map<std::string, TransportProtocolsMap> ServerNamesMap;
+  typedef std::unordered_map<std::string, ServerNamesMap> DestinationIPsMap;
+  typedef std::shared_ptr<ServerNamesMap> ServerNamesMapSharedPtr;
+  typedef Network::LcTrie::LcTrie<ServerNamesMapSharedPtr> DestinationIPsTrie;
+  typedef std::unique_ptr<DestinationIPsTrie> DestinationIPsTriePtr;
+  typedef std::unordered_map<uint16_t, std::pair<DestinationIPsMap, DestinationIPsTriePtr>>
+      DestinationPortsMap;
+
+  void addFilterChain(uint16_t destination_port, const std::vector<std::string>& destination_ips,
+                      const std::vector<std::string>& server_names,
                       const std::string& transport_protocol,
                       const std::vector<std::string>& application_protocols,
                       Network::TransportSocketFactoryPtr&& transport_socket_factory,
                       std::vector<Network::FilterFactoryCb> filters_factory);
-  void addFilterChainForApplicationProtocols(
-      std::unordered_map<std::string, Network::FilterChainSharedPtr>& transport_protocol_map,
-      const std::vector<std::string>& application_protocols,
-      const Network::FilterChainSharedPtr& filter_chain);
-  const Network::FilterChain* findFilterChainForServerName(
-      const std::unordered_map<std::string,
-                               std::unordered_map<std::string, Network::FilterChainSharedPtr>>&
-          server_name_match,
-      const Network::ConnectionSocket& socket) const;
-  const Network::FilterChain* findFilterChainForApplicationProtocols(
-      const std::unordered_map<std::string, Network::FilterChainSharedPtr>&
-          transport_protocol_match,
-      const Network::ConnectionSocket& socket) const;
+  void addFilterChainForDestinationPorts(DestinationPortsMap& destination_ports_map,
+                                         uint16_t destination_port,
+                                         const std::vector<std::string>& destination_ips,
+                                         const std::vector<std::string>& server_names,
+                                         const std::string& transport_protocol,
+                                         const std::vector<std::string>& application_protocols,
+                                         const Network::FilterChainSharedPtr& filter_chain);
+  void addFilterChainForDestinationIPs(DestinationIPsMap& destination_ips_map,
+                                       const std::vector<std::string>& destination_ips,
+                                       const std::vector<std::string>& server_names,
+                                       const std::string& transport_protocol,
+                                       const std::vector<std::string>& application_protocols,
+                                       const Network::FilterChainSharedPtr& filter_chain);
+  void addFilterChainForServerNames(ServerNamesMap& server_names_map,
+                                    const std::vector<std::string>& server_names,
+                                    const std::string& transport_protocol,
+                                    const std::vector<std::string>& application_protocols,
+                                    const Network::FilterChainSharedPtr& filter_chain);
+  void addFilterChainForApplicationProtocols(ApplicationProtocolsMap& application_protocol_map,
+                                             const std::vector<std::string>& application_protocols,
+                                             const Network::FilterChainSharedPtr& filter_chain);
+
+  void convertDestinationIPsMapToTrie();
+
+  const Network::FilterChain*
+  findFilterChainForDestinationIP(const DestinationIPsTrie& destination_ips_trie,
+                                  const Network::ConnectionSocket& socket) const;
+  const Network::FilterChain*
+  findFilterChainForServerName(const ServerNamesMap& server_names_map,
+                               const Network::ConnectionSocket& socket) const;
+  const Network::FilterChain*
+  findFilterChainForTransportProtocol(const TransportProtocolsMap& transport_protocols_map,
+                                      const Network::ConnectionSocket& socket) const;
+  const Network::FilterChain*
+  findFilterChainForApplicationProtocols(const ApplicationProtocolsMap& application_protocols_map,
+                                         const Network::ConnectionSocket& socket) const;
+
   static bool isWildcardServerName(const std::string& name);
 
-  // Mapping of FilterChain's configured server name and transport protocol, i.e.
-  //   map[server_name][transport_protocol][application_protocol] => FilterChainSharedPtr
-  //
-  // For the server_name lookups, both exact server names and wildcard domains are part of the same
-  // map, in which wildcard domains are prefixed with "." (i.e. ".example.com" for "*.example.com")
-  // to differentiate between exact and wildcard entries.
-  std::unordered_map<
-      std::string, std::unordered_map<
-                       std::string, std::unordered_map<std::string, Network::FilterChainSharedPtr>>>
-      filter_chains_;
+  // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
+  // and application protocols, using structures defined above.
+  DestinationPortsMap destination_ports_map_;
 
   ListenerManagerImpl& parent_;
   Network::Address::InstanceConstSharedPtr address_;

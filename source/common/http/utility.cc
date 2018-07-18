@@ -201,15 +201,18 @@ uint64_t Utility::getResponseStatus(const HeaderMap& headers) {
   return response_code;
 }
 
-bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
+bool Utility::isUpgrade(const HeaderMap& headers) {
   // In firefox the "Connection" request header value is "keep-alive, Upgrade",
   // we should check if it contains the "Upgrade" token.
   return (headers.Connection() && headers.Upgrade() &&
-          headers.Connection()->value().caseInsensitiveContains(
-              Http::Headers::get().ConnectionValues.Upgrade.c_str()) &&
-          (0 == StringUtil::caseInsensitiveCompare(
-                    headers.Upgrade()->value().c_str(),
-                    Http::Headers::get().UpgradeValues.WebSocket.c_str())));
+          Envoy::StringUtil::caseFindToken(headers.Connection()->value().getStringView(), ",",
+                                           Http::Headers::get().ConnectionValues.Upgrade.c_str()));
+}
+
+bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
+  return (isUpgrade(headers) && (0 == StringUtil::caseInsensitiveCompare(
+                                          headers.Upgrade()->value().c_str(),
+                                          Http::Headers::get().UpgradeValues.WebSocket.c_str())));
 }
 
 Http2Settings
@@ -335,7 +338,7 @@ const std::string& Utility::getProtocolString(const Protocol protocol) {
     return Headers::get().ProtocolStrings.Http2String;
   }
 
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
@@ -345,7 +348,7 @@ void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_
    *
    *  Example:
    *  uri  = "https://example.com:8443/certs"
-   *  pos:          ^
+   *  pos:         ^
    *  host_pos:       ^
    *  path_pos:                       ^
    *  host = "example.com:8443"
@@ -375,6 +378,18 @@ MessagePtr Utility::prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_u
   message->headers().insertHost().value(host.data(), host.size());
 
   return message;
+}
+
+// TODO(jmarantz): make QueryParams a real class and put this serializer there,
+// along with proper URL escaping of the name and value.
+std::string Utility::queryParamsToString(const QueryParams& params) {
+  std::string out;
+  std::string delim = "?";
+  for (auto p : params) {
+    absl::StrAppend(&out, delim, p.first, "=", p.second);
+    delim = "&";
+  }
+  return out;
 }
 
 } // namespace Http

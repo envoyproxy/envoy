@@ -68,12 +68,12 @@ public:
             Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
                                                            config.api_config_source(), scope)
                 ->create(),
-            dispatcher, *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method),
-            stats));
+            dispatcher, random,
+            *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(grpc_method), stats));
         break;
       }
       default:
-        NOT_REACHED;
+        NOT_REACHED_GCOVR_EXCL_LINE;
       }
       break;
     }

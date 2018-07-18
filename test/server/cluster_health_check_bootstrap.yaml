@@ -1,0 +1,17 @@
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: {{ ntop_ip_loopback_address }}
+      port_value: 0
+static_resources:
+  clusters:
+  - name: service_google
+    connect_timeout: 0.25s
+    health_checks:
+      - timeout: {{ health_check_timeout }}s
+        interval: {{ health_check_interval }}s
+        unhealthy_threshold: 1
+        healthy_threshold: 1
+        http_health_check:
+          path: "/"

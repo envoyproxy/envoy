@@ -102,7 +102,8 @@ public:
   void SetUpTest(const std::string json) {
     envoy::api::v2::RouteConfiguration route_config;
     auto json_object_ptr = Json::Factory::loadFromString(json);
-    Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config);
+    Envoy::Config::RdsJson::translateRouteConfiguration(*json_object_ptr, route_config,
+                                                        stats_options);
     config_.reset(new ConfigImpl(route_config, factory_context_, true));
   }
 
@@ -111,6 +112,7 @@ public:
   Http::TestHeaderMapImpl header_;
   const RouteEntry* route_;
   Network::Address::Ipv4Instance default_remote_address_{"10.0.0.1"};
+  Stats::StatsOptionsImpl stats_options;
 };
 
 TEST_F(RateLimitConfiguration, NoApplicableRateLimit) {

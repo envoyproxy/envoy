@@ -163,7 +163,7 @@ public:
  */
 class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
-  ThreadLocalStoreImpl(StatDataAllocator& alloc);
+  ThreadLocalStoreImpl(const Stats::StatsOptions& stats_options, StatDataAllocator& alloc);
   ~ThreadLocalStoreImpl();
 
   // Stats::Scope
@@ -195,6 +195,8 @@ public:
 
   Source& source() override { return source_; }
 
+  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
+
 private:
   struct TlsCacheEntry {
     std::unordered_map<std::string, CounterSharedPtr> counters_;
@@ -224,6 +226,7 @@ private:
     Gauge& gauge(const std::string& name) override;
     Histogram& histogram(const std::string& name) override;
     Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
+    const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
 
     template <class StatType>
     using MakeStatFn =
@@ -272,6 +275,7 @@ private:
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
 
+  const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;

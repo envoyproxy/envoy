@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
@@ -34,6 +35,7 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/json/json_loader.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/network/utility.h"
 #include "common/profiler/profiler.h"
 #include "common/router/config_impl.h"
 #include "common/stats/stats_impl.h"
@@ -125,6 +127,22 @@ const char AdminHtmlEnd[] = R"(
 </body>
 )";
 
+void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_map) {
+  header_map.insertStatus().value(std::to_string(enumToInt(code)));
+  const auto& headers = Http::Headers::get();
+  if (header_map.ContentType() == nullptr) {
+    // Default to text-plain if unset.
+    header_map.insertContentType().value().setReference(headers.ContentTypeValues.TextUtf8);
+  }
+  // Default to 'no-cache' if unset, but not 'no-store' which may break the back button.
+  if (header_map.CacheControl() == nullptr) {
+    header_map.insertCacheControl().value().setReference(headers.CacheControlValues.NoCacheMaxAge0);
+  }
+
+  // Under no circumstance should browsers sniff content-type.
+  header_map.addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
+}
+
 } // namespace
 
 AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
@@ -161,7 +179,7 @@ void AdminFilter::addOnDestroyCallback(std::function<void()> cb) {
   on_destroy_callbacks_.push_back(std::move(cb));
 }
 
-const Http::StreamDecoderFilterCallbacks& AdminFilter::getDecoderFilterCallbacks() const {
+Http::StreamDecoderFilterCallbacks& AdminFilter::getDecoderFilterCallbacks() const {
   ASSERT(callbacks_ != nullptr);
   return *callbacks_;
 }
@@ -242,8 +260,62 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
                            resource_manager.retries().max()));
 }
 
-Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
-                                      Buffer::Instance& response, AdminStream&) {
+void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
+  envoy::admin::v2alpha::Clusters clusters;
+  for (auto& cluster_pair : server_.clusterManager().clusters()) {
+    const Upstream::Cluster& cluster = cluster_pair.second.get();
+    Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
+
+    envoy::admin::v2alpha::ClusterStatus& cluster_status = *clusters.add_cluster_statuses();
+    cluster_status.set_name(cluster_info->name());
+
+    const Upstream::Outlier::Detector* outlier_detector = cluster.outlierDetector();
+    if (outlier_detector != nullptr && outlier_detector->successRateEjectionThreshold() > 0.0) {
+      cluster_status.mutable_success_rate_ejection_threshold()->set_value(
+          outlier_detector->successRateEjectionThreshold());
+    }
+
+    cluster_status.set_added_via_api(cluster_info->addedViaApi());
+
+    for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
+      for (auto& host : host_set->hosts()) {
+        envoy::admin::v2alpha::HostStatus& host_status = *cluster_status.add_host_statuses();
+        Network::Utility::addressToProtobufAddress(*host->address(),
+                                                   *host_status.mutable_address());
+
+        for (const Stats::CounterSharedPtr& counter : host->counters()) {
+          auto& metric = (*host_status.mutable_stats())[counter->name()];
+          metric.set_type(envoy::admin::v2alpha::SimpleMetric::COUNTER);
+          metric.set_value(counter->value());
+        }
+
+        for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
+          auto& metric = (*host_status.mutable_stats())[gauge->name()];
+          metric.set_type(envoy::admin::v2alpha::SimpleMetric::GAUGE);
+          metric.set_value(gauge->value());
+        }
+
+        envoy::admin::v2alpha::HostHealthStatus& health_status =
+            *host_status.mutable_health_status();
+        health_status.set_failed_active_health_check(
+            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_ACTIVE_HC));
+        health_status.set_failed_outlier_check(
+            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_OUTLIER_CHECK));
+        health_status.set_eds_health_status(
+            host->healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)
+                ? envoy::api::v2::core::HealthStatus::UNHEALTHY
+                : envoy::api::v2::core::HealthStatus::HEALTHY);
+        double success_rate = host->outlierDetector().successRate();
+        if (success_rate >= 0.0) {
+          host_status.mutable_success_rate()->set_value(success_rate);
+        }
+      }
+    }
+  }
+  response.add(MessageUtil::getJsonStringFromMessage(clusters, true)); // pretty-print
+}
+
+void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
   for (auto& cluster : server_.clusterManager().clusters()) {
     addOutlierInfo(cluster.second.get().info()->name(), cluster.second.get().outlierDetector(),
                    response);
@@ -293,6 +365,20 @@ Http::Code AdminImpl::handlerClusters(absl::string_view, Http::HeaderMap&,
       }
     }
   }
+}
+
+Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& response_headers,
+                                      Buffer::Instance& response, AdminStream&) {
+  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  auto it = query_params.find("format");
+
+  if (it != query_params.end() && it->second == "json") {
+    writeClustersAsJson(response);
+    response_headers.insertContentType().value().setReference(
+        Http::Headers::get().ContentTypeValues.Json);
+  } else {
+    writeClustersAsText(response);
+  }
 
   return Http::Code::OK;
 }
@@ -304,7 +390,7 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& resp
   auto& config_dump_map = *(dump.mutable_configs());
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
-    RELEASE_ASSERT(message);
+    RELEASE_ASSERT(message, "");
     ProtobufWkt::Any any_message;
     any_message.PackFrom(*message);
     config_dump_map[key_callback_pair.first] = any_message;
@@ -478,7 +564,7 @@ std::string PrometheusStatsFormatter::sanitizeName(const std::string& name) {
 std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag>& tags) {
   std::vector<std::string> buf;
   for (const Stats::Tag& tag : tags) {
-    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), sanitizeName(tag.value_)));
+    buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), tag.value_));
   }
   return StringUtil::join(buf, ",");
 }
@@ -756,22 +842,9 @@ void AdminFilter::onComplete() {
 
   Buffer::OwnedImpl response;
   Http::HeaderMapPtr header_map{new Http::HeaderMapImpl};
-  RELEASE_ASSERT(request_headers_);
+  RELEASE_ASSERT(request_headers_, "");
   Http::Code code = parent_.runCallback(path, *header_map, response, *this);
-  header_map->insertStatus().value(std::to_string(enumToInt(code)));
-  const auto& headers = Http::Headers::get();
-  if (header_map->ContentType() == nullptr) {
-    // Default to text-plain if unset.
-    header_map->insertContentType().value().setReference(headers.ContentTypeValues.TextUtf8);
-  }
-  // Default to 'no-cache' if unset, but not 'no-store' which may break the back button.
-  if (header_map->CacheControl() == nullptr) {
-    header_map->insertCacheControl().value().setReference(
-        headers.CacheControlValues.NoCacheMaxAge0);
-  }
-
-  // Under no circumstance should browsers sniff content-type.
-  header_map->addReference(headers.XContentTypeOptions, headers.XContentTypeOptionValues.Nosniff);
+  populateFallbackResponseHeaders(code, *header_map);
   callbacks_->encodeHeaders(std::move(header_map),
                             end_stream_on_complete_ && response.length() == 0);
 
@@ -990,6 +1063,24 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
     return true;
   }
   return false;
+}
+
+Http::Code AdminImpl::request(absl::string_view path, const Http::Utility::QueryParams& params,
+                              absl::string_view method, Http::HeaderMap& response_headers,
+                              std::string& body) {
+  AdminFilter filter(*this);
+  Http::HeaderMapImpl request_headers;
+  request_headers.insertMethod().value(method.data(), method.size());
+  filter.decodeHeaders(request_headers, false);
+  std::string path_and_query = absl::StrCat(path, Http::Utility::queryParamsToString(params));
+  Buffer::OwnedImpl response;
+
+  // TODO(jmarantz): rather than serializing params here and then re-parsing in the handler,
+  // change the callback signature to take the query-params separately.
+  Http::Code code = runCallback(path_and_query, response_headers, response, filter);
+  populateFallbackResponseHeaders(code, response_headers);
+  body = response.toString();
+  return code;
 }
 
 } // namespace Server

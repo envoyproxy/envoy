@@ -46,6 +46,8 @@ TEST(HttpUtility, isWebSocketUpgradeRequest) {
   EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(TestHeaderMapImpl{{"upgrade", "websocket"}}));
   EXPECT_FALSE(Utility::isWebSocketUpgradeRequest(
       TestHeaderMapImpl{{"Connection", "close"}, {"Upgrade", "websocket"}}));
+  EXPECT_FALSE(Utility::isUpgrade(
+      TestHeaderMapImpl{{"Connection", "IsNotAnUpgrade"}, {"Upgrade", "websocket"}}));
 
   EXPECT_TRUE(Utility::isWebSocketUpgradeRequest(
       TestHeaderMapImpl{{"Connection", "upgrade"}, {"Upgrade", "websocket"}}));
@@ -53,6 +55,23 @@ TEST(HttpUtility, isWebSocketUpgradeRequest) {
       TestHeaderMapImpl{{"connection", "upgrade"}, {"upgrade", "websocket"}}));
   EXPECT_TRUE(Utility::isWebSocketUpgradeRequest(
       TestHeaderMapImpl{{"connection", "Upgrade"}, {"upgrade", "WebSocket"}}));
+}
+
+TEST(HttpUtility, isUpgrade) {
+  EXPECT_FALSE(Utility::isUpgrade(TestHeaderMapImpl{}));
+  EXPECT_FALSE(Utility::isUpgrade(TestHeaderMapImpl{{"connection", "upgrade"}}));
+  EXPECT_FALSE(Utility::isUpgrade(TestHeaderMapImpl{{"upgrade", "foo"}}));
+  EXPECT_FALSE(Utility::isUpgrade(TestHeaderMapImpl{{"Connection", "close"}, {"Upgrade", "foo"}}));
+  EXPECT_FALSE(
+      Utility::isUpgrade(TestHeaderMapImpl{{"Connection", "IsNotAnUpgrade"}, {"Upgrade", "foo"}}));
+  EXPECT_FALSE(Utility::isUpgrade(
+      TestHeaderMapImpl{{"Connection", "Is Not An Upgrade"}, {"Upgrade", "foo"}}));
+
+  EXPECT_TRUE(Utility::isUpgrade(TestHeaderMapImpl{{"Connection", "upgrade"}, {"Upgrade", "foo"}}));
+  EXPECT_TRUE(Utility::isUpgrade(TestHeaderMapImpl{{"connection", "upgrade"}, {"upgrade", "foo"}}));
+  EXPECT_TRUE(Utility::isUpgrade(TestHeaderMapImpl{{"connection", "Upgrade"}, {"upgrade", "FoO"}}));
+  EXPECT_TRUE(Utility::isUpgrade(
+      TestHeaderMapImpl{{"connection", "keep-alive, Upgrade"}, {"upgrade", "FOO"}}));
 }
 
 TEST(HttpUtility, appendXff) {
@@ -388,6 +407,13 @@ TEST(HttpUtility, TestPrepareHeaders) {
 
   EXPECT_STREQ("/x/y/z", message->headers().Path()->value().c_str());
   EXPECT_STREQ("dns.name", message->headers().Host()->value().c_str());
+}
+
+TEST(HttpUtility, QueryParamsToString) {
+  EXPECT_EQ("", Utility::queryParamsToString(Utility::QueryParams({})));
+  EXPECT_EQ("?a=1", Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}})));
+  EXPECT_EQ("?a=1&b=2",
+            Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}, {"b", "2"}})));
 }
 
 } // namespace Http

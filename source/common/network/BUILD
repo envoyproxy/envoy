@@ -96,7 +96,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "lc_trie_lib",
-    srcs = ["lc_trie.cc"],
     hdrs = ["lc_trie.h"],
     external_deps = ["abseil_int128"],
     deps = [
@@ -215,6 +214,7 @@ envoy_cc_library(
         ":socket_option_lib",
         "//include/envoy/network:listen_socket_interface",
         "//source/common/common:logger_lib",
+        "@envoy_api//envoy/api/v2/core:address_cc",
     ],
 )
 

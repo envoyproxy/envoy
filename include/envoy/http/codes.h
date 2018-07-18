@@ -10,6 +10,7 @@ namespace Http {
 enum class Code {
   // clang-format off
   Continue                      = 100,
+  SwitchingProtocols            = 101,
 
   OK                            = 200,
   Created                       = 201,

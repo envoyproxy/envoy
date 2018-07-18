@@ -13,6 +13,7 @@ import argparse
 import httplib
 import json
 import os.path
+import re
 import sys
 import time
 
@@ -20,38 +21,56 @@ import time
 # with failure if the file is not found.
 ADMIN_FILE_TIMEOUT_SECS = 20
 
-def GenerateNewConfig(original_json, admin_address, updated_json):
+# Because the hot restart files are yaml but yaml support is not included in
+# python by default, we parse this fairly manually.
+def GenerateNewConfig(original_yaml, admin_address, updated_json):
   # Get original listener addresses
-  with open(original_json, 'r') as original_json_file:
-    # Import original config file in order to get a deterministic output. This
-    # allows us to diff the original config file and the updated config file
-    # output from this script to check for any changes.
-    parsed_json = json.load(original_json_file, object_pairs_hook=OrderedDict)
-  original_listeners = parsed_json['listeners']
-
-  sys.stdout.write('Admin address is ' + admin_address + '\n')
-  try:
-    admin_conn = httplib.HTTPConnection(admin_address)
-    admin_conn.request('GET', '/listeners')
-    admin_response = admin_conn.getresponse()
-    if not admin_response.status == 200:
+  with open(original_yaml, 'r') as original_file:
+    sys.stdout.write('Admin address is ' + admin_address + '\n')
+    try:
+      admin_conn = httplib.HTTPConnection(admin_address)
+      admin_conn.request('GET', '/listeners')
+      admin_response = admin_conn.getresponse()
+      if not admin_response.status == 200:
+        return False
+      discovered_listeners = json.loads(admin_response.read())
+    except Exception as e:
+      sys.stderr.write('Cannot connect to admin: %s\n' % e)
       return False
-    discovered_listeners = json.loads(admin_response.read())
-  except Exception as e:
-    sys.stderr.write('Cannot connect to admin: %s\n' % e)
-    return False
-  else:
-    if len(discovered_listeners) != len(original_listeners):
-      return False
-    for discovered, original in zip(discovered_listeners, original_listeners):
-      if discovered.startswith('/'):
-        original['address'] = 'unix://' + discovered
-      else:
-        original['address'] = 'tcp://' + discovered
-    with open(updated_json, 'w') as outfile:
-      json.dump(OrderedDict(parsed_json), outfile, indent=2, separators=(',',':'))
-  finally:
-    admin_conn.close()
+    else:
+      raw_yaml = original_file.readlines()
+      index = 0;
+      for discovered in discovered_listeners:
+        replaced = False;
+        if discovered.startswith('/'):
+          for index in range(index + 1, len(raw_yaml) - 1):
+            if 'pipe:' in raw_yaml[index] and 'path:' in raw_yaml[index + 1]:
+              raw_yaml[index + 1] = re.sub(
+                  'path:.*', 'path: "' + discovered + '"', raw_yaml[index + 1])
+              replaced = True
+              break
+        else:
+          addr, _, port = discovered.rpartition(':')
+          if addr[0] == '[':
+            addr = addr[1:-1]  # strip [] from ipv6 address.
+          for index in range(index + 1, len(raw_yaml) - 2):
+            if ('socket_address:' in raw_yaml[index] and 'address:' in raw_yaml[index + 1]
+                and'port_value:' in raw_yaml[index + 2]):
+              raw_yaml[index + 1] = re.sub(
+                  'address:.*', 'address: "' + addr + '"', raw_yaml[index + 1])
+              raw_yaml[index + 2] = re.sub(
+                  'port_value:.*', 'port_value: ' + port, raw_yaml[index + 2])
+              replaced = True
+              break
+        if replaced:
+          sys.stderr.write('replaced listener at line ' + str(index) + ' with ' + discovered + '\n')
+        else:
+          sys.stderr.write('Failed to replace a discovered listener ' + discovered + '\n')
+          return False;
+      with open(updated_json, 'w') as outfile:
+        outfile.writelines(raw_yaml)
+    finally:
+      admin_conn.close()
 
   return True
 

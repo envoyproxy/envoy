@@ -99,6 +99,11 @@ public:
    */
   virtual const std::list<std::string>& allowOrigins() const PURE;
 
+  /*
+   * @return std::list<std::regex>& regexes that match allowed origins.
+   */
+  virtual const std::list<std::regex>& allowOriginRegexes() const PURE;
+
   /**
    * @return std::string access-control-allow-methods value.
    */
@@ -468,6 +473,11 @@ public:
   virtual std::chrono::milliseconds timeout() const PURE;
 
   /**
+   * @return absl::optional<std::chrono::milliseconds> the route's idle timeout.
+   */
+  virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+
+  /**
    * @return absl::optional<std::chrono::milliseconds> the maximum allowed timeout value derived
    * from 'grpc-timeout' header of a gRPC request. Non-present value disables use of 'grpc-timeout'
    * header, while 0 represents infinity.
@@ -493,8 +503,11 @@ public:
 
   /**
    * @return bool true if this route should use WebSockets.
+   * Per https://github.com/envoyproxy/envoy/issues/3301 this is the "old style"
+   * websocket" where headers are proxied upstream unchanged, and the websocket
+   * is handed off to a tcp proxy session.
    */
-  virtual bool useWebSocket() const PURE;
+  virtual bool useOldStyleWebSocket() const PURE;
 
   /**
    * Create an instance of a WebSocketProxy, using the configuration in this route.

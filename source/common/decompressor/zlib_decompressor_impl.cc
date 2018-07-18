@@ -25,7 +25,7 @@ ZlibDecompressorImpl::ZlibDecompressorImpl(uint64_t chunk_size)
 void ZlibDecompressorImpl::init(int64_t window_bits) {
   ASSERT(initialized_ == false);
   const int result = inflateInit2(zstream_ptr_.get(), window_bits);
-  RELEASE_ASSERT(result >= 0);
+  RELEASE_ASSERT(result >= 0, "");
   initialized_ = true;
 }
 
@@ -70,7 +70,7 @@ bool ZlibDecompressorImpl::inflateNext() {
     return false; // This means that zlib needs more input, so stop here.
   }
 
-  RELEASE_ASSERT(result == Z_OK);
+  RELEASE_ASSERT(result == Z_OK, "");
   return true;
 }
 

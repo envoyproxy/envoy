@@ -90,6 +90,9 @@ private:
   struct NullCorsPolicy : public Router::CorsPolicy {
     // Router::CorsPolicy
     const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
+    const std::list<std::regex>& allowOriginRegexes() const override {
+      return allow_origin_regex_;
+    };
     const std::string& allowMethods() const override { return EMPTY_STRING; };
     const std::string& allowHeaders() const override { return EMPTY_STRING; };
     const std::string& exposeHeaders() const override { return EMPTY_STRING; };
@@ -98,6 +101,7 @@ private:
     bool enabled() const override { return false; };
 
     static const std::list<std::string> allow_origin_;
+    static const std::list<std::regex> allow_origin_regex_;
     static const absl::optional<bool> allow_credentials_;
   };
 
@@ -191,6 +195,7 @@ private:
         return std::chrono::milliseconds(0);
       }
     }
+    absl::optional<std::chrono::milliseconds> idleTimeout() const override { return absl::nullopt; }
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
       return absl::nullopt;
     }
@@ -202,12 +207,12 @@ private:
     }
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
-    bool useWebSocket() const override { return false; }
+    bool useOldStyleWebSocket() const override { return false; }
     Http::WebSocketProxyPtr createWebSocketProxy(Http::HeaderMap&, RequestInfo::RequestInfo&,
                                                  Http::WebSocketProxyCallbacks&,
                                                  Upstream::ClusterManager&,
                                                  Network::ReadFilterCallbacks*) const override {
-      NOT_IMPLEMENTED;
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
     bool includeVirtualHostRateLimits() const override { return true; }
     const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
@@ -262,8 +267,8 @@ private:
   RequestInfo::RequestInfo& requestInfo() override { return request_info_; }
   Tracing::Span& activeSpan() override { return active_span_; }
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
-  void continueDecoding() override { NOT_IMPLEMENTED; }
-  void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED; }
+  void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
   void sendLocalReply(Code code, const std::string& body,
                       std::function<void(HeaderMap& headers)> modify_headers) override {

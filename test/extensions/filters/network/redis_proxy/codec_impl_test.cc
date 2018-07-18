@@ -35,7 +35,7 @@ TEST_F(RedisEncoderDecoderImplTest, Null) {
   RespValue value;
   EXPECT_EQ("null", value.toString());
   encoder_.encode(value, buffer_);
-  EXPECT_EQ("$-1\r\n", TestUtility::bufferToString(buffer_));
+  EXPECT_EQ("$-1\r\n", buffer_.toString());
   decoder_.decode(buffer_);
   EXPECT_EQ(value, *decoded_values_[0]);
   EXPECT_EQ(0UL, buffer_.length());
@@ -47,7 +47,7 @@ TEST_F(RedisEncoderDecoderImplTest, Error) {
   value.asString() = "error";
   EXPECT_EQ("\"error\"", value.toString());
   encoder_.encode(value, buffer_);
-  EXPECT_EQ("-error\r\n", TestUtility::bufferToString(buffer_));
+  EXPECT_EQ("-error\r\n", buffer_.toString());
   decoder_.decode(buffer_);
   EXPECT_EQ(value, *decoded_values_[0]);
   EXPECT_EQ(0UL, buffer_.length());
@@ -59,7 +59,7 @@ TEST_F(RedisEncoderDecoderImplTest, SimpleString) {
   value.asString() = "simple string";
   EXPECT_EQ("\"simple string\"", value.toString());
   encoder_.encode(value, buffer_);
-  EXPECT_EQ("+simple string\r\n", TestUtility::bufferToString(buffer_));
+  EXPECT_EQ("+simple string\r\n", buffer_.toString());
   decoder_.decode(buffer_);
   EXPECT_EQ(value, *decoded_values_[0]);
   EXPECT_EQ(0UL, buffer_.length());
@@ -71,7 +71,7 @@ TEST_F(RedisEncoderDecoderImplTest, Integer) {
   value.asInteger() = std::numeric_limits<int64_t>::max();
   EXPECT_EQ("9223372036854775807", value.toString());
   encoder_.encode(value, buffer_);
-  EXPECT_EQ(":9223372036854775807\r\n", TestUtility::bufferToString(buffer_));
+  EXPECT_EQ(":9223372036854775807\r\n", buffer_.toString());
   decoder_.decode(buffer_);
   EXPECT_EQ(value, *decoded_values_[0]);
   EXPECT_EQ(0UL, buffer_.length());
@@ -82,7 +82,7 @@ TEST_F(RedisEncoderDecoderImplTest, NegativeIntegerSmall) {
   value.type(RespType::Integer);
   value.asInteger() = -1;
   encoder_.encode(value, buffer_);
-  EXPECT_EQ(":-1\r\n", TestUtility::bufferToString(buffer_));
+  EXPECT_EQ(":-1\r\n", buffer_.toString());
   decoder_.decode(buffer_);
   EXPECT_EQ(value, *decoded_values_[0]);
   EXPECT_EQ(0UL, buffer_.length());
@@ -93,7 +93,7 @@ TEST_F(RedisEncoderDecoderImplTest, NegativeIntegerLarge) {
   value.type(RespType::Integer);
   value.asInteger() = std::numeric_limits<int64_t>::min();
   encoder_.encode(value, buffer_);
-  EXPECT_EQ(":-9223372036854775808\r\n", TestUtility::bufferToString(buffer_));
+  EXPECT_EQ(":-9223372036854775808\r\n", buffer_.toString());
   decoder_.decode(buffer_);
   EXPECT_EQ(value, *decoded_values_[0]);
   EXPECT_EQ(0UL, buffer_.length());
@@ -104,7 +104,7 @@ TEST_F(RedisEncoderDecoderImplTest, EmptyArray) {
   value.type(RespType::Array);
   EXPECT_EQ("[]", value.toString());
   encoder_.encode(value, buffer_);
-  EXPECT_EQ("*0\r\n", TestUtility::bufferToString(buffer_));
+  EXPECT_EQ("*0\r\n", buffer_.toString());
   decoder_.decode(buffer_);
   EXPECT_EQ(value, *decoded_values_[0]);
   EXPECT_EQ(0UL, buffer_.length());
@@ -122,7 +122,7 @@ TEST_F(RedisEncoderDecoderImplTest, Array) {
   value.asArray().swap(values);
   EXPECT_EQ("[\"hello\", -5]", value.toString());
   encoder_.encode(value, buffer_);
-  EXPECT_EQ("*2\r\n$5\r\nhello\r\n:-5\r\n", TestUtility::bufferToString(buffer_));
+  EXPECT_EQ("*2\r\n$5\r\nhello\r\n:-5\r\n", buffer_.toString());
   decoder_.decode(buffer_);
   EXPECT_EQ(value, *decoded_values_[0]);
   EXPECT_EQ(0UL, buffer_.length());
@@ -145,11 +145,10 @@ TEST_F(RedisEncoderDecoderImplTest, NestedArray) {
   value.type(RespType::Array);
   value.asArray().swap(values);
   encoder_.encode(value, buffer_);
-  EXPECT_EQ("*2\r\n*3\r\n$5\r\nhello\r\n:0\r\n$-1\r\n$5\r\nworld\r\n",
-            TestUtility::bufferToString(buffer_));
+  EXPECT_EQ("*2\r\n*3\r\n$5\r\nhello\r\n:0\r\n$-1\r\n$5\r\nworld\r\n", buffer_.toString());
 
   // To test partial decode we will feed the buffer in 1 char at a time.
-  for (char c : TestUtility::bufferToString(buffer_)) {
+  for (char c : buffer_.toString()) {
     Buffer::OwnedImpl temp_buffer(&c, 1);
     decoder_.decode(temp_buffer);
     EXPECT_EQ(0UL, temp_buffer.length());

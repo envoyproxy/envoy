@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/grpc/status.h"
 
@@ -27,12 +28,14 @@ public:
    * @param runtime supplies the runtime loader.
    * @param random supplies the random generator.
    * @param dispatcher supplies the dispatcher.
+   * @param event_logger supplies the event_logger.
    * @return a health checker.
    */
   static HealthCheckerSharedPtr create(const envoy::api::v2::core::HealthCheck& hc_config,
                                        Upstream::Cluster& cluster, Runtime::Loader& runtime,
                                        Runtime::RandomGenerator& random,
-                                       Event::Dispatcher& dispatcher);
+                                       Event::Dispatcher& dispatcher,
+                                       AccessLog::AccessLogManager& log_manager);
 };
 
 /**
@@ -42,7 +45,7 @@ class HttpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   HttpHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Runtime::RandomGenerator& random);
+                        Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
 private:
   struct HttpActiveHealthCheckSession : public ActiveHealthCheckSession,
@@ -104,6 +107,9 @@ private:
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
     return std::make_unique<HttpActiveHealthCheckSession>(*this, host);
+  }
+  envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const override {
+    return envoy::data::core::v2alpha::HealthCheckerType::HTTP;
   }
 
   Http::CodecClient::Type codecClientType(bool use_http2);
@@ -187,7 +193,7 @@ class TcpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   TcpHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                        Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                       Runtime::RandomGenerator& random);
+                       Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
 private:
   struct TcpActiveHealthCheckSession;
@@ -233,6 +239,9 @@ private:
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
     return std::make_unique<TcpActiveHealthCheckSession>(*this, host);
   }
+  envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const override {
+    return envoy::data::core::v2alpha::HealthCheckerType::TCP;
+  }
 
   const TcpHealthCheckMatcher::MatchSegments send_bytes_;
   const TcpHealthCheckMatcher::MatchSegments receive_bytes_;
@@ -245,7 +254,7 @@ class GrpcHealthCheckerImpl : public HealthCheckerImplBase {
 public:
   GrpcHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                        Runtime::RandomGenerator& random);
+                        Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
 private:
   struct GrpcActiveHealthCheckSession : public ActiveHealthCheckSession,
@@ -319,6 +328,9 @@ private:
   // HealthCheckerImplBase
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
     return std::make_unique<GrpcActiveHealthCheckSession>(*this, host);
+  }
+  envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const override {
+    return envoy::data::core::v2alpha::HealthCheckerType::GRPC;
   }
 
   const Protobuf::MethodDescriptor& service_method_;

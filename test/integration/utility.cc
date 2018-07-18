@@ -36,13 +36,15 @@ void BufferingStreamDecoder::decodeHeaders(Http::HeaderMapPtr&& headers, bool en
 void BufferingStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!complete_);
   complete_ = end_stream;
-  body_.append(TestUtility::bufferToString(data));
+  body_.append(data.toString());
   if (complete_) {
     onComplete();
   }
 }
 
-void BufferingStreamDecoder::decodeTrailers(Http::HeaderMapPtr&&) { NOT_IMPLEMENTED; }
+void BufferingStreamDecoder::decodeTrailers(Http::HeaderMapPtr&&) {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
 
 void BufferingStreamDecoder::onComplete() {
   ASSERT(complete_);
@@ -125,7 +127,7 @@ WaitForPayloadReader::WaitForPayloadReader(Event::Dispatcher& dispatcher)
     : dispatcher_(dispatcher) {}
 
 Network::FilterStatus WaitForPayloadReader::onData(Buffer::Instance& data, bool end_stream) {
-  data_.append(TestUtility::bufferToString(data));
+  data_.append(data.toString());
   data.drain(data.length());
   read_end_stream_ = end_stream;
   if ((!data_to_wait_for_.empty() && data_.find(data_to_wait_for_) == 0) ||

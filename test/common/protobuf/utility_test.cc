@@ -211,6 +211,12 @@ TEST(UtilityTest, JsonConvertSuccess) {
   EXPECT_EQ(42, dest_duration.seconds());
 }
 
+TEST(UtilityTest, JsonConvertUnknownFieldSuccess) {
+  const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  EXPECT_NO_THROW(MessageUtil::jsonConvert(obj, bootstrap));
+}
+
 TEST(UtilityTest, JsonConvertFail) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(-281474976710656);

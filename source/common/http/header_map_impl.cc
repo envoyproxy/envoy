@@ -91,7 +91,7 @@ void HeaderString::append(const char* data, uint32_t size) {
       const uint64_t new_capacity = (static_cast<uint64_t>(string_length_) + size) * 2;
       // If the resizing will cause buffer overflow due to hitting uint32_t::max, an OOM is likely
       // imminent. Fast-fail rather than allow a buffer overflow attack (issue #1421)
-      RELEASE_ASSERT(new_capacity <= std::numeric_limits<uint32_t>::max());
+      RELEASE_ASSERT(new_capacity <= std::numeric_limits<uint32_t>::max(), "");
       buffer_.dynamic_ = static_cast<char*>(malloc(new_capacity));
       memcpy(buffer_.dynamic_, inline_buffer_, string_length_);
       dynamic_capacity_ = new_capacity;

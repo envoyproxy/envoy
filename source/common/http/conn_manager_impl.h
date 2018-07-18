@@ -150,7 +150,7 @@ private:
     Buffer::WatermarkBufferPtr createBuffer() override;
     Buffer::WatermarkBufferPtr& bufferedData() override { return parent_.buffered_request_data_; }
     bool complete() override { return parent_.state_.remote_complete_; }
-    void do100ContinueHeaders() override { NOT_REACHED; }
+    void do100ContinueHeaders() override { NOT_REACHED_GCOVR_EXCL_LINE; }
     void doHeaders(bool end_stream) override {
       parent_.decodeHeaders(this, *parent_.request_headers_, end_stream);
     }
@@ -287,7 +287,7 @@ private:
     void onBelowWriteBufferLowWatermark() override;
 
     // Http::StreamDecoder
-    void decode100ContinueHeaders(HeaderMapPtr&&) override { NOT_REACHED; }
+    void decode100ContinueHeaders(HeaderMapPtr&&) override { NOT_REACHED_GCOVR_EXCL_LINE; }
     void decodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
     void decodeData(Buffer::Instance& data, bool end_stream) override;
     void decodeTrailers(HeaderMapPtr&& trailers) override;
@@ -360,6 +360,12 @@ private:
 
     // Possibly increases buffer_limit_ to the value of limit.
     void setBufferLimit(uint32_t limit);
+    // Set up the Encoder/Decoder filter chain.
+    bool createFilterChain();
+    // Per-stream idle timeout callback.
+    void onIdleTimeout();
+    // Reset per-stream idle timer.
+    void resetIdleTimer();
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
@@ -377,6 +383,9 @@ private:
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
     Stats::TimespanPtr request_timer_;
+    // Per-stream idle timeout.
+    Event::TimerPtr idle_timer_;
+    std::chrono::milliseconds idle_timeout_ms_{};
     State state_;
     RequestInfo::RequestInfoImpl request_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
@@ -413,7 +422,7 @@ private:
   void onDrainTimeout();
   void startDrainSequence();
 
-  bool isWebSocketConnection() const { return ws_connection_ != nullptr; }
+  bool isOldStyleWebSocketConnection() const { return ws_connection_ != nullptr; }
 
   enum class DrainState { NotDraining, Draining, Closing };
 

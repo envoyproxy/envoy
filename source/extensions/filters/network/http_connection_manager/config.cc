@@ -28,6 +28,22 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace HttpConnectionManager {
+namespace {
+
+typedef std::list<Http::FilterFactoryCb> FilterFactoriesList;
+typedef std::map<std::string, std::unique_ptr<FilterFactoriesList>> FilterFactoryMap;
+
+FilterFactoryMap::const_iterator findUpgradeCaseInsensitive(const FilterFactoryMap& upgrade_map,
+                                                            absl::string_view upgrade_type) {
+  for (auto it = upgrade_map.begin(); it != upgrade_map.end(); ++it) {
+    if (StringUtil::CaseInsensitiveCompare()(it->first, upgrade_type)) {
+      return it;
+    }
+  }
+  return upgrade_map.end();
+}
+
+} // namespace
 
 // Singleton registration via macro defined in envoy/singleton/manager.h
 SINGLETON_MANAGER_REGISTRATION(date_provider);
@@ -68,7 +84,8 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
 Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
     const Json::Object& json_config, Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager proto_config;
-  Config::FilterJson::translateHttpConnectionManager(json_config, proto_config);
+  Config::FilterJson::translateHttpConnectionManager(json_config, proto_config,
+                                                     context.scope().statsOptions());
   return createFilterFactoryFromProtoTyped(proto_config, context);
 }
 
@@ -143,7 +160,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     forward_client_cert_ = Http::ForwardClientCertType::AlwaysForwardOnly;
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const auto& set_current_client_cert_details = config.set_current_client_cert_details();
@@ -152,9 +169,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, subject, false)) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
-  }
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, san, false)) {
-    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::SAN);
   }
   if (set_current_client_cert_details.uri()) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::URI);
@@ -183,15 +197,23 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       tracing_operation_name = Tracing::OperationName::Egress;
       break;
     default:
-      NOT_REACHED;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
     for (const std::string& header : tracing_config.request_headers_for_tags()) {
       request_headers_for_tags.push_back(Http::LowerCaseString(header));
     }
 
+    uint64_t client_sampling{
+        PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing_config, client_sampling, 100, 100)};
+    uint64_t random_sampling{PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+        tracing_config, random_sampling, 10000, 10000)};
+    uint64_t overall_sampling{
+        PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(tracing_config, overall_sampling, 100, 100)};
+
     tracing_config_.reset(new Http::TracingConnectionManagerConfig(
-        {tracing_operation_name, request_headers_for_tags}));
+        {tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
+         overall_sampling}));
   }
 
   if (config.has_idle_timeout()) {
@@ -221,36 +243,60 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     codec_type_ = CodecType::HTTP2;
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const auto& filters = config.http_filters();
   for (int32_t i = 0; i < filters.size(); i++) {
-    const ProtobufTypes::String& string_name = filters[i].name();
-    const auto& proto_config = filters[i];
-
-    ENVOY_LOG(debug, "    filter #{}", i);
-    ENVOY_LOG(debug, "      name: {}", string_name);
-
-    const Json::ObjectSharedPtr filter_config =
-        MessageUtil::getJsonObjectFromMessage(proto_config.config());
-    ENVOY_LOG(debug, "    config: {}", filter_config->asJsonString());
-
-    // Now see if there is a factory that will accept the config.
-    auto& factory =
-        Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-            string_name);
-    Http::FilterFactoryCb callback;
-    if (filter_config->getBoolean("deprecated_v1", false)) {
-      callback = factory.createFilterFactory(*filter_config->getObject("value", true),
-                                             stats_prefix_, context);
-    } else {
-      ProtobufTypes::MessagePtr message =
-          Config::Utility::translateToFactoryConfig(proto_config, factory);
-      callback = factory.createFilterFactoryFromProto(*message, stats_prefix_, context);
-    }
-    filter_factories_.push_back(callback);
+    processFilter(filters[i], i, "http", filter_factories_);
   }
+
+  for (auto upgrade_config : config.upgrade_configs()) {
+    const std::string& name = upgrade_config.upgrade_type();
+    if (findUpgradeCaseInsensitive(upgrade_filter_factories_, name) !=
+        upgrade_filter_factories_.end()) {
+      throw EnvoyException(
+          fmt::format("Error: multiple upgrade configs with the same name: '{}'", name));
+    }
+    if (upgrade_config.filters().size() > 0) {
+      std::unique_ptr<FilterFactoriesList> factories = std::make_unique<FilterFactoriesList>();
+      for (int32_t i = 0; i < upgrade_config.filters().size(); i++) {
+        processFilter(upgrade_config.filters(i), i, name, *factories);
+      }
+      upgrade_filter_factories_.emplace(std::make_pair(name, std::move(factories)));
+    } else {
+      std::unique_ptr<FilterFactoriesList> factories(nullptr);
+      upgrade_filter_factories_.emplace(std::make_pair(name, std::move(factories)));
+    }
+  }
+}
+
+void HttpConnectionManagerConfig::processFilter(
+    const envoy::config::filter::network::http_connection_manager::v2::HttpFilter& proto_config,
+    int i, absl::string_view prefix, std::list<Http::FilterFactoryCb>& filter_factories) {
+  const ProtobufTypes::String& string_name = proto_config.name();
+
+  ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
+  ENVOY_LOG(debug, "      name: {}", string_name);
+
+  const Json::ObjectSharedPtr filter_config =
+      MessageUtil::getJsonObjectFromMessage(proto_config.config());
+  ENVOY_LOG(debug, "    config: {}", filter_config->asJsonString());
+
+  // Now see if there is a factory that will accept the config.
+  auto& factory =
+      Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
+          string_name);
+  Http::FilterFactoryCb callback;
+  if (filter_config->getBoolean("deprecated_v1", false)) {
+    callback = factory.createFilterFactory(*filter_config->getObject("value", true), stats_prefix_,
+                                           context_);
+  } else {
+    ProtobufTypes::MessagePtr message =
+        Config::Utility::translateToFactoryConfig(proto_config, factory);
+    callback = factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
+  }
+  filter_factories.push_back(callback);
 }
 
 Http::ServerConnectionPtr
@@ -275,13 +321,31 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     }
   }
 
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {
   for (const Http::FilterFactoryCb& factory : filter_factories_) {
     factory(callbacks);
   }
+}
+
+bool HttpConnectionManagerConfig::createUpgradeFilterChain(
+    absl::string_view upgrade_type, Http::FilterChainFactoryCallbacks& callbacks) {
+  auto it = findUpgradeCaseInsensitive(upgrade_filter_factories_, upgrade_type);
+  if (it != upgrade_filter_factories_.end()) {
+    FilterFactoriesList* filters_to_use = nullptr;
+    if (it->second != nullptr) {
+      filters_to_use = it->second.get();
+    } else {
+      filters_to_use = &filter_factories_;
+    }
+    for (const Http::FilterFactoryCb& factory : *filters_to_use) {
+      factory(callbacks);
+    }
+    return true;
+  }
+  return false;
 }
 
 const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {

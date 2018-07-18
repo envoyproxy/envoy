@@ -38,6 +38,7 @@ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderS
 
 ConnectionImpl::Http2Callbacks ConnectionImpl::http2_callbacks_;
 ConnectionImpl::Http2Options ConnectionImpl::http2_options_;
+ConnectionImpl::ClientHttp2Options ConnectionImpl::client_http2_options_;
 
 /**
  * Helper to remove const during a cast. nghttp2 takes non-const pointers for headers even though
@@ -410,7 +411,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
     default:
       // We do not currently support push.
-      NOT_IMPLEMENTED;
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
 
     stream->headers_.reset();
@@ -735,12 +736,21 @@ ConnectionImpl::Http2Options::Http2Options() {
 
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
 
+ConnectionImpl::ClientHttp2Options::ClientHttp2Options() : Http2Options() {
+  // Temporarily disable initial max streams limit/protection, since we might want to create
+  // more than 100 streams before receiving the HTTP/2 SETTINGS frame from the server.
+  //
+  // TODO(PiotrSikora): remove this once multiple upstream connections or queuing are implemented.
+  nghttp2_option_set_peer_max_concurrent_streams(options_,
+                                                 Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
+}
+
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
                                            Http::ConnectionCallbacks& callbacks,
                                            Stats::Scope& stats, const Http2Settings& http2_settings)
     : ConnectionImpl(connection, stats, http2_settings), callbacks_(callbacks) {
   nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
-                              http2_options_.options());
+                              client_http2_options_.options());
   sendSettings(http2_settings, true);
 }
 
@@ -759,9 +769,10 @@ Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
 
 int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   // The client code explicitly does not currently suport push promise.
-  RELEASE_ASSERT(frame->hd.type == NGHTTP2_HEADERS);
+  RELEASE_ASSERT(frame->hd.type == NGHTTP2_HEADERS, "");
   RELEASE_ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE ||
-                 frame->headers.cat == NGHTTP2_HCAT_HEADERS);
+                     frame->headers.cat == NGHTTP2_HCAT_HEADERS,
+                 "");
   if (frame->headers.cat == NGHTTP2_HCAT_HEADERS) {
     StreamImpl* stream = getStream(frame->hd.stream_id);
     ASSERT(!stream->headers_);
