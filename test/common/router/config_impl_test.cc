@@ -4383,7 +4383,6 @@ virtual_hosts:
       - match: { regex: "/regex"}
         route:
           cluster: some-cluster
-          idle_timeout: 0s
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
@@ -4393,9 +4392,9 @@ virtual_hosts:
   EXPECT_EQ(absl::nullopt, route_entry->idleTimeout());
 }
 
-TEST(RouteConfigurationV2, DefaultIdleTimeout) {
-  const std::string DefaultIdleTimeot = R"EOF(
-name: NoIdleTimeout
+TEST(RouteConfigurationV2, ZeroIdleTimeout) {
+  const std::string ZeroIdleTimeot = R"EOF(
+name: ZeroIdleTimeout
 virtual_hosts:
   - name: regex
     domains: [idle.lyft.com]
@@ -4403,18 +4402,19 @@ virtual_hosts:
       - match: { regex: "/regex"}
         route:
           cluster: some-cluster
+          idle_timeout: 0s
   )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  ConfigImpl config(parseRouteConfigurationFromV2Yaml(DefaultIdleTimeot), factory_context, true);
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(ZeroIdleTimeot), factory_context, true);
   Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
   const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
-  EXPECT_EQ(5 * 60 * 1000, route_entry->idleTimeout().value().count());
+  EXPECT_EQ(0, route_entry->idleTimeout().value().count());
 }
 
 TEST(RouteConfigurationV2, ExplicitIdleTimeout) {
   const std::string ExplicitIdleTimeot = R"EOF(
-name: NoIdleTimeout
+name: ExplicitIdleTimeout
 virtual_hosts:
   - name: regex
     domains: [idle.lyft.com]

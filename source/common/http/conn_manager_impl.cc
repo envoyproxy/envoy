@@ -370,8 +370,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   request_info_.setDownstreamRemoteAddress(
       connection_manager_.read_callbacks_->connection().remoteAddress());
 
-  if (connection_manager_.config_.streamIdleTimeout()) {
-    idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout().value();
+  if (connection_manager_.config_.streamIdleTimeout().count()) {
+    idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
     idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onIdleTimeout(); });
     resetIdleTimer();
@@ -612,9 +612,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     if (route_entry != nullptr && route_entry->idleTimeout()) {
       idle_timeout_ms_ = route_entry->idleTimeout().value();
-      if (idle_timer_ == nullptr) {
-        idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
-            [this]() -> void { onIdleTimeout(); });
+      if (idle_timeout_ms_.count()) {
+        if (idle_timer_ == nullptr) {
+          idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+              [this]() -> void { onIdleTimeout(); });
+        }
+      } else if (idle_timer_ != nullptr) {
+        idle_timer_->disableTimer();
+        idle_timer_ = nullptr;
       }
     }
   }
