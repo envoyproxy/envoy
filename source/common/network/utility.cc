@@ -98,7 +98,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string&
     return std::make_shared<Address::Ipv6Instance>(sa6, v6only);
   }
   throwWithMalformedIp(ip_address);
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::string& ip_address,
@@ -250,7 +250,7 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
     absl::uint128 addr = address.ip()->ipv6()->address();
     return 0 == memcmp(&addr, &in6addr_loopback, sizeof(in6addr_loopback));
   }
-  NOT_IMPLEMENTED;
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
 Address::InstanceConstSharedPtr Utility::getCanonicalIpv4LoopbackAddress() {
@@ -285,7 +285,7 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
   case Network::Address::IpVersion::v6:
     return std::make_shared<Address::Ipv6Instance>(address.ip()->addressAsString(), port);
   }
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
@@ -384,7 +384,7 @@ Utility::protobufAddressToAddress(const envoy::api::v2::core::Address& proto_add
   case envoy::api::v2::core::Address::kPipe:
     return std::make_shared<Address::PipeInstance>(proto_address.pipe().path());
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

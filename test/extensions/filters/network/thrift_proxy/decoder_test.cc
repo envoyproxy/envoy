@@ -88,7 +88,7 @@ ExpectationSet expectValue(MockProtocol& proto, ThriftFilters::MockDecoderFilter
     }
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   return s;
 }
@@ -126,7 +126,7 @@ ExpectationSet expectContainerStart(MockProtocol& proto, ThriftFilters::MockDeco
              .WillOnce(Return(ThriftFilters::FilterStatus::Continue));
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   return s;
 }
@@ -156,7 +156,7 @@ ExpectationSet expectContainerEnd(MockProtocol& proto, ThriftFilters::MockDecode
     s += EXPECT_CALL(filter, setEnd()).WillOnce(Return(ThriftFilters::FilterStatus::Continue));
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   return s;
 }

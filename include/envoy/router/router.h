@@ -473,6 +473,11 @@ public:
   virtual std::chrono::milliseconds timeout() const PURE;
 
   /**
+   * @return absl::optional<std::chrono::milliseconds> the route's idle timeout.
+   */
+  virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+
+  /**
    * @return absl::optional<std::chrono::milliseconds> the maximum allowed timeout value derived
    * from 'grpc-timeout' header of a gRPC request. Non-present value disables use of 'grpc-timeout'
    * header, while 0 represents infinity.

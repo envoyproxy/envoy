@@ -70,10 +70,6 @@ Http::FilterHeadersStatus CorsFilter::decodeHeaders(Http::HeaderMap& headers, bo
     response_headers->insertAccessControlAllowHeaders().value(allowHeaders());
   }
 
-  if (!exposeHeaders().empty()) {
-    response_headers->insertAccessControlExposeHeaders().value(exposeHeaders());
-  }
-
   if (!maxAge().empty()) {
     response_headers->insertAccessControlMaxAge().value(maxAge());
   }
@@ -93,6 +89,10 @@ Http::FilterHeadersStatus CorsFilter::encodeHeaders(Http::HeaderMap& headers, bo
   headers.insertAccessControlAllowOrigin().value(*origin_);
   if (allowCredentials()) {
     headers.insertAccessControlAllowCredentials().value(Http::Headers::get().CORSValues.True);
+  }
+
+  if (!exposeHeaders().empty()) {
+    headers.insertAccessControlExposeHeaders().value(exposeHeaders());
   }
 
   return Http::FilterHeadersStatus::Continue;

@@ -170,7 +170,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
 
   ClientContextConfigImpl client_ctx_config(client_ctx_proto, secret_manager);
   ClientSslSocketFactory client_ssl_socket_factory(client_ctx_config, manager, stats_store);
-  ClientContextPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
+  ClientContextSharedPtr client_ctx(manager.createSslClientContext(stats_store, client_ctx_config));
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
       client_ssl_socket_factory.createTransportSocket(), nullptr);
@@ -2754,7 +2754,7 @@ public:
   Network::ListenerPtr listener_;
   Json::ObjectSharedPtr client_ctx_loader_;
   std::unique_ptr<ClientContextConfigImpl> client_ctx_config_;
-  ClientContextPtr client_ctx_;
+  ClientContextSharedPtr client_ctx_;
   Network::TransportSocketFactoryPtr client_ssl_socket_factory_;
   Network::ClientConnectionPtr client_connection_;
   Network::ConnectionPtr server_connection_;

@@ -323,7 +323,7 @@ public:
 
   // Http::ServerConnectionCallbacks
   Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder) override;
-  void onGoAway() override { NOT_IMPLEMENTED; }
+  void onGoAway() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
@@ -427,10 +427,12 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
 
+  // Stops the dispatcher loop and joins the listening thread.
+  void cleanUp();
+
 protected:
   Stats::IsolatedStoreImpl stats_store_;
   const FakeHttpConnection::Type http_type_;
-  void cleanUp();
 
 private:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
