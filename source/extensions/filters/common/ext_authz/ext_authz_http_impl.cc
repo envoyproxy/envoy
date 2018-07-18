@@ -44,14 +44,15 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
 
   Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>(*getZeroContentLengthHeader());
   for (const auto& header : request.attributes().request().http().headers()) {
-
     const Http::LowerCaseString key{header.first};
-    if (key == Http::Headers::get().Path && !path_prefix_.empty()) {
-      std::string value;
-      absl::StrAppend(&value, path_prefix_, header.second);
-      headers->addCopy(key, value);
-    } else {
-      headers->addCopy(key, header.second);
+    if (key != Http::Headers::get().ContentLength) {
+      if (key == Http::Headers::get().Path && !path_prefix_.empty()) {
+        std::string value;
+        absl::StrAppend(&value, path_prefix_, header.second);
+        headers->addCopy(key, value);
+      } else {
+        headers->addCopy(key, header.second);
+      }
     }
   }
 

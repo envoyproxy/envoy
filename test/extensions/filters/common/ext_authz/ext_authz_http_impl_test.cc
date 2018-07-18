@@ -67,7 +67,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   client_.onSuccess(std::move(check_response));
 }
 
-// Test the client when an request contains path to be re-written and ok response is received.
+// Test the client when a request contains path to be re-written and ok response is received.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
   const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
@@ -82,6 +82,36 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
 
+  client_.onSuccess(std::move(check_response));
+}
+
+// Test the client when a request contains Content-Length greater than 0.
+TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZero) {
+  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
+  const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
+  auto check_response = TestCommon::makeMessageResponse(expected_headers);
+
+  envoy::service::auth::v2alpha::CheckRequest request{};
+  auto mutable_headers =
+      request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
+  (*mutable_headers)[std::string{"content-length"}] = std::string{"47"};
+  (*mutable_headers)[std::string{":method"}] = std::string{"POST"};
+
+  EXPECT_CALL(async_client_, send_(_, _, _))
+      .WillOnce(Invoke(
+          [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks&,
+              const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+            const auto* length_header_entry =
+                message->headers().get(Http::Headers::get().ContentLength);
+            EXPECT_EQ(length_header_entry->value().getStringView(), "0");
+            const auto* method_header_entry = message->headers().get(Http::Headers::get().Method);
+            EXPECT_EQ(method_header_entry->value().getStringView(), "POST");
+            return nullptr;
+          }));
+
+  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
   client_.onSuccess(std::move(check_response));
 }
 
