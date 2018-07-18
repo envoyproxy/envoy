@@ -128,7 +128,7 @@ TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
               ContainerEq(config.tracingConfig()->request_headers_for_tags_));
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
   EXPECT_EQ("foo", config.serverName());
-  EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().value().count());
+  EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
 }
 
 // Validated that an explicit zero stream idle timeout disables.
@@ -144,7 +144,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_);
-  EXPECT_FALSE(config.streamIdleTimeout());
+  EXPECT_EQ(0, config.streamIdleTimeout().count());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
