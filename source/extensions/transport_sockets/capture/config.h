@@ -17,7 +17,7 @@ class CaptureSocketConfigFactory
     : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
   virtual ~CaptureSocketConfigFactory() {}
-  std::string name() const override { return TransportSocketNames::get().CAPTURE; }
+  std::string name() const override { return TransportSocketNames::get().Capture; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 };
 

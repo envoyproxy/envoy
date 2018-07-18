@@ -73,7 +73,7 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
             hc_config.has_redis_health_check()
-                ? Extensions::HealthCheckers::HealthCheckerNames::get().REDIS_HEALTH_CHECKER
+                ? Extensions::HealthCheckers::HealthCheckerNames::get().RedisHealthChecker
                 : std::string(hc_config.custom_health_check().name()));
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher,

@@ -342,7 +342,7 @@ void RdsJson::translateRoute(const Json::Object& json_route, envoy::api::v2::rou
     const Json::ObjectSharedPtr obj = json_route.getObject("opaque_config");
     auto& filter_metadata =
         (*route.mutable_metadata()
-              ->mutable_filter_metadata())[Extensions::HttpFilters::HttpFilterNames::get().ROUTER];
+              ->mutable_filter_metadata())[Extensions::HttpFilters::HttpFilterNames::get().Router];
     obj->iterate([&filter_metadata](const std::string& name, const Json::Object& value) {
       (*filter_metadata.mutable_fields())[name].set_string_value(value.asString());
       return true;
