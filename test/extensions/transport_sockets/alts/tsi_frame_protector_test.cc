@@ -25,7 +25,8 @@ using namespace std::string_literals;
  */
 class TsiFrameProtectorTest : public Test {
 public:
-  TsiFrameProtectorTest() : frame_protector_({tsi_create_fake_frame_protector(nullptr)}) {}
+  TsiFrameProtectorTest()
+      : frame_protector_(CFrameProtectorPtr{tsi_create_fake_frame_protector(nullptr)}) {}
 
 protected:
   TsiFrameProtector frame_protector_;

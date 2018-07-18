@@ -32,6 +32,8 @@ tsi_result TsiFrameProtector::protect(Buffer::Instance& input, Buffer::Instance&
     input.drain(processed_message_size);
   }
 
+  // TSI may buffer some of the input in its internal, flushing its buffer to protected_buffer to
+  // avoid some of input is not written to socket.
   size_t still_pending_size;
   do {
     size_t protected_buffer_size = BUFFER_SIZE;
