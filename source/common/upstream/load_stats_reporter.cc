@@ -41,8 +41,8 @@ void LoadStatsReporter::establishNewStream() {
 
 void LoadStatsReporter::sendLoadStatsRequest() {
   request_.mutable_cluster_stats()->Clear();
-  for (const auto& cluster_timestamp : clusters_) {
-    const std::string& cluster_name = cluster_timestamp.first;
+  for (const auto& cluster_name_and_timestamp : clusters_) {
+    const std::string& cluster_name = cluster_name_and_timestamp.first;
     auto cluster_info_map = cm_.clusters();
     auto it = cluster_info_map.find(cluster_name);
     if (it == cluster_info_map.end()) {
@@ -77,7 +77,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     cluster_stats->set_total_dropped_requests(
         cluster.info()->loadReportStats().upstream_rq_dropped_.latch());
     const auto now = time_source_.currentTime().time_since_epoch();
-    const auto measured_interval = now - cluster_timestamp.second;
+    const auto measured_interval = now - cluster_name_and_timestamp.second;
     cluster_stats->mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(
             std::chrono::duration_cast<std::chrono::microseconds>(measured_interval).count()));
@@ -120,7 +120,8 @@ void LoadStatsReporter::onReceiveMessage(
 void LoadStatsReporter::startLoadReportPeriod() {
   // Once a cluster is tracked, we don't want to reset its stats between reports
   // to avoid racing between request/response.
-  std::unordered_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
+  std::unordered_map<absl::string_view, std::chrono::steady_clock::duration, StringViewHash>
+      existing_clusters;
   for (const std::string& cluster_name : message_->clusters()) {
     if (clusters_.count(cluster_name) > 0) {
       existing_clusters.emplace(cluster_name, clusters_[cluster_name]);

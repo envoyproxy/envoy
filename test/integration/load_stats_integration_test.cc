@@ -223,9 +223,9 @@ public:
       for (auto& cluster_stats : *local_loadstats_request.mutable_cluster_stats()) {
         const uint32_t actual_load_report_interval_ms =
             Protobuf::util::TimeUtil::DurationToMilliseconds(cluster_stats.load_report_interval());
-        // Turns out libevent timers aren't that accurate; without this
-        // adjustment we see things like "expected 500, actual 497".
-        EXPECT_GE(actual_load_report_interval_ms, load_report_interval_ms_ - 10);
+        // Turns out libevent timers aren't that accurate; without this adjustment we see things
+        // like "expected 500, actual 497". Tweak as needed if races are observed.
+        EXPECT_GE(actual_load_report_interval_ms, load_report_interval_ms_ - 100);
         // Allow for some skew in test environment.
         EXPECT_LT(actual_load_report_interval_ms, load_report_interval_ms_ + 1000);
         cluster_stats.mutable_load_report_interval()->Clear();
