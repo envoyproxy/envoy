@@ -42,7 +42,9 @@ void BufferingStreamDecoder::decodeData(Buffer::Instance& data, bool end_stream)
   }
 }
 
-void BufferingStreamDecoder::decodeTrailers(Http::HeaderMapPtr&&) { NOT_IMPLEMENTED; }
+void BufferingStreamDecoder::decodeTrailers(Http::HeaderMapPtr&&) {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
 
 void BufferingStreamDecoder::onComplete() {
   ASSERT(complete_);

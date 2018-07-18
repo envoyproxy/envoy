@@ -162,7 +162,7 @@ http_logs:
     test_server_->waitForCounterGe("grpc.accesslog.streams_closed_0", 1);
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   response = IntegrationUtil::makeSingleRequest(lookupPort("http"), "GET", "/notfound", "",
                                                 downstream_protocol_, version_);

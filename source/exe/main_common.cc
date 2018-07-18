@@ -90,7 +90,7 @@ bool MainCommonBase::run() {
     PERF_DUMP();
     return true;
   }
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 MainCommon::MainCommon(int argc, const char* const* argv)

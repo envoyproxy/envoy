@@ -149,7 +149,7 @@ TEST_P(MetricsServiceIntegrationTest, BasicFlow) {
     test_server_->waitForCounterGe("grpc.metrics_service.streams_closed_0", 1);
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   cleanup();
 }

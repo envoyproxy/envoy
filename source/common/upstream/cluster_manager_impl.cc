@@ -255,7 +255,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
     }
     default:
       // Validated by schema.
-      NOT_REACHED;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
 

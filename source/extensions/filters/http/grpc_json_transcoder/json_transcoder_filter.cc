@@ -92,7 +92,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
     }
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   for (const auto& file : descriptor_set.file()) {

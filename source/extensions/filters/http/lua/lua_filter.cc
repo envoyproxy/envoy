@@ -540,7 +540,7 @@ void Filter::scriptLog(spdlog::level::level_enum level, const char* message) {
     ENVOY_LOG(critical, "script log: {}", message);
     return;
   case spdlog::level::off:
-    NOT_IMPLEMENTED;
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 }
 

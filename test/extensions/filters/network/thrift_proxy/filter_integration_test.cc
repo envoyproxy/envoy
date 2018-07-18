@@ -65,7 +65,7 @@ public:
       result_mode = "exception";
       break;
     default:
-      NOT_REACHED;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
     preparePayloads(result_mode, "execute");

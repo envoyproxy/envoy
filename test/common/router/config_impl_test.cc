@@ -4445,7 +4445,7 @@ public:
 
     Http::FilterFactoryCb createFilter(const std::string&,
                                        Server::Configuration::FactoryContext&) override {
-      NOT_IMPLEMENTED;
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
       return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
