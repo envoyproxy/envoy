@@ -31,11 +31,10 @@ Per cluster member health check config
 
 If active health checking is configured for an upstream cluster, a specific additional configuration
 for each registered member can be specified by setting the
-:ref:`health check config<envoy_api_msg_endpoint.Endpoint.HealthCheckConfig>`
-in :ref:`endpoint message<envoy_api_msg_endpoint.Endpoint>`
-of an :ref:`LbEndpoint<envoy_api_msg_endpoint.LbEndpoint>` of each defined
-:ref:`LocalityLbEndpoints<envoy_api_msg_endpoint.LocalityLbEndpoints>`
-in a :ref:`ClusterLoadAssignment<envoy_api_msg_ClusterLoadAssignment>`.
+:ref:`HealthCheckConfig<envoy_api_msg_endpoint.Endpoint.HealthCheckConfig>`
+in the :ref:`Endpoint<envoy_api_msg_endpoint.Endpoint>` of an :ref:`LbEndpoint<envoy_api_msg_endpoint.LbEndpoint>`
+of each defined :ref:`LocalityLbEndpoints<envoy_api_msg_endpoint.LocalityLbEndpoints>` in a
+:ref:`ClusterLoadAssignment<envoy_api_msg_ClusterLoadAssignment>`.
 
 An example of setting up :ref:`health check config<envoy_api_msg_endpoint.Endpoint.HealthCheckConfig>`
 to set a :ref:`cluster member<envoy_api_msg_endpoint.Endpoint>`'s alternative health check
@@ -49,7 +48,6 @@ to set a :ref:`cluster member<envoy_api_msg_endpoint.Endpoint>`'s alternative he
       - endpoint:
           health_check_config:
             port_value: 8080
-
           address:
             socket_address:
               address: localhost

@@ -564,7 +564,7 @@ the shared ADS channel.
 Management Server Unreachability
 --------------------------------
 
-When Envoy instance looses connectivity with the management server, Envoy will latch on to
+When Envoy instance loses connectivity with the management server, Envoy will latch on to
 the previous configuration while actively retrying in the background to reestablish the
 connection with the management server.
 
