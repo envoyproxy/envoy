@@ -50,8 +50,8 @@ public:
     return local_address_ip_version_;
   }
   std::chrono::seconds drainTime() const override { return std::chrono::seconds(1); }
-  spdlog::level::level_enum logLevel() const override { NOT_IMPLEMENTED; }
-  const std::string& logFormat() const override { NOT_IMPLEMENTED; }
+  spdlog::level::level_enum logLevel() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  const std::string& logFormat() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   std::chrono::seconds parentShutdownTime() const override { return std::chrono::seconds(2); }
   const std::string& logPath() const override { return log_path_; }
   uint64_t restartEpoch() const override { return 0; }

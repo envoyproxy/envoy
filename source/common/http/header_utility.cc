@@ -109,7 +109,7 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
     match = absl::EndsWith(header->value().getStringView(), header_data.value_);
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   return match != header_data.invert_match_;

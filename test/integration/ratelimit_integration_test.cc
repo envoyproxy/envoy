@@ -204,7 +204,7 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
     EXPECT_EQ(1, test_server_->counter("grpc.ratelimit.streams_closed_4")->value());
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
   // Rate limiter fails open
   waitForSuccessfulUpstreamResponse();

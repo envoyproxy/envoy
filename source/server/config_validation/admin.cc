@@ -9,13 +9,13 @@ bool ValidationAdmin::addHandler(const std::string&, const std::string&, Handler
 
 bool ValidationAdmin::removeHandler(const std::string&) { return false; };
 
-const Network::Socket& ValidationAdmin::socket() { NOT_IMPLEMENTED; };
+const Network::Socket& ValidationAdmin::socket() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; };
 
 ConfigTracker& ValidationAdmin::getConfigTracker() { return config_tracker_; };
 
 Http::Code ValidationAdmin::request(absl::string_view, const Http::Utility::QueryParams&,
                                     absl::string_view, Http::HeaderMap&, std::string&) {
-  NOT_IMPLEMENTED;
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
 } // namespace Server

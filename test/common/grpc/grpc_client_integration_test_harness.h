@@ -286,7 +286,7 @@ public:
     return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stub_factory,
                                                    stats_scope_, createGoogleGrpcConfig());
 #else
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
 #endif
   }
 

@@ -8,12 +8,14 @@ namespace Upstream {
 LoadStatsReporter::LoadStatsReporter(const envoy::api::v2::core::Node& node,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
                                      Grpc::AsyncClientPtr async_client,
-                                     Event::Dispatcher& dispatcher)
+                                     Event::Dispatcher& dispatcher,
+                                     MonotonicTimeSource& time_source)
     : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")) {
+          "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")),
+      time_source_(time_source) {
   request_.mutable_node()->MergeFrom(node);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
@@ -39,7 +41,8 @@ void LoadStatsReporter::establishNewStream() {
 
 void LoadStatsReporter::sendLoadStatsRequest() {
   request_.mutable_cluster_stats()->Clear();
-  for (const std::string& cluster_name : clusters_) {
+  for (const auto& cluster_name_and_timestamp : clusters_) {
+    const std::string& cluster_name = cluster_name_and_timestamp.first;
     auto cluster_info_map = cm_.clusters();
     auto it = cluster_info_map.find(cluster_name);
     if (it == cluster_info_map.end()) {
@@ -73,6 +76,12 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     }
     cluster_stats->set_total_dropped_requests(
         cluster.info()->loadReportStats().upstream_rq_dropped_.latch());
+    const auto now = time_source_.currentTime().time_since_epoch();
+    const auto measured_interval = now - cluster_name_and_timestamp.second;
+    cluster_stats->mutable_load_report_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MicrosecondsToDuration(
+            std::chrono::duration_cast<std::chrono::microseconds>(measured_interval).count()));
+    clusters_[cluster_name] = now;
   }
 
   ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
@@ -109,13 +118,28 @@ void LoadStatsReporter::onReceiveMessage(
 }
 
 void LoadStatsReporter::startLoadReportPeriod() {
+  // Once a cluster is tracked, we don't want to reset its stats between reports
+  // to avoid racing between request/response.
+  std::unordered_map<absl::string_view, std::chrono::steady_clock::duration, StringViewHash>
+      existing_clusters;
+  for (const std::string& cluster_name : message_->clusters()) {
+    if (clusters_.count(cluster_name) > 0) {
+      existing_clusters.emplace(cluster_name, clusters_[cluster_name]);
+    }
+  }
   clusters_.clear();
   // Reset stats for all hosts in clusters we are tracking.
   for (const std::string& cluster_name : message_->clusters()) {
-    clusters_.emplace_back(cluster_name);
+    clusters_.emplace(cluster_name, existing_clusters.count(cluster_name) > 0
+                                        ? existing_clusters[cluster_name]
+                                        : time_source_.currentTime().time_since_epoch());
     auto cluster_info_map = cm_.clusters();
     auto it = cluster_info_map.find(cluster_name);
     if (it == cluster_info_map.end()) {
+      continue;
+    }
+    // Don't reset stats for existing tracked clusters.
+    if (existing_clusters.count(cluster_name) > 0) {
       continue;
     }
     auto& cluster = it->second.get();

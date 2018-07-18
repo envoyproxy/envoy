@@ -27,7 +27,7 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Permis
   case envoy::config::rbac::v2alpha::Permission::RuleCase::kNotRule:
     return std::make_shared<const NotMatcher>(permission.not_rule());
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -50,7 +50,7 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Princi
   case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kNotId:
     return std::make_shared<const NotMatcher>(principal.not_id());
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
