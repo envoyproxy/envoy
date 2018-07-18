@@ -12,7 +12,13 @@ cmake -G "Ninja" ../benchmark \
   -DCMAKE_BUILD_TYPE=RELEASE \
   -DBENCHMARK_ENABLE_GTEST_TESTS=OFF
 ninja
-cp src/libbenchmark.a "$THIRDPARTY_BUILD"/lib
+
+benchmark_lib="libbenchmark.a"
+if [[ "${OS}" == "Windows_NT" ]]; then
+  benchmark_lib="benchmark.lib"
+fi
+
+cp "src/$benchmark_lib" "$THIRDPARTY_BUILD"/lib
 cd ../benchmark
 
 INCLUDE_DIR="$THIRDPARTY_BUILD/include/testing/base/public"

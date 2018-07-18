@@ -10,16 +10,26 @@ VERSION=cares-1_14_0
 CPPFLAGS="$(for f in $CXXFLAGS; do if [[ $f =~ -D.* ]]; then echo $f; fi; done | tr '\n' ' ')"
 CFLAGS="$(for f in $CXXFLAGS; do if [[ ! $f =~ -D.* ]]; then echo $f; fi; done | tr '\n' ' ')"
 
-wget -O c-ares-"$VERSION".tar.gz https://github.com/c-ares/c-ares/archive/"$VERSION".tar.gz
+curl https://github.com/c-ares/c-ares/archive/"$VERSION".tar.gz -sLo c-ares-"$VERSION".tar.gz
 tar xf c-ares-"$VERSION".tar.gz
 cd c-ares-"$VERSION"
 
 mkdir build
 cd build
+
+build_type=RelWithDebInfo
+if [[ "${OS}" == "Windows_NT" ]]; then
+  build_type=Debug
+fi
+
 cmake -G "Ninja" -DCMAKE_INSTALL_PREFIX="$THIRDPARTY_BUILD" \
   -DCARES_SHARED=no \
   -DCARES_STATIC=on \
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  -DCMAKE_BUILD_TYPE="$build_type" \
   ..
 ninja
 ninja install
+
+if [[ "${OS}" == "Windows_NT" ]]; then
+  cp "CMakeFiles/c-ares.dir/c-ares.pdb" "$THIRDPARTY_BUILD/lib/c-ares.pdb"
+fi
