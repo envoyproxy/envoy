@@ -27,7 +27,7 @@ void HdsDelegate::setRetryTimer() {
 }
 
 void HdsDelegate::setServerResponseTimer() {
-  server_response_timer_->enableTimer(std::chrono::milliseconds(ServerResponseMilliseconds));
+  server_response_timer_->enableTimer(std::chrono::milliseconds(server_response_ms_));
 }
 
 void HdsDelegate::establishNewStream() {
@@ -91,7 +91,7 @@ void HdsDelegate::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
 
 void HdsDelegate::processMessage(
     std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
-  // TODO(lilika): What if the message is empty?
+  ASSERT(message);
   for (int i = 0; i < message->health_check_size(); i++) {
     // Create HdsCluster config
     ENVOY_LOG(debug, "Creating HdsCluster config");
@@ -100,24 +100,26 @@ void HdsDelegate::processMessage(
     clusters_config_.emplace_back();
     envoy::api::v2::Cluster& cluster_config = clusters_config_.back();
 
-    cluster_config.set_name(message->mutable_health_check(i)->cluster_name());
+    cluster_config.set_name(message->health_check(i).cluster_name());
     cluster_config.mutable_connect_timeout()->set_seconds(ClusterTimeoutSeconds);
     cluster_config.mutable_per_connection_buffer_limit_bytes()->set_value(
         ClusterConnectionBufferLimitBytes);
 
     // Add endpoints to cluster
-    const int localities_size = message->mutable_health_check(i)->endpoints_size();
+    const int localities_size = message->health_check(i).endpoints_size();
     for (int j = 0; j < localities_size; j++) {
-      auto endpoints = message->mutable_health_check(i)->mutable_endpoints(j);
-      for (int k = 0; k < endpoints->endpoints_size(); k++) {
-        cluster_config.add_hosts()->MergeFrom(*endpoints->mutable_endpoints(k)->mutable_address());
+      auto endpoints = message->health_check(i).endpoints(j);
+      for (int k = 0; k < endpoints.endpoints_size(); k++) {
+        cluster_config.add_hosts()->MergeFrom(endpoints.endpoints(k).address());
       }
     }
 
+    // TODO(lilika): Add support for optional per-endpoint health checks
+
     // Add healthcheckers to cluster
-    auto health_checkers = message->mutable_health_check(i);
-    for (int j = 0; j < health_checkers->health_checks_size(); j++) {
-      cluster_config.add_health_checks()->MergeFrom(*health_checkers->mutable_health_checks(j));
+    auto health_checkers = message->health_check(i);
+    for (int j = 0; j < health_checkers.health_checks_size(); j++) {
+      cluster_config.add_health_checks()->MergeFrom(health_checkers.health_checks(j));
     }
 
     ENVOY_LOG(debug, "New HdsCluster config {} ", cluster_config.DebugString());
@@ -129,11 +131,10 @@ void HdsDelegate::processMessage(
     hds_clusters_.push_back(cluster_);
 
     std::vector<Upstream::HealthCheckerSharedPtr> cluster_health_checkers;
-    for (int j = 0; j < message->mutable_health_check(i)->health_checks_size(); j++) {
+    for (int j = 0; j < message->health_check(i).health_checks_size(); j++) {
       // Creating HealthCheckers
       cluster_health_checkers.push_back(Upstream::HealthCheckerFactory::create(
-          *cluster_config.mutable_health_checks(j), *hds_clusters_[i], runtime_, random_,
-          dispatcher_));
+          cluster_config.health_checks(j), *hds_clusters_[i], runtime_, random_, dispatcher_));
     }
     health_checkers_ptr.push_back(cluster_health_checkers);
   }
@@ -152,10 +153,10 @@ void HdsDelegate::onReceiveMessage(
   // Initializing Clusters & HealthCheckers
   for (uint32_t i = 0; i < hds_clusters_.size(); i++) {
     for (uint32_t j = 0; j < health_checkers_ptr[i].size(); j++) {
-      hds_clusters_[i]->setHealthChecker(health_checkers_ptr[i][j]);
+      hds_clusters_[i]->startHealthChecker(health_checkers_ptr[i][j]);
     }
     hds_clusters_[i]->initialize([] {});
-    ServerResponseMilliseconds = PROTOBUF_GET_MS_REQUIRED(*message, interval);
+    server_response_ms_ = PROTOBUF_GET_MS_REQUIRED(*message, interval);
     setServerResponseTimer();
   }
 }
@@ -193,8 +194,7 @@ HdsCluster::HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& 
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED; }
 
-void HdsCluster::setHealthChecker(const HealthCheckerSharedPtr& health_checker) {
-  ASSERT(!health_checker_);
+void HdsCluster::startHealthChecker(const HealthCheckerSharedPtr& health_checker) {
   health_checker_ = health_checker;
   health_checker_->start();
 }
@@ -235,12 +235,7 @@ HdsCluster::resolveProtoAddress2(const envoy::api::v2::core::Address& address) {
   return Network::Address::resolveProtoAddress(address);
 }
 
-void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector) {
-  if (outlier_detector) {
-    NOT_IMPLEMENTED;
-  }
-  NOT_IMPLEMENTED;
-}
+void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) { NOT_IMPLEMENTED; }
 
 } // namespace Upstream
 } // namespace Envoy

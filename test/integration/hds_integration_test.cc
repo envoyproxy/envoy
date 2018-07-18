@@ -219,6 +219,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeout) {
 
   // Endpoint doesn't repond to the healthcheck
   hds_stream_->waitForGrpcMessage(*dispatcher_, response);
+  // TODO(lilika): Ideally this would be envoy::api::v2::core::HealthStatus::TIMEOUT
   EXPECT_EQ(
       envoy::api::v2::core::HealthStatus::UNHEALTHY,
       response.mutable_endpoint_health_response()->mutable_endpoints_health(0)->health_status());

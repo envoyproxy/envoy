@@ -21,7 +21,7 @@ namespace Upstream {
 
 class HdsCluster : public Cluster, Logger::Loggable<Logger::Id::upstream> {
 public:
-  void setHealthChecker(const HealthCheckerSharedPtr& health_checker);
+  void startHealthChecker(const HealthCheckerSharedPtr& health_checker);
 
   static ClusterSharedPtr create();
 
@@ -98,7 +98,7 @@ public:
   const uint32_t RetryDelayMilliseconds = 5000;
   static constexpr uint32_t ClusterConnectionBufferLimitBytes = 12345;
   static constexpr uint32_t ClusterTimeoutSeconds = 1;
-  uint32_t ServerResponseMilliseconds = 1000;
+  uint32_t server_response_ms_ = 1000;
 
   void
   processMessage(std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message);
