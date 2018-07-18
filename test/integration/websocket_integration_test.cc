@@ -237,10 +237,6 @@ TEST_P(WebsocketIntegrationTest, EarlyData) {
 }
 
 TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
-  if (!old_style_websockets_) {
-    return;
-  }
-
   envoy::api::v2::route::RouteAction::WebSocketProxyConfig ws_config;
   ws_config.mutable_idle_timeout()->set_nanos(
       std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100)).count());
@@ -248,16 +244,13 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
   config_helper_.addConfigModifier(setRouteUsingWebsocket(&ws_config, old_style_websockets_));
   if (!old_style_websockets_) {
     config_helper_.addConfigModifier(
-        [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-               hcm) {
-          auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
-          auto* route_idle_timeout = route->mutable_route()->mutable_timeout();
-          auto nanos =
-              std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
-                  .count();
-          route_idle_timeout->set_nanos(nanos);
-          auto* idle_timeout = hcm.mutable_idle_timeout();
-          idle_timeout->set_nanos(nanos);
+        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
+            -> void {
+          auto* route_config = hcm.mutable_route_config();
+          auto* virtual_host = route_config->mutable_virtual_hosts(0);
+          auto* route = virtual_host->mutable_routes(0)->mutable_route();
+          route->mutable_idle_timeout()->set_seconds(0);
+          route->mutable_idle_timeout()->set_nanos(200 * 1000 * 1000);
         });
   }
   initialize();
@@ -287,7 +280,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
   if (old_style_websockets_) {
     test_server_->waitForCounterGe("tcp.my-stat-prefix.idle_timeout", 1);
   } else {
-    test_server_->waitForCounterGe("http.downstream_cx_idle_timeout", 1);
+    test_server_->waitForCounterGe("http.config_test.downstream_rq_idle_timeout", 1);
   }
   tcp_client->waitForDisconnect();
   fake_upstream_connection->waitForDisconnect();
