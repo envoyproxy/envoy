@@ -28,6 +28,7 @@ public:
 
   IntegrationStreamDecoderPtr setupPerStreamIdleTimeoutTest() {
     initialize();
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
     auto encoder_decoder =
         codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
@@ -36,7 +37,6 @@ public:
                                                             {":authority", "host"}});
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
     upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
     upstream_request_->waitForHeadersComplete();
