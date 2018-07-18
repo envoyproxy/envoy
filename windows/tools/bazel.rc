@@ -1,0 +1,6 @@
+# Windows/Envoy specific Bazel build/test options.
+
+build --experimental_shortened_obj_file_path
+build --define signal_trace=disabled
+build --define hot_restart=disabled
+build --define tcmalloc=disabled
