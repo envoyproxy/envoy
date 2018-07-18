@@ -35,9 +35,8 @@ tsi_result TsiFrameProtector::protect(Buffer::Instance& input, Buffer::Instance&
   size_t still_pending_size;
   do {
     size_t protected_buffer_size = BUFFER_SIZE;
-    tsi_result result =
-        tsi_frame_protector_protect_flush(frame_protector_.get(), protected_buffer,
-                                          &protected_buffer_size, &still_pending_size);
+    tsi_result result = tsi_frame_protector_protect_flush(
+        frame_protector_.get(), protected_buffer, &protected_buffer_size, &still_pending_size);
     if (result != TSI_OK) {
       ASSERT(result != TSI_INVALID_ARGUMENT && result != TSI_UNIMPLEMENTED);
       return result;
