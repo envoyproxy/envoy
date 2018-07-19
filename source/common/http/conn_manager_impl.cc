@@ -613,11 +613,14 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     if (route_entry != nullptr && route_entry->idleTimeout()) {
       idle_timeout_ms_ = route_entry->idleTimeout().value();
       if (idle_timeout_ms_.count()) {
+        // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
         if (idle_timer_ == nullptr) {
           idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
               [this]() -> void { onIdleTimeout(); });
         }
       } else if (idle_timer_ != nullptr) {
+        // If we had a global stream idle timeout but the route-level idle timeout is set to zero
+        // (to override), we disable the idle timer.
         idle_timer_->disableTimer();
         idle_timer_ = nullptr;
       }
