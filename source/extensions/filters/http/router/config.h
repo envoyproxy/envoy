@@ -18,7 +18,7 @@ namespace RouterFilter {
 class RouterFilterConfig
     : public Common::FactoryBase<envoy::config::filter::http::router::v2::Router> {
 public:
-  RouterFilterConfig() : FactoryBase(HttpFilterNames::get().ROUTER) {}
+  RouterFilterConfig() : FactoryBase(HttpFilterNames::get().Router) {}
 
   Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string& stat_prefix,

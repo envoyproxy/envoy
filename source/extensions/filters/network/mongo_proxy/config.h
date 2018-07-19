@@ -19,7 +19,7 @@ namespace MongoProxy {
 class MongoProxyFilterConfigFactory
     : public Common::FactoryBase<envoy::config::filter::network::mongo_proxy::v2::MongoProxy> {
 public:
-  MongoProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().MONGO_PROXY) {}
+  MongoProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().MongoProxy) {}
 
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb

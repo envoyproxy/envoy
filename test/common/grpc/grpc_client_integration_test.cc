@@ -396,7 +396,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthRequest) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   access_token_value_ = "accesstokenvalue";
   credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE;
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -408,7 +408,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthStream) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   access_token_value_ = "accesstokenvalue";
   credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE;
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendServerInitialMetadata(empty_metadata_);
@@ -424,7 +424,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, MultipleAccessTokens) {
   access_token_value_ = "accesstokenvalue";
   access_token_value_2_ = "accesstokenvalue2";
   credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE;
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -437,7 +437,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, ExtraCredentialParams) {
   access_token_value_ = "accesstokenvalue";
   refresh_token_value_ = "refreshtokenvalue";
   credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE;
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -448,7 +448,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, ExtraCredentialParams) {
 TEST_P(GrpcAccessTokenClientIntegrationTest, NoAccessTokens) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().ACCESS_TOKEN_EXAMPLE;
+      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();

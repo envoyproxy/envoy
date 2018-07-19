@@ -76,7 +76,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   // configured at the filter level.
   fault_settings_ = config_->settings();
   if (callbacks_->route() && callbacks_->route()->routeEntry()) {
-    const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().FAULT;
+    const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().Fault;
     const auto* route_entry = callbacks_->route()->routeEntry();
 
     const FaultSettings* per_route_settings_ =
