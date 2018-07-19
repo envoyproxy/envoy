@@ -16,12 +16,11 @@ option go_package = "v2alpha";
 //
 // Here is an example of RBAC configuration. It has two policies:
 //
-// * Service account "cluster.local/ns/default/sa/admin" has full access (empty permission entry
-//   means full access) to the service.
+// * Service account "cluster.local/ns/default/sa/admin" has full access to the service, and so
+//   does "cluster.local/ns/default/sa/superuser".
 //
-// * Any user (empty principal entry means any user) can read ("GET") the service at paths with
-//   prefix "/products" or suffix "/reviews" when request header "version" set to either "v1" or
-//   "v2".
+// * Any user can read ("GET") the service at paths with prefix "/products", so long as the
+//   destination port is either 80 or 443.
 //
 //  .. code-block:: yaml
 //
@@ -115,6 +114,11 @@ message Permission {
 
     // Metadata that describes additional information about the action.
     envoy.type.matcher.MetadataMatcher metadata = 7;
+
+    // Negates matching the provided permission. For instance, if the value of `not_rule` would
+    // match, this permission would not match. Conversely, if the value of `not_rule` would not
+    // match, this permission would match.
+    Permission not_rule = 8;
   }
 }
 
@@ -157,5 +161,10 @@ message Principal {
 
     // Metadata that describes additional information about the principal.
     envoy.type.matcher.MetadataMatcher metadata = 7;
+
+    // Negates matching the provided principal. For instance, if the value of `not_id` would match,
+    // this principal would not match. Conversely, if the value of `not_id` would not match, this
+    // principal would match.
+    Principal not_id = 8;
   }
 }

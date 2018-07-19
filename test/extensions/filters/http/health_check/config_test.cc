@@ -152,7 +152,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatch) {
 
   envoy::api::v2::route::HeaderMatcher& yheader = *config.add_headers();
   yheader.set_name("y-healthcheck");
-  yheader.set_value("foo");
+  yheader.set_exact_match("foo");
 
   Http::TestHeaderMapImpl headers{{"x-healthcheck", "arbitrary_value"}, {"y-healthcheck", "foo"}};
 
@@ -170,7 +170,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchWrongValue) {
 
   envoy::api::v2::route::HeaderMatcher& yheader = *config.add_headers();
   yheader.set_name("y-healthcheck");
-  yheader.set_value("foo");
+  yheader.set_exact_match("foo");
 
   Http::TestHeaderMapImpl headers{{"x-healthcheck", "arbitrary_value"}, {"y-healthcheck", "bar"}};
 
@@ -188,7 +188,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchMissingHeader) {
 
   envoy::api::v2::route::HeaderMatcher& yheader = *config.add_headers();
   yheader.set_name("y-healthcheck");
-  yheader.set_value("foo");
+  yheader.set_exact_match("foo");
 
   Http::TestHeaderMapImpl headers{{"y-healthcheck", "foo"}};
 
@@ -206,7 +206,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterEndpoint) {
 
   envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
   header.set_name(Http::Headers::get().Path.get());
-  header.set_value("bar");
+  header.set_exact_match("bar");
 
   Http::TestHeaderMapImpl headers{{Http::Headers::get().Path.get(), "foo"}};
 
@@ -224,7 +224,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterEndpointOverride) {
 
   envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
   header.set_name(Http::Headers::get().Path.get());
-  header.set_value("bar");
+  header.set_exact_match("bar");
 
   Http::TestHeaderMapImpl headers{{Http::Headers::get().Path.get(), "bar"}};
 
@@ -239,7 +239,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateMatch) {
 
   envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
   header.set_name("x-healthcheck");
-  header.set_value("foo");
+  header.set_exact_match("foo");
 
   envoy::api::v2::route::HeaderMatcher& dup_header = *config.add_headers();
   dup_header.set_name("x-healthcheck");
@@ -257,11 +257,11 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
 
   envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
   header.set_name("x-healthcheck");
-  header.set_value("foo");
+  header.set_exact_match("foo");
 
   envoy::api::v2::route::HeaderMatcher& dup_header = *config.add_headers();
   dup_header.set_name("x-healthcheck");
-  dup_header.set_value("bar");
+  dup_header.set_exact_match("bar");
 
   Http::TestHeaderMapImpl headers{{"x-healthcheck", "foo"}};
 

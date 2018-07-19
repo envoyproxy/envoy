@@ -38,19 +38,23 @@ public:
     uint8_t* p = static_cast<uint8_t*>(underlying_.linearize(position_ + size));
     return p + position_;
   }
-  void add(const void*, uint64_t) override { NOT_IMPLEMENTED; }
-  void addBufferFragment(Buffer::BufferFragment&) override { NOT_IMPLEMENTED; }
-  void add(const std::string&) override { NOT_IMPLEMENTED; }
-  void add(const Buffer::Instance&) override { NOT_IMPLEMENTED; }
-  void commit(Buffer::RawSlice*, uint64_t) override { NOT_IMPLEMENTED; }
-  uint64_t getRawSlices(Buffer::RawSlice*, uint64_t) const override { NOT_IMPLEMENTED; }
-  void move(Buffer::Instance&) override { NOT_IMPLEMENTED; }
-  void move(Buffer::Instance&, uint64_t) override { NOT_IMPLEMENTED; }
-  int read(int, uint64_t) override { NOT_IMPLEMENTED; }
-  uint64_t reserve(uint64_t, Buffer::RawSlice*, uint64_t) override { NOT_IMPLEMENTED; }
-  ssize_t search(const void*, uint64_t, size_t) const override { NOT_IMPLEMENTED; }
-  int write(int) override { NOT_IMPLEMENTED; }
-  std::string toString() const override { NOT_IMPLEMENTED; }
+  void add(const void*, uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void addBufferFragment(Buffer::BufferFragment&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void add(const std::string&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void add(const Buffer::Instance&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void commit(Buffer::RawSlice*, uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  uint64_t getRawSlices(Buffer::RawSlice*, uint64_t) const override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  void move(Buffer::Instance&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void move(Buffer::Instance&, uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  std::tuple<int, int> read(int, uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  uint64_t reserve(uint64_t, Buffer::RawSlice*, uint64_t) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  ssize_t search(const void*, uint64_t, size_t) const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  std::tuple<int, int> write(int) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  std::string toString() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:
   Buffer::Instance& underlying_;
@@ -211,6 +215,83 @@ public:
    *                       larger than 32 bits.
    */
   static int32_t peekZigZagI32(Buffer::Instance& buffer, uint64_t offset, int& size);
+
+  /**
+   * Writes an int8_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int8_t to write
+   */
+  static void writeI8(Buffer::Instance& buffer, int8_t value);
+
+  /**
+   * Writes an int16_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int16_t to write
+   */
+  static void writeI16(Buffer::Instance& buffer, int16_t value);
+
+  /**
+   * Writes an uint16_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the uint16_t to write
+   */
+  static void writeU16(Buffer::Instance& buffer, uint16_t value);
+
+  /**
+   * Writes an int32_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int32_t to write
+   */
+  static void writeI32(Buffer::Instance& buffer, int32_t value);
+
+  /**
+   * Writes an uint32_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the uint32_t to write
+   */
+  static void writeU32(Buffer::Instance& buffer, uint32_t value);
+
+  /**
+   * Writes an int64_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int64_t to write
+   */
+  static void writeI64(Buffer::Instance& buffer, int64_t value);
+
+  /**
+   * Writes a double to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the double to write
+   */
+  static void writeDouble(Buffer::Instance& buffer, double value);
+
+  /**
+   * Writes a var-int encoded int32_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int32_t to write
+   */
+  static void writeVarIntI32(Buffer::Instance& buffer, int32_t value);
+
+  /**
+   * Writes a var-int encoded int64_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int64_t to write
+   */
+  static void writeVarIntI64(Buffer::Instance& buffer, int64_t value);
+
+  /**
+   * Writes a zig-zag encoded int32_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int32_t to write
+   */
+  static void writeZigZagI32(Buffer::Instance& buffer, int32_t value);
+
+  /**
+   * Writes a zig-zag encoded int64_t to the buffer.
+   * @param buffer Buffer::Instance written to
+   * @param value the int64_t to write
+   */
+  static void writeZigZagI64(Buffer::Instance& buffer, int64_t value);
 
 private:
   /**

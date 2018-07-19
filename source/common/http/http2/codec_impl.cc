@@ -37,7 +37,6 @@ bool Utility::reconstituteCrumbledCookies(const HeaderString& key, const HeaderS
 }
 
 ConnectionImpl::Http2Callbacks ConnectionImpl::http2_callbacks_;
-ConnectionImpl::Http2Options ConnectionImpl::http2_options_;
 
 /**
  * Helper to remove const during a cast. nghttp2 takes non-const pointers for headers even though
@@ -410,7 +409,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
     default:
       // We do not currently support push.
-      NOT_IMPLEMENTED;
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
 
     stream->headers_.reset();
@@ -723,7 +722,7 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
 
 ConnectionImpl::Http2Callbacks::~Http2Callbacks() { nghttp2_session_callbacks_del(callbacks_); }
 
-ConnectionImpl::Http2Options::Http2Options() {
+ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings) {
   nghttp2_option_new(&options_);
   // Currently we do not do anything with stream priority. Setting the following option prevents
   // nghttp2 from keeping around closed streams for use during stream priority dependency graph
@@ -731,16 +730,31 @@ ConnectionImpl::Http2Options::Http2Options() {
   // of kept alive HTTP/2 connections.
   nghttp2_option_set_no_closed_streams(options_, 1);
   nghttp2_option_set_no_auto_window_update(options_, 1);
+
+  if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
+    nghttp2_option_set_max_deflate_dynamic_table_size(options_, http2_settings.hpack_table_size_);
+  }
 }
 
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }
+
+ConnectionImpl::ClientHttp2Options::ClientHttp2Options(const Http2Settings& http2_settings)
+    : Http2Options(http2_settings) {
+  // Temporarily disable initial max streams limit/protection, since we might want to create
+  // more than 100 streams before receiving the HTTP/2 SETTINGS frame from the server.
+  //
+  // TODO(PiotrSikora): remove this once multiple upstream connections or queuing are implemented.
+  nghttp2_option_set_peer_max_concurrent_streams(options_,
+                                                 Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS);
+}
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection,
                                            Http::ConnectionCallbacks& callbacks,
                                            Stats::Scope& stats, const Http2Settings& http2_settings)
     : ConnectionImpl(connection, stats, http2_settings), callbacks_(callbacks) {
+  ClientHttp2Options client_http2_options(http2_settings);
   nghttp2_session_client_new2(&session_, http2_callbacks_.callbacks(), base(),
-                              http2_options_.options());
+                              client_http2_options.options());
   sendSettings(http2_settings, true);
 }
 
@@ -759,9 +773,10 @@ Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
 
 int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
   // The client code explicitly does not currently suport push promise.
-  RELEASE_ASSERT(frame->hd.type == NGHTTP2_HEADERS);
+  RELEASE_ASSERT(frame->hd.type == NGHTTP2_HEADERS, "");
   RELEASE_ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE ||
-                 frame->headers.cat == NGHTTP2_HCAT_HEADERS);
+                     frame->headers.cat == NGHTTP2_HCAT_HEADERS,
+                 "");
   if (frame->headers.cat == NGHTTP2_HCAT_HEADERS) {
     StreamImpl* stream = getStream(frame->hd.stream_id);
     ASSERT(!stream->headers_);
@@ -783,8 +798,9 @@ ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            Http::ServerConnectionCallbacks& callbacks,
                                            Stats::Scope& scope, const Http2Settings& http2_settings)
     : ConnectionImpl(connection, scope, http2_settings), callbacks_(callbacks) {
+  Http2Options http2_options(http2_settings);
   nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
-                              http2_options_.options());
+                              http2_options.options());
   sendSettings(http2_settings, false);
 }
 

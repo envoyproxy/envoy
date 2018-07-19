@@ -77,7 +77,7 @@ TEST_P(RBACIntegrationTest, RouteOverride) {
                            ->Mutable(0)
                            ->mutable_per_filter_config();
 
-        (*config)[Extensions::HttpFilters::HttpFilterNames::get().RBAC] = pfc;
+        (*config)[Extensions::HttpFilters::HttpFilterNames::get().Rbac] = pfc;
       });
   config_helper_.addFilter(RBAC_CONFIG);
 

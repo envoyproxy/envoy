@@ -36,7 +36,7 @@ RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr rou
     return engine(mode);
   }
 
-  const std::string& name = HttpFilterNames::get().RBAC;
+  const std::string& name = HttpFilterNames::get().Rbac;
   const auto* entry = route->routeEntry();
 
   const auto* route_local =

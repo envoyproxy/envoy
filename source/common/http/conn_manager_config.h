@@ -54,6 +54,7 @@ namespace Http {
   COUNTER  (downstream_rq_4xx)                                                                     \
   COUNTER  (downstream_rq_5xx)                                                                     \
   HISTOGRAM(downstream_rq_time)                                                                    \
+  COUNTER  (downstream_rq_idle_timeout)                                                            \
   COUNTER  (rs_too_large)
 // clang-format on
 

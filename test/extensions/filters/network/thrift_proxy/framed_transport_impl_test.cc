@@ -6,13 +6,14 @@
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
+#include "test/mocks/buffer/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::NiceMock;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -20,14 +21,14 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 TEST(FramedTransportTest, Name) {
-  NiceMock<MockTransportCallbacks> cb;
+  StrictMock<MockTransportCallbacks> cb;
   FramedTransportImpl transport(cb);
   EXPECT_EQ(transport.name(), "framed");
 }
 
 TEST(FramedTransportTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
-  NiceMock<MockTransportCallbacks> cb;
+  StrictMock<MockTransportCallbacks> cb;
   FramedTransportImpl transport(cb);
 
   EXPECT_FALSE(transport.decodeFrameStart(buffer));
@@ -38,7 +39,7 @@ TEST(FramedTransportTest, NotEnoughData) {
 }
 
 TEST(FramedTransportTest, InvalidFrameSize) {
-  NiceMock<MockTransportCallbacks> cb;
+  StrictMock<MockTransportCallbacks> cb;
   FramedTransportImpl transport(cb);
 
   {
@@ -59,7 +60,7 @@ TEST(FramedTransportTest, InvalidFrameSize) {
 }
 
 TEST(FramedTransportTest, DecodeFrameStart) {
-  MockTransportCallbacks cb;
+  StrictMock<MockTransportCallbacks> cb;
   EXPECT_CALL(cb, transportFrameStart(absl::optional<uint32_t>(100U)));
 
   FramedTransportImpl transport(cb);
@@ -73,7 +74,7 @@ TEST(FramedTransportTest, DecodeFrameStart) {
 }
 
 TEST(FramedTransportTest, DecodeFrameEnd) {
-  MockTransportCallbacks cb;
+  StrictMock<MockTransportCallbacks> cb;
   EXPECT_CALL(cb, transportFrameComplete());
 
   FramedTransportImpl transport(cb);
@@ -81,6 +82,33 @@ TEST(FramedTransportTest, DecodeFrameEnd) {
   Buffer::OwnedImpl buffer;
 
   EXPECT_TRUE(transport.decodeFrameEnd(buffer));
+}
+
+TEST(FramedTransportTest, EncodeFrame) {
+  StrictMock<MockTransportCallbacks> cb;
+
+  FramedTransportImpl transport(cb);
+
+  {
+    Buffer::OwnedImpl message;
+    message.add("fake message");
+
+    Buffer::OwnedImpl buffer;
+    transport.encodeFrame(buffer, message);
+
+    EXPECT_EQ(0, message.length());
+    EXPECT_EQ(std::string("\0\0\0\xC"
+                          "fake message",
+                          16),
+              buffer.toString());
+  }
+
+  {
+    Buffer::OwnedImpl message;
+    Buffer::OwnedImpl buffer;
+    EXPECT_THROW_WITH_MESSAGE(transport.encodeFrame(buffer, message), EnvoyException,
+                              "invalid thrift framed transport frame size 0");
+  }
 }
 
 } // namespace ThriftProxy

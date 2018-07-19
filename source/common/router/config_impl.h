@@ -98,6 +98,7 @@ public:
 
   // Router::CorsPolicy
   const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
+  const std::list<std::regex>& allowOriginRegexes() const override { return allow_origin_regex_; }
   const std::string& allowMethods() const override { return allow_methods_; };
   const std::string& allowHeaders() const override { return allow_headers_; };
   const std::string& exposeHeaders() const override { return expose_headers_; };
@@ -107,6 +108,7 @@ public:
 
 private:
   std::list<std::string> allow_origin_;
+  std::list<std::regex> allow_origin_regex_;
   std::string allow_methods_;
   std::string allow_headers_;
   std::string expose_headers_;
@@ -309,6 +311,10 @@ public:
     return vhost_.virtualClusterFromEntries(headers);
   }
   std::chrono::milliseconds timeout() const override { return timeout_; }
+  absl::optional<std::chrono::milliseconds> idleTimeout() const override {
+    return idle_timeout_.count() == 0 ? absl::nullopt
+                                      : absl::optional<std::chrono::milliseconds>(idle_timeout_);
+  }
   absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
     return max_grpc_timeout_;
   }
@@ -393,6 +399,9 @@ private:
     const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
     const ShadowPolicy& shadowPolicy() const override { return parent_->shadowPolicy(); }
     std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
+    absl::optional<std::chrono::milliseconds> idleTimeout() const override {
+      return parent_->idleTimeout();
+    }
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
       return parent_->maxGrpcTimeout();
     }
@@ -501,6 +510,9 @@ private:
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
 
+  // Default idle timeout is 5 minutes if nothing is specified in the route config.
+  static const uint64_t DEFAULT_ROUTE_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+
   std::unique_ptr<const CorsPolicyImpl> cors_policy_;
   const VirtualHostImpl& vhost_; // See note in RouteEntryImplBase::clusterEntry() on why raw ref
                                  // to virtual host is currently safe.
@@ -510,6 +522,7 @@ private:
   const Http::LowerCaseString cluster_header_name_;
   const Http::Code cluster_not_found_response_code_;
   const std::chrono::milliseconds timeout_;
+  const std::chrono::milliseconds idle_timeout_;
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
   const absl::optional<RuntimeData> runtime_;
   Runtime::Loader& loader_;

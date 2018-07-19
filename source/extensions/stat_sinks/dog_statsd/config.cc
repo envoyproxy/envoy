@@ -30,7 +30,7 @@ ProtobufTypes::MessagePtr DogStatsdSinkFactory::createEmptyConfigProto() {
       new envoy::config::metrics::v2::DogStatsdSink());
 }
 
-std::string DogStatsdSinkFactory::name() { return StatsSinkNames::get().DOG_STATSD; }
+std::string DogStatsdSinkFactory::name() { return StatsSinkNames::get().DogStatsd; }
 
 /**
  * Static registration for the this sink factory. @see RegisterFactory.

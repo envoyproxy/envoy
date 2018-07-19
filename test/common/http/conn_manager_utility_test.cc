@@ -1004,5 +1004,18 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceOnBrokenUuid) {
             UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
 }
 
+TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
+  Http::TestHeaderMapImpl request_headers{{}};
+  Http::TestHeaderMapImpl response_headers{{"keep-alive", "timeout=60"},
+                                           {"proxy-connection", "proxy-header"}};
+  ConnectionManagerUtility::mutateResponseHeaders(response_headers, request_headers, "");
+
+  EXPECT_EQ(UuidTraceStatus::NoTrace,
+            UuidUtils::isTraceableUuid(request_headers.get_("x-request-id")));
+
+  EXPECT_FALSE(response_headers.has("keep-alive"));
+  EXPECT_FALSE(response_headers.has("proxy-connection"));
+}
+
 } // namespace Http
 } // namespace Envoy

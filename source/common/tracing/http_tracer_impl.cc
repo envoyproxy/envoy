@@ -50,7 +50,7 @@ const std::string& HttpTracerUtility::toString(OperationName operation_name) {
     return EGRESS_OPERATION;
   }
 
-  NOT_REACHED
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Decision HttpTracerUtility::isTracing(const RequestInfo::RequestInfo& request_info,
@@ -79,7 +79,7 @@ Decision HttpTracerUtility::isTracing(const RequestInfo::RequestInfo& request_in
     return {Reason::NotTraceableRequestId, false};
   }
 
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void HttpTracerUtility::finalizeSpan(Span& span, const Http::HeaderMap* request_headers,

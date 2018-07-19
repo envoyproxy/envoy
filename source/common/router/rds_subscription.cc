@@ -1,5 +1,7 @@
 #include "common/router/rds_subscription.h"
 
+#include "envoy/stats/stats.h"
+
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/rds_json.h"
@@ -14,12 +16,12 @@ RdsSubscription::RdsSubscription(
     Envoy::Config::SubscriptionStats stats,
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
     Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-    const LocalInfo::LocalInfo& local_info)
+    const LocalInfo::LocalInfo& local_info, const Stats::Scope& scope)
     : RestApiFetcher(cm, rds.config_source().api_config_source().cluster_names()[0], dispatcher,
                      random,
                      Envoy::Config::Utility::apiConfigSourceRefreshDelay(
                          rds.config_source().api_config_source())),
-      local_info_(local_info), stats_(stats) {
+      local_info_(local_info), stats_(stats), scope_(scope) {
   const auto& api_config_source = rds.config_source().api_config_source();
   UNREFERENCED_PARAMETER(api_config_source);
   // If we are building an RdsSubscription, the ConfigSource should be REST_LEGACY.
@@ -45,7 +47,8 @@ void RdsSubscription::parseResponse(const Http::Message& response) {
   const std::string response_body = response.bodyAsString();
   Json::ObjectSharedPtr response_json = Json::Factory::loadFromString(response_body);
   Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> resources;
-  Envoy::Config::RdsJson::translateRouteConfiguration(*response_json, *resources.Add());
+  Envoy::Config::RdsJson::translateRouteConfiguration(*response_json, *resources.Add(),
+                                                      scope_.statsOptions());
   resources[0].set_name(route_config_name_);
   std::pair<std::string, uint64_t> hash =
       Envoy::Config::Utility::computeHashedVersion(response_body);

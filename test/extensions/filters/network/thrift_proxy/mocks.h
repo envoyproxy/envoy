@@ -31,6 +31,7 @@ public:
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_METHOD1(decodeFrameStart, bool(Buffer::Instance&));
   MOCK_METHOD1(decodeFrameEnd, bool(Buffer::Instance&));
+  MOCK_METHOD2(encodeFrame, void(Buffer::Instance&, Buffer::Instance&));
 
   std::string name_{"mock"};
 };
@@ -78,6 +79,30 @@ public:
   MOCK_METHOD2(readDouble, bool(Buffer::Instance& buffer, double& value));
   MOCK_METHOD2(readString, bool(Buffer::Instance& buffer, std::string& value));
   MOCK_METHOD2(readBinary, bool(Buffer::Instance& buffer, std::string& value));
+
+  MOCK_METHOD4(writeMessageBegin, void(Buffer::Instance& buffer, const std::string& name,
+                                       MessageType msg_type, int32_t seq_id));
+  MOCK_METHOD1(writeMessageEnd, void(Buffer::Instance& buffer));
+  MOCK_METHOD2(writeStructBegin, void(Buffer::Instance& buffer, const std::string& name));
+  MOCK_METHOD1(writeStructEnd, void(Buffer::Instance& buffer));
+  MOCK_METHOD4(writeFieldBegin, void(Buffer::Instance& buffer, const std::string& name,
+                                     FieldType field_type, int16_t field_id));
+  MOCK_METHOD1(writeFieldEnd, void(Buffer::Instance& buffer));
+  MOCK_METHOD4(writeMapBegin, void(Buffer::Instance& buffer, FieldType key_type,
+                                   FieldType value_type, uint32_t size));
+  MOCK_METHOD1(writeMapEnd, void(Buffer::Instance& buffer));
+  MOCK_METHOD3(writeListBegin, void(Buffer::Instance& buffer, FieldType elem_type, uint32_t size));
+  MOCK_METHOD1(writeListEnd, void(Buffer::Instance& buffer));
+  MOCK_METHOD3(writeSetBegin, void(Buffer::Instance& buffer, FieldType elem_type, uint32_t size));
+  MOCK_METHOD1(writeSetEnd, void(Buffer::Instance& buffer));
+  MOCK_METHOD2(writeBool, void(Buffer::Instance& buffer, bool value));
+  MOCK_METHOD2(writeByte, void(Buffer::Instance& buffer, uint8_t value));
+  MOCK_METHOD2(writeInt16, void(Buffer::Instance& buffer, int16_t value));
+  MOCK_METHOD2(writeInt32, void(Buffer::Instance& buffer, int32_t value));
+  MOCK_METHOD2(writeInt64, void(Buffer::Instance& buffer, int64_t value));
+  MOCK_METHOD2(writeDouble, void(Buffer::Instance& buffer, double value));
+  MOCK_METHOD2(writeString, void(Buffer::Instance& buffer, const std::string& value));
+  MOCK_METHOD2(writeBinary, void(Buffer::Instance& buffer, const std::string& value));
 
   std::string name_{"mock"};
 };

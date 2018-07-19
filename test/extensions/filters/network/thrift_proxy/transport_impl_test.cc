@@ -13,6 +13,8 @@
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
+using testing::Ref;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -21,7 +23,7 @@ namespace ThriftProxy {
 
 TEST(AutoTransportTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
-  NiceMock<MockTransportCallbacks> cb;
+  StrictMock<MockTransportCallbacks> cb;
   AutoTransportImpl transport(cb);
 
   EXPECT_FALSE(transport.decodeFrameStart(buffer));
@@ -32,7 +34,7 @@ TEST(AutoTransportTest, NotEnoughData) {
 }
 
 TEST(AutoTransportTest, UnknownTransport) {
-  NiceMock<MockTransportCallbacks> cb;
+  StrictMock<MockTransportCallbacks> cb;
   AutoTransportImpl transport(cb);
 
   // Looks like unframed, but fails protocol check.
@@ -57,7 +59,7 @@ TEST(AutoTransportTest, UnknownTransport) {
 }
 
 TEST(AutoTransportTest, DecodeFrameStart) {
-  NiceMock<MockTransportCallbacks> cb;
+  StrictMock<MockTransportCallbacks> cb;
 
   // Framed transport + binary protocol
   {
@@ -115,7 +117,7 @@ TEST(AutoTransportTest, DecodeFrameStart) {
 }
 
 TEST(AutoTransportTest, DecodeFrameEnd) {
-  NiceMock<MockTransportCallbacks> cb;
+  StrictMock<MockTransportCallbacks> cb;
 
   AutoTransportImpl transport(cb);
   Buffer::OwnedImpl buffer;
@@ -131,8 +133,22 @@ TEST(AutoTransportTest, DecodeFrameEnd) {
   EXPECT_TRUE(transport.decodeFrameEnd(buffer));
 }
 
+TEST(AutoTransportTest, EncodeFrame) {
+  StrictMock<MockTransportCallbacks> cb;
+  MockTransport* mock_transport = new NiceMock<MockTransport>();
+
+  AutoTransportImpl transport(cb);
+  transport.setTransport(TransportPtr{mock_transport});
+
+  Buffer::OwnedImpl buffer;
+  Buffer::OwnedImpl message;
+
+  EXPECT_CALL(*mock_transport, encodeFrame(Ref(buffer), Ref(message)));
+  transport.encodeFrame(buffer, message);
+}
+
 TEST(AutoTransportTest, Name) {
-  NiceMock<MockTransportCallbacks> cb;
+  StrictMock<MockTransportCallbacks> cb;
   AutoTransportImpl transport(cb);
   EXPECT_EQ(transport.name(), "auto");
 }

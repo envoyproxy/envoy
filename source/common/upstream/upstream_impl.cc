@@ -299,11 +299,11 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   auto transport_socket = config.transport_socket();
   if (!config.has_transport_socket()) {
     if (config.has_tls_context()) {
-      transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().TLS);
+      transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
       MessageUtil::jsonConvert(config.tls_context(), *transport_socket.mutable_config());
     } else {
       transport_socket.set_name(
-          Extensions::TransportSockets::TransportSocketNames::get().RAW_BUFFER);
+          Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
     }
   }
 
@@ -337,7 +337,7 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
     lb_type_ = LoadBalancerType::Maglev;
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (config.protocol_selection() == envoy::api::v2::Cluster::USE_CONFIGURED_PROTOCOL) {
@@ -417,7 +417,7 @@ ClusterSharedPtr ClusterImplBase::create(
                                          cm, dispatcher, random, added_via_api));
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (!cluster.health_checks().empty()) {
@@ -620,7 +620,7 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
     priority_name = "high";
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const std::string runtime_prefix =
@@ -641,6 +641,115 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
   }
   return ResourceManagerImplPtr{new ResourceManagerImpl(
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries)};
+}
+
+PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
+                                           const LocalInfo::LocalInfo& local_info)
+    : parent_(cluster), local_info_node_(local_info.node()) {}
+
+void PriorityStateManager::initializePriorityFor(
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint) {
+  const uint32_t priority = locality_lb_endpoint.priority();
+  if (priority_state_.size() <= priority) {
+    priority_state_.resize(priority + 1);
+  }
+  if (priority_state_[priority].first == nullptr) {
+    priority_state_[priority].first.reset(new HostVector());
+  }
+  if (locality_lb_endpoint.has_locality() && locality_lb_endpoint.has_load_balancing_weight()) {
+    priority_state_[priority].second[locality_lb_endpoint.locality()] =
+        locality_lb_endpoint.load_balancing_weight().value();
+  }
+}
+
+void PriorityStateManager::registerHostForPriority(
+    const std::string& hostname, Network::Address::InstanceConstSharedPtr address,
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
+    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
+    const Upstream::Host::HealthFlag health_checker_flag) {
+  const uint32_t priority = locality_lb_endpoint.priority();
+  // Should be called after initializePriorityFor.
+  ASSERT(priority_state_[priority].first);
+  priority_state_[priority].first->emplace_back(
+      new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
+                   lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
+                   lb_endpoint.endpoint().health_check_config()));
+
+  const auto& health_status = lb_endpoint.health_status();
+  if (health_status == envoy::api::v2::core::HealthStatus::UNHEALTHY ||
+      health_status == envoy::api::v2::core::HealthStatus::DRAINING ||
+      health_status == envoy::api::v2::core::HealthStatus::TIMEOUT) {
+    priority_state_[priority].first->back()->healthFlagSet(health_checker_flag);
+  }
+}
+
+void PriorityStateManager::updateClusterPrioritySet(
+    const uint32_t priority, HostVectorSharedPtr&& current_hosts,
+    const absl::optional<HostVector>& hosts_added,
+    const absl::optional<HostVector>& hosts_removed) {
+  // If local locality is not defined then skip populating per locality hosts.
+  const auto& local_locality = local_info_node_.locality();
+  ENVOY_LOG(trace, "Local locality: {}", local_locality.DebugString());
+
+  // For non-EDS, most likely the current hosts are from priority_state_[priority].first.
+  HostVectorSharedPtr hosts(std::move(current_hosts));
+  LocalityWeightsMap empty_locality_map;
+  LocalityWeightsMap& locality_weights_map =
+      priority_state_.size() > priority ? priority_state_[priority].second : empty_locality_map;
+  ASSERT(priority_state_.size() > priority || locality_weights_map.empty());
+  LocalityWeightsSharedPtr locality_weights;
+  std::vector<HostVector> per_locality;
+
+  // If we are configured for locality weighted LB we populate the locality weights.
+  const bool locality_weighted_lb = parent_.info()->lbConfig().has_locality_weighted_lb_config();
+  if (locality_weighted_lb) {
+    locality_weights = std::make_shared<LocalityWeights>();
+  }
+
+  // We use std::map to guarantee a stable ordering for zone aware routing.
+  std::map<envoy::api::v2::core::Locality, HostVector, LocalityLess> hosts_per_locality;
+
+  for (const HostSharedPtr& host : *hosts) {
+    // TODO(dio): Take into consideration when a non-EDS cluster has active health checking, i.e. to
+    // mark all the hosts unhealthy (host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC)) and
+    // then fire update callbacks to start the health checking process.
+    hosts_per_locality[host->locality()].push_back(host);
+  }
+
+  // Do we have hosts for the local locality?
+  const bool non_empty_local_locality =
+      local_info_node_.has_locality() &&
+      hosts_per_locality.find(local_locality) != hosts_per_locality.end();
+
+  // As per HostsPerLocality::get(), the per_locality vector must have the local locality hosts
+  // first if non_empty_local_locality.
+  if (non_empty_local_locality) {
+    per_locality.emplace_back(hosts_per_locality[local_locality]);
+    if (locality_weighted_lb) {
+      locality_weights->emplace_back(locality_weights_map[local_locality]);
+    }
+  }
+
+  // After the local locality hosts (if any), we place the remaining locality host groups in
+  // lexicographic order. This provides a stable ordering for zone aware routing.
+  for (auto& entry : hosts_per_locality) {
+    if (!non_empty_local_locality || !LocalityEqualTo()(local_locality, entry.first)) {
+      per_locality.emplace_back(entry.second);
+      if (locality_weighted_lb) {
+        locality_weights->emplace_back(locality_weights_map[entry.first]);
+      }
+    }
+  }
+
+  auto per_locality_shared =
+      std::make_shared<HostsPerLocalityImpl>(std::move(per_locality), non_empty_local_locality);
+
+  auto& host_set =
+      static_cast<PrioritySetImpl&>(parent_.prioritySet()).getOrCreateHostSet(priority);
+  host_set.updateHosts(hosts, ClusterImplBase::createHealthyHostList(*hosts), per_locality_shared,
+                       ClusterImplBase::createHealthyHostLists(*per_locality_shared),
+                       std::move(locality_weights), hosts_added.value_or(*hosts),
+                       hosts_removed.value_or<HostVector>({}));
 }
 
 StaticClusterImpl::StaticClusterImpl(const envoy::api::v2::Cluster& cluster,
@@ -684,16 +793,22 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
                                                    HostVector& hosts_added,
                                                    HostVector& hosts_removed) {
   uint64_t max_host_weight = 1;
+
+  // Did hosts change?
+  //
   // Has the EDS health status changed the health of any endpoint? If so, we
   // rebuild the hosts vectors. We only do this if the health status of an
   // endpoint has materially changed (e.g. if previously failing active health
   // checks, we just note it's now failing EDS health status but don't rebuild).
+  //
+  // Likewise, if metadata for an endpoint changed we rebuild the hosts vectors.
+  //
   // TODO(htuch): We can be smarter about this potentially, and not force a full
   // host set update on health status change. The way this would work is to
   // implement a HealthChecker subclass that provides thread local health
-  // updates to the Cluster objeect. This will probably make sense to do in
+  // updates to the Cluster object. This will probably make sense to do in
   // conjunction with https://github.com/envoyproxy/envoy/issues/2874.
-  bool health_changed = false;
+  bool hosts_changed = false;
 
   // Go through and see if the list we have is different from what we just got. If it is, we make a
   // new host list and raise a change notification. This uses an N^2 search given that this does not
@@ -725,13 +840,30 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
             (*i)->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
             // If the host was previously healthy and we're now unhealthy, we need to
             // rebuild.
-            health_changed |= previously_healthy;
+            hosts_changed |= previously_healthy;
           } else {
             (*i)->healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
             // If the host was previously unhealthy and now healthy, we need to
             // rebuild.
-            health_changed |= !previously_healthy && (*i)->healthy();
+            hosts_changed |= !previously_healthy && (*i)->healthy();
           }
+        }
+
+        // Did metadata change?
+        const bool metadata_changed =
+            !Protobuf::util::MessageDifferencer::Equivalent(*host->metadata(), *(*i)->metadata());
+        if (metadata_changed) {
+          // First, update the entire metadata for the endpoint.
+          (*i)->metadata(*host->metadata());
+
+          // Also, given that the canary attribute of an endpoint is derived from its metadata
+          // (e.g.: from envoy.lb/canary), we do a blind update here since it's cheaper than testing
+          // to see if it actually changed. We must update this besides just updating the metadata,
+          // because it'll be used by the router filter to compute upstream stats.
+          (*i)->canary(host->canary());
+
+          // If metadata changed, we need to rebuild. See github issue #3810.
+          hosts_changed = true;
         }
 
         (*i)->weight(host->weight());
@@ -791,11 +923,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     // During the search we moved all of the hosts from hosts_ into final_hosts so just
     // move them back.
     current_hosts = std::move(final_hosts);
-    // We return false here in the absence of EDS health status, because we
+    // We return false here in the absence of EDS health status or metadata changes, because we
     // have no changes to host vector status (modulo weights). When we have EDS
-    // health status, we return true, causing updateHosts() to fire in the
+    // health status or metadata changed, we return true, causing updateHosts() to fire in the
     // caller.
-    return health_changed;
+    return hosts_changed;
   }
 }
 
@@ -821,7 +953,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluste
     dns_lookup_family_ = Network::DnsLookupFamily::Auto;
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   for (const auto& host : cluster.hosts()) {

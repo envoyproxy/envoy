@@ -30,7 +30,7 @@ uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent&
     return 1000000;
   default:
     // Checked by schema.
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -107,7 +107,7 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   ProtobufTypes::String json;
   const auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
   // This should always succeed unless something crash-worthy such as out-of-memory.
-  RELEASE_ASSERT(status.ok());
+  RELEASE_ASSERT(status.ok(), "");
   return json;
 }
 
@@ -188,7 +188,7 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
   }
 
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
