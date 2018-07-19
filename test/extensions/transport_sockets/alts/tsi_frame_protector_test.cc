@@ -59,7 +59,7 @@ TEST_F(TsiFrameProtectorTest, Protect) {
 
     EXPECT_EQ(TSI_OK, frame_protector_.protect(input, encrypted));
 
-    // fake frameprotector will split long buffer to 2 "encrypted" frames with length 16K.
+    // fake frame protector will split long buffer to 2 "encrypted" frames with length 16K.
     std::string expected =
         "\0\x40\0\0"s + std::string(16380, 'a') + "\x28\x0e\0\0"s + std::string(3620, 'a');
     EXPECT_EQ(expected, encrypted.toString());
