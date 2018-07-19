@@ -90,7 +90,7 @@ EXTENSIONS = {
     #
 
     "envoy.filters.thrift.router":                      "//source/extensions/filters/network/thrift_proxy/router:config",
- 
+
     #
     # Tracers
     #
