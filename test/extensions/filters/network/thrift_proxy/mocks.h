@@ -157,12 +157,12 @@ public:
   ~MockDecoderFilterCallbacks();
 
   // ThriftProxy::ThriftFilters::DecoderFilterCallbacks
-  MOCK_METHOD0(streamId, uint64_t());
-  MOCK_METHOD0(connection, const Network::Connection*());
+  MOCK_CONST_METHOD0(streamId, uint64_t());
+  MOCK_CONST_METHOD0(connection, const Network::Connection*());
   MOCK_METHOD0(continueDecoding, void());
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
-  MOCK_METHOD0(downstreamTransportType, TransportType());
-  MOCK_METHOD0(downstreamProtocolType, ProtocolType());
+  MOCK_CONST_METHOD0(downstreamTransportType, TransportType());
+  MOCK_CONST_METHOD0(downstreamProtocolType, ProtocolType());
   void sendLocalReply(DirectResponsePtr&& response) override { sendLocalReply_(response); }
   MOCK_METHOD2(startUpstreamResponse, void(TransportType, ProtocolType));
   MOCK_METHOD1(upstreamData, bool(Buffer::Instance&));

@@ -195,12 +195,16 @@ private:
     ThriftFilters::FilterStatus setEnd() override { return decoder_filter_->setEnd(); }
 
     // ThriftFilters::DecoderFilterCallbacks
-    uint64_t streamId() override { return stream_id_; }
-    const Network::Connection* connection() override;
+    uint64_t streamId() const override { return stream_id_; }
+    const Network::Connection* connection() const override;
     void continueDecoding() override;
     Router::RouteConstSharedPtr route() override;
-    TransportType downstreamTransportType() override { return parent_.decoder_->transportType(); }
-    ProtocolType downstreamProtocolType() override { return parent_.decoder_->protocolType(); }
+    TransportType downstreamTransportType() const override {
+      return parent_.decoder_->transportType();
+    }
+    ProtocolType downstreamProtocolType() const override {
+      return parent_.decoder_->protocolType();
+    }
     void sendLocalReply(ThriftFilters::DirectResponsePtr&& response) override;
     void startUpstreamResponse(TransportType transport_type, ProtocolType protocol_type) override;
     bool upstreamData(Buffer::Instance& buffer) override;

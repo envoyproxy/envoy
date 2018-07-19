@@ -215,7 +215,7 @@ void ConnectionManager::ActiveRpc::onError(const std::string& what) {
   // possible to provide a valid response, so don't try.
 }
 
-const Network::Connection* ConnectionManager::ActiveRpc::connection() {
+const Network::Connection* ConnectionManager::ActiveRpc::connection() const {
   return &parent_.read_callbacks_->connection();
 }
 

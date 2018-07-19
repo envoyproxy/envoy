@@ -44,12 +44,12 @@ public:
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
    */
-  virtual uint64_t streamId() PURE;
+  virtual uint64_t streamId() const PURE;
 
   /**
    * @return const Network::Connection* the originating connection, or nullptr if there is none.
    */
-  virtual const Network::Connection* connection() PURE;
+  virtual const Network::Connection* connection() const PURE;
 
   /**
    * Continue iterating through the filter chain with buffered data. This routine can only be
@@ -68,12 +68,12 @@ public:
   /**
    * @return TransportType the originating transport.
    */
-  virtual TransportType downstreamTransportType() PURE;
+  virtual TransportType downstreamTransportType() const PURE;
 
   /**
    * @return ProtocolType the originating protocol.
    */
-  virtual ProtocolType downstreamProtocolType() PURE;
+  virtual ProtocolType downstreamProtocolType() const PURE;
 
   /**
    * Create a locally generated response using the provided response object.
