@@ -22,16 +22,17 @@ public:
 
   /**
    * Wrapper for tsi_frame_protector_protect
-   * @param input supplies the input buffer, the method will drain it when it is processed.
-   * @param output supplies the output buffer
+   * @param input supplies the input data to protect, the method will drain it when it is processed.
+   * @param output supplies the buffer where the protected data will be stored.
    * @return tsi_result the status.
    */
   tsi_result protect(Buffer::Instance& input, Buffer::Instance& output);
 
   /**
    * Wrapper for tsi_frame_protector_unprotect
-   * @param input supplies the input buffer, the method will drain it when it is processed.
-   * @param output supplies the output buffer
+   * @param input supplies the input data to unprotect, the method will drain it when it is
+   * processed.
+   * @param output supplies the buffer where the unprotected data will be stored.
    * @return tsi_result the status.
    */
   tsi_result unprotect(Buffer::Instance& input, Buffer::Instance& output);
