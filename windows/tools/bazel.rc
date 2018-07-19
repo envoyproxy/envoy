@@ -1,5 +1,6 @@
 # Windows/Envoy specific Bazel build/test options.
 
+// TODO: remove experimental_shortened_obj_file_path for Bazel 0.16.0
 build --experimental_shortened_obj_file_path
 build --define signal_trace=disabled
 build --define hot_restart=disabled
