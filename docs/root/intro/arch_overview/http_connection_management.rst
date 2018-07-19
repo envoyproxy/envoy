@@ -55,7 +55,7 @@ Various configurable timeouts apply to an HTTP connection and its constituent st
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.drain_timeout>`:
   this spans between an Envoy originated GOAWAY and connection termination.
 * Stream-level idle timeout: this applies to each individual stream. It may be configured at both
-  the :ref:`connection manage
+  the :ref:`connection manager
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
   and :ref:`per-route <envoy_api_field_route.RouteAction.idle_timeout>` granularity.
   Header/data/trailer events on the stream reset the idle timeout.
