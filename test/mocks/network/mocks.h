@@ -412,7 +412,7 @@ public:
   MOCK_CONST_METHOD1(bind, std::tuple<int, int>(int));
   MOCK_CONST_METHOD1(connect, std::tuple<int, int>(int));
   MOCK_CONST_METHOD0(ip, Address::Ip*());
-  MOCK_CONST_METHOD1(socket, int(Address::SocketType));
+  MOCK_CONST_METHOD1(socket, std::tuple<int, int>(Address::SocketType));
   MOCK_CONST_METHOD0(type, Address::Type());
 
   const std::string& asString() const override { return physical_; }

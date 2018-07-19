@@ -51,7 +51,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   ASSERT_NE(addr_port->ip(), nullptr);
 
   // Create a socket on which we'll listen for connections from clients.
-  const int listen_fd = addr_port->socket(SocketType::Stream);
+  const int listen_fd = std::get<0>(addr_port->socket(SocketType::Stream));
   ASSERT_GE(listen_fd, 0) << addr_port->asString();
   ScopedFdCloser closer1(listen_fd);
 
@@ -75,7 +75,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 
   auto client_connect = [](Address::InstanceConstSharedPtr addr_port) {
     // Create a client socket and connect to the server.
-    const int client_fd = addr_port->socket(SocketType::Stream);
+    const int client_fd = std::get<0>(addr_port->socket(SocketType::Stream));
     ASSERT_GE(client_fd, 0) << addr_port->asString();
     ScopedFdCloser closer2(client_fd);
 
@@ -312,7 +312,7 @@ TEST(PipeInstanceTest, BadAddress) {
 TEST(PipeInstanceTest, UnlinksExistingFile) {
   const auto bind_uds_socket = [](const std::string& path) {
     PipeInstance address(path);
-    const int listen_fd = address.socket(SocketType::Stream);
+    const int listen_fd = std::get<0>(address.socket(SocketType::Stream));
     ASSERT_GE(listen_fd, 0) << address.asString();
     ScopedFdCloser closer(listen_fd);
 

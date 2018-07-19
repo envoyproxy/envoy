@@ -151,11 +151,11 @@ public:
   /**
    * Create a socket for this address.
    * @param type supplies the socket type to create.
-   * @return the file descriptor naming the socket for success and -1 for failure. The error
-   * code associated with a failure will be accessible in a plaform dependent fashion (e.g.
-   * errno for Unix platforms).
+   * @return a tuple of <fd, errno> for success and <-1, errno> for failure, where fd represents
+   *   the file descriptor naming the socket. If a valid file descriptor is returned, errno
+   *   shouldn't be used.
    */
-  virtual int socket(SocketType type) const PURE;
+  virtual std::tuple<int, int> socket(SocketType type) const PURE;
 
   /**
    * @return the type of address.

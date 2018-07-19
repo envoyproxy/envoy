@@ -133,7 +133,7 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
   return addressFromSockAddr(ss, ss_len);
 }
 
-int InstanceBase::socketFromSocketType(SocketType socketType) const {
+std::tuple<int, int> InstanceBase::socketFromSocketType(SocketType socketType) const {
 #if defined(__APPLE__)
   int flags = 0;
 #else
@@ -168,7 +168,7 @@ int InstanceBase::socketFromSocketType(SocketType socketType) const {
   RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1, "");
 #endif
 
-  return fd;
+  return std::make_tuple(fd, errno);
 }
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address) : InstanceBase(Type::Ip) {
@@ -224,7 +224,9 @@ std::tuple<int, int> Ipv4Instance::connect(int fd) const {
                          errno);
 }
 
-int Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
+std::tuple<int, int> Ipv4Instance::socket(SocketType type) const {
+  return socketFromSocketType(type);
+}
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
@@ -289,13 +291,14 @@ std::tuple<int, int> Ipv6Instance::connect(int fd) const {
                          errno);
 }
 
-int Ipv6Instance::socket(SocketType type) const {
-  const int fd = socketFromSocketType(type);
+std::tuple<int, int> Ipv6Instance::socket(SocketType type) const {
+  const std::tuple<int, int> result = socketFromSocketType(type);
+  const int fd = std::get<0>(result);
 
   // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
   const int v6only = ip_.v6only_;
   RELEASE_ASSERT(::setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1, "");
-  return fd;
+  return result;
 }
 
 PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
@@ -361,7 +364,9 @@ std::tuple<int, int> PipeInstance::connect(int fd) const {
       ::connect(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_)), errno);
 }
 
-int PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }
+std::tuple<int, int> PipeInstance::socket(SocketType type) const {
+  return socketFromSocketType(type);
+}
 
 } // namespace Address
 } // namespace Network

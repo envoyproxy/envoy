@@ -55,7 +55,7 @@ public:
 
 protected:
   InstanceBase(Type type) : type_(type) {}
-  int socketFromSocketType(SocketType type) const;
+  std::tuple<int, int> socketFromSocketType(SocketType type) const;
 
   std::string friendly_name_;
 
@@ -94,7 +94,7 @@ public:
   std::tuple<int, int> bind(int fd) const override;
   std::tuple<int, int> connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
-  int socket(SocketType type) const override;
+  std::tuple<int, int> socket(SocketType type) const override;
 
 private:
   struct Ipv4Helper : public Ipv4 {
@@ -154,7 +154,7 @@ public:
   std::tuple<int, int> bind(int fd) const override;
   std::tuple<int, int> connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
-  int socket(SocketType type) const override;
+  std::tuple<int, int> socket(SocketType type) const override;
 
 private:
   struct Ipv6Helper : public Ipv6 {
@@ -211,7 +211,7 @@ public:
   std::tuple<int, int> bind(int fd) const override;
   std::tuple<int, int> connect(int fd) const override;
   const Ip* ip() const override { return nullptr; }
-  int socket(SocketType type) const override;
+  std::tuple<int, int> socket(SocketType type) const override;
 
 private:
   sockaddr_un address_;

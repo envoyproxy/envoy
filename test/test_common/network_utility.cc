@@ -26,9 +26,11 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << (addr_port == nullptr ? "nullptr" : addr_port->asString());
     return nullptr;
   }
-  const int fd = addr_port->socket(type);
+  std::tuple<int, int> result = addr_port->socket(type);
+  const int fd = std::get<0>(result);
+  int err;
   if (fd < 0) {
-    const int err = errno;
+    err = std::get<1>(result);
     ADD_FAILURE() << "socket failed for '" << addr_port->asString()
                   << "' with error: " << strerror(err) << " (" << err << ")";
     return nullptr;
@@ -37,9 +39,8 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   // Not setting REUSEADDR, therefore if the address has been recently used we won't reuse it here.
   // However, because we're going to use the address while checking if it is available, we'll need
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
-  std::tuple<int, int> result = addr_port->bind(fd);
+  result = addr_port->bind(fd);
   int rc = std::get<0>(result);
-  int err;
   const char* failing_fn = nullptr;
   if (rc != 0) {
     err = std::get<1>(result);
@@ -150,7 +151,7 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, 
 
 bool supportsIpVersion(const Address::IpVersion version) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  const int fd = addr->socket(Address::SocketType::Stream);
+  const int fd = std::get<0>(addr->socket(Address::SocketType::Stream));
   if (fd < 0) {
     // Socket creation failed.
     return false;
@@ -168,13 +169,14 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
                                                                      Address::SocketType type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   const char* failing_fn = nullptr;
-  const int fd = addr->socket(type);
+  std::tuple<int, int> result = addr->socket(type);
+  const int fd = std::get<0>(result);
   int err;
   if (fd < 0) {
-    err = errno;
+    err = std::get<1>(result);
     failing_fn = "socket";
   } else {
-    std::tuple<int, int> result = addr->bind(fd);
+    result = addr->bind(fd);
     if (0 != std::get<0>(result)) {
       err = std::get<1>(result);
       failing_fn = "bind";
