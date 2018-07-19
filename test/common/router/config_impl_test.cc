@@ -4434,7 +4434,9 @@ virtual_hosts:
 
 class PerFilterConfigsTest : public testing::Test {
 public:
-  PerFilterConfigsTest() : factory_(), registered_factory_(factory_) {}
+  PerFilterConfigsTest()
+      : factory_(), registered_factory_(factory_), default_factory_(),
+        registered_default_factory_(default_factory_) {}
 
   struct DerivedFilterConfig : public RouteSpecificFilterConfig {
     ProtobufWkt::Timestamp config_;
@@ -4456,6 +4458,15 @@ public:
       auto obj = std::make_shared<DerivedFilterConfig>();
       obj->config_.MergeFrom(message);
       return obj;
+    }
+  };
+  class DefaultTestFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+  public:
+    DefaultTestFilterConfig() : EmptyHttpFilterConfig("test.default.filter") {}
+
+    Http::FilterFactoryCb createFilter(const std::string&,
+                                       Server::Configuration::FactoryContext&) override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
   };
 
@@ -4481,8 +4492,24 @@ public:
         << "config value does not match expected for source: " << source;
   }
 
+  void checkNoPerFilterConfig(const std::string& yaml) {
+    const ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+    const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
+    const auto* route_entry = route->routeEntry();
+    const auto& vhost = route_entry->virtualHost();
+
+    EXPECT_EQ(nullptr,
+              route_entry->perFilterConfigTyped<DerivedFilterConfig>(default_factory_.name()));
+    EXPECT_EQ(nullptr, route->perFilterConfigTyped<DerivedFilterConfig>(default_factory_.name()));
+    EXPECT_EQ(nullptr, vhost.perFilterConfigTyped<DerivedFilterConfig>(default_factory_.name()));
+  }
+
   TestFilterConfig factory_;
   Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registered_factory_;
+  DefaultTestFilterConfig default_factory_;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>
+      registered_default_factory_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 };
 
@@ -4501,6 +4528,23 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       ConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException,
       "Didn't find a registered implementation for name: 'unknown.filter'");
+}
+
+// Test that a trivially specified NamedHttpFilterConfigFactory ignores per_filter_config without
+// error.
+TEST_F(PerFilterConfigsTest, DefaultFilterImplementation) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+    per_filter_config: { test.default.filter: { unknown_key: 123} }
+)EOF";
+
+  checkNoPerFilterConfig(yaml);
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalConfig) {

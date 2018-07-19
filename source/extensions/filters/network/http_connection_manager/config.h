@@ -32,7 +32,7 @@ class HttpConnectionManagerFilterConfigFactory
           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager> {
 public:
   HttpConnectionManagerFilterConfigFactory()
-      : FactoryBase(NetworkFilterNames::get().HTTP_CONNECTION_MANAGER) {}
+      : FactoryBase(NetworkFilterNames::get().HttpConnectionManager) {}
 
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
