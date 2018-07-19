@@ -3,7 +3,7 @@ $ProgressPreference="SilentlyContinue"
 
 trap { $host.SetShouldExit(1) }
 
-Invoke-WebRequest -UseBasicParsing "https://aka.ms/vs/15/release/vs_buildtools.exe" -OutFile "$env:TEMP\vs_buildtools.exe"
+Start-BitsTransfer "https://aka.ms/vs/15/release/vs_buildtools.exe" "$env:TEMP\vs_buildtools.exe"
 
 # Install VS Build Tools in a directory without spaces to work around: https://github.com/bazelbuild/bazel/issues/4496
 # otherwise none of the go code will build (c++ is fine)
