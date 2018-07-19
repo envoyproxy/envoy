@@ -285,10 +285,11 @@ private:
 
 template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
-  //static const uint64_t UNLIMITED_WIDTH = 0;
-
-  //StatDataAllocatorImpl() : max_width_(UNLIMITED_WIDTH) {}
-  explicit StatDataAllocatorImpl(const StatsOptions& options) : options_(options) {}
+  /**
+   * @param stats_options The stat optinos, which must live longer than the allocator.
+   */
+  explicit StatDataAllocatorImpl(const StatsOptions& stats_options)
+      : stats_options_(stats_options) {}
 
   // StatDataAllocator
   CounterSharedPtr makeCounter(const std::string& name, std::string&& tag_extracted_name,
@@ -312,11 +313,22 @@ public:
    */
   virtual void free(StatData& data) PURE;
 
+  /**
+   * Truncates a stat name based on the options passed into the constructor,
+   * issuing a warning if a truncation was needed.
+   *
+   * @param stat_name The original stat name.
+   * @return absl::string_view The stat name, truncated if needed to meet limits in stat_options_.
+   */
   absl::string_view truncateStatName(absl::string_view stat_name);
-  const StatsOptions& statsOptions() const override { return options_; }
+
+  /**
+   * @return const StatsOptions& The options passed into the constructor.
+   */
+  const StatsOptions& statsOptions() const override { return stats_options_; }
 
 private:
-  const StatsOptions& options_;
+  const StatsOptions& stats_options_;
 };
 
 using RawStatDataAllocator = StatDataAllocatorImpl<RawStatData>;
@@ -407,9 +419,8 @@ struct HeapStatData {
  */
 class HeapStatDataAllocator : public StatDataAllocatorImpl<HeapStatData> {
 public:
-  explicit HeapStatDataAllocator(const StatsOptions& options)
-      : StatDataAllocatorImpl(options) {}
-  //HeapStatDataAllocator() {}
+  explicit HeapStatDataAllocator(const StatsOptions& options) : StatDataAllocatorImpl(options) {}
+  // HeapStatDataAllocator() {}
   ~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 
   // StatDataAllocator
@@ -484,9 +495,16 @@ private:
  */
 class IsolatedStoreImpl : public Store {
 public:
-  /*explicit*/ IsolatedStoreImpl(/*Stats::StatsOptions& stats_options*/)
-      : alloc_(stats_options_),
-        counters_([this](const std::string& name) -> CounterSharedPtr {
+  // TODO(jmarantz): It appears that if the configuartion overrides the max
+  // option length, this isolated store will not see the adjustment. I am
+  // not sure if that's a problem. Ideally I'd like to take the stat_options
+  // here we can creating the StatAllocator, but it's not immediately obvious
+  // where to pull that from. I think this issue existed starting with
+  // https://github.com/envoyproxy/envoy/pull/3629, which removed the shadowing
+  // of option size in a static.
+
+  /* explicit */ IsolatedStoreImpl(/*Stats::StatsOptions& stats_options*/)
+      : alloc_(stats_options_), counters_([this](const std::string& name) -> CounterSharedPtr {
           std::string tag_extracted_name = name;
           std::vector<Tag> tags;
           return alloc_.makeCounter(name, std::move(tag_extracted_name), std::move(tags));

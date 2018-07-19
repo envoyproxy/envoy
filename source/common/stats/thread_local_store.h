@@ -276,6 +276,7 @@ private:
   void mergeInternal(PostMergeCb mergeCb);
 
   StatDataAllocator& alloc_;
+  HeapStatDataAllocator heap_allocator_;
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
   mutable Thread::MutexBasicLockable lock_;
@@ -286,7 +287,6 @@ private:
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
-  HeapStatDataAllocator heap_allocator_;
   SourceImpl source_;
 };
 

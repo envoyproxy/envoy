@@ -138,6 +138,7 @@ public:
    */
   static std::string hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len);
 
+  // RawStatDataAllocator
   Stats::RawStatData* alloc(const std::string& name) override;
   void free(Stats::RawStatData& data) override;
 

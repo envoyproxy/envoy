@@ -14,10 +14,9 @@ namespace Stats {
 
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(const Stats::StatsOptions& stats_options,
                                            StatDataAllocator& alloc)
-    : alloc_(alloc), default_scope_(createScope("")),
+    : alloc_(alloc), heap_allocator_(stats_options), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
-      num_last_resort_stats_(default_scope_->counter("stats.overflow")),
-      heap_allocator_(stats_options), source_(*this) {}
+      num_last_resort_stats_(default_scope_->counter("stats.overflow")), source_(*this) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_);

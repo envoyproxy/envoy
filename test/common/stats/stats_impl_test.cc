@@ -478,9 +478,9 @@ TEST(TagProducerTest, CheckConstructor) {
       "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
 }
 
-// Validate truncation behavior of RawStatData.
+// Validate truncation behavior of HeapStatData.
 // Note: a similar test using RawStatData* is in test/server/hot_restart_impl_test.cc.
-TEST(RawStatDataTest, Truncate) {
+TEST(RawStatDataTest, HeapTruncate) {
   Stats::StatsOptionsImpl stats_options;
   HeapStatDataAllocator alloc(stats_options);
   const std::string long_string(stats_options.maxNameLength() + 1, 'A');
@@ -507,7 +507,9 @@ TEST(RawStatDataTest, HeapAlloc) {
   alloc.free(*stat_3);
 }
 
-TEST(RawStatDataTest, TruncateRaw) {
+// See also HotRestartImplTest.RawTruncateWithAllocator and
+//
+TEST(RawStatDataTest, TruncateWithoutAllocator) {
   // RawStatData::truncateAndInit(absl::string_view key, const StatsOptions& stats_options) will
   // truncate and log to ENVOY_LOG_MISC if given a key longer than the allowed
   // stats_options.maxNameLength(). This mechanism is also tested in HotRestartImplTest.truncateKey.

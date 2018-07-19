@@ -139,16 +139,6 @@ HeapStatData::HeapStatData(absl::string_view key) : name_(key.data(), key.size()
 
 HeapStatData* HeapStatDataAllocator::alloc(const std::string& name) {
   auto data = std::make_unique<HeapStatData>(truncateStatName(name));
-  /*
-RawStatData* HeapRawStatDataAllocator::alloc(const std::string& name) {
-  uint64_t num_bytes_to_allocate = RawStatData::structSize(name.size());
-  RawStatData* data = static_cast<RawStatData*>(::calloc(num_bytes_to_allocate, 1));
-  if (data == nullptr) {
-    throw std::bad_alloc();
-  }
-  data->checkAndInit(name, num_bytes_to_allocate);
-
-  */
   Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data.get());
   HeapStatData* existing_data = *ret.first;
@@ -178,8 +168,9 @@ void HeapStatDataAllocator::free(HeapStatData& data) {
 
 /**
  * Counter implementation that wraps a StatData. StatData must have data members:
- *    int64 value_;
- *    ....
+ *    int64_t value_;
+ *    int64_t pending_increment_;
+ *    int16_t flags_;
  */
 template <class StatData> class CounterImpl : public Counter, public MetricImpl {
 public:
@@ -342,12 +333,12 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
 
 template <class StatData>
 absl::string_view StatDataAllocatorImpl<StatData>::truncateStatName(absl::string_view key) {
-  const uint64_t max_width = options_.maxNameLength();
-  if (/*(max_width_ != UNLIMITED_WIDTH) &&*/ (key.size() > max_width)) {
+  const uint64_t max_width = stats_options_.maxNameLength();
+  if (key.size() > max_width) {
     ENVOY_LOG_MISC(
         warn,
         "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
-        key.size(), options_.maxNameLength());
+        key.size(), max_width);
     return absl::string_view(key.data(), max_width);
   }
   return key;

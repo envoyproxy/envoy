@@ -377,11 +377,10 @@ private:
 class MockedTestAllocator : public RawStatDataAllocator {
 public:
   MockedTestAllocator(const StatsOptions& stats_options)
-      : RawStatDataAllocator(stats_options),
-        alloc_(stats_options) {
-    ON_CALL(*this, alloc(_))
-        .WillByDefault(Invoke(
-            [this](const std::string& name) -> RawStatData* { return alloc_.alloc(name); }));
+      : RawStatDataAllocator(stats_options), alloc_(stats_options) {
+    ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](const std::string& name) -> RawStatData* {
+      return alloc_.alloc(name);
+    }));
 
     ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
       return alloc_.free(data);

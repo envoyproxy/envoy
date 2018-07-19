@@ -90,7 +90,8 @@ TEST_F(HotRestartImplTest, versionString) {
   }
 }
 
-TEST_F(HotRestartImplTest, RawTruncate) {
+// See also StatsImplTest.RawTruncateWithoutAllocator.
+TEST_F(HotRestartImplTest, RawTruncateWithAllocator) {
   setup();
 
   const std::string long_string(hot_restart_->statsOptions().maxNameLength() + 1, 'A');
