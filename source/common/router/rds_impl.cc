@@ -35,7 +35,7 @@ RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
     return route_config_provider_manager.getRdsRouteConfigProvider(config.rds(), factory_context,
                                                                    stat_prefix);
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

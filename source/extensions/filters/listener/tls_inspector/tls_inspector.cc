@@ -210,7 +210,7 @@ void Filter::parseClientHello(const void* data, size_t len) {
       } else {
         config_->stats().alpn_not_found_.inc();
       }
-      cb_->socket().setDetectedTransportProtocol(TransportSockets::TransportSocketNames::get().TLS);
+      cb_->socket().setDetectedTransportProtocol(TransportSockets::TransportSocketNames::get().Tls);
     } else {
       config_->stats().tls_not_found_.inc();
     }

@@ -245,6 +245,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "resource_monitor_config_lib",
+    hdrs = ["resource_monitor_config_impl.h"],
+    deps = [
+        "//include/envoy/server:resource_monitor_config_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "server_lib",
     srcs = ["server.cc"],
     hdrs = ["server.h"],

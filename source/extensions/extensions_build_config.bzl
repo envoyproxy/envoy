@@ -71,6 +71,12 @@ EXTENSIONS = {
     "envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
 
     #
+    # Resource monitors
+    #
+
+    "envoy.resource_monitors.fixed_heap":               "//source/extensions/resource_monitors/fixed_heap:config",
+
+    #
     # Stat sinks
     #
 
