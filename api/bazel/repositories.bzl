@@ -308,6 +308,7 @@ def _com_github_grpc_grpc():
         name = "libssl",
         actual = "@boringssl//:ssl",
     )
+
     # Envoy requires this bind
     native.bind(
         name = "ssl",
