@@ -480,6 +480,9 @@ public:
   virtual GaugeSharedPtr makeGauge(const std::string& name, std::string&& tag_extracted_name,
                                    std::vector<Tag>&& tags) PURE;
 
+  /**
+   * @return const StatsOptions& the options used to initialize the allocator.
+   */
   virtual const StatsOptions& statsOptions() const PURE;
 
   // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At

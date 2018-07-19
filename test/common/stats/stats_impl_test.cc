@@ -489,33 +489,6 @@ TEST(RawStatDataTest, Truncate) {
   alloc.free(*stat);
 }
 
-// Check consistency of internal stat representation
-TEST(RawStatDataTest, Consistency) {
-  Stats::StatsOptionsImpl stats_options;
-  HeapStatDataAllocator alloc(stats_options);
-  // Generate a stat, encode it to hex, and take the hash of that hex string. We expect the hash to
-  // vary only when the internal representation of a stat has been intentionally changed, in which
-  // case SharedMemory::VERSION should be incremented as well.
-  uint64_t expected_hash = 1874506077228772558;
-  uint64_t max_name_length = stats_options.maxNameLength();
-
-  const std::string name_1(max_name_length, 'A');
-  HeapStatData* stat_1 = alloc.alloc(name_1);
-  std::string stat_hex_dump_1 =
-      Hex::encode(reinterpret_cast<uint8_t*>(stat_1), sizeof(RawStatData) + max_name_length);
-  EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_1), expected_hash);
-  alloc.free(*stat_1);
-
-  // If a stat name is truncated, we expect that its internal representation is the same as if it
-  // had been initialized with the already-truncated name.
-  const std::string name_2(max_name_length + 1, 'A');
-  HeapStatData* stat_2 = alloc.alloc(name_2);
-  std::string stat_hex_dump_2 =
-      Hex::encode(reinterpret_cast<uint8_t*>(stat_2), sizeof(RawStatData) + max_name_length);
-  EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_2), expected_hash);
-  alloc.free(*stat_2);
-}
-
 // Note: a similar test using RawStatData* is in test/server/hot_restart_impl_test.cc.
 TEST(RawStatDataTest, HeapAlloc) {
   Stats::StatsOptionsImpl stats_options;

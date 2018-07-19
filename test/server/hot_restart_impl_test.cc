@@ -1,4 +1,5 @@
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/hex.h"
 #include "common/stats/stats_impl.h"
 
 #include "server/hot_restart_impl.h"
@@ -96,6 +97,32 @@ TEST_F(HotRestartImplTest, RawTruncate) {
   Stats::RawStatData* stat{};
   EXPECT_LOG_CONTAINS("warning", "is too long with", stat = hot_restart_->alloc(long_string));
   hot_restart_->free(*stat);
+}
+
+// Check consistency of internal stat representation
+TEST_F(HotRestartImplTest, Consistency) {
+  setup();
+
+  // Generate a stat, encode it to hex, and take the hash of that hex string. We expect the hash to
+  // vary only when the internal representation of a stat has been intentionally changed, in which
+  // case SharedMemory::VERSION should be incremented as well.
+  uint64_t expected_hash = 1874506077228772558;
+  uint64_t max_name_length = stats_options_.maxNameLength();
+
+  const std::string name_1(max_name_length, 'A');
+  Stats::RawStatData* stat_1 = hot_restart_->alloc(name_1);
+  uint64_t stat_size = sizeof(Stats::RawStatData) + max_name_length;
+  std::string stat_hex_dump_1 = Hex::encode(reinterpret_cast<uint8_t*>(stat_1), stat_size);
+  EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_1), expected_hash);
+  hot_restart_->free(*stat_1);
+
+  // If a stat name is truncated, we expect that its internal representation is the same as if it
+  // had been initialized with the already-truncated name.
+  const std::string name_2(max_name_length + 1, 'A');
+  Stats::RawStatData* stat_2 = hot_restart_->alloc(name_2);
+  std::string stat_hex_dump_2 = Hex::encode(reinterpret_cast<uint8_t*>(stat_2), stat_size);
+  EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_2), expected_hash);
+  hot_restart_->free(*stat_2);
 }
 
 TEST_F(HotRestartImplTest, RawAlloc) {

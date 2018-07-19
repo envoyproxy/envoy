@@ -148,11 +148,7 @@ HotRestartImpl::HotRestartImpl(Options& options)
 Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
   Thread::LockGuard lock(stat_lock_);
-  absl::string_view key = name;
-  if (key.size() > options_.statsOptions().maxNameLength()) {
-    key.remove_suffix(key.size() - options_.statsOptions().maxNameLength());
-  }
-  auto value_created = stats_set_->insert(key);
+  auto value_created = stats_set_->insert(truncateStatName(name));
   Stats::RawStatData* data = value_created.first;
   if (data == nullptr) {
     return nullptr;
