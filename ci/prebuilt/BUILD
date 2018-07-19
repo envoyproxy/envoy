@@ -3,13 +3,6 @@ licenses(["notice"])  # Apache 2
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "ares",
-    srcs = ["thirdparty_build/lib/libcares.a"],
-    hdrs = glob(["thirdparty_build/include/ares*.h"]),
-    includes = ["thirdparty_build/include"],
-)
-
-cc_library(
     name = "benchmark",
     srcs = ["thirdparty_build/lib/libbenchmark.a"],
     hdrs = ["thirdparty_build/include/testing/base/public/benchmark.h"],

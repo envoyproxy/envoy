@@ -30,7 +30,10 @@ def envoy_copts(repository, test = False):
                "//conditions:default": [],
            }) + envoy_select_hot_restart(["-DENVOY_HOT_RESTART"], repository) + \
            envoy_select_perf_annotation(["-DENVOY_PERF_ANNOTATION"]) + \
-           envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository)
+           envoy_select_google_grpc(["-DENVOY_GOOGLE_GRPC"], repository) + \
+           [
+               "-DGRPC_BAZEL_BUILD",  # workaround bazel thread-local bug https://github.com/grpc/grpc/pull/13929
+           ]
 
 def envoy_static_link_libstdcpp_linkopts():
     return envoy_select_force_libcpp(
