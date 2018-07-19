@@ -26,9 +26,11 @@ using namespace std::string_literals;
 class TsiFrameProtectorTest : public Test {
 public:
   TsiFrameProtectorTest()
-      : frame_protector_(CFrameProtectorPtr{tsi_create_fake_frame_protector(nullptr)}) {}
+      : raw_frame_protector_(tsi_create_fake_frame_protector(nullptr)),
+        frame_protector_(CFrameProtectorPtr{raw_frame_protector_}) {}
 
 protected:
+  tsi_frame_protector* raw_frame_protector_;
   TsiFrameProtector frame_protector_;
 };
 
@@ -66,6 +68,37 @@ TEST_F(TsiFrameProtectorTest, Protect) {
   }
 }
 
+TEST_F(TsiFrameProtectorTest, ProtectError) {
+  const tsi_frame_protector_vtable* vtable = raw_frame_protector_->vtable;
+  tsi_frame_protector_vtable mock_vtable = *raw_frame_protector_->vtable;
+  mock_vtable.protect = [](tsi_frame_protector*, const unsigned char*, size_t*, unsigned char*,
+                           size_t*) { return TSI_INTERNAL_ERROR; };
+  raw_frame_protector_->vtable = &mock_vtable;
+
+  Buffer::OwnedImpl input, encrypted;
+  input.add("foo");
+
+  EXPECT_EQ(TSI_INTERNAL_ERROR, frame_protector_.protect(input, encrypted));
+
+  raw_frame_protector_->vtable = vtable;
+}
+
+TEST_F(TsiFrameProtectorTest, ProtectFlushError) {
+  const tsi_frame_protector_vtable* vtable = raw_frame_protector_->vtable;
+  tsi_frame_protector_vtable mock_vtable = *raw_frame_protector_->vtable;
+  mock_vtable.protect_flush = [](tsi_frame_protector*, unsigned char*, size_t*, size_t*) {
+    return TSI_INTERNAL_ERROR;
+  };
+  raw_frame_protector_->vtable = &mock_vtable;
+
+  Buffer::OwnedImpl input, encrypted;
+  input.add("foo");
+
+  EXPECT_EQ(TSI_INTERNAL_ERROR, frame_protector_.protect(input, encrypted));
+
+  raw_frame_protector_->vtable = vtable;
+}
+
 TEST_F(TsiFrameProtectorTest, Unprotect) {
   {
     Buffer::OwnedImpl input, decrypted;
@@ -95,6 +128,20 @@ TEST_F(TsiFrameProtectorTest, Unprotect) {
     EXPECT_EQ(TSI_OK, frame_protector_.unprotect(input, decrypted));
     EXPECT_EQ(std::string(20000, 'a'), decrypted.toString());
   }
+}
+TEST_F(TsiFrameProtectorTest, UnprotectError) {
+  const tsi_frame_protector_vtable* vtable = raw_frame_protector_->vtable;
+  tsi_frame_protector_vtable mock_vtable = *raw_frame_protector_->vtable;
+  mock_vtable.unprotect = [](tsi_frame_protector*, const unsigned char*, size_t*, unsigned char*,
+                             size_t*) { return TSI_INTERNAL_ERROR; };
+  raw_frame_protector_->vtable = &mock_vtable;
+
+  Buffer::OwnedImpl input, decrypted;
+  input.add("\x0a\0\0\0foo"s);
+
+  EXPECT_EQ(TSI_INTERNAL_ERROR, frame_protector_.unprotect(input, decrypted));
+
+  raw_frame_protector_->vtable = vtable;
 }
 
 } // namespace Alts
