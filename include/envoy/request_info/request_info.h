@@ -8,6 +8,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/http/protocol.h"
+#include "envoy/request_info/dynamic_metadata.h"
 #include "envoy/upstream/upstream.h"
 
 #include "absl/types/optional.h"
@@ -300,6 +301,12 @@ public:
    * the same key overriding existing.
    */
   virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
+
+  /**
+   * More general dynamic metadata object.
+   * TODO(rdsmith): Replace uses of above with this object.
+   */
+  virtual DynamicMetadata& dynamicMetadata2() PURE;
 };
 
 } // namespace RequestInfo
