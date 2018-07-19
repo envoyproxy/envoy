@@ -23,7 +23,7 @@ public:
   void SetUp() override {
     factory_ =
         Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-            AccessLogNames::get().HTTP_GRPC);
+            AccessLogNames::get().HttpGrpc);
     ASSERT_NE(nullptr, factory_);
 
     message_ = factory_->createEmptyConfigProto();

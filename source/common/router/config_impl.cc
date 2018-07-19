@@ -258,6 +258,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
+      idle_timeout_(
+          PROTOBUF_GET_MS_OR_DEFAULT(route.route(), idle_timeout, DEFAULT_ROUTE_IDLE_TIMEOUT_MS)),
       max_grpc_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), max_grpc_timeout)),
       runtime_(loadRuntimeData(route.match())), loader_(factory_context.runtime()),
       host_redirect_(route.redirect().host_redirect()),
@@ -460,7 +462,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::route::Route& route)
   std::multimap<std::string, std::string> ret;
   if (route.has_metadata()) {
     const auto filter_metadata = route.metadata().filter_metadata().find(
-        Extensions::HttpFilters::HttpFilterNames::get().ROUTER);
+        Extensions::HttpFilters::HttpFilterNames::get().Router);
     if (filter_metadata == route.metadata().filter_metadata().end()) {
       return ret;
     }
@@ -540,7 +542,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
     }
     begin = end;
   }
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
@@ -713,7 +715,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
     ssl_requirements_ = SslRequirements::ALL;
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   for (const auto& route : virtual_host.routes()) {

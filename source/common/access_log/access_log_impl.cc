@@ -47,7 +47,7 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) {
   case envoy::config::filter::accesslog::v2::ComparisonFilter::LE:
     return lhs <= value;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -75,7 +75,7 @@ FilterFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLogFi
     MessageUtil::validate(config);
     return FilterPtr{new ResponseFlagFilter(config.response_flag_filter())};
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

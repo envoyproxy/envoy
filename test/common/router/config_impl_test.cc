@@ -4373,9 +4373,70 @@ virtual_hosts:
   }
 }
 
+TEST(RouteConfigurationV2, NoIdleTimeout) {
+  const std::string NoIdleTimeot = R"EOF(
+name: NoIdleTimeout
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          idle_timeout: 0s
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(NoIdleTimeot), factory_context, true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(absl::nullopt, route_entry->idleTimeout());
+}
+
+TEST(RouteConfigurationV2, DefaultIdleTimeout) {
+  const std::string DefaultIdleTimeot = R"EOF(
+name: NoIdleTimeout
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(DefaultIdleTimeot), factory_context, true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(5 * 60 * 1000, route_entry->idleTimeout().value().count());
+}
+
+TEST(RouteConfigurationV2, ExplicitIdleTimeout) {
+  const std::string ExplicitIdleTimeot = R"EOF(
+name: NoIdleTimeout
+virtual_hosts:
+  - name: regex
+    domains: [idle.lyft.com]
+    routes:
+      - match: { regex: "/regex"}
+        route:
+          cluster: some-cluster
+          idle_timeout: 7s
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  ConfigImpl config(parseRouteConfigurationFromV2Yaml(ExplicitIdleTimeot), factory_context, true);
+  Http::TestHeaderMapImpl headers = genRedirectHeaders("idle.lyft.com", "/regex", true, false);
+  const RouteEntry* route_entry = config.route(headers, 0)->routeEntry();
+  EXPECT_EQ(7 * 1000, route_entry->idleTimeout().value().count());
+}
+
 class PerFilterConfigsTest : public testing::Test {
 public:
-  PerFilterConfigsTest() : factory_(), registered_factory_(factory_) {}
+  PerFilterConfigsTest()
+      : factory_(), registered_factory_(factory_), default_factory_(),
+        registered_default_factory_(default_factory_) {}
 
   struct DerivedFilterConfig : public RouteSpecificFilterConfig {
     ProtobufWkt::Timestamp config_;
@@ -4386,7 +4447,7 @@ public:
 
     Http::FilterFactoryCb createFilter(const std::string&,
                                        Server::Configuration::FactoryContext&) override {
-      NOT_IMPLEMENTED;
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
       return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
@@ -4397,6 +4458,15 @@ public:
       auto obj = std::make_shared<DerivedFilterConfig>();
       obj->config_.MergeFrom(message);
       return obj;
+    }
+  };
+  class DefaultTestFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+  public:
+    DefaultTestFilterConfig() : EmptyHttpFilterConfig("test.default.filter") {}
+
+    Http::FilterFactoryCb createFilter(const std::string&,
+                                       Server::Configuration::FactoryContext&) override {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
   };
 
@@ -4422,8 +4492,24 @@ public:
         << "config value does not match expected for source: " << source;
   }
 
+  void checkNoPerFilterConfig(const std::string& yaml) {
+    const ConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
+
+    const auto route = config.route(genHeaders("www.foo.com", "/", "GET"), 0);
+    const auto* route_entry = route->routeEntry();
+    const auto& vhost = route_entry->virtualHost();
+
+    EXPECT_EQ(nullptr,
+              route_entry->perFilterConfigTyped<DerivedFilterConfig>(default_factory_.name()));
+    EXPECT_EQ(nullptr, route->perFilterConfigTyped<DerivedFilterConfig>(default_factory_.name()));
+    EXPECT_EQ(nullptr, vhost.perFilterConfigTyped<DerivedFilterConfig>(default_factory_.name()));
+  }
+
   TestFilterConfig factory_;
   Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registered_factory_;
+  DefaultTestFilterConfig default_factory_;
+  Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory>
+      registered_default_factory_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 };
 
@@ -4442,6 +4528,23 @@ virtual_hosts:
   EXPECT_THROW_WITH_MESSAGE(
       ConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true), EnvoyException,
       "Didn't find a registered implementation for name: 'unknown.filter'");
+}
+
+// Test that a trivially specified NamedHttpFilterConfigFactory ignores per_filter_config without
+// error.
+TEST_F(PerFilterConfigsTest, DefaultFilterImplementation) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+    per_filter_config: { test.default.filter: { unknown_key: 123} }
+)EOF";
+
+  checkNoPerFilterConfig(yaml);
 }
 
 TEST_F(PerFilterConfigsTest, RouteLocalConfig) {
@@ -4499,6 +4602,7 @@ virtual_hosts:
 
   checkEach(yaml, 1213, 1213, 1415);
 }
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

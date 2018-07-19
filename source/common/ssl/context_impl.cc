@@ -29,10 +29,8 @@ int ContextImpl::sslContextIndex() {
   }());
 }
 
-ContextImpl::ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
-                         const ContextConfig& config)
-    : parent_(parent), ctx_(SSL_CTX_new(TLS_method())), scope_(scope),
-      stats_(generateStats(scope)) {
+ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
+    : ctx_(SSL_CTX_new(TLS_method())), scope_(scope), stats_(generateStats(scope)) {
   RELEASE_ASSERT(ctx_, "");
 
   int rc = SSL_CTX_set_ex_data(ctx_.get(), sslContextIndex(), this);
@@ -461,9 +459,8 @@ std::string ContextImpl::getCertChainInformation() const {
                      getDaysUntilExpiration(cert_chain_.get()));
 }
 
-ClientContextImpl::ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
-                                     const ClientContextConfig& config)
-    : ContextImpl(parent, scope, config), server_name_indication_(config.serverNameIndication()),
+ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config)
+    : ContextImpl(scope, config), server_name_indication_(config.serverNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
@@ -487,11 +484,10 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
   return ssl_con;
 }
 
-ServerContextImpl::ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
-                                     const ServerContextConfig& config,
+ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
                                      const std::vector<std::string>& server_names,
                                      Runtime::Loader& runtime)
-    : ContextImpl(parent, scope, config), runtime_(runtime),
+    : ContextImpl(scope, config), runtime_(runtime),
       session_ticket_keys_(config.sessionTicketKeys()) {
   if (config.certChain().empty()) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");

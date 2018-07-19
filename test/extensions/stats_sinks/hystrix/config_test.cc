@@ -26,7 +26,7 @@ namespace StatSinks {
 namespace Hystrix {
 
 TEST(StatsConfigTest, ValidHystrixSink) {
-  const std::string name = StatsSinkNames::get().HYSTRIX;
+  const std::string name = StatsSinkNames::get().Hystrix;
 
   envoy::config::metrics::v2::HystrixSink sink_config;
 

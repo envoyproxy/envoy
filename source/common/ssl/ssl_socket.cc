@@ -15,8 +15,8 @@ using Envoy::Network::PostIoAction;
 namespace Envoy {
 namespace Ssl {
 
-SslSocket::SslSocket(Context& ctx, InitialState state)
-    : ctx_(dynamic_cast<Ssl::ContextImpl&>(ctx)), ssl_(ctx_.newSsl()) {
+SslSocket::SslSocket(ContextSharedPtr ctx, InitialState state)
+    : ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), ssl_(ctx_->newSsl()) {
   if (state == InitialState::Client) {
     SSL_set_connect_state(ssl_.get());
   } else {
@@ -99,7 +99,7 @@ PostIoAction SslSocket::doHandshake() {
   if (rc == 1) {
     ENVOY_CONN_LOG(debug, "handshake complete", callbacks_->connection());
     handshake_complete_ = true;
-    ctx_.logHandshake(ssl_.get());
+    ctx_->logHandshake(ssl_.get());
     callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
 
     // It's possible that we closed during the handshake callback.
@@ -126,7 +126,7 @@ void SslSocket::drainErrorQueue() {
   while (uint64_t err = ERR_get_error()) {
     if (ERR_GET_LIB(err) == ERR_LIB_SSL) {
       if (ERR_GET_REASON(err) == SSL_R_PEER_DID_NOT_RETURN_A_CERTIFICATE) {
-        ctx_.stats().fail_verify_no_cert_.inc();
+        ctx_->stats().fail_verify_no_cert_.inc();
         saw_counted_error = true;
       } else if (ERR_GET_REASON(err) == SSL_R_CERTIFICATE_VERIFY_FAILED) {
         saw_counted_error = true;
@@ -139,7 +139,7 @@ void SslSocket::drainErrorQueue() {
                    ERR_reason_error_string(err));
   }
   if (saw_error && !saw_counted_error) {
-    ctx_.stats().connection_error_.inc();
+    ctx_->stats().connection_error_.inc();
   }
 }
 
@@ -388,7 +388,7 @@ ClientSslSocketFactory::ClientSslSocketFactory(const ClientContextConfig& config
     : ssl_ctx_(manager.createSslClientContext(stats_scope, config)) {}
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() const {
-  return std::make_unique<Ssl::SslSocket>(*ssl_ctx_, Ssl::InitialState::Client);
+  return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Client);
 }
 
 bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
@@ -400,7 +400,7 @@ ServerSslSocketFactory::ServerSslSocketFactory(const ServerContextConfig& config
     : ssl_ctx_(manager.createSslServerContext(stats_scope, config, server_names)) {}
 
 Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() const {
-  return std::make_unique<Ssl::SslSocket>(*ssl_ctx_, Ssl::InitialState::Server);
+  return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Server);
 }
 
 bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }

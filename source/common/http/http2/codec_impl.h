@@ -123,8 +123,13 @@ protected:
 
     const nghttp2_option* options() { return options_; }
 
-  private:
+  protected:
     nghttp2_option* options_;
+  };
+
+  class ClientHttp2Options : public Http2Options {
+  public:
+    ClientHttp2Options();
   };
 
   /**
@@ -239,6 +244,7 @@ protected:
 
   static Http2Callbacks http2_callbacks_;
   static Http2Options http2_options_;
+  static ClientHttp2Options client_http2_options_;
 
   std::list<StreamImplPtr> active_streams_;
   nghttp2_session* session_{};

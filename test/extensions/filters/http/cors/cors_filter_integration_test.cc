@@ -46,7 +46,6 @@ public:
             cors->add_allow_origin("test-host-2");
             cors->set_allow_headers("content-type");
             cors->set_allow_methods("POST");
-            cors->set_expose_headers("content-type");
             cors->set_max_age("100");
           }
 
@@ -65,6 +64,15 @@ public:
             route->mutable_route()->set_cluster("cluster_0");
             auto* cors = route->mutable_route()->mutable_cors();
             cors->add_allow_origin_regex(".*\\.envoyproxy\\.io");
+          }
+
+          {
+            auto* route = virtual_host->add_routes();
+            route->mutable_match()->set_prefix("/cors-expose-headers");
+            route->mutable_route()->set_cluster("cluster_0");
+            auto* cors = route->mutable_route()->mutable_cors();
+            cors->add_allow_origin("test-origin-1");
+            cors->set_expose_headers("custom-header-1,custom-header-2");
           }
         });
     HttpIntegrationTest::initialize();
@@ -137,7 +145,6 @@ TEST_P(CorsFilterIntegrationTest, TestRouteConfigSuccess) {
           {"access-control-allow-origin", "test-origin-1"},
           {"access-control-allow-methods", "POST"},
           {"access-control-allow-headers", "content-type"},
-          {"access-control-expose-headers", "content-type"},
           {"access-control-max-age", "100"},
           {"server", "envoy"},
           {"content-length", "0"},
@@ -226,6 +233,24 @@ TEST_P(CorsFilterIntegrationTest, TestAllowedOriginRegex) {
       Http::TestHeaderMapImpl{
           {"access-control-allow-origin", "www.envoyproxy.io"},
           {"access-control-allow-credentials", "true"},
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+      });
+}
+
+TEST_P(CorsFilterIntegrationTest, TestExposeHeaders) {
+  testNormalRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/cors-expose-headers/test"},
+          {":scheme", "http"},
+          {":authority", "test-host"},
+          {"origin", "test-origin-1"},
+      },
+      Http::TestHeaderMapImpl{
+          {"access-control-allow-origin", "test-origin-1"},
+          {"access-control-expose-headers", "custom-header-1,custom-header-2"},
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},

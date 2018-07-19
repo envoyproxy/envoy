@@ -153,7 +153,7 @@ void ConnectionHandlerImpl::ActiveSocket::continueFilterChain(bool success) {
       // Set default transport protocol if none of the listener filters did it.
       if (socket_->detectedTransportProtocol().empty()) {
         socket_->setDetectedTransportProtocol(
-            Extensions::TransportSockets::TransportSocketNames::get().RAW_BUFFER);
+            Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
       }
       // Create a new connection on this listener.
       listener_.newConnection(std::move(socket_));

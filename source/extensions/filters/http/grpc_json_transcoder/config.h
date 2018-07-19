@@ -16,7 +16,7 @@ namespace GrpcJsonTranscoder {
 class GrpcJsonTranscoderFilterConfig
     : public Common::FactoryBase<envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder> {
 public:
-  GrpcJsonTranscoderFilterConfig() : FactoryBase(HttpFilterNames::get().GRPC_JSON_TRANSCODER) {}
+  GrpcJsonTranscoderFilterConfig() : FactoryBase(HttpFilterNames::get().GrpcJsonTranscoder) {}
 
   Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string& stats_prefix,
