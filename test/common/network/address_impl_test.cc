@@ -64,8 +64,9 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   }
 
   // Bind the socket to the desired address and port.
-  const int rc = addr_port->bind(listen_fd);
-  const int err = errno;
+  const std::tuple<int, int> result = addr_port->bind(listen_fd);
+  const int rc = std::get<0>(result);
+  const int err = std::get<1>(result);
   ASSERT_EQ(rc, 0) << addr_port->asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
 
   // Do a bare listen syscall. Not bothering to accept connections as that would
@@ -85,8 +86,9 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
     makeFdBlocking(client_fd);
 
     // Connect to the server.
-    const int rc = addr_port->connect(client_fd);
-    const int err = errno;
+    const std::tuple<int, int> result = addr_port->connect(client_fd);
+    const int rc = std::get<0>(result);
+    const int err = std::get<1>(result);
     ASSERT_EQ(rc, 0) << addr_port->asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
   };
 
@@ -314,8 +316,9 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
     ASSERT_GE(listen_fd, 0) << address.asString();
     ScopedFdCloser closer(listen_fd);
 
-    const int rc = address.bind(listen_fd);
-    const int err = errno;
+    const std::tuple<int, int> result = address.bind(listen_fd);
+    const int rc = std::get<0>(result);
+    const int err = std::get<1>(result);
     ASSERT_EQ(rc, 0) << address.asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
   };
 

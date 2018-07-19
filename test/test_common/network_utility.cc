@@ -37,19 +37,22 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   // Not setting REUSEADDR, therefore if the address has been recently used we won't reuse it here.
   // However, because we're going to use the address while checking if it is available, we'll need
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
-  int rc = addr_port->bind(fd);
+  std::tuple<int, int> result = addr_port->bind(fd);
+  int rc = std::get<0>(result);
+  int err;
   const char* failing_fn = nullptr;
   if (rc != 0) {
+    err = std::get<1>(result);
     failing_fn = "bind";
   } else if (type == Address::SocketType::Stream) {
     // Try listening on the port also, if the type is TCP.
     rc = ::listen(fd, 1);
     if (rc != 0) {
+      err = errno;
       failing_fn = "listen";
     }
   }
   if (failing_fn != nullptr) {
-    const int err = errno;
     if (err == EADDRINUSE) {
       // The port is already in use. Perfectly normal.
       return nullptr;
@@ -152,7 +155,7 @@ bool supportsIpVersion(const Address::IpVersion version) {
     // Socket creation failed.
     return false;
   }
-  if (0 != addr->bind(fd)) {
+  if (0 != std::get<0>(addr->bind(fd))) {
     // Socket bind failed.
     RELEASE_ASSERT(::close(fd) == 0, "");
     return false;
@@ -166,14 +169,19 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   const char* failing_fn = nullptr;
   const int fd = addr->socket(type);
+  int err;
   if (fd < 0) {
+    err = errno;
     failing_fn = "socket";
-  } else if (0 != addr->bind(fd)) {
-    failing_fn = "bind";
   } else {
-    return std::make_pair(Address::addressFromFd(fd), fd);
+    std::tuple<int, int> result = addr->bind(fd);
+    if (0 != std::get<0>(result)) {
+      err = std::get<1>(result);
+      failing_fn = "bind";
+    } else {
+      return std::make_pair(Address::addressFromFd(fd), fd);
+    }
   }
-  const int err = errno;
   if (fd >= 0) {
     close(fd);
   }

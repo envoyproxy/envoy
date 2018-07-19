@@ -551,10 +551,10 @@ ClientConnectionImpl::ClientConnectionImpl(
   }
 
   if (source_address != nullptr) {
-    const int rc = source_address->bind(fd());
-    if (rc < 0) {
+    const std::tuple<int, int> result = source_address->bind(fd());
+    if (std::get<0>(result) < 0) {
       ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
-                     strerror(errno));
+                     strerror(std::get<1>(result)));
       bind_error_ = true;
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect".
@@ -568,19 +568,21 @@ ClientConnectionImpl::ClientConnectionImpl(
 
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
-  const int rc = socket_->remoteAddress()->connect(fd());
+  const std::tuple<int, int> result = socket_->remoteAddress()->connect(fd());
+  const int rc = std::get<0>(result);
+  const int error = std::get<1>(result);
   if (rc == 0) {
     // write will become ready.
     ASSERT(connecting_);
   } else {
     ASSERT(rc == -1);
-    if (errno == EINPROGRESS) {
+    if (error == EINPROGRESS) {
       ASSERT(connecting_);
       ENVOY_CONN_LOG(debug, "connection in progress", *this);
     } else {
       immediate_error_event_ = ConnectionEvent::RemoteClose;
       connecting_ = false;
-      ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
+      ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, error);
 
       // Trigger a write event. This is needed on OSX and seems harmless on Linux.
       file_event_->activate(Event::FileReadyType::Write);

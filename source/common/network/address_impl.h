@@ -91,8 +91,8 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  int bind(int fd) const override;
-  int connect(int fd) const override;
+  std::tuple<int, int> bind(int fd) const override;
+  std::tuple<int, int> connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
   int socket(SocketType type) const override;
 
@@ -151,8 +151,8 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  int bind(int fd) const override;
-  int connect(int fd) const override;
+  std::tuple<int, int> bind(int fd) const override;
+  std::tuple<int, int> connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
   int socket(SocketType type) const override;
 
@@ -208,8 +208,8 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  int bind(int fd) const override;
-  int connect(int fd) const override;
+  std::tuple<int, int> bind(int fd) const override;
+  std::tuple<int, int> connect(int fd) const override;
   const Ip* ip() const override { return nullptr; }
   int socket(SocketType type) const override;
 

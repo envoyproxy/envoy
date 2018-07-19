@@ -212,14 +212,16 @@ bool Ipv4Instance::operator==(const Instance& rhs) const {
           (ip_.port() == rhs_casted->ip_.port()));
 }
 
-int Ipv4Instance::bind(int fd) const {
-  return ::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
-                sizeof(ip_.ipv4_.address_));
+std::tuple<int, int> Ipv4Instance::bind(int fd) const {
+  return std::make_tuple(::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
+                                sizeof(ip_.ipv4_.address_)),
+                         errno);
 }
 
-int Ipv4Instance::connect(int fd) const {
-  return ::connect(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
-                   sizeof(ip_.ipv4_.address_));
+std::tuple<int, int> Ipv4Instance::connect(int fd) const {
+  return std::make_tuple(::connect(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
+                                   sizeof(ip_.ipv4_.address_)),
+                         errno);
 }
 
 int Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
@@ -275,14 +277,16 @@ bool Ipv6Instance::operator==(const Instance& rhs) const {
           (ip_.port() == rhs_casted->ip_.port()));
 }
 
-int Ipv6Instance::bind(int fd) const {
-  return ::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
-                sizeof(ip_.ipv6_.address_));
+std::tuple<int, int> Ipv6Instance::bind(int fd) const {
+  return std::make_tuple(::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
+                                sizeof(ip_.ipv6_.address_)),
+                         errno);
 }
 
-int Ipv6Instance::connect(int fd) const {
-  return ::connect(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
-                   sizeof(ip_.ipv6_.address_));
+std::tuple<int, int> Ipv6Instance::connect(int fd) const {
+  return std::make_tuple(::connect(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
+                                   sizeof(ip_.ipv6_.address_)),
+                         errno);
 }
 
 int Ipv6Instance::socket(SocketType type) const {
@@ -333,24 +337,28 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
 
 bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
 
-int PipeInstance::bind(int fd) const {
+std::tuple<int, int> PipeInstance::bind(int fd) const {
   if (abstract_namespace_) {
-    return ::bind(fd, reinterpret_cast<const sockaddr*>(&address_),
-                  offsetof(struct sockaddr_un, sun_path) + address_length_);
+    return std::make_tuple(::bind(fd, reinterpret_cast<const sockaddr*>(&address_),
+                                  offsetof(struct sockaddr_un, sun_path) + address_length_),
+                           errno);
   }
   // Try to unlink an existing filesystem object at the requested path. Ignore
   // errors -- it's fine if the path doesn't exist, and if it exists but can't
   // be unlinked then `::bind()` will generate a reasonable errno.
   unlink(address_.sun_path);
-  return ::bind(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_));
+  return std::make_tuple(::bind(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_)),
+                         errno);
 }
 
-int PipeInstance::connect(int fd) const {
+std::tuple<int, int> PipeInstance::connect(int fd) const {
   if (abstract_namespace_) {
-    return ::connect(fd, reinterpret_cast<const sockaddr*>(&address_),
-                     offsetof(struct sockaddr_un, sun_path) + address_length_);
+    return std::make_tuple(::connect(fd, reinterpret_cast<const sockaddr*>(&address_),
+                                     offsetof(struct sockaddr_un, sun_path) + address_length_),
+                           errno);
   }
-  return ::connect(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_));
+  return std::make_tuple(
+      ::connect(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_)), errno);
 }
 
 int PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }

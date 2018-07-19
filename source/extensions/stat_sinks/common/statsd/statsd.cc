@@ -23,7 +23,7 @@ Writer::Writer(Network::Address::InstanceConstSharedPtr address) {
   fd_ = address->socket(Network::Address::SocketType::Datagram);
   ASSERT(fd_ != -1);
 
-  int rc = address->connect(fd_);
+  const int rc = std::get<0>(address->connect(fd_));
   ASSERT(rc != -1);
 }
 

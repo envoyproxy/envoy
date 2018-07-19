@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <tuple>
 
 #include "envoy/common/pure.h"
 
@@ -128,19 +129,19 @@ public:
    * Bind a socket to this address. The socket should have been created with a call to socket() on
    * an Instance of the same address family.
    * @param fd supplies the platform socket handle.
-   * @return 0 for success and -1 for failure. The error code associated with a failure will
-   * be accessible in a plaform dependent fashion (e.g. errno for Unix platforms).
+   * @return a tuple of <0, errno> for success and <-1, errno> for failure. If the call is
+   *   successful, errno shouldn't be used.
    */
-  virtual int bind(int fd) const PURE;
+  virtual std::tuple<int, int> bind(int fd) const PURE;
 
   /**
    * Connect a socket to this address. The socket should have been created with a call to socket()
    * on this object.
    * @param fd supplies the platform socket handle.
-   * @return 0 for success and -1 for failure. The error code associated with a failure will
-   * be accessible in a plaform dependent fashion (e.g. errno for Unix platforms).
+   * @return a tuple of <0, errno> for success and <-1, errno> for failure. If the call is
+   *   successful, errno shouldn't be used.
    */
-  virtual int connect(int fd) const PURE;
+  virtual std::tuple<int, int> connect(int fd) const PURE;
 
   /**
    * @return the IP address information IFF type() == Type::Ip, otherwise nullptr.
