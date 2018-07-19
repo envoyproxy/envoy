@@ -26,48 +26,29 @@ using testing::_;
 namespace Envoy {
 namespace Stats {
 
-class StatsThreadLocalStoreTest : public testing::Test, public RawStatDataAllocator {
+class StatsThreadLocalStoreTest : public testing::Test {
 public:
-  StatsThreadLocalStoreTest() {
-    ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](const std::string& name) -> RawStatData* {
-      return alloc_.alloc(name);
-    }));
-
-    ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
-      return alloc_.free(data);
-    }));
-
-    EXPECT_CALL(*this, alloc("stats.overflow"));
-    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, *this);
+  StatsThreadLocalStoreTest() : alloc_(options_) {
+    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, alloc_);
     store_->addSink(sink_);
   }
 
-  MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
-  MOCK_METHOD1(free, void(RawStatData& data));
-
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::StatsOptionsImpl options_;
-  TestAllocator alloc_;
+  StatsOptionsImpl options_;
+  MockedTestAllocator alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
 };
 
-class HistogramTest : public testing::Test, public RawStatDataAllocator {
+class HistogramTest : public testing::Test {
 public:
-  typedef std::map<std::string, Stats::ParentHistogramSharedPtr> NameHistogramMap;
+  typedef std::map<std::string, ParentHistogramSharedPtr> NameHistogramMap;
+
+  HistogramTest() : alloc_(options_) {}
 
   void SetUp() override {
-    ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](const std::string& name) -> RawStatData* {
-      return alloc_.alloc(name);
-    }));
-
-    ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
-      return alloc_.free(data);
-    }));
-
-    EXPECT_CALL(*this, alloc("stats.overflow"));
-    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, *this);
+    store_ = std::make_unique<ThreadLocalStoreImpl>(options_, alloc_);
     store_->addSink(sink_);
     store_->initializeThreading(main_thread_dispatcher_, tls_);
   }
@@ -76,12 +57,12 @@ public:
     store_->shutdownThreading();
     tls_.shutdownThread();
     // Includes overflow stat.
-    EXPECT_CALL(*this, free(_));
+    EXPECT_CALL(alloc_, free(_));
   }
 
   NameHistogramMap makeHistogramMap(const std::vector<ParentHistogramSharedPtr>& hist_list) {
     NameHistogramMap name_histogram_map;
-    for (const Stats::ParentHistogramSharedPtr& histogram : hist_list) {
+    for (const ParentHistogramSharedPtr& histogram : hist_list) {
       // Exclude the scope part of the name.
       const std::vector<std::string>& split_vector = absl::StrSplit(histogram->name(), '.');
       name_histogram_map.insert(std::make_pair(split_vector.back(), histogram));
@@ -112,12 +93,12 @@ public:
     HistogramStatisticsImpl h2_interval_statistics(hist2_interval);
 
     NameHistogramMap name_histogram_map = makeHistogramMap(histogram_list);
-    const Stats::ParentHistogramSharedPtr& h1 = name_histogram_map["h1"];
+    const ParentHistogramSharedPtr& h1 = name_histogram_map["h1"];
     EXPECT_EQ(h1->cumulativeStatistics().summary(), h1_cumulative_statistics.summary());
     EXPECT_EQ(h1->intervalStatistics().summary(), h1_interval_statistics.summary());
 
     if (histogram_list.size() > 1) {
-      const Stats::ParentHistogramSharedPtr& h2 = name_histogram_map["h2"];
+      const ParentHistogramSharedPtr& h2 = name_histogram_map["h2"];
       EXPECT_EQ(h2->cumulativeStatistics().summary(), h2_cumulative_statistics.summary());
       EXPECT_EQ(h2->intervalStatistics().summary(), h2_interval_statistics.summary());
     }
@@ -159,8 +140,8 @@ public:
 
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::StatsOptionsImpl options_;
-  TestAllocator alloc_;
+  StatsOptionsImpl options_;
+  MockedTestAllocator alloc_;
   MockSink sink_;
   std::unique_ptr<ThreadLocalStoreImpl> store_;
   InSequence s;
@@ -170,7 +151,7 @@ public:
 
 TEST_F(StatsThreadLocalStoreTest, NoTls) {
   InSequence s;
-  EXPECT_CALL(*this, alloc(_)).Times(2);
+  EXPECT_CALL(alloc_, alloc(_)).Times(2);
 
   Counter& c1 = store_->counter("c1");
   EXPECT_EQ(&c1, &store_->counter("c1"));
@@ -194,7 +175,7 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   EXPECT_EQ(2L, store_->gauges().front().use_count());
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(3);
+  EXPECT_CALL(alloc_, free(_)).Times(3);
 
   store_->shutdownThreading();
 }
@@ -203,7 +184,7 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  EXPECT_CALL(*this, alloc(_)).Times(2);
+  EXPECT_CALL(alloc_, alloc(_)).Times(2);
 
   Counter& c1 = store_->counter("c1");
   EXPECT_EQ(&c1, &store_->counter("c1"));
@@ -232,7 +213,7 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(2L, store_->gauges().front().use_count());
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(3);
+  EXPECT_CALL(alloc_, free(_)).Times(3);
 }
 
 TEST_F(StatsThreadLocalStoreTest, BasicScope) {
@@ -240,7 +221,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   ScopePtr scope1 = store_->createScope("scope1.");
-  EXPECT_CALL(*this, alloc(_)).Times(4);
+  EXPECT_CALL(alloc_, alloc(_)).Times(4);
   Counter& c1 = store_->counter("c1");
   Counter& c2 = scope1->counter("c2");
   EXPECT_EQ("c1", c1.name());
@@ -266,7 +247,7 @@ TEST_F(StatsThreadLocalStoreTest, BasicScope) {
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(5);
+  EXPECT_CALL(alloc_, free(_)).Times(5);
 }
 
 // Validate that we sanitize away bad characters in the stats prefix.
@@ -275,7 +256,7 @@ TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   ScopePtr scope1 = store_->createScope(std::string("scope1:\0:foo.", 13));
-  EXPECT_CALL(*this, alloc(_));
+  EXPECT_CALL(alloc_, alloc(_));
   Counter& c1 = scope1->counter("c1");
   EXPECT_EQ("scope1___foo.c1", c1.name());
 
@@ -283,7 +264,7 @@ TEST_F(StatsThreadLocalStoreTest, SanitizePrefix) {
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(2);
+  EXPECT_CALL(alloc_, free(_)).Times(2);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
@@ -291,7 +272,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   ScopePtr scope1 = store_->createScope("scope1.");
-  EXPECT_CALL(*this, alloc(_));
+  EXPECT_CALL(alloc_, alloc(_));
   scope1->counter("c1");
   EXPECT_EQ(2UL, store_->counters().size());
   CounterSharedPtr c1 = store_->counters().front();
@@ -306,7 +287,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   store_->source().clearCache();
   EXPECT_EQ(1UL, store_->source().cachedCounters().size());
 
-  EXPECT_CALL(*this, free(_));
+  EXPECT_CALL(alloc_, free(_));
   EXPECT_EQ(1L, c1.use_count());
   c1.reset();
 
@@ -314,7 +295,7 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_));
+  EXPECT_CALL(alloc_, free(_));
 }
 
 TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
@@ -322,12 +303,12 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
   ScopePtr scope1 = store_->createScope("scope1.");
-  EXPECT_CALL(*this, alloc(_));
+  EXPECT_CALL(alloc_, alloc(_));
   Counter& c1 = scope1->counter("foo.bar");
   EXPECT_EQ("scope1.foo.bar", c1.name());
 
   ScopePtr scope2 = scope1->createScope("foo.");
-  EXPECT_CALL(*this, alloc(_));
+  EXPECT_CALL(alloc_, alloc(_));
   Counter& c2 = scope2->counter("bar");
   EXPECT_NE(&c1, &c2);
   EXPECT_EQ("scope1.foo.bar", c2.name());
@@ -337,7 +318,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   EXPECT_EQ(1UL, c1.value());
   EXPECT_EQ(c1.value(), c2.value());
 
-  EXPECT_CALL(*this, alloc(_));
+  EXPECT_CALL(alloc_, alloc(_));
   Gauge& g1 = scope2->gauge("some_gauge");
   EXPECT_EQ("scope1.foo.some_gauge", g1.name());
 
@@ -345,7 +326,7 @@ TEST_F(StatsThreadLocalStoreTest, NestedScopes) {
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(4);
+  EXPECT_CALL(alloc_, free(_)).Times(4);
 }
 
 TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
@@ -358,7 +339,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   ScopePtr scope2 = store_->createScope("scope1.");
 
   // We will call alloc twice, but they should point to the same backing storage.
-  EXPECT_CALL(*this, alloc(_)).Times(2);
+  EXPECT_CALL(alloc_, alloc(_)).Times(2);
   Counter& c1 = scope1->counter("c");
   Counter& c2 = scope2->counter("c");
   EXPECT_NE(&c1, &c2);
@@ -373,7 +354,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_EQ(2UL, store_->counters().size());
 
   // Gauges should work the same way.
-  EXPECT_CALL(*this, alloc(_)).Times(2);
+  EXPECT_CALL(alloc_, alloc(_)).Times(2);
   Gauge& g1 = scope1->gauge("g");
   Gauge& g2 = scope2->gauge("g");
   EXPECT_NE(&g1, &g2);
@@ -386,7 +367,7 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   EXPECT_EQ(1UL, store_->gauges().size());
 
   // Deleting scope 1 will call free but will be reference counted. It still leaves scope 2 valid.
-  EXPECT_CALL(*this, free(_)).Times(2);
+  EXPECT_CALL(alloc_, free(_)).Times(2);
   scope1.reset();
   c2.inc();
   EXPECT_EQ(3UL, c2.value());
@@ -399,14 +380,14 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(3);
+  EXPECT_CALL(alloc_, free(_)).Times(3);
 }
 
 TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  EXPECT_CALL(*this, alloc("foo")).WillOnce(Return(nullptr));
+  EXPECT_CALL(alloc_, alloc("foo")).WillOnce(Return(nullptr));
   Counter& c1 = store_->counter("foo");
   EXPECT_EQ(1UL, store_->counter("stats.overflow").value());
 
@@ -417,14 +398,14 @@ TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
   tls_.shutdownThread();
 
   // Includes overflow but not the failsafe stat which we allocated from the heap.
-  EXPECT_CALL(*this, free(_));
+  EXPECT_CALL(alloc_, free(_));
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  EXPECT_CALL(*this, alloc(_)).Times(4);
+  EXPECT_CALL(alloc_, alloc(_)).Times(4);
   store_->counter("c1");
   store_->gauge("g1");
   store_->shutdownThreading();
@@ -440,7 +421,7 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   tls_.shutdownThread();
 
   // Includes overflow stat.
-  EXPECT_CALL(*this, free(_)).Times(5);
+  EXPECT_CALL(alloc_, free(_)).Times(5);
 }
 
 TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
@@ -463,7 +444,7 @@ TEST_F(StatsThreadLocalStoreTest, MergeDuringShutDown) {
 
   tls_.shutdownThread();
 
-  EXPECT_CALL(*this, free(_));
+  EXPECT_CALL(alloc_, free(_));
 }
 
 // Histogram tests
@@ -610,7 +591,7 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   // Merge histograms again and validate that both h1 and h2 are used.
   store_->mergeHistograms([]() -> void {});
 
-  for (const Stats::ParentHistogramSharedPtr& histogram : store_->histograms()) {
+  for (const ParentHistogramSharedPtr& histogram : store_->histograms()) {
     EXPECT_TRUE(histogram->used());
   }
 }

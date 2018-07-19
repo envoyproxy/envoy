@@ -92,7 +92,7 @@ TEST_F(HotRestartImplTest, versionString) {
 TEST_F(HotRestartImplTest, RawTruncate) {
   setup();
 
-  const std::string long_string(Stats::RawStatData::maxNameLength() + 1, 'A');
+  const std::string long_string(hot_restart_->statsOptions().maxNameLength() + 1, 'A');
   Stats::RawStatData* stat{};
   EXPECT_LOG_CONTAINS("warning", "is too long with", stat = hot_restart_->alloc(long_string));
   hot_restart_->free(*stat);

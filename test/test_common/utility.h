@@ -26,6 +26,8 @@
 using testing::AssertionFailure;
 using testing::AssertionResult;
 using testing::AssertionSuccess;
+using testing::Invoke;
+using testing::_;
 
 namespace Envoy {
 #define EXPECT_THROW_WITH_MESSAGE(statement, expected_exception, message)                          \
@@ -339,6 +341,7 @@ namespace Stats {
  */
 class TestAllocator : public RawStatDataAllocator {
 public:
+  TestAllocator(const StatsOptions& stats_options) : RawStatDataAllocator(stats_options) {}
   ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
 
   RawStatData* alloc(const std::string& name) override {
@@ -369,6 +372,28 @@ public:
 private:
   static void freeAdapter(RawStatData* data) { ::free(data); }
   std::unordered_map<std::string, CSmartPtr<RawStatData, freeAdapter>> stats_;
+};
+
+class MockedTestAllocator : public RawStatDataAllocator {
+public:
+  MockedTestAllocator(const StatsOptions& stats_options)
+      : RawStatDataAllocator(stats_options),
+        alloc_(stats_options) {
+    ON_CALL(*this, alloc(_))
+        .WillByDefault(Invoke(
+            [this](const std::string& name) -> RawStatData* { return alloc_.alloc(name); }));
+
+    ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
+      return alloc_.free(data);
+    }));
+
+    EXPECT_CALL(*this, alloc("stats.overflow"));
+  }
+
+  MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
+  MOCK_METHOD1(free, void(RawStatData& data));
+
+  TestAllocator alloc_;
 };
 
 } // namespace Stats

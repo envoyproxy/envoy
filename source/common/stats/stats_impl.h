@@ -285,10 +285,10 @@ private:
 
 template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
-  static const uint64_t UNLIMITED_WIDTH = 0;
+  //static const uint64_t UNLIMITED_WIDTH = 0;
 
-  StatDataAllocatorImpl() : max_width_(UNLIMITED_WIDTH) {}
-  explicit StatDataAllocatorImpl(uint64_t max_width) : max_width_(max_width) {}
+  //StatDataAllocatorImpl() : max_width_(UNLIMITED_WIDTH) {}
+  explicit StatDataAllocatorImpl(const StatsOptions& options) : options_(options) {}
 
   // StatDataAllocator
   CounterSharedPtr makeCounter(const std::string& name, std::string&& tag_extracted_name,
@@ -313,9 +313,10 @@ public:
   virtual void free(StatData& data) PURE;
 
   absl::string_view truncateStatName(absl::string_view stat_name);
+  const StatsOptions& statsOptions() const override { return options_; }
 
 private:
-  const uint64_t max_width_;
+  const StatsOptions& options_;
 };
 
 using RawStatDataAllocator = StatDataAllocatorImpl<RawStatData>;
@@ -406,8 +407,9 @@ struct HeapStatData {
  */
 class HeapStatDataAllocator : public StatDataAllocatorImpl<HeapStatData> {
 public:
-  explicit HeapStatDataAllocator(uint64_t max_width) : StatDataAllocatorImpl(max_width) {}
-  HeapStatDataAllocator() {}
+  explicit HeapStatDataAllocator(const StatsOptions& options)
+      : StatDataAllocatorImpl(options) {}
+  //HeapStatDataAllocator() {}
   ~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 
   // StatDataAllocator
@@ -482,8 +484,9 @@ private:
  */
 class IsolatedStoreImpl : public Store {
 public:
-  IsolatedStoreImpl()
-      : counters_([this](const std::string& name) -> CounterSharedPtr {
+  /*explicit*/ IsolatedStoreImpl(/*Stats::StatsOptions& stats_options*/)
+      : alloc_(stats_options_),
+        counters_([this](const std::string& name) -> CounterSharedPtr {
           std::string tag_extracted_name = name;
           std::vector<Tag> tags;
           return alloc_.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
@@ -539,11 +542,11 @@ private:
     const std::string prefix_;
   };
 
+  StatsOptionsImpl stats_options_;
   HeapStatDataAllocator alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
-  const Stats::StatsOptionsImpl stats_options_;
 };
 
 } // namespace Stats

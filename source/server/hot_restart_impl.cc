@@ -116,15 +116,13 @@ std::string SharedMemory::version(uint64_t max_num_stats,
 }
 
 HotRestartImpl::HotRestartImpl(Options& options)
-    : Stats::RawStatDataAllocator(options.maxObjNameLength() +
-                                  Stats::RawStatData::maxStatSuffixLength()),
-      options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())),
+    : Stats::RawStatDataAllocator(options.statsOptions()),
+      /*options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())),
       shmem_(SharedMemory::initialize(RawStatDataSet::numBytes(stats_set_options_), options)),
-        /*
-    : options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())),
+      */
+      options_(options), stats_set_options_(blockMemHashOptions(options.maxStats())),
       shmem_(SharedMemory::initialize(
           RawStatDataSet::numBytes(stats_set_options_, options_.statsOptions()), options_)),
-*/
       log_lock_(shmem_.log_lock_), access_log_lock_(shmem_.access_log_lock_),
       stat_lock_(shmem_.stat_lock_), init_lock_(shmem_.init_lock_) {
   {

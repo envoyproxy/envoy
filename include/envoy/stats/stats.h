@@ -480,6 +480,8 @@ public:
   virtual GaugeSharedPtr makeGauge(const std::string& name, std::string&& tag_extracted_name,
                                    std::vector<Tag>&& tags) PURE;
 
+  virtual const StatsOptions& statsOptions() const PURE;
+
   // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At
   // the moment, histograms don't fit the same pattern of counters and gaugaes
   // as they are not actually created in the context of a stats allocator.

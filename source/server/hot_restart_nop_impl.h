@@ -14,7 +14,7 @@ namespace Server {
  */
 class HotRestartNopImpl : public Server::HotRestart {
 public:
-  HotRestartNopImpl() {}
+  HotRestartNopImpl(const Stats::StatsOptions& options) : stats_allocator_(options) {}
 
   // Server::HotRestart
   void drainParentListeners() override {}

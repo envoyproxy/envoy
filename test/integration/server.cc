@@ -88,13 +88,13 @@ void IntegrationTestServer::onWorkerListenerRemoved() {
 void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion version,
                                           bool deterministic) {
   Server::TestOptionsImpl options(config_path_, version);
-  Server::HotRestartNopImpl restarter;
+  Stats::StatsOptionsImpl stats_options;
+  Server::HotRestartNopImpl restarter(stats_options);
   Thread::MutexBasicLockable lock;
 
   ThreadLocal::InstanceImpl tls;
-  Stats::HeapStatDataAllocator stats_allocator;
-  Stats::StatsOptionsImpl options_;
-  Stats::ThreadLocalStoreImpl stats_store(options_, stats_allocator);
+  Stats::HeapStatDataAllocator stats_allocator(stats_options);
+  Stats::ThreadLocalStoreImpl stats_store(stats_options, stats_allocator);
   stat_store_ = &stats_store;
   Runtime::RandomGeneratorPtr random_generator;
   if (deterministic) {

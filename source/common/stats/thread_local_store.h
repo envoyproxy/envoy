@@ -195,7 +195,7 @@ public:
 
   Source& source() override { return source_; }
 
-  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
+  const Stats::StatsOptions& statsOptions() const override { return alloc_.statsOptions(); }
 
 private:
   struct TlsCacheEntry {
@@ -275,7 +275,6 @@ private:
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
 
-  const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;

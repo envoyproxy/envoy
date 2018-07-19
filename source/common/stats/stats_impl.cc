@@ -342,12 +342,13 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
 
 template <class StatData>
 absl::string_view StatDataAllocatorImpl<StatData>::truncateStatName(absl::string_view key) {
-  if ((max_width_ != UNLIMITED_WIDTH) && (key.size() > max_width_)) {
+  const uint64_t max_width = options_.maxNameLength();
+  if (/*(max_width_ != UNLIMITED_WIDTH) &&*/ (key.size() > max_width)) {
     ENVOY_LOG_MISC(
         warn,
         "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
-        key.size(), max_width_);
-    return absl::string_view(key.data(), max_width_);
+        key.size(), options_.maxNameLength());
+    return absl::string_view(key.data(), max_width);
   }
   return key;
 }
