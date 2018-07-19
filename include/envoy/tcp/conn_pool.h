@@ -29,16 +29,22 @@ public:
  * Reason that a pool stream could not be obtained.
  */
 enum class PoolFailureReason {
-  // A resource overflowed and policy prevented a new stream from being created.
+  // A resource overflowed and policy prevented a new connection from being created.
   Overflow,
-  // A connection failure took place and the stream could not be bound.
-  ConnectionFailure
+  // A local connection failure took place and the connection could not be bound.
+  LocalConnectionFailure,
+  // A remote connection failure took place and the connection could not be bound.
+  RemoteConnectionFailure,
+  // A connection timeout occurred.
+  Timeout,
 };
 
 /*
- * UpstreamCallbacks for connection pool upstream connection callbacks.
+ * UpstreamCallbacks for connection pool upstream connection callbacks and data. Note that
+ * onEvent(Connected) is never triggered since the event always occurs before a ConnectionPool
+ * caller is assigned a connection.
  */
-class UpstreamCallbacks {
+class UpstreamCallbacks : public Network::ConnectionCallbacks {
 public:
   virtual ~UpstreamCallbacks() {}
 

@@ -104,6 +104,15 @@ void ConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     ENVOY_CONN_LOG(debug, "client disconnected", *conn.conn_);
+
+    if (event == Network::ConnectionEvent::LocalClose) {
+      host_->cluster().stats().upstream_cx_destroy_local_.inc();
+    }
+    if (event == Network::ConnectionEvent::RemoteClose) {
+      host_->cluster().stats().upstream_cx_destroy_remote_.inc();
+    }
+    host_->cluster().stats().upstream_cx_destroy_.inc();
+
     ActiveConnPtr removed;
     bool check_for_drained = true;
     if (conn.wrapper_ != nullptr) {
@@ -135,13 +144,21 @@ void ConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent 
       // do with the request.
       // NOTE: We move the existing pending requests to a temporary list. This is done so that
       //       if retry logic submits a new request to the pool, we don't fail it inline.
+      ConnectionPool::PoolFailureReason reason;
+      if (conn.timed_out_) {
+        reason = ConnectionPool::PoolFailureReason::Timeout;
+      } else if (event == Network::ConnectionEvent::RemoteClose) {
+        reason = ConnectionPool::PoolFailureReason::RemoteConnectionFailure;
+      } else {
+        reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
+      }
+
       std::list<PendingRequestPtr> pending_requests_to_purge(std::move(pending_requests_));
       while (!pending_requests_to_purge.empty()) {
         PendingRequestPtr request =
             pending_requests_to_purge.front()->removeFromList(pending_requests_to_purge);
         host_->cluster().stats().upstream_rq_pending_failure_eject_.inc();
-        request->callbacks_.onPoolFailure(ConnectionPool::PoolFailureReason::ConnectionFailure,
-                                          conn.real_host_description_);
+        request->callbacks_.onPoolFailure(reason, conn.real_host_description_);
       }
     }
 
@@ -277,7 +294,7 @@ ConnPoolImpl::PendingRequest::~PendingRequest() {
 ConnPoolImpl::ActiveConn::ActiveConn(ConnPoolImpl& parent)
     : parent_(parent),
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
-      remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()) {
+      remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()), timed_out_(false) {
 
   parent_.conn_connect_ms_.reset(
       new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_connect_ms_));
@@ -297,7 +314,6 @@ ConnPoolImpl::ActiveConn::ActiveConn(ConnPoolImpl& parent)
 
   parent_.host_->cluster().stats().upstream_cx_total_.inc();
   parent_.host_->cluster().stats().upstream_cx_active_.inc();
-  parent_.host_->cluster().stats().upstream_cx_http1_total_.inc();
   parent_.host_->stats().cx_total_.inc();
   parent_.host_->stats().cx_active_.inc();
   conn_length_.reset(new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_length_ms_));
@@ -328,6 +344,7 @@ void ConnPoolImpl::ActiveConn::onConnectTimeout() {
   // We just close the connection at this point. This will result in both a timeout and a connect
   // failure and will fold into all the normal connect failure logic.
   ENVOY_CONN_LOG(debug, "connect timeout", *conn_);
+  timed_out_ = true;
   parent_.host_->cluster().stats().upstream_cx_connect_timeout_.inc();
   conn_->close(Network::ConnectionCloseType::NoFlush);
 }
@@ -340,6 +357,26 @@ void ConnPoolImpl::ActiveConn::onUpstreamData(Buffer::Instance& data, bool end_s
     // Unexpected data from upstream, close down the connection.
     ENVOY_CONN_LOG(debug, "unexpected data from upstream, closing connection", *conn_);
     conn_->close(Network::ConnectionCloseType::NoFlush);
+  }
+}
+
+void ConnPoolImpl::ActiveConn::onEvent(Network::ConnectionEvent event) {
+  if (wrapper_ != nullptr && wrapper_->callbacks_ != nullptr) {
+    wrapper_->callbacks_->onEvent(event);
+  }
+
+  parent_.onConnectionEvent(*this, event);
+}
+
+void ConnPoolImpl::ActiveConn::onAboveWriteBufferHighWatermark() {
+  if (wrapper_ != nullptr && wrapper_->callbacks_ != nullptr) {
+    wrapper_->callbacks_->onAboveWriteBufferHighWatermark();
+  }
+}
+
+void ConnPoolImpl::ActiveConn::onBelowWriteBufferLowWatermark() {
+  if (wrapper_ != nullptr && wrapper_->callbacks_ != nullptr) {
+    wrapper_->callbacks_->onBelowWriteBufferLowWatermark();
   }
 }
 
