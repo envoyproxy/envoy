@@ -18,3 +18,20 @@ envoy_cc_library(
         "//include/envoy/upstream:upstream_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "dynamic_metadata_interface",
+    hdrs = ["dynamic_metadata.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+    ],
+)
+
+envoy_cc_library(
+    name = "string_accessor_interface",
+    hdrs = ["string_accessor.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+    ],
+)
+
