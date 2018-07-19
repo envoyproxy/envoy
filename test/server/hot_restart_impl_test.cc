@@ -115,6 +115,7 @@ TEST_F(HotRestartImplTest, Consistency) {
   uint64_t stat_size = sizeof(Stats::RawStatData) + max_name_length;
   std::string stat_hex_dump_1 = Hex::encode(reinterpret_cast<uint8_t*>(stat_1), stat_size);
   EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_1), expected_hash);
+  EXPECT_EQ(name_1, stat_1->key());
   hot_restart_->free(*stat_1);
 
   // If a stat name is truncated, we expect that its internal representation is the same as if it
@@ -123,6 +124,8 @@ TEST_F(HotRestartImplTest, Consistency) {
   Stats::RawStatData* stat_2 = hot_restart_->alloc(name_2);
   std::string stat_hex_dump_2 = Hex::encode(reinterpret_cast<uint8_t*>(stat_2), stat_size);
   EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_2), expected_hash);
+  EXPECT_EQ(name_1, stat_2->key());
+  EXPECT_NE(name_2, stat_2->key()); // Was truncated.
   hot_restart_->free(*stat_2);
 }
 
