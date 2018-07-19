@@ -24,6 +24,12 @@ cc_library(
 )
 
 cc_library(
+    name = "event_pthreads",
+    srcs = ["thirdparty_build/lib/libevent_pthreads.a"],
+    deps = [":event"],
+)
+
+cc_library(
     name = "luajit",
     srcs = ["thirdparty_build/lib/libluajit-5.1.a"],
     hdrs = glob(["thirdparty_build/include/luajit-2.0/*"]),
