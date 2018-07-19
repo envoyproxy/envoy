@@ -65,7 +65,7 @@ uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent&
 // @param default_value supplies the default if the field is not present.
 #define PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(message, field_name, max_value,             \
                                                        default_value)                              \
-  ((message).has_##field_name()                                                                    \
+  ((message).has_##field_name() && !std::isnan((message).field_name().value())                     \
        ? ProtobufPercentHelper::convertPercent((message).field_name().value(), max_value)          \
        : ProtobufPercentHelper::checkAndReturnDefault(default_value, max_value))
 
