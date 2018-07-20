@@ -24,8 +24,9 @@ cc_library(
 )
 
 cc_library(
+    # TODO: Remove 'event_pthreads' once no BUIlD files use it
     name = "event_pthreads",
-    srcs = ["thirdparty_build/lib/libevent_pthreads.a"],
+    srcs = glob(["thirdparty_build/lib/libevent_pthreads.a"]),
     deps = [":event"],
 )
 
