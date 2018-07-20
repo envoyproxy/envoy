@@ -1133,6 +1133,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders
     // Expect resetIdleTimer() to be called for the response
     // encodeHeaders()/encodeData().
     EXPECT_CALL(*idle_timer, enableTimer(_)).Times(2);
+    EXPECT_CALL(*idle_timer, disableTimer());
     idle_timer->callback_();
 
     data.drain(4);
@@ -1151,6 +1152,33 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders
 
   EXPECT_EQ("stream timeout", response_body);
   EXPECT_EQ(1U, stats_.named_.downstream_rq_idle_timeout_.value());
+}
+
+// Validate the per-stream idle timer is properly disabled when the stream terminates normally.
+TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNormalTermination) {
+  setup(false, "");
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, idleTimeout())
+      .WillByDefault(Return(std::chrono::milliseconds(10)));
+
+  // Codec sends downstream request headers.
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+
+    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}}};
+    EXPECT_CALL(*idle_timer, enableTimer(_));
+    decoder->decodeHeaders(std::move(headers), false);
+
+    data.drain(4);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_CALL(*idle_timer, disableTimer());
+  conn_manager_->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_idle_timeout_.value());
 }
 
 // Validate the per-stream idle timeout after having sent downstream
@@ -1175,6 +1203,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterDownstreamHeaders
     // Expect resetIdleTimer() to be called for the response
     // encodeHeaders()/encodeData().
     EXPECT_CALL(*idle_timer, enableTimer(_)).Times(2);
+    EXPECT_CALL(*idle_timer, disableTimer());
     idle_timer->callback_();
 
     data.drain(4);
@@ -1224,6 +1253,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterUpstreamHeaders) 
     EXPECT_CALL(*idle_timer, enableTimer(_));
     filter->callbacks_->encodeHeaders(std::move(response_headers), false);
 
+    EXPECT_CALL(*idle_timer, disableTimer());
     idle_timer->callback_();
 
     data.drain(4);
@@ -1286,6 +1316,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
     EXPECT_CALL(*idle_timer, enableTimer(_));
     filter->callbacks_->encodeData(fake_response, false);
 
+    EXPECT_CALL(*idle_timer, disableTimer());
     idle_timer->callback_();
 
     data.drain(4);
