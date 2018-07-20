@@ -54,7 +54,17 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       });
 }
 
-SubsetLoadBalancer::~SubsetLoadBalancer() { original_priority_set_callback_handle_->remove(); }
+SubsetLoadBalancer::~SubsetLoadBalancer() {
+  original_priority_set_callback_handle_->remove();
+
+  // Ensure gauges reflect correct values.
+  forEachSubset(subsets_, [&](LbSubsetEntryPtr entry) {
+    if (entry->initialized() && entry->active()) {
+      stats_.lb_subsets_removed_.inc();
+      stats_.lb_subsets_active_.dec();
+    }
+  });
+}
 
 void SubsetLoadBalancer::refreshSubsets() {
   for (auto& host_set : original_priority_set_.hostSetsPerPriority()) {
