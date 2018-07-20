@@ -1,7 +1,8 @@
 #include "common/request_info/dynamic_metadata_impl.h"
 
+#include "envoy/common/exception.h"
+
 #include "gtest/gtest.h"
-// #include "gmock/gmock.h"
 
 namespace Envoy {
 namespace RequestInfo {
@@ -11,10 +12,16 @@ class TestStoredType {
  public:
   TestStoredType(int value, size_t* access_count, size_t* destruction_count)
       : value_(value), access_count_(access_count), destruction_count_(destruction_count) {}
-  ~TestStoredType() { ++*destruction_count_; }
+  ~TestStoredType() {
+    if (destruction_count_) {
+      ++*destruction_count_;
+    }
+  }
 
   int Access() const {
-    ++*access_count_;
+    if (access_count_) {
+      ++*access_count_;
+    }
     return value_;
   }
 
@@ -42,8 +49,8 @@ class DynamicMetadataImplTest  : public testing::Test {
 } // namespace
 
 TEST_F(DynamicMetadataImplTest, Simple) {
-  size_t access_count;
-  size_t destruction_count;
+  size_t access_count = 0u;
+  size_t destruction_count = 0u;
   dynamic_metadata().setData("test_name",
                              std::make_unique<TestStoredType>(
                                  5, &access_count, &destruction_count));
@@ -58,6 +65,54 @@ TEST_F(DynamicMetadataImplTest, Simple) {
   EXPECT_EQ(1u, access_count);
   EXPECT_EQ(1u, destruction_count);
 }
+
+TEST_F(DynamicMetadataImplTest, SameTypes) {
+  size_t access_count_1 = 0u;
+  size_t access_count_2 = 0u;
+  size_t destruction_count = 0u;
+  const int ValueOne = 5;
+  const int ValueTwo = 6;
+  
+  dynamic_metadata().setData(
+      "test_1", std::make_unique<TestStoredType>(
+          ValueOne, &access_count_1, &destruction_count));
+  dynamic_metadata().setData(
+      "test_2", std::make_unique<TestStoredType>(
+          ValueTwo, &access_count_2, &destruction_count));
+  EXPECT_EQ(0u, access_count_1);
+  EXPECT_EQ(0u, access_count_2);
+  EXPECT_EQ(0u, destruction_count);
+
+  EXPECT_EQ(ValueOne,
+            dynamic_metadata().getData<TestStoredType>("test_1").Access());
+  EXPECT_EQ(1u, access_count_1);
+  EXPECT_EQ(0u, access_count_2);
+  EXPECT_EQ(ValueTwo,
+            dynamic_metadata().getData<TestStoredType>("test_2").Access());
+  EXPECT_EQ(1u, access_count_1);
+  EXPECT_EQ(1u, access_count_2);
+  ResetDynamicMetadata();
+  EXPECT_EQ(2u, destruction_count);
+}
+
+TEST_F(DynamicMetadataImplTest, SimpleType) {
+  dynamic_metadata().setData("test_1", std::make_unique<int>(1));
+  dynamic_metadata().setData("test_2", std::make_unique<int>(2));
+  
+  EXPECT_EQ(1, dynamic_metadata().getData<int>("test_1"));
+  EXPECT_EQ(2, dynamic_metadata().getData<int>("test_2"));
+}
+
+TEST_F(DynamicMetadataImplTest, NameConflict) {
+  dynamic_metadata().setData("test_1", std::make_unique<int>(1));
+  EXPECT_THROW(dynamic_metadata().setData("test_1", std::make_unique<int>(2)), EnvoyException);
+}
+
+TEST_F(DynamicMetadataImplTest, NameConflictDifferentTypes) {
+  dynamic_metadata().setData("test_1", std::make_unique<int>(1));
+  EXPECT_THROW(dynamic_metadata().setData("test_1", std::make_unique<TestStoredType>(2, nullptr, nullptr)), EnvoyException);
+}
+  
 
 } // namespace RequestInfo
 } // namespace Envoy
