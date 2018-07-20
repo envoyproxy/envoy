@@ -13,7 +13,7 @@ namespace HealthCheck {
 class HealthCheckFilterConfig
     : public Common::FactoryBase<envoy::config::filter::http::health_check::v2::HealthCheck> {
 public:
-  HealthCheckFilterConfig() : FactoryBase(HttpFilterNames::get().HEALTH_CHECK) {}
+  HealthCheckFilterConfig() : FactoryBase(HttpFilterNames::get().HealthCheck) {}
 
   Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string&,

@@ -48,6 +48,7 @@ public:
   int getsockopt(int sockfd, int level, int optname, void* optval, socklen_t* optlen) override;
 
   MOCK_METHOD3(bind, int(int sockfd, const sockaddr* addr, socklen_t addrlen));
+  MOCK_METHOD3(ioctl, int(int sockfd, unsigned long int request, void* argp));
   MOCK_METHOD1(close, int(int));
   MOCK_METHOD3(open_, int(const std::string& full_path, int flags, int mode));
   MOCK_METHOD3(write_, ssize_t(int, const void*, size_t));

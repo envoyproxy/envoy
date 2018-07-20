@@ -34,7 +34,7 @@ uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
     }
   }
   // The percentages should always add up to 100 but we have to have a return for the compiler.
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,
@@ -403,7 +403,7 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
   case HostsSource::SourceType::LocalityHealthyHosts:
     return host_set.healthyHostsPerLocality().get()[hosts_source.locality_index_];
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

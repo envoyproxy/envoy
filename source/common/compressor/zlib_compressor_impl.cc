@@ -27,7 +27,7 @@ void ZlibCompressorImpl::init(CompressionLevel comp_level, CompressionStrategy c
   ASSERT(initialized_ == false);
   const int result = deflateInit2(zstream_ptr_.get(), static_cast<int64_t>(comp_level), Z_DEFLATED,
                                   window_bits, memory_level, static_cast<uint64_t>(comp_strategy));
-  RELEASE_ASSERT(result >= 0);
+  RELEASE_ASSERT(result >= 0, "");
   initialized_ = true;
 }
 
@@ -57,7 +57,7 @@ bool ZlibCompressorImpl::deflateNext(int64_t flush_state) {
   switch (flush_state) {
   case Z_FINISH:
     if (result != Z_OK && result != Z_BUF_ERROR) {
-      RELEASE_ASSERT(result == Z_STREAM_END);
+      RELEASE_ASSERT(result == Z_STREAM_END, "");
       return false;
     }
     FALLTHRU;
@@ -65,7 +65,7 @@ bool ZlibCompressorImpl::deflateNext(int64_t flush_state) {
     if (result == Z_BUF_ERROR && zstream_ptr_->avail_in == 0) {
       return false; // This means that zlib needs more input, so stop here.
     }
-    RELEASE_ASSERT(result == Z_OK);
+    RELEASE_ASSERT(result == Z_OK, "");
   }
 
   return true;

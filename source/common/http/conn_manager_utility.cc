@@ -45,7 +45,6 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   request_headers.removeEnvoyInternalRequest();
   request_headers.removeKeepAlive();
   request_headers.removeProxyConnection();
-  // TODO(alyssawilk) handle this with current and new websocket here and below.
   request_headers.removeTransferEncoding();
 
   // If we are "using remote address" this means that we create/append to XFF with our immediate
@@ -293,7 +292,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
   } else if (config.forwardClientCert() == Http::ForwardClientCertType::SanitizeSet) {
     request_headers.insertForwardedClientCert().value(client_cert_details_str);
   } else {
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

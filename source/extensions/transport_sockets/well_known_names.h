@@ -12,9 +12,9 @@ namespace TransportSockets {
  */
 class TransportSocketNameValues {
 public:
-  const std::string CAPTURE = "envoy.transport_sockets.capture";
-  const std::string RAW_BUFFER = "raw_buffer";
-  const std::string TLS = "tls";
+  const std::string Capture = "envoy.transport_sockets.capture";
+  const std::string RawBuffer = "raw_buffer";
+  const std::string Tls = "tls";
 };
 
 typedef ConstSingleton<TransportSocketNameValues> TransportSocketNames;

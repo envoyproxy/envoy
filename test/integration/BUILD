@@ -221,6 +221,12 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test(
+    name = "idle_timeout_integration_test",
+    srcs = ["idle_timeout_integration_test.cc"],
+    deps = [":http_protocol_integration_lib"],
+)
+
 envoy_cc_test_library(
     name = "integration_lib",
     srcs = [
@@ -253,6 +259,7 @@ envoy_cc_test_library(
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:hot_restart_interface",
         "//include/envoy/server:options_interface",
+        "//include/envoy/stats:stats_interface",
         "//source/common/api:api_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",
@@ -284,6 +291,7 @@ envoy_cc_test_library(
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
@@ -320,10 +328,7 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/common/http:header_map_lib",
         "//source/extensions/access_loggers/file:config",
-        "//source/extensions/filters/http/cors:config",
-        "//source/extensions/filters/http/dynamo:config",
-        "//source/extensions/filters/http/grpc_http1_bridge:config",
-        "//source/extensions/filters/http/health_check:config",
+        "//source/extensions/filters/http/buffer:config",
         "//test/test_common:utility_lib",
     ],
 )

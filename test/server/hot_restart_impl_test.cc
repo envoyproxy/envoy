@@ -14,6 +14,7 @@
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Return;
+using testing::ReturnRef;
 using testing::WithArg;
 using testing::_;
 
@@ -33,24 +34,17 @@ public:
       return buffer_.data();
     }));
     EXPECT_CALL(os_sys_calls_, bind(_, _, _));
-
-    Stats::RawStatData::configureForTestsOnly(options_);
+    EXPECT_CALL(options_, statsOptions()).WillRepeatedly(ReturnRef(stats_options_));
 
     // Test we match the correct stat with empty-slots before, after, or both.
     hot_restart_.reset(new HotRestartImpl(options_));
     hot_restart_->drainParentListeners();
   }
 
-  void TearDown() {
-    // Configure it back so that later tests don't get the wonky values
-    // used here
-    NiceMock<MockOptions> default_options;
-    Stats::RawStatData::configureForTestsOnly(default_options);
-  }
-
   Api::MockOsSysCalls os_sys_calls_;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
   NiceMock<MockOptions> options_;
+  Stats::StatsOptionsImpl stats_options_;
   std::vector<uint8_t> buffer_;
   std::unique_ptr<HotRestartImpl> hot_restart_;
 };
@@ -68,7 +62,7 @@ TEST_F(HotRestartImplTest, versionString) {
     version = hot_restart_->version();
     EXPECT_TRUE(absl::StartsWith(version, fmt::format("{}.", SharedMemory::VERSION))) << version;
     max_stats = options_.maxStats(); // Save this so we can double it below.
-    max_obj_name_length = options_.maxObjNameLength();
+    max_obj_name_length = options_.statsOptions().maxObjNameLength();
     TearDown();
   }
 
@@ -86,7 +80,7 @@ TEST_F(HotRestartImplTest, versionString) {
   }
 
   {
-    ON_CALL(options_, maxObjNameLength()).WillByDefault(Return(2 * max_obj_name_length));
+    stats_options_.max_obj_name_length_ = 2 * max_obj_name_length;
     setup();
     EXPECT_NE(version, hot_restart_->version())
         << "Version changes when max-obj-name-length changes";
@@ -123,7 +117,7 @@ TEST_F(HotRestartImplTest, crossAlloc) {
 TEST_F(HotRestartImplTest, truncateKey) {
   setup();
 
-  std::string key1(Stats::RawStatData::maxNameLength(), 'a');
+  std::string key1(options_.statsOptions().maxNameLength(), 'a');
   Stats::RawStatData* stat1 = hot_restart_->alloc(key1);
   std::string key2 = key1 + "a";
   Stats::RawStatData* stat2 = hot_restart_->alloc(key2);
@@ -150,12 +144,15 @@ class HotRestartImplAlignmentTest : public HotRestartImplTest,
                                     public testing::WithParamInterface<uint64_t> {
 public:
   HotRestartImplAlignmentTest() : name_len_(8 + GetParam()) {
+    stats_options_.max_obj_name_length_ = name_len_;
+    EXPECT_CALL(options_, statsOptions()).WillRepeatedly(ReturnRef(stats_options_));
     EXPECT_CALL(options_, maxStats()).WillRepeatedly(Return(num_stats_));
-    EXPECT_CALL(options_, maxObjNameLength()).WillRepeatedly(Return(name_len_));
+
     setup();
-    EXPECT_EQ(name_len_, Stats::RawStatData::maxObjNameLength());
+    EXPECT_EQ(name_len_ + stats_options_.maxStatSuffixLength(), stats_options_.maxNameLength());
   }
 
+  Stats::StatsOptionsImpl stats_options_;
   static const uint64_t num_stats_ = 8;
   const uint64_t name_len_;
 };
@@ -185,7 +182,7 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
                                    "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
                                    "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
                                    i)
-                           .substr(0, Stats::RawStatData::maxNameLength());
+                           .substr(0, stats_options_.maxNameLength());
     TestStat ts;
     ts.stat_ = hot_restart_->alloc(name);
     ts.name_ = ts.stat_->name_;
@@ -193,7 +190,7 @@ TEST_P(HotRestartImplAlignmentTest, objectOverlap) {
 
     // If this isn't true then the hard coded part of the name isn't long enough to make the test
     // valid.
-    EXPECT_EQ(ts.name_.size(), Stats::RawStatData::maxNameLength());
+    EXPECT_EQ(ts.name_.size(), stats_options_.maxNameLength());
 
     stats.push_back(ts);
   }

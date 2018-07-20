@@ -17,7 +17,7 @@ namespace RateLimitFilter {
 class RateLimitConfigFactory
     : public Common::FactoryBase<envoy::config::filter::network::rate_limit::v2::RateLimit> {
 public:
-  RateLimitConfigFactory() : FactoryBase(NetworkFilterNames::get().RATE_LIMIT) {}
+  RateLimitConfigFactory() : FactoryBase(NetworkFilterNames::get().RateLimit) {}
 
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb

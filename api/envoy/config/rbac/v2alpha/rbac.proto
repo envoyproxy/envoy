@@ -16,12 +16,11 @@ option go_package = "v2alpha";
 //
 // Here is an example of RBAC configuration. It has two policies:
 //
-// * Service account "cluster.local/ns/default/sa/admin" has full access (empty permission entry
-//   means full access) to the service.
+// * Service account "cluster.local/ns/default/sa/admin" has full access to the service, and so
+//   does "cluster.local/ns/default/sa/superuser".
 //
-// * Any user (empty principal entry means any user) can read ("GET") the service at paths with
-//   prefix "/products" or suffix "/reviews" when request header "version" set to either "v1" or
-//   "v2".
+// * Any user can read ("GET") the service at paths with prefix "/products", so long as the
+//   destination port is either 80 or 443.
 //
 //  .. code-block:: yaml
 //

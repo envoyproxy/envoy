@@ -41,7 +41,7 @@ bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string& n
 }
 
 bool AutoProtocolImpl::readMessageEnd(Buffer::Instance& buffer) {
-  RELEASE_ASSERT(protocol_ != nullptr);
+  RELEASE_ASSERT(protocol_ != nullptr, "");
   return protocol_->readMessageEnd(buffer);
 }
 

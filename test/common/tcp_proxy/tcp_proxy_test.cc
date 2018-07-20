@@ -315,7 +315,7 @@ TEST(ConfigTest, EmptyRouteConfig) {
 TEST(ConfigTest, AccessLogConfig) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy config;
   envoy::config::filter::accesslog::v2::AccessLog* log = config.mutable_access_log()->Add();
-  log->set_name(Extensions::AccessLoggers::AccessLogNames::get().FILE);
+  log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
   {
     envoy::config::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("some_path");
@@ -325,7 +325,7 @@ TEST(ConfigTest, AccessLogConfig) {
   }
 
   log = config.mutable_access_log()->Add();
-  log->set_name(Extensions::AccessLoggers::AccessLogNames::get().FILE);
+  log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
   {
     envoy::config::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("another path");
@@ -365,7 +365,7 @@ public:
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
     envoy::config::filter::accesslog::v2::AccessLog* access_log =
         config.mutable_access_log()->Add();
-    access_log->set_name(Extensions::AccessLoggers::AccessLogNames::get().FILE);
+    access_log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
     envoy::config::accesslog::v2::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
     file_access_log.set_format(access_log_format);

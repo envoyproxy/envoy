@@ -4,6 +4,8 @@ package envoy.api.v2.endpoint;
 
 import "envoy/api/v2/core/base.proto";
 
+import "google/protobuf/duration.proto";
+
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
@@ -93,4 +95,10 @@ message ClusterStats {
   // The total number of dropped requests. This covers requests
   // deliberately dropped by the drop_overload policy and circuit breaking.
   uint64 total_dropped_requests = 3;
+
+  // Period over which the actual load report occurred. This will be guaranteed to include every
+  // request reported. Due to system load and delays between the *LoadStatsRequest* sent from Envoy
+  // and the *LoadStatsResponse* message sent from the management server, this may be longer than
+  // the requested load reporting interval in the *LoadStatsResponse*.
+  google.protobuf.Duration load_report_interval = 4;
 }

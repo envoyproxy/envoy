@@ -75,8 +75,7 @@ public:
   std::string getCertChainInformation() const override;
 
 protected:
-  ContextImpl(ContextManagerImpl& parent, Stats::Scope& scope, const ContextConfig& config);
-  ~ContextImpl() { parent_.releaseContext(this); }
+  ContextImpl(Stats::Scope& scope, const ContextConfig& config);
 
   /**
    * The global SSL-library index used for storing a pointer to the context
@@ -123,7 +122,6 @@ protected:
   std::string getCaFileName() const { return ca_file_path_; };
   std::string getCertChainFileName() const { return cert_chain_file_path_; };
 
-  ContextManagerImpl& parent_;
   bssl::UniquePtr<SSL_CTX> ctx_;
   bool verify_trusted_ca_{false};
   std::vector<std::string> verify_subject_alt_name_list_;
@@ -138,10 +136,11 @@ protected:
   std::string cert_chain_file_path_;
 };
 
+typedef std::shared_ptr<ContextImpl> ContextImplSharedPtr;
+
 class ClientContextImpl : public ContextImpl, public ClientContext {
 public:
-  ClientContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
-                    const ClientContextConfig& config);
+  ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config);
 
   bssl::UniquePtr<SSL> newSsl() const override;
 
@@ -152,9 +151,8 @@ private:
 
 class ServerContextImpl : public ContextImpl, public ServerContext {
 public:
-  ServerContextImpl(ContextManagerImpl& parent, Stats::Scope& scope,
-                    const ServerContextConfig& config, const std::vector<std::string>& server_names,
-                    Runtime::Loader& runtime);
+  ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,
+                    const std::vector<std::string>& server_names, Runtime::Loader& runtime);
 
 private:
   int alpnSelectCallback(const unsigned char** out, unsigned char* outlen, const unsigned char* in,
