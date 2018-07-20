@@ -1,10 +1,10 @@
 #pragma once
 
+#include <memory>
+
 #include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
-
-#include <memory>
 
 namespace Envoy {
 namespace RequestInfo {
