@@ -35,10 +35,12 @@ LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
                            : Config::Utility::translateClusterHosts(cluster.hosts())) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   if (locality_lb_endpoints.size() != 1 || locality_lb_endpoints[0].lb_endpoints().size() != 1) {
-    throw EnvoyException(fmt::format("LOGICAL_DNS clusters must have {}",
-                                     cluster.has_load_assignment()
-                                         ? "a single locality_lb_endpoint and a single lb_endpoint"
-                                         : "a single host"));
+    if (cluster.has_load_assignment()) {
+      throw EnvoyException(
+          "LOGICAL_DNS clusters must have a single locality_lb_endpoint and a single lb_endpoint");
+    } else {
+      throw EnvoyException("LOGICAL_DNS clusters must have a single host");
+    }
   }
 
   switch (cluster.dns_lookup_family()) {
