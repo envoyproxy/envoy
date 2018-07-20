@@ -21,19 +21,10 @@ namespace Address {
 
 namespace {
 
-// Check if an IP family is supported on this machine.
-bool ipFamilySupported(int domain) {
-  const int fd = ::socket(domain, SOCK_STREAM, 0);
-  if (fd >= 0) {
-    RELEASE_ASSERT(::close(fd) == 0, "");
-  }
-  return fd != -1;
-}
-
 // Validate that IPv4 is supported on this platform, raise an exception for the
 // given address if not.
 void validateIpv4Supported(const std::string& address) {
-  static const bool supported = ipFamilySupported(AF_INET);
+  static const bool supported = Network::Address::ipFamilySupported(AF_INET);
   if (!supported) {
     throw EnvoyException(
         fmt::format("IPv4 addresses are not supported on this machine: {}", address));
@@ -43,7 +34,7 @@ void validateIpv4Supported(const std::string& address) {
 // Validate that IPv6 is supported on this platform, raise an exception for the
 // given address if not.
 void validateIpv6Supported(const std::string& address) {
-  static const bool supported = ipFamilySupported(AF_INET6);
+  static const bool supported = Network::Address::ipFamilySupported(AF_INET6);
   if (!supported) {
     throw EnvoyException(
         fmt::format("IPv6 addresses are not supported on this machine: {}", address));
@@ -51,6 +42,15 @@ void validateIpv6Supported(const std::string& address) {
 }
 
 } // namespace
+
+// Check if an IP family is supported on this machine.
+bool ipFamilySupported(int domain) {
+  const int fd = ::socket(domain, SOCK_STREAM, 0);
+  if (fd >= 0) {
+    RELEASE_ASSERT(::close(fd) == 0, "");
+  }
+  return fd != -1;
+}
 
 Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t ss_len,
                                                     bool v6only) {

@@ -380,11 +380,18 @@ void ListenerImpl::convertDestinationIPsMapToTrie() {
     for (const auto& entry : destination_ips_map) {
       std::vector<Network::Address::CidrRange> subnets;
       if (entry.first == EMPTY_STRING) {
-        list.push_back(
-            std::make_pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>(
-                std::make_shared<ServerNamesMap>(entry.second),
-                {Network::Address::CidrRange::create("0.0.0.0/0"),
-                 Network::Address::CidrRange::create("::/0")}));
+        if (Network::Address::ipFamilySupported(AF_INET6)) {
+          list.push_back(
+              std::make_pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>(
+                  std::make_shared<ServerNamesMap>(entry.second),
+                  {Network::Address::CidrRange::create("0.0.0.0/0"),
+                   Network::Address::CidrRange::create("::/0")}));
+        } else {
+          list.push_back(
+              std::make_pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>(
+                  std::make_shared<ServerNamesMap>(entry.second),
+                  {Network::Address::CidrRange::create("0.0.0.0/0")}));
+        }
       } else {
         list.push_back(
             std::make_pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>(
