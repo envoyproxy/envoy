@@ -1,7 +1,6 @@
 #include "common/request_info/string_accessor_impl.h"
 
 #include "absl/strings/string_view.h"
-
 #include "gtest/gtest.h"
 
 namespace Envoy {

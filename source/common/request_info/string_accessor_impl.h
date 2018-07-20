@@ -5,17 +5,15 @@
 namespace Envoy {
 namespace RequestInfo {
 
-class StringAccessorImpl : public StringAccessor { 
- public:
+class StringAccessorImpl : public StringAccessor {
+public:
   StringAccessorImpl(absl::string_view value) : value_(value) {}
 
   // StringAccessor
   ~StringAccessorImpl() override {}
-  absl::string_view asString() const override {
-    return value_;
-  }
+  absl::string_view asString() const override { return value_; }
 
- private:
+private:
   std::string value_;
 };
 

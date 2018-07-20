@@ -8,8 +8,8 @@ namespace Envoy {
 namespace RequestInfo {
 
 class StringAccessor {
- public:
-  virtual ~StringAccessor() {};
+public:
+  virtual ~StringAccessor(){};
   virtual absl::string_view asString() const PURE;
 };
 
