@@ -140,6 +140,9 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
     NiceMock<Router::MockRouteEntry> route_entry;
     request_info.route_entry_ = &route_entry;
     EXPECT_EQ(&route_entry, request_info.routeEntry());
+
+    request_info.dynamicMetadata2().setData<int>("test", std::make_unique<int>(1));
+    EXPECT_EQ(1, request_info.dynamicMetadata2().getData<int>("test"));
   }
 }
 
