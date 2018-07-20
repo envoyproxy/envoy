@@ -66,6 +66,16 @@ TEST(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(2UL, store.gauges().size());
 }
 
+TEST(StatsIsolatedStoreImplTest, LongStatName) {
+  IsolatedStoreImpl store;
+  Stats::StatsOptionsImpl stats_options;
+  const std::string long_string(stats_options.maxNameLength() + 1, 'A');
+
+  ScopePtr scope = store.createScope("scope.");
+  Counter& counter = scope->counter(long_string);
+  EXPECT_EQ(absl::StrCat("scope.", long_string), counter.name());
+}
+
 /**
  * Test stats macros. @see stats_macros.h
  */

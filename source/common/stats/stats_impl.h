@@ -504,20 +504,26 @@ public:
   // of option size in a static.
 
   /* explicit */ IsolatedStoreImpl(/*Stats::StatsOptions& stats_options*/)
-      : alloc_(stats_options_), counters_([this](const std::string& name) -> CounterSharedPtr {
+      : counters_([this](const std::string& name) -> CounterSharedPtr {
           std::string tag_extracted_name = name;
           std::vector<Tag> tags;
-          return alloc_.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
+          return alloc_->makeCounter(name, std::move(tag_extracted_name), std::move(tags));
         }),
         gauges_([this](const std::string& name) -> GaugeSharedPtr {
           std::string tag_extracted_name = name;
           std::vector<Tag> tags;
-          return alloc_.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
+          return alloc_->makeGauge(name, std::move(tag_extracted_name), std::move(tags));
         }),
         histograms_([this](const std::string& name) -> HistogramSharedPtr {
           return std::make_shared<HistogramImpl>(name, *this, std::string(name),
                                                  std::vector<Tag>());
-        }) {}
+        }) {
+    // TODO(jmarantz): for now, just set the limit to be very high, until
+    // we make a decision on whether to plumb in the options structure seen
+    // by the rest of the system.
+    stats_options_.max_obj_name_length_ = 1000 * 1000;
+    alloc_ = std::make_unique<HeapStatDataAllocator>(stats_options_);
+  }
 
   // Stats::Scope
   Counter& counter(const std::string& name) override { return counters_.get(name); }
@@ -561,7 +567,7 @@ private:
   };
 
   StatsOptionsImpl stats_options_;
-  HeapStatDataAllocator alloc_;
+  std::unique_ptr<HeapStatDataAllocator> alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
