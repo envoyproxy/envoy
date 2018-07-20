@@ -4,6 +4,8 @@
 
 #include "absl/strings/string_view.h"
 
+#include <memory>
+
 namespace Envoy {
 namespace RequestInfo {
 
@@ -29,7 +31,6 @@ protected:
   virtual void* getDataGeneric(absl::string_view data_name, size_t type_id) PURE;
 
 private:
-  // TODO(rdsmith): Is it ok to default this to presumably zero this way?
   static size_t type_id_index_;
 
   template <typename T> class Traits {

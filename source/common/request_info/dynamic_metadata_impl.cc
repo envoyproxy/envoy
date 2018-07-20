@@ -17,6 +17,7 @@ DynamicMetadataImpl::~DynamicMetadataImpl() {
 void DynamicMetadataImpl::setDataGeneric(absl::string_view data_name, size_t type_id, void* data,
                                          void (*destructor)(void*)) {
   if (data_storage_.find(data_name) != data_storage_.end()) {
+    (*destructor)(data);
     throw EnvoyException("DynamicMetadata::setData<T> called twice with same name.");
   }
 

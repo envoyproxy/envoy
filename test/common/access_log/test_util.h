@@ -154,6 +154,8 @@ public:
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
+  ::Envoy::RequestInfo::DynamicMetadata& dynamicMetadata2() override { return metadata2_; }
+
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
@@ -176,6 +178,7 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
+  ::Envoy::RequestInfo::DynamicMetadataImpl metadata2_{};
 };
 
 } // namespace Envoy
