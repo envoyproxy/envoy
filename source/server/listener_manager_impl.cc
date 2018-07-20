@@ -380,17 +380,19 @@ void ListenerImpl::convertDestinationIPsMapToTrie() {
     for (const auto& entry : destination_ips_map) {
       std::vector<Network::Address::CidrRange> subnets;
       if (entry.first == EMPTY_STRING) {
-        list.push_back(
-            std::make_pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>(
-                std::make_shared<ServerNamesMap>(entry.second),
-                {Network::Address::CidrRange::create("0.0.0.0/0"),
-                 Network::Address::CidrRange::create("::/0")}));
+        if (Network::Address::ipFamilySupported(AF_INET)) {
+          subnets.push_back(Network::Address::CidrRange::create("0.0.0.0/0"));
+        }
+        if (Network::Address::ipFamilySupported(AF_INET6)) {
+          subnets.push_back(Network::Address::CidrRange::create("::/0"));
+        }
       } else {
-        list.push_back(
-            std::make_pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>(
-                std::make_shared<ServerNamesMap>(entry.second),
-                {Network::Address::CidrRange::create(entry.first)}));
+        subnets.push_back(Network::Address::CidrRange::create(entry.first));
       }
+      list.push_back(
+          std::make_pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>(
+              std::make_shared<ServerNamesMap>(entry.second),
+              std::vector<Network::Address::CidrRange>(subnets)));
     }
     destination_ips_pair.second = std::make_unique<DestinationIPsTrie>(list, true);
   }
