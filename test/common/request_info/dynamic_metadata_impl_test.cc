@@ -1,0 +1,63 @@
+#include "common/request_info/dynamic_metadata_impl.h"
+
+#include "gtest/gtest.h"
+// #include "gmock/gmock.h"
+
+namespace Envoy {
+namespace RequestInfo {
+namespace {
+
+class TestStoredType {
+ public:
+  TestStoredType(int value, size_t* access_count, size_t* destruction_count)
+      : value_(value), access_count_(access_count), destruction_count_(destruction_count) {}
+  ~TestStoredType() { ++*destruction_count_; }
+
+  int Access() const {
+    ++*access_count_;
+    return value_;
+  }
+
+ private:
+  int value_;
+  size_t* access_count_;
+  size_t* destruction_count_;
+};
+
+class DynamicMetadataImplTest  : public testing::Test {
+ public:
+  DynamicMetadataImplTest() {
+    ResetDynamicMetadata();
+  }
+
+  void ResetDynamicMetadata() {
+    dynamic_metadata_ = std::make_unique<DynamicMetadataImpl>();
+  }
+  DynamicMetadata& dynamic_metadata() { return *dynamic_metadata_; }
+
+ private:
+  std::unique_ptr<DynamicMetadataImpl> dynamic_metadata_;
+};
+
+} // namespace
+
+TEST_F(DynamicMetadataImplTest, Simple) {
+  size_t access_count;
+  size_t destruction_count;
+  dynamic_metadata().setData("test_name",
+                             std::make_unique<TestStoredType>(
+                                 5, &access_count, &destruction_count));
+  EXPECT_EQ(0u, access_count);
+  EXPECT_EQ(0u, destruction_count);
+
+  EXPECT_EQ(5, dynamic_metadata().getData<TestStoredType>("test_name").Access());
+  EXPECT_EQ(1u, access_count);
+  EXPECT_EQ(0u, destruction_count);
+
+  ResetDynamicMetadata();
+  EXPECT_EQ(1u, access_count);
+  EXPECT_EQ(1u, destruction_count);
+}
+
+} // namespace RequestInfo
+} // namespace Envoy

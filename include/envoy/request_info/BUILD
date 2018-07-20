@@ -23,6 +23,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "dynamic_metadata_interface",
     hdrs = ["dynamic_metadata.h"],
+    srcs = ["dynamic_metadata.cc"],
     external_deps = ["abseil_optional"],
     deps = [
     ],

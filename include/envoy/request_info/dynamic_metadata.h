@@ -9,7 +9,7 @@ namespace RequestInfo {
 
 class DynamicMetadata {
  public:
-  virtual ~DynamicMetadata() PURE;
+  virtual ~DynamicMetadata() {};
 
   // May only be called once for a particular |data_name|
   template <typename T>
@@ -17,7 +17,7 @@ class DynamicMetadata {
       absl::string_view data_name,
       std::unique_ptr<T>&& data) {
     setDataGeneric(data_name, Traits<T>::getTypeId(), static_cast<void*>(data.release()),
-                   Traits<T>::destructor);
+                   &Traits<T>::destructor);
   }
 
   template <typename T>
@@ -42,11 +42,12 @@ class DynamicMetadata {
 
   template <typename T>
   class Traits {
+   public:
     static size_t getTypeId() {
       static const size_t type_id = ++type_id_index_;
       return type_id;
     }
-    void destructor(void *ptr) {
+    static void destructor(void *ptr) {
       delete static_cast<T*>(ptr);
     }
   };

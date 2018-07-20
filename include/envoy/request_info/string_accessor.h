@@ -9,8 +9,8 @@ namespace RequestInfo {
 
 class StringAccessor {
  public:
-  virtual ~StringAccessor() PURE;
-  absl::string_view asString() const PURE;
+  virtual ~StringAccessor() {};
+  virtual absl::string_view asString() const PURE;
 };
 
 } // namespace RequestInfo

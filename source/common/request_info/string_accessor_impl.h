@@ -1,6 +1,6 @@
 #pragma once
 
-#include "include/envoy/request_info/string_accessor.h"
+#include "envoy/request_info/string_accessor.h"
 
 namespace Envoy {
 namespace RequestInfo {
