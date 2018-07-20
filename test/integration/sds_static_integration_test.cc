@@ -37,13 +37,12 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      auto* filter_chain =
-          bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-
-      auto* common_tls_context = filter_chain->mutable_tls_context()->mutable_common_tls_context();
-      common_tls_context->add_alpn_protocols("h2");
+      auto* common_tls_context = bootstrap.mutable_static_resources()
+                                     ->mutable_listeners(0)
+                                     ->mutable_filter_chains(0)
+                                     ->mutable_tls_context()
+                                     ->mutable_common_tls_context();
       common_tls_context->add_alpn_protocols("http/1.1");
-      common_tls_context->mutable_deprecated_v1()->set_alt_alpn_protocols("http/1.1");
 
       auto* validation_context = common_tls_context->mutable_validation_context();
       validation_context->mutable_trusted_ca()->set_filename(
@@ -112,14 +111,14 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      auto* static_resources = bootstrap.mutable_static_resources();
-      auto* cluster = static_resources->mutable_clusters(0);
-      cluster->mutable_tls_context()
+      bootstrap.mutable_static_resources()
+          ->mutable_clusters(0)
+          ->mutable_tls_context()
           ->mutable_common_tls_context()
           ->add_tls_certificate_sds_secret_configs()
           ->set_name("client_cert");
 
-      auto* secret = static_resources->add_secrets();
+      auto* secret = bootstrap.mutable_static_resources()->add_secrets();
       secret->set_name("client_cert");
       auto* tls_certificate = secret->mutable_tls_certificate();
       tls_certificate->mutable_certificate_chain()->set_filename(
