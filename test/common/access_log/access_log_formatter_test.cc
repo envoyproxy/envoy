@@ -74,7 +74,7 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   }
 
   {
-    RequestInfoFormatter ttlb_duration_format("TIME_TO_LAST_BYTE_DURATION");
+    RequestInfoFormatter ttlb_duration_format("RESPONSE_TX_DURATION");
 
     absl::optional<std::chrono::nanoseconds> dur_upstream = std::chrono::nanoseconds(10000000);
     EXPECT_CALL(request_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur_upstream));
@@ -85,7 +85,7 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   }
 
   {
-    RequestInfoFormatter ttlb_duration_format("TIME_TO_LAST_BYTE_DURATION");
+    RequestInfoFormatter ttlb_duration_format("RESPONSE_TX_DURATION");
 
     absl::optional<std::chrono::nanoseconds> dur_upstream;
     EXPECT_CALL(request_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur_upstream));

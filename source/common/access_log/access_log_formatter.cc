@@ -223,7 +223,7 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       return AccessLogFormatUtils::durationToString(request_info.firstUpstreamRxByteReceived());
     };
-  } else if (field_name == "TIME_TO_LAST_BYTE_DURATION") {
+  } else if (field_name == "RESPONSE_TX_DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       auto downstream = request_info.lastDownstreamTxByteSent();
       auto upstream = request_info.firstUpstreamRxByteReceived();
