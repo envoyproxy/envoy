@@ -2,6 +2,8 @@
 
 #include "envoy/request_info/request_info.h"
 
+#include "common/request_info/dynamic_metadata_impl.h"
+
 namespace Envoy {
 
 class TestRequestInfo : public RequestInfo::RequestInfo {
