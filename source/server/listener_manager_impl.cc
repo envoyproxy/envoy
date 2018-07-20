@@ -380,7 +380,6 @@ void ListenerImpl::convertDestinationIPsMapToTrie() {
     for (const auto& entry : destination_ips_map) {
       std::vector<Network::Address::CidrRange> subnets;
       if (entry.first == EMPTY_STRING) {
-        std::vector<Network::Address::CidrRange> subnets;
         if (Network::Address::ipFamilySupported(AF_INET)) {
           subnets.push_back(Network::Address::CidrRange::create("0.0.0.0/0"));
         }
