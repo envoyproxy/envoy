@@ -23,6 +23,8 @@ A logged warning is expected for each deprecated item that is in deprecation win
   is deprecated. Please use the new `upgrade_configs` in the
   [HttpConnectionManager](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto)
   instead.
+* Use of `response_headers_to_*` and `request_headers_to_add` are deprecated at the `RouteAction`
+  level. Please use the configuration options at the `Route` level.
 
 ## Version 1.7.0
 
