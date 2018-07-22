@@ -519,7 +519,7 @@ message RouteAction {
   // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including details on
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
-  repeated core.HeaderValueOption request_headers_to_add = 12;
+  repeated core.HeaderValueOption request_headers_to_add = 12 [deprecated = true];
 
   // Specifies a set of headers that will be added to responses to requests
   // matching this route. Headers specified at this level are applied before
@@ -527,11 +527,11 @@ message RouteAction {
   // :ref:`envoy_api_msg_RouteConfiguration`, and :ref:`envoy_api_msg_route.Route`. For more
   // information, including details on header value syntax, see the documentation on
   // :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`.
-  repeated core.HeaderValueOption response_headers_to_add = 18;
+  repeated core.HeaderValueOption response_headers_to_add = 18 [deprecated = true];
 
   // Specifies a list of HTTP headers that should be removed from each response
   // to requests matching this route.
-  repeated string response_headers_to_remove = 19;
+  repeated string response_headers_to_remove = 19 [deprecated = true];
 
   // Specifies a set of rate limit configurations that could be applied to the
   // route.
