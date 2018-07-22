@@ -357,6 +357,14 @@ then log back in and it should start working.
 The latest coverage report for master is available
 [here](https://s3.amazonaws.com/lyft-envoy/coverage/report-master/coverage.html).
 
+It's also possible to specialize the coverage build to a single test target. This is useful
+when doing things like exploring the coverage of a fuzzer over its corpus. This can be done with
+the `COVERAGE_TARGET` and `VALIDATE_COVERAGE` environment variables, e.g.:
+
+```
+COVERAGE_TARGET=//test/common/common:base64_fuzz_test VALIDATE_COVERAGE=false test/run_envoy_bazel_coverage.sh
+```
+
 # Cleaning the build and test artifacts
 
 `bazel clean` will nuke all the build/test artifacts from the Bazel cache for
