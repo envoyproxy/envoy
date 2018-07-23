@@ -25,7 +25,7 @@ FileBasedMetadataGrpcCredentialsFactory::getChannelCredentials(
   for (const auto& credential : google_grpc.call_credentials()) {
     switch (credential.credential_specifier_case()) {
     case envoy::api::v2::core::GrpcService::GoogleGrpc::CallCredentials::kFromPlugin: {
-      if (credential.from_plugin().name() == GrpcCredentialsNames::get().FILE_BASED_METADATA) {
+      if (credential.from_plugin().name() == GrpcCredentialsNames::get().FileBasedMetadata) {
         FileBasedMetadataGrpcCredentialsFactory file_based_metadata_credentials_factory;
         const Envoy::ProtobufTypes::MessagePtr file_based_metadata_config_message =
             Envoy::Config::Utility::translateToFactoryConfig(

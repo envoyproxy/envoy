@@ -439,12 +439,11 @@ message RouteAction {
     google.protobuf.Duration per_try_timeout = 3 [(gogoproto.stdduration) = true];
   }
 
-  // Specifies the idle timeout for the route. If not specified, this defaults
-  // to 5 minutes. The default value was select so as not to interfere with any
-  // smaller configured timeouts that may have existed in configurations prior
-  // to the introduction of this feature, while introducing robustness to TCP
-  // connections that terminate without FIN. A value of 0 will completely
-  // disable the idle timeout.
+  // Specifies the idle timeout for the route. If not specified, there is no per-route idle timeout
+  // specified, although the connection manager wide :ref:`stream_idle_timeout
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
+  // will still apply. A value of 0 will completely disable the route's idle timeout, even if a
+  // connection manager stream idle timeout is configured.
   //
   // The idle timeout is distinct to :ref:`timeout
   // <envoy_api_field_route.RouteAction.timeout>`, which provides an upper bound

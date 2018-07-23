@@ -35,6 +35,14 @@ parseHttpConnectionManagerFromJson(const std::string& json_string) {
   return http_connection_manager;
 }
 
+envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
+  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+      http_connection_manager;
+  MessageUtil::loadFromYaml(yaml, http_connection_manager);
+  return http_connection_manager;
+}
+
 class HttpConnectionManagerConfigTest : public testing::Test {
 public:
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -120,6 +128,23 @@ TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
               ContainerEq(config.tracingConfig()->request_headers_for_tags_));
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
   EXPECT_EQ("foo", config.serverName());
+  EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
+}
+
+// Validated that an explicit zero stream idle timeout disables.
+TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  stream_idle_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(0, config.streamIdleTimeout().count());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {

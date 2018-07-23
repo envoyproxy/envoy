@@ -66,16 +66,10 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
     }
     return std::make_shared<ProdGrpcHealthCheckerImpl>(cluster, hc_config, dispatcher, runtime,
                                                        random, std::move(event_logger));
-  // Deprecated redis_health_check, preserving using old config until it is removed.
-  case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kRedisHealthCheck:
-    ENVOY_LOG(warn, "redis_health_check is deprecated, use custom_health_check instead");
-    FALLTHRU;
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kCustomHealthCheck: {
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
-            hc_config.has_redis_health_check()
-                ? Extensions::HealthCheckers::HealthCheckerNames::get().REDIS_HEALTH_CHECKER
-                : std::string(hc_config.custom_health_check().name()));
+            std::string(hc_config.custom_health_check().name()));
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher,
                                             std::move(event_logger)));
@@ -83,7 +77,7 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
   }
   default:
     // Checked by schema.
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -603,7 +597,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
       break;
     default:
       // Should not happen really, Protobuf should not parse undefined enums values.
-      NOT_REACHED;
+      NOT_REACHED_GCOVR_EXCL_LINE;
       break;
     }
   }
