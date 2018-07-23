@@ -22,19 +22,20 @@ public:
 
   ~SquashFilterIntegrationTest() {
     if (fake_squash_connection_) {
-      fake_squash_connection_->close();
-      fake_squash_connection_->waitForDisconnect();
+      ASSERT(fake_squash_connection_->close());
+      ASSERT(fake_squash_connection_->waitForDisconnect());
     }
   }
 
   FakeStreamPtr sendSquash(const std::string& status, const std::string& body) {
 
     if (!fake_squash_connection_) {
-      fake_squash_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
+      ASSERT(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, &fake_squash_connection_));
     }
 
-    FakeStreamPtr request_stream = fake_squash_connection_->waitForNewStream(*dispatcher_);
-    request_stream->waitForEndStream(*dispatcher_);
+    FakeStreamPtr request_stream;
+    ASSERT(fake_squash_connection_->waitForNewStream(*dispatcher_, &request_stream));
+    ASSERT(request_stream->waitForEndStream(*dispatcher_));
     if (body.empty()) {
       request_stream->encodeHeaders(Http::TestHeaderMapImpl{{":status", status}}, true);
     } else {

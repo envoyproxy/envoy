@@ -19,7 +19,7 @@ namespace {
 class GrpcFileBasedMetadataClientIntegrationTest : public GrpcSslClientIntegrationTest {
 public:
   void expectExtraHeaders(FakeStream& fake_stream) override {
-    fake_stream.waitForHeadersComplete();
+    ASSERT(fake_stream.waitForHeadersComplete());
     Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
     if (!header_value_1_.empty()) {
       EXPECT_EQ(header_prefix_1_ + header_value_1_, stream_headers.get_(header_key_1_));

@@ -173,16 +173,18 @@ TEST_P(ThriftFilterIntegrationTest, Success) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(request_bytes_.toString());
 
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  Buffer::OwnedImpl upstream_request(
-      fake_upstream_connection->waitForData(request_bytes_.length()));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
+  Buffer::OwnedImpl upstream_request(data);
   EXPECT_TRUE(TestUtility::buffersEqual(upstream_request, request_bytes_));
 
-  fake_upstream_connection->write(response_bytes_.toString());
+  ASSERT_TRUE(fake_upstream_connection->write(response_bytes_.toString()));
 
   tcp_client->waitForData(response_bytes_.toString());
   tcp_client->close();
-  fake_upstream_connection->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   EXPECT_TRUE(TestUtility::buffersEqual(Buffer::OwnedImpl(tcp_client->data()), response_bytes_));
 
@@ -198,16 +200,18 @@ TEST_P(ThriftFilterIntegrationTest, IDLException) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(request_bytes_.toString());
 
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  Buffer::OwnedImpl upstream_request(
-      fake_upstream_connection->waitForData(request_bytes_.length()));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
+  Buffer::OwnedImpl upstream_request(data);
   EXPECT_TRUE(TestUtility::buffersEqual(upstream_request, request_bytes_));
 
-  fake_upstream_connection->write(response_bytes_.toString());
+  ASSERT_TRUE(fake_upstream_connection->write(response_bytes_.toString()));
 
   tcp_client->waitForData(response_bytes_.toString());
   tcp_client->close();
-  fake_upstream_connection->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   EXPECT_TRUE(TestUtility::buffersEqual(Buffer::OwnedImpl(tcp_client->data()), response_bytes_));
 
@@ -223,16 +227,19 @@ TEST_P(ThriftFilterIntegrationTest, Exception) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(request_bytes_.toString());
 
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  Buffer::OwnedImpl upstream_request(
-      fake_upstream_connection->waitForData(request_bytes_.length()));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
+  Buffer::OwnedImpl upstream_request(data);
+
   EXPECT_TRUE(TestUtility::buffersEqual(upstream_request, request_bytes_));
 
-  fake_upstream_connection->write(response_bytes_.toString());
+  ASSERT_TRUE(fake_upstream_connection->write(response_bytes_.toString()));
 
   tcp_client->waitForData(response_bytes_.toString());
   tcp_client->close();
-  fake_upstream_connection->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   EXPECT_TRUE(TestUtility::buffersEqual(Buffer::OwnedImpl(tcp_client->data()), response_bytes_));
 
@@ -248,13 +255,15 @@ TEST_P(ThriftFilterIntegrationTest, Oneway) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(request_bytes_.toString());
 
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  Buffer::OwnedImpl upstream_request(
-      fake_upstream_connection->waitForData(request_bytes_.length()));
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
+  Buffer::OwnedImpl upstream_request(data);
   EXPECT_TRUE(TestUtility::buffersEqual(upstream_request, request_bytes_));
 
   tcp_client->close();
-  fake_upstream_connection->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_oneway");
   EXPECT_EQ(1U, counter->value());

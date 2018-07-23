@@ -39,6 +39,7 @@ envoy_extension_cc_test(
         "//source/extensions/stat_sinks/metrics_service:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
         "@envoy_api//envoy/service/metrics/v2:metrics_service_cc",
     ],
 )

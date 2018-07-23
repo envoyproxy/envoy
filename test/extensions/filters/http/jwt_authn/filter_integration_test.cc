@@ -109,9 +109,9 @@ public:
   }
 
   void waitForJwksResponse(const std::string& status, const std::string& jwks_body) {
-    fake_jwks_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-    jwks_request_ = fake_jwks_connection_->waitForNewStream(*dispatcher_);
-    jwks_request_->waitForEndStream(*dispatcher_);
+    ASSERT(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, &fake_jwks_connection_));
+    ASSERT(fake_jwks_connection_->waitForNewStream(*dispatcher_, &jwks_request_));
+    ASSERT(jwks_request_->waitForEndStream(*dispatcher_));
 
     Http::TestHeaderMapImpl response_headers{{":status", status}};
     jwks_request_->encodeHeaders(response_headers, false);
@@ -122,12 +122,12 @@ public:
   void cleanup() {
     codec_client_->close();
     if (fake_jwks_connection_ != nullptr) {
-      fake_jwks_connection_->close();
-      fake_jwks_connection_->waitForDisconnect();
+      ASSERT(fake_jwks_connection_->close());
+      ASSERT(fake_jwks_connection_->waitForDisconnect());
     }
     if (fake_upstream_connection_ != nullptr) {
-      fake_upstream_connection_->close();
-      fake_upstream_connection_->waitForDisconnect();
+      ASSERT(fake_upstream_connection_->close());
+      ASSERT(fake_upstream_connection_->waitForDisconnect());
     }
   }
 
