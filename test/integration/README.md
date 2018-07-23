@@ -110,6 +110,12 @@ likely a one-off change, it can be scoped to the existing test file.
 
 # Deflaking tests
 
+The instructions below assume the developer is running tests natively with bazel
+rather than in docker.  For developers using docker the best workaround today is
+to replace `//test/...` on the relevant `ci/do_ci.sh`with the command lines
+referenced below and remember to back those changes out before sending the fix
+upstream!
+
 ## Reproducing test flakes
 
 The first step of fixing test flakes is reproducing the test flake. In general
