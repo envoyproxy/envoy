@@ -17,6 +17,7 @@ envoy_cc_library(
         "libcircllhist",
     ],
     deps = [
+        ":symbol_table_lib",
         "//include/envoy/common:time_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
@@ -30,6 +31,16 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
         "@envoy_api//envoy/config/metrics/v2:stats_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "symbol_table_lib",
+    hdrs = ["symbol_table_impl.h"],
+    external_deps = ["abseil_base"],
+    deps = [
+        "//include/envoy/stats:symbol_table_interface",
+        "//source/common/common:assert_lib",
     ],
 )
 
