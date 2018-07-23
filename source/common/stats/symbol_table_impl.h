@@ -6,12 +6,12 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
-
-#include "common/common/assert.h"
 #include "envoy/stats/symbol_table.h"
 
-#include "absl/strings/str_split.h"
+#include "common/common/assert.h"
+
 #include "absl/strings/str_join.h"
+#include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Stats {
