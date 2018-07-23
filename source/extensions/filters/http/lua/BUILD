@@ -38,6 +38,7 @@ envoy_cc_library(
         "//include/envoy/request_info:request_info_interface",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/common/lua:lua_lib",
+        "//source/extensions/filters/common/lua:wrappers_lib",
     ],
 )
 
