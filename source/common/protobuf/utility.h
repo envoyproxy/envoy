@@ -63,6 +63,9 @@ uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent&
 // @param field_name supplies the field name in the message.
 // @param max_value supplies the maximum allowed integral value (e.g., 100, 10000, etc.).
 // @param default_value supplies the default if the field is not present.
+//
+// TODO(anirudhmurali): Recommended to capture and validate NaN values in PGV
+// Issue: https://github.com/lyft/protoc-gen-validate/issues/85
 #define PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(message, field_name, max_value,             \
                                                        default_value)                              \
   ((message).has_##field_name() && !std::isnan((message).field_name().value())                     \
