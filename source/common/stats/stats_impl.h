@@ -221,14 +221,7 @@ struct RawStatData {
    * does not expect stat name truncation. We pass in the number of bytes allocated in order to
    * assert the copy is safe inline.
    */
-  void checkAndInit(absl::string_view key, uint64_t num_bytes_allocated);
-
-  /**
-   * Initializes this object to have the specified key,
-   * a refcount of 1, and all other values zero. Required by the BlockMemoryHashSet. StatsOptions is
-   * used to truncate key inline, if necessary.
-   */
-  void truncateAndInit(absl::string_view key, const StatsOptions& stats_options);
+  void initialize(absl::string_view key, const StatsOptions& stats_options);
 
   /**
    * Returns a hash of the key. This is required by BlockMemoryHashSet.
@@ -251,9 +244,6 @@ struct RawStatData {
   std::atomic<uint16_t> ref_count_;
   std::atomic<uint32_t> unused_;
   char name_[];
-
-private:
-  void initialize(absl::string_view key, uint64_t num_bytes_allocated);
 };
 
 /**
@@ -495,15 +485,7 @@ private:
  */
 class IsolatedStoreImpl : public Store {
 public:
-  // TODO(jmarantz): It appears that if the configuartion overrides the max
-  // option length, this isolated store will not see the adjustment. I am
-  // not sure if that's a problem. Ideally I'd like to take the stat_options
-  // here we can creating the StatAllocator, but it's not immediately obvious
-  // where to pull that from. I think this issue existed starting with
-  // https://github.com/envoyproxy/envoy/pull/3629, which removed the shadowing
-  // of option size in a static.
-
-  /* explicit */ IsolatedStoreImpl(/*Stats::StatsOptions& stats_options*/)
+  IsolatedStoreImpl()
       : counters_([this](const std::string& name) -> CounterSharedPtr {
           std::string tag_extracted_name = name;
           std::vector<Tag> tags;
@@ -518,9 +500,6 @@ public:
           return std::make_shared<HistogramImpl>(name, *this, std::string(name),
                                                  std::vector<Tag>());
         }) {
-    // TODO(jmarantz): for now, just set the limit to be very high, until
-    // we make a decision on whether to plumb in the options structure seen
-    // by the rest of the system.
     stats_options_.max_obj_name_length_ = 1000 * 1000;
     alloc_ = std::make_unique<HeapStatDataAllocator>(stats_options_);
   }

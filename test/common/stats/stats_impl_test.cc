@@ -517,21 +517,6 @@ TEST(RawStatDataTest, HeapAlloc) {
   alloc.free(*stat_3);
 }
 
-// See also HotRestartImplTest.RawTruncateWithAllocator and
-//
-TEST(RawStatDataTest, TruncateWithoutAllocator) {
-  // RawStatData::truncateAndInit(absl::string_view key, const StatsOptions& stats_options) will
-  // truncate and log to ENVOY_LOG_MISC if given a key longer than the allowed
-  // stats_options.maxNameLength(). This mechanism is also tested in HotRestartImplTest.truncateKey.
-  Stats::StatsOptionsImpl stats_options;
-  const std::string long_string(stats_options.maxNameLength() + 1, 'A');
-  RawStatData* stat =
-      static_cast<RawStatData*>(::calloc(RawStatData::structSizeWithOptions(stats_options), 1));
-  EXPECT_LOG_CONTAINS("warning", "is too long with",
-                      stat->truncateAndInit(long_string, stats_options));
-  ::free(stat);
-}
-
 TEST(SourceImplTest, Caching) {
   NiceMock<MockStore> store;
   std::vector<CounterSharedPtr> stored_counters;

@@ -333,42 +333,23 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
 
 template <class StatData>
 absl::string_view StatDataAllocatorImpl<StatData>::truncateStatName(absl::string_view key) {
-  const uint64_t max_width = stats_options_.maxNameLength();
-  if (key.size() > max_width) {
+  const uint64_t max_length = stats_options_.maxNameLength();
+  if (key.size() > max_length) {
     ENVOY_LOG_MISC(
         warn,
         "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
-        key.size(), max_width);
-    return absl::string_view(key.data(), max_width);
+        key.size(), max_length);
+    return absl::string_view(key.data(), max_length);
   }
   return key;
 }
 
-void RawStatData::initialize(absl::string_view key, uint64_t xfer_size) {
+void RawStatData::initialize(absl::string_view key, const StatsOptions& stats_options) {
   ASSERT(!initialized());
+  ASSERT(key.size() <= stats_options.maxNameLength());
   ref_count_ = 1;
-  memcpy(name_, key.data(), xfer_size);
-  name_[xfer_size] = '\0';
-}
-
-void RawStatData::checkAndInit(absl::string_view key, uint64_t num_bytes_allocated) {
-  uint64_t xfer_size = key.size();
-  ASSERT(structSize(xfer_size) <= num_bytes_allocated);
-
-  initialize(key, xfer_size);
-}
-
-void RawStatData::truncateAndInit(absl::string_view key, const StatsOptions& stats_options) {
-  if (key.size() > stats_options.maxNameLength()) {
-    ENVOY_LOG_MISC(
-        warn,
-        "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
-        key.size(), stats_options.maxNameLength());
-  }
-
-  // key is not necessarily nul-terminated, but we want to make sure name_ is.
-  uint64_t xfer_size = std::min(stats_options.maxNameLength(), key.size());
-  initialize(key, xfer_size);
+  memcpy(name_, key.data(), key.size());
+  name_[key.size()] = '\0';
 }
 
 HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr)

@@ -351,7 +351,7 @@ public:
     if (!stat_ref) {
       stat_ref.reset(static_cast<RawStatData*>(
           ::calloc(RawStatData::structSizeWithOptions(stats_options), 1)));
-      stat_ref->truncateAndInit(name, stats_options);
+      stat_ref->initialize(name, stats_options);
     } else {
       stat_ref->ref_count_++;
     }
