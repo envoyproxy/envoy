@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package test.common.http.http2;
+
+import "google/protobuf/empty.proto";
+
+// Structured input for H2 codec_impl_fuzz_test.
+
+message Header {
+  string key = 1;
+  string value = 2;
+}
+
+message Headers {
+  repeated Header headers = 1;
+}
+
+message NewStream {
+  Headers request_headers = 1;
+  bool end_stream = 2;
+}
+
+message DirectionalAction {
+  oneof directional_action_selector {
+    Headers continue_100_headers = 1;
+    Headers headers = 2;
+    uint32 data = 3;
+    Headers trailers = 4;
+    uint32 reset = 5;
+    bool read_disable = 6;
+  }
+  bool end_stream = 7;
+}
+
+message StreamAction {
+  uint32 stream_id = 1;
+  oneof stream_action_selector {
+    DirectionalAction request = 2;
+    DirectionalAction response = 3;
+  }
+}
+
+message MutateAction {
+  // Buffer index.
+  uint32 buffer = 1;
+  // Offset withing buffer.
+  uint32 offset = 2;
+  // Value to set (only lower byte is significant).
+  uint32 value = 3;
+  // Server connection buffer? Otherwise client.
+  bool server = 4;
+}
+
+message SwapBufferAction {
+  // Target buffer index to swap with. The buffer at index 0 is swapped with the
+  // target buffer.
+  uint32 buffer = 1;
+  // Server connection buffer? Otherwise client.
+  bool server = 2;
+}
+
+message Action {
+  oneof action_selector {
+    // Create new stream.
+    NewStream new_stream = 1;
+    // Perform an action on an existing stream.
+    StreamAction stream_action = 2;
+    // Mutate a connection buffer.
+    MutateAction mutate = 3;
+    // Swap two fragments in a connection buffer.
+    SwapBufferAction swap_buffer = 4;
+    // Drain client connection buffer.
+    google.protobuf.Empty client_drain = 5;
+    // Drain server connection buffer.
+    google.protobuf.Empty server_drain = 6;
+    // Drain client/server buffers alternatively until both are empty.
+    google.protobuf.Empty quiesce_drain = 7;
+  }
+}
+
+// Setting X below is interpreted as min_valid_setting + X % (1 +
+// max_valid_setting - min_valid_setting).
+message Http2Settings {
+  uint32 hpack_table_size = 1;
+  uint32 max_concurrent_streams = 2;
+  uint32 initial_stream_window_size = 3;
+  uint32 initial_connection_window_size = 4;
+}
+
+message CodecImplFuzzTestCase {
+  Http2Settings client_settings = 1;
+  Http2Settings server_settings = 2;
+  repeated Action actions = 3;
+}
