@@ -1620,6 +1620,50 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   factory_.tls_.shutdownThread();
 }
 
+TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11002
+      common_lb_config:
+        time_between_updates: 3s
+  )EOF";
+
+  create(parseBootstrapFromV2Yaml(yaml));
+  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+
+  // Save the updates timer.
+  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+
+  // Remove each host, sequentially.
+  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
+
+  HostVectorSharedPtr hosts(
+      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_added{};
+  HostVector hosts_removed_0{(*hosts)[0]};
+  HostVector hosts_removed_1{(*hosts)[1]};
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed_0);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed_1);
+
+  // Ensure the coalesced updates were applied.
+  timer->callback_();
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
+}
+
 class ClusterManagerInitHelperTest : public testing::Test {
 public:
   MOCK_METHOD1(onClusterInit, void(Cluster& cluster));

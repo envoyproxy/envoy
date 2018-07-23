@@ -180,7 +180,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
-      system_time_source_(system_time_source) {
+      system_time_source_(system_time_source), dispatcher_(main_thread_dispatcher) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
@@ -330,7 +330,46 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
                                                            const HostVector& hosts_removed) {
     // This fires when a cluster is about to have an updated member set. We need to send this
     // out to all of the thread local configurations.
-    postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
+
+    // Should we coalesce updates?
+    if (cluster.info()->lbConfig().has_time_between_updates()) {
+      PendingUpdatesByPriorityMapPtr updates_by_prio;
+      PendingUpdatesPtr updates;
+
+      // Find pending updates for this cluster.
+      auto updates_by_prio_it = updates_map_.find(cluster.info()->name());
+      if (updates_by_prio_it != updates_map_.end()) {
+        updates_by_prio = updates_by_prio_it->second;
+      } else {
+        updates_by_prio = std::make_shared<PendingUpdatesByPriorityMap>();
+        updates_map_[cluster.info()->name()] = updates_by_prio;
+      }
+
+      // Find pending updates for this priority.
+      auto updates_it = updates_by_prio->find(priority);
+      if (updates_it != updates_by_prio->end()) {
+        updates = updates_it->second;
+      } else {
+        updates = std::make_shared<PendingUpdates>();
+        (*updates_by_prio)[priority] = updates;
+      }
+
+      // Record the updates that should be applied when the timer fires.
+      updates->added.insert(hosts_added.begin(), hosts_added.end());
+      updates->removed.insert(hosts_removed.begin(), hosts_removed.end());
+
+      // If there's no timer, create one.
+      if (updates->timer == nullptr) {
+        updates->timer = dispatcher_.createTimer([this, &cluster, priority, &updates]() -> void {
+          applyUpdates(cluster, priority, updates);
+        });
+        const auto& time_between_updates = cluster.info()->lbConfig().time_between_updates();
+        const auto timeout = DurationUtil::durationToMilliseconds(time_between_updates);
+        updates->timer->enableTimer(std::chrono::milliseconds(timeout));
+      }
+    } else {
+      postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
+    }
   });
 
   // Finally, if the cluster has any hosts, post updates cross-thread so the per-thread load
@@ -341,6 +380,22 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     }
     postThreadLocalClusterUpdate(cluster, host_set->priority(), host_set->hosts(), HostVector{});
   }
+}
+
+void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
+                                      PendingUpdatesPtr updates) {
+  // Merge pending updates & deliver.
+  const HostVector& hosts_added{updates->added.begin(), updates->added.end()};
+  const HostVector& hosts_removed{updates->removed.begin(), updates->removed.end()};
+
+  postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
+
+  cm_stats_.coalesced_updates_.inc();
+
+  // Reset everything.
+  updates->timer = nullptr;
+  updates->added.clear();
+  updates->removed.clear();
 }
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,

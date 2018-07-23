@@ -138,6 +138,7 @@ private:
   COUNTER(cluster_added)                                                                           \
   COUNTER(cluster_modified)                                                                        \
   COUNTER(cluster_removed)                                                                         \
+  COUNTER(coalesced_updates)                                                                       \
   GAUGE  (active_clusters)                                                                         \
   GAUGE  (warming_clusters)
 // clang-format on
@@ -361,6 +362,18 @@ private:
   // This map is ordered so that config dumping is consistent.
   typedef std::map<std::string, ClusterDataPtr> ClusterMap;
 
+  struct PendingUpdates {
+    PendingUpdates() {}
+    Event::TimerPtr timer;
+    std::unordered_set<HostSharedPtr> added;
+    std::unordered_set<HostSharedPtr> removed;
+  };
+  typedef std::shared_ptr<PendingUpdates> PendingUpdatesPtr;
+  typedef std::unordered_map<uint32_t, PendingUpdatesPtr> PendingUpdatesByPriorityMap;
+  typedef std::shared_ptr<PendingUpdatesByPriorityMap> PendingUpdatesByPriorityMapPtr;
+  typedef std::unordered_map<std::string, PendingUpdatesByPriorityMapPtr> ClusterUpdatesMap;
+
+  void applyUpdates(const Cluster& cluster, uint32_t priority, PendingUpdatesPtr updates);
   void createOrUpdateThreadLocalCluster(ClusterData& cluster);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
   static ClusterManagerStats generateStats(Stats::Scope& scope);
@@ -394,6 +407,8 @@ private:
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTimeSource& system_time_source_;
+  ClusterUpdatesMap updates_map_;
+  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace Upstream
