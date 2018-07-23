@@ -43,7 +43,10 @@ public:
 
   uint64_t bodyLength() { return body_.length(); }
   Buffer::Instance& body() { return body_; }
-  bool complete() { return end_stream_; }
+  bool complete() {
+    Thread::LockGuard lock(lock_);
+    return end_stream_;
+  }
   void encode100ContinueHeaders(const Http::HeaderMapImpl& headers);
   void encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
