@@ -22,13 +22,13 @@ import "validate/validate.proto";
 //     issuer: https://example.com
 //     audiences:
 //     - bookstore_android.apps.googleusercontent.com
-//       bookstore_web.apps.googleusercontent.com
+//     - bookstore_web.apps.googleusercontent.com
 //     remote_jwks:
-//     - http_uri:
-//       - uri: https://example.com/.well-known/jwks.json
+//       http_uri:
+//         uri: https://example.com/.well-known/jwks.json
 //         cluster: example_jwks_cluster
 //       cache_duration:
-//       - seconds: 300
+//         seconds: 300
 //
 // [#not-implemented-hide:]
 message JwtProvider {
@@ -50,7 +50,7 @@ message JwtProvider {
   //
   //     audiences:
   //     - bookstore_android.apps.googleusercontent.com
-  //       bookstore_web.apps.googleusercontent.com
+  //     - bookstore_web.apps.googleusercontent.com
   //
   repeated string audiences = 2;
 
@@ -67,11 +67,11 @@ message JwtProvider {
     // .. code-block:: yaml
     //
     //    remote_jwks:
-    //    - http_uri:
-    //      - uri: https://www.googleapis.com/oauth2/v1/certs
+    //      http_uri:
+    //        uri: https://www.googleapis.com/oauth2/v1/certs
     //        cluster: jwt.www.googleapis.com|443
     //      cache_duration:
-    //      - seconds: 300
+    //        seconds: 300
     //
     RemoteJwks remote_jwks = 3;
 
@@ -83,14 +83,14 @@ message JwtProvider {
     // .. code-block:: yaml
     //
     //    local_jwks:
-    //    - filename: /etc/envoy/jwks/jwks1.txt
+    //      filename: /etc/envoy/jwks/jwks1.txt
     //
     // Example: inline_string
     //
     // .. code-block:: yaml
     //
     //    local_jwks:
-    //    - inline_string: "ACADADADADA"
+    //      inline_string: "ACADADADADA"
     //
     envoy.api.v2.core.DataSource local_jwks = 4;
   }
@@ -163,7 +163,7 @@ message RemoteJwks {
   // .. code-block:: yaml
   //
   //    http_uri:
-  //    - uri: https://www.googleapis.com/oauth2/v1/certs
+  //      uri: https://www.googleapis.com/oauth2/v1/certs
   //      cluster: jwt.www.googleapis.com|443
   //
   envoy.api.v2.core.HttpUri http_uri = 1;
