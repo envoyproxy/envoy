@@ -26,16 +26,16 @@ public:
 };
 
 /**
- * Reason that a pool stream could not be obtained.
+ * Reason that a pool connection could not be obtained.
  */
 enum class PoolFailureReason {
   // A resource overflowed and policy prevented a new connection from being created.
   Overflow,
-  // A local connection failure took place and the connection could not be bound.
+  // A local connection failure took place while creating a new connection.
   LocalConnectionFailure,
-  // A remote connection failure took place and the connection could not be bound.
+  // A remote connection failure took place while creating a new connection.
   RemoteConnectionFailure,
-  // A connection timeout occurred.
+  // A timeout occurred while creating a new connection.
   Timeout,
 };
 
@@ -128,14 +128,14 @@ public:
   /**
    * Register a callback that gets called when the connection pool is fully drained. No actual
    * draining is done. The owner of the connection pool is responsible for not creating any
-   * new streams.
+   * new connections.
    */
   virtual void addDrainedCallback(DrainedCb cb) PURE;
 
   /**
    * Actively drain all existing connection pool connections. This method can be used in cases
    * where the connection pool is not being destroyed, but the caller wishes to make sure that
-   * all new streams take place on a new connection. For example, when a health check failure
+   * all new requests take place on a new connection. For example, when a health check failure
    * occurs.
    */
   virtual void drainConnections() PURE;
