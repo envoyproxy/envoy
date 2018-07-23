@@ -1,5 +1,9 @@
 #pragma once
 
+#include <vector>
+
+#include "envoy/common/pure.h"
+
 namespace Envoy {
 namespace Stats {
 /**
