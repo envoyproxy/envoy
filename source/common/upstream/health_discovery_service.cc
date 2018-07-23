@@ -9,13 +9,15 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
                          Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                          Runtime::Loader& runtime, Envoy::Stats::Store& stats,
                          Ssl::ContextManager& ssl_context_manager,
-                         Secret::SecretManager& secret_manager, Runtime::RandomGenerator& random)
+                         Secret::SecretManager& secret_manager, Runtime::RandomGenerator& random,
+                         HdsInfoFactory& info_factory)
     : stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_delegate."))},
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")),
       runtime_(runtime), store_stats(stats), ssl_context_manager_(ssl_context_manager),
-      secret_manager_(secret_manager), random_(random), dispatcher_(dispatcher) {
+      secret_manager_(secret_manager), random_(random), dispatcher_(dispatcher),
+      info_factory_(info_factory) {
   health_check_request_.mutable_node()->MergeFrom(node);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   server_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
@@ -91,6 +93,7 @@ void HdsDelegate::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
 
 void HdsDelegate::processMessage(
     std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
+  ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
   ASSERT(message);
   for (int i = 0; i < message->health_check_size(); i++) {
     // Create HdsCluster config
@@ -126,7 +129,7 @@ void HdsDelegate::processMessage(
 
     // Create HdsCluster
     cluster_.reset(new HdsCluster(runtime_, cluster_config, bind_config, store_stats,
-                                  ssl_context_manager_, secret_manager_, false));
+                                  ssl_context_manager_, secret_manager_, false, info_factory_));
 
     hds_clusters_.push_back(cluster_);
 
@@ -150,12 +153,11 @@ void HdsDelegate::onReceiveMessage(
   // Process the HealthCheckSpecifier message
   processMessage(std::move(message));
 
-  // Initializing Clusters & HealthCheckers
+  // Initializing HealthCheckers
   for (uint32_t i = 0; i < hds_clusters_.size(); i++) {
     for (uint32_t j = 0; j < health_checkers_ptr[i].size(); j++) {
       hds_clusters_[i]->startHealthChecker(health_checkers_ptr[i][j]);
     }
-    hds_clusters_[i]->initialize([] {});
     server_response_ms_ = PROTOBUF_GET_MS_REQUIRED(*message, interval);
     setServerResponseTimer();
   }
@@ -175,21 +177,26 @@ void HdsDelegate::onRemoteClose(Grpc::Status::GrpcStatus status, const std::stri
 HdsCluster::HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
                        const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
                        Ssl::ContextManager& ssl_context_manager,
-                       Secret::SecretManager& secret_manager, bool added_via_api)
-    : info_(new ClusterInfoImpl(cluster, bind_config, runtime, stats, ssl_context_manager,
-                                secret_manager, added_via_api)),
-      runtime_(runtime), initial_hosts_(new HostVector())
-
-{
+                       Secret::SecretManager& secret_manager, bool added_via_api,
+                       HdsInfoFactory& info_factory)
+    : runtime_(runtime), cluster_(cluster), bind_config_(bind_config), stats_(stats),
+      ssl_context_manager_(ssl_context_manager), secret_manager_(secret_manager),
+      added_via_api_(added_via_api), initial_hosts_(new HostVector()), info_factory_(info_factory) {
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
 
+  ClusterInfoConstSharedPtr info_ptr;
+  info_ptr =
+      info_factory_.createHdsClusterInfo(runtime_, cluster_, bind_config_, stats_,
+                                         ssl_context_manager_, secret_manager_, added_via_api_);
+  info_.swap(info_ptr);
   for (const auto& host : cluster.hosts()) {
     initial_hosts_->emplace_back(HostSharedPtr{new HostImpl(
         info_, "", resolveProtoAddress2(host), envoy::api::v2::core::Metadata::default_instance(),
         1, envoy::api::v2::core::Locality().default_instance(),
         envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())});
   }
+  initialize([] {});
 }
 
 ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED; }
@@ -209,6 +216,18 @@ HostVectorConstSharedPtr HdsCluster::createHealthyHostList(const HostVector& hos
   return healthy_list;
 }
 
+ClusterInfoConstSharedPtr RealHdsInfoFactory::createHdsClusterInfo(
+    Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
+    const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
+    Ssl::ContextManager& ssl_context_manager, Secret::SecretManager& secret_manager,
+    bool added_via_api) {
+
+  ClusterInfoConstSharedPtr info;
+  info.reset(new ClusterInfoImpl(cluster, bind_config, runtime, stats, ssl_context_manager,
+                                 secret_manager, added_via_api));
+  return info;
+}
+
 HostsPerLocalityConstSharedPtr HdsCluster::createHealthyHostLists(const HostsPerLocality& hosts) {
   return hosts.filter([](const Host& host) { return host.healthy(); });
 }
@@ -216,10 +235,8 @@ HostsPerLocalityConstSharedPtr HdsCluster::createHealthyHostLists(const HostsPer
 void HdsCluster::initialize(std::function<void()> callback) {
   ASSERT(initialization_complete_callback_ == nullptr);
   initialization_complete_callback_ = callback;
-  if (health_checker_) {
-    for (const auto& host : *initial_hosts_) {
-      host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-    }
+  for (const auto& host : *initial_hosts_) {
+    host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
   }
 
   auto& first_host_set = priority_set_.getOrCreateHostSet(0);
