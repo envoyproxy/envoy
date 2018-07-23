@@ -8,6 +8,7 @@ set -e
 [[ -z "${BAZEL_COVERAGE}" ]] && BAZEL_COVERAGE=bazel
 [[ -z "${GCOVR}" ]] && GCOVR=gcovr
 [[ -z "${WORKSPACE}" ]] && WORKSPACE=envoy
+[[ -z "${VALIDATE_COVERAGE}" ]] && VALIDATE_COVERAGE=true
 
 # This is the target that will be run to generate coverage data. It can be overriden by consumer
 # projects that want to run coverage on a different/combined target.
@@ -56,7 +57,7 @@ COVERAGE_SUMMARY="${COVERAGE_DIR}/coverage_summary.txt"
 pushd "${GCOVR_DIR}"
 for f in $(find -L bazel-out/ -name "*.gcno")
 do
-  cp --parents "$f" bazel-out/k8-dbg/bin/test/coverage/coverage_tests.runfiles/"${WORKSPACE}"
+  cp --parents "$f" bazel-out/k8-dbg/bin/"${COVERAGE_TARGET/:/\/}".runfiles/"${WORKSPACE}"
 done
 popd
 
@@ -76,13 +77,16 @@ rm "${SRCDIR}"/test/coverage/BUILD
 
 [[ -z "${ENVOY_COVERAGE_DIR}" ]] || rsync -av "${COVERAGE_DIR}"/ "${ENVOY_COVERAGE_DIR}"
 
-COVERAGE_VALUE=$(grep -Po 'lines: \K(\d|\.)*' "${COVERAGE_SUMMARY}")
-COVERAGE_THRESHOLD=98.0
-COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
-if test ${COVERAGE_FAILED} -eq 1; then
-    echo Code coverage ${COVERAGE_VALUE} is lower than limit of ${COVERAGE_THRESHOLD}
-    exit 1
-else
-    echo Code coverage ${COVERAGE_VALUE} is good and higher than limit of ${COVERAGE_THRESHOLD}
+if [ "$VALIDATE_COVERAGE" == "true" ]
+then
+  COVERAGE_VALUE=$(grep -Po 'lines: \K(\d|\.)*' "${COVERAGE_SUMMARY}")
+  COVERAGE_THRESHOLD=98.0
+  COVERAGE_FAILED=$(echo "${COVERAGE_VALUE}<${COVERAGE_THRESHOLD}" | bc)
+  if test ${COVERAGE_FAILED} -eq 1; then
+      echo Code coverage ${COVERAGE_VALUE} is lower than limit of ${COVERAGE_THRESHOLD}
+      exit 1
+  else
+      echo Code coverage ${COVERAGE_VALUE} is good and higher than limit of ${COVERAGE_THRESHOLD}
+  fi
+  echo "HTML coverage report is in ${COVERAGE_DIR}/coverage.html"
 fi
-echo "HTML coverage report is in ${COVERAGE_DIR}/coverage.html"

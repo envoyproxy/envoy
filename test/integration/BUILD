@@ -424,6 +424,32 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "sds_static_integration_test",
+    srcs = [
+        "sds_static_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:connection_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/ssl:context_config_lib",
+        "//source/common/ssl:context_lib",
+        "//source/extensions/filters/listener/tls_inspector:config",
+        "//source/extensions/transport_sockets/ssl:config",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
+        "@envoy_api//envoy/data/tap/v2alpha:capture_cc",
+    ],
+)
+
+envoy_cc_test(
     name = "ssl_integration_test",
     srcs = [
         "ssl_integration_test.cc",

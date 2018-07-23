@@ -40,10 +40,10 @@ void WatermarkBuffer::move(Instance& rhs, uint64_t length) {
   checkHighWatermark();
 }
 
-int WatermarkBuffer::read(int fd, uint64_t max_length) {
-  int bytes_read = OwnedImpl::read(fd, max_length);
+std::tuple<int, int> WatermarkBuffer::read(int fd, uint64_t max_length) {
+  std::tuple<int, int> result = OwnedImpl::read(fd, max_length);
   checkHighWatermark();
-  return bytes_read;
+  return result;
 }
 
 uint64_t WatermarkBuffer::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
@@ -52,10 +52,10 @@ uint64_t WatermarkBuffer::reserve(uint64_t length, RawSlice* iovecs, uint64_t nu
   return bytes_reserved;
 }
 
-int WatermarkBuffer::write(int fd) {
-  int bytes_written = OwnedImpl::write(fd);
+std::tuple<int, int> WatermarkBuffer::write(int fd) {
+  std::tuple<int, int> result = OwnedImpl::write(fd);
   checkLowWatermark();
-  return bytes_written;
+  return result;
 }
 
 void WatermarkBuffer::setWatermarks(uint32_t low_watermark, uint32_t high_watermark) {

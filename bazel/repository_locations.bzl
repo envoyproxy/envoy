@@ -68,9 +68,11 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/jwt_verify_lib",
     ),
     com_github_nodejs_http_parser = dict(
-        # 2018-05-30 snapshot to pick up a performance fix, nodejs/http-parser PR 422
+        # 2018-07-20 snapshot to pick up:
+        # A performance fix, nodejs/http-parser PR 422.
+        # A bug fix, nodejs/http-parser PR 432.
         # TODO(brian-pane): Upgrade to the next http-parser release once it's available
-        commit = "cf69c8eda9fe79e4682598a7b3d39338dea319a3",
+        commit = "77310eeb839c4251c07184a5db8885a572a08352",
         remote = "https://github.com/nodejs/http-parser",
     ),
     com_github_pallets_jinja = dict(

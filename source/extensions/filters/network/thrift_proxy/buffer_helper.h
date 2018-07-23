@@ -48,12 +48,12 @@ public:
   }
   void move(Buffer::Instance&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void move(Buffer::Instance&, uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  int read(int, uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  std::tuple<int, int> read(int, uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   uint64_t reserve(uint64_t, Buffer::RawSlice*, uint64_t) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   ssize_t search(const void*, uint64_t, size_t) const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  int write(int) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  std::tuple<int, int> write(int) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   std::string toString() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:

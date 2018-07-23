@@ -53,9 +53,11 @@ void CdsJson::translateHealthCheck(const Json::Object& json_health_check,
     }
   } else {
     ASSERT(hc_type == "redis");
-    auto* redis_health_check = health_check.mutable_redis_health_check();
+    auto* redis_health_check = health_check.mutable_custom_health_check();
+    redis_health_check->set_name("envoy.health_checkers.redis");
     if (json_health_check.hasObject("redis_key")) {
-      redis_health_check->set_key(json_health_check.getString("redis_key"));
+      redis_health_check->mutable_config()->MergeFrom(
+          MessageUtil::keyValueStruct("key", json_health_check.getString("redis_key")));
     }
   }
 }
