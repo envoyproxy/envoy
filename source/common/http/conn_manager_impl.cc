@@ -373,6 +373,13 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   // prevents surprises for logging code in edge cases.
   request_info_.setDownstreamRemoteAddress(
       connection_manager_.read_callbacks_->connection().remoteAddress());
+
+  if (connection_manager_.config_.streamIdleTimeout().count()) {
+    idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
+    idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onIdleTimeout(); });
+    resetIdleTimer();
+  }
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
@@ -609,9 +616,18 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     if (route_entry != nullptr && route_entry->idleTimeout()) {
       idle_timeout_ms_ = route_entry->idleTimeout().value();
-      idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
-          [this]() -> void { onIdleTimeout(); });
-      resetIdleTimer();
+      if (idle_timeout_ms_.count()) {
+        // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
+        if (idle_timer_ == nullptr) {
+          idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+              [this]() -> void { onIdleTimeout(); });
+        }
+      } else if (idle_timer_ != nullptr) {
+        // If we had a global stream idle timeout but the route-level idle timeout is set to zero
+        // (to override), we disable the idle timer.
+        idle_timer_->disableTimer();
+        idle_timer_ = nullptr;
+      }
     }
   }
 
@@ -621,6 +637,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   decodeHeaders(nullptr, *request_headers_, end_stream);
+
+  // Reset it here for both global and overriden cases.
+  resetIdleTimer();
 }
 
 void ConnectionManagerImpl::ActiveStream::traceRequest() {

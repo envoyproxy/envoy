@@ -14,6 +14,12 @@ Version history
 * health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
 * health check: added support for :ref:`specifying jitter as a percentage <envoy_api_field_core.HealthCheck.interval_jitter_percent>`.
 * health_check: added support for :ref:`health check event logging <arch_overview_health_check_logging>`.
+* http: added support for a per-stream idle timeout. This applies at both :ref:`connection manager
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
+  and :ref:`per-route granularity <envoy_api_field_route.RouteAction.idle_timeout>`. The timeout
+  defaults to 5 minutes; if you have other timeouts (e.g. connection idle timeout, upstream
+  response per-retry) that are longer than this in duration, you may want to consider setting a
+  non-default per-stream idle timeout.
 * http: added support for a :ref:`per-stream idle timeout
   <envoy_api_field_route.RouteAction.idle_timeout>`. This defaults to 5 minutes; if you have
   other timeouts (e.g. connection idle timeout, upstream response per-retry) that are longer than

@@ -254,7 +254,8 @@ public:
   std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
   bool generateRequestId() override { return true; }
-  const absl::optional<std::chrono::milliseconds>& idleTimeout() override { return idle_timeout_; }
+  absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return server_name_; }
   ConnectionManagerStats& stats() override { return stats_; }
@@ -294,6 +295,7 @@ public:
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   absl::optional<std::string> user_agent_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
+  std::chrono::milliseconds stream_idle_timeout_{};
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -1093,7 +1095,9 @@ TEST_F(HttpConnectionManagerImplTest, NoPath) {
   conn_manager_->onData(fake_input, false);
 }
 
-// No idle timeout when route idle timeout is not configured.
+// No idle timeout when route idle timeout is implied at both global and
+// per-route level. The connection manager config is responsible for managing
+// the default configuration aspects.
 TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNotConfigured) {
   setup(false, "");
 
@@ -1104,6 +1108,89 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNotConfigured) {
         StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
 
         HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}}};
+        decoder->decodeHeaders(std::move(headers), false);
+
+        data.drain(4);
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_idle_timeout_.value());
+}
+
+// When the global timeout is configured, the timer is enabled before we receive
+// headers.
+TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutGlobal) {
+  stream_idle_timeout_ = std::chrono::milliseconds(10);
+  setup(false, "");
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .Times(1)
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+        Event::MockTimer* idle_timer =
+            new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+        EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10)));
+        StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+
+        HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}}};
+        EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10)));
+        decoder->decodeHeaders(std::move(headers), false);
+
+        data.drain(4);
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_idle_timeout_.value());
+}
+
+// Per-route timeouts override the global stream idle timeout.
+TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteOverride) {
+  stream_idle_timeout_ = std::chrono::milliseconds(10);
+  setup(false, "");
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, idleTimeout())
+      .WillByDefault(Return(std::chrono::milliseconds(30)));
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .Times(1)
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+        Event::MockTimer* idle_timer =
+            new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+        EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10)));
+        StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+
+        HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}}};
+        EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(30)));
+        decoder->decodeHeaders(std::move(headers), false);
+
+        data.drain(4);
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_idle_timeout_.value());
+}
+
+// Per-route zero timeout overrides the global stream idle timeout.
+TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteZeroOverride) {
+  stream_idle_timeout_ = std::chrono::milliseconds(10);
+  setup(false, "");
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, idleTimeout())
+      .WillByDefault(Return(std::chrono::milliseconds(0)));
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .Times(1)
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+        Event::MockTimer* idle_timer =
+            new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+        EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10)));
+        StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+
+        HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}}};
+        EXPECT_CALL(*idle_timer, disableTimer());
         decoder->decodeHeaders(std::move(headers), false);
 
         data.drain(4);
