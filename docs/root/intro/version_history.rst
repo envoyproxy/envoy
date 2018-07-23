@@ -14,6 +14,12 @@ Version history
 * health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
 * health check: added support for :ref:`specifying jitter as a percentage <envoy_api_field_core.HealthCheck.interval_jitter_percent>`.
 * health_check: added support for :ref:`health check event logging <arch_overview_health_check_logging>`.
+* http: added support for a per-stream idle timeout. This applies at both :ref:`connection manager
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
+  and :ref:`per-route granularity <envoy_api_field_route.RouteAction.idle_timeout>`. The timeout
+  defaults to 5 minutes; if you have other timeouts (e.g. connection idle timeout, upstream
+  response per-retry) that are longer than this in duration, you may want to consider setting a
+  non-default per-stream idle timeout.
 * http: added support for a :ref:`per-stream idle timeout
   <envoy_api_field_route.RouteAction.idle_timeout>`. This defaults to 5 minutes; if you have
   other timeouts (e.g. connection idle timeout, upstream response per-retry) that are longer than
@@ -29,6 +35,7 @@ Version history
   :ref:`prefix_ranges <envoy_api_field_listener.FilterChainMatch.prefix_ranges>`.
 * lua: added :ref:`connection() <config_http_filters_lua_connection_wrapper>` wrapper and *ssl()* API.
 * lua: added :ref:`requestInfo() <config_http_filters_lua_request_info_wrapper>` wrapper and *protocol()* API.
+* lua: added :ref:`requestInfo():dynamicMetadata() <config_http_filters_lua_request_info_dynamic_metadata_wrapper>` API.
 * proxy_protocol: added support for HAProxy Proxy Protocol v2 (AF_INET/AF_INET6 only).
 * ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`.
   Lyft's reference implementation of the `ratelimit <https://github.com/lyft/ratelimit>`_ service also supports the data-plane-api proto as of v1.1.0.

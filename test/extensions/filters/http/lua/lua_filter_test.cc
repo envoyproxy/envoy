@@ -1,5 +1,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/http/message_impl.h"
+#include "common/request_info/request_info_impl.h"
 
 #include "extensions/filters/http/lua/lua_filter.h"
 
@@ -1514,6 +1515,33 @@ TEST_F(LuaHttpFilterTest, GetCurrentProtocol) {
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("HTTP/1.1")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Set and get request info dynamic metadata.
+TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:requestInfo():dynamicMetadata():set("envoy.lb", "foo", "bar")
+      request_handle:logTrace(request_handle:requestInfo():dynamicMetadata():get("envoy.lb")["foo"])
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2);
+  EXPECT_EQ(0, request_info.dynamicMetadata().filter_metadata_size());
+  EXPECT_CALL(decoder_callbacks_, requestInfo()).WillOnce(ReturnRef(request_info));
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  EXPECT_EQ(1, request_info.dynamicMetadata().filter_metadata_size());
+  EXPECT_EQ("bar", request_info.dynamicMetadata()
+                       .filter_metadata()
+                       .at("envoy.lb")
+                       .fields()
+                       .at("foo")
+                       .string_value());
 }
 
 // Check the connection.
