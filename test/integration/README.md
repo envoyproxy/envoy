@@ -111,7 +111,7 @@ likely a one-off change, it can be scoped to the existing test file.
 # Deflaking tests
 
 The instructions below assume the developer is running tests natively with bazel
-rather than in docker.  For developers using docker the best workaround today is
+rather than in docker. For developers using docker the best workaround today is
 to replace `//test/...` on the relevant `ci/do_ci.sh`with the command lines
 referenced below and remember to back those changes out before sending the fix
 upstream!
@@ -151,7 +151,7 @@ bazel test //test/integration:http2_upstream_integration_test \
 ## Debugging test flakes
 
 Once you've managed to reproduce your test flake, you get to figure out what's
-doing on. If your failure mode isn't documented below, ideally some combination
+going on. If your failure mode isn't documented below, ideally some combination
 of cerr << logging and trace logs will help you sort out what is going on (and
 please add to this document as you figure it out!)
 
@@ -159,9 +159,9 @@ please add to this document as you figure it out!)
 
 As commented in `HttpIntegrationTest::cleanupUpstreamAndDownstream()`, the
 tear-down sequence between upstream, Envoy, and client is somewhat sensitive to
-ordering. If a given unit test does not use the current global variables, for
+ordering. If a given unit test does not use the provided member variables, for
 example opens multiple client or upstream connections, the test author should be
-aware of test best practives for clean-up which boil down to "Clean up upstream
+aware of test best practices for clean-up which boil down to "Clean up upstream
 first".
 
 Upstream connections run in their own threads, so if the client disconnects with
