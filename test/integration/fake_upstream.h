@@ -211,7 +211,10 @@ public:
       } else {
         RELEASE_ASSERT(
             allow_unexpected_disconnects_,
-            "The connection disconnected unexpectedly, and allow_unexpected_disconnects_ is false");
+            "The connection disconnected unexpectedly, and allow_unexpected_disconnects_ is false."
+            "\n See "
+            "https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md#"
+            "unexpected-disconnects");
       }
       callback_ready_event.notifyOne();
     });
@@ -251,7 +254,9 @@ public:
                      "An queued upstream connection was torn down without being associated "
                      "with a fake connection. Either manage the connection via "
                      "waitForRawConnection() or waitForHttpConnection(), or "
-                     "set_allow_unexpected_disconnects(true).");
+                     "set_allow_unexpected_disconnects(true).\n See "
+                     "https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md#"
+                     "unparented-upstream-connections");
     });
   }
 
