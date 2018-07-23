@@ -31,6 +31,9 @@ public:
 
   // Tcp::ConnectionPool::UpstreamCallbacks
   MOCK_METHOD2(onUpstreamData, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD1(onEvent, void(Network::ConnectionEvent event));
+  MOCK_METHOD0(onAboveWriteBufferHighWatermark, void());
+  MOCK_METHOD0(onBelowWriteBufferLowWatermark, void());
 };
 
 class MockConnectionData : public ConnectionData {
@@ -56,8 +59,16 @@ public:
   MOCK_METHOD0(drainConnections, void());
   MOCK_METHOD1(newConnection, Cancellable*(Tcp::ConnectionPool::Callbacks& callbacks));
 
-  std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
-      new testing::NiceMock<Upstream::MockHostDescription>()};
+  MockCancellable* newConnectionImpl(Callbacks& cb);
+  void poolFailure(PoolFailureReason reason);
+  void poolReady();
+
+  std::list<NiceMock<MockCancellable>> handles_;
+  std::list<Callbacks*> callbacks_;
+
+  std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
+      new NiceMock<Upstream::MockHostDescription>()};
+  NiceMock<MockConnectionData> connection_data_;
 };
 
 } // namespace ConnectionPool
