@@ -1,42 +1,47 @@
 #pragma once
 
-#include "absl/strings/string_view.h"
-
 namespace Envoy {
-
 namespace Stats {
 /**
- * Abstract interface for shortening and retrieving stat names.
- *
+ * Interface for shortening and retrieving stat names.
  * Guarantees that x = decode(encode(x)) for any x.
+ *
+ * Even though the symbol table does manual reference counting, curr_counter_ is monotonically
+ * increasing. So encoding "foo", freeing the sole stat containing "foo", and then re-encoding "foo"
+ * will produce a different symbol each time.
  */
 class SymbolTable {
 public:
   typedef uint32_t Symbol;
-  typedef std::vector<Symbol> SymbolVec;
 
   virtual ~SymbolTable() {}
 
   /**
-   * Encodes a stat name into a SymbolVec. Expects the name to be period-delimited.
+   * Encodes a stat name into a vector of Symbols. Expects the name to be period-delimited.
+   *
    * @param name the stat name to encode.
-   * @return SymbolVec the encoded stat name.
+   * @return std::vector<Symbol> the encoded stat name.
    */
-  virtual SymbolVec encode(const std::string& name) PURE;
+  virtual std::vector<Symbol> encode(const std::string& name) PURE;
 
   /**
-   * Decodes a SymbolVec back into its period-delimited stat name.
-   * @param symbol_vec the SymbolVec to decode.
+   * Decodes a vector of symbols back into its period-delimited stat name.
+   * If decoding fails on any part of the symbol_vec, that symbol will be decoded to the empty
+   * string ("").
+   *
+   * @param symbol_vec the vector of symbols to decode.
    * @return std::string the retrieved stat name.
    */
-  virtual std::string decode(const SymbolVec& symbol_vec) const PURE;
+  virtual std::string decode(const std::vector<Symbol>& symbol_vec) const PURE;
 
   /**
    * Since SymbolTableImpl does manual reference counting, a client of SymbolTable must manually
    * call ::free(symbol_vec) when it is freeing the stat it represents. This way, the symbol table
    * will grow and shrink dynamically, instead of being write-only.
+   *
+   * @return bool whether or not the total free operation was successful. Expected to be true.
    */
-  virtual void free(const SymbolVec& symbol_vec) PURE;
+  virtual bool free(const std::vector<Symbol>& symbol_vec) PURE;
 };
 
 } // namespace Stats

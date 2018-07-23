@@ -1,8 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <string>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 #include "envoy/common/exception.h"
 
@@ -17,28 +18,29 @@ namespace Stats {
 
 class SymbolTableImpl : public SymbolTable {
 public:
-  SymbolVec encode(const std::string& name) override {
-    SymbolVec symbol_vec = {};
-    std::vector<std::string> segment_vec = absl::StrSplit(name, '.');
-    for (const auto str : segment_vec) {
-      symbol_vec.push_back(toSymbol(str));
-    }
+  std::vector<Symbol> encode(const std::string& name) override {
+    std::vector<Symbol> symbol_vec;
+    std::vector<std::string> name_vec = absl::StrSplit(name, '.');
+    symbol_vec.resize(name_vec.size());
+    std::transform(name_vec.begin(), name_vec.end(), symbol_vec.begin(),
+                   [this](std::string x) { return this->toSymbol(x); });
     return symbol_vec;
   }
 
-  std::string decode(const SymbolVec& symbol_vec) const override {
-    std::string name;
-    for (const auto token : symbol_vec) {
-      absl::StrAppend(&name, fromSymbol(token), ".");
-    }
-    name.pop_back();
-    return name;
+  std::string decode(const std::vector<Symbol>& symbol_vec) const override {
+    std::vector<std::string> name;
+    name.resize(symbol_vec.size());
+    std::transform(symbol_vec.begin(), symbol_vec.end(), name.begin(),
+                   [this](Symbol x) { return this->fromSymbol(x); });
+    return absl::StrJoin(name, ".");
   }
 
-  void free(const SymbolVec& symbol_vec) override {
+  bool free(const std::vector<Symbol>& symbol_vec) override {
+    bool successful_free = true;
     for (const Symbol symbol : symbol_vec) {
-      freeSymbol(symbol);
+      successful_free = successful_free && freeSymbol(symbol);
     }
+    return successful_free;
   }
 
   // For testing purposes only.
@@ -47,29 +49,20 @@ public:
 private:
   Symbol curr_counter_ = 0;
 
-  // Bimap implementation. String to token is an
-  // unordered_map<string, Symbol>, token to string is a vector<string>.
-  // Default behavior is to split on periods.
-  std::unordered_map<std::string, Symbol> encode_map_ = {};
-  std::unordered_map<std::string, uint32_t> rcount_map_ = {};
+  // Bimap implementation.
+  // The encode map stores both the symbol and the ref count of that symbol.
+  std::unordered_map<std::string, std::pair<Symbol, uint32_t>> encode_map_ = {};
   std::unordered_map<Symbol, std::string> decode_map_ = {};
 
-  // Per-token encoding.
   Symbol toSymbol(const std::string& str) {
     Symbol result;
-
     auto encode_search = encode_map_.find(str);
     if (encode_search != encode_map_.end()) {
-      // The symbol exists. Return it and...
-      result = encode_search->second;
-      // ...asserting that it exists in rcount_map_, up its ref count.
-      auto ref_search = rcount_map_.find(str);
-      assert(ref_search != rcount_map_.end());
-      ref_search->second++;
+      // If the symbol exists. Return it and up its refcount.
+      result = encode_search->second.first;
+      (encode_search->second.second)++;
     } else {
-      // The symbol doesn't exist.
-      encode_map_.insert({str, curr_counter_});
-      rcount_map_.insert({str, 1});
+      encode_map_.insert({str, std::make_pair(curr_counter_, 1)});
       decode_map_.insert({curr_counter_, str});
       result = curr_counter_;
       curr_counter_++;
@@ -79,25 +72,28 @@ private:
 
   std::string fromSymbol(const Symbol symbol) const {
     auto search = decode_map_.find(symbol);
-    assert(search != decode_map_.end());
-    return search->second;
+    return (search != decode_map_.end()) ? (search->second) : "";
   }
 
-  void freeSymbol(const Symbol symbol) {
+  // Returns true if the free was successful, false if the symbol was invalid.
+  bool freeSymbol(const Symbol symbol) {
     auto decode_search = decode_map_.find(symbol);
-    assert(decode_search != decode_map_.end());
-    std::string token = decode_search->second;
-    auto rcount_search = rcount_map_.find(token);
-    assert(rcount_search != rcount_map_.end());
-    rcount_map_[token]--;
-    if (rcount_search->second == 0) {
-      decode_map_.erase(symbol);
-      encode_map_.erase(token);
-      rcount_map_.erase(token);
+    if (decode_search == decode_map_.end()) {
+      return false;
     }
+    std::string str = decode_search->second;
+    auto encode_search = encode_map_.find(str);
+    if (encode_search == encode_map_.end()) {
+      return false;
+    }
+    ((encode_search->second).second)--;
+    if ((encode_search->second).second == 0) {
+      decode_map_.erase(symbol);
+      encode_map_.erase(str);
+    }
+    return true;
   }
-
-}; // namespace Stats
+};
 
 } // namespace Stats
 } // namespace Envoy
