@@ -276,7 +276,7 @@ INSTANTIATE_TEST_CASE_P(ContainerFieldTypes, ThriftRouterContainerTest,
                         Values(FieldType::Map, FieldType::List, FieldType::Set),
                         fieldTypeParamToString);
 
-TEST_F(ThriftRouterTest, PoolConnectionFailure) {
+TEST_F(ThriftRouterTest, PoolRemoteConnectionFailure) {
   initializeRouter();
 
   startRequest(MessageType::Call);
@@ -290,8 +290,43 @@ TEST_F(ThriftRouterTest, PoolConnectionFailure) {
         EXPECT_EQ(AppExceptionType::InternalError, app_ex->type_);
         EXPECT_THAT(app_ex->error_message_, ContainsRegex(".*connection failure.*"));
       }));
-  conn_pool_callbacks_->onPoolFailure(Tcp::ConnectionPool::PoolFailureReason::ConnectionFailure,
-                                      host_ptr_);
+  conn_pool_callbacks_->onPoolFailure(
+      Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure, host_ptr_);
+}
+
+TEST_F(ThriftRouterTest, PoolLocalConnectionFailure) {
+  initializeRouter();
+
+  startRequest(MessageType::Call);
+
+  EXPECT_CALL(callbacks_, sendLocalReply_(_))
+      .WillOnce(Invoke([&](ThriftFilters::DirectResponsePtr& response) -> void {
+        auto* app_ex = dynamic_cast<AppException*>(response.get());
+        EXPECT_NE(nullptr, app_ex);
+        EXPECT_EQ(method_name_, app_ex->method_name_);
+        EXPECT_EQ(seq_id_, app_ex->seq_id_);
+        EXPECT_EQ(AppExceptionType::InternalError, app_ex->type_);
+        EXPECT_THAT(app_ex->error_message_, ContainsRegex(".*connection failure.*"));
+      }));
+  conn_pool_callbacks_->onPoolFailure(
+      Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure, host_ptr_);
+}
+
+TEST_F(ThriftRouterTest, PoolTimeout) {
+  initializeRouter();
+
+  startRequest(MessageType::Call);
+
+  EXPECT_CALL(callbacks_, sendLocalReply_(_))
+      .WillOnce(Invoke([&](ThriftFilters::DirectResponsePtr& response) -> void {
+        auto* app_ex = dynamic_cast<AppException*>(response.get());
+        EXPECT_NE(nullptr, app_ex);
+        EXPECT_EQ(method_name_, app_ex->method_name_);
+        EXPECT_EQ(seq_id_, app_ex->seq_id_);
+        EXPECT_EQ(AppExceptionType::InternalError, app_ex->type_);
+        EXPECT_THAT(app_ex->error_message_, ContainsRegex(".*connection failure.*"));
+      }));
+  conn_pool_callbacks_->onPoolFailure(Tcp::ConnectionPool::PoolFailureReason::Timeout, host_ptr_);
 }
 
 TEST_F(ThriftRouterTest, PoolOverflowFailure) {

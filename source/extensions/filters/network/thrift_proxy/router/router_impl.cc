@@ -164,8 +164,30 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   if (end_stream) {
     // Response is incomplete, but no more data is coming.
     upstream_request_->onResponseComplete();
-    upstream_request_->onResetStream(Tcp::ConnectionPool::PoolFailureReason::ConnectionFailure);
+    upstream_request_->onResetStream(
+        Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     cleanup();
+  }
+}
+
+void Router::onEvent(Network::ConnectionEvent event) {
+  if (!upstream_request_ || upstream_request_->response_complete_) {
+    // Client closed connection after completing response.
+    return;
+  }
+
+  switch (event) {
+  case Network::ConnectionEvent::RemoteClose:
+    upstream_request_->onResetStream(
+        Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
+    break;
+  case Network::ConnectionEvent::LocalClose:
+    upstream_request_->onResetStream(
+        Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
+    break;
+  default:
+    // Connected is consumed by the connection pool.
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -258,7 +280,10 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
         method_name_, seq_id_, AppExceptionType::InternalError,
         fmt::format("too many connections to '{}'", upstream_host_->address()->asString()))});
     break;
-  case Tcp::ConnectionPool::PoolFailureReason::ConnectionFailure:
+  case Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+  case Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
+  case Tcp::ConnectionPool::PoolFailureReason::Timeout:
+    // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
     if (!response_started_) {
       parent_.callbacks_->sendLocalReply(ThriftFilters::DirectResponsePtr{new AppException(
           method_name_, seq_id_, AppExceptionType::InternalError,
