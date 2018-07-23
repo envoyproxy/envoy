@@ -2269,7 +2269,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
   EXPECT_EQ(0U, manager_->listeners().size());
 }
 
-class OriginalDstTestFilterIPv6 : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
+class OriginalDstTestFilterIPv6
+    : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
   Network::Address::InstanceConstSharedPtr getOriginalDst(int) override {
     return Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv6Instance("1::2", 2345)};
