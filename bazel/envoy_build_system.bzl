@@ -28,7 +28,7 @@ def envoy_copts(repository, test = False):
     ]
 
     return select({
-               "//bazel:windows_x86_64": msvc_options,
+               repository + "//bazel:windows_x86_64": msvc_options,
                "//conditions:default": posix_options,
            }) + select({
                # Bazel adds an implicit -DNDEBUG for opt.
@@ -67,7 +67,7 @@ def envoy_linkopts():
                    "-pagezero_size 10000",
                    "-image_base 100000000",
                ],
-               "//bazel:windows_x86_64": [
+               "@envoy//bazel:windows_x86_64": [
                    "-DEFAULTLIB:advapi32.lib",
                ],
                "//conditions:default": [
@@ -85,7 +85,7 @@ def _envoy_stamped_linkopts():
         #
         # /usr/bin/ld.gold: internal error in write_build_id, at ../../gold/layout.cc:5419
         "@envoy//bazel:coverage_build": [],
-        "//bazel:windows_x86_64": [],
+        "@envoy//bazel:windows_x86_64": [],
 
         # MacOS doesn't have an official equivalent to the `.note.gnu.build-id`
         # ELF section, so just stuff the raw ID into a new text section.
@@ -519,6 +519,6 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
     return select({
         "@envoy//bazel:force_libcpp": if_libcpp,
         "@bazel_tools//tools/osx:darwin": [],
-        "//bazel:windows_x86_64": [],
+        "@envoy//bazel:windows_x86_64": [],
         "//conditions:default": default or [],
     })
