@@ -10,7 +10,7 @@ A logged warning is expected for each deprecated item that is in deprecation win
 
 * Use of the v1 API is deprecated. See envoy-announce
   [email](https://groups.google.com/forum/#!topic/envoy-announce/oPnYMZw8H4U).
-* Use of the legacy 
+* Use of the legacy
   [ratelimit.proto](https://github.com/envoyproxy/envoy/blob/b0a518d064c8255e0e20557a8f909b6ff457558f/source/common/ratelimit/ratelimit.proto)
   is deprecated, in favor of the proto defined in
   [date-plane-api](https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/ratelimit/v2/rls.proto)
@@ -23,6 +23,7 @@ A logged warning is expected for each deprecated item that is in deprecation win
   is deprecated. Please use the new `upgrade_configs` in the
   [HttpConnectionManager](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto)
   instead.
+* Setting hosts via `hosts` field in `Cluster` is deprecated. Use `load_assignment` instead.
 
 ## Version 1.7.0
 

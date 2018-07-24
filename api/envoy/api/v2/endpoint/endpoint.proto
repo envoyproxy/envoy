@@ -29,7 +29,7 @@ message Endpoint {
   //   and will be resolved via DNS.
   core.Address address = 1;
 
-  // [#not-implemented-hide:] The optional health check configuration.
+  // The optional health check configuration.
   message HealthCheckConfig {
     // Optional alternative health check port value.
     //
@@ -40,8 +40,8 @@ message Endpoint {
     uint32 port_value = 1;
   }
 
-  // [#not-implemented-hide:] The optional health check configuration is used as
-  // configuration for the health checker to contact the health checked host.
+  // The optional health check configuration is used as configuration for the
+  // health checker to contact the health checked host.
   //
   // .. attention::
   //
