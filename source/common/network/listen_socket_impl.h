@@ -137,7 +137,7 @@ public:
 class ClientSocketImpl : public ConnectionSocketImpl {
 public:
   ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address)
-      : ConnectionSocketImpl(remote_address->socket(Address::SocketType::Stream).rc, nullptr,
+      : ConnectionSocketImpl(remote_address->socket(Address::SocketType::Stream).rc_, nullptr,
                              remote_address) {}
 };
 

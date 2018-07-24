@@ -55,7 +55,7 @@ public:
 
 protected:
   InstanceBase(Type type) : type_(type) {}
-  Result socketFromSocketType(SocketType type) const;
+  Api::SysCallResult socketFromSocketType(SocketType type) const;
 
   std::string friendly_name_;
 
@@ -91,10 +91,10 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Result bind(int fd) const override;
-  Result connect(int fd) const override;
+  Api::SysCallResult bind(int fd) const override;
+  Api::SysCallResult connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
-  Result socket(SocketType type) const override;
+  Api::SysCallResult socket(SocketType type) const override;
 
 private:
   struct Ipv4Helper : public Ipv4 {
@@ -151,10 +151,10 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Result bind(int fd) const override;
-  Result connect(int fd) const override;
+  Api::SysCallResult bind(int fd) const override;
+  Api::SysCallResult connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
-  Result socket(SocketType type) const override;
+  Api::SysCallResult socket(SocketType type) const override;
 
 private:
   struct Ipv6Helper : public Ipv6 {
@@ -208,10 +208,10 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  Result bind(int fd) const override;
-  Result connect(int fd) const override;
+  Api::SysCallResult bind(int fd) const override;
+  Api::SysCallResult connect(int fd) const override;
   const Ip* ip() const override { return nullptr; }
-  Result socket(SocketType type) const override;
+  Api::SysCallResult socket(SocketType type) const override;
 
 private:
   sockaddr_un address_;

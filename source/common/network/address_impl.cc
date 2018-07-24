@@ -133,7 +133,7 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
   return addressFromSockAddr(ss, ss_len);
 }
 
-Result InstanceBase::socketFromSocketType(SocketType socketType) const {
+Api::SysCallResult InstanceBase::socketFromSocketType(SocketType socketType) const {
 #if defined(__APPLE__)
   int flags = 0;
 #else
@@ -212,19 +212,21 @@ bool Ipv4Instance::operator==(const Instance& rhs) const {
           (ip_.port() == rhs_casted->ip_.port()));
 }
 
-Result Ipv4Instance::bind(int fd) const {
+Api::SysCallResult Ipv4Instance::bind(int fd) const {
   return {::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
                  sizeof(ip_.ipv4_.address_)),
           errno};
 }
 
-Result Ipv4Instance::connect(int fd) const {
+Api::SysCallResult Ipv4Instance::connect(int fd) const {
   return {::connect(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
                     sizeof(ip_.ipv4_.address_)),
           errno};
 }
 
-Result Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
+Api::SysCallResult Ipv4Instance::socket(SocketType type) const {
+  return socketFromSocketType(type);
+}
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
@@ -277,23 +279,23 @@ bool Ipv6Instance::operator==(const Instance& rhs) const {
           (ip_.port() == rhs_casted->ip_.port()));
 }
 
-Result Ipv6Instance::bind(int fd) const {
+Api::SysCallResult Ipv6Instance::bind(int fd) const {
   return {::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
                  sizeof(ip_.ipv6_.address_)),
           errno};
 }
 
-Result Ipv6Instance::connect(int fd) const {
+Api::SysCallResult Ipv6Instance::connect(int fd) const {
   return {::connect(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
                     sizeof(ip_.ipv6_.address_)),
           errno};
 }
 
-Result Ipv6Instance::socket(SocketType type) const {
-  const Result result = socketFromSocketType(type);
+Api::SysCallResult Ipv6Instance::socket(SocketType type) const {
+  const Api::SysCallResult result = socketFromSocketType(type);
   // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
   const int v6only = ip_.v6only_;
-  RELEASE_ASSERT(::setsockopt(result.rc, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1,
+  RELEASE_ASSERT(::setsockopt(result.rc_, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1,
                  "");
   return result;
 }
@@ -337,7 +339,7 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
 
 bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
 
-Result PipeInstance::bind(int fd) const {
+Api::SysCallResult PipeInstance::bind(int fd) const {
   if (abstract_namespace_) {
     return {::bind(fd, reinterpret_cast<const sockaddr*>(&address_),
                    offsetof(struct sockaddr_un, sun_path) + address_length_),
@@ -350,7 +352,7 @@ Result PipeInstance::bind(int fd) const {
   return {::bind(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_)), errno};
 }
 
-Result PipeInstance::connect(int fd) const {
+Api::SysCallResult PipeInstance::connect(int fd) const {
   if (abstract_namespace_) {
     return {::connect(fd, reinterpret_cast<const sockaddr*>(&address_),
                       offsetof(struct sockaddr_un, sun_path) + address_length_),
@@ -359,7 +361,9 @@ Result PipeInstance::connect(int fd) const {
   return {::connect(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_)), errno};
 }
 
-Result PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }
+Api::SysCallResult PipeInstance::socket(SocketType type) const {
+  return socketFromSocketType(type);
+}
 
 } // namespace Address
 } // namespace Network

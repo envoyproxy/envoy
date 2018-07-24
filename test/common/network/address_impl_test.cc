@@ -51,7 +51,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   ASSERT_NE(addr_port->ip(), nullptr);
 
   // Create a socket on which we'll listen for connections from clients.
-  const int listen_fd = addr_port->socket(SocketType::Stream).rc;
+  const int listen_fd = addr_port->socket(SocketType::Stream).rc_;
   ASSERT_GE(listen_fd, 0) << addr_port->asString();
   ScopedFdCloser closer1(listen_fd);
 
@@ -64,9 +64,9 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   }
 
   // Bind the socket to the desired address and port.
-  const Result result = addr_port->bind(listen_fd);
-  ASSERT_EQ(result.rc, 0) << addr_port->asString() << "\nerror: " << strerror(result.error)
-                          << "\nerrno: " << result.error;
+  const Api::SysCallResult result = addr_port->bind(listen_fd);
+  ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
+                           << "\nerrno: " << result.errno_;
 
   // Do a bare listen syscall. Not bothering to accept connections as that would
   // require another thread.
@@ -74,7 +74,7 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
 
   auto client_connect = [](Address::InstanceConstSharedPtr addr_port) {
     // Create a client socket and connect to the server.
-    const int client_fd = addr_port->socket(SocketType::Stream).rc;
+    const int client_fd = addr_port->socket(SocketType::Stream).rc_;
     ASSERT_GE(client_fd, 0) << addr_port->asString();
     ScopedFdCloser closer2(client_fd);
 
@@ -85,9 +85,9 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
     makeFdBlocking(client_fd);
 
     // Connect to the server.
-    const Result result = addr_port->connect(client_fd);
-    ASSERT_EQ(result.rc, 0) << addr_port->asString() << "\nerror: " << strerror(result.error)
-                            << "\nerrno: " << result.error;
+    const Api::SysCallResult result = addr_port->connect(client_fd);
+    ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
+                             << "\nerrno: " << result.errno_;
   };
 
   client_connect(addr_port);
@@ -310,13 +310,13 @@ TEST(PipeInstanceTest, BadAddress) {
 TEST(PipeInstanceTest, UnlinksExistingFile) {
   const auto bind_uds_socket = [](const std::string& path) {
     PipeInstance address(path);
-    const int listen_fd = address.socket(SocketType::Stream).rc;
+    const int listen_fd = address.socket(SocketType::Stream).rc_;
     ASSERT_GE(listen_fd, 0) << address.asString();
     ScopedFdCloser closer(listen_fd);
 
-    const Result result = address.bind(listen_fd);
-    ASSERT_EQ(result.rc, 0) << address.asString() << "\nerror: " << strerror(result.error)
-                            << "\nerrno: " << result.error;
+    const Api::SysCallResult result = address.bind(listen_fd);
+    ASSERT_EQ(result.rc_, 0) << address.asString() << "\nerror: " << strerror(result.errno_)
+                             << "\nerrno: " << result.errno_;
   };
 
   const std::string path = TestEnvironment::unixDomainSocketPath("UnlinksExistingFile.sock");

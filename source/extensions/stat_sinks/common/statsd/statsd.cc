@@ -20,10 +20,10 @@ namespace Common {
 namespace Statsd {
 
 Writer::Writer(Network::Address::InstanceConstSharedPtr address) {
-  fd_ = address->socket(Network::Address::SocketType::Datagram).rc;
+  fd_ = address->socket(Network::Address::SocketType::Datagram).rc_;
   ASSERT(fd_ != -1);
 
-  const int rc = address->connect(fd_).rc;
+  const int rc = address->connect(fd_).rc_;
   ASSERT(rc != -1);
 }
 

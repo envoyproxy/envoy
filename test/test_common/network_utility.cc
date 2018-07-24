@@ -26,11 +26,11 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << (addr_port == nullptr ? "nullptr" : addr_port->asString());
     return nullptr;
   }
-  Network::Address::Result result = addr_port->socket(type);
-  const int fd = result.rc;
+  Api::SysCallResult result = addr_port->socket(type);
+  const int fd = result.rc_;
   if (fd < 0) {
     ADD_FAILURE() << "socket failed for '" << addr_port->asString()
-                  << "' with error: " << strerror(result.error) << " (" << result.error << ")";
+                  << "' with error: " << strerror(result.errno_) << " (" << result.errno_ << ")";
     return nullptr;
   }
   ScopedFdCloser closer(fd);
@@ -40,8 +40,8 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   result = addr_port->bind(fd);
   int err;
   const char* failing_fn = nullptr;
-  if (result.rc != 0) {
-    err = result.error;
+  if (result.rc_ != 0) {
+    err = result.errno_;
     failing_fn = "bind";
   } else if (type == Address::SocketType::Stream) {
     // Try listening on the port also, if the type is TCP.
@@ -148,12 +148,12 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, 
 
 bool supportsIpVersion(const Address::IpVersion version) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  const int fd = addr->socket(Address::SocketType::Stream).rc;
+  const int fd = addr->socket(Address::SocketType::Stream).rc_;
   if (fd < 0) {
     // Socket creation failed.
     return false;
   }
-  if (0 != addr->bind(fd).rc) {
+  if (0 != addr->bind(fd).rc_) {
     // Socket bind failed.
     RELEASE_ASSERT(::close(fd) == 0, "");
     return false;
@@ -166,16 +166,16 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
                                                                      Address::SocketType type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   const char* failing_fn = nullptr;
-  Network::Address::Result result = addr->socket(type);
-  const int fd = result.rc;
+  Api::SysCallResult result = addr->socket(type);
+  const int fd = result.rc_;
   int err;
   if (fd < 0) {
-    err = result.error;
+    err = result.errno_;
     failing_fn = "socket";
   } else {
     result = addr->bind(fd);
-    if (0 != result.rc) {
-      err = result.error;
+    if (0 != result.rc_) {
+      err = result.errno_;
       failing_fn = "bind";
     } else {
       return std::make_pair(Address::addressFromFd(fd), fd);

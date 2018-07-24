@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/os_sys_calls.h"
 #include "envoy/common/pure.h"
 
 #include "absl/numeric/int128.h"
@@ -15,22 +16,6 @@
 namespace Envoy {
 namespace Network {
 namespace Address {
-
-/**
- * Result holds the rc and errno values resulting from a system call.
- */
-struct Result {
-
-  /**
-   * The return code from the system call.
-   */
-  int rc;
-
-  /**
-   * The errno value as captured after the system call.
-   */
-  int error;
-};
 
 /**
  * Interface for an Ipv4 address.
@@ -144,19 +129,19 @@ public:
    * Bind a socket to this address. The socket should have been created with a call to socket() on
    * an Instance of the same address family.
    * @param fd supplies the platform socket handle.
-   * @return a Result with rc = 0 for success and rc = -1 for failure. If the call is successful,
-   *   the error value shouldn't be used.
+   * @return a Api::SysCallResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
+   *   is successful, errno_ shouldn't be used.
    */
-  virtual Result bind(int fd) const PURE;
+  virtual Api::SysCallResult bind(int fd) const PURE;
 
   /**
    * Connect a socket to this address. The socket should have been created with a call to socket()
    * on this object.
    * @param fd supplies the platform socket handle.
-   * @return a Result with rc = 0 for success and rc = -1 for failure. If the call is successful,
-   *   the error value shouldn't be used.
+   * @return a Api::SysCallResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
+   *   is successful, errno_ shouldn't be used.
    */
-  virtual Result connect(int fd) const PURE;
+  virtual Api::SysCallResult connect(int fd) const PURE;
 
   /**
    * @return the IP address information IFF type() == Type::Ip, otherwise nullptr.
@@ -166,11 +151,11 @@ public:
   /**
    * Create a socket for this address.
    * @param type supplies the socket type to create.
-   * @return a Result with rc = fd for success and rc = -1 for failure, where fd represents the
-   *   file descriptor naming the socket. If a valid file descriptor is returned, the error value
-   *   shouldn't be used.
+   * @return a Api::SysCallResult with rc_ = fd for success and rc_ = -1 for failure, where fd
+   *   represents the file descriptor naming the socket. If a valid file descriptor is returned,
+   *   errno_ shouldn't be used.
    */
-  virtual Result socket(SocketType type) const PURE;
+  virtual Api::SysCallResult socket(SocketType type) const PURE;
 
   /**
    * @return the type of address.
