@@ -158,25 +158,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test_library(
-    name = "hds_helper_lib",
-    srcs = [
-        "hds_helper.cc",
-    ],
-    hdrs = [
-        "hds_helper.h",
-    ],
-    deps = [
-        "//source/common/upstream:health_discovery_service_lib",
-        "//test/mocks/upstream:upstream_mocks",
-    ],
-)
-
 envoy_cc_test(
     name = "hds_test",
     srcs = ["hds_test.cc"],
     deps = [
-        ":hds_helper_lib",
         "//source/common/ssl:context_lib",
         "//source/common/stats:stats_lib",
         "//source/common/upstream:health_discovery_service_lib",

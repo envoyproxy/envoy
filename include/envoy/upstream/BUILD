@@ -41,6 +41,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "health_discovery_service_lib",
+    hdrs = ["health_discovery_service.h"],
+    deps = [
+        "//include/envoy/upstream:upstream_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "host_description_interface",
     hdrs = ["host_description.h"],
     deps = [

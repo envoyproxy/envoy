@@ -1,17 +1,24 @@
-#include "common/upstream/health_discovery_service.h"
-
-#include "test/mocks/upstream/mocks.h"
+#include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Upstream {
 
-class TestClusterInfoFactory : public ClusterInfoFactory, Logger::Loggable<Logger::Id::upstream> {
+/**
+ * Factory for unit testing Upstream::HdsDelegate
+ */
+
+class ClusterInfoFactory {
 public:
-  ClusterInfoConstSharedPtr
+  virtual ~ClusterInfoFactory() {}
+  /**
+   * @return ClusterInfoConstSharedPtr
+   */
+
+  virtual ClusterInfoConstSharedPtr
   createHdsClusterInfo(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
                        const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
                        Ssl::ContextManager& ssl_context_manager,
-                       Secret::SecretManager& secret_manager, bool added_via_api) override;
+                       Secret::SecretManager& secret_manager, bool added_via_api) PURE;
 };
 
 } // namespace Upstream

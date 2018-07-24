@@ -4,7 +4,6 @@
 #include "common/stats/stats_impl.h"
 #include "common/upstream/health_discovery_service.h"
 
-#include "test/common/upstream/hds_helper.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -53,7 +52,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
 
   HdsDelegatePtr hds_delegate_;
-  TestClusterInfoFactory test_factory_;
+  MockClusterInfoFactory test_factory_;
 
   Event::MockTimer* retry_timer_;
   Event::TimerCb retry_timer_cb_;
