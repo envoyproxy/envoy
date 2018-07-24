@@ -220,8 +220,10 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   // will interpret that as an unexpected disconnect. The codec client is not
   // subject to the same failure mode.
   if (fake_upstream_connection_) {
-    ASSERT(fake_upstream_connection_->close());
-    ASSERT(fake_upstream_connection_->waitForDisconnect());
+    AssertionResult result = fake_upstream_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = fake_upstream_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
   }
   if (codec_client_) {
     codec_client_->close();
@@ -231,13 +233,17 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
 void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
-    ASSERT(fake_upstreams_[upstream_index]->waitForHttpConnection(*dispatcher_,
-                                                                  &fake_upstream_connection_));
+    AssertionResult result = fake_upstreams_[upstream_index]->waitForHttpConnection(
+        *dispatcher_, &fake_upstream_connection_);
+    RELEASE_ASSERT(result, result.message());
   }
   // Wait for the next stream on the upstream connection.
-  ASSERT(fake_upstream_connection_->waitForNewStream(*dispatcher_, &upstream_request_));
+  AssertionResult result =
+      fake_upstream_connection_->waitForNewStream(*dispatcher_, &upstream_request_);
+  RELEASE_ASSERT(result, result.message());
   // Wait for the stream to be completely received.
-  ASSERT(upstream_request_->waitForEndStream(*dispatcher_));
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
 }
 
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(

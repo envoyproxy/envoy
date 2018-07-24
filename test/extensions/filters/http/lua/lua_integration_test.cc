@@ -72,12 +72,16 @@ public:
   void cleanup() {
     codec_client_->close();
     if (fake_lua_connection_ != nullptr) {
-      ASSERT(fake_lua_connection_->close());
-      ASSERT(fake_lua_connection_->waitForDisconnect());
+      AssertionResult result = fake_lua_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_lua_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
     if (fake_upstream_connection_ != nullptr) {
-      ASSERT(fake_upstream_connection_->close());
-      ASSERT(fake_upstream_connection_->waitForDisconnect());
+      AssertionResult result = fake_upstream_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_upstream_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
   }
 

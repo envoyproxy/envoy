@@ -397,7 +397,8 @@ void TcpProxySslIntegrationTest::setupConnections() {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  ASSERT(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection_));
+  AssertionResult result = fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
 }
 
 // Test proxying data in both directions with envoy doing TCP and TLS

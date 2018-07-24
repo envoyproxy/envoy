@@ -48,7 +48,10 @@ public:
           tcp_client->close();
           return;
         }
-        ASSERT(fake_upstream_connection->write(event.upstream_send_bytes()));
+        {
+          AssertionResult result = fake_upstream_connection->write(event.upstream_send_bytes());
+          RELEASE_ASSERT(result, result.message());
+        }
         break;
       case test::integration::Event::kUpstreamRecvBytes:
         // TODO(htuch): Should we wait for some data?
@@ -60,9 +63,11 @@ public:
     }
     if (fake_upstream_connection != nullptr) {
       if (fake_upstream_connection->connected()) {
-        ASSERT(fake_upstream_connection->close());
+        AssertionResult result = fake_upstream_connection->close();
+        RELEASE_ASSERT(result, result.message());
       }
-      ASSERT(fake_upstream_connection->waitForDisconnect(true));
+      AssertionResult result = fake_upstream_connection->waitForDisconnect(true);
+      RELEASE_ASSERT(result, result.message());
     }
     tcp_client->close();
   }

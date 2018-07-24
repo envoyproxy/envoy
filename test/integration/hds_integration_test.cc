@@ -53,8 +53,11 @@ public:
   }
 
   void waitForHdsStream() {
-    ASSERT(hds_upstream_->waitForHttpConnection(*dispatcher_, &fake_hds_connection_));
-    ASSERT(fake_hds_connection_->waitForNewStream(*dispatcher_, &hds_stream_));
+    AssertionResult result =
+        hds_upstream_->waitForHttpConnection(*dispatcher_, &fake_hds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_hds_connection_->waitForNewStream(*dispatcher_, &hds_stream_);
+    RELEASE_ASSERT(result, result.message());
   }
 
   void requestHealthCheckSpecifier() {
@@ -68,8 +71,10 @@ public:
 
   void cleanupHdsConnection() {
     if (fake_hds_connection_ != nullptr) {
-      ASSERT(fake_hds_connection_->close());
-      ASSERT(fake_hds_connection_->waitForDisconnect());
+      AssertionResult result = fake_hds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_hds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
   }
 

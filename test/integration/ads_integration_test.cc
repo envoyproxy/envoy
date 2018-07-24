@@ -68,7 +68,8 @@ public:
 
   void createAdsConnection(FakeUpstream& upstream) {
     ads_upstream_ = &upstream;
-    ASSERT(ads_upstream_->waitForHttpConnection(*dispatcher_, &ads_connection_));
+    AssertionResult result = ads_upstream_->waitForHttpConnection(*dispatcher_, &ads_connection_);
+    RELEASE_ASSERT(result, result.message());
   }
 
   void cleanUpAdsConnection() {
@@ -76,8 +77,10 @@ public:
 
     // Don't ASSERT fail if an ADS reconnect ends up unparented.
     ads_upstream_->set_allow_unexpected_disconnects(true);
-    ASSERT(ads_connection_->close());
-    ASSERT(ads_connection_->waitForDisconnect());
+    AssertionResult result = ads_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = ads_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
     ads_connection_.reset();
   }
 
@@ -266,7 +269,8 @@ public:
     AdsIntegrationBaseTest::initialize();
     if (ads_stream_ == nullptr) {
       createAdsConnection(*(fake_upstreams_[1]));
-      ASSERT(ads_connection_->waitForNewStream(*dispatcher_, &ads_stream_));
+      AssertionResult result = ads_connection_->waitForNewStream(*dispatcher_, &ads_stream_);
+      RELEASE_ASSERT(result, result.message());
       ads_stream_->startGrpcStream();
     }
   }

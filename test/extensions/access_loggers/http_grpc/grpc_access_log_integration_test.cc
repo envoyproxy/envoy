@@ -90,8 +90,10 @@ public:
 
   void cleanup() {
     if (fake_access_log_connection_ != nullptr) {
-      ASSERT(fake_access_log_connection_->close());
-      ASSERT(fake_access_log_connection_->waitForDisconnect());
+      AssertionResult result = fake_access_log_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_access_log_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
   }
 

@@ -400,8 +400,10 @@ Http2RingHashIntegrationTest::~Http2RingHashIntegrationTest() {
     codec_client_ = nullptr;
   }
   for (auto it = fake_upstream_connections_.begin(); it != fake_upstream_connections_.end(); ++it) {
-    ASSERT((*it)->close());
-    ASSERT((*it)->waitForDisconnect());
+    AssertionResult result = (*it)->close();
+    RELEASE_ASSERT(result, result.message());
+    result = (*it)->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
   }
 }
 

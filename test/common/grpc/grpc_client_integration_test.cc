@@ -352,7 +352,8 @@ TEST_P(GrpcSslClientIntegrationTest, BasicSslRequestWithClientCert) {
 class GrpcAccessTokenClientIntegrationTest : public GrpcSslClientIntegrationTest {
 public:
   void expectExtraHeaders(FakeStream& fake_stream) override {
-    ASSERT(fake_stream.waitForHeadersComplete());
+    AssertionResult result = fake_stream.waitForHeadersComplete();
+    RELEASE_ASSERT(result, result.message());
     Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
     if (access_token_value_ != "") {
       if (access_token_value_2_ == "") {

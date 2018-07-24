@@ -116,8 +116,10 @@ public:
 
   void cleanup() {
     if (fake_metrics_service_connection_ != nullptr) {
-      ASSERT(fake_metrics_service_connection_->close());
-      ASSERT(fake_metrics_service_connection_->waitForDisconnect());
+      AssertionResult result = fake_metrics_service_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_metrics_service_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
   }
 
