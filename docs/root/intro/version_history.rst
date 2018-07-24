@@ -47,6 +47,7 @@ Version history
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
   selecting a host from a subset.
+* access log: added RESPONSE_DURATION and RESPONSE_TX_DURATION.
 
 1.7.0
 ===============
@@ -100,8 +101,7 @@ Version history
 * health check: health check connections can now be configured to use http/2.
 * health check http filter: added
   :ref:`generic header matching <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.headers>`
-  to trigger health check response. Deprecated the
-  :ref:`endpoint option <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.endpoint>`.
+  to trigger health check response. Deprecated the endpoint option.
 * http: filters can now optionally support
   :ref:`virtual host <envoy_api_field_route.VirtualHost.per_filter_config>`,
   :ref:`route <envoy_api_field_route.Route.per_filter_config>`, and

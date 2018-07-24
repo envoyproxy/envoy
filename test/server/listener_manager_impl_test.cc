@@ -2269,6 +2269,143 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFail) 
   EXPECT_EQ(0U, manager_->listeners().size());
 }
 
+class OriginalDstTestFilterIPv6
+    : public Extensions::ListenerFilters::OriginalDst::OriginalDstFilter {
+  Network::Address::InstanceConstSharedPtr getOriginalDst(int) override {
+    return Network::Address::InstanceConstSharedPtr{
+        new Network::Address::Ipv6Instance("1::2", 2345)};
+  }
+};
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
+  static int fd;
+  fd = -1;
+  EXPECT_CALL(*listener_factory_.socket_, fd()).WillOnce(Return(0));
+
+  class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
+  public:
+    // NamedListenerFilterConfigFactory
+    Network::ListenerFilterFactoryCb
+    createFilterFactoryFromProto(const Protobuf::Message&,
+                                 Configuration::ListenerFactoryContext& context) override {
+      auto option = std::make_unique<Network::MockSocketOption>();
+      EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
+          .WillOnce(Return(true));
+      EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))
+          .WillOnce(Invoke(
+              [](Network::Socket& socket, envoy::api::v2::core::SocketOption::SocketState) -> bool {
+                fd = socket.fd();
+                return true;
+              }));
+      context.addListenSocketOption(std::move(option));
+      return [](Network::ListenerFilterManager& filter_manager) -> void {
+        filter_manager.addAcceptFilter(std::make_unique<OriginalDstTestFilterIPv6>());
+      };
+    }
+
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    }
+
+    std::string name() override { return "test.listener.original_dstipv6"; }
+  };
+
+  /**
+   * Static registration for the original dst filter. @see RegisterFactory.
+   */
+  static Registry::RegisterFactory<OriginalDstTestConfigFactory,
+                                   Configuration::NamedListenerFilterConfigFactory>
+      registered_;
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: ::0001, port_value: 1111 }
+    filter_chains: {}
+    listener_filters:
+    - name: "test.listener.original_dstipv6"
+      config: {}
+  )EOF",
+                                                       Network::Address::IpVersion::v6);
+
+  EXPECT_CALL(server_.random_, uuid());
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  Network::ListenerConfig& listener = manager_->listeners().back().get();
+
+  Network::FilterChainFactory& filterChainFactory = listener.filterChainFactory();
+  Network::MockListenerFilterManager manager;
+
+  NiceMock<Network::MockListenerFilterCallbacks> callbacks;
+  Network::AcceptedSocketImpl socket(
+      -1, std::make_unique<Network::Address::Ipv6Instance>("::0001", 1234),
+      std::make_unique<Network::Address::Ipv6Instance>("::0001", 5678));
+
+  EXPECT_CALL(callbacks, socket()).WillOnce(Invoke([&]() -> Network::ConnectionSocket& {
+    return socket;
+  }));
+
+  EXPECT_CALL(manager, addAcceptFilter_(_))
+      .WillOnce(Invoke([&](Network::ListenerFilterPtr& filter) -> void {
+        EXPECT_EQ(Network::FilterStatus::Continue, filter->onAccept(callbacks));
+      }));
+
+  EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
+  EXPECT_TRUE(socket.localAddressRestored());
+  EXPECT_EQ("[1::2]:2345", socket.localAddress()->asString());
+  EXPECT_NE(fd, -1);
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterOptionFailIPv6) {
+  class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
+  public:
+    // NamedListenerFilterConfigFactory
+    Network::ListenerFilterFactoryCb
+    createFilterFactoryFromProto(const Protobuf::Message&,
+                                 Configuration::ListenerFactoryContext& context) override {
+      auto option = std::make_unique<Network::MockSocketOption>();
+      EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
+          .WillOnce(Return(false));
+      context.addListenSocketOption(std::move(option));
+      return [](Network::ListenerFilterManager& filter_manager) -> void {
+        filter_manager.addAcceptFilter(std::make_unique<OriginalDstTestFilterIPv6>());
+      };
+    }
+
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+      return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    }
+
+    std::string name() override { return "testfail.listener.original_dstipv6"; }
+  };
+
+  /**
+   * Static registration for the original dst filter. @see RegisterFactory.
+   */
+  static Registry::RegisterFactory<OriginalDstTestConfigFactory,
+                                   Configuration::NamedListenerFilterConfigFactory>
+      registered_;
+
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: "socketOptionFailListener"
+    address:
+      socket_address: { address: ::0001, port_value: 1111 }
+    filter_chains: {}
+    listener_filters:
+    - name: "testfail.listener.original_dstipv6"
+      config: {}
+  )EOF",
+                                                       Network::Address::IpVersion::v6);
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                            EnvoyException,
+                            "MockListenerComponentFactory: Setting socket options failed");
+  EXPECT_EQ(0U, manager_->listeners().size());
+}
+
 // Validate that when neither transparent nor freebind is not set in the
 // Listener, we see no socket option set.
 TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabled) {

@@ -404,7 +404,7 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
     *connection =
         std::make_unique<FakeHttpConnection>(consumeConnection(), stats_store_, http_type_);
   }
-  (*connection)->initialize();
+  VERIFY_ASSERTION((*connection)->initialize());
   VERIFY_ASSERTION((*connection)->readDisable(false));
   return AssertionSuccess();
 }
@@ -429,7 +429,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         *connection = std::make_unique<FakeHttpConnection>(
             upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_);
         lock.release();
-        (*connection)->initialize();
+        VERIFY_ASSERTION((*connection)->initialize());
         VERIFY_ASSERTION((*connection)->readDisable(false));
         return AssertionSuccess();
       }
