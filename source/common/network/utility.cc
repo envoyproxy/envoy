@@ -7,6 +7,11 @@
 #include <linux/netfilter_ipv4.h>
 #endif
 
+#ifndef IP6T_SO_ORIGINAL_DST
+// From linux/netfilter_ipv6/ip6_tables.h
+#define IP6T_SO_ORIGINAL_DST 80
+#endif
+
 #include <netinet/ip.h>
 #include <sys/socket.h>
 
@@ -20,6 +25,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
@@ -292,14 +298,35 @@ Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
 #ifdef SOL_IP
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
-  int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
+  int socket_domain;
+  socklen_t domain_len = sizeof(socket_domain);
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  int status = os_syscalls.getsockopt(fd, SOL_SOCKET, SO_DOMAIN, &socket_domain, &domain_len);
 
-  if (status == 0) {
-    // TODO(mattklein123): IPv6 support. See github issue #1094.
-    ASSERT(orig_addr.ss_family == AF_INET);
+  if (status != 0) {
+    return nullptr;
+  }
+
+  if (socket_domain == AF_INET) {
+    status = os_syscalls.getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
+  } else if (socket_domain == AF_INET6) {
+    status = os_syscalls.getsockopt(fd, SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len);
+  } else {
+    return nullptr;
+  }
+
+  if (status != 0) {
+    return nullptr;
+  }
+
+  switch (orig_addr.ss_family) {
+  case AF_INET:
     return Address::InstanceConstSharedPtr{
         new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
-  } else {
+  case AF_INET6:
+    return Address::InstanceConstSharedPtr{
+        new Address::Ipv6Instance(reinterpret_cast<sockaddr_in6&>(orig_addr))};
+  default:
     return nullptr;
   }
 #else

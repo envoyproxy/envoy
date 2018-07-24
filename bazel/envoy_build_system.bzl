@@ -5,19 +5,39 @@ def envoy_package():
 
 # Compute the final copts based on various options.
 def envoy_copts(repository, test = False):
-    return [
-               "-Wall",
-               "-Wextra",
-               "-Werror",
-               "-Wnon-virtual-dtor",
-               "-Woverloaded-virtual",
-               "-Wold-style-cast",
-               "-std=c++14",
-           ] + select({
+    posix_options = [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wnon-virtual-dtor",
+        "-Woverloaded-virtual",
+        "-Wold-style-cast",
+        "-std=c++14",
+    ]
+
+    msvc_options = [
+        "-WX",
+        "-DWIN32",
+        "-DWIN32_LEAN_AND_MEAN",
+        # need win8 for ntohll
+        # https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
+        "-D_WIN32_WINNT=0x0602",
+        "-DNTDDI_VERSION=0x06020000",
+        "-DCARES_STATICLIB",
+        "-DNGHTTP2_STATICLIB",
+    ]
+
+    return select({
+               "//bazel:windows_x86_64": msvc_options,
+               "//conditions:default": posix_options,
+           }) + select({
                # Bazel adds an implicit -DNDEBUG for opt.
                repository + "//bazel:opt_build": [] if test else ["-ggdb3"],
                repository + "//bazel:fastbuild_build": [],
                repository + "//bazel:dbg_build": ["-ggdb3"],
+               repository + "//bazel:windows_opt_build": [],
+               repository + "//bazel:windows_fastbuild_build": [],
+               repository + "//bazel:windows_dbg_build": [],
            }) + select({
                repository + "//bazel:disable_tcmalloc": ["-DABSL_MALLOC_HOOK_MMAP_DISABLE"],
                "//conditions:default": ["-DTCMALLOC"],
@@ -47,6 +67,9 @@ def envoy_linkopts():
                    "-pagezero_size 10000",
                    "-image_base 100000000",
                ],
+               "//bazel:windows_x86_64": [
+                   "-DEFAULTLIB:advapi32.lib",
+               ],
                "//conditions:default": [
                    "-pthread",
                    "-lrt",
@@ -62,6 +85,7 @@ def _envoy_stamped_linkopts():
         #
         # /usr/bin/ld.gold: internal error in write_build_id, at ../../gold/layout.cc:5419
         "@envoy//bazel:coverage_build": [],
+        "//bazel:windows_x86_64": [],
 
         # MacOS doesn't have an official equivalent to the `.note.gnu.build-id`
         # ELF section, so just stuff the raw ID into a new text section.
@@ -120,6 +144,13 @@ def tcmalloc_external_deps(repository):
         "//conditions:default": [envoy_external_dep_path("tcmalloc_and_profiler")],
     })
 
+# Dependencies on libevent should be wrapped with this function.
+def libevent_external_deps(repository):
+    return [envoy_external_dep_path("event")] + select({
+        repository + "//bazel:windows_x86_64": [],
+        "//conditions:default": [envoy_external_dep_path("event_pthreads")],
+    })
+
 # Transform the package path (e.g. include/envoy/common) into a path for
 # exporting the package headers at (e.g. envoy/common). Source files can then
 # include using this path scheme (e.g. #include "envoy/common/time.h").
@@ -144,6 +175,7 @@ def envoy_cc_library(
         visibility = None,
         external_deps = [],
         tcmalloc_dep = None,
+        libevent_dep = None,
         repository = "",
         linkstamp = None,
         tags = [],
@@ -151,6 +183,9 @@ def envoy_cc_library(
         strip_include_prefix = None):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
+    if libevent_dep:
+        deps += libevent_external_deps(repository)
+
     native.cc_library(
         name = name,
         srcs = srcs,
@@ -168,7 +203,10 @@ def envoy_cc_library(
         include_prefix = envoy_include_prefix(PACKAGE_NAME),
         alwayslink = 1,
         linkstatic = 1,
-        linkstamp = linkstamp,
+        linkstamp = select({
+            repository + "//bazel:windows_x86_64": None,
+            "//conditions:default": linkstamp,
+        }),
         strip_include_prefix = strip_include_prefix,
     )
 
@@ -481,5 +519,6 @@ def envoy_select_force_libcpp(if_libcpp, default = None):
     return select({
         "@envoy//bazel:force_libcpp": if_libcpp,
         "@bazel_tools//tools/osx:darwin": [],
+        "//bazel:windows_x86_64": [],
         "//conditions:default": default or [],
     })

@@ -473,7 +473,8 @@ public:
   virtual std::chrono::milliseconds timeout() const PURE;
 
   /**
-   * @return absl::optional<std::chrono::milliseconds> the route's idle timeout.
+   * @return optional<std::chrono::milliseconds> the route's idle timeout. Zero indicates a
+   *         disabled idle timeout, while nullopt indicates deference to the global timeout.
    */
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 

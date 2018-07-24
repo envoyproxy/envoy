@@ -1,4 +1,5 @@
 #include "common/http/utility.h"
+#include "common/request_info/request_info_impl.h"
 
 #include "extensions/filters/http/lua/wrappers.h"
 
@@ -7,6 +8,7 @@
 #include "test/test_common/utility.h"
 
 using testing::InSequence;
+using testing::Return;
 using testing::ReturnPointee;
 
 namespace Envoy {
@@ -219,6 +221,8 @@ class LuaRequestInfoWrapperTest
 public:
   virtual void setup(const std::string& script) {
     Filters::Common::Lua::LuaWrappersTestBase<RequestInfoWrapper>::setup(script);
+    state_->registerType<DynamicMetadataMapWrapper>();
+    state_->registerType<DynamicMetadataMapIterator>();
   }
 
 protected:
@@ -241,6 +245,12 @@ protected:
     start("callMe");
     wrapper.reset();
   }
+
+  envoy::api::v2::core::Metadata parseMetadataFromYaml(const std::string& yaml_string) {
+    envoy::api::v2::core::Metadata metadata;
+    MessageUtil::loadFromYaml(yaml_string, metadata);
+    return metadata;
+  }
 };
 
 // Return the current request protocol.
@@ -248,6 +258,138 @@ TEST_F(LuaRequestInfoWrapperTest, ReturnCurrentProtocol) {
   expectToPrintCurrentProtocol(Http::Protocol::Http10);
   expectToPrintCurrentProtocol(Http::Protocol::Http11);
   expectToPrintCurrentProtocol(Http::Protocol::Http2);
+}
+
+// Set, get and iterate request info dynamic metadata.
+TEST_F(LuaRequestInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
+  const std::string SCRIPT{R"EOF(
+      function callMe(object)
+        testPrint(type(object:dynamicMetadata()))
+        object:dynamicMetadata():set("envoy.lb", "foo", "bar")
+        object:dynamicMetadata():set("envoy.lb", "so", "cool")
+
+        testPrint(object:dynamicMetadata():get("envoy.lb")["foo"])
+        testPrint(object:dynamicMetadata():get("envoy.lb")["so"])
+
+        for filter, entry in pairs(object:dynamicMetadata()) do
+          for key, value in pairs(entry) do
+            testPrint(string.format("'%s' '%s'", key, value))
+          end
+        end
+
+        local function nRetVals(...)
+          return select('#',...)
+        end
+        testPrint(tostring(nRetVals(object:dynamicMetadata():get("envoy.ngx"))))
+      end
+    )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2);
+  EXPECT_EQ(0, request_info.dynamicMetadata().filter_metadata_size());
+  Filters::Common::Lua::LuaDeathRef<RequestInfoWrapper> wrapper(
+      RequestInfoWrapper::create(coroutine_->luaState(), request_info), true);
+  EXPECT_CALL(*this, testPrint("userdata"));
+  EXPECT_CALL(*this, testPrint("bar"));
+  EXPECT_CALL(*this, testPrint("cool"));
+  EXPECT_CALL(*this, testPrint("'foo' 'bar'"));
+  EXPECT_CALL(*this, testPrint("'so' 'cool'"));
+  EXPECT_CALL(*this, testPrint("0"));
+  start("callMe");
+
+  EXPECT_EQ(1, request_info.dynamicMetadata().filter_metadata_size());
+  EXPECT_EQ("bar", request_info.dynamicMetadata()
+                       .filter_metadata()
+                       .at("envoy.lb")
+                       .fields()
+                       .at("foo")
+                       .string_value());
+  wrapper.reset();
+}
+
+// Modify during iteration.
+TEST_F(LuaRequestInfoWrapperTest, ModifyDuringIterationForDynamicMetadata) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      object:dynamicMetadata():set("envoy.lb", "hello", "world")
+      for key, value in pairs(object:dynamicMetadata()) do
+        object:dynamicMetadata():set("envoy.lb", "hello", "envoy")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2);
+  Filters::Common::Lua::LuaDeathRef<RequestInfoWrapper> wrapper(
+      RequestInfoWrapper::create(coroutine_->luaState(), request_info), true);
+  EXPECT_THROW_WITH_MESSAGE(
+      start("callMe"), Filters::Common::Lua::LuaException,
+      "[string \"...\"]:5: dynamic metadata map cannot be modified while iterating");
+}
+
+// Modify after iteration.
+TEST_F(LuaRequestInfoWrapperTest, ModifyAfterIterationForDynamicMetadata) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      object:dynamicMetadata():set("envoy.lb", "hello", "world")
+      for filter, entry in pairs(object:dynamicMetadata()) do
+        testPrint(filter)
+        for key, value in pairs(entry) do
+          testPrint(string.format("'%s' '%s'", key, value))
+        end
+      end
+
+      object:dynamicMetadata():set("envoy.lb", "hello", "envoy")
+      object:dynamicMetadata():set("envoy.proxy", "proto", "grpc")
+      for filter, entry in pairs(object:dynamicMetadata()) do
+        testPrint(filter)
+        for key, value in pairs(entry) do
+          testPrint(string.format("'%s' '%s'", key, value))
+        end
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2);
+  EXPECT_EQ(0, request_info.dynamicMetadata().filter_metadata_size());
+  Filters::Common::Lua::LuaDeathRef<RequestInfoWrapper> wrapper(
+      RequestInfoWrapper::create(coroutine_->luaState(), request_info), true);
+  EXPECT_CALL(*this, testPrint("envoy.lb"));
+  EXPECT_CALL(*this, testPrint("'hello' 'world'"));
+  EXPECT_CALL(*this, testPrint("envoy.proxy"));
+  EXPECT_CALL(*this, testPrint("'proto' 'grpc'"));
+  EXPECT_CALL(*this, testPrint("envoy.lb"));
+  EXPECT_CALL(*this, testPrint("'hello' 'envoy'"));
+  start("callMe");
+}
+
+// Don't finish iteration.
+TEST_F(LuaRequestInfoWrapperTest, DontFinishIterationForDynamicMetadata) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      object:dynamicMetadata():set("envoy.lb", "foo", "bar")
+      iterator = pairs(object:dynamicMetadata())
+      key, value = iterator()
+      iterator2 = pairs(object:dynamicMetadata())
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2);
+  Filters::Common::Lua::LuaDeathRef<RequestInfoWrapper> wrapper(
+      RequestInfoWrapper::create(coroutine_->luaState(), request_info), true);
+  EXPECT_THROW_WITH_MESSAGE(
+      start("callMe"), Filters::Common::Lua::LuaException,
+      "[string \"...\"]:6: cannot create a second iterator before completing the first");
 }
 
 } // namespace Lua
