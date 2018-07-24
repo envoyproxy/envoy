@@ -374,6 +374,8 @@ private:
   typedef std::unordered_map<std::string, PendingUpdatesByPriorityMapPtr> ClusterUpdatesMap;
 
   void applyUpdates(const Cluster& cluster, uint32_t priority, PendingUpdatesPtr updates);
+  void scheduleUpdate(const Cluster& cluster, uint32_t priority, const HostVector& hosts_added,
+                      const HostVector& hosts_removed);
   void createOrUpdateThreadLocalCluster(ClusterData& cluster);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
   static ClusterManagerStats generateStats(Stats::Scope& scope);

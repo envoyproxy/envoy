@@ -333,40 +333,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
 
     // Should we coalesce updates?
     if (cluster.info()->lbConfig().has_time_between_updates()) {
-      PendingUpdatesByPriorityMapPtr updates_by_prio;
-      PendingUpdatesPtr updates;
-
-      // Find pending updates for this cluster.
-      auto updates_by_prio_it = updates_map_.find(cluster.info()->name());
-      if (updates_by_prio_it != updates_map_.end()) {
-        updates_by_prio = updates_by_prio_it->second;
-      } else {
-        updates_by_prio = std::make_shared<PendingUpdatesByPriorityMap>();
-        updates_map_[cluster.info()->name()] = updates_by_prio;
-      }
-
-      // Find pending updates for this priority.
-      auto updates_it = updates_by_prio->find(priority);
-      if (updates_it != updates_by_prio->end()) {
-        updates = updates_it->second;
-      } else {
-        updates = std::make_shared<PendingUpdates>();
-        (*updates_by_prio)[priority] = updates;
-      }
-
-      // Record the updates that should be applied when the timer fires.
-      updates->added.insert(hosts_added.begin(), hosts_added.end());
-      updates->removed.insert(hosts_removed.begin(), hosts_removed.end());
-
-      // If there's no timer, create one.
-      if (updates->timer == nullptr) {
-        updates->timer = dispatcher_.createTimer([this, &cluster, priority, &updates]() -> void {
-          applyUpdates(cluster, priority, updates);
-        });
-        const auto& time_between_updates = cluster.info()->lbConfig().time_between_updates();
-        const auto timeout = DurationUtil::durationToMilliseconds(time_between_updates);
-        updates->timer->enableTimer(std::chrono::milliseconds(timeout));
-      }
+      scheduleUpdate(cluster, priority, hosts_added, hosts_removed);
     } else {
       postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
     }
@@ -379,6 +346,45 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
       continue;
     }
     postThreadLocalClusterUpdate(cluster, host_set->priority(), host_set->hosts(), HostVector{});
+  }
+}
+
+void ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priority,
+                                        const HostVector& hosts_added,
+                                        const HostVector& hosts_removed) {
+  PendingUpdatesByPriorityMapPtr updates_by_prio;
+  PendingUpdatesPtr updates;
+
+  // Find pending updates for this cluster.
+  auto updates_by_prio_it = updates_map_.find(cluster.info()->name());
+  if (updates_by_prio_it != updates_map_.end()) {
+    updates_by_prio = updates_by_prio_it->second;
+  } else {
+    updates_by_prio = std::make_shared<PendingUpdatesByPriorityMap>();
+    updates_map_[cluster.info()->name()] = updates_by_prio;
+  }
+
+  // Find pending updates for this priority.
+  auto updates_it = updates_by_prio->find(priority);
+  if (updates_it != updates_by_prio->end()) {
+    updates = updates_it->second;
+  } else {
+    updates = std::make_shared<PendingUpdates>();
+    (*updates_by_prio)[priority] = updates;
+  }
+
+  // Record the updates that should be applied when the timer fires.
+  updates->added.insert(hosts_added.begin(), hosts_added.end());
+  updates->removed.insert(hosts_removed.begin(), hosts_removed.end());
+
+  // If there's no timer, create one.
+  if (updates->timer == nullptr) {
+    updates->timer = dispatcher_.createTimer([this, &cluster, priority, &updates]() -> void {
+      applyUpdates(cluster, priority, updates);
+    });
+    const auto& time_between_updates = cluster.info()->lbConfig().time_between_updates();
+    const auto timeout = DurationUtil::durationToMilliseconds(time_between_updates);
+    updates->timer->enableTimer(std::chrono::milliseconds(timeout));
   }
 }
 

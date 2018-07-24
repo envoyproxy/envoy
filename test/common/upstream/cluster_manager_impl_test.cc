@@ -1662,6 +1662,19 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
   // Ensure the coalesced updates were applied.
   timer->callback_();
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
+
+  // Prepare a new timer.
+  timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+
+  // Add them back.
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_removed_0, hosts_added);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_removed_1, hosts_added);
+
+  // Ensure the coalesced updates were applied again.
+  timer->callback_();
+  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
 }
 
 class ClusterManagerInitHelperTest : public testing::Test {
