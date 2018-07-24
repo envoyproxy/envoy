@@ -367,6 +367,7 @@ private:
     Event::TimerPtr timer;
     std::unordered_set<HostSharedPtr> added;
     std::unordered_set<HostSharedPtr> removed;
+    MonotonicTime last_updated;
   };
   typedef std::shared_ptr<PendingUpdates> PendingUpdatesPtr;
   typedef std::unordered_map<uint32_t, PendingUpdatesPtr> PendingUpdatesByPriorityMap;
@@ -374,7 +375,7 @@ private:
   typedef std::unordered_map<std::string, PendingUpdatesByPriorityMapPtr> ClusterUpdatesMap;
 
   void applyUpdates(const Cluster& cluster, uint32_t priority, PendingUpdatesPtr updates);
-  void scheduleUpdate(const Cluster& cluster, uint32_t priority, const HostVector& hosts_added,
+  bool scheduleUpdate(const Cluster& cluster, uint32_t priority, const HostVector& hosts_added,
                       const HostVector& hosts_removed);
   void createOrUpdateThreadLocalCluster(ClusterData& cluster);
   ProtobufTypes::MessagePtr dumpClusterConfigs();

@@ -332,9 +332,13 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     // out to all of the thread local configurations.
 
     // Should we coalesce updates?
-    if (cluster.info()->lbConfig().has_time_between_updates()) {
-      scheduleUpdate(cluster, priority, hosts_added, hosts_removed);
-    } else {
+    bool scheduled = false;
+    if (cluster.info()->lbConfig().has_update_merge_window()) {
+      scheduled = scheduleUpdate(cluster, priority, hosts_added, hosts_removed);
+    }
+
+    // If an update was not scheduled, deliver it immediately.
+    if (!scheduled) {
       postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
     }
   });
@@ -349,9 +353,11 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 }
 
-void ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priority,
+bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priority,
                                         const HostVector& hosts_added,
                                         const HostVector& hosts_removed) {
+  const auto& update_merge_window = cluster.info()->lbConfig().update_merge_window();
+  const auto timeout = DurationUtil::durationToMilliseconds(update_merge_window);
   PendingUpdatesByPriorityMapPtr updates_by_prio;
   PendingUpdatesPtr updates;
 
@@ -373,6 +379,15 @@ void ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
     (*updates_by_prio)[priority] = updates;
   }
 
+  // Has an update_merge_window gone by since the last update? If so, don't schedule
+  // the update so it can be applied immediately.
+  auto delta = std::chrono::steady_clock::now() - updates->last_updated;
+  uint64_t delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
+  if (delta_ms > timeout) {
+    updates->last_updated = std::chrono::steady_clock::now();
+    return false;
+  }
+
   // Record the updates that should be applied when the timer fires.
   updates->added.insert(hosts_added.begin(), hosts_added.end());
   updates->removed.insert(hosts_removed.begin(), hosts_removed.end());
@@ -382,10 +397,10 @@ void ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
     updates->timer = dispatcher_.createTimer([this, &cluster, priority, &updates]() -> void {
       applyUpdates(cluster, priority, updates);
     });
-    const auto& time_between_updates = cluster.info()->lbConfig().time_between_updates();
-    const auto timeout = DurationUtil::durationToMilliseconds(time_between_updates);
     updates->timer->enableTimer(std::chrono::milliseconds(timeout));
   }
+
+  return true;
 }
 
 void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
@@ -402,6 +417,7 @@ void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
   updates->timer = nullptr;
   updates->added.clear();
   updates->removed.clear();
+  updates->last_updated = std::chrono::steady_clock::now();
 }
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,

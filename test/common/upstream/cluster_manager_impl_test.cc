@@ -1636,14 +1636,11 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
           address: "127.0.0.1"
           port_value: 11002
       common_lb_config:
-        time_between_updates: 3s
+        update_merge_window: 3s
   )EOF";
 
   create(parseBootstrapFromV2Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
-
-  // Save the updates timer.
-  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
 
   // Remove each host, sequentially.
   const Cluster& cluster = cluster_manager_->clusters().begin()->second;
@@ -1654,8 +1651,15 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
   HostVector hosts_added{};
   HostVector hosts_removed_0{(*hosts)[0]};
   HostVector hosts_removed_1{(*hosts)[1]};
+
+  // No timer needs to be mocked at this point, since the first update should be applied
+  // immediately.
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed_0);
+
+  // Now we need the timer to be ready, since createTimer() will be call given that this update
+  // _will_ be delayed.
+  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed_1);
 
@@ -1663,7 +1667,7 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
   timer->callback_();
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
 
-  // Prepare a new timer.
+  // Prepare a new timer for the next round of updates.
   timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
 
   // Add them back.
