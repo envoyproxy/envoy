@@ -6,6 +6,23 @@
 
 namespace Envoy {
 namespace Stats {
+
+using Symbol = uint32_t;
+using SymbolVec = std::vector<Symbol>;
+
+/**
+ * Interface for storing a stat name, which is a wrapper around a SymbolVec.
+ */
+class StatName {
+public:
+  StatName() {}
+  virtual ~StatName(){};
+  virtual std::string toString() const PURE;
+  virtual SymbolVec toSymbols() const PURE;
+};
+
+using StatNamePtr = std::unique_ptr<StatName>;
+
 /**
  * Interface for shortening and retrieving stat names.
  * Guarantees that x = decode(encode(x)) for any x.
@@ -16,12 +33,10 @@ namespace Stats {
  */
 class SymbolTable {
 public:
-  typedef uint32_t Symbol;
-
   virtual ~SymbolTable() {}
 
   /**
-   * Encodes a stat name into a vector of Symbols. Expects the name to be period-delimited.
+   * Encodes a stat name into a StatNamePtr. Expects the name to be period-delimited.
    *
    * @param name the stat name to encode.
    * @return std::vector<Symbol> the encoded stat name.

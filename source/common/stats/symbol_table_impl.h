@@ -51,48 +51,28 @@ private:
 
   // Bimap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
-  std::unordered_map<std::string, std::pair<Symbol, uint32_t>> encode_map_ = {};
-  std::unordered_map<Symbol, std::string> decode_map_ = {};
+  std::unordered_map<std::string, std::pair<Symbol, uint32_t>> encode_map_;
+  std::unordered_map<Symbol, std::string> decode_map_;
 
-  Symbol toSymbol(const std::string& str) {
-    Symbol result;
-    auto encode_search = encode_map_.find(str);
-    if (encode_search != encode_map_.end()) {
-      // If the symbol exists. Return it and up its refcount.
-      result = encode_search->second.first;
-      (encode_search->second.second)++;
-    } else {
-      encode_map_.insert({str, std::make_pair(curr_counter_, 1)});
-      decode_map_.insert({curr_counter_, str});
-      result = curr_counter_;
-      curr_counter_++;
-    }
-    return result;
-  }
+  Symbol toSymbol(const std::string& str);
+  std::string fromSymbol(const Symbol symbol) const;
+};
 
-  std::string fromSymbol(const Symbol symbol) const {
-    auto search = decode_map_.find(symbol);
-    return (search != decode_map_.end()) ? (search->second) : "";
-  }
+/**
+ * Implements RAII for Symbols, since the StatName destructor does the work of freeing its component
+ * symbols.
+ */
+class StatNameImpl : public StatName {
+public:
+  StatNameImpl(SymbolVec symbol_vec, SymbolTableImpl* symbol_table)
+      : symbol_vec_(symbol_vec), symbol_table_(symbol_table) {}
+  ~StatNameImpl() override { symbol_table_->free(symbol_vec_); }
+  std::string toString() const override { return symbol_table_->decode(symbol_vec_); }
+  SymbolVec toSymbols() const override { return symbol_vec_; }
 
-  // Returns true if the free was successful, false if the symbol was invalid.
-  bool freeSymbol(const Symbol symbol) {
-    auto decode_search = decode_map_.find(symbol);
-    if (decode_search == decode_map_.end()) {
-      return false;
-    }
-    std::string str = decode_search->second;
-    auto encode_search = encode_map_.find(str);
-    if (encode_search == encode_map_.end()) {
-      return false;
-    }
-    ((encode_search->second).second)--;
-    if ((encode_search->second).second == 0) {
-      decode_map_.erase(symbol);
-      encode_map_.erase(str);
-    }
-    return true;
-  }
+private:
+  SymbolVec symbol_vec_;
+  SymbolTableImpl* symbol_table_;
 };
 
 } // namespace Stats
