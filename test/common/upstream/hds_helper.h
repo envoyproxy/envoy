@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Upstream {
 
-class TestHdsInfoFactory : public HdsInfoFactory, Logger::Loggable<Logger::Id::upstream> {
+class TestClusterInfoFactory : public ClusterInfoFactory, Logger::Loggable<Logger::Id::upstream> {
 public:
   ClusterInfoConstSharedPtr
   createHdsClusterInfo(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,

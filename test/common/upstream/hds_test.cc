@@ -19,6 +19,8 @@ using testing::NiceMock;
 using testing::Return;
 using testing::_;
 
+using ::testing::AtLeast;
+
 namespace Envoy {
 namespace Upstream {
 
@@ -51,7 +53,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
 
   HdsDelegatePtr hds_delegate_;
-  TestHdsInfoFactory test_factory_;
+  TestClusterInfoFactory test_factory_;
 
   Event::MockTimer* retry_timer_;
   Event::TimerCb retry_timer_cb_;
@@ -173,6 +175,66 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
   auto& host6 = hds_delegate_->hdsClusters()[1]->prioritySet().hostSetsPerPriority()[0]->hosts()[2];
   EXPECT_EQ(host6->address()->ip()->addressAsString(), "128.0.1.0");
   EXPECT_EQ(host6->address()->ip()->port(), 8765);
+}
+
+TEST_F(HdsTest, TestProcessMessageHealthChecks) {
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message.reset(new envoy::service::discovery::v2::HealthCheckSpecifier);
+  message->mutable_interval()->set_seconds(1);
+
+  auto* health_check = message->add_health_check();
+  health_check->set_cluster_name("anna");
+
+  health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
+  health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
+  health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
+  health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
+  health_check->mutable_health_checks(0)->mutable_grpc_health_check();
+  health_check->mutable_health_checks(0)->mutable_http_health_check()->set_use_http2(false);
+  health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
+
+  health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
+  health_check->mutable_health_checks(1)->mutable_interval()->set_seconds(1);
+  health_check->mutable_health_checks(1)->mutable_unhealthy_threshold()->set_value(2);
+  health_check->mutable_health_checks(1)->mutable_healthy_threshold()->set_value(2);
+  health_check->mutable_health_checks(1)->mutable_grpc_health_check();
+  health_check->mutable_health_checks(1)->mutable_http_health_check()->set_use_http2(false);
+  health_check->mutable_health_checks(1)->mutable_http_health_check()->set_path("/healthcheck");
+
+  auto* health_check2 = message->add_health_check();
+  health_check2->set_cluster_name("minkowski");
+
+  health_check2->add_health_checks()->mutable_timeout()->set_seconds(2);
+  health_check2->mutable_health_checks(0)->mutable_interval()->set_seconds(2);
+  health_check2->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(4);
+  health_check2->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(21);
+  health_check2->mutable_health_checks(0)->mutable_grpc_health_check();
+  health_check2->mutable_health_checks(0)->mutable_http_health_check()->set_use_http2(true);
+  health_check2->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck2");
+
+  // Process message
+  hds_delegate_->processMessage(std::move(message));
+
+  // Check Correctness
+  EXPECT_EQ(hds_delegate_->healthCheckers().size(), 3);
+}
+
+TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message.reset(new envoy::service::discovery::v2::HealthCheckSpecifier);
+  message->mutable_interval()->set_seconds(1);
+
+  EXPECT_CALL(*server_response_timer_, enableTimer(_)).Times(AtLeast(1));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
 }
 
 } // namespace Upstream

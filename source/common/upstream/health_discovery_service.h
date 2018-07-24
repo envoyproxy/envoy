@@ -15,9 +15,9 @@
 namespace Envoy {
 namespace Upstream {
 
-class HdsInfoFactory {
+class ClusterInfoFactory {
 public:
-  virtual ~HdsInfoFactory() {}
+  virtual ~ClusterInfoFactory() {}
 
   /**
    * @return ClusterInfoConstSharedPtr
@@ -30,7 +30,7 @@ public:
                        Secret::SecretManager& secret_manager, bool added_via_api) PURE;
 };
 
-class RealHdsInfoFactory : public HdsInfoFactory, Logger::Loggable<Logger::Id::upstream> {
+class RealClusterInfoFactory : public ClusterInfoFactory, Logger::Loggable<Logger::Id::upstream> {
 public:
   ClusterInfoConstSharedPtr
   createHdsClusterInfo(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
@@ -46,8 +46,6 @@ public:
 
 class HdsCluster : public Cluster, Logger::Loggable<Logger::Id::upstream> {
 public:
-  void startHealthChecker(const HealthCheckerSharedPtr& health_checker);
-
   static ClusterSharedPtr create();
 
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -64,7 +62,7 @@ public:
   HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
              const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
              Ssl::ContextManager& ssl_context_manager, Secret::SecretManager& secret_manager,
-             bool added_via_api, HdsInfoFactory& info_factory);
+             bool added_via_api, ClusterInfoFactory& info_factory);
   const Network::Address::InstanceConstSharedPtr
   resolveProtoAddress2(const envoy::api::v2::core::Address& address);
 
@@ -86,7 +84,6 @@ private:
   Secret::SecretManager& secret_manager_;
   bool added_via_api_;
   HostVectorSharedPtr initial_hosts_;
-  HdsInfoFactory& info_factory_;
 };
 
 typedef std::shared_ptr<HdsCluster> HdsClusterPtr;
@@ -116,7 +113,7 @@ public:
               Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
               Runtime::Loader& runtime, Envoy::Stats::Store& stats,
               Ssl::ContextManager& ssl_context_manager, Secret::SecretManager& secret_manager,
-              Runtime::RandomGenerator& random, HdsInfoFactory& info_factory);
+              Runtime::RandomGenerator& random, ClusterInfoFactory& info_factory);
 
   // Grpc::TypedAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
@@ -137,6 +134,7 @@ public:
 
   void establishNewStream();
   std::vector<HdsClusterPtr> hdsClusters() { return hds_clusters_; };
+  std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
 
 private:
   void setRetryTimer();
@@ -159,11 +157,10 @@ private:
 
   Event::TimerPtr server_response_timer_;
 
-  std::vector<std::vector<Upstream::HealthCheckerSharedPtr>> health_checkers_ptr;
+  std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
   std::vector<envoy::api::v2::Cluster> clusters_config_;
-  HdsClusterPtr cluster_;
   std::vector<HdsClusterPtr> hds_clusters_;
-  HdsInfoFactory& info_factory_;
+  ClusterInfoFactory& info_factory_;
 };
 
 typedef std::unique_ptr<HdsDelegate> HdsDelegatePtr;
