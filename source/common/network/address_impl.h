@@ -55,7 +55,7 @@ public:
 
 protected:
   InstanceBase(Type type) : type_(type) {}
-  Api::SysCallResult socketFromSocketType(SocketType type) const;
+  int socketFromSocketType(SocketType type) const;
 
   std::string friendly_name_;
 
@@ -94,7 +94,7 @@ public:
   Api::SysCallResult bind(int fd) const override;
   Api::SysCallResult connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
-  Api::SysCallResult socket(SocketType type) const override;
+  int socket(SocketType type) const override;
 
 private:
   struct Ipv4Helper : public Ipv4 {
@@ -154,7 +154,7 @@ public:
   Api::SysCallResult bind(int fd) const override;
   Api::SysCallResult connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
-  Api::SysCallResult socket(SocketType type) const override;
+  int socket(SocketType type) const override;
 
 private:
   struct Ipv6Helper : public Ipv6 {
@@ -211,7 +211,7 @@ public:
   Api::SysCallResult bind(int fd) const override;
   Api::SysCallResult connect(int fd) const override;
   const Ip* ip() const override { return nullptr; }
-  Api::SysCallResult socket(SocketType type) const override;
+  int socket(SocketType type) const override;
 
 private:
   sockaddr_un address_;

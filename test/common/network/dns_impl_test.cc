@@ -362,9 +362,7 @@ public:
   Api::SysCallResult bind(int fd) const override { return instance_.bind(fd); }
   Api::SysCallResult connect(int fd) const override { return instance_.connect(fd); }
   const Address::Ip* ip() const override { return instance_.ip(); }
-  Api::SysCallResult socket(Address::SocketType type) const override {
-    return instance_.socket(type);
-  }
+  int socket(Address::SocketType type) const override { return instance_.socket(type); }
   Address::Type type() const override { return instance_.type(); }
 
 private:

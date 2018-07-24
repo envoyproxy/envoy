@@ -133,7 +133,7 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
   return addressFromSockAddr(ss, ss_len);
 }
 
-Api::SysCallResult InstanceBase::socketFromSocketType(SocketType socketType) const {
+int InstanceBase::socketFromSocketType(SocketType socketType) const {
 #if defined(__APPLE__)
   int flags = 0;
 #else
@@ -168,7 +168,7 @@ Api::SysCallResult InstanceBase::socketFromSocketType(SocketType socketType) con
   RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1, "");
 #endif
 
-  return {fd, errno};
+  return fd;
 }
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address) : InstanceBase(Type::Ip) {
@@ -224,9 +224,7 @@ Api::SysCallResult Ipv4Instance::connect(int fd) const {
   return {rc, errno};
 }
 
-Api::SysCallResult Ipv4Instance::socket(SocketType type) const {
-  return socketFromSocketType(type);
-}
+int Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
@@ -291,13 +289,12 @@ Api::SysCallResult Ipv6Instance::connect(int fd) const {
   return {rc, errno};
 }
 
-Api::SysCallResult Ipv6Instance::socket(SocketType type) const {
-  const Api::SysCallResult result = socketFromSocketType(type);
+int Ipv6Instance::socket(SocketType type) const {
+  const int fd = socketFromSocketType(type);
   // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
   const int v6only = ip_.v6only_;
-  RELEASE_ASSERT(::setsockopt(result.rc_, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1,
-                 "");
-  return result;
+  RELEASE_ASSERT(::setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1, "");
+  return fd;
 }
 
 PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
@@ -363,9 +360,7 @@ Api::SysCallResult PipeInstance::connect(int fd) const {
   return {rc, errno};
 }
 
-Api::SysCallResult PipeInstance::socket(SocketType type) const {
-  return socketFromSocketType(type);
-}
+int PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }
 
 } // namespace Address
 } // namespace Network

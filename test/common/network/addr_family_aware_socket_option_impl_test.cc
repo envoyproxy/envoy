@@ -23,7 +23,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionFailure) {
 // If a platform supports IPv4 socket option variant for an IPv4 address, it works
 TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionSuccess) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
-  const int fd = address.socket(Address::SocketType::Stream).rc_;
+  const int fd = address.socket(Address::SocketType::Stream);
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
@@ -37,7 +37,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionSuccess) {
 // If a platform doesn't support IPv4 socket option variant for an IPv4 address we fail
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V4EmptyOptionNames) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
-  const int fd = address.socket(Address::SocketType::Stream).rc_;
+  const int fd = address.socket(Address::SocketType::Stream);
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
   AddrFamilyAwareSocketOptionImpl socket_option{
       envoy::api::v2::core::SocketOption::STATE_PREBIND, {}, {}, 1};
@@ -50,7 +50,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V4EmptyOptionNames) {
 // If a platform doesn't support IPv4 and IPv6 socket option variants for an IPv4 address, we fail
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6EmptyOptionNames) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
-  const int fd = address.socket(Address::SocketType::Stream).rc_;
+  const int fd = address.socket(Address::SocketType::Stream);
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
   AddrFamilyAwareSocketOptionImpl socket_option{
       envoy::api::v2::core::SocketOption::STATE_PREBIND, {}, {}, 1};
@@ -64,7 +64,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6EmptyOptionNames) {
 // IPv4 varient
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V4IgnoreV6) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
-  const int fd = address.socket(Address::SocketType::Stream).rc_;
+  const int fd = address.socket(Address::SocketType::Stream);
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
@@ -78,7 +78,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V4IgnoreV6) {
 // If a platform suppports IPv6 socket option variant for an IPv6 address it works
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Only) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
-  const int fd = address.socket(Address::SocketType::Stream).rc_;
+  const int fd = address.socket(Address::SocketType::Stream);
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
@@ -93,7 +93,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Only) {
 // we apply the IPv4 variant.
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6OnlyV4Fallback) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
-  const int fd = address.socket(Address::SocketType::Stream).rc_;
+  const int fd = address.socket(Address::SocketType::Stream);
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
@@ -108,7 +108,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6OnlyV4Fallback) {
 // AddrFamilyAwareSocketOptionImpl::setIpSocketOption() works with the IPv6 variant.
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Precedence) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
-  const int fd = address.socket(Address::SocketType::Stream).rc_;
+  const int fd = address.socket(Address::SocketType::Stream);
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,

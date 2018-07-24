@@ -26,18 +26,12 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << (addr_port == nullptr ? "nullptr" : addr_port->asString());
     return nullptr;
   }
-  Api::SysCallResult result = addr_port->socket(type);
-  const int fd = result.rc_;
-  if (fd < 0) {
-    ADD_FAILURE() << "socket failed for '" << addr_port->asString()
-                  << "' with error: " << strerror(result.errno_) << " (" << result.errno_ << ")";
-    return nullptr;
-  }
+  const int fd = addr_port->socket(type);
   ScopedFdCloser closer(fd);
   // Not setting REUSEADDR, therefore if the address has been recently used we won't reuse it here.
   // However, because we're going to use the address while checking if it is available, we'll need
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
-  result = addr_port->bind(fd);
+  Api::SysCallResult result = addr_port->bind(fd);
   int err;
   const char* failing_fn = nullptr;
   if (result.rc_ != 0) {
@@ -148,11 +142,7 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, 
 
 bool supportsIpVersion(const Address::IpVersion version) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  const int fd = addr->socket(Address::SocketType::Stream).rc_;
-  if (fd < 0) {
-    // Socket creation failed.
-    return false;
-  }
+  const int fd = addr->socket(Address::SocketType::Stream);
   if (0 != addr->bind(fd).rc_) {
     // Socket bind failed.
     RELEASE_ASSERT(::close(fd) == 0, "");
@@ -165,29 +155,16 @@ bool supportsIpVersion(const Address::IpVersion version) {
 std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::IpVersion version,
                                                                      Address::SocketType type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  const char* failing_fn = nullptr;
-  Api::SysCallResult result = addr->socket(type);
-  const int fd = result.rc_;
-  int err;
-  if (fd < 0) {
-    err = result.errno_;
-    failing_fn = "socket";
-  } else {
-    result = addr->bind(fd);
-    if (0 != result.rc_) {
-      err = result.errno_;
-      failing_fn = "bind";
-    } else {
-      return std::make_pair(Address::addressFromFd(fd), fd);
-    }
-  }
-  if (fd >= 0) {
+  const int fd = addr->socket(type);
+  Api::SysCallResult result = addr->bind(fd);
+  if (0 != result.rc_) {
     close(fd);
+    std::string msg = fmt::format("bind failed for address {} with error: {} ({})",
+                                  addr->asString(), strerror(result.errno_), result.errno_);
+    ADD_FAILURE() << msg;
+    throw EnvoyException(msg);
   }
-  std::string msg = fmt::format("{} failed for address {} with error: {} ({})", failing_fn,
-                                addr->asString(), strerror(err), err);
-  ADD_FAILURE() << msg;
-  throw EnvoyException(msg);
+  return std::make_pair(Address::addressFromFd(fd), fd);
 }
 
 TransportSocketPtr createRawBufferSocket() { return std::make_unique<RawBufferSocket>(); }
