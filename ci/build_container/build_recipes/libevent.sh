@@ -14,6 +14,11 @@ cd build
 # libevent defaults CMAKE_BUILD_TYPE to Release
 build_type=Release
 if [[ "${OS}" == "Windows_NT" ]]; then
+  # On Windows, every object file in the final executable needs to be compiled to use the
+  # same version of the C Runtime Library. If Envoy is built with '-c dbg', then it will
+  # use the Debug C Runtime Library. Setting CMAKE_BUILD_TYPE to Debug will cause libevent
+  # to use the debug version as well
+  # TODO: when '-c fastbuild' and '-c opt' work for Windows builds, set this appropriately
   build_type=Debug
 fi
 
