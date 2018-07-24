@@ -26,13 +26,11 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
                   << (addr_port == nullptr ? "nullptr" : addr_port->asString());
     return nullptr;
   }
-  std::tuple<int, int> result = addr_port->socket(type);
-  const int fd = std::get<0>(result);
-  int err;
+  Network::Address::Result result = addr_port->socket(type);
+  const int fd = result.rc;
   if (fd < 0) {
-    err = std::get<1>(result);
     ADD_FAILURE() << "socket failed for '" << addr_port->asString()
-                  << "' with error: " << strerror(err) << " (" << err << ")";
+                  << "' with error: " << strerror(result.error) << " (" << result.error << ")";
     return nullptr;
   }
   ScopedFdCloser closer(fd);
@@ -40,15 +38,14 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   // However, because we're going to use the address while checking if it is available, we'll need
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
   result = addr_port->bind(fd);
-  int rc = std::get<0>(result);
+  int err;
   const char* failing_fn = nullptr;
-  if (rc != 0) {
-    err = std::get<1>(result);
+  if (result.rc != 0) {
+    err = result.error;
     failing_fn = "bind";
   } else if (type == Address::SocketType::Stream) {
     // Try listening on the port also, if the type is TCP.
-    rc = ::listen(fd, 1);
-    if (rc != 0) {
+    if (::listen(fd, 1) != 0) {
       err = errno;
       failing_fn = "listen";
     }
@@ -151,12 +148,12 @@ Address::InstanceConstSharedPtr getAnyAddress(const Address::IpVersion version, 
 
 bool supportsIpVersion(const Address::IpVersion version) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
-  const int fd = std::get<0>(addr->socket(Address::SocketType::Stream));
+  const int fd = addr->socket(Address::SocketType::Stream).rc;
   if (fd < 0) {
     // Socket creation failed.
     return false;
   }
-  if (0 != std::get<0>(addr->bind(fd))) {
+  if (0 != addr->bind(fd).rc) {
     // Socket bind failed.
     RELEASE_ASSERT(::close(fd) == 0, "");
     return false;
@@ -169,16 +166,16 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
                                                                      Address::SocketType type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   const char* failing_fn = nullptr;
-  std::tuple<int, int> result = addr->socket(type);
-  const int fd = std::get<0>(result);
+  Network::Address::Result result = addr->socket(type);
+  const int fd = result.rc;
   int err;
   if (fd < 0) {
-    err = std::get<1>(result);
+    err = result.error;
     failing_fn = "socket";
   } else {
     result = addr->bind(fd);
-    if (0 != std::get<0>(result)) {
-      err = std::get<1>(result);
+    if (0 != result.rc) {
+      err = result.error;
       failing_fn = "bind";
     } else {
       return std::make_pair(Address::addressFromFd(fd), fd);

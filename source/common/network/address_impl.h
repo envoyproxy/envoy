@@ -55,7 +55,7 @@ public:
 
 protected:
   InstanceBase(Type type) : type_(type) {}
-  std::tuple<int, int> socketFromSocketType(SocketType type) const;
+  Result socketFromSocketType(SocketType type) const;
 
   std::string friendly_name_;
 
@@ -91,10 +91,10 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  std::tuple<int, int> bind(int fd) const override;
-  std::tuple<int, int> connect(int fd) const override;
+  Result bind(int fd) const override;
+  Result connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
-  std::tuple<int, int> socket(SocketType type) const override;
+  Result socket(SocketType type) const override;
 
 private:
   struct Ipv4Helper : public Ipv4 {
@@ -151,10 +151,10 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  std::tuple<int, int> bind(int fd) const override;
-  std::tuple<int, int> connect(int fd) const override;
+  Result bind(int fd) const override;
+  Result connect(int fd) const override;
   const Ip* ip() const override { return &ip_; }
-  std::tuple<int, int> socket(SocketType type) const override;
+  Result socket(SocketType type) const override;
 
 private:
   struct Ipv6Helper : public Ipv6 {
@@ -208,10 +208,10 @@ public:
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
-  std::tuple<int, int> bind(int fd) const override;
-  std::tuple<int, int> connect(int fd) const override;
+  Result bind(int fd) const override;
+  Result connect(int fd) const override;
   const Ip* ip() const override { return nullptr; }
-  std::tuple<int, int> socket(SocketType type) const override;
+  Result socket(SocketType type) const override;
 
 private:
   sockaddr_un address_;

@@ -137,8 +137,8 @@ public:
 class ClientSocketImpl : public ConnectionSocketImpl {
 public:
   ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address)
-      : ConnectionSocketImpl(std::get<0>(remote_address->socket(Address::SocketType::Stream)),
-                             nullptr, remote_address) {}
+      : ConnectionSocketImpl(remote_address->socket(Address::SocketType::Stream).rc, nullptr,
+                             remote_address) {}
 };
 
 } // namespace Network

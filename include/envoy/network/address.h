@@ -7,7 +7,6 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <tuple>
 
 #include "envoy/common/pure.h"
 
@@ -16,6 +15,22 @@
 namespace Envoy {
 namespace Network {
 namespace Address {
+
+/**
+ * Result holds the rc and errno values resulting from a system call.
+ */
+struct Result {
+
+  /**
+   * The return code from the system call.
+   */
+  int rc;
+
+  /**
+   * The errno value as captured after the system call.
+   */
+  int error;
+};
 
 /**
  * Interface for an Ipv4 address.
@@ -129,19 +144,19 @@ public:
    * Bind a socket to this address. The socket should have been created with a call to socket() on
    * an Instance of the same address family.
    * @param fd supplies the platform socket handle.
-   * @return a tuple of <0, errno> for success and <-1, errno> for failure. If the call is
-   *   successful, errno shouldn't be used.
+   * @return a Result with rc = 0 for success and rc = -1 for failure. If the call is successful,
+   *   the error value shouldn't be used.
    */
-  virtual std::tuple<int, int> bind(int fd) const PURE;
+  virtual Result bind(int fd) const PURE;
 
   /**
    * Connect a socket to this address. The socket should have been created with a call to socket()
    * on this object.
    * @param fd supplies the platform socket handle.
-   * @return a tuple of <0, errno> for success and <-1, errno> for failure. If the call is
-   *   successful, errno shouldn't be used.
+   * @return a Result with rc = 0 for success and rc = -1 for failure. If the call is successful,
+   *   the error value shouldn't be used.
    */
-  virtual std::tuple<int, int> connect(int fd) const PURE;
+  virtual Result connect(int fd) const PURE;
 
   /**
    * @return the IP address information IFF type() == Type::Ip, otherwise nullptr.
@@ -151,11 +166,11 @@ public:
   /**
    * Create a socket for this address.
    * @param type supplies the socket type to create.
-   * @return a tuple of <fd, errno> for success and <-1, errno> for failure, where fd represents
-   *   the file descriptor naming the socket. If a valid file descriptor is returned, errno
+   * @return a Result with rc = fd for success and rc = -1 for failure, where fd represents the
+   *   file descriptor naming the socket. If a valid file descriptor is returned, the error value
    *   shouldn't be used.
    */
-  virtual std::tuple<int, int> socket(SocketType type) const PURE;
+  virtual Result socket(SocketType type) const PURE;
 
   /**
    * @return the type of address.

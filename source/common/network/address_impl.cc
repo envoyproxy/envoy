@@ -133,7 +133,7 @@ InstanceConstSharedPtr peerAddressFromFd(int fd) {
   return addressFromSockAddr(ss, ss_len);
 }
 
-std::tuple<int, int> InstanceBase::socketFromSocketType(SocketType socketType) const {
+Result InstanceBase::socketFromSocketType(SocketType socketType) const {
 #if defined(__APPLE__)
   int flags = 0;
 #else
@@ -168,7 +168,7 @@ std::tuple<int, int> InstanceBase::socketFromSocketType(SocketType socketType) c
   RELEASE_ASSERT(fcntl(fd, F_SETFL, O_NONBLOCK) != -1, "");
 #endif
 
-  return std::make_tuple(fd, errno);
+  return {fd, errno};
 }
 
 Ipv4Instance::Ipv4Instance(const sockaddr_in* address) : InstanceBase(Type::Ip) {
@@ -212,21 +212,19 @@ bool Ipv4Instance::operator==(const Instance& rhs) const {
           (ip_.port() == rhs_casted->ip_.port()));
 }
 
-std::tuple<int, int> Ipv4Instance::bind(int fd) const {
-  return std::make_tuple(::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
-                                sizeof(ip_.ipv4_.address_)),
-                         errno);
+Result Ipv4Instance::bind(int fd) const {
+  return {::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
+                 sizeof(ip_.ipv4_.address_)),
+          errno};
 }
 
-std::tuple<int, int> Ipv4Instance::connect(int fd) const {
-  return std::make_tuple(::connect(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
-                                   sizeof(ip_.ipv4_.address_)),
-                         errno);
+Result Ipv4Instance::connect(int fd) const {
+  return {::connect(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_),
+                    sizeof(ip_.ipv4_.address_)),
+          errno};
 }
 
-std::tuple<int, int> Ipv4Instance::socket(SocketType type) const {
-  return socketFromSocketType(type);
-}
+Result Ipv4Instance::socket(SocketType type) const { return socketFromSocketType(type); }
 
 absl::uint128 Ipv6Instance::Ipv6Helper::address() const {
   absl::uint128 result{0};
@@ -279,25 +277,24 @@ bool Ipv6Instance::operator==(const Instance& rhs) const {
           (ip_.port() == rhs_casted->ip_.port()));
 }
 
-std::tuple<int, int> Ipv6Instance::bind(int fd) const {
-  return std::make_tuple(::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
-                                sizeof(ip_.ipv6_.address_)),
-                         errno);
+Result Ipv6Instance::bind(int fd) const {
+  return {::bind(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
+                 sizeof(ip_.ipv6_.address_)),
+          errno};
 }
 
-std::tuple<int, int> Ipv6Instance::connect(int fd) const {
-  return std::make_tuple(::connect(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
-                                   sizeof(ip_.ipv6_.address_)),
-                         errno);
+Result Ipv6Instance::connect(int fd) const {
+  return {::connect(fd, reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_),
+                    sizeof(ip_.ipv6_.address_)),
+          errno};
 }
 
-std::tuple<int, int> Ipv6Instance::socket(SocketType type) const {
-  const std::tuple<int, int> result = socketFromSocketType(type);
-  const int fd = std::get<0>(result);
-
+Result Ipv6Instance::socket(SocketType type) const {
+  const Result result = socketFromSocketType(type);
   // Setting IPV6_V6ONLY resticts the IPv6 socket to IPv6 connections only.
   const int v6only = ip_.v6only_;
-  RELEASE_ASSERT(::setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1, "");
+  RELEASE_ASSERT(::setsockopt(result.rc, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only)) != -1,
+                 "");
   return result;
 }
 
@@ -340,33 +337,29 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
 
 bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
 
-std::tuple<int, int> PipeInstance::bind(int fd) const {
+Result PipeInstance::bind(int fd) const {
   if (abstract_namespace_) {
-    return std::make_tuple(::bind(fd, reinterpret_cast<const sockaddr*>(&address_),
-                                  offsetof(struct sockaddr_un, sun_path) + address_length_),
-                           errno);
+    return {::bind(fd, reinterpret_cast<const sockaddr*>(&address_),
+                   offsetof(struct sockaddr_un, sun_path) + address_length_),
+            errno};
   }
   // Try to unlink an existing filesystem object at the requested path. Ignore
   // errors -- it's fine if the path doesn't exist, and if it exists but can't
   // be unlinked then `::bind()` will generate a reasonable errno.
   unlink(address_.sun_path);
-  return std::make_tuple(::bind(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_)),
-                         errno);
+  return {::bind(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_)), errno};
 }
 
-std::tuple<int, int> PipeInstance::connect(int fd) const {
+Result PipeInstance::connect(int fd) const {
   if (abstract_namespace_) {
-    return std::make_tuple(::connect(fd, reinterpret_cast<const sockaddr*>(&address_),
-                                     offsetof(struct sockaddr_un, sun_path) + address_length_),
-                           errno);
+    return {::connect(fd, reinterpret_cast<const sockaddr*>(&address_),
+                      offsetof(struct sockaddr_un, sun_path) + address_length_),
+            errno};
   }
-  return std::make_tuple(
-      ::connect(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_)), errno);
+  return {::connect(fd, reinterpret_cast<const sockaddr*>(&address_), sizeof(address_)), errno};
 }
 
-std::tuple<int, int> PipeInstance::socket(SocketType type) const {
-  return socketFromSocketType(type);
-}
+Result PipeInstance::socket(SocketType type) const { return socketFromSocketType(type); }
 
 } // namespace Address
 } // namespace Network
