@@ -12,6 +12,7 @@ tar xf nghttp2-"$VERSION".tar.gz
 cd nghttp2-"$VERSION"
 
 # Allow nghttp2 to build as static lib on Windows
+# TODO: remove once https://github.com/nghttp2/nghttp2/pull/1198 is merged
 cat > nghttp2_cmakelists.diff << 'EOF'
 diff --git a/lib/CMakeLists.txt b/lib/CMakeLists.txt
 index 17e422b2..e58070f5 100644
