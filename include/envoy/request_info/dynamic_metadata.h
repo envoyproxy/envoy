@@ -13,14 +13,27 @@ class DynamicMetadata {
 public:
   virtual ~DynamicMetadata(){};
 
-  // May only be called once for a particular |data_name|
+  /**
+   * @param data_name the name of the data being set.  
+   * @param data an owning pointer to the data to be stored.
+   * Note that it is an error to call setData() twice with the same data_name.
+   */
   template <typename T> void setData(absl::string_view data_name, std::unique_ptr<T>&& data) {
     setDataGeneric(data_name, Traits<T>::getTypeId(), static_cast<void*>(data.release()),
                    &Traits<T>::destructor);
   }
 
+  /**
+   * @param data_name the name of the data being set.  
+   * @return a reference to the stored data.
+   * Note that it is an error to access data that has not previously been set.
+   */
   template <typename T> const T& getData(absl::string_view data_name) {
     return *static_cast<T*>(getDataGeneric(data_name, Traits<T>::getTypeId()));
+  }
+
+  template <typename T> bool hasData(absl::string_view data_name) {
+    return hasDataGeneric(data_name, Traits<T>::getTypeId());
   }
 
 protected:
@@ -29,6 +42,7 @@ protected:
                               void (*destructor)(void*)) PURE;
 
   virtual void* getDataGeneric(absl::string_view data_name, size_t type_id) PURE;
+  virtual bool hasDataGeneric(absl::string_view data_name, size_t type_id) PURE;
 
 private:
   static size_t type_id_index_;

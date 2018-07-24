@@ -39,5 +39,11 @@ void* DynamicMetadataImpl::getDataGeneric(absl::string_view data_name, size_t ty
   return it->second.ptr_;
 }
 
+bool DynamicMetadataImpl::hasDataGeneric(absl::string_view data_name, size_t type_id) {
+  const auto& it = data_storage_.find(data_name);
+
+  return (it != data_storage_.end() && it->second.typeid_ == type_id);
+}
+
 } // namespace RequestInfo
 } // namespace Envoy

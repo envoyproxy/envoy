@@ -97,6 +97,7 @@ TEST_F(DynamicMetadataImplTest, SimpleType) {
 TEST_F(DynamicMetadataImplTest, NameConflict) {
   dynamic_metadata().setData("test_1", std::make_unique<int>(1));
   EXPECT_THROW(dynamic_metadata().setData("test_1", std::make_unique<int>(2)), EnvoyException);
+  EXPECT_EQ(1, dynamic_metadata().getData<int>("test_1"));
 }
 
 TEST_F(DynamicMetadataImplTest, NameConflictDifferentTypes) {
@@ -104,6 +105,25 @@ TEST_F(DynamicMetadataImplTest, NameConflictDifferentTypes) {
   EXPECT_THROW(
       dynamic_metadata().setData("test_1", std::make_unique<TestStoredType>(2, nullptr, nullptr)),
       EnvoyException);
+}
+
+TEST_F(DynamicMetadataImplTest, UnknownName) {
+  EXPECT_THROW(dynamic_metadata().getData<int>("test_1"), EnvoyException);
+}
+
+TEST_F(DynamicMetadataImplTest, WrongTypeGet) {
+  dynamic_metadata().setData(
+      "test_name", std::make_unique<TestStoredType>(5, nullptr, nullptr));
+  EXPECT_EQ(5, dynamic_metadata().getData<TestStoredType>("test_name").Access());
+  EXPECT_THROW(dynamic_metadata().getData<int>("test_name"), EnvoyException);
+}
+
+TEST_F(DynamicMetadataImplTest, HasData) {
+  dynamic_metadata().setData("test_1", std::make_unique<int>(1));
+  EXPECT_TRUE(dynamic_metadata().hasData<int>("test_1"));
+  EXPECT_FALSE(dynamic_metadata().hasData<int>("test_2"));
+  EXPECT_FALSE(dynamic_metadata().hasData<bool>("test_1"));
+  EXPECT_FALSE(dynamic_metadata().hasData<bool>("test_2"));
 }
 
 } // namespace RequestInfo
