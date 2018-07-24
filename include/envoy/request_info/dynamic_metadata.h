@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <memory>
 
 #include "envoy/common/pure.h"
@@ -45,12 +46,12 @@ protected:
   virtual bool hasDataGeneric(absl::string_view data_name, size_t type_id) PURE;
 
 private:
-  static size_t type_id_index_;
+  static std::atomic<size_t> type_id_index_;
 
   template <typename T> class Traits {
   public:
     static size_t getTypeId() {
-      static const size_t type_id = ++type_id_index_;
+      static const size_t type_id = type_id_index_.fetch_add(1);
       return type_id;
     }
     static void destructor(void* ptr) { delete static_cast<T*>(ptr); }

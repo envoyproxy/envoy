@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace RequestInfo {
 
-size_t DynamicMetadata::type_id_index_ = 0;
+std::atomic<size_t> DynamicMetadata::type_id_index_(0u);
 
 } // namespace RequestInfo
 } // namespace Envoy
