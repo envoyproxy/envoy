@@ -47,6 +47,7 @@ Version history
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
   selecting a host from a subset.
+* access log: added RESPONSE_DURATION and RESPONSE_TX_DURATION.
 
 1.7.0
 ===============
