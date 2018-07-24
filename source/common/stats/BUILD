@@ -36,6 +36,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "symbol_table_lib",
+    srcs = ["symbol_table_impl.cc"],
     hdrs = ["symbol_table_impl.h"],
     external_deps = ["abseil_base"],
     deps = [

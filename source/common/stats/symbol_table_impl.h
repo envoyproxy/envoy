@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -17,36 +18,34 @@ namespace Envoy {
 namespace Stats {
 
 class SymbolTableImpl : public SymbolTable {
+  friend class StatNameImpl;
+
 public:
-  std::vector<Symbol> encode(const std::string& name) override {
-    std::vector<Symbol> symbol_vec;
-    std::vector<std::string> name_vec = absl::StrSplit(name, '.');
-    symbol_vec.resize(name_vec.size());
-    std::transform(name_vec.begin(), name_vec.end(), symbol_vec.begin(),
-                   [this](std::string x) { return this->toSymbol(x); });
-    return symbol_vec;
-  }
-
-  std::string decode(const std::vector<Symbol>& symbol_vec) const override {
-    std::vector<std::string> name;
-    name.resize(symbol_vec.size());
-    std::transform(symbol_vec.begin(), symbol_vec.end(), name.begin(),
-                   [this](Symbol x) { return this->fromSymbol(x); });
-    return absl::StrJoin(name, ".");
-  }
-
-  bool free(const std::vector<Symbol>& symbol_vec) override {
-    bool successful_free = true;
-    for (const Symbol symbol : symbol_vec) {
-      successful_free = successful_free && freeSymbol(symbol);
-    }
-    return successful_free;
-  }
+  StatNamePtr encode(const std::string& name) override;
 
   // For testing purposes only.
   size_t size() const { return sizeof(SymbolTableImpl) + encode_map_.size() + decode_map_.size(); }
 
 private:
+  /**
+   * Decodes a vector of symbols back into its period-delimited stat name.
+   * If decoding fails on any part of the symbol_vec, we release_assert and crash hard, since this
+   * should never happen, and we don't want to continue running with a corrupt stats set.
+   *
+   * @param symbol_vec the vector of symbols to decode.
+   * @return std::string the retrieved stat name.
+   */
+  std::string decode(const SymbolVec& symbol_vec) const;
+
+  /**
+   * Since SymbolTableImpl does manual reference counting, a client of SymbolTable (such as
+   * StatName) must manually call free(symbol_vec) when it is freeing the stat it represents. This
+   * way, the symbol table will grow and shrink dynamically, instead of being write-only.
+   *
+   * @return bool whether or not the total free operation was successful. Expected to be true.
+   */
+  void free(const SymbolVec& symbol_vec);
+
   Symbol curr_counter_ = 0;
 
   // Bimap implementation.
