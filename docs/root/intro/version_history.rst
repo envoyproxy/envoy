@@ -48,7 +48,7 @@ Version history
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
   selecting a host from a subset.
 * access log: added RESPONSE_DURATION and RESPONSE_TX_DURATION.
-* cluster: added :ref:`option <envoy_api_field_Cluster.CommonLbConfig.time_between_updates>` to coalesce updates
+* cluster: added :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>` to coalesce updates
   within the given duration.
 
 1.7.0
