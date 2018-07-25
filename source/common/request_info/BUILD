@@ -12,7 +12,6 @@ envoy_cc_library(
     name = "request_info_lib",
     hdrs = ["request_info_impl.h"],
     deps = [
-        ":dynamic_metadata_lib",
         "//include/envoy/request_info:request_info_interface",
         "//source/common/common:assert_lib",
     ],

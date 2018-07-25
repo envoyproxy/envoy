@@ -17,7 +17,6 @@ public:
   // DynamicMetadata
   void setDataGeneric(absl::string_view data_name, size_t type_id, void* data,
                       void (*destructor)(void*)) override;
-
   void* getDataGeneric(absl::string_view data_name, size_t type_id) override;
   bool hasDataGeneric(absl::string_view data_name, size_t type_id) override;
 

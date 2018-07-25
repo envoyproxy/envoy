@@ -2,8 +2,6 @@
 
 #include "envoy/request_info/request_info.h"
 
-#include "common/request_info/dynamic_metadata_impl.h"
-
 namespace Envoy {
 
 class TestRequestInfo : public RequestInfo::RequestInfo {
@@ -178,7 +176,6 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
-  ::Envoy::RequestInfo::DynamicMetadataImpl metadata2_{};
 };
 
 } // namespace Envoy

@@ -6,7 +6,6 @@
 #include "envoy/request_info/request_info.h"
 
 #include "common/common/assert.h"
-#include "common/request_info/dynamic_metadata_impl.h"
 
 namespace Envoy {
 namespace RequestInfo {
