@@ -380,10 +380,11 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
   }
 
   // Has an update_merge_window gone by since the last update? If so, don't schedule
-  // the update so it can be applied immediately.
+  // the update so it can be applied immediately as long as there's no active timer
+  // (to avoid changing the order of updates).
   const auto delta = std::chrono::steady_clock::now() - updates->last_updated;
   const uint64_t delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
-  if (delta_ms > timeout) {
+  if (delta_ms > timeout && updates->timer == nullptr) {
     updates->last_updated = std::chrono::steady_clock::now();
     return false;
   }
