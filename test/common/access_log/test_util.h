@@ -156,8 +156,6 @@ public:
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  ::Envoy::RequestInfo::DynamicMetadata& dynamicMetadata2() override { return metadata2_; }
-
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
