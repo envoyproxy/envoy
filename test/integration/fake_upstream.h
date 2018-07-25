@@ -438,6 +438,7 @@ public:
   write(const std::string& data, bool end_stream = false,
         std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
 
+  ABSL_MUST_USE_RESULT
   testing::AssertionResult initialize() override {
     testing::AssertionResult result =
         shared_connection_.executeOnDispatcher([this](Network::Connection& connection) {
