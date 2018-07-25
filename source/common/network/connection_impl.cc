@@ -504,7 +504,7 @@ void ConnectionImpl::onWriteReady() {
 }
 
 void ConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
-  ASSERT(!connection_stats_);
+  ASSERT(!connection_stats_, "Perhaps there are duplicate filters in your configuration?");
   connection_stats_.reset(new ConnectionStats(stats));
 }
 
