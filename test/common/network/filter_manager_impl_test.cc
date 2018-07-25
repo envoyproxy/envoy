@@ -154,6 +154,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   InSequence s;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   NiceMock<MockConnection> connection;
+  NiceMock<MockClientConnection> upstream_connection;
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool;
   FilterManagerImpl manager(connection, *this);
 
@@ -208,10 +209,10 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
 
   request_callbacks->complete(RateLimit::LimitStatus::OK);
 
-  conn_pool.poolReady();
+  conn_pool.poolReady(upstream_connection);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(conn_pool.connection_data_.connection_, write(BufferEqual(&buffer), _));
+  EXPECT_CALL(upstream_connection, write(BufferEqual(&buffer), _));
   read_buffer_.add("hello");
   manager.onRead();
 }

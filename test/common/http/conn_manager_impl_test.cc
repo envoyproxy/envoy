@@ -312,6 +312,7 @@ public:
   ConnectionManagerListenerStats listener_stats_;
   bool proxy_100_continue_ = false;
   Http::Http1Settings http1_settings_;
+  NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
@@ -1682,7 +1683,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
   conn_manager_->onData(fake_input, false);
 
   conn_pool_.host_->hostname_ = "newhost";
-  conn_pool_.poolReady();
+  conn_pool_.poolReady(upstream_conn_);
 
   // rewritten authority header when auto_host_rewrite is true
   EXPECT_STREQ("newhost", raw_header_ptr->Host()->value().c_str());
@@ -1726,10 +1727,10 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyData) {
 
   conn_manager_->onData(fake_input, false);
 
-  EXPECT_CALL(conn_pool_.connection_data_.connection_, write(_, false));
-  EXPECT_CALL(conn_pool_.connection_data_.connection_, write(BufferEqual(&early_data), false));
+  EXPECT_CALL(upstream_conn_, write(_, false));
+  EXPECT_CALL(upstream_conn_, write(BufferEqual(&early_data), false));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
-  conn_pool_.poolReady();
+  conn_pool_.poolReady(upstream_conn_);
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
@@ -1802,9 +1803,9 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyEndStream) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, true);
 
-  EXPECT_CALL(conn_pool_.connection_data_.connection_, write(_, false));
-  EXPECT_CALL(conn_pool_.connection_data_.connection_, write(_, true)).Times(0);
-  conn_pool_.poolReady();
+  EXPECT_CALL(upstream_conn_, write(_, false));
+  EXPECT_CALL(upstream_conn_, write(_, true)).Times(0);
+  conn_pool_.poolReady(upstream_conn_);
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
 }

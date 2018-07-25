@@ -58,7 +58,7 @@ public:
 
   MockCancellable* newConnectionImpl(Callbacks& cb);
   void poolFailure(PoolFailureReason reason);
-  void poolReady();
+  void poolReady(Network::MockClientConnection& conn);
 
   std::list<NiceMock<MockCancellable>> handles_;
   std::list<Callbacks*> callbacks_;

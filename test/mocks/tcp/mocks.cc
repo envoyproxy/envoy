@@ -41,10 +41,12 @@ void MockInstance::poolFailure(PoolFailureReason reason) {
   cb->onPoolFailure(reason, host_);
 }
 
-void MockInstance::poolReady() {
+void MockInstance::poolReady(Network::MockClientConnection& conn) {
   Callbacks* cb = callbacks_.front();
   callbacks_.pop_front();
   handles_.pop_front();
+
+  ON_CALL(*connection_data_, connection()).WillByDefault(ReturnRef(conn));
 
   cb->onPoolReady(std::move(connection_data_), host_);
 }

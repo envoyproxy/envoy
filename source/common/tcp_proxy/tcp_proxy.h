@@ -247,7 +247,7 @@ protected:
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   Tcp::ConnectionPool::Cancellable* upstream_handle_{};
-  Tcp::ConnectionPool::ConnectionDataPtr upstream_connection_{};
+  Tcp::ConnectionPool::ConnectionDataPtr upstream_connection_;
   DownstreamCallbacks downstream_callbacks_;
   Event::TimerPtr idle_timer_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
@@ -276,7 +276,7 @@ public:
 private:
   UpstreamDrainManager& parent_;
   std::shared_ptr<Filter::UpstreamCallbacks> callbacks_;
-  Tcp::ConnectionPool::ConnectionDataPtr upstream_connection_{};
+  Tcp::ConnectionPool::ConnectionDataPtr upstream_connection_;
   Event::TimerPtr timer_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   Config::SharedConfigSharedPtr config_;
