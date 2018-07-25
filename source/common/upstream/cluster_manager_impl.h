@@ -363,18 +363,15 @@ private:
   typedef std::map<std::string, ClusterDataPtr> ClusterMap;
 
   struct PendingUpdates {
-    PendingUpdates() {}
     Event::TimerPtr timer;
-    HostVector added;
-    HostVector removed;
-    std::unordered_set<HostSharedPtr> added_seen;
-    std::unordered_set<HostSharedPtr> removed_seen;
+    std::set<HostSharedPtr> added;
+    std::set<HostSharedPtr> removed;
     MonotonicTime last_updated;
   };
-  typedef std::shared_ptr<PendingUpdates> PendingUpdatesPtr;
-  typedef std::unordered_map<uint32_t, PendingUpdatesPtr> PendingUpdatesByPriorityMap;
-  typedef std::shared_ptr<PendingUpdatesByPriorityMap> PendingUpdatesByPriorityMapPtr;
-  typedef std::unordered_map<std::string, PendingUpdatesByPriorityMapPtr> ClusterUpdatesMap;
+  using PendingUpdatesPtr = std::shared_ptr<PendingUpdates>;
+  using PendingUpdatesByPriorityMap = std::unordered_map<uint32_t, PendingUpdatesPtr>;
+  using PendingUpdatesByPriorityMapPtr = std::shared_ptr<PendingUpdatesByPriorityMap>;
+  using ClusterUpdatesMap = std::unordered_map<std::string, PendingUpdatesByPriorityMapPtr>;
 
   void applyUpdates(const Cluster& cluster, uint32_t priority, PendingUpdatesPtr updates);
   bool scheduleUpdate(const Cluster& cluster, uint32_t priority, const HostVector& hosts_added,

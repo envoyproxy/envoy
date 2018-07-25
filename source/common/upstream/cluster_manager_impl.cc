@@ -362,7 +362,7 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
   PendingUpdatesPtr updates;
 
   // Find pending updates for this cluster.
-  auto updates_by_prio_it = updates_map_.find(cluster.info()->name());
+  const auto updates_by_prio_it = updates_map_.find(cluster.info()->name());
   if (updates_by_prio_it != updates_map_.end()) {
     updates_by_prio = updates_by_prio_it->second;
   } else {
@@ -371,7 +371,7 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
   }
 
   // Find pending updates for this priority.
-  auto updates_it = updates_by_prio->find(priority);
+  const auto updates_it = updates_by_prio->find(priority);
   if (updates_it != updates_by_prio->end()) {
     updates = updates_it->second;
   } else {
@@ -381,23 +381,28 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
 
   // Has an update_merge_window gone by since the last update? If so, don't schedule
   // the update so it can be applied immediately.
-  auto delta = std::chrono::steady_clock::now() - updates->last_updated;
-  uint64_t delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
+  const auto delta = std::chrono::steady_clock::now() - updates->last_updated;
+  const uint64_t delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
   if (delta_ms > timeout) {
     updates->last_updated = std::chrono::steady_clock::now();
     return false;
   }
 
-  // Record the updates — preserving order — that should be applied when the timer fires.
-  for (auto host : hosts_added) {
-    if (updates->added_seen.count(host) != 1) {
-      updates->added.push_back(host);
+  // Record the updates that should be applied when the timer fires.
+  // Handle the case when a pair of add/remove cancels out.
+  for (const auto& host : hosts_added) {
+    if (updates->removed.count(host) == 1) {
+      updates->removed.erase(host);
+    } else {
+      updates->added.insert(host);
     }
   }
 
-  for (auto host : hosts_removed) {
-    if (updates->removed_seen.count(host) != 1) {
-      updates->removed.push_back(host);
+  for (const auto& host : hosts_removed) {
+    if (updates->added.count(host) == 1) {
+      updates->added.erase(host);
+    } else {
+      updates->removed.insert(host);
     }
   }
 
@@ -415,15 +420,15 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
 void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
                                       PendingUpdatesPtr updates) {
   // Deliver pending updates.
-  postThreadLocalClusterUpdate(cluster, priority, updates->added, updates->removed);
+  const HostVector& hosts_added{updates->added.begin(), updates->added.end()};
+  const HostVector& hosts_removed{updates->removed.begin(), updates->removed.end()};
+  postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
   cm_stats_.coalesced_updates_.inc();
 
   // Reset everything.
   updates->timer = nullptr;
   updates->added.clear();
   updates->removed.clear();
-  updates->added_seen.clear();
-  updates->removed_seen.clear();
   updates->last_updated = std::chrono::steady_clock::now();
 }
 
