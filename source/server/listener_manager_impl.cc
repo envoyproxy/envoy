@@ -209,29 +209,15 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       destination_ips.push_back(cidr_range.asString());
     }
 
-    std::vector<std::string> server_names;
-    if (!filter_chain_match.server_names().empty()) {
-      if (!filter_chain_match.sni_domains().empty()) {
-        throw EnvoyException(
-            fmt::format("error adding listener '{}': both \"server_names\" and the deprecated "
-                        "\"sni_domains\" are used, please merge the list of expected server names "
-                        "into \"server_names\" and remove \"sni_domains\"",
-                        address_->asString()));
-      }
-
-      server_names.assign(filter_chain_match.server_names().begin(),
-                          filter_chain_match.server_names().end());
-    } else if (!filter_chain_match.sni_domains().empty()) {
-      server_names.assign(filter_chain_match.sni_domains().begin(),
-                          filter_chain_match.sni_domains().end());
-    }
+    std::vector<std::string> server_names(filter_chain_match.server_names().begin(),
+                                          filter_chain_match.server_names().end());
 
     // Reject partial wildcards, we don't match on them.
     for (const auto& server_name : server_names) {
       if (server_name.find('*') != std::string::npos && !isWildcardServerName(server_name)) {
         throw EnvoyException(
             fmt::format("error adding listener '{}': partial wildcards are not supported in "
-                        "\"server_names\" (or the deprecated \"sni_domains\")",
+                        "\"server_names\"",
                         address_->asString()));
       }
     }
