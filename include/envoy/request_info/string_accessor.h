@@ -8,7 +8,7 @@ namespace Envoy {
 namespace RequestInfo {
 
 /**
- * Contains a string in a form which is usable with DynamicMetadata and 
+ * Contains a string in a form which is usable with DynamicMetadata and
  * allows lazy evaluation if needed.
  */
 class StringAccessor {

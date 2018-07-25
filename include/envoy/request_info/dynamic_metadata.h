@@ -15,7 +15,7 @@ public:
   virtual ~DynamicMetadata(){};
 
   /**
-   * @param data_name the name of the data being set.  
+   * @param data_name the name of the data being set.
    * @param data an owning pointer to the data to be stored.
    * Note that it is an error to call setData() twice with the same data_name.
    */
@@ -25,7 +25,7 @@ public:
   }
 
   /**
-   * @param data_name the name of the data being set.  
+   * @param data_name the name of the data being set.
    * @return a reference to the stored data.
    * Note that it is an error to access data that has not previously been set.
    */

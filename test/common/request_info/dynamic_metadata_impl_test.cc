@@ -112,8 +112,7 @@ TEST_F(DynamicMetadataImplTest, UnknownName) {
 }
 
 TEST_F(DynamicMetadataImplTest, WrongTypeGet) {
-  dynamic_metadata().setData(
-      "test_name", std::make_unique<TestStoredType>(5, nullptr, nullptr));
+  dynamic_metadata().setData("test_name", std::make_unique<TestStoredType>(5, nullptr, nullptr));
   EXPECT_EQ(5, dynamic_metadata().getData<TestStoredType>("test_name").Access());
   EXPECT_THROW(dynamic_metadata().getData<int>("test_name"), EnvoyException);
 }
