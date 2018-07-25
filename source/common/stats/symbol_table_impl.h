@@ -17,6 +17,14 @@
 namespace Envoy {
 namespace Stats {
 
+/**
+ * Underlying SymbolTableImpl implementation which assists with per-symbol reference counting.
+ *
+ * The underlying Symbol / SymbolVec data structures are not meant for public consumption. One side
+ * effect of the non-monotonically-increasing symbol counter is that if a string is encoded, the
+ * resulting stat is destroyed, and then that same string is re-encoded, it may or may not encode to
+ * the same underlying symbol.
+ */
 class SymbolTableImpl : public SymbolTable {
 public:
   StatNamePtr encode(const std::string& name) override;
@@ -66,12 +74,31 @@ private:
    */
   std::string fromSymbol(const Symbol symbol) const;
 
-  Symbol curr_counter_{};
+  // Stages a new symbol for use. To be called after a successful insertion.
+  void newSymbol() {
+    if (pool_.empty()) {
+      RELEASE_ASSERT(monotonic_counter_ < std::numeric_limits<Symbol>::max(), "");
+      current_symbol_ = ++monotonic_counter_;
+    } else {
+      current_symbol_ = pool_.front();
+      pool_.pop_front();
+    }
+  }
+
+  // Stores the symbol to be used at next insertion. This should exist ahead of insertion time so
+  // that if insertion succeeds, the value written is the correct one.
+  Symbol current_symbol_{};
+
+  // If the free pool is exhausted, we monotonically increase this counter.
+  Symbol monotonic_counter_{};
 
   // Bimap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
   std::unordered_map<std::string, std::pair<Symbol, uint32_t>> encode_map_;
   std::unordered_map<Symbol, std::string> decode_map_;
+
+  // Free pool of symbols for re-use.
+  std::deque<Symbol> pool_;
 };
 
 /**

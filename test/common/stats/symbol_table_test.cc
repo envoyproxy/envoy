@@ -20,6 +20,7 @@ public:
     return impl.symbol_vec_;
   }
   std::string decodeSymbolVec(const SymbolVec& symbol_vec) { return table_.decode(symbol_vec); }
+  Symbol monotonicCounter() { return table_.monotonic_counter_; }
 };
 
 TEST_F(StatNameTest, TestArbitrarySymbolRoundtrip) {
@@ -86,36 +87,54 @@ TEST_F(StatNameTest, TestSymbolConsistency) {
   EXPECT_EQ(vec_2[0], vec_1[1]);
 }
 
-// Even though the symbol table does manual reference counting, curr_counter_ is monotonically
-// increasing. So encoding "foo", freeing the sole stat containing "foo", and then re-encoding
-// "foo" will produce a different symbol each time.
-TEST_F(StatNameTest, TestNewValueAfterFree) {
-  {
-    StatNamePtr stat_name_1 = table_.encode("foo");
-    SymbolVec stat_name_1_symbols = getSymbols(stat_name_1.get());
-    stat_name_1.reset();
-    StatNamePtr stat_name_2 = table_.encode("foo");
-    SymbolVec stat_name_2_symbols = getSymbols(stat_name_2.get());
-    EXPECT_NE(stat_name_1_symbols, stat_name_2_symbols);
-  }
+TEST_F(StatNameTest, TestSameValueOnPartialFree) {
+  // This should hold true for components as well. Since "foo" persists even when "foo.bar" is
+  // freed, we expect both instances of "foo" to have the same symbol.
+  StatNamePtr stat_foo = table_.encode("foo");
+  StatNamePtr stat_foobar_1 = table_.encode("foo.bar");
+  SymbolVec stat_foobar_1_symbols = getSymbols(stat_foobar_1.get());
+  stat_foobar_1.reset();
+
+  StatNamePtr stat_foobar_2 = table_.encode("foo.bar");
+  SymbolVec stat_foobar_2_symbols = getSymbols(stat_foobar_2.get());
+
+  EXPECT_EQ(stat_foobar_1_symbols[0],
+            stat_foobar_2_symbols[0]); // Both "foo" components have the same symbol,
+  // And we have no expectation for the "bar" components, because of the free pool.
+}
+
+TEST_F(StatNameTest, FreePoolTest) {
+  // To ensure that the free pool is being used, we should be able to cycle through a large number
+  // of stats while validating that:
+  //   a) the size of the table has not increased, and
+  //   b) the monotonically increasing counter has not risen to more than the maximum number of
+  //   coexisting symbols during the life of the table.
 
   {
-    // This should hold true for components as well. Since "foo" persists even when "foo.bar" is
-    // freed, we expect both instances of "foo" to have the same symbol, but each instance of
-    // "bar" to have a different symbol.
-    StatNamePtr stat_foo = table_.encode("foo");
-    StatNamePtr stat_foobar_1 = table_.encode("foo.bar");
-    SymbolVec stat_foobar_1_symbols = getSymbols(stat_foobar_1.get());
-    stat_foobar_1.reset();
-
-    StatNamePtr stat_foobar_2 = table_.encode("foo.bar");
-    SymbolVec stat_foobar_2_symbols = getSymbols(stat_foobar_2.get());
-
-    EXPECT_EQ(stat_foobar_1_symbols[0],
-              stat_foobar_2_symbols[0]); // Both "foo" components have the same symbol,
-    EXPECT_NE(stat_foobar_1_symbols[1],
-              stat_foobar_2_symbols[1]); // but the two "bar" components do not.
+    StatNamePtr stat_1 = table_.encode("1a");
+    StatNamePtr stat_2 = table_.encode("2a");
+    StatNamePtr stat_3 = table_.encode("3a");
+    StatNamePtr stat_4 = table_.encode("4a");
+    StatNamePtr stat_5 = table_.encode("5a");
+    EXPECT_EQ(monotonicCounter(), 5);
+    EXPECT_EQ(table_.size(), 5);
   }
+  EXPECT_EQ(monotonicCounter(), 5);
+  EXPECT_EQ(table_.size(), 0);
+
+  // These are different strings being encoded, but they should recycle through the same symbols as
+  // the stats above.
+  StatNamePtr stat_1 = table_.encode("1b");
+  StatNamePtr stat_2 = table_.encode("2b");
+  StatNamePtr stat_3 = table_.encode("3b");
+  StatNamePtr stat_4 = table_.encode("4b");
+  StatNamePtr stat_5 = table_.encode("5b");
+  EXPECT_EQ(monotonicCounter(), 5);
+  EXPECT_EQ(table_.size(), 5);
+
+  StatNamePtr stat_6 = table_.encode("6");
+  EXPECT_EQ(monotonicCounter(), 6);
+  EXPECT_EQ(table_.size(), 6);
 }
 
 TEST_F(StatNameTest, TestShrinkingExpectation) {

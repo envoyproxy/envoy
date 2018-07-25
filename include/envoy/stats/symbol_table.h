@@ -26,11 +26,8 @@ using StatNamePtr = std::unique_ptr<StatName>;
 
 /**
  * Interface for shortening and retrieving stat names.
- * Guarantees that x = encode(x).toString() for any x.
  *
- * Even though the symbol table does manual reference counting, curr_counter_ is monotonically
- * increasing. So encoding "foo", freeing the sole stat containing "foo", and then re-encoding "foo"
- * will produce a different symbol each time.
+ * Guarantees that x = encode(x).toString() for any x.
  */
 class SymbolTable {
 public:

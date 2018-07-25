@@ -40,23 +40,26 @@ void SymbolTableImpl::free(const SymbolVec& symbol_vec) {
     RELEASE_ASSERT(encode_search != encode_map_.end(), "");
 
     ((encode_search->second).second)--;
+    // If that was the last remaining client usage of the symbol, erase the the current
+    // mappings and add the now-unused symbol to the reuse pool.
     if ((encode_search->second).second == 0) {
       decode_map_.erase(decode_search);
       encode_map_.erase(encode_search);
+      pool_.push_back(symbol);
     }
   }
 }
 
 Symbol SymbolTableImpl::toSymbol(const std::string& str) {
   Symbol result;
-  auto encode_insert = encode_map_.insert({str, std::make_pair(curr_counter_, 1)});
+  auto encode_insert = encode_map_.insert({str, std::make_pair(current_symbol_, 1)});
   // If the insertion took place, we mirror the insertion in the decode_map.
   if (encode_insert.second) {
-    auto decode_insert = decode_map_.insert({curr_counter_, str});
+    auto decode_insert = decode_map_.insert({current_symbol_, str});
     // We expect the decode_map to be in lockstep.
     RELEASE_ASSERT(decode_insert.second, "");
-    result = curr_counter_;
-    ++curr_counter_;
+    result = current_symbol_;
+    newSymbol();
   } else {
     // If the insertion didn't take place, return the actual value at that location
     result = (encode_insert.first)->second.first;
