@@ -1684,16 +1684,6 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
   createWithLocalClusterUpdate(parseBootstrapFromV2Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
-  // Remove each host, sequentially.
-  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
-
-  HostVectorSharedPtr hosts(
-      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
-  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
-  HostVector hosts_added{};
-  HostVector hosts_removed_0{(*hosts)[0]};
-  HostVector hosts_removed_1{(*hosts)[1]};
-
   // Ensure we see the right set of added/removed hosts on every call.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
       .WillRepeatedly(Invoke([](uint32_t priority, const HostVector& hosts_added,
@@ -1720,6 +1710,15 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
 
         ++call;
       }));
+
+  // Remove each host, sequentially.
+  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
+  HostVectorSharedPtr hosts(
+      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_added{};
+  HostVector hosts_removed_0{(*hosts)[0]};
+  HostVector hosts_removed_1{(*hosts)[1]};
 
   // No timer needs to be mocked at this point, since the first update should be applied
   // immediately.
