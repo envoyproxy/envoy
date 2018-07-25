@@ -129,8 +129,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthy) {
   // Messages
   envoy::service::discovery::v2::HealthCheckRequest envoy_msg;
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse response;
-  envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier =
-      makeHealthCheckSpecifier();
 
   // Server <--> Envoy
   hds_fake_connection_ = hds_upstream_->waitForHttpConnection(*dispatcher_);
@@ -141,6 +139,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthy) {
             envoy_msg.mutable_capability()->health_check_protocol(0));
 
   // Server asks for healthchecking
+  envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier =
+      makeHealthCheckSpecifier();
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier);
 

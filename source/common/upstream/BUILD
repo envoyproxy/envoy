@@ -171,7 +171,6 @@ envoy_cc_library(
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/upstream:cluster_manager_interface",
-        "//include/envoy/upstream:health_discovery_service_lib",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/grpc:async_client_lib",

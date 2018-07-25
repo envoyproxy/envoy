@@ -167,6 +167,7 @@ envoy_cc_test(
         "//source/common/upstream:health_discovery_service_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2/endpoint:load_report_cc",

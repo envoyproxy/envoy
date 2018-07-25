@@ -6,6 +6,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -59,6 +60,7 @@ public:
   Event::MockTimer* server_response_timer_;
   Event::TimerCb server_response_timer_cb_;
 
+  ClusterInfoConstSharedPtr info_;
   std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier> message;
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
@@ -79,75 +81,46 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
 
   auto* health_check = message->add_health_check();
   health_check->set_cluster_name("anna");
-  health_check->add_endpoints()
-      ->add_endpoints()
-      ->mutable_address()
-      ->mutable_socket_address()
-      ->set_address("127.0.0.0");
-  health_check->mutable_endpoints(0)
-      ->mutable_endpoints(0)
-      ->mutable_address()
-      ->mutable_socket_address()
-      ->set_port_value(1234);
 
-  health_check->mutable_endpoints(0)
-      ->add_endpoints()
-      ->mutable_address()
-      ->mutable_socket_address()
-      ->set_address("127.0.0.1");
-  health_check->mutable_endpoints(0)
-      ->mutable_endpoints(1)
-      ->mutable_address()
-      ->mutable_socket_address()
-      ->set_port_value(2345);
+  auto* socket_address =
+      health_check->add_endpoints()->add_endpoints()->mutable_address()->mutable_socket_address();
+  socket_address->set_address("127.0.0.0");
+  socket_address->set_port_value(1234);
 
-  health_check->add_endpoints()
-      ->add_endpoints()
-      ->mutable_address()
-      ->mutable_socket_address()
-      ->set_address("127.0.1.0");
-  health_check->mutable_endpoints(1)
-      ->mutable_endpoints(0)
-      ->mutable_address()
-      ->mutable_socket_address()
-      ->set_port_value(8765);
+  auto* socket_address2 = health_check->mutable_endpoints(0)
+                              ->add_endpoints()
+                              ->mutable_address()
+                              ->mutable_socket_address();
+  socket_address2->set_address("127.0.0.1");
+  socket_address2->set_port_value(2345);
+
+  auto* socket_address3 =
+      health_check->add_endpoints()->add_endpoints()->mutable_address()->mutable_socket_address();
+  socket_address3->set_address("127.0.1.0");
+  socket_address3->set_port_value(8765);
 
   auto* health_check2 = message->add_health_check();
   health_check2->set_cluster_name("voronoi");
-  health_check2->add_endpoints()
-      ->add_endpoints()
-      ->mutable_address()
-      ->mutable_socket_address()
-      ->set_address("128.0.0.0");
-  health_check2->mutable_endpoints(0)
-      ->mutable_endpoints(0)
-      ->mutable_address()
-      ->mutable_socket_address()
-      ->set_port_value(1234);
 
-  health_check2->mutable_endpoints(0)
-      ->add_endpoints()
-      ->mutable_address()
-      ->mutable_socket_address()
-      ->set_address("128.0.0.1");
-  health_check2->mutable_endpoints(0)
-      ->mutable_endpoints(1)
-      ->mutable_address()
-      ->mutable_socket_address()
-      ->set_port_value(2345);
+  auto* socket_address4 =
+      health_check2->add_endpoints()->add_endpoints()->mutable_address()->mutable_socket_address();
+  socket_address4->set_address("128.0.0.0");
+  socket_address4->set_port_value(1234);
 
-  health_check2->add_endpoints()
-      ->add_endpoints()
-      ->mutable_address()
-      ->mutable_socket_address()
-      ->set_address("128.0.1.0");
-  health_check2->mutable_endpoints(1)
-      ->mutable_endpoints(0)
-      ->mutable_address()
-      ->mutable_socket_address()
-      ->set_port_value(8765);
+  auto* socket_address5 = health_check2->mutable_endpoints(0)
+                              ->add_endpoints()
+                              ->mutable_address()
+                              ->mutable_socket_address();
+  socket_address5->set_address("128.0.0.1");
+  socket_address5->set_port_value(2345);
+
+  auto* socket_address6 =
+      health_check2->add_endpoints()->add_endpoints()->mutable_address()->mutable_socket_address();
+  socket_address6->set_address("128.0.1.0");
+  socket_address6->set_port_value(8765);
 
   // Process message
+  EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _)).Times(2);
   hds_delegate_->processMessage(std::move(message));
 
   // Check Correctness
@@ -216,6 +189,8 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   health_check2->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck2");
 
   // Process message
+  info_.reset(new NiceMock<Upstream::MockClusterInfo>());
+  EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _)).WillRepeatedly(Return(info_));
   hds_delegate_->processMessage(std::move(message));
 
   // Check Correctness
@@ -234,6 +209,34 @@ TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
   EXPECT_CALL(*server_response_timer_, enableTimer(_)).Times(AtLeast(1));
   // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
+}
+
+TEST_F(HdsTest, TestMinimalSendResponse) {
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message.reset(new envoy::service::discovery::v2::HealthCheckSpecifier);
+  message->mutable_interval()->set_seconds(1);
+
+  EXPECT_CALL(*server_response_timer_, enableTimer(_)).Times(AtLeast(1));
+  EXPECT_CALL(async_stream_, sendMessage(_, _)).Times(2);
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  hds_delegate_->sendResponse();
+  server_response_timer_cb_();
+}
+
+TEST_F(HdsTest, TestStreamConnectionFailure) {
+  EXPECT_CALL(*async_client_, start(_, _))
+      .WillOnce(Return(nullptr))
+      .WillOnce(Return(&async_stream_));
+  EXPECT_CALL(*retry_timer_, enableTimer(_));
+  EXPECT_CALL(async_stream_, sendMessage(_, _));
+
+  createHdsDelegate();
+  retry_timer_cb_();
 }
 
 } // namespace Upstream

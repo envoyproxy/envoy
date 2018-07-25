@@ -60,8 +60,8 @@ void HdsDelegate::handleFailure() {
 // TODO(lilika): Add support for the same endpoint in different clusters/ports
 void HdsDelegate::sendResponse() {
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse response;
-  for (uint32_t i = 0; i < hds_clusters_.size(); i++) {
-    for (const auto& hosts : hds_clusters_[i]->prioritySet().hostSetsPerPriority()) {
+  for (auto& cluster : hds_clusters_) {
+    for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
       for (const auto& host : hosts->hosts()) {
         auto* endpoint = response.mutable_endpoint_health_response()->add_endpoints_health();
         endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
@@ -95,7 +95,8 @@ void HdsDelegate::processMessage(
     std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
   ASSERT(message);
-  for (int i = 0; i < message->health_check_size(); i++) {
+
+  for (auto& cluster : message->health_check()) {
     // Create HdsCluster config
     ENVOY_LOG(debug, "Creating HdsCluster config");
     envoy::api::v2::core::BindConfig bind_config;
@@ -103,25 +104,23 @@ void HdsDelegate::processMessage(
     clusters_config_.emplace_back();
     envoy::api::v2::Cluster& cluster_config = clusters_config_.back();
 
-    cluster_config.set_name(message->health_check(i).cluster_name());
+    cluster_config.set_name(cluster.cluster_name());
     cluster_config.mutable_connect_timeout()->set_seconds(ClusterTimeoutSeconds);
     cluster_config.mutable_per_connection_buffer_limit_bytes()->set_value(
         ClusterConnectionBufferLimitBytes);
 
     // Add endpoints to cluster
-    for (int j = 0; j < message->health_check(i).endpoints_size(); j++) {
-      const auto& endpoints = message->health_check(i).endpoints(j);
-      for (int k = 0; k < endpoints.endpoints_size(); k++) {
-        cluster_config.add_hosts()->MergeFrom(endpoints.endpoints(k).address());
+    for (auto& locality_endpoints : cluster.endpoints()) {
+      for (auto& endpoint : locality_endpoints.endpoints()) {
+        cluster_config.add_hosts()->MergeFrom(endpoint.address());
       }
     }
 
     // TODO(lilika): Add support for optional per-endpoint health checks
 
     // Add healthcheckers to cluster
-    auto health_checkers = message->health_check(i);
-    for (int j = 0; j < health_checkers.health_checks_size(); j++) {
-      cluster_config.add_health_checks()->MergeFrom(health_checkers.health_checks(j));
+    for (auto& health_check : cluster.health_checks()) {
+      cluster_config.add_health_checks()->MergeFrom(health_check);
     }
 
     ENVOY_LOG(debug, "New HdsCluster config {} ", cluster_config.DebugString());
@@ -131,10 +130,9 @@ void HdsDelegate::processMessage(
                                               ssl_context_manager_, secret_manager_, false,
                                               info_factory_));
 
-    for (int j = 0; j < message->health_check(i).health_checks_size(); j++) {
-      // Creating HealthCheckers
+    for (auto& health_check : cluster_config.health_checks()) {
       health_checkers_.push_back(Upstream::HealthCheckerFactory::create(
-          cluster_config.health_checks(j), *hds_clusters_[i], runtime_, random_, dispatcher_));
+          health_check, *hds_clusters_.back(), runtime_, random_, dispatcher_));
     }
   }
 }
@@ -180,8 +178,8 @@ HdsCluster::HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& 
   ENVOY_LOG(debug, "Creating an HdsCluster");
   priority_set_.getOrCreateHostSet(0);
 
-  info_ = info_factory.createHdsClusterInfo(runtime_, cluster_, bind_config_, stats_,
-                                            ssl_context_manager_, secret_manager_, added_via_api_);
+  info_ = info_factory.createClusterInfo(runtime_, cluster_, bind_config_, stats_,
+                                         ssl_context_manager_, secret_manager_, added_via_api_);
 
   for (const auto& host : cluster.hosts()) {
     initial_hosts_->emplace_back(HostSharedPtr{new HostImpl(
@@ -204,7 +202,7 @@ HostVectorConstSharedPtr HdsCluster::createHealthyHostList(const HostVector& hos
   return healthy_list;
 }
 
-ClusterInfoConstSharedPtr RealClusterInfoFactory::createHdsClusterInfo(
+ClusterInfoConstSharedPtr ProdClusterInfoFactory::createClusterInfo(
     Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
     const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
     Ssl::ContextManager& ssl_context_manager, Secret::SecretManager& secret_manager,
