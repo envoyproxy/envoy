@@ -17,7 +17,7 @@ namespace JwtAuthn {
 class FilterFactory : public Common::FactoryBase<
                           ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication> {
 public:
-  FilterFactory() : FactoryBase(HttpFilterNames::get().JWT_AUTHN) {}
+  FilterFactory() : FactoryBase(HttpFilterNames::get().JwtAuthn) {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

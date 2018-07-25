@@ -35,7 +35,7 @@ ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {
   return ProtobufTypes::MessagePtr{new envoy::config::accesslog::v2::FileAccessLog()};
 }
 
-std::string FileAccessLogFactory::name() const { return AccessLogNames::get().FILE; }
+std::string FileAccessLogFactory::name() const { return AccessLogNames::get().File; }
 
 /**
  * Static registration for the file access log. @see RegisterFactory.

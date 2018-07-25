@@ -131,7 +131,8 @@ TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
 
   int bytes_written_total = 0;
   while (bytes_written_total < 20) {
-    int bytes_written = buffer_.write(pipe_fds[1]);
+    std::tuple<int, int> result = buffer_.write(pipe_fds[1]);
+    int bytes_written = std::get<0>(result);
     if (bytes_written < 0) {
       ASSERT_EQ(EAGAIN, errno);
     } else {
@@ -144,7 +145,8 @@ TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
 
   int bytes_read_total = 0;
   while (bytes_read_total < 20) {
-    bytes_read_total += buffer_.read(pipe_fds[0], 20);
+    std::tuple<int, int> result = buffer_.read(pipe_fds[0], 20);
+    bytes_read_total += std::get<0>(result);
   }
   EXPECT_EQ(2, times_high_watermark_called_);
   EXPECT_EQ(20, buffer_.length());

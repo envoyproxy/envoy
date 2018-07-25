@@ -28,7 +28,7 @@ namespace StatSinks {
 namespace Statsd {
 
 TEST(StatsConfigTest, ValidTcpStatsd) {
-  const std::string name = StatsSinkNames::get().STATSD;
+  const std::string name = StatsSinkNames::get().Statsd;
 
   envoy::config::metrics::v2::StatsdSink sink_config;
   sink_config.set_tcp_cluster_name("fake_cluster");
@@ -53,7 +53,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, StatsConfigParameterizedTest,
                         TestUtility::ipTestParamsToString);
 
 TEST_P(StatsConfigParameterizedTest, UdpSinkDefaultPrefix) {
-  const std::string name = StatsSinkNames::get().STATSD;
+  const std::string name = StatsSinkNames::get().Statsd;
   auto defaultPrefix = Common::Statsd::getDefaultPrefix();
 
   envoy::config::metrics::v2::StatsdSink sink_config;
@@ -84,7 +84,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkDefaultPrefix) {
 }
 
 TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
-  const std::string name = StatsSinkNames::get().STATSD;
+  const std::string name = StatsSinkNames::get().Statsd;
   const std::string customPrefix = "prefix.test";
 
   envoy::config::metrics::v2::StatsdSink sink_config;
@@ -116,7 +116,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
 }
 
 TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
-  const std::string name = StatsSinkNames::get().STATSD;
+  const std::string name = StatsSinkNames::get().Statsd;
 
   envoy::config::metrics::v2::StatsdSink sink_config;
   auto defaultPrefix = Common::Statsd::getDefaultPrefix();
@@ -139,7 +139,7 @@ TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
 }
 
 TEST(StatsConfigTest, TcpSinkCustomPrefix) {
-  const std::string name = StatsSinkNames::get().STATSD;
+  const std::string name = StatsSinkNames::get().Statsd;
 
   envoy::config::metrics::v2::StatsdSink sink_config;
   ProtobufTypes::String prefix = "prefixTest";
@@ -169,7 +169,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, StatsConfigLoopbackTest,
                         TestUtility::ipTestParamsToString);
 
 TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
-  const std::string name = StatsSinkNames::get().STATSD;
+  const std::string name = StatsSinkNames::get().Statsd;
 
   envoy::config::metrics::v2::StatsdSink sink_config;
   envoy::api::v2::core::Address& address = *sink_config.mutable_address();

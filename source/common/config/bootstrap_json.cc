@@ -78,7 +78,7 @@ void BootstrapJson::translateBootstrap(const Json::Object& json_config,
   auto* stats_sinks = bootstrap.mutable_stats_sinks();
   if (json_config.hasObject("statsd_udp_ip_address")) {
     auto* stats_sink = stats_sinks->Add();
-    stats_sink->set_name(Extensions::StatSinks::StatsSinkNames::get().STATSD);
+    stats_sink->set_name(Extensions::StatSinks::StatsSinkNames::get().Statsd);
     envoy::config::metrics::v2::StatsdSink statsd_sink;
     AddressJson::translateAddress(json_config.getString("statsd_udp_ip_address"), false, true,
                                   *statsd_sink.mutable_address());
@@ -87,7 +87,7 @@ void BootstrapJson::translateBootstrap(const Json::Object& json_config,
 
   if (json_config.hasObject("statsd_tcp_cluster_name")) {
     auto* stats_sink = stats_sinks->Add();
-    stats_sink->set_name(Extensions::StatSinks::StatsSinkNames::get().STATSD);
+    stats_sink->set_name(Extensions::StatSinks::StatsSinkNames::get().Statsd);
     envoy::config::metrics::v2::StatsdSink statsd_sink;
     statsd_sink.set_tcp_cluster_name(json_config.getString("statsd_tcp_cluster_name"));
     MessageUtil::jsonConvert(statsd_sink, *stats_sink->mutable_config());

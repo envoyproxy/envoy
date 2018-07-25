@@ -2,9 +2,11 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
@@ -165,6 +167,22 @@ envoy_cc_test(
     deps = [
         "//source/common/http:header_map_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "header_map_impl_fuzz_proto",
+    srcs = ["header_map_impl_fuzz.proto"],
+    external_deps = ["well_known_protos"],
+)
+
+envoy_cc_fuzz_test(
+    name = "header_map_impl_fuzz_test",
+    srcs = ["header_map_impl_fuzz_test.cc"],
+    corpus = "header_map_impl_corpus",
+    deps = [
+        ":header_map_impl_fuzz_proto",
+        "//source/common/http:header_map_lib",
     ],
 )
 
