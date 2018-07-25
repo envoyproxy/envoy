@@ -18,8 +18,6 @@ namespace Envoy {
 namespace Stats {
 
 class SymbolTableImpl : public SymbolTable {
-  friend class StatNameImpl;
-
 public:
   StatNamePtr encode(const std::string& name) override;
 
@@ -30,6 +28,7 @@ public:
   }
 
 private:
+  friend class StatNameImpl;
   /**
    * Decodes a vector of symbols back into its period-delimited stat name.
    * If decoding fails on any part of the symbol_vec, we release_assert and crash hard, since this
@@ -49,15 +48,15 @@ private:
    */
   void free(const SymbolVec& symbol_vec);
 
+  Symbol toSymbol(const std::string& str);
+  std::string fromSymbol(const Symbol symbol) const;
+
   Symbol curr_counter_ = 0;
 
   // Bimap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
   std::unordered_map<std::string, std::pair<Symbol, uint32_t>> encode_map_;
   std::unordered_map<Symbol, std::string> decode_map_;
-
-  Symbol toSymbol(const std::string& str);
-  std::string fromSymbol(const Symbol symbol) const;
 };
 
 /**
