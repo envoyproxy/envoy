@@ -423,12 +423,10 @@ ClusterSharedPtr ClusterImplBase::create(
   if (!cluster.health_checks().empty()) {
     // TODO(htuch): Need to support multiple health checks in v2.
     if (cluster.health_checks().size() != 1) {
-      throw EnvoyException(
-          fmt::format("Multiple health checks not supported. Health checks count: {}",
-                      cluster.health_checks().size()));
+      throw EnvoyException("Multiple health checks not supported");
     } else {
       new_cluster->setHealthChecker(HealthCheckerFactory::create(
-          cluster.health_checks()[0], *new_cluster, runtime, random, dispatcher, log_manager));
+          cluster.health_checks()[0], *new_cluster, runtime, random, dispatcher));
     }
   }
 
