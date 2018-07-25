@@ -101,7 +101,7 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
   EXPECT_CALL(engine, allowed(_, _, _)).WillRepeatedly(Return(true));
   EXPECT_CALL(per_route_config_, engine()).WillRepeatedly(ReturnRef(engine));
 
-  EXPECT_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().RBAC))
+  EXPECT_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Rbac))
       .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, true));

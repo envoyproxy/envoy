@@ -28,7 +28,7 @@ static_resources {
     }
     filter_chains {
       filter_chain_match {
-        sni_domains: "6e702f1f66d415068aabbc60377ad67a326b6b2b"
+        server_names: "6e702f1f66d415068aabbc60377ad67a326b6b2b"
       }
     }
     filter_chains {

@@ -17,7 +17,7 @@ const std::string& Schema::toString(Type type) {
     return ROUTE;
   }
 
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Options::Options(int argc, char** argv) {
@@ -63,7 +63,7 @@ void Validator::validate(const std::string& json_path, Schema::Type schema_type)
     break;
   }
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

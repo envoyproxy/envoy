@@ -665,6 +665,30 @@ TEST_P(Http2CodecImplTest, WatermarkUnderEndStream) {
   response_encoder_->encodeHeaders(response_headers, true);
 }
 
+class Http2CodecImplStreamLimitTest : public Http2CodecImplTest {};
+
+// Regression test for issue #3076.
+//
+// TODO(PiotrSikora): add tests that exercise both scenarios: before and after receiving
+// the HTTP/2 SETTINGS frame.
+TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
+  for (int i = 0; i < 101; ++i) {
+    request_encoder_ = &client_.newStream(response_decoder_);
+    setupDefaultConnectionMocks();
+    EXPECT_CALL(server_callbacks_, newStream(_))
+        .WillOnce(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
+          response_encoder_ = &encoder;
+          encoder.getStream().addCallbacks(server_stream_callbacks_);
+          return request_decoder_;
+        }));
+
+    TestHeaderMapImpl request_headers;
+    HttpTestUtility::addDefaultHeaders(request_headers);
+    EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+    request_encoder_->encodeHeaders(request_headers, true);
+  }
+}
+
 #define HTTP2SETTINGS_SMALL_WINDOW_COMBINE                                                         \
   ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
                      ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
@@ -687,6 +711,12 @@ INSTANTIATE_TEST_CASE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowControl
                      ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \
                      ::testing::Values(Http2Settings::DEFAULT_INITIAL_STREAM_WINDOW_SIZE),         \
                      ::testing::Values(Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE))
+
+// Stream limit test only uses the default values because not all combinations of
+// edge settings allow for the number of streams needed by the test.
+INSTANTIATE_TEST_CASE_P(Http2CodecImplStreamLimitTest, Http2CodecImplStreamLimitTest,
+                        ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
+                                           HTTP2SETTINGS_DEFAULT_COMBINE));
 
 INSTANTIATE_TEST_CASE_P(Http2CodecImplTestDefaultSettings, Http2CodecImplTest,
                         ::testing::Combine(HTTP2SETTINGS_DEFAULT_COMBINE,
@@ -751,6 +781,34 @@ TEST_P(Http2CodecImplTest, TestCodecHeaderLimits) {
   }
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_));
   request_encoder_->encodeHeaders(request_headers, false);
+}
+
+TEST_P(Http2CodecImplTest, TestCodecHeaderCompression) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestHeaderMapImpl response_headers{{":status", "200"}, {"compression", "test"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
+  response_encoder_->encodeHeaders(response_headers, true);
+
+  // Sanity check to verify that state of encoders and decoders matches.
+  EXPECT_EQ(nghttp2_session_get_hd_deflate_dynamic_table_size(server_.session()),
+            nghttp2_session_get_hd_inflate_dynamic_table_size(client_.session()));
+  EXPECT_EQ(nghttp2_session_get_hd_deflate_dynamic_table_size(client_.session()),
+            nghttp2_session_get_hd_inflate_dynamic_table_size(server_.session()));
+
+  // Verify that headers are compressed only when both client and server advertise table size > 0:
+  if (client_http2settings_.hpack_table_size_ && server_http2settings_.hpack_table_size_) {
+    EXPECT_NE(0, nghttp2_session_get_hd_deflate_dynamic_table_size(client_.session()));
+    EXPECT_NE(0, nghttp2_session_get_hd_deflate_dynamic_table_size(server_.session()));
+  } else {
+    EXPECT_EQ(0, nghttp2_session_get_hd_deflate_dynamic_table_size(client_.session()));
+    EXPECT_EQ(0, nghttp2_session_get_hd_deflate_dynamic_table_size(server_.session()));
+  }
 }
 
 } // namespace Http2

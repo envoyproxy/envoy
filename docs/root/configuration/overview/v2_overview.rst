@@ -95,7 +95,14 @@ A minimal fully static bootstrap config is provided below:
       connect_timeout: 0.25s
       type: STATIC
       lb_policy: ROUND_ROBIN
-      hosts: [{ socket_address: { address: 127.0.0.2, port_value: 1234 }}]
+      load_assignment:
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 1234
 
 Mostly static with dynamic EDS
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -150,7 +157,14 @@ on 127.0.0.3:5678 is provided below:
       type: STATIC
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {}
-      hosts: [{ socket_address: { address: 127.0.0.3, port_value: 5678 }}]
+      load_assignment:
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 5678
 
 Notice above that *xds_cluster* is defined to point Envoy at the management server. Even in
 an otherwise completely dynamic configurations, some static resources need to
@@ -214,7 +228,14 @@ below:
       type: STATIC
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {}
-      hosts: [{ socket_address: { address: 127.0.0.3, port_value: 5678 }}]
+      load_assignment:
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 5678
 
 The management server could respond to LDS requests with:
 
@@ -543,11 +564,11 @@ the shared ADS channel.
 Management Server Unreachability
 --------------------------------
 
-When Envoy instance looses connectivity with the management server, Envoy will latch on to
-the previous configuration while actively retrying in the background to reestablish the 
-connection with the management server. 
+When an Envoy instance loses connectivity with the management server, Envoy will latch on to
+the previous configuration while actively retrying in the background to reestablish the
+connection with the management server.
 
-Envoy debug logs the fact that it is not able to establish a connection with the management server 
+Envoy debug logs the fact that it is not able to establish a connection with the management server
 every time it attempts a connection.
 
 :ref:`upstream_cx_connect_fail <config_cluster_manager_cluster_stats>` a cluster level statistic

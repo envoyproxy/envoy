@@ -160,7 +160,13 @@ message Cluster {
   // :ref:`STRICT_DNS<envoy_api_enum_value_Cluster.DiscoveryType.STRICT_DNS>`
   // or :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`,
   // then hosts is required.
-  repeated core.Address hosts = 7;
+  //
+  // .. attention::
+  //
+  //   **This field is deprecated**. Set the
+  //   :ref:`load_assignment<envoy_api_field_Cluster.load_assignment>` field instead.
+  //
+  repeated core.Address hosts = 7 [deprecated = true];
 
   // Setting this is required for specifying members of
   // :ref:`STATIC<envoy_api_enum_value_Cluster.DiscoveryType.STATIC>`,
@@ -176,7 +182,6 @@ message Cluster {
   //   :ref:`endpoint assignments<envoy_api_msg_ClusterLoadAssignment>`.
   //   Setting this overrides :ref:`hosts<envoy_api_field_Cluster.hosts>` values.
   //
-  // [#not-implemented-hide:]
   ClusterLoadAssignment load_assignment = 33;
 
   // Optional :ref:`active health checking <arch_overview_health_checking>`

@@ -46,6 +46,7 @@ private:
   public:
     Request(TestFilter& parent, Buffer::Instance& data) : parent_(parent) { data_.move(data); }
 
+    // Tcp::ConnectionPool::Callbacks
     void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason,
                        Upstream::HostDescriptionConstSharedPtr) override {
       ASSERT(false);
@@ -59,6 +60,7 @@ private:
       upstream_->connection().write(data_, false);
     }
 
+    // Tcp::ConnectionPool::UpstreamCallbacks
     void onUpstreamData(Buffer::Instance& data, bool end_stream) override {
       UNREFERENCED_PARAMETER(end_stream);
 
@@ -67,6 +69,9 @@ private:
 
       upstream_->release();
     }
+    void onEvent(Network::ConnectionEvent) override {}
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
 
     TestFilter& parent_;
     Buffer::OwnedImpl data_;
