@@ -391,19 +391,48 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
 
   // Record the updates that should be applied when the timer fires.
   // Handle the case when a pair of add/remove cancels out.
+  //
+  // A few notes:
+  // * if a host's health changed, we won't see that as an add or remove
+  //   so there's no need to check for health changes here. The fact that
+  //   we got called with no added/removed hosts implies a health or metadata
+  //   change, so we just forward the empty vectors along.
+  // * if while we are merging updates we see a host multiple times (e.g.:
+  //   add -> remove -> add), we deal with the cancellations and we always
+  //   propagate the latest version of that host.
+  // * we track hosts by their address since the Host ptr will most likely change
+  //   as it gets materialized out of an EDS change, and an address is considered
+  //   the unique constant identifier for a host.
   for (const auto& host : hosts_added) {
-    if (updates->removed.count(host) == 1) {
-      updates->removed.erase(host);
+    const auto& addr = host->address()->asString();
+    // Is adding this host cancelling a previous remove?
+    if (updates->removed.count(addr) == 1) {
+      updates->removed.erase(addr);
+
+      // If it was previously added, store the latest one.
+      if (updates->added.count(addr) == 1) {
+        updates->added[addr] = host;
+      }
     } else {
-      updates->added.insert(host);
+      // No previous remove, just store.
+      updates->added[addr] = host;
     }
   }
 
+  // Same dance as above.
   for (const auto& host : hosts_removed) {
-    if (updates->added.count(host) == 1) {
-      updates->added.erase(host);
+    const auto& addr = host->address()->asString();
+    // Is removing this host cancelling a previous add?
+    if (updates->added.count(addr) == 1) {
+      updates->added.erase(addr);
+
+      // If it was previously removed, store the latest one.
+      if (updates->removed.count(addr) == 1) {
+        updates->removed[addr] = host;
+      }
     } else {
-      updates->removed.insert(host);
+      // No previous add, just store.
+      updates->removed[addr] = host;
     }
   }
 
@@ -421,8 +450,8 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
 void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
                                       PendingUpdatesPtr updates) {
   // Deliver pending updates.
-  const HostVector& hosts_added{updates->added.begin(), updates->added.end()};
-  const HostVector& hosts_removed{updates->removed.begin(), updates->removed.end()};
+  const HostVector& hosts_added = fromMap(updates->added);
+  const HostVector& hosts_removed = fromMap(updates->removed);
   postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
   cm_stats_.coalesced_updates_.inc();
 
@@ -431,6 +460,14 @@ void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
   updates->added.clear();
   updates->removed.clear();
   updates->last_updated = std::chrono::steady_clock::now();
+}
+
+HostVector ClusterManagerImpl::fromMap(HostMap map) const {
+  HostVector hosts;
+  for (const auto& host_pair : map) {
+    hosts.push_back(host_pair.second);
+  }
+  return hosts;
 }
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,

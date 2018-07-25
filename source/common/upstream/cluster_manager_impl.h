@@ -362,10 +362,12 @@ private:
   // This map is ordered so that config dumping is consistent.
   typedef std::map<std::string, ClusterDataPtr> ClusterMap;
 
+  // Track hosts by their address (as a string).
+  using HostMap = std::map<std::string, HostSharedPtr>;
   struct PendingUpdates {
     Event::TimerPtr timer;
-    std::set<HostSharedPtr> added;
-    std::set<HostSharedPtr> removed;
+    HostMap added;
+    HostMap removed;
     MonotonicTime last_updated;
   };
   using PendingUpdatesPtr = std::shared_ptr<PendingUpdates>;
@@ -376,6 +378,7 @@ private:
   void applyUpdates(const Cluster& cluster, uint32_t priority, PendingUpdatesPtr updates);
   bool scheduleUpdate(const Cluster& cluster, uint32_t priority, const HostVector& hosts_added,
                       const HostVector& hosts_removed);
+  HostVector fromMap(HostMap map) const;
   void createOrUpdateThreadLocalCluster(ClusterData& cluster);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
   static ClusterManagerStats generateStats(Stats::Scope& scope);
