@@ -35,12 +35,14 @@ FormatterPtr AccessLogFormatUtils::defaultAccessLogFormatter() {
 std::string
 AccessLogFormatUtils::durationToString(const absl::optional<std::chrono::nanoseconds>& time) {
   if (time) {
-    return fmt::FormatInt(
-               std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count())
-        .str();
+    return durationToString(time.value());
   } else {
     return UnspecifiedValueString;
   }
+}
+
+std::string AccessLogFormatUtils::durationToString(const std::chrono::nanoseconds& time) {
+  return fmt::FormatInt(std::chrono::duration_cast<std::chrono::milliseconds>(time).count()).str();
 }
 
 const std::string&
@@ -220,6 +222,18 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
   } else if (field_name == "RESPONSE_DURATION") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
       return AccessLogFormatUtils::durationToString(request_info.firstUpstreamRxByteReceived());
+    };
+  } else if (field_name == "RESPONSE_TX_DURATION") {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
+      auto downstream = request_info.lastDownstreamTxByteSent();
+      auto upstream = request_info.firstUpstreamRxByteReceived();
+
+      if (downstream && upstream) {
+        auto val = downstream.value() - upstream.value();
+        return AccessLogFormatUtils::durationToString(val);
+      }
+
+      return UnspecifiedValueString;
     };
   } else if (field_name == "BYTES_RECEIVED") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
