@@ -35,7 +35,7 @@ void SymbolTableImpl::free(const SymbolVec& symbol_vec) {
     auto decode_search = decode_map_.find(symbol);
     RELEASE_ASSERT(decode_search != decode_map_.end(), "");
 
-    std::string str = decode_search->second;
+    const std::string& str = decode_search->second;
     auto encode_search = encode_map_.find(str);
     RELEASE_ASSERT(encode_search != encode_map_.end(), "");
 
