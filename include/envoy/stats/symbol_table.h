@@ -44,6 +44,11 @@ public:
    * @return StatNamePtr a unique_ptr to the StatName class encapsulating the symbol vector.
    */
   virtual StatNamePtr encode(const std::string& name) PURE;
+
+  /**
+   * Returns the size of a SymbolTable, as measured in number of symbols stored.
+   */
+  virtual size_t size() const PURE;
 };
 
 } // namespace Stats

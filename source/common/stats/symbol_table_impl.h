@@ -24,7 +24,10 @@ public:
   StatNamePtr encode(const std::string& name) override;
 
   // For testing purposes only.
-  size_t size() const { return sizeof(SymbolTableImpl) + encode_map_.size() + decode_map_.size(); }
+  size_t size() const override {
+    RELEASE_ASSERT(encode_map_.size() == decode_map_.size(), "");
+    return encode_map_.size();
+  }
 
 private:
   /**
