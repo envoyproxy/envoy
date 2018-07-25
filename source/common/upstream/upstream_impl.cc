@@ -809,7 +809,8 @@ void StaticClusterImpl::startPreInit() {
 bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
                                                    HostVector& current_hosts,
                                                    HostVector& hosts_added,
-                                                   HostVector& hosts_removed) {
+                                                   HostVector& hosts_removed,
+                                                   const HostVector& all_hosts) {
   uint64_t max_host_weight = 1;
 
   // Did hosts change?
@@ -898,13 +899,32 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         max_host_weight = host->weight();
       }
 
+      // If we are depending on a health checker, determine what to initialize the new host
+      if (health_checker_ != nullptr) {
+
+        // This host might have been added from another priority, in which case it might
+        // have already passed health checks. To avoid reseting this host to unhealthy
+        // and potentially fail traffic, search through all hosts for the clusters to
+        // see if we already know about this host.
+        bool failed_active_health_check = true;
+        // see if we can find it in the list of all hosts
+        for (auto i = all_hosts.begin(); i != all_hosts.end(); ++i) {
+          if (*(*i)->address() == *host->address()) {
+            // We've found a match, so stop the loop and copy the health check flag from the other
+            // host. todo(snowp): should we OR all the hc values in case the host exists in multiple
+            // priorities?
+            failed_active_health_check = !(*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC);
+            break;
+          }
+        }
+
+        if (failed_active_health_check) {
+          host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+        }
+      }
+
       final_hosts.push_back(host);
       hosts_added.push_back(host);
-
-      // If we are depending on a health checker, we initialize to unhealthy.
-      if (health_checker_ != nullptr) {
-        hosts_added.back()->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-      }
     }
   }
 
@@ -1058,7 +1078,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
         HostVector hosts_added;
         HostVector hosts_removed;
-        if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed)) {
+        if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, {})) {
           ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
           parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
         }

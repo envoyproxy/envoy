@@ -40,7 +40,8 @@ private:
   bool updateHostsPerLocality(const uint32_t priority, const HostVector& new_hosts,
                               LocalityWeightsMap& locality_weights_map,
                               LocalityWeightsMap& new_locality_weights_map,
-                              PriorityStateManager& priority_state_manager);
+                              PriorityStateManager& priority_state_manager,
+                              const HostVector& all_hosts);
 
   // ClusterImplBase
   void startPreInit() override;

@@ -597,7 +597,8 @@ protected:
   using ClusterImplBase::ClusterImplBase;
 
   bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_hosts,
-                             HostVector& hosts_added, HostVector& hosts_removed);
+                             HostVector& hosts_added, HostVector& hosts_removed,
+                             const HostVector& all_current_hosts);
 };
 
 /**
