@@ -1743,7 +1743,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidServe
   EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
                             EnvoyException,
                             "error adding listener '127.0.0.1:1234': partial wildcards are not "
-                            "supported in \"server_names\" (or the deprecated \"sni_domains\")");
+                            "supported in \"server_names\"");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, MultipleFilterChainsWithSameMatch) {
@@ -1872,69 +1872,6 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, CustomTransportProtocolWithSniWit
   Network::MockListenerFilterManager manager;
   EXPECT_CALL(manager, addAcceptFilter_(_)).Times(0);
   EXPECT_TRUE(filterChainFactory.createListenerFilterChain(manager));
-}
-
-// Copy of the SingleFilterChainWithServerNamesMatch to make sure it behaves the same.
-TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithDeprecatedSniDomainsMatch) {
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
-    address:
-      socket_address: { address: 127.0.0.1, port_value: 1234 }
-    listener_filters:
-    - name: "envoy.listener.tls_inspector"
-      config: {}
-    filter_chains:
-    - filter_chain_match:
-        sni_domains: "server1.example.com"
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key.pem" }
-  )EOF",
-                                                       Network::Address::IpVersion::v4);
-
-  EXPECT_CALL(server_.random_, uuid());
-  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
-  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
-  EXPECT_EQ(1U, manager_->listeners().size());
-
-  // TLS client without SNI - no match.
-  auto filter_chain = findFilterChain(1234, true, "127.0.0.1", true, "", false, "tls", false, {});
-  EXPECT_EQ(filter_chain, nullptr);
-
-  // TLS client without matching SNI - no match.
-  filter_chain =
-      findFilterChain(1234, true, "127.0.0.1", true, "www.example.com", false, "tls", false, {});
-  EXPECT_EQ(filter_chain, nullptr);
-
-  // TLS client with matching SNI - using 1st filter chain.
-  filter_chain =
-      findFilterChain(1234, true, "127.0.0.1", true, "server1.example.com", true, "tls", true, {});
-  ASSERT_NE(filter_chain, nullptr);
-  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
-  auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket();
-  auto ssl_socket = dynamic_cast<Ssl::SslSocket*>(transport_socket.get());
-  auto server_names = ssl_socket->dnsSansLocalCertificate();
-  EXPECT_EQ(server_names.size(), 1);
-  EXPECT_EQ(server_names.front(), "server1.example.com");
-}
-
-TEST_F(ListenerManagerImplWithRealFiltersTest, DeprecatedSniDomainsAndServerNamesUsedTogether) {
-  const std::string yaml = TestEnvironment::substitute(R"EOF(
-    address:
-      socket_address: { address: 127.0.0.1, port_value: 1234 }
-    filter_chains:
-    - filter_chain_match:
-        server_names: "example.com"
-        sni_domains: "www.example.com"
-  )EOF",
-                                                       Network::Address::IpVersion::v4);
-
-  EXPECT_THROW_WITH_MESSAGE(
-      manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true), EnvoyException,
-      "error adding listener '127.0.0.1:1234': both \"server_names\" and the deprecated "
-      "\"sni_domains\" are used, please merge the list of expected server names into "
-      "\"server_names\" and remove \"sni_domains\"");
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TlsCertificateInline) {
