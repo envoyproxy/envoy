@@ -126,6 +126,40 @@ public:
   Secret::MockSecretManager secret_manager_;
 };
 
+// Helper to intercept calls to postThreadLocalClusterUpdate.
+class MockLocalClusterUpdate {
+public:
+  MOCK_METHOD3(post, void(uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed));
+};
+
+// Override postThreadLocalClusterUpdate so we can test that merged updates calls
+// it with the right values at the right times.
+class TestClusterManagerImpl : public ClusterManagerImpl {
+public:
+  TestClusterManagerImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+                         ClusterManagerFactory& factory, Stats::Store& stats,
+                         ThreadLocal::Instance& tls, Runtime::Loader& runtime,
+                         Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                         AccessLog::AccessLogManager& log_manager,
+                         Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
+                         SystemTimeSource& system_time_source,
+                         MonotonicTimeSource& monotonic_time_source,
+                         MockLocalClusterUpdate& local_cluster_update)
+      : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
+                           main_thread_dispatcher, admin, system_time_source,
+                           monotonic_time_source),
+        local_cluster_update_(local_cluster_update) {}
+
+protected:
+  void postThreadLocalClusterUpdate(const Cluster&, uint32_t priority,
+                                    const HostVector& hosts_added,
+                                    const HostVector& hosts_removed) override {
+    local_cluster_update_.post(priority, hosts_added, hosts_removed);
+  }
+  MockLocalClusterUpdate& local_cluster_update_;
+};
+
 class ClusterManagerImplTest : public testing::Test {
 public:
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -133,6 +167,13 @@ public:
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, system_time_source_,
         monotonic_time_source_));
+  }
+
+  void createWithLocalClusterUpdate(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    cluster_manager_.reset(new TestClusterManagerImpl(
+        bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, system_time_source_,
+        monotonic_time_source_, local_cluster_update_));
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -160,6 +201,7 @@ public:
   NiceMock<Server::MockAdmin> admin_;
   NiceMock<MockSystemTimeSource> system_time_source_;
   NiceMock<MockMonotonicTimeSource> monotonic_time_source_;
+  MockLocalClusterUpdate local_cluster_update_;
 };
 
 envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {
@@ -1639,7 +1681,7 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
         update_merge_window: 3s
   )EOF";
 
-  create(parseBootstrapFromV2Yaml(yaml));
+  createWithLocalClusterUpdate(parseBootstrapFromV2Yaml(yaml));
   EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
 
   // Remove each host, sequentially.
@@ -1651,6 +1693,33 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
   HostVector hosts_added{};
   HostVector hosts_removed_0{(*hosts)[0]};
   HostVector hosts_removed_1{(*hosts)[1]};
+
+  // Ensure we see the right set of added/removed hosts on every call.
+  EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillRepeatedly(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                                const HostVector& hosts_removed) -> void {
+        static int call = 0;
+
+        switch (call) {
+        case 0:
+          EXPECT_EQ(0, priority);
+          EXPECT_EQ(0, hosts_added.size());
+          EXPECT_EQ(1, hosts_removed.size());
+          break;
+        case 1:
+          EXPECT_EQ(0, priority);
+          EXPECT_EQ(0, hosts_added.size());
+          EXPECT_EQ(1, hosts_removed.size());
+          break;
+        case 2:
+          EXPECT_EQ(0, priority);
+          EXPECT_EQ(2, hosts_added.size());
+          EXPECT_EQ(0, hosts_removed.size());
+          break;
+        }
+
+        ++call;
+      }));
 
   // No timer needs to be mocked at this point, since the first update should be applied
   // immediately.

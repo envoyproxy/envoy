@@ -210,6 +210,11 @@ public:
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
 
+protected:
+  virtual void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
+                                            const HostVector& hosts_added,
+                                            const HostVector& hosts_removed);
+
 private:
   /**
    * Thread local cached cluster data. Each thread local cluster gets updates from the parent
@@ -385,8 +390,6 @@ private:
   void loadCluster(const envoy::api::v2::Cluster& cluster, const std::string& version_info,
                    bool added_via_api, ClusterMap& cluster_map);
   void onClusterInit(Cluster& cluster);
-  void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
-                                    const HostVector& hosts_added, const HostVector& hosts_removed);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateGauges();
 
