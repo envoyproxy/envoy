@@ -20,7 +20,6 @@ public:
   StatName() {}
   virtual ~StatName(){};
   virtual std::string toString() const PURE;
-  virtual SymbolVec toSymbols() const PURE;
 };
 
 using StatNamePtr = std::unique_ptr<StatName>;

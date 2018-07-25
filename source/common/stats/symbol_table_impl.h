@@ -17,6 +17,8 @@
 namespace Envoy {
 namespace Stats {
 
+class StatNameTest;
+
 class SymbolTableImpl : public SymbolTable {
 public:
   StatNamePtr encode(const std::string& name) override;
@@ -44,6 +46,7 @@ private:
    * StatName) must manually call free(symbol_vec) when it is freeing the stat it represents. This
    * way, the symbol table will grow and shrink dynamically, instead of being write-only.
    *
+   * @param SymbolVec& the vector of symbols to be freed.
    * @return bool whether or not the total free operation was successful. Expected to be true.
    */
   void free(const SymbolVec& symbol_vec);
@@ -51,7 +54,7 @@ private:
   Symbol toSymbol(const std::string& str);
   std::string fromSymbol(const Symbol symbol) const;
 
-  Symbol curr_counter_ = 0;
+  Symbol curr_counter_{};
 
   // Bimap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
@@ -69,9 +72,9 @@ public:
       : symbol_vec_(symbol_vec), symbol_table_(symbol_table) {}
   ~StatNameImpl() override { symbol_table_->free(symbol_vec_); }
   std::string toString() const override { return symbol_table_->decode(symbol_vec_); }
-  SymbolVec toSymbols() const override { return symbol_vec_; }
 
 private:
+  friend class StatNameTest;
   SymbolVec symbol_vec_;
   SymbolTableImpl* symbol_table_;
 };

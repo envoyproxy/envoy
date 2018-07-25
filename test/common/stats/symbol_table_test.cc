@@ -14,6 +14,11 @@ class StatNameTest : public testing::Test {
 public:
   StatNameTest() {}
   SymbolTableImpl table_;
+
+  SymbolVec getSymbols(StatNamePtr stat_name_ptr) {
+    StatNameImpl& impl = dynamic_cast<StatNameImpl&>(*stat_name_ptr.get());
+    return impl.symbol_vec_;
+  }
 };
 
 TEST_F(StatNameTest, TestArbitrarySymbolRoundtrip) {
@@ -32,9 +37,9 @@ TEST_F(StatNameTest, TestUnusualDelimitersRoundtrip) {
 }
 
 TEST_F(StatNameTest, TestSuccessfulDoubleLookup) {
-  auto stat_name_1 = table_.encode("foo.bar.baz");
-  auto stat_name_2 = table_.encode("foo.bar.baz");
-  EXPECT_EQ(stat_name_1->toSymbols(), stat_name_2->toSymbols());
+  StatNamePtr stat_name_1 = table_.encode("foo.bar.baz");
+  StatNamePtr stat_name_2 = table_.encode("foo.bar.baz");
+  EXPECT_EQ(getSymbols(std::move(stat_name_1)), getSymbols(std::move(stat_name_2)));
 }
 
 TEST_F(StatNameTest, TestSuccessfulDecode) {
@@ -48,25 +53,19 @@ TEST_F(StatNameTest, TestSuccessfulDecode) {
 TEST_F(StatNameTest, TestDifferentStats) {
   auto stat_name_1 = table_.encode("foo.bar");
   auto stat_name_2 = table_.encode("bar.foo");
-  EXPECT_NE(stat_name_1->toSymbols(), stat_name_2->toSymbols());
   EXPECT_NE(stat_name_1->toString(), stat_name_2->toString());
+  EXPECT_NE(getSymbols(std::move(stat_name_1)), getSymbols(std::move(stat_name_2)));
 }
 
 TEST_F(StatNameTest, TestSymbolConsistency) {
   auto stat_name_1 = table_.encode("foo.bar");
   auto stat_name_2 = table_.encode("bar.foo");
   // We expect the encoding of "foo" in one context to be the same as another.
-  EXPECT_EQ(stat_name_1->toSymbols()[0], stat_name_2->toSymbols()[1]);
-  EXPECT_EQ(stat_name_2->toSymbols()[0], stat_name_1->toSymbols()[1]);
+  SymbolVec vec_1 = getSymbols(std::move(stat_name_1));
+  SymbolVec vec_2 = getSymbols(std::move(stat_name_2));
+  EXPECT_EQ(vec_1[0], vec_2[1]);
+  EXPECT_EQ(vec_2[0], vec_1[1]);
 }
-
-// We also wish to test the internals of what gets called inside a SymbolTable, even though these
-// functions are not user-facing.
-class SymbolTableTest : public testing::Test {
-public:
-  SymbolTableTest() {}
-  SymbolTableImpl table_;
-};
 
 // TODO(ambuc): Test decoding an invalid symbol vector. This will probably need a test which
 // implements a mock StatNameImpl, so that it can get access to .decode(), which is protected.
@@ -74,13 +73,13 @@ public:
 // Even though the symbol table does manual reference counting, curr_counter_ is monotonically
 // increasing. So encoding "foo", freeing the sole stat containing "foo", and then re-encoding
 // "foo" will produce a different symbol each time.
-TEST_F(SymbolTableTest, TestNewValueAfterFree) {
+TEST_F(StatNameTest, TestNewValueAfterFree) {
   {
     StatNamePtr stat_name_1 = table_.encode("foo");
-    SymbolVec stat_name_1_symbols = stat_name_1->toSymbols();
+    SymbolVec stat_name_1_symbols = getSymbols(std::move(stat_name_1));
     stat_name_1.reset();
     StatNamePtr stat_name_2 = table_.encode("foo");
-    SymbolVec stat_name_2_symbols = stat_name_2->toSymbols();
+    SymbolVec stat_name_2_symbols = getSymbols(std::move(stat_name_2));
     EXPECT_NE(stat_name_1_symbols, stat_name_2_symbols);
   }
 
@@ -90,11 +89,11 @@ TEST_F(SymbolTableTest, TestNewValueAfterFree) {
     // "bar" to have a different symbol.
     StatNamePtr stat_foo = table_.encode("foo");
     StatNamePtr stat_foobar_1 = table_.encode("foo.bar");
-    SymbolVec stat_foobar_1_symbols = stat_foobar_1->toSymbols();
+    SymbolVec stat_foobar_1_symbols = getSymbols(std::move(stat_foobar_1));
     stat_foobar_1.reset();
 
     StatNamePtr stat_foobar_2 = table_.encode("foo.bar");
-    SymbolVec stat_foobar_2_symbols = stat_foobar_2->toSymbols();
+    SymbolVec stat_foobar_2_symbols = getSymbols(std::move(stat_foobar_2));
 
     EXPECT_EQ(stat_foobar_1_symbols[0],
               stat_foobar_2_symbols[0]); // Both "foo" components have the same symbol,
@@ -103,7 +102,7 @@ TEST_F(SymbolTableTest, TestNewValueAfterFree) {
   }
 }
 
-TEST_F(SymbolTableTest, TestShrinkingExpectation) {
+TEST_F(StatNameTest, TestShrinkingExpectation) {
   // We expect that as we free stat names, the memory used to store those underlying symbols will
   // be freed.
   // ::size() is a public function, but should only be used for testing.
