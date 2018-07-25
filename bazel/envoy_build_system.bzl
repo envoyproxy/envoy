@@ -144,13 +144,6 @@ def tcmalloc_external_deps(repository):
         "//conditions:default": [envoy_external_dep_path("tcmalloc_and_profiler")],
     })
 
-# Dependencies on libevent should be wrapped with this function.
-def libevent_external_deps(repository):
-    return [envoy_external_dep_path("event")] + select({
-        repository + "//bazel:windows_x86_64": [],
-        "//conditions:default": [envoy_external_dep_path("event_pthreads")],
-    })
-
 # Transform the package path (e.g. include/envoy/common) into a path for
 # exporting the package headers at (e.g. envoy/common). Source files can then
 # include using this path scheme (e.g. #include "envoy/common/time.h").
@@ -175,7 +168,6 @@ def envoy_cc_library(
         visibility = None,
         external_deps = [],
         tcmalloc_dep = None,
-        libevent_dep = None,
         repository = "",
         linkstamp = None,
         tags = [],
@@ -183,8 +175,6 @@ def envoy_cc_library(
         strip_include_prefix = None):
     if tcmalloc_dep:
         deps += tcmalloc_external_deps(repository)
-    if libevent_dep:
-        deps += libevent_external_deps(repository)
 
     native.cc_library(
         name = name,
