@@ -436,6 +436,7 @@ void ConnectionImpl::onMessageCompleteBase() {
 }
 
 void ConnectionImpl::onMessageBeginBase() {
+  ENVOY_CONN_LOG(trace, "message begin", connection_);
   ASSERT(!current_header_map_);
   current_header_map_.reset(new HeaderMapImpl());
   header_parsing_state_ = HeaderParsingState::Field;
@@ -725,6 +726,7 @@ void ClientConnectionImpl::onBody(const char* data, size_t length) {
 }
 
 void ClientConnectionImpl::onMessageComplete() {
+  ENVOY_CONN_LOG(trace, "message complete", connection_);
   if (ignore_message_complete_for_100_continue_) {
     ignore_message_complete_for_100_continue_ = false;
     return;

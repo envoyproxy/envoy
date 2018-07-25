@@ -30,6 +30,7 @@ class LogicalDnsCluster : public ClusterImplBase {
 public:
   LogicalDnsCluster(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                     Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                    const LocalInfo::LocalInfo& local_info,
                     Network::DnsResolverSharedPtr dns_resolver, ThreadLocal::SlotAllocator& tls,
                     ClusterManager& cm, Event::Dispatcher& dispatcher, bool added_via_api);
 
@@ -42,9 +43,10 @@ private:
   struct LogicalHost : public HostImpl {
     LogicalHost(ClusterInfoConstSharedPtr cluster, const std::string& hostname,
                 Network::Address::InstanceConstSharedPtr address, LogicalDnsCluster& parent)
-        : HostImpl(cluster, hostname, address, envoy::api::v2::core::Metadata::default_instance(),
-                   1, envoy::api::v2::core::Locality().default_instance(),
-                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()),
+        : HostImpl(cluster, hostname, address, parent.lbEndpoint().metadata(),
+                   parent.lbEndpoint().load_balancing_weight().value(),
+                   parent.localityLbEndpoint().locality(),
+                   parent.lbEndpoint().endpoint().health_check_config()),
           parent_(parent) {}
 
     // Upstream::Host
@@ -57,10 +59,17 @@ private:
 
   struct RealHostDescription : public HostDescription {
     RealHostDescription(Network::Address::InstanceConstSharedPtr address,
+                        const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
+                        const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
                         HostConstSharedPtr logical_host)
         : address_(address), logical_host_(logical_host),
-          metadata_(std::make_shared<envoy::api::v2::core::Metadata>(
-              envoy::api::v2::core::Metadata::default_instance())) {}
+          metadata_(std::make_shared<envoy::api::v2::core::Metadata>(lb_endpoint.metadata())),
+          health_check_address_(
+              lb_endpoint.endpoint().health_check_config().port_value() == 0
+                  ? address
+                  : Network::Utility::getAddressWithPort(
+                        *address, lb_endpoint.endpoint().health_check_config().port_value())),
+          locality_lb_endpoint_(locality_lb_endpoint), lb_endpoint_(lb_endpoint) {}
 
     // Upstream:HostDescription
     bool canary() const override { return false; }
@@ -81,20 +90,35 @@ private:
     const std::string& hostname() const override { return logical_host_->hostname(); }
     Network::Address::InstanceConstSharedPtr address() const override { return address_; }
     const envoy::api::v2::core::Locality& locality() const override {
-      return envoy::api::v2::core::Locality().default_instance();
+      return locality_lb_endpoint_.locality();
     }
-    // TODO(dio): To support different address port.
     Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
-      return address_;
+      return health_check_address_;
     }
+    uint32_t priority() const { return locality_lb_endpoint_.priority(); }
     Network::Address::InstanceConstSharedPtr address_;
     HostConstSharedPtr logical_host_;
     const std::shared_ptr<envoy::api::v2::core::Metadata> metadata_;
+    Network::Address::InstanceConstSharedPtr health_check_address_;
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint_;
+    const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint_;
   };
 
   struct PerThreadCurrentHostData : public ThreadLocal::ThreadLocalObject {
     Network::Address::InstanceConstSharedPtr current_resolved_address_;
   };
+
+  const envoy::api::v2::endpoint::LocalityLbEndpoints& localityLbEndpoint() const {
+    // This is checked in the constructor, i.e. at config load time.
+    ASSERT(load_assignment_.endpoints().size() == 1);
+    return load_assignment_.endpoints()[0];
+  }
+
+  const envoy::api::v2::endpoint::LbEndpoint& lbEndpoint() const {
+    // This is checked in the constructor, i.e. at config load time.
+    ASSERT(localityLbEndpoint().lb_endpoints().size() == 1);
+    return localityLbEndpoint().lb_endpoints()[0];
+  }
 
   void startResolve();
 
@@ -111,6 +135,8 @@ private:
   Network::Address::InstanceConstSharedPtr current_resolved_address_;
   HostSharedPtr logical_host_;
   Network::ActiveDnsQuery* active_dns_query_{};
+  const LocalInfo::LocalInfo& local_info_;
+  const envoy::api::v2::ClusterLoadAssignment load_assignment_;
 };
 
 } // namespace Upstream

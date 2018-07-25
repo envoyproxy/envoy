@@ -122,7 +122,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
   NiceMock<Event::MockDispatcher> dispatcher_;
-  LocalInfo::MockLocalInfo local_info_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Secret::MockSecretManager secret_manager_;
 };
 
