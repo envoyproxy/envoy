@@ -1,3 +1,5 @@
+#include <ares.h>
+#include <ares_dns.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
 #include <arpa/nameser_compat.h>
@@ -28,8 +30,6 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "ares.h"
-#include "ares_dns.h"
 #include "gtest/gtest.h"
 
 using testing::InSequence;
@@ -111,11 +111,8 @@ private:
 
         // Expect requests to be small, so stack allocation is fine for test code.
         unsigned char* request = static_cast<unsigned char*>(buffer_.linearize(size_));
-// Only expecting a single question.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
+        // Only expecting a single question.
         ASSERT_EQ(1, DNS_HEADER_QDCOUNT(request));
-#pragma GCC diagnostic pop
         // Decode the question and perform lookup.
         const unsigned char* question = request + HFIXEDSZ;
         // The number of bytes the encoded question name takes up in the request.
@@ -129,11 +126,8 @@ private:
         char* name;
         ASSERT_EQ(ARES_SUCCESS, ares_expand_name(question, request, size_, &name, &name_len));
         const std::list<std::string>* ips = nullptr;
-// We only expect resources of type A or AAAA.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
+        // We only expect resources of type A or AAAA.
         const int q_type = DNS_QUESTION_TYPE(question + name_len);
-#pragma GCC diagnostic pop
         std::string cname;
         // check if we have a cname. If so, we will need to send a response element with the cname
         // and lookup the ips of the cname and send back those ips (if any) too
@@ -175,15 +169,12 @@ private:
         const size_t response_base_len = HFIXEDSZ + name_len + QFIXEDSZ;
         unsigned char response_base[response_base_len];
         memcpy(response_base, request, response_base_len);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
         DNS_HEADER_SET_QR(response_base, 1);
         DNS_HEADER_SET_AA(response_base, 0);
         DNS_HEADER_SET_RCODE(response_base, answer_size > 0 ? NOERROR : NXDOMAIN);
         DNS_HEADER_SET_ANCOUNT(response_base, answer_size);
         DNS_HEADER_SET_NSCOUNT(response_base, 0);
         DNS_HEADER_SET_ARCOUNT(response_base, 0);
-#pragma GCC diagnostic pop
         // Total response size will be computed according to cname response size + ip response sizes
         size_t response_ip_rest_len;
         if (q_type == T_A) {
@@ -202,9 +193,7 @@ private:
         write_buffer.add(&response_size_n, sizeof(response_size_n));
         write_buffer.add(response_base, response_base_len);
 
-// if we have a cname, create a resource record
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
+        // if we have a cname, create a resource record
         if (!encodedCname.empty()) {
           unsigned char cname_rr_fixed[RRFIXEDSZ];
           DNS_RR_SET_TYPE(cname_rr_fixed, T_CNAME);
@@ -227,7 +216,6 @@ private:
         }
         DNS_RR_SET_CLASS(response_rr_fixed, C_IN);
         DNS_RR_SET_TTL(response_rr_fixed, 0);
-#pragma GCC diagnostic pop
         if (ips != nullptr) {
           for (const auto& it : *ips) {
             write_buffer.add(ip_question, ip_name_len);
