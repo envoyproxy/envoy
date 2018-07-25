@@ -68,11 +68,11 @@ uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent&
 // Issue: https://github.com/lyft/protoc-gen-validate/issues/85
 #define PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(message, field_name, max_value,             \
                                                        default_value)                              \
-  ((message).has_##field_name()                                                                    \
-       ? !std::isnan((message).field_name().value())                                               \
+  (!std::isnan((message).field_name().value())                                                     \
+       ? (message).has_##field_name()                                                              \
              ? ProtobufPercentHelper::convertPercent((message).field_name().value(), max_value)    \
-             : throw EnvoyException(fmt::format("Value not in the range of 0..100 range."))        \
-       : ProtobufPercentHelper::checkAndReturnDefault(default_value, max_value))
+             : ProtobufPercentHelper::checkAndReturnDefault(default_value, max_value)              \
+       : throw EnvoyException(fmt::format("Value not in the range of 0..100 range.")))
 
 namespace Envoy {
 
