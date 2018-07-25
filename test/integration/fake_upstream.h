@@ -43,7 +43,10 @@ public:
 
   uint64_t bodyLength() { return body_.length(); }
   Buffer::Instance& body() { return body_; }
-  bool complete() { return end_stream_; }
+  bool complete() {
+    Thread::LockGuard lock(lock_);
+    return end_stream_;
+  }
   void encode100ContinueHeaders(const Http::HeaderMapImpl& headers);
   void encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
@@ -208,7 +211,10 @@ public:
       } else {
         RELEASE_ASSERT(
             allow_unexpected_disconnects_,
-            "The connection disconnected unexpectedly, and allow_unexpected_disconnects_ is false");
+            "The connection disconnected unexpectedly, and allow_unexpected_disconnects_ is false."
+            "\n See "
+            "https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md#"
+            "unexpected-disconnects");
       }
       callback_ready_event.notifyOne();
     });
@@ -248,7 +254,9 @@ public:
                      "An queued upstream connection was torn down without being associated "
                      "with a fake connection. Either manage the connection via "
                      "waitForRawConnection() or waitForHttpConnection(), or "
-                     "set_allow_unexpected_disconnects(true).");
+                     "set_allow_unexpected_disconnects(true).\n See "
+                     "https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md#"
+                     "unparented-upstream-connections");
     });
   }
 

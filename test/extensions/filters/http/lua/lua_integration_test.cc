@@ -106,6 +106,10 @@ config:
 
       local metadata = request_handle:metadata():get("foo.bar")
       local body_length = request_handle:body():length()
+
+      request_handle:requestInfo():dynamicMetadata():set("envoy.lb", "foo", "bar")
+      local dynamic_metadata_value = request_handle:requestInfo():dynamicMetadata():get("envoy.lb")["foo"]
+
       request_handle:headers():add("request_body_size", body_length)
       request_handle:headers():add("request_metadata_foo", metadata["foo"])
       request_handle:headers():add("request_metadata_baz", metadata["baz"])
@@ -115,6 +119,7 @@ config:
         request_handle:headers():add("request_secure", "true")
       end
       request_handle:headers():add("request_protocol", request_handle:requestInfo():protocol())
+      request_handle:headers():add("request_dynamic_metadata_value", dynamic_metadata_value)
     end
 
     function envoy_on_response(response_handle)
@@ -166,6 +171,11 @@ config:
   EXPECT_STREQ(
       "HTTP/1.1",
       upstream_request_->headers().get(Http::LowerCaseString("request_protocol"))->value().c_str());
+
+  EXPECT_STREQ("bar", upstream_request_->headers()
+                          .get(Http::LowerCaseString("request_dynamic_metadata_value"))
+                          ->value()
+                          .c_str());
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   upstream_request_->encodeHeaders(response_headers, false);

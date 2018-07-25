@@ -318,8 +318,8 @@ def _com_github_grpc_grpc():
     if "boringssl" not in native.existing_rules():
         native.http_archive(
             name = "boringssl",
-            # chromium-67.0.3396.62
-            url = "https://boringssl.googlesource.com/boringssl/+archive/2a52ce799382c87cd3119f3b44fbbebf97061ab6.tar.gz",
+            # chromium-68.0.3440.75
+            url = "https://boringssl.googlesource.com/boringssl/+archive/372daf7042ffe3da1335743e7c93d78f1399aba7.tar.gz",
         )
 
     native.bind(

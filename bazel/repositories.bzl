@@ -7,6 +7,12 @@ load(":genrule_repository.bzl", "genrule_repository")
 load(":patched_http_archive.bzl", "patched_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
 load(":target_recipes.bzl", "TARGET_RECIPES")
+load(
+    "@bazel_tools//tools/cpp:windows_cc_configure.bzl",
+    "find_vc_path",
+    "setup_vc_env_vars",
+)
+load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_env_var")
 
 def _repository_impl(name, **kwargs):
     # `existing_rule_keys` contains the names of repositories that have already
@@ -67,6 +73,7 @@ def _repository_impl(name, **kwargs):
 def _build_recipe_repository_impl(ctxt):
     # Setup the build directory with links to the relevant files.
     ctxt.symlink(Label("//bazel:repositories.sh"), "repositories.sh")
+    ctxt.symlink(Label("//bazel:repositories.bat"), "repositories.bat")
     ctxt.symlink(
         Label("//ci/build_container:build_and_install_deps.sh"),
         "build_and_install_deps.sh",
@@ -81,11 +88,25 @@ def _build_recipe_repository_impl(ctxt):
     ctxt.symlink(Label("//ci/prebuilt:BUILD"), "BUILD")
 
     # Run the build script.
-    environment = {}
+    command = []
+    env = {}
+    if ctxt.os.name.upper().startswith("WINDOWS"):
+        vc_path = find_vc_path(ctxt)
+        current_path = get_env_var(ctxt, "PATH", None, False)
+        env = setup_vc_env_vars(ctxt, vc_path)
+        env["PATH"] += (";%s" % current_path)
+        env["CC"] = "cl"
+        env["CXX"] = "cl"
+        env["CXXFLAGS"] = "-DNDEBUG"
+        env["CFLAGS"] = "-DNDEBUG"
+        command = ["./repositories.bat"] + ctxt.attr.recipes
+    else:
+        command = ["./repositories.sh"] + ctxt.attr.recipes
+
     print("Fetching external dependencies...")
     result = ctxt.execute(
-        ["./repositories.sh"] + ctxt.attr.recipes,
-        environment = environment,
+        command,
+        environment = env,
         quiet = False,
     )
     print(result.stdout)

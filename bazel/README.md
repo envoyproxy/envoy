@@ -27,16 +27,15 @@ up-to-date with the latest security patches. See
 for how to update or override dependencies.
 
 1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2. Install external dependencies libtool, cmake, and realpath libraries separately.
+2. Install external dependencies libtool, cmake, ninja, and realpath libraries separately.
 On Ubuntu, run the following commands:
 ```
  apt-get install libtool
  apt-get install cmake
  apt-get install realpath
  apt-get install clang-format-5.0
- apt-get install autoconf
  apt-get install automake
- apt-get install pkg-config
+ apt-get install ninja-build
 ```
 
 On Fedora (maybe also other red hat distros), run the following:
@@ -52,9 +51,8 @@ brew install cmake
 brew install libtool
 brew install go
 brew install bazel
-brew install autoconf
 brew install automake
-brew install pkg-config
+brew install ninja
 ```
 
 Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
@@ -356,6 +354,14 @@ then log back in and it should start working.
 
 The latest coverage report for master is available
 [here](https://s3.amazonaws.com/lyft-envoy/coverage/report-master/coverage.html).
+
+It's also possible to specialize the coverage build to a single test target. This is useful
+when doing things like exploring the coverage of a fuzzer over its corpus. This can be done with
+the `COVERAGE_TARGET` and `VALIDATE_COVERAGE` environment variables, e.g.:
+
+```
+COVERAGE_TARGET=//test/common/common:base64_fuzz_test VALIDATE_COVERAGE=false test/run_envoy_bazel_coverage.sh
+```
 
 # Cleaning the build and test artifacts
 
