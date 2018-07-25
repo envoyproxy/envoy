@@ -361,10 +361,10 @@ void Filter::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
   }
 }
 
-void Filter::onPoolReady(Tcp::ConnectionPool::ConnectionData& conn_data,
+void Filter::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                          Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
-  upstream_connection_ = &conn_data;
+  upstream_connection_ = std::move(conn_data);
   read_callbacks_->upstreamHost(host);
 
   upstream_connection_->addUpstreamCallbacks(*upstream_callbacks_);
@@ -408,15 +408,15 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
 
       if (upstream_connection_ != nullptr &&
           upstream_connection_->connection().state() != Network::Connection::State::Closed) {
-        config_->drainManager().add(config_->sharedConfig(), upstream_connection_->connection(),
+        config_->drainManager().add(config_->sharedConfig(), std::move(upstream_connection_),
                                     std::move(upstream_callbacks_), std::move(idle_timer_),
                                     read_callbacks_->upstreamHost());
       }
     } else if (event == Network::ConnectionEvent::LocalClose) {
       upstream_connection_->connection().close(Network::ConnectionCloseType::NoFlush);
+      upstream_connection_.reset();
       disableIdleTimer();
     }
-    upstream_connection_ = nullptr;
   }
 }
 
@@ -437,7 +437,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    upstream_connection_ = nullptr;
+    upstream_connection_.reset();
     disableIdleTimer();
 
     if (connecting) {
@@ -518,11 +518,11 @@ UpstreamDrainManager::~UpstreamDrainManager() {
 }
 
 void UpstreamDrainManager::add(const Config::SharedConfigSharedPtr& config,
-                               Network::ClientConnection& upstream_connection,
+                               Tcp::ConnectionPool::ConnectionDataPtr&& upstream_connection,
                                const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
                                Event::TimerPtr&& idle_timer,
                                const Upstream::HostDescriptionConstSharedPtr& upstream_host) {
-  DrainerPtr drainer(new Drainer(*this, config, callbacks, upstream_connection,
+  DrainerPtr drainer(new Drainer(*this, config, callbacks, std::move(upstream_connection),
                                  std::move(idle_timer), upstream_host));
   callbacks->drain(*drainer);
 
@@ -540,9 +540,9 @@ void UpstreamDrainManager::remove(Drainer& drainer, Event::Dispatcher& dispatche
 
 Drainer::Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
                  const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
-                 Network::ClientConnection& connection, Event::TimerPtr&& idle_timer,
+                 Tcp::ConnectionPool::ConnectionDataPtr&& connection, Event::TimerPtr&& idle_timer,
                  const Upstream::HostDescriptionConstSharedPtr& upstream_host)
-    : parent_(parent), callbacks_(callbacks), upstream_connection_(connection),
+    : parent_(parent), callbacks_(callbacks), upstream_connection_(std::move(connection)),
       timer_(std::move(idle_timer)), upstream_host_(upstream_host), config_(config) {
   config_->stats().upstream_flush_total_.inc();
   config_->stats().upstream_flush_active_.inc();
@@ -555,7 +555,7 @@ void Drainer::onEvent(Network::ConnectionEvent event) {
       timer_->disableTimer();
     }
     config_->stats().upstream_flush_active_.dec();
-    parent_.remove(*this, upstream_connection_.dispatcher());
+    parent_.remove(*this, upstream_connection_->connection().dispatcher());
   }
 }
 
@@ -582,7 +582,7 @@ void Drainer::onBytesSent() {
 
 void Drainer::cancelDrain() {
   // This sends onEvent(LocalClose).
-  upstream_connection_.close(Network::ConnectionCloseType::NoFlush);
+  upstream_connection_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
 } // namespace TcpProxy

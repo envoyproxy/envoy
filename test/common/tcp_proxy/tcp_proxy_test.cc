@@ -384,7 +384,11 @@ public:
     if (connections >= 1) {
       for (uint32_t i = 0; i < connections; i++) {
         upstream_connections_.push_back(
+            std::make_unique<NiceMock<Network::MockClientConnection>>());
+        upstream_connection_data_.push_back(
             std::make_unique<NiceMock<Tcp::ConnectionPool::MockConnectionData>>());
+        ON_CALL(*upstream_connection_data_.back(), connection())
+            .WillByDefault(ReturnRef(*upstream_connections_.back()));
         upstream_hosts_.push_back(std::make_shared<NiceMock<Upstream::MockHost>>());
         conn_pool_handles_.push_back(
             std::make_unique<NiceMock<Tcp::ConnectionPool::MockCancellable>>());
@@ -393,9 +397,8 @@ public:
             .WillByDefault(ReturnPointee(
                 factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_));
         ON_CALL(*upstream_hosts_.at(i), address()).WillByDefault(Return(upstream_remote_address_));
-        Network::MockClientConnection& connection = upstream_connections_.at(i)->connection_;
-        connection.local_address_ = upstream_local_address_;
-        EXPECT_CALL(connection, dispatcher())
+        upstream_connections_.at(i)->local_address_ = upstream_local_address_;
+        EXPECT_CALL(*upstream_connections_.at(i), dispatcher())
             .WillRepeatedly(ReturnRef(filter_callbacks_.connection_.dispatcher_));
       }
     }
@@ -433,17 +436,18 @@ public:
 
   void raiseEventUpstreamConnected(uint32_t conn_index) {
     EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
-    EXPECT_CALL(*upstream_connections_.at(conn_index), addUpstreamCallbacks(_))
+    EXPECT_CALL(*upstream_connection_data_.at(conn_index), addUpstreamCallbacks(_))
         .WillOnce(Invoke([=](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
           upstream_callbacks_ = &cb;
 
           // Simulate TCP conn pool upstream callbacks. This is safe because the TCP proxy never
           // releases a connection so all events go to the same UpstreamCallbacks instance.
-          upstream_connections_.at(conn_index)->connection_.addConnectionCallbacks(cb);
+          upstream_connections_.at(conn_index)->addConnectionCallbacks(cb);
         }));
-    EXPECT_CALL(upstream_connections_.at(conn_index)->connection_, enableHalfClose(true));
+    EXPECT_CALL(*upstream_connections_.at(conn_index), enableHalfClose(true));
     conn_pool_callbacks_.at(conn_index)
-        ->onPoolReady(*upstream_connections_.at(conn_index), upstream_hosts_.at(conn_index));
+        ->onPoolReady(std::move(upstream_connection_data_.at(conn_index)),
+                      upstream_hosts_.at(conn_index));
   }
 
   void raiseEventUpstreamConnectFailed(uint32_t conn_index,
@@ -455,8 +459,9 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::vector<std::shared_ptr<NiceMock<Upstream::MockHost>>> upstream_hosts_{};
+  std::vector<std::unique_ptr<NiceMock<Network::MockClientConnection>>> upstream_connections_{};
   std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockConnectionData>>>
-      upstream_connections_{};
+      upstream_connection_data_{};
   std::vector<Tcp::ConnectionPool::Callbacks*> conn_pool_callbacks_;
   std::vector<std::unique_ptr<NiceMock<Tcp::ConnectionPool::MockCancellable>>> conn_pool_handles_;
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_;
@@ -472,12 +477,12 @@ TEST_F(TcpProxyTest, HalfCloseProxy) {
   setup(1);
 
   EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(0);
-  EXPECT_CALL(upstream_connections_.at(0)->connection_, close(_)).Times(0);
+  EXPECT_CALL(*upstream_connections_.at(0), close(_)).Times(0);
 
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(upstream_connections_.at(0)->connection_, write(BufferEqual(&buffer), true));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), true));
   filter_->onData(buffer, true);
 
   Buffer::OwnedImpl response("world");
@@ -495,7 +500,7 @@ TEST_F(TcpProxyTest, UpstreamLocalDisconnect) {
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(upstream_connections_.at(0)->connection_, write(BufferEqual(&buffer), false));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
   filter_->onData(buffer, false);
 
   Buffer::OwnedImpl response("world");
@@ -513,7 +518,7 @@ TEST_F(TcpProxyTest, UpstreamRemoteDisconnect) {
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(upstream_connections_.at(0)->connection_, write(BufferEqual(&buffer), false));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), false));
   filter_->onData(buffer, false);
 
   Buffer::OwnedImpl response("world");
@@ -528,6 +533,7 @@ TEST_F(TcpProxyTest, UpstreamRemoteDisconnect) {
 TEST_F(TcpProxyTest, ConnectAttemptsUpstreamLocalFail) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
   config.mutable_max_connect_attempts()->set_value(2);
+
   setup(2, config);
 
   raiseEventUpstreamConnectFailed(0,
@@ -617,14 +623,14 @@ TEST_F(TcpProxyTest, UpstreamDisconnectDownstreamFlowControl) {
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(upstream_connections_.at(0)->connection_, write(BufferEqual(&buffer), _));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
   filter_->onData(buffer, false);
 
   Buffer::OwnedImpl response("world");
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
   upstream_callbacks_->onUpstreamData(response, false);
 
-  EXPECT_CALL(upstream_connections_.at(0)->connection_, readDisable(true));
+  EXPECT_CALL(*upstream_connections_.at(0), readDisable(true));
   filter_callbacks_.connection_.runHighWatermarkCallbacks();
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
@@ -639,15 +645,14 @@ TEST_F(TcpProxyTest, DownstreamDisconnectRemote) {
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(upstream_connections_.at(0)->connection_, write(BufferEqual(&buffer), _));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
   filter_->onData(buffer, false);
 
   Buffer::OwnedImpl response("world");
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
   upstream_callbacks_->onUpstreamData(response, false);
 
-  EXPECT_CALL(upstream_connections_.at(0)->connection_,
-              close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::FlushWrite));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
@@ -657,15 +662,14 @@ TEST_F(TcpProxyTest, DownstreamDisconnectLocal) {
   raiseEventUpstreamConnected(0);
 
   Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(upstream_connections_.at(0)->connection_, write(BufferEqual(&buffer), _));
+  EXPECT_CALL(*upstream_connections_.at(0), write(BufferEqual(&buffer), _));
   filter_->onData(buffer, false);
 
   Buffer::OwnedImpl response("world");
   EXPECT_CALL(filter_callbacks_.connection_, write(BufferEqual(&response), _));
   upstream_callbacks_->onUpstreamData(response, false);
 
-  EXPECT_CALL(upstream_connections_.at(0)->connection_,
-              close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
 }
 
@@ -777,10 +781,9 @@ TEST_F(TcpProxyTest, IdleTimeout) {
   filter_callbacks_.connection_.raiseBytesSentCallbacks(1);
 
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
-  upstream_connections_.at(0)->connection_.raiseBytesSentCallbacks(2);
+  upstream_connections_.at(0)->raiseBytesSentCallbacks(2);
 
-  EXPECT_CALL(upstream_connections_.at(0)->connection_,
-              close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*idle_timer, disableTimer());
   idle_timer->callback_();
@@ -868,10 +871,10 @@ TEST_F(TcpProxyTest, UpstreamFlushNoTimeout) {
   setup(1);
   raiseEventUpstreamConnected(0);
 
-  EXPECT_CALL(upstream_connections_.at(0)->connection_,
+  EXPECT_CALL(*upstream_connections_.at(0),
               close(Network::ConnectionCloseType::FlushWrite))
       .WillOnce(Return()); // Cancel default action of raising LocalClose
-  EXPECT_CALL(upstream_connections_.at(0)->connection_, state())
+  EXPECT_CALL(*upstream_connections_.at(0), state())
       .WillOnce(Return(Network::Connection::State::Closing));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
@@ -879,7 +882,7 @@ TEST_F(TcpProxyTest, UpstreamFlushNoTimeout) {
   EXPECT_EQ(1U, config_->stats().upstream_flush_active_.value());
 
   // Send some bytes; no timeout configured so this should be a no-op (not a crash).
-  upstream_connections_.at(0)->connection_.raiseBytesSentCallbacks(1);
+  upstream_connections_.at(0)->raiseBytesSentCallbacks(1);
 
   // Simulate flush complete.
   upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
@@ -899,10 +902,10 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutConfigured) {
   EXPECT_CALL(*idle_timer, enableTimer(_));
   raiseEventUpstreamConnected(0);
 
-  EXPECT_CALL(upstream_connections_.at(0)->connection_,
+  EXPECT_CALL(*upstream_connections_.at(0),
               close(Network::ConnectionCloseType::FlushWrite))
       .WillOnce(Return()); // Cancel default action of raising LocalClose
-  EXPECT_CALL(upstream_connections_.at(0)->connection_, state())
+  EXPECT_CALL(*upstream_connections_.at(0), state())
       .WillOnce(Return(Network::Connection::State::Closing));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 
@@ -910,7 +913,7 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutConfigured) {
   EXPECT_EQ(1U, config_->stats().upstream_flush_active_.value());
 
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
-  upstream_connections_.at(0)->connection_.raiseBytesSentCallbacks(1);
+  upstream_connections_.at(0)->raiseBytesSentCallbacks(1);
 
   // Simulate flush complete.
   EXPECT_CALL(*idle_timer, disableTimer());
@@ -931,18 +934,17 @@ TEST_F(TcpProxyTest, UpstreamFlushTimeoutExpired) {
   EXPECT_CALL(*idle_timer, enableTimer(_));
   raiseEventUpstreamConnected(0);
 
-  EXPECT_CALL(upstream_connections_.at(0)->connection_,
+  EXPECT_CALL(*upstream_connections_.at(0),
               close(Network::ConnectionCloseType::FlushWrite))
       .WillOnce(Return()); // Cancel default action of raising LocalClose
-  EXPECT_CALL(upstream_connections_.at(0)->connection_, state())
+  EXPECT_CALL(*upstream_connections_.at(0), state())
       .WillOnce(Return(Network::Connection::State::Closing));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 
   filter_.reset();
   EXPECT_EQ(1U, config_->stats().upstream_flush_active_.value());
 
-  EXPECT_CALL(upstream_connections_.at(0)->connection_,
-              close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
   idle_timer->callback_();
   EXPECT_EQ(1U, config_->stats().upstream_flush_total_.value());
   EXPECT_EQ(0U, config_->stats().upstream_flush_active_.value());
@@ -955,10 +957,10 @@ TEST_F(TcpProxyTest, UpstreamFlushReceiveUpstreamData) {
   setup(1);
   raiseEventUpstreamConnected(0);
 
-  EXPECT_CALL(upstream_connections_.at(0)->connection_,
+  EXPECT_CALL(*upstream_connections_.at(0),
               close(Network::ConnectionCloseType::FlushWrite))
       .WillOnce(Return()); // Cancel default action of raising LocalClose
-  EXPECT_CALL(upstream_connections_.at(0)->connection_, state())
+  EXPECT_CALL(*upstream_connections_.at(0), state())
       .WillOnce(Return(Network::Connection::State::Closing));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
@@ -967,8 +969,7 @@ TEST_F(TcpProxyTest, UpstreamFlushReceiveUpstreamData) {
 
   // Send some bytes; no timeout configured so this should be a no-op (not a crash).
   Buffer::OwnedImpl buffer("a");
-  EXPECT_CALL(upstream_connections_.at(0)->connection_,
-              close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
   upstream_callbacks_->onUpstreamData(buffer, false);
 }
 

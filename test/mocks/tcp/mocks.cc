@@ -17,9 +17,7 @@ MockCancellable::~MockCancellable() {}
 MockUpstreamCallbacks::MockUpstreamCallbacks() {}
 MockUpstreamCallbacks::~MockUpstreamCallbacks() {}
 
-MockConnectionData::MockConnectionData() {
-  ON_CALL(*this, connection()).WillByDefault(ReturnRef(connection_));
-}
+MockConnectionData::MockConnectionData() {}
 MockConnectionData::~MockConnectionData() {}
 
 MockInstance::MockInstance() {
@@ -48,7 +46,7 @@ void MockInstance::poolReady() {
   callbacks_.pop_front();
   handles_.pop_front();
 
-  cb->onPoolReady(connection_data_, host_);
+  cb->onPoolReady(std::move(connection_data_), host_);
 }
 
 } // namespace ConnectionPool

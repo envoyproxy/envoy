@@ -154,7 +154,7 @@ public:
   // Tcp::ConnectionPool::Callbacks
   void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
-  void onPoolReady(Tcp::ConnectionPool::ConnectionData& conn_data,
+  void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
   // Upstream::LoadBalancerContext
@@ -247,7 +247,7 @@ protected:
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   Tcp::ConnectionPool::Cancellable* upstream_handle_{};
-  Tcp::ConnectionPool::ConnectionData* upstream_connection_{};
+  Tcp::ConnectionPool::ConnectionDataPtr upstream_connection_{};
   DownstreamCallbacks downstream_callbacks_;
   Event::TimerPtr idle_timer_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
@@ -264,7 +264,7 @@ class Drainer : public Event::DeferredDeletable {
 public:
   Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
           const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
-          Network::ClientConnection& connection, Event::TimerPtr&& idle_timer,
+          Tcp::ConnectionPool::ConnectionDataPtr&& connection, Event::TimerPtr&& idle_timer,
           const Upstream::HostDescriptionConstSharedPtr& upstream_host);
 
   void onEvent(Network::ConnectionEvent event);
@@ -276,7 +276,7 @@ public:
 private:
   UpstreamDrainManager& parent_;
   std::shared_ptr<Filter::UpstreamCallbacks> callbacks_;
-  Network::ClientConnection& upstream_connection_;
+  Tcp::ConnectionPool::ConnectionDataPtr upstream_connection_{};
   Event::TimerPtr timer_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   Config::SharedConfigSharedPtr config_;
@@ -288,7 +288,7 @@ class UpstreamDrainManager : public ThreadLocal::ThreadLocalObject {
 public:
   ~UpstreamDrainManager();
   void add(const Config::SharedConfigSharedPtr& config,
-           Network::ClientConnection& upstream_connection,
+           Tcp::ConnectionPool::ConnectionDataPtr&& upstream_connection,
            const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
            Event::TimerPtr&& idle_timer,
            const Upstream::HostDescriptionConstSharedPtr& upstream_host);
