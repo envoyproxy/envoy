@@ -50,7 +50,20 @@ private:
    */
   void free(const SymbolVec& symbol_vec);
 
+  /**
+   * Convenience function for encode(), symbolizing one string segment at a time.
+   *
+   * @param std::string& the individual string to be encoded as a symbol.
+   * @return Symbol the encoded string.
+   */
   Symbol toSymbol(const std::string& str);
+
+  /**
+   * Convenience function for decode(), decoding one symbol at a time.
+   *
+   * @param Symbol the individual symbol to be decoded.
+   * @return std::string the decoded string.
+   */
   std::string fromSymbol(const Symbol symbol) const;
 
   Symbol curr_counter_{};
