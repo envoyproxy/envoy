@@ -365,8 +365,10 @@ private:
   struct PendingUpdates {
     PendingUpdates() {}
     Event::TimerPtr timer;
-    std::unordered_set<HostSharedPtr> added;
-    std::unordered_set<HostSharedPtr> removed;
+    HostVector added;
+    HostVector removed;
+    std::unordered_set<HostSharedPtr> added_seen;
+    std::unordered_set<HostSharedPtr> removed_seen;
     MonotonicTime last_updated;
   };
   typedef std::shared_ptr<PendingUpdates> PendingUpdatesPtr;
