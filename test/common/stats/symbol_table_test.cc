@@ -15,10 +15,11 @@ public:
   StatNameTest() {}
   SymbolTableImpl table_;
 
-  SymbolVec getSymbols(StatNamePtr stat_name_ptr) {
-    StatNameImpl& impl = dynamic_cast<StatNameImpl&>(*stat_name_ptr.get());
+  SymbolVec getSymbols(StatName* stat_name_ptr) {
+    StatNameImpl& impl = dynamic_cast<StatNameImpl&>(*stat_name_ptr);
     return impl.symbol_vec_;
   }
+  std::string decodeSymbolVec(const SymbolVec& symbol_vec) { return table_.decode(symbol_vec); }
 };
 
 TEST_F(StatNameTest, TestArbitrarySymbolRoundtrip) {
@@ -39,7 +40,7 @@ TEST_F(StatNameTest, TestUnusualDelimitersRoundtrip) {
 TEST_F(StatNameTest, TestSuccessfulDoubleLookup) {
   StatNamePtr stat_name_1 = table_.encode("foo.bar.baz");
   StatNamePtr stat_name_2 = table_.encode("foo.bar.baz");
-  EXPECT_EQ(getSymbols(std::move(stat_name_1)), getSymbols(std::move(stat_name_2)));
+  EXPECT_EQ(getSymbols(stat_name_1.get()), getSymbols(stat_name_2.get()));
 }
 
 TEST_F(StatNameTest, TestSuccessfulDecode) {
@@ -50,25 +51,40 @@ TEST_F(StatNameTest, TestSuccessfulDecode) {
   EXPECT_EQ(stat_name_1->toString(), stat_name);
 }
 
+TEST_F(StatNameTest, TestBadDecodes) {
+  {
+    // If a symbol doesn't exist, decoding it should trigger a RELEASE_ASSERT() and crash.
+    SymbolVec bad_symbol_vec = {0};
+    EXPECT_DEATH(decodeSymbolVec(bad_symbol_vec), "");
+  }
+
+  {
+    StatNamePtr stat_name_1 = table_.encode("foo");
+    SymbolVec vec_1 = getSymbols(stat_name_1.get());
+    // Decoding a symbol vec that exists is perfectly normal...
+    EXPECT_NO_THROW(decodeSymbolVec(vec_1));
+    stat_name_1.reset();
+    // But when the StatNamePtr is destroyed, its symbols are as well.
+    EXPECT_DEATH(decodeSymbolVec(vec_1), "");
+  }
+}
+
 TEST_F(StatNameTest, TestDifferentStats) {
   auto stat_name_1 = table_.encode("foo.bar");
   auto stat_name_2 = table_.encode("bar.foo");
   EXPECT_NE(stat_name_1->toString(), stat_name_2->toString());
-  EXPECT_NE(getSymbols(std::move(stat_name_1)), getSymbols(std::move(stat_name_2)));
+  EXPECT_NE(getSymbols(stat_name_1.get()), getSymbols(stat_name_2.get()));
 }
 
 TEST_F(StatNameTest, TestSymbolConsistency) {
   auto stat_name_1 = table_.encode("foo.bar");
   auto stat_name_2 = table_.encode("bar.foo");
   // We expect the encoding of "foo" in one context to be the same as another.
-  SymbolVec vec_1 = getSymbols(std::move(stat_name_1));
-  SymbolVec vec_2 = getSymbols(std::move(stat_name_2));
+  SymbolVec vec_1 = getSymbols(stat_name_1.get());
+  SymbolVec vec_2 = getSymbols(stat_name_2.get());
   EXPECT_EQ(vec_1[0], vec_2[1]);
   EXPECT_EQ(vec_2[0], vec_1[1]);
 }
-
-// TODO(ambuc): Test decoding an invalid symbol vector. This will probably need a test which
-// implements a mock StatNameImpl, so that it can get access to .decode(), which is protected.
 
 // Even though the symbol table does manual reference counting, curr_counter_ is monotonically
 // increasing. So encoding "foo", freeing the sole stat containing "foo", and then re-encoding
@@ -76,10 +92,10 @@ TEST_F(StatNameTest, TestSymbolConsistency) {
 TEST_F(StatNameTest, TestNewValueAfterFree) {
   {
     StatNamePtr stat_name_1 = table_.encode("foo");
-    SymbolVec stat_name_1_symbols = getSymbols(std::move(stat_name_1));
+    SymbolVec stat_name_1_symbols = getSymbols(stat_name_1.get());
     stat_name_1.reset();
     StatNamePtr stat_name_2 = table_.encode("foo");
-    SymbolVec stat_name_2_symbols = getSymbols(std::move(stat_name_2));
+    SymbolVec stat_name_2_symbols = getSymbols(stat_name_2.get());
     EXPECT_NE(stat_name_1_symbols, stat_name_2_symbols);
   }
 
@@ -89,11 +105,11 @@ TEST_F(StatNameTest, TestNewValueAfterFree) {
     // "bar" to have a different symbol.
     StatNamePtr stat_foo = table_.encode("foo");
     StatNamePtr stat_foobar_1 = table_.encode("foo.bar");
-    SymbolVec stat_foobar_1_symbols = getSymbols(std::move(stat_foobar_1));
+    SymbolVec stat_foobar_1_symbols = getSymbols(stat_foobar_1.get());
     stat_foobar_1.reset();
 
     StatNamePtr stat_foobar_2 = table_.encode("foo.bar");
-    SymbolVec stat_foobar_2_symbols = getSymbols(std::move(stat_foobar_2));
+    SymbolVec stat_foobar_2_symbols = getSymbols(stat_foobar_2.get());
 
     EXPECT_EQ(stat_foobar_1_symbols[0],
               stat_foobar_2_symbols[0]); // Both "foo" components have the same symbol,

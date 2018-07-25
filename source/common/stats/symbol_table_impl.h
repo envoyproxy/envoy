@@ -17,8 +17,6 @@
 namespace Envoy {
 namespace Stats {
 
-class StatNameTest;
-
 class SymbolTableImpl : public SymbolTable {
 public:
   StatNamePtr encode(const std::string& name) override;
@@ -31,6 +29,7 @@ public:
 
 private:
   friend class StatNameImpl;
+  friend class StatNameTest;
   /**
    * Decodes a vector of symbols back into its period-delimited stat name.
    * If decoding fails on any part of the symbol_vec, we release_assert and crash hard, since this
