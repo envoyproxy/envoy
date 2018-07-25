@@ -220,6 +220,29 @@ public:
                     name, Network::Test::getLoopbackAddressString(ipVersion()), route_config));
   }
 
+  envoy::api::v2::Listener buildListener11(const std::string& name,
+                                           const std::string& route_config) {
+    return TestUtility::parseYaml<envoy::api::v2::Listener>(
+        fmt::format(R"EOF(
+      name: {}
+      address:
+        socket_address:
+          address: {}
+          port_value: 0
+      filter_chains:
+        filters:
+        - name: envoy.http_connection_manager
+          config:
+            stat_prefix: ads_test11
+            codec_type: HTTP2
+            rds:
+              route_config_name: {}
+              config_source: {{ ads: {{}} }}
+            http_filters: [{{ name: envoy.router }}]
+    )EOF",
+                    name, Network::Test::getLoopbackAddressString(ipVersion()), route_config));
+  }
+
   envoy::api::v2::RouteConfiguration buildRouteConfig(const std::string& name,
                                                       const std::string& cluster) {
     return TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(fmt::format(R"EOF(
@@ -296,6 +319,55 @@ public:
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Validate basic config delivery and upgrade.
+TEST_P(AdsIntegrationTest, RdsCrash) {
+  initialize();
+
+  // Send initial configuration, validate we can process a request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1", {"cluster_0"}));
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}));
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}));
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1", {"route_config_0"}));
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  makeSingleRequest();
+  const ProtobufWkt::Timestamp first_active_listener_ts_1 =
+      getListenersConfigDump().dynamic_active_listeners()[0].last_updated();
+  const ProtobufWkt::Timestamp first_active_cluster_ts_1 =
+      getClustersConfigDump().dynamic_active_clusters()[0].last_updated();
+  const ProtobufWkt::Timestamp first_route_config_ts_1 =
+      getRoutesConfigDump().dynamic_route_configs()[0].last_updated();
+
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener11("listener_0", "route_config_0")}, "2");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+  makeSingleRequest();
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "2");
+}
 
 // Validate basic config delivery and upgrade.
 TEST_P(AdsIntegrationTest, Basic) {
