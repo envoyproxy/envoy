@@ -195,6 +195,18 @@ public:
     EXPECT_EQ(expected_clusters_config_dump.DebugString(), clusters_config_dump.DebugString());
   }
 
+  envoy::api::v2::core::Metadata buildMetadata(const std::string& version) const {
+    envoy::api::v2::core::Metadata metadata;
+
+    if (version != "") {
+      Envoy::Config::Metadata::mutableMetadataValue(
+          metadata, Config::MetadataFilters::get().ENVOY_LB, "version")
+          .set_string_value(version);
+    }
+
+    return metadata;
+  }
+
   NiceMock<TestClusterManagerFactory> factory_;
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
@@ -1747,6 +1759,456 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
   // Ensure the coalesced updates were applied again.
   timer->callback_();
   EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
+}
+
+TEST_F(ClusterManagerImplTest, CoalescedUpdatesAddRemoveAdd) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11002
+      common_lb_config:
+        update_merge_window: 3s
+  )EOF";
+
+  createWithLocalClusterUpdate(parseBootstrapFromV2Yaml(yaml));
+  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+
+  // Ensure we see the right set of added/removed hosts on every call.
+  uint32_t calls = 0;
+  EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillRepeatedly(Invoke([&calls](uint32_t priority, const HostVector& hosts_added,
+                                      const HostVector& hosts_removed) -> void {
+        switch (calls) {
+        case 0:
+          // First immediate call, nothing was added/removed.
+          EXPECT_EQ(0, priority);
+          EXPECT_EQ(0, hosts_added.size());
+          EXPECT_EQ(0, hosts_removed.size());
+          break;
+        case 1:
+          // Merged call, add/remove/add is coalesced as 1 add.
+          EXPECT_EQ(0, priority);
+          EXPECT_EQ(1, hosts_added.size());
+          EXPECT_EQ(0, hosts_removed.size());
+          break;
+        }
+
+        ++calls;
+      }));
+
+  // Remove each host, sequentially.
+  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
+  HostVectorSharedPtr hosts(
+      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_added{};
+  HostVector hosts_removed{};
+
+  // No timer needs to be mocked at this point, since the first update should be applied
+  // immediately.
+  // No added/removed hosts (emulate metadata or health change).
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Now we need the timer to be ready, since createTimer() will be call given that this update
+  // _will_ be delayed.
+  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+
+  // Add the host.
+  hosts_added.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11003"));
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Remove it.
+  hosts_added.clear();
+  hosts_removed.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11003"));
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Add it again.
+  hosts_added.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11003"));
+  hosts_removed.clear();
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Ensure the coalesced updates were applied.
+  timer->callback_();
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
+
+  // postThreadLocalClusterUpdate() calls.
+  EXPECT_EQ(2, calls);
+}
+
+TEST_F(ClusterManagerImplTest, CoalescedUpdatesRemoveAddRemove) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11002
+      common_lb_config:
+        update_merge_window: 3s
+  )EOF";
+
+  createWithLocalClusterUpdate(parseBootstrapFromV2Yaml(yaml));
+  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+
+  // Ensure we see the right set of added/removed hosts on every call.
+  uint32_t calls = 0;
+  EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillRepeatedly(Invoke([&calls](uint32_t priority, const HostVector& hosts_added,
+                                      const HostVector& hosts_removed) -> void {
+        switch (calls) {
+        case 0:
+          // First immediate call, nothing was added/removed.
+          EXPECT_EQ(0, priority);
+          EXPECT_EQ(0, hosts_added.size());
+          EXPECT_EQ(0, hosts_removed.size());
+          break;
+        case 1:
+          // Merged call, remove/add/remove is coalesced as 1 remove.
+          EXPECT_EQ(0, priority);
+          EXPECT_EQ(0, hosts_added.size());
+          EXPECT_EQ(1, hosts_removed.size());
+          break;
+        }
+
+        ++calls;
+      }));
+
+  // Remove each host, sequentially.
+  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
+  HostVectorSharedPtr hosts(
+      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_added{};
+  HostVector hosts_removed{};
+
+  // No timer needs to be mocked at this point, since the first update should be applied
+  // immediately.
+  // No added/removed hosts (emulate metadata or health change).
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Now we need the timer to be ready, since createTimer() will be call given that this update
+  // _will_ be delayed.
+  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+
+  // Remove a host.
+  hosts_added.clear();
+  hosts_removed.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11002"));
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Add it back.
+  hosts_added.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11002"));
+  hosts_removed.clear();
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Remove it again.
+  hosts_added.clear();
+  hosts_removed.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11002"));
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Ensure the coalesced updates were applied.
+  timer->callback_();
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
+
+  // postThreadLocalClusterUpdate() calls.
+  EXPECT_EQ(2, calls);
+}
+
+TEST_F(ClusterManagerImplTest, CoalescedUpdatesHostChangesInPlace) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11002
+      common_lb_config:
+        update_merge_window: 3s
+  )EOF";
+
+  createWithLocalClusterUpdate(parseBootstrapFromV2Yaml(yaml));
+  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+
+  // Ensure we see the right set of added/removed hosts on every call.
+  uint32_t calls = 0;
+  EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillRepeatedly(Invoke([&calls](uint32_t priority, const HostVector& hosts_added,
+                                      const HostVector& hosts_removed) -> void {
+        switch (calls) {
+        case 0:
+          // First immediate call, nothing was added/removed.
+          EXPECT_EQ(0, priority);
+          EXPECT_EQ(0, hosts_added.size());
+          EXPECT_EQ(0, hosts_removed.size());
+          break;
+        case 1:
+          // Merged call, failed/active/failed is coalesced as 1 call.
+          // Note, note, note: the host gets updated in place in the original
+          // list of hosts in this case, so nothing expected here.
+          EXPECT_EQ(0, priority);
+          EXPECT_EQ(0, hosts_added.size());
+          EXPECT_EQ(0, hosts_removed.size());
+          break;
+        }
+
+        ++calls;
+      }));
+
+  // Remove each host, sequentially.
+  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
+  HostVectorSharedPtr hosts(
+      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_added{};
+  HostVector hosts_removed{};
+
+  // No timer needs to be mocked at this point, since the first update should be applied
+  // immediately.
+  // No added/removed hosts (emulate metadata or health change).
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Now we need the timer to be ready, since createTimer() will be call given that this update
+  // _will_ be delayed.
+  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+
+  // Host becomes failed (no need to actually change it here).
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  // Host becomes active.
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  // Host becomes failed again.
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Ensure the coalesced updates were applied.
+  timer->callback_();
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
+
+  // postThreadLocalClusterUpdate() calls.
+  EXPECT_EQ(2, calls);
+}
+
+TEST_F(ClusterManagerImplTest, CoalescedUpdatesMetadataLatest) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11002
+      common_lb_config:
+        update_merge_window: 3s
+  )EOF";
+
+  createWithLocalClusterUpdate(parseBootstrapFromV2Yaml(yaml));
+  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+
+  // Ensure we see the right set of added/removed hosts on every call.
+  uint32_t calls = 0;
+  EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillRepeatedly(Invoke([&calls](uint32_t priority, const HostVector& hosts_added,
+                                      const HostVector& hosts_removed) -> void {
+        switch (calls) {
+        case 0:
+          // First immediate call, nothing was added/removed.
+          EXPECT_EQ(0, priority);
+          EXPECT_EQ(0, hosts_added.size());
+          EXPECT_EQ(0, hosts_removed.size());
+          break;
+        case 1:
+          // Merged call, add/remove/add is coalesced as 1 add.
+          // We should see the latest metadata.
+          EXPECT_EQ(0, priority);
+          EXPECT_EQ(1, hosts_added.size());
+          EXPECT_EQ(0, hosts_removed.size());
+          EXPECT_EQ(Config::Metadata::metadataValue(*hosts_added[0]->metadata(),
+                                                    Config::MetadataFilters::get().ENVOY_LB,
+                                                    "version")
+                        .string_value(),
+                    std::string("v1"));
+          break;
+        }
+
+        ++calls;
+      }));
+
+  // Remove each host, sequentially.
+  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
+  HostVectorSharedPtr hosts(
+      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_added{};
+  HostVector hosts_removed{};
+
+  // No timer needs to be mocked at this point, since the first update should be applied
+  // immediately.
+  // No added/removed hosts (emulate metadata or health change).
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Now we need the timer to be ready, since createTimer() will be call given that this update
+  // _will_ be delayed.
+  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+
+  // Add the host without metadata.
+  hosts_added.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11003"));
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Remove it.
+  hosts_added.clear();
+  hosts_removed.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11003"));
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Add it again, with metadata.
+  auto host = makeTestHost(cluster.info(), "tcp://127.0.0.1:11003");
+  host->metadata(buildMetadata("v1"));
+  hosts_added.push_back(host);
+  hosts_removed.clear();
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Ensure the coalesced updates were applied.
+  timer->callback_();
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
+
+  // postThreadLocalClusterUpdate() calls.
+  EXPECT_EQ(2, calls);
+}
+
+TEST_F(ClusterManagerImplTest, CoalescedUpdatesWeightLatest) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11002
+      common_lb_config:
+        update_merge_window: 3s
+  )EOF";
+
+  createWithLocalClusterUpdate(parseBootstrapFromV2Yaml(yaml));
+  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+
+  // Ensure we see the right set of added/removed hosts on every call.
+  uint32_t calls = 0;
+  EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillRepeatedly(Invoke([&calls](uint32_t priority, const HostVector& hosts_added,
+                                      const HostVector& hosts_removed) -> void {
+        switch (calls) {
+        case 0:
+          // First immediate call, nothing was added/removed.
+          EXPECT_EQ(0, priority);
+          EXPECT_EQ(0, hosts_added.size());
+          EXPECT_EQ(0, hosts_removed.size());
+          break;
+        case 1:
+          // Merged call, add/remove/add is coalesced as 1 add.
+          // We should the latest weight
+          EXPECT_EQ(0, priority);
+          EXPECT_EQ(1, hosts_added.size());
+          EXPECT_EQ(0, hosts_removed.size());
+          EXPECT_EQ(hosts_added[0]->weight(), 100);
+          break;
+        }
+
+        ++calls;
+      }));
+
+  // Remove each host, sequentially.
+  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
+  HostVectorSharedPtr hosts(
+      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_added{};
+  HostVector hosts_removed{};
+
+  // No timer needs to be mocked at this point, since the first update should be applied
+  // immediately.
+  // No added/removed hosts (emulate metadata or health change).
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Now we need the timer to be ready, since createTimer() will be call given that this update
+  // _will_ be delayed.
+  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+
+  // Add the host with some weight.
+  auto host = makeTestHost(cluster.info(), "tcp://127.0.0.1:11003");
+  host->weight(50);
+  hosts_added.push_back(host);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Remove it.
+  hosts_added.clear();
+  hosts_removed.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11003"));
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Add it again, with a new weight.
+  auto updated_host = makeTestHost(cluster.info(), "tcp://127.0.0.1:11003");
+  updated_host->weight(100);
+  hosts_added.push_back(updated_host);
+  hosts_removed.clear();
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Ensure the coalesced updates were applied.
+  timer->callback_();
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
+
+  // postThreadLocalClusterUpdate() calls.
+  EXPECT_EQ(2, calls);
 }
 
 class ClusterManagerInitHelperTest : public testing::Test {
