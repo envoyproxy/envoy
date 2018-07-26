@@ -331,13 +331,13 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     // This fires when a cluster is about to have an updated member set. We need to send this
     // out to all of the thread local configurations.
 
-    // Should we coalesce updates?
+    // Should we save this update and merge it with other updates?
     bool scheduled = false;
     if (cluster.info()->lbConfig().has_update_merge_window()) {
       scheduled = scheduleUpdate(cluster, priority, hosts_added, hosts_removed);
     }
 
-    // If an update was not scheduled, deliver it immediately.
+    // If an update was not scheduled for later, deliver it immediately.
     if (!scheduled) {
       postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
     }
@@ -453,7 +453,7 @@ void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
   const HostVector& hosts_added = fromMap(updates->added);
   const HostVector& hosts_removed = fromMap(updates->removed);
   postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
-  cm_stats_.coalesced_updates_.inc();
+  cm_stats_.merged_updates_.inc();
 
   // Reset everything.
   updates->timer = nullptr;

@@ -432,7 +432,7 @@ message Cluster {
       ZoneAwareLbConfig zone_aware_lb_config = 2;
       LocalityWeightedLbConfig locality_weighted_lb_config = 3;
     }
-    // If set, membership and healthcheck updates that happen within this duration will be coalesced
+    // If set, membership and healthcheck updates that happen within this duration will be merged
     // and delivered in one shot when the duration expires. The start of the duration is when the
     // first update happens. This is useful for big clusters, with potentially noisy deploys that
     // might trigger excessive CPU usage due to a constant stream of healthcheck state changes or

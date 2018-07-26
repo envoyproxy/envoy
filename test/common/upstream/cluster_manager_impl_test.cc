@@ -1693,7 +1693,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   factory_.tls_.shutdownThread();
 }
 
-TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
+TEST_F(ClusterManagerImplTest, MergedUpdates) {
   createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
@@ -1744,9 +1744,9 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
 
-  // Ensure the coalesced updates were applied.
+  // Ensure the merged updates were applied.
   timer->callback_();
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
 
   // Prepare a new timer for the next round of updates.
   timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
@@ -1761,12 +1761,12 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
 
-  // Ensure the coalesced updates were applied again.
+  // Ensure the merged updates were applied again.
   timer->callback_();
-  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
+  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.merged_updates").value());
 }
 
-TEST_F(ClusterManagerImplTest, CoalescedUpdatesAddRemoveAdd) {
+TEST_F(ClusterManagerImplTest, MergedUpdatesAddRemoveAdd) {
   createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
@@ -1782,7 +1782,7 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesAddRemoveAdd) {
           EXPECT_EQ(0, hosts_removed.size());
           break;
         case 1:
-          // Merged call, add/remove/add is coalesced as 1 add.
+          // Merged call, add/remove/add is merged as 1 add.
           EXPECT_EQ(0, priority);
           EXPECT_EQ(1, hosts_added.size());
           EXPECT_EQ(0, hosts_removed.size());
@@ -1826,15 +1826,15 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesAddRemoveAdd) {
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
 
-  // Ensure the coalesced updates were applied.
+  // Ensure the merged updates were applied.
   timer->callback_();
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
 
   // postThreadLocalClusterUpdate() calls.
   EXPECT_EQ(2, calls);
 }
 
-TEST_F(ClusterManagerImplTest, CoalescedUpdatesRemoveAddRemove) {
+TEST_F(ClusterManagerImplTest, MergedUpdatesRemoveAddRemove) {
   createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
@@ -1850,7 +1850,7 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesRemoveAddRemove) {
           EXPECT_EQ(0, hosts_removed.size());
           break;
         case 1:
-          // Merged call, remove/add/remove is coalesced as 1 remove.
+          // Merged call, remove/add/remove is merged as 1 remove.
           EXPECT_EQ(0, priority);
           EXPECT_EQ(0, hosts_added.size());
           EXPECT_EQ(1, hosts_removed.size());
@@ -1895,15 +1895,15 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesRemoveAddRemove) {
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
 
-  // Ensure the coalesced updates were applied.
+  // Ensure the merged updates were applied.
   timer->callback_();
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
 
   // postThreadLocalClusterUpdate() calls.
   EXPECT_EQ(2, calls);
 }
 
-TEST_F(ClusterManagerImplTest, CoalescedUpdatesHostChangesInPlace) {
+TEST_F(ClusterManagerImplTest, MergedUpdatesHostChangesInPlace) {
   createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
@@ -1919,7 +1919,7 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesHostChangesInPlace) {
           EXPECT_EQ(0, hosts_removed.size());
           break;
         case 1:
-          // Merged call, failed/active/failed is coalesced as 1 call.
+          // Merged call, failed/active/failed is merged as 1 call.
           // Note, note, note: the host gets updated in place in the original
           // list of hosts in this case, so nothing expected here.
           EXPECT_EQ(0, priority);
@@ -1958,15 +1958,15 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesHostChangesInPlace) {
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
 
-  // Ensure the coalesced updates were applied.
+  // Ensure the merged updates were applied.
   timer->callback_();
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
 
   // postThreadLocalClusterUpdate() calls.
   EXPECT_EQ(2, calls);
 }
 
-TEST_F(ClusterManagerImplTest, CoalescedUpdatesMetadataLatest) {
+TEST_F(ClusterManagerImplTest, MergedUpdatesMetadataLatest) {
   createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
@@ -1982,7 +1982,7 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesMetadataLatest) {
           EXPECT_EQ(0, hosts_removed.size());
           break;
         case 1:
-          // Merged call, add/remove/add is coalesced as 1 add.
+          // Merged call, add/remove/add is merged as 1 add.
           // We should see the latest metadata.
           EXPECT_EQ(0, priority);
           EXPECT_EQ(1, hosts_added.size());
@@ -2034,15 +2034,15 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesMetadataLatest) {
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
 
-  // Ensure the coalesced updates were applied.
+  // Ensure the merged updates were applied.
   timer->callback_();
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
 
   // postThreadLocalClusterUpdate() calls.
   EXPECT_EQ(2, calls);
 }
 
-TEST_F(ClusterManagerImplTest, CoalescedUpdatesWeightLatest) {
+TEST_F(ClusterManagerImplTest, MergedUpdatesWeightLatest) {
   createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
@@ -2058,7 +2058,7 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesWeightLatest) {
           EXPECT_EQ(0, hosts_removed.size());
           break;
         case 1:
-          // Merged call, add/remove/add is coalesced as 1 add.
+          // Merged call, add/remove/add is merged as 1 add.
           // We should the latest weight
           EXPECT_EQ(0, priority);
           EXPECT_EQ(1, hosts_added.size());
@@ -2108,9 +2108,9 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesWeightLatest) {
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
 
-  // Ensure the coalesced updates were applied.
+  // Ensure the merged updates were applied.
   timer->callback_();
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.coalesced_updates").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
 
   // postThreadLocalClusterUpdate() calls.
   EXPECT_EQ(2, calls);
