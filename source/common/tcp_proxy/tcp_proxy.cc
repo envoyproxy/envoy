@@ -139,8 +139,8 @@ Filter::~Filter() {
     upstream_handle_->cancel();
   }
 
-  if (upstream_connection_) {
-    upstream_connection_->connection().close(Network::ConnectionCloseType::NoFlush);
+  if (upstream_conn_data_) {
+    upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
   }
 }
 
@@ -177,15 +177,15 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
 }
 
 void Filter::readDisableUpstream(bool disable) {
-  if (upstream_connection_ == nullptr ||
-      upstream_connection_->connection().state() != Network::Connection::State::Open) {
+  if (upstream_conn_data_ == nullptr ||
+      upstream_conn_data_->connection().state() != Network::Connection::State::Open) {
     // Because we flush write downstream, we can have a case where upstream has already disconnected
     // and we are waiting to flush. If we had a watermark event during this time we should no
     // longer touch the upstream connection.
     return;
   }
 
-  upstream_connection_->connection().readDisable(disable);
+  upstream_conn_data_->connection().readDisable(disable);
   if (disable) {
     read_callbacks_->upstreamHost()
         ->cluster()
@@ -282,7 +282,7 @@ void Filter::UpstreamCallbacks::drain(Drainer& drainer) {
 }
 
 Network::FilterStatus Filter::initializeUpstreamConnection() {
-  ASSERT(upstream_connection_ == nullptr);
+  ASSERT(upstream_conn_data_ == nullptr);
 
   const std::string& cluster_name = getUpstreamCluster();
 
@@ -364,12 +364,12 @@ void Filter::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
 void Filter::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                          Upstream::HostDescriptionConstSharedPtr host) {
   upstream_handle_ = nullptr;
-  upstream_connection_ = std::move(conn_data);
+  upstream_conn_data_ = std::move(conn_data);
   read_callbacks_->upstreamHost(host);
 
-  upstream_connection_->addUpstreamCallbacks(*upstream_callbacks_);
+  upstream_conn_data_->addUpstreamCallbacks(*upstream_callbacks_);
 
-  Network::ClientConnection& connection = upstream_connection_->connection();
+  Network::ClientConnection& connection = upstream_conn_data_->connection();
 
   connection.enableHalfClose(true);
 
@@ -395,26 +395,26 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "downstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
   getRequestInfo().addBytesReceived(data.length());
-  upstream_connection_->connection().write(data, end_stream);
+  upstream_conn_data_->connection().write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   return Network::FilterStatus::StopIteration;
 }
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
-  if (upstream_connection_) {
+  if (upstream_conn_data_) {
     if (event == Network::ConnectionEvent::RemoteClose) {
-      upstream_connection_->connection().close(Network::ConnectionCloseType::FlushWrite);
+      upstream_conn_data_->connection().close(Network::ConnectionCloseType::FlushWrite);
 
-      if (upstream_connection_ != nullptr &&
-          upstream_connection_->connection().state() != Network::Connection::State::Closed) {
-        config_->drainManager().add(config_->sharedConfig(), std::move(upstream_connection_),
+      if (upstream_conn_data_ != nullptr &&
+          upstream_conn_data_->connection().state() != Network::Connection::State::Closed) {
+        config_->drainManager().add(config_->sharedConfig(), std::move(upstream_conn_data_),
                                     std::move(upstream_callbacks_), std::move(idle_timer_),
                                     read_callbacks_->upstreamHost());
       }
     } else if (event == Network::ConnectionEvent::LocalClose) {
-      upstream_connection_->connection().close(Network::ConnectionCloseType::NoFlush);
-      upstream_connection_.reset();
+      upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+      upstream_conn_data_.reset();
       disableIdleTimer();
     }
   }
@@ -437,7 +437,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    upstream_connection_.reset();
+    upstream_conn_data_.reset();
     disableIdleTimer();
 
     if (connecting) {
@@ -473,8 +473,8 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
           });
       resetIdleTimer();
       read_callbacks_->connection().addBytesSentCallback([this](uint64_t) { resetIdleTimer(); });
-      upstream_connection_->connection().addBytesSentCallback([upstream_callbacks =
-                                                                   upstream_callbacks_](uint64_t) {
+      upstream_conn_data_->connection().addBytesSentCallback([upstream_callbacks =
+                                                                  upstream_callbacks_](uint64_t) {
         upstream_callbacks->onBytesSent();
       });
     }
@@ -518,11 +518,11 @@ UpstreamDrainManager::~UpstreamDrainManager() {
 }
 
 void UpstreamDrainManager::add(const Config::SharedConfigSharedPtr& config,
-                               Tcp::ConnectionPool::ConnectionDataPtr&& upstream_connection,
+                               Tcp::ConnectionPool::ConnectionDataPtr&& upstream_conn_data,
                                const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
                                Event::TimerPtr&& idle_timer,
                                const Upstream::HostDescriptionConstSharedPtr& upstream_host) {
-  DrainerPtr drainer(new Drainer(*this, config, callbacks, std::move(upstream_connection),
+  DrainerPtr drainer(new Drainer(*this, config, callbacks, std::move(upstream_conn_data),
                                  std::move(idle_timer), upstream_host));
   callbacks->drain(*drainer);
 
@@ -540,9 +540,9 @@ void UpstreamDrainManager::remove(Drainer& drainer, Event::Dispatcher& dispatche
 
 Drainer::Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
                  const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
-                 Tcp::ConnectionPool::ConnectionDataPtr&& connection, Event::TimerPtr&& idle_timer,
+                 Tcp::ConnectionPool::ConnectionDataPtr&& conn_data, Event::TimerPtr&& idle_timer,
                  const Upstream::HostDescriptionConstSharedPtr& upstream_host)
-    : parent_(parent), callbacks_(callbacks), upstream_connection_(std::move(connection)),
+    : parent_(parent), callbacks_(callbacks), upstream_conn_data_(std::move(conn_data)),
       timer_(std::move(idle_timer)), upstream_host_(upstream_host), config_(config) {
   config_->stats().upstream_flush_total_.inc();
   config_->stats().upstream_flush_active_.inc();
@@ -555,7 +555,7 @@ void Drainer::onEvent(Network::ConnectionEvent event) {
       timer_->disableTimer();
     }
     config_->stats().upstream_flush_active_.dec();
-    parent_.remove(*this, upstream_connection_->connection().dispatcher());
+    parent_.remove(*this, upstream_conn_data_->connection().dispatcher());
   }
 }
 
@@ -582,7 +582,7 @@ void Drainer::onBytesSent() {
 
 void Drainer::cancelDrain() {
   // This sends onEvent(LocalClose).
-  upstream_connection_->connection().close(Network::ConnectionCloseType::NoFlush);
+  upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
 
 } // namespace TcpProxy
