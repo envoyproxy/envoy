@@ -3,8 +3,6 @@ syntax = "proto3";
 package envoy.config.overload.v2alpha;
 option go_package = "v2alpha";
 
-import "envoy/type/percent.proto";
-
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
@@ -28,7 +26,7 @@ message ResourceMonitor {
 message ThresholdTrigger {
   // If the resource pressure is greater than or equal to this value, the trigger
   // will fire.
-  envoy.type.Percent pressure = 1;
+  double value = 1 [(validate.rules).double = {gte: 0, lte: 1}];
 }
 
 message Trigger {
@@ -36,6 +34,7 @@ message Trigger {
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   oneof trigger_oneof {
+    option (validate.required) = true;
     ThresholdTrigger threshold = 2;
   }
 }

@@ -14,7 +14,7 @@ namespace {
 class ThresholdTriggerImpl : public OverloadActionImpl::Trigger {
 public:
   ThresholdTriggerImpl(const envoy::config::overload::v2alpha::ThresholdTrigger& config)
-      : threshold_(config.pressure().value()) {}
+      : threshold_(config.value()) {}
 
   bool updateValue(double value) {
     const bool fired = isFired();

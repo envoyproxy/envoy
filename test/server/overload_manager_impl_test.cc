@@ -113,13 +113,13 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
       triggers {
         name: "envoy.resource_monitors.fake_resource1"
         threshold {
-          pressure { value: 0.9 }
+          value: 0.9
         }
       }
       triggers {
         name: "envoy.resource_monitors.fake_resource2"
         threshold {
-          pressure { value: 0.8 }
+          value: 0.8
         }
       }
     }
@@ -206,7 +206,7 @@ TEST_F(OverloadManagerImplTest, UnknownTrigger) {
       triggers {
         name: "envoy.resource_monitors.fake_resource1"
         threshold {
-          pressure { value: 0.9 }
+          value: 0.9
         }
       }
     }
@@ -226,13 +226,13 @@ TEST_F(OverloadManagerImplTest, DuplicateTrigger) {
       triggers {
         name: "envoy.resource_monitors.fake_resource1"
         threshold {
-          pressure { value: 0.9 }
+          value: 0.9
         }
       }
       triggers {
         name: "envoy.resource_monitors.fake_resource1"
         threshold {
-          pressure { value: 0.8 }
+          value: 0.8
         }
       }
     }
