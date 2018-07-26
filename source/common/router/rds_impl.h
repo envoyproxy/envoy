@@ -83,6 +83,10 @@ struct RdsStats {
 class RouteConfigProviderManagerImpl;
 class RdsRouteConfigProviderImpl;
 
+/**
+ * A class that fetches the route configuration dynamically using the RDS API and updates them to
+ * RDS config providers.
+ */
 class RdsRouteConfigSubscription
     : public Init::Target,
       Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>,
@@ -136,9 +140,11 @@ private:
   friend class RdsRouteConfigProviderImpl;
 };
 
+typedef std::shared_ptr<RdsRouteConfigSubscription> RdsRouteConfigSubscriptionSharedPtr;
+
 /**
  * Implementation of RouteConfigProvider that fetches the route configuration dynamically using
- * the RDS API.
+ * the subscription.
  */
 class RdsRouteConfigProviderImpl : public RouteConfigProvider,
                                    public std::enable_shared_from_this<RdsRouteConfigProviderImpl>,
@@ -158,12 +164,12 @@ private:
     ConfigConstSharedPtr config_;
   };
 
-  RdsRouteConfigProviderImpl(std::shared_ptr<RdsRouteConfigSubscription>&& subscription,
+  RdsRouteConfigProviderImpl(RdsRouteConfigSubscriptionSharedPtr&& subscription,
                              Server::Configuration::FactoryContext& factory_context);
 
   void onConfigUpdate();
 
-  std::shared_ptr<RdsRouteConfigSubscription> subscription_;
+  RdsRouteConfigSubscriptionSharedPtr subscription_;
   Server::Configuration::FactoryContext& factory_context_;
   ThreadLocal::SlotPtr tls_;
   const std::string route_config_name_;

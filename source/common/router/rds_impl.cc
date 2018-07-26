@@ -45,6 +45,8 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     : config_(new ConfigImpl(config, factory_context, true)), route_config_proto_{config},
       last_updated_(factory_context.systemTimeSource().currentTime()) {}
 
+// TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
+// initialization needs to be fixed.
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
     const std::string& manager_identifier, Server::Configuration::FactoryContext& factory_context,
@@ -138,10 +140,8 @@ void RdsRouteConfigSubscription::runInitializeCallbackIfAny() {
   }
 }
 
-// TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
-// initialization needs to be fixed.
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
-    std::shared_ptr<RdsRouteConfigSubscription>&& subscription,
+    RdsRouteConfigSubscriptionSharedPtr&& subscription,
     Server::Configuration::FactoryContext& factory_context)
     : subscription_(std::move(subscription)), factory_context_(factory_context),
       tls_(factory_context.threadLocal().allocateSlot()) {
@@ -232,7 +232,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRdsRoute
   // strong hash instead.
   const std::string manager_identifier = rds.SerializeAsString();
 
-  std::shared_ptr<RdsRouteConfigSubscription> subscription;
+  RdsRouteConfigSubscriptionSharedPtr subscription;
 
   auto it = route_config_subscriptions_.find(manager_identifier);
   if (it == route_config_subscriptions_.end()) {
