@@ -168,9 +168,10 @@ void HeapStatDataAllocator::free(HeapStatData& data) {
 
 /**
  * Counter implementation that wraps a StatData. StatData must have data members:
- *    int64_t value_;
- *    int64_t pending_increment_;
- *    int16_t flags_;
+ *    std::atomic<int64_t> value_;
+ *    std::atomic<int64_t> pending_increment_;
+ *    std::atomic<int16_t> flags_;
+ *    std::atomic<int16_t> ref_count_;
  */
 template <class StatData> class CounterImpl : public Counter, public MetricImpl {
 public:

@@ -391,7 +391,7 @@ struct HeapStatData {
   explicit HeapStatData(absl::string_view key);
 
   /**
-   * Returns the name as a string_view. This is required by BlockMemoryHashSet.
+   * @returns absl::string_view the name as a string_view.
    */
   absl::string_view key() const { return name_; }
 
@@ -399,7 +399,6 @@ struct HeapStatData {
   std::atomic<uint64_t> pending_increment_{0};
   std::atomic<uint16_t> flags_{0};
   std::atomic<uint16_t> ref_count_{1};
-  std::atomic<uint32_t> unused_{0};
   std::string name_;
 };
 
