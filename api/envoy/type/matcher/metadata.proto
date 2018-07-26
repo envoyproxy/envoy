@@ -49,8 +49,8 @@ import "validate/validate.proto";
 //      string_match:
 //        prefix: pr
 //
-// The following MetadataMatcher is not matched as the path [a, t] is pointing to a list value in
-// the Metadata which is not supported for now.
+// The following MetadataMatcher is matched as the code will match one of the string values in the
+// list at the path [a, t].
 //
 // .. code-block:: yaml
 //
@@ -68,8 +68,6 @@ import "validate/validate.proto";
 // <envoy_api_msg_config.rbac.v2alpha.Principal>`.
 message MetadataMatcher {
   // Specifies the segment in a path to retrieve value from Metadata.
-  // Note: Currently it's not supported to retrieve a value from a list in Metadata. This means it
-  // will always be not matched if the associated value of the key is a list.
   message PathSegment {
     oneof segment {
       option (validate.required) = true;
