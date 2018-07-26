@@ -23,7 +23,7 @@ StatNamePtr SymbolTableImpl::encode(const std::string& name) {
 }
 
 std::string SymbolTableImpl::decode(const SymbolVec& symbol_vec) const {
-  std::vector<std::string> name;
+  std::vector<absl::string_view> name;
   name.reserve(symbol_vec.size());
   std::transform(symbol_vec.begin(), symbol_vec.end(), std::back_inserter(name),
                  [this](Symbol x) { return fromSymbol(x); });
@@ -76,7 +76,7 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   return result;
 }
 
-std::string SymbolTableImpl::fromSymbol(const Symbol symbol) const {
+absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const {
   auto search = decode_map_.find(symbol);
   RELEASE_ASSERT(search != decode_map_.end(), "");
   return search->second;

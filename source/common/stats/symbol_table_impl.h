@@ -74,9 +74,9 @@ private:
    * Convenience function for decode(), decoding one symbol at a time.
    *
    * @param symbol the individual symbol to be decoded.
-   * @return std::string the decoded string.
+   * @return absl::string_view the decoded string.
    */
-  std::string fromSymbol(const Symbol symbol) const;
+  absl::string_view fromSymbol(const Symbol symbol) const;
 
   // Stages a new symbol for use. To be called after a successful insertion.
   void newSymbol() {
