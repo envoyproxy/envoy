@@ -164,7 +164,8 @@ TEST(MetadataTest, MatchPresentValue) {
 
 TEST(MetadataTest, MatchStringListValue) {
   envoy::api::v2::core::Metadata metadata;
-  ProtobufWkt::Value& metadataValue = Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
+  ProtobufWkt::Value& metadataValue =
+      Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
   ProtobufWkt::ListValue* values = metadataValue.mutable_list_value();
   values->add_values()->set_string_value("first");
   values->add_values()->set_string_value("second");
@@ -191,7 +192,8 @@ TEST(MetadataTest, MatchStringListValue) {
 
 TEST(MetadataTest, MatchBoolListValue) {
   envoy::api::v2::core::Metadata metadata;
-  ProtobufWkt::Value& metadataValue = Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
+  ProtobufWkt::Value& metadataValue =
+      Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
   ProtobufWkt::ListValue* values = metadataValue.mutable_list_value();
   values->add_values()->set_bool_value(false);
   values->add_values()->set_bool_value(false);
@@ -213,7 +215,8 @@ TEST(MetadataTest, MatchBoolListValue) {
 
 TEST(MetadataTest, MatchDoubleListValue) {
   envoy::api::v2::core::Metadata metadata;
-  ProtobufWkt::Value& metadataValue = Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
+  ProtobufWkt::Value& metadataValue =
+      Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
   ProtobufWkt::ListValue* values = metadataValue.mutable_list_value();
   values->add_values()->set_number_value(10);
   values->add_values()->set_number_value(23);
