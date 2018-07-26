@@ -574,7 +574,8 @@ TEST_F(RouteConfigProviderManagerImplTest, ValidateFail) {
   auto* route_config = route_configs.Add();
   route_config->set_name("foo_route_config");
   route_config->mutable_virtual_hosts()->Add();
-  EXPECT_THROW(provider_impl.subscription().onConfigUpdate(route_configs, ""), ProtoValidationException);
+  EXPECT_THROW(provider_impl.subscription().onConfigUpdate(route_configs, ""),
+               ProtoValidationException);
 }
 
 TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateEmpty) {
@@ -595,8 +596,8 @@ TEST_F(RouteConfigProviderManagerImplTest, onConfigUpdateWrongSize) {
   route_configs.Add();
   route_configs.Add();
   EXPECT_CALL(factory_context_.init_manager_.initialized_, ready());
-  EXPECT_THROW_WITH_MESSAGE(provider_impl.subscription().onConfigUpdate(route_configs, ""), EnvoyException,
-                            "Unexpected RDS resource length: 2");
+  EXPECT_THROW_WITH_MESSAGE(provider_impl.subscription().onConfigUpdate(route_configs, ""),
+                            EnvoyException, "Unexpected RDS resource length: 2");
 }
 
 } // namespace
