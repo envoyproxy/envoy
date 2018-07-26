@@ -160,6 +160,12 @@ protected:
   MockLocalClusterUpdate& local_cluster_update_;
 };
 
+envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  MessageUtil::loadFromYaml(yaml, bootstrap);
+  return bootstrap;
+}
+
 class ClusterManagerImplTest : public testing::Test {
 public:
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -169,7 +175,26 @@ public:
         monotonic_time_source_));
   }
 
-  void createWithLocalClusterUpdate(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  void createWithLocalClusterUpdate() {
+    const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STATIC
+      lb_policy: ROUND_ROBIN
+      hosts:
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11001
+      - socket_address:
+          address: "127.0.0.1"
+          port_value: 11002
+      common_lb_config:
+        update_merge_window: 3s
+  )EOF";
+    const auto& bootstrap = parseBootstrapFromV2Yaml(yaml);
+
     cluster_manager_.reset(new TestClusterManagerImpl(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
         factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, system_time_source_,
@@ -222,12 +247,6 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string
   Stats::StatsOptionsImpl stats_options;
   Config::BootstrapJson::translateClusterManagerBootstrap(*json_object_ptr, bootstrap,
                                                           stats_options);
-  return bootstrap;
-}
-
-envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  MessageUtil::loadFromYaml(yaml, bootstrap);
   return bootstrap;
 }
 
@@ -1675,26 +1694,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
 }
 
 TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
-  const std::string yaml = R"EOF(
-  static_resources:
-    clusters:
-    - name: cluster_1
-      connect_timeout: 0.250s
-      type: STATIC
-      lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11002
-      common_lb_config:
-        update_merge_window: 3s
-  )EOF";
-
-  createWithLocalClusterUpdate(parseBootstrapFromV2Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
@@ -1723,25 +1723,26 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
         ++call;
       }));
 
-  // Remove each host, sequentially.
   const Cluster& cluster = cluster_manager_->clusters().begin()->second;
   HostVectorSharedPtr hosts(
       new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
   HostVector hosts_added{};
-  HostVector hosts_removed_0{(*hosts)[0]};
-  HostVector hosts_removed_1{(*hosts)[1]};
+  HostVector hosts_removed{};
 
   // No timer needs to be mocked at this point, since the first update should be applied
   // immediately.
+  hosts_removed.push_back((*hosts)[0]);
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed_0);
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
 
   // Now we need the timer to be ready, since createTimer() will be call given that this update
   // _will_ be delayed.
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+  hosts_removed.clear();
+  hosts_removed.push_back((*hosts)[1]);
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed_1);
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
 
   // Ensure the coalesced updates were applied.
   timer->callback_();
@@ -1751,10 +1752,14 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
   timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
 
   // Add them back.
+  hosts_removed.clear();
+  hosts_added.push_back((*hosts)[0]);
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_removed_0, hosts_added);
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  hosts_added.clear();
+  hosts_added.push_back((*hosts)[1]);
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_removed_1, hosts_added);
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
 
   // Ensure the coalesced updates were applied again.
   timer->callback_();
@@ -1762,26 +1767,7 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdates) {
 }
 
 TEST_F(ClusterManagerImplTest, CoalescedUpdatesAddRemoveAdd) {
-  const std::string yaml = R"EOF(
-  static_resources:
-    clusters:
-    - name: cluster_1
-      connect_timeout: 0.250s
-      type: STATIC
-      lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11002
-      common_lb_config:
-        update_merge_window: 3s
-  )EOF";
-
-  createWithLocalClusterUpdate(parseBootstrapFromV2Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
   uint32_t calls = 0;
@@ -1806,7 +1792,6 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesAddRemoveAdd) {
         ++calls;
       }));
 
-  // Remove each host, sequentially.
   const Cluster& cluster = cluster_manager_->clusters().begin()->second;
   HostVectorSharedPtr hosts(
       new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
@@ -1850,26 +1835,7 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesAddRemoveAdd) {
 }
 
 TEST_F(ClusterManagerImplTest, CoalescedUpdatesRemoveAddRemove) {
-  const std::string yaml = R"EOF(
-  static_resources:
-    clusters:
-    - name: cluster_1
-      connect_timeout: 0.250s
-      type: STATIC
-      lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11002
-      common_lb_config:
-        update_merge_window: 3s
-  )EOF";
-
-  createWithLocalClusterUpdate(parseBootstrapFromV2Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
   uint32_t calls = 0;
@@ -1894,7 +1860,6 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesRemoveAddRemove) {
         ++calls;
       }));
 
-  // Remove each host, sequentially.
   const Cluster& cluster = cluster_manager_->clusters().begin()->second;
   HostVectorSharedPtr hosts(
       new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
@@ -1939,26 +1904,7 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesRemoveAddRemove) {
 }
 
 TEST_F(ClusterManagerImplTest, CoalescedUpdatesHostChangesInPlace) {
-  const std::string yaml = R"EOF(
-  static_resources:
-    clusters:
-    - name: cluster_1
-      connect_timeout: 0.250s
-      type: STATIC
-      lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11002
-      common_lb_config:
-        update_merge_window: 3s
-  )EOF";
-
-  createWithLocalClusterUpdate(parseBootstrapFromV2Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
   uint32_t calls = 0;
@@ -1985,7 +1931,6 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesHostChangesInPlace) {
         ++calls;
       }));
 
-  // Remove each host, sequentially.
   const Cluster& cluster = cluster_manager_->clusters().begin()->second;
   HostVectorSharedPtr hosts(
       new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
@@ -2022,26 +1967,7 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesHostChangesInPlace) {
 }
 
 TEST_F(ClusterManagerImplTest, CoalescedUpdatesMetadataLatest) {
-  const std::string yaml = R"EOF(
-  static_resources:
-    clusters:
-    - name: cluster_1
-      connect_timeout: 0.250s
-      type: STATIC
-      lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11002
-      common_lb_config:
-        update_merge_window: 3s
-  )EOF";
-
-  createWithLocalClusterUpdate(parseBootstrapFromV2Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
   uint32_t calls = 0;
@@ -2072,7 +1998,6 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesMetadataLatest) {
         ++calls;
       }));
 
-  // Remove each host, sequentially.
   const Cluster& cluster = cluster_manager_->clusters().begin()->second;
   HostVectorSharedPtr hosts(
       new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
@@ -2118,26 +2043,7 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesMetadataLatest) {
 }
 
 TEST_F(ClusterManagerImplTest, CoalescedUpdatesWeightLatest) {
-  const std::string yaml = R"EOF(
-  static_resources:
-    clusters:
-    - name: cluster_1
-      connect_timeout: 0.250s
-      type: STATIC
-      lb_policy: ROUND_ROBIN
-      hosts:
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11001
-      - socket_address:
-          address: "127.0.0.1"
-          port_value: 11002
-      common_lb_config:
-        update_merge_window: 3s
-  )EOF";
-
-  createWithLocalClusterUpdate(parseBootstrapFromV2Yaml(yaml));
-  EXPECT_FALSE(cluster_manager_->get("cluster_1")->info()->addedViaApi());
+  createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
   uint32_t calls = 0;
@@ -2164,7 +2070,6 @@ TEST_F(ClusterManagerImplTest, CoalescedUpdatesWeightLatest) {
         ++calls;
       }));
 
-  // Remove each host, sequentially.
   const Cluster& cluster = cluster_manager_->clusters().begin()->second;
   HostVectorSharedPtr hosts(
       new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
