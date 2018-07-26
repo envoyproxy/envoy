@@ -35,7 +35,7 @@ public:
 
   /**
    * @param data_name the name of the data being set.
-   * @return Whether data of the type and name specified exists in the 
+   * @return Whether data of the type and name specified exists in the
    * data store.
    */
   template <typename T> bool hasData(absl::string_view data_name) const {
@@ -44,7 +44,7 @@ public:
 
   /**
    * @param data_name the name of the data being set.
-   * @return Whether data of any type and the name specified exists in the 
+   * @return Whether data of any type and the name specified exists in the
    * data store.
    */
   virtual bool hasDataWithName(absl::string_view data_name) const PURE;
