@@ -595,6 +595,11 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
   if (removed) {
     cm_stats_.cluster_removed_.inc();
     updateGauges();
+    // Did we ever deliver merged updates for this cluster?
+    if (updates_map_.count(cluster_name) == 1) {
+      // No need to manually disable timers, this should take care of it.
+      updates_map_.erase(cluster_name);
+    }
   }
 
   return removed;
