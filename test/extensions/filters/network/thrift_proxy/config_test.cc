@@ -31,7 +31,7 @@ TEST(ThriftFilterConfigTest, ValidProtoConfiguration) {
   ThriftProxyFilterConfigFactory factory;
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addFilter(_));
+  EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 }
 
@@ -45,7 +45,7 @@ TEST(ThriftFilterConfigTest, ThriftProxyWithEmptyProto) {
 
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;
-  EXPECT_CALL(connection, addFilter(_));
+  EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 }
 
