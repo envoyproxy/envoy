@@ -38,10 +38,10 @@ void SymbolTableImpl::free(const SymbolVec& symbol_vec) {
     auto encode_search = encode_map_.find(decode_search->second);
     RELEASE_ASSERT(encode_search != encode_map_.end(), "");
 
-    ((encode_search->second).second)--;
+    (encode_search->second.ref_count_)--;
     // If that was the last remaining client usage of the symbol, erase the the current
     // mappings and add the now-unused symbol to the reuse pool.
-    if ((encode_search->second).second == 0) {
+    if (encode_search->second.ref_count_ == 0) {
       decode_map_.erase(decode_search);
       encode_map_.erase(encode_search);
       pool_.push(symbol);
@@ -61,8 +61,8 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
     auto decode_insert = decode_map_.insert({current_symbol_, std::move(str)});
     RELEASE_ASSERT(decode_insert.second, "");
 
-    auto encode_insert =
-        encode_map_.insert({decode_insert.first->second, std::make_pair(current_symbol_, 1)});
+    auto encode_insert = encode_map_.insert(
+        {decode_insert.first->second, {.symbol_ = current_symbol_, .ref_count_ = 1}});
     RELEASE_ASSERT(encode_insert.second, "");
 
     result = current_symbol_;
@@ -70,8 +70,8 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   } else {
     // If the insertion didn't take place, return the actual value at that location and up the
     // refcount at that location
-    result = (encode_find->second).first;
-    ++(encode_find->second).second;
+    result = encode_find->second.symbol_;
+    ++(encode_find->second.ref_count_);
   }
   return result;
 }

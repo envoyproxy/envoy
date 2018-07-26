@@ -43,6 +43,12 @@ public:
 private:
   friend class StatNameImpl;
   friend class StatNameTest;
+
+  struct SharedSymbol {
+    Symbol symbol_;
+    uint32_t ref_count_;
+  };
+
   /**
    * Decodes a vector of symbols back into its period-delimited stat name.
    * If decoding fails on any part of the symbol_vec, we release_assert and crash hard, since this
@@ -101,7 +107,7 @@ private:
   // Bimap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
   // Using absl::string_view lets us only store the complete string once, in the decode map.
-  std::unordered_map<absl::string_view, std::pair<Symbol, uint32_t>, StringViewHash> encode_map_;
+  std::unordered_map<absl::string_view, SharedSymbol, StringViewHash> encode_map_;
   std::unordered_map<Symbol, std::string> decode_map_;
 
   // Free pool of symbols for re-use.
