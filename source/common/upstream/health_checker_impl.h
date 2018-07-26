@@ -90,13 +90,14 @@ private:
       HttpActiveHealthCheckSession& parent_;
     };
 
-    static const RequestInfo::RequestInfoImpl REQUEST_INFO;
-
     ConnectionCallbackImpl connection_callback_impl_{*this};
     HttpHealthCheckerImpl& parent_;
     Http::CodecClientPtr client_;
     Http::StreamEncoder* request_encoder_{};
     Http::HeaderMapPtr response_headers_;
+    const std::string& hostname_;
+    const Http::Protocol protocol_;
+    Network::Address::InstanceConstSharedPtr local_address_;
     bool expect_reset_{};
   };
 
