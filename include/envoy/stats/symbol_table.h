@@ -6,6 +6,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -36,7 +38,7 @@ public:
    * @param name the stat name to encode.
    * @return StatNamePtr a unique_ptr to the StatName class encapsulating the symbol vector.
    */
-  virtual StatNamePtr encode(const std::string& name) PURE;
+  virtual StatNamePtr encode(const absl::string_view name) PURE;
 
   /**
    * Returns the size of a SymbolTable, as measured in number of symbols stored.

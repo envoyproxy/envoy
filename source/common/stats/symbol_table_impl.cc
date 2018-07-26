@@ -12,7 +12,7 @@ namespace Stats {
 // TODO(ambuc): There is a possible performance optimization here for avoiding the encoding of IPs,
 // if they appear in stat names. We don't want to waste time symbolizing an integer as an integer,
 // if we can help it.
-StatNamePtr SymbolTableImpl::encode(const std::string& name) {
+StatNamePtr SymbolTableImpl::encode(const absl::string_view name) {
   SymbolVec symbol_vec;
   std::vector<absl::string_view> name_vec = absl::StrSplit(name, '.');
   symbol_vec.reserve(name_vec.size());

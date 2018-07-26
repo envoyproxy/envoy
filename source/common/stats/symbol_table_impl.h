@@ -32,7 +32,7 @@ using SymbolVec = std::vector<Symbol>;
  */
 class SymbolTableImpl : public SymbolTable {
 public:
-  StatNamePtr encode(const std::string& name) override;
+  StatNamePtr encode(const absl::string_view name) override;
 
   // For testing purposes only.
   size_t size() const override {
