@@ -426,7 +426,7 @@ ClusterSharedPtr ClusterImplBase::create(
       throw EnvoyException("Multiple health checks not supported");
     } else {
       new_cluster->setHealthChecker(HealthCheckerFactory::create(
-          cluster.health_checks()[0], *new_cluster, runtime, random, dispatcher));
+          cluster.health_checks()[0], *new_cluster, runtime, random, dispatcher, log_manager));
     }
   }
 
