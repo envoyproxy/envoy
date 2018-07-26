@@ -78,6 +78,18 @@ bool MetadataMatcher::match(const envoy::api::v2::core::Metadata& metadata) cons
   case ProtobufWkt::Value::kBoolValue:
     return (bool_matcher_.has_value() && *bool_matcher_ == value.bool_value());
   case ProtobufWkt::Value::kListValue:
+    for (int i = 0; i < value.list_value().values_size(); ++i) {
+      const auto& lv = value.list_value().values(i);
+      if ((double_matcher_.has_value() && lv.kind_case() == ProtobufWkt::Value::kNumberValue
+            && double_matcher_->match(lv.number_value())) ||
+          (string_matcher_.has_value() && lv.kind_case() == ProtobufWkt::Value::kStringValue
+            && string_matcher_->match(lv.string_value())) ||
+          (bool_matcher_.has_value() && lv.kind_case() == ProtobufWkt::Value::kBoolValue
+            && *bool_matcher_ == lv.bool_value())) {
+          return true;
+      }
+    }
+    return false;
   case ProtobufWkt::Value::kStructValue:
   case ProtobufWkt::Value::KIND_NOT_SET:
     return false;
