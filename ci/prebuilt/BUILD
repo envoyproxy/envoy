@@ -38,16 +38,6 @@ cc_library(
 )
 
 cc_library(
-    # TODO: Remove 'event_pthreads' once no BUIlD files use it
-    # glob here is due to the fact that ninja doesn't produce a libevent_pthreads.a file -
-    # all the symbols are included in libevent.a. This is a hack so that CI can pass before
-    # https://github.com/envoyproxy/envoy/pull/3909 is merged as well
-    name = "event_pthreads",
-    srcs = glob(["thirdparty_build/lib/libevent_pthreads.a"]),
-    deps = [":event"],
-)
-
-cc_library(
     name = "luajit",
     srcs = select({
         ":windows_x86_64": ["thirdparty_build/lib/luajit.lib"],

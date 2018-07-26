@@ -15,33 +15,25 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-/*
- * TransportImplBase provides a base class for Transport implementations.
- */
-class TransportImplBase : public virtual Transport {
-public:
-  TransportImplBase(TransportCallbacks& callbacks) : callbacks_(callbacks) {}
-
-protected:
-  void onFrameStart(absl::optional<uint32_t> size) const { callbacks_.transportFrameStart(size); }
-  void onFrameComplete() const { callbacks_.transportFrameComplete(); }
-
-  TransportCallbacks& callbacks_;
-};
-
 /**
  * AutoTransportImpl implements Transport and attempts to distinguish between the Thrift framed and
  * unframed transports. Once the transport is detected, subsequent operations are delegated to the
  * appropriate implementation.
  */
-class AutoTransportImpl : public TransportImplBase {
+class AutoTransportImpl : public Transport {
 public:
-  AutoTransportImpl(TransportCallbacks& callbacks)
-      : TransportImplBase(callbacks), name_(TransportNames::get().AUTO){};
+  AutoTransportImpl() : name_(TransportNames::get().AUTO){};
 
   // Transport
   const std::string& name() const override { return name_; }
-  bool decodeFrameStart(Buffer::Instance& buffer) override;
+  TransportType type() const override {
+    if (transport_ != nullptr) {
+      return transport_->type();
+    }
+
+    return TransportType::Auto;
+  }
+  bool decodeFrameStart(Buffer::Instance& buffer, absl::optional<uint32_t>& size) override;
   bool decodeFrameEnd(Buffer::Instance& buffer) override;
   void encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) override;
 

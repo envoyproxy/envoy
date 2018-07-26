@@ -96,6 +96,16 @@ message ClusterStats {
   // deliberately dropped by the drop_overload policy and circuit breaking.
   uint64 total_dropped_requests = 3;
 
+  message DroppedRequests {
+    // Identifier for the policy specifying the drop.
+    string category = 1 [(validate.rules).string.min_bytes = 1];
+    // Total number of deliberately dropped requests for the category.
+    uint64 dropped_count = 2;
+  }
+  // Information about deliberately dropped requests for each category specified
+  // in the DropOverload policy.
+  repeated DroppedRequests dropped_requests = 5;
+
   // Period over which the actual load report occurred. This will be guaranteed to include every
   // request reported. Due to system load and delays between the *LoadStatsRequest* sent from Envoy
   // and the *LoadStatsResponse* message sent from the management server, this may be longer than

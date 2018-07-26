@@ -24,6 +24,8 @@ A logged warning is expected for each deprecated item that is in deprecation win
   [HttpConnectionManager](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto)
   instead.
 * Setting hosts via `hosts` field in `Cluster` is deprecated. Use `load_assignment` instead.
+* Use of `response_headers_to_*` and `request_headers_to_add` are deprecated at the `RouteAction`
+  level. Please use the configuration options at the `Route` level.
 
 ## Version 1.7.0
 

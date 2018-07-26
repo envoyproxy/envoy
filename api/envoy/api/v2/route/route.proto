@@ -75,7 +75,7 @@ message VirtualHost {
 
   // Specifies a list of HTTP headers that should be added to each request
   // handled by this virtual host. Headers specified at this level are applied
-  // after headers from enclosed :ref:`envoy_api_msg_route.RouteAction` and before headers from the
+  // after headers from enclosed :ref:`envoy_api_msg_route.Route` and before headers from the
   // enclosing :ref:`envoy_api_msg_RouteConfiguration`. For more information, including
   // details on header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
@@ -83,7 +83,7 @@ message VirtualHost {
 
   // Specifies a list of HTTP headers that should be added to each response
   // handled by this virtual host. Headers specified at this level are applied
-  // after headers from enclosed :ref:`envoy_api_msg_route.RouteAction` and before headers from the
+  // after headers from enclosed :ref:`envoy_api_msg_route.Route` and before headers from the
   // enclosing :ref:`envoy_api_msg_RouteConfiguration`. For more information, including
   // details on header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
@@ -148,6 +148,26 @@ message Route {
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
   // if and how it is utilized.
   map<string, google.protobuf.Struct> per_filter_config = 8;
+
+  // Specifies a set of headers that will be added to requests matching this
+  // route. Headers specified at this level are applied before headers from the
+  // enclosing :ref:`envoy_api_msg_route.VirtualHost` and
+  // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including details on
+  // header value syntax, see the documentation on :ref:`custom request headers
+  // <config_http_conn_man_headers_custom_request_headers>`.
+  repeated core.HeaderValueOption request_headers_to_add = 9;
+
+  // Specifies a set of headers that will be added to responses to requests
+  // matching this route. Headers specified at this level are applied before
+  // headers from the enclosing :ref:`envoy_api_msg_route.VirtualHost` and
+  // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including
+  // details on header value syntax, see the documentation on
+  // :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`.
+  repeated core.HeaderValueOption response_headers_to_add = 10;
+
+  // Specifies a list of HTTP headers that should be removed from each response
+  // to requests matching this route.
+  repeated string response_headers_to_remove = 11;
 }
 
 // Compared to the :ref:`cluster <envoy_api_field_route.RouteAction.cluster>` field that specifies a
@@ -176,8 +196,7 @@ message WeightedCluster {
     // Specifies a list of headers to be added to requests when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_route.RouteAction`.
     // Headers specified at this level are applied before headers from the enclosing
-    // :ref:`envoy_api_msg_route.RouteAction`,
-    // :ref:`envoy_api_msg_route.VirtualHost`, and
+    // :ref:`envoy_api_msg_route.Route`, :ref:`envoy_api_msg_route.VirtualHost`, and
     // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including details on
     // header value syntax, see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
@@ -186,8 +205,7 @@ message WeightedCluster {
     // Specifies a list of headers to be added to responses when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_route.RouteAction`.
     // Headers specified at this level are applied before headers from the enclosing
-    // :ref:`envoy_api_msg_route.RouteAction`,
-    // :ref:`envoy_api_msg_route.VirtualHost`, and
+    // :ref:`envoy_api_msg_route.Route`, :ref:`envoy_api_msg_route.VirtualHost`, and
     // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including details on
     // header value syntax, see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
@@ -492,25 +510,14 @@ message RouteAction {
   // https://github.com/lyft/protoc-gen-validate/issues/42 is resolved.]
   core.RoutingPriority priority = 11;
 
-  // Specifies a set of headers that will be added to requests matching this
-  // route. Headers specified at this level are applied before headers from the
-  // enclosing :ref:`envoy_api_msg_route.VirtualHost` and
-  // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including details on
-  // header value syntax, see the documentation on :ref:`custom request headers
-  // <config_http_conn_man_headers_custom_request_headers>`.
-  repeated core.HeaderValueOption request_headers_to_add = 12;
+  // [#not-implemented-hide:]
+  repeated core.HeaderValueOption request_headers_to_add = 12 [deprecated = true];
 
-  // Specifies a set of headers that will be added to responses to requests
-  // matching this route. Headers specified at this level are applied before
-  // headers from the enclosing :ref:`envoy_api_msg_route.VirtualHost` and
-  // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including
-  // details on header value syntax, see the documentation on
-  // :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`.
-  repeated core.HeaderValueOption response_headers_to_add = 18;
+  // [#not-implemented-hide:]
+  repeated core.HeaderValueOption response_headers_to_add = 18 [deprecated = true];
 
-  // Specifies a list of HTTP headers that should be removed from each response
-  // to requests matching this route.
-  repeated string response_headers_to_remove = 19;
+  // [#not-implemented-hide:]
+  repeated string response_headers_to_remove = 19 [deprecated = true];
 
   // Specifies a set of rate limit configurations that could be applied to the
   // route.
@@ -711,8 +718,9 @@ message DirectResponseAction {
   //
   // .. note::
   //
-  //   Headers can be specified using *response_headers_to_add* in
-  //   :ref:`envoy_api_msg_RouteConfiguration`.
+  //   Headers can be specified using *response_headers_to_add* in the enclosing
+  //   :ref:`envoy_api_msg_route.Route`, :ref:`envoy_api_msg_RouteConfiguration` or
+  //   :ref:`envoy_api_msg_route.VirtualHost`.
   core.DataSource body = 2;
 }
 

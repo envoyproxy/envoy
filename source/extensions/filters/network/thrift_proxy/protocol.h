@@ -5,7 +5,10 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/registry/registry.h"
 
+#include "common/common/assert.h"
+#include "common/config/utility.h"
 #include "common/singleton/const_singleton.h"
 
 #include "absl/strings/string_view.h"
@@ -14,6 +17,16 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
+
+enum class ProtocolType {
+  Binary,
+  LaxBinary,
+  Compact,
+  Auto,
+
+  // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST PROTOCOL TYPE
+  LastProtocolType = Auto,
+};
 
 /**
  * Names of available Protocol implementations.
@@ -29,11 +42,23 @@ public:
   // Compact protocol
   const std::string COMPACT = "compact";
 
-  // JSON protocol
-  const std::string JSON = "json";
-
   // Auto-detection protocol
   const std::string AUTO = "auto";
+
+  const std::string& fromType(ProtocolType type) const {
+    switch (type) {
+    case ProtocolType::Binary:
+      return BINARY;
+    case ProtocolType::LaxBinary:
+      return LAX_BINARY;
+    case ProtocolType::Compact:
+      return COMPACT;
+    case ProtocolType::Auto:
+      return AUTO;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
 };
 
 typedef ConstSingleton<ProtocolNameValues> ProtocolNames;
@@ -76,48 +101,6 @@ enum class FieldType {
 };
 
 /**
- * ProtocolCallbacks are Thrift protocol-level callbacks.
- */
-class ProtocolCallbacks {
-public:
-  virtual ~ProtocolCallbacks() {}
-
-  /**
-   * Indicates that the start of a Thrift protocol message was detected.
-   * @param name the name of the message, if available
-   * @param msg_type the type of the message
-   * @param seq_id the message sequence id
-   */
-  virtual void messageStart(const absl::string_view name, MessageType msg_type,
-                            int32_t seq_id) PURE;
-
-  /**
-   * Indicates that the start of a Thrift protocol struct was detected.
-   * @param name the name of the struct, if available
-   */
-  virtual void structBegin(const absl::string_view name) PURE;
-
-  /**
-   * Indicates that the start of Thrift protocol struct field was detected.
-   * @param name the name of the field, if available
-   * @param field_type the type of the field
-   * @param field_id the field id
-   */
-  virtual void structField(const absl::string_view name, FieldType field_type,
-                           int16_t field_id) PURE;
-
-  /**
-   * Indicates that the end of a Thrift protocol struct was detected.
-   */
-  virtual void structEnd() PURE;
-
-  /**
-   * Indicates that the end of a Thrift protocol message was detected.
-   */
-  virtual void messageComplete() PURE;
-};
-
-/**
  * Protocol represents the operations necessary to implement the a generic Thrift protocol.
  * See https://github.com/apache/thrift/blob/master/doc/specs/thrift-protocol-spec.md
  */
@@ -125,7 +108,15 @@ class Protocol {
 public:
   virtual ~Protocol() {}
 
+  /**
+   * @return const std::string& the human-readable name of the protocol
+   */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return ProtocolType the protocol type
+   */
+  virtual ProtocolType type() const PURE;
 
   /**
    * Reads the start of a Thrift protocol message from the buffer and updates the name, msg_type,
@@ -484,6 +475,52 @@ public:
 };
 
 typedef std::unique_ptr<Protocol> ProtocolPtr;
+
+/**
+ * Implemented by each Thrift protocol and registered via Registry::registerFactory or the
+ * convenience class RegisterFactory.
+ */
+class NamedProtocolConfigFactory {
+public:
+  virtual ~NamedProtocolConfigFactory() {}
+
+  /**
+   * Create a particular Thrift protocol
+   * @return ProtocolFactoryCb the protocol
+   */
+  virtual ProtocolPtr createProtocol() PURE;
+
+  /**
+   * @return std::string the identifying name for a particular implementation of thrift protocol
+   * produced by the factory.
+   */
+  virtual std::string name() PURE;
+
+  /**
+   * Convenience method to lookup a factory by type.
+   * @param ProtocolType the protocol type
+   * @return NamedProtocolConfigFactory& for the ProtocolType
+   */
+  static NamedProtocolConfigFactory& getFactory(ProtocolType type) {
+    const std::string& name = ProtocolNames::get().fromType(type);
+    return Envoy::Config::Utility::getAndCheckFactory<NamedProtocolConfigFactory>(name);
+  }
+};
+
+/**
+ * ProtocolFactoryBase provides a template for a trivial NamedProtocolConfigFactory.
+ */
+template <class ProtocolImpl> class ProtocolFactoryBase : public NamedProtocolConfigFactory {
+  ProtocolPtr createProtocol() override { return std::move(std::make_unique<ProtocolImpl>()); }
+
+  std::string name() override { return name_; }
+
+protected:
+  ProtocolFactoryBase(const std::string& name) : name_(name) {}
+
+private:
+  const std::string name_;
+};
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters
