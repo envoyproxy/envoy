@@ -9,11 +9,8 @@
 namespace Envoy {
 namespace Stats {
 
-using Symbol = uint32_t;
-using SymbolVec = std::vector<Symbol>;
-
 /**
- * Interface for storing a stat name, which is a wrapper around a SymbolVec.
+ * Interface for storing a stat name.
  */
 class StatName {
 public:

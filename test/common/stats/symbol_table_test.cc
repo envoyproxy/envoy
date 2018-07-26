@@ -11,28 +11,27 @@ namespace Envoy {
 namespace Stats {
 
 class StatNameTest : public testing::Test {
-public:
-  StatNameTest() {}
-  SymbolTableImpl table_;
-
+protected:
   SymbolVec getSymbols(StatName* stat_name_ptr) {
     StatNameImpl& impl = dynamic_cast<StatNameImpl&>(*stat_name_ptr);
-    return impl.symbol_vec_;
+    return impl.symbolVec();
   }
   std::string decodeSymbolVec(const SymbolVec& symbol_vec) { return table_.decode(symbol_vec); }
-  Symbol monotonicCounter() { return table_.monotonic_counter_; }
+  Symbol monotonicCounter() { return table_.monotonicCounter(); }
+
+  SymbolTableImpl table_;
 };
 
 TEST_F(StatNameTest, TestArbitrarySymbolRoundtrip) {
-  std::vector<std::string> stat_names = {"", " ", "  ", ",", "\t", "$", "%", "`", "."};
+  const std::vector<std::string> stat_names = {"", " ", "  ", ",", "\t", "$", "%", "`", "."};
   for (auto stat_name : stat_names) {
     EXPECT_EQ(stat_name, table_.encode(stat_name)->toString());
   }
 }
 
 TEST_F(StatNameTest, TestUnusualDelimitersRoundtrip) {
-  std::vector<std::string> stat_names = {".",    "..",    "...",    "foo",    "foo.",
-                                         ".foo", ".foo.", ".foo..", "..foo.", "..foo.."};
+  const std::vector<std::string> stat_names = {".",    "..",    "...",    "foo",    "foo.",
+                                               ".foo", ".foo.", ".foo..", "..foo.", "..foo.."};
   for (auto stat_name : stat_names) {
     EXPECT_EQ(stat_name, table_.encode(stat_name)->toString());
   }

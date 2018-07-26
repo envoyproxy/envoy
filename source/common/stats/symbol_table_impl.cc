@@ -19,7 +19,7 @@ StatNamePtr SymbolTableImpl::encode(const std::string& name) {
   std::transform(name_vec.begin(), name_vec.end(), std::back_inserter(symbol_vec),
                  [this](std::string x) { return toSymbol(x); });
 
-  return std::make_unique<StatNameImpl>(symbol_vec, this);
+  return std::make_unique<StatNameImpl>(symbol_vec, *this);
 }
 
 std::string SymbolTableImpl::decode(const SymbolVec& symbol_vec) const {

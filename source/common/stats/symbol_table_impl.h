@@ -17,10 +17,13 @@
 namespace Envoy {
 namespace Stats {
 
+using Symbol = uint32_t;
+using SymbolVec = std::vector<Symbol>;
+
 /**
- * Underlying SymbolTableImpl implementation which assists with per-symbol reference counting.
+ * Underlying SymbolTableImpl implementation which manages per-symbol reference counting.
  *
- * The underlying Symbol / SymbolVec data structures are not meant for public consumption. One side
+ * The underlying Symbol / SymbolVec data structures are private to the impl. One side
  * effect of the non-monotonically-increasing symbol counter is that if a string is encoded, the
  * resulting stat is destroyed, and then that same string is re-encoded, it may or may not encode to
  * the same underlying symbol.
@@ -53,15 +56,14 @@ private:
    * StatName) must manually call free(symbol_vec) when it is freeing the stat it represents. This
    * way, the symbol table will grow and shrink dynamically, instead of being write-only.
    *
-   * @param SymbolVec& the vector of symbols to be freed.
-   * @return bool whether or not the total free operation was successful. Expected to be true.
+   * @param symbol_vec the vector of symbols to be freed.
    */
   void free(const SymbolVec& symbol_vec);
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
    *
-   * @param std::string& the individual string to be encoded as a symbol.
+   * @param str the individual string to be encoded as a symbol.
    * @return Symbol the encoded string.
    */
   Symbol toSymbol(const std::string& str);
@@ -69,7 +71,7 @@ private:
   /**
    * Convenience function for decode(), decoding one symbol at a time.
    *
-   * @param Symbol the individual symbol to be decoded.
+   * @param symbol the individual symbol to be decoded.
    * @return std::string the decoded string.
    */
   std::string fromSymbol(const Symbol symbol) const;
@@ -85,12 +87,14 @@ private:
     }
   }
 
+  Symbol monotonicCounter() { return monotonic_counter_; }
+
   // Stores the symbol to be used at next insertion. This should exist ahead of insertion time so
   // that if insertion succeeds, the value written is the correct one.
-  Symbol current_symbol_{};
+  Symbol current_symbol_ = 0;
 
   // If the free pool is exhausted, we monotonically increase this counter.
-  Symbol monotonic_counter_{};
+  Symbol monotonic_counter_ = 0;
 
   // Bimap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
@@ -107,15 +111,16 @@ private:
  */
 class StatNameImpl : public StatName {
 public:
-  StatNameImpl(SymbolVec symbol_vec, SymbolTableImpl* symbol_table)
+  StatNameImpl(SymbolVec symbol_vec, SymbolTableImpl& symbol_table)
       : symbol_vec_(symbol_vec), symbol_table_(symbol_table) {}
-  ~StatNameImpl() override { symbol_table_->free(symbol_vec_); }
-  std::string toString() const override { return symbol_table_->decode(symbol_vec_); }
+  ~StatNameImpl() override { symbol_table_.free(symbol_vec_); }
+  std::string toString() const override { return symbol_table_.decode(symbol_vec_); }
 
 private:
   friend class StatNameTest;
+  SymbolVec symbolVec() { return symbol_vec_; }
   SymbolVec symbol_vec_;
-  SymbolTableImpl* symbol_table_;
+  SymbolTableImpl& symbol_table_;
 };
 
 } // namespace Stats
