@@ -1,5 +1,6 @@
 #include "server/overload_manager_impl.h"
 
+#include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -13,10 +14,7 @@ namespace {
 class ThresholdTriggerImpl : public OverloadActionImpl::Trigger {
 public:
   ThresholdTriggerImpl(const envoy::config::overload::v2alpha::ThresholdTrigger& config)
-      : threshold_(config.value()) {
-    RELEASE_ASSERT(threshold_ >= 0, "");
-    RELEASE_ASSERT(threshold_ <= 1, "");
-  }
+      : threshold_(config.pressure().value()) {}
 
   bool updateValue(double value) {
     const bool fired = isFired();
@@ -42,12 +40,14 @@ OverloadActionImpl::OverloadActionImpl(
     case envoy::config::overload::v2alpha::Trigger::kThreshold:
       trigger = std::make_unique<ThresholdTriggerImpl>(trigger_config.threshold());
       break;
-    case envoy::config::overload::v2alpha::Trigger::TRIGGER_ONEOF_NOT_SET:
-      RELEASE_ASSERT(false, "missing trigger");
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
-    const auto result = triggers_.insert(std::make_pair(trigger_config.name(), std::move(trigger)));
-    RELEASE_ASSERT(result.second, "duplicate trigger");
+    if (!triggers_.insert(std::make_pair(trigger_config.name(), std::move(trigger))).second) {
+      throw EnvoyException(
+          fmt::format("Duplicate trigger resource for overload action {}", config.name()));
+    }
   }
 }
 
@@ -55,14 +55,14 @@ bool OverloadActionImpl::updateResourcePressure(const std::string& name, double 
   const bool active = isActive();
 
   auto it = triggers_.find(name);
-  ASSERT(it != triggers_.end());
+  RELEASE_ASSERT(it != triggers_.end(), "");
   if (it->second->updateValue(pressure)) {
     if (it->second->isFired()) {
       const auto result = fired_triggers_.insert(name);
-      ASSERT(result.second);
+      RELEASE_ASSERT(result.second, "");
     } else {
       const auto result = fired_triggers_.erase(name);
-      ASSERT(result == 1);
+      RELEASE_ASSERT(result == 1, "");
     }
   }
 
@@ -87,7 +87,9 @@ OverloadManagerImpl::OverloadManagerImpl(
 
     auto result = resources_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
                                      std::forward_as_tuple(name, std::move(monitor), *this));
-    RELEASE_ASSERT(result.second, "duplicate resource monitor");
+    if (!result.second) {
+      throw EnvoyException(fmt::format("Duplicate resource monitor {}", name));
+    }
   }
 
   for (const auto& action : config.actions()) {
@@ -95,14 +97,17 @@ OverloadManagerImpl::OverloadManagerImpl(
     ENVOY_LOG(debug, "Adding overload action {}", name);
     auto result = actions_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
                                    std::forward_as_tuple(action));
-    RELEASE_ASSERT(result.second, "duplicate overload action");
+    if (!result.second) {
+      throw EnvoyException(fmt::format("Duplicate overload action {}", name));
+    }
 
-    std::unordered_set<std::string> resources;
     for (const auto& trigger : action.triggers()) {
       const std::string resource = trigger.name();
 
-      RELEASE_ASSERT(resources_.find(resource) != resources_.end(), "unknown resource");
-      RELEASE_ASSERT(resources.insert(resource).second, "duplicate trigger");
+      if (resources_.find(resource) == resources_.end()) {
+        throw EnvoyException(
+            fmt::format("Unknown trigger resource {} for overload action {}", resource, name));
+      }
 
       resource_to_actions_.insert(std::make_pair(resource, name));
     }
@@ -138,24 +143,23 @@ void OverloadManagerImpl::registerForAction(const std::string& action,
 
 void OverloadManagerImpl::updateResourcePressure(const std::string& resource, double pressure) {
   auto action_range = resource_to_actions_.equal_range(resource);
-  typedef std::unordered_multimap<std::string, std::string> ActionMap;
-  typedef std::unordered_multimap<std::string, ActionCallback> CallbackMap;
-  std::for_each(action_range.first, action_range.second, [&](ActionMap::value_type& entry) {
-    const std::string& action = entry.second;
-    auto action_it = actions_.find(entry.second);
-    ASSERT(action_it != actions_.end());
-    if (action_it->second.updateResourcePressure(resource, pressure)) {
-      const bool is_active = action_it->second.isActive();
-      ENVOY_LOG(info, "Overload action {} has become {}", action,
-                is_active ? "active" : "inactive");
-      auto callback_range = action_to_callbacks_.equal_range(action);
-      std::for_each(callback_range.first, callback_range.second,
-                    [&](CallbackMap::value_type& cb_entry) {
-                      auto& cb = cb_entry.second;
-                      cb.dispatcher_.post([&]() { cb.callback_(is_active); });
-                    });
-    }
-  });
+  std::for_each(action_range.first, action_range.second,
+                [&](ResourceToActionMap::value_type& entry) {
+                  const std::string& action = entry.second;
+                  auto action_it = actions_.find(action);
+                  RELEASE_ASSERT(action_it != actions_.end(), "");
+                  if (action_it->second.updateResourcePressure(resource, pressure)) {
+                    const bool is_active = action_it->second.isActive();
+                    ENVOY_LOG(info, "Overload action {} has become {}", action,
+                              is_active ? "active" : "inactive");
+                    auto callback_range = action_to_callbacks_.equal_range(action);
+                    std::for_each(callback_range.first, callback_range.second,
+                                  [&](ActionToCallbackMap::value_type& cb_entry) {
+                                    auto& cb = cb_entry.second;
+                                    cb.dispatcher_.post([&]() { cb.callback_(is_active); });
+                                  });
+                  }
+                });
 }
 
 void OverloadManagerImpl::Resource::update() {

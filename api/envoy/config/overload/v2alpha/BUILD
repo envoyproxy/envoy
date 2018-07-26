@@ -6,5 +6,6 @@ api_proto_library_internal(
     name = "overload",
     srcs = ["overload.proto"],
     deps = [
+        "//envoy/type:percent",
     ],
 )

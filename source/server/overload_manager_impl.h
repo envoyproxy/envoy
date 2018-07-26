@@ -48,8 +48,8 @@ public:
   OverloadManagerImpl(Event::Dispatcher& dispatcher,
                       const envoy::config::overload::v2alpha::OverloadManager& config);
 
+  // Server::OverloadManager
   void start() override;
-
   void registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                          std::function<void(bool)> callback) override;
 
@@ -59,6 +59,7 @@ private:
     Resource(const std::string& name, ResourceMonitorPtr monitor, OverloadManagerImpl& manager)
         : name_(name), monitor_(std::move(monitor)), manager_(manager), pending_update_(false) {}
 
+    // ResourceMonitor::Callbacks
     void onSuccess(const ResourceUsage& usage) override;
     void onFailure(const EnvoyException& error) override;
 
@@ -86,8 +87,12 @@ private:
   Event::TimerPtr timer_;
   std::unordered_map<std::string, Resource> resources_;
   std::unordered_map<std::string, OverloadActionImpl> actions_;
-  std::unordered_multimap<std::string, std::string> resource_to_actions_;
-  std::unordered_multimap<std::string, ActionCallback> action_to_callbacks_;
+
+  typedef std::unordered_multimap<std::string, std::string> ResourceToActionMap;
+  ResourceToActionMap resource_to_actions_;
+
+  typedef std::unordered_multimap<std::string, ActionCallback> ActionToCallbackMap;
+  ActionToCallbackMap action_to_callbacks_;
 };
 
 } // namespace Server

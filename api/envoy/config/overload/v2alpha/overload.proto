@@ -3,6 +3,8 @@ syntax = "proto3";
 package envoy.config.overload.v2alpha;
 option go_package = "v2alpha";
 
+import "envoy/type/percent.proto";
+
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
@@ -24,14 +26,14 @@ message ResourceMonitor {
 }
 
 message ThresholdTrigger {
-  // If the resource metric (ie. pressure) is greater than or equal to this value, the trigger
+  // If the resource pressure is greater than or equal to this value, the trigger
   // will fire.
-  double value = 1;
+  envoy.type.Percent pressure = 1;
 }
 
 message Trigger {
   // The name of the resource this is a trigger for.
-  string name = 1;
+  string name = 1 [(validate.rules).string.min_bytes = 1];
 
   oneof trigger_oneof {
     ThresholdTrigger threshold = 2;
@@ -42,12 +44,12 @@ message OverloadAction {
   // The name of the overload action. This is just a well-known string that listeners can
   // use for registering callbacks. Custom overload actions should be named using reverse
   // DNS to ensure uniqueness.
-  string name = 1;
+  string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // A set of triggers for this action. If any of these triggers fires the overload action
   // is activated. Listeners are notified when the overload action transitions from
   // inactivated to activated, or vice versa.
-  repeated Trigger triggers = 2;
+  repeated Trigger triggers = 2 [(validate.rules).repeated .min_items = 1];
 }
 
 message OverloadManager {
@@ -55,8 +57,8 @@ message OverloadManager {
   google.protobuf.Duration refresh_interval = 1;
 
   // The set of resources to monitor.
-  repeated ResourceMonitor resource_monitors = 2;
+  repeated ResourceMonitor resource_monitors = 2 [(validate.rules).repeated .min_items = 1];
 
   // The set of overload actions.
-  repeated OverloadAction actions = 3;
+  repeated OverloadAction actions = 3 [(validate.rules).repeated .min_items = 1];
 }
