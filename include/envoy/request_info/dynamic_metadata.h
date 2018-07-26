@@ -29,7 +29,7 @@ public:
    * @return a reference to the stored data.
    * Note that it is an error to access data that has not previously been set.
    */
-  template <typename T> const T& getData(absl::string_view data_name) {
+  template <typename T> const T& getData(absl::string_view data_name) const {
     return *static_cast<T*>(getDataGeneric(data_name, Traits<T>::getTypeId()));
   }
 
@@ -54,8 +54,8 @@ protected:
                               void* data, // Implementation must take ownership
                               void (*destructor)(void*)) PURE;
 
-  virtual void* getDataGeneric(absl::string_view data_name, size_t type_id) PURE;
-  virtual bool hasDataGeneric(absl::string_view data_name, size_t type_id) PURE;
+  virtual void* getDataGeneric(absl::string_view data_name, size_t type_id) const PURE;
+  virtual bool hasDataGeneric(absl::string_view data_name, size_t type_id) const PURE;
 
 private:
   static std::atomic<size_t> type_id_index_;
