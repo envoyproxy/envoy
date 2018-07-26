@@ -14,10 +14,10 @@ namespace Stats {
 // if we can help it.
 StatNamePtr SymbolTableImpl::encode(const std::string& name) {
   SymbolVec symbol_vec;
-  std::vector<std::string> name_vec = absl::StrSplit(name, '.');
+  std::vector<absl::string_view> name_vec = absl::StrSplit(name, '.');
   symbol_vec.reserve(name_vec.size());
   std::transform(name_vec.begin(), name_vec.end(), std::back_inserter(symbol_vec),
-                 [this](std::string x) { return toSymbol(x); });
+                 [this](absl::string_view x) { return toSymbol(x); });
 
   return std::make_unique<StatNameImpl>(symbol_vec, *this);
 }
@@ -35,8 +35,7 @@ void SymbolTableImpl::free(const SymbolVec& symbol_vec) {
     auto decode_search = decode_map_.find(symbol);
     RELEASE_ASSERT(decode_search != decode_map_.end(), "");
 
-    const std::string& str = decode_search->second;
-    auto encode_search = encode_map_.find(str);
+    auto encode_search = encode_map_.find(decode_search->second);
     RELEASE_ASSERT(encode_search != encode_map_.end(), "");
 
     ((encode_search->second).second)--;
@@ -50,21 +49,29 @@ void SymbolTableImpl::free(const SymbolVec& symbol_vec) {
   }
 }
 
-Symbol SymbolTableImpl::toSymbol(const std::string& str) {
+Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   Symbol result;
-  auto encode_insert = encode_map_.insert({str, std::make_pair(current_symbol_, 1)});
-  // If the insertion took place, we mirror the insertion in the decode_map.
-  if (encode_insert.second) {
-    auto decode_insert = decode_map_.insert({current_symbol_, str});
-    // We expect the decode_map to be in lockstep.
+  auto encode_find = encode_map_.find(sv);
+  // If the string segment doesn't already exist,
+  if (encode_find == encode_map_.end()) {
+    // We create the actual string, place it in the decode_map_, and then insert a string_view
+    // pointing to it in the encode_map_. This allows us to only store the string once.
+    std::string str = std::string(sv.data(), sv.size());
+
+    auto decode_insert = decode_map_.insert({current_symbol_, std::move(str)});
     RELEASE_ASSERT(decode_insert.second, "");
+
+    auto encode_insert =
+        encode_map_.insert({decode_insert.first->second, std::make_pair(current_symbol_, 1)});
+    RELEASE_ASSERT(encode_insert.second, "");
+
     result = current_symbol_;
     newSymbol();
   } else {
-    // If the insertion didn't take place, return the actual value at that location
-    result = (encode_insert.first)->second.first;
-    // and up the refcount at that location
-    ++(encode_insert.first)->second.second;
+    // If the insertion didn't take place, return the actual value at that location and up the
+    // refcount at that location
+    result = (encode_find->second).first;
+    ++(encode_find->second).second;
   }
   return result;
 }

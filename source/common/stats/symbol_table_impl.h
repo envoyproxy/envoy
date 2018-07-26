@@ -11,6 +11,7 @@
 #include "envoy/stats/symbol_table.h"
 
 #include "common/common/assert.h"
+#include "common/common/utility.h"
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
@@ -64,10 +65,10 @@ private:
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
    *
-   * @param str the individual string to be encoded as a symbol.
+   * @param sv the individual string to be encoded as a symbol.
    * @return Symbol the encoded string.
    */
-  Symbol toSymbol(const std::string& str);
+  Symbol toSymbol(absl::string_view sv);
 
   /**
    * Convenience function for decode(), decoding one symbol at a time.
@@ -99,7 +100,8 @@ private:
 
   // Bimap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
-  std::unordered_map<std::string, std::pair<Symbol, uint32_t>> encode_map_;
+  // Using absl::string_view lets us only store the complete string once, in the decode map.
+  std::unordered_map<absl::string_view, std::pair<Symbol, uint32_t>, StringViewHash> encode_map_;
   std::unordered_map<Symbol, std::string> decode_map_;
 
   // Free pool of symbols for re-use.
