@@ -907,7 +907,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         // and potentially fail traffic, search through all hosts for the clusters to
         // see if we already know about this host.
         bool failed_active_health_check = true;
-        // see if we can find it in the list of all hosts
         for (auto i = all_hosts.begin(); i != all_hosts.end(); ++i) {
           if (*(*i)->address() == *host->address()) {
             // We've found a match, so stop the loop and copy the health check flag from the other
