@@ -501,6 +501,9 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsWithNoRdsChanges) {
   sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
       "2");
+
+  // Validate that we can process a request again
+  makeSingleRequest();
 }
 
 // Regression test for the use-after-free crash when processing RDS update (#3953).
@@ -536,6 +539,10 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
   sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_1")},
       "2");
+
+  // Validate that we can process a request after RDS update
+  test_server_->waitForCounterGe("http.ads_test.rds.route_config_0.config_reload", 2);
+  makeSingleRequest();
 }
 
 class AdsFailIntegrationTest : public AdsIntegrationBaseTest,

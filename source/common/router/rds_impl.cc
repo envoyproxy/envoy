@@ -73,7 +73,6 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       },
       "envoy.api.v2.RouteDiscoveryService.FetchRoutes",
       "envoy.api.v2.RouteDiscoveryService.StreamRoutes");
-  config_source_ = MessageUtil::getJsonStringFromMessage(rds.config_source(), true);
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -227,7 +226,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::getRdsRoute
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
 
-  // RdsRouteConfigProviders are unique based on their serialized RDS config.
+  // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
   // TODO(htuch): Full serialization here gives large IDs, could get away with a
   // strong hash instead.
   const std::string manager_identifier = rds.SerializeAsString();

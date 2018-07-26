@@ -123,7 +123,6 @@ private:
   void runInitializeCallbackIfAny();
 
   std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
-  std::string config_source_;
   std::function<void()> initialize_callback_;
   const std::string route_config_name_;
   Stats::ScopePtr scope_;
@@ -153,6 +152,7 @@ public:
   ~RdsRouteConfigProviderImpl();
 
   RdsRouteConfigSubscription& subscription() { return *subscription_; }
+  void onConfigUpdate();
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;
@@ -169,15 +169,12 @@ private:
   RdsRouteConfigProviderImpl(RdsRouteConfigSubscriptionSharedPtr&& subscription,
                              Server::Configuration::FactoryContext& factory_context);
 
-  void onConfigUpdate();
-
   RdsRouteConfigSubscriptionSharedPtr subscription_;
   Server::Configuration::FactoryContext& factory_context_;
   ThreadLocal::SlotPtr tls_;
   const std::string route_config_name_;
 
   friend class RouteConfigProviderManagerImpl;
-  friend class RdsRouteConfigSubscription;
 };
 
 class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
@@ -210,7 +207,6 @@ private:
   std::vector<std::weak_ptr<RouteConfigProvider>> static_route_config_providers_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 
-  friend class RdsRouteConfigProviderImpl;
   friend class RdsRouteConfigSubscription;
 };
 
