@@ -56,7 +56,7 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   if (encode_find == encode_map_.end()) {
     // We create the actual string, place it in the decode_map_, and then insert a string_view
     // pointing to it in the encode_map_. This allows us to only store the string once.
-    std::string str = std::string(sv.data(), sv.size());
+    std::string str = std::string(sv);
 
     auto decode_insert = decode_map_.insert({current_symbol_, std::move(str)});
     RELEASE_ASSERT(decode_insert.second, "");
