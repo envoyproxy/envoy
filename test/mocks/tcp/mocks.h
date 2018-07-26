@@ -44,6 +44,10 @@ public:
   // Tcp::ConnectionPool::ConnectionData
   MOCK_METHOD0(connection, Network::ClientConnection&());
   MOCK_METHOD1(addUpstreamCallbacks, void(ConnectionPool::UpstreamCallbacks&));
+
+  // If set, invoked in ~MockConnectionData, which indicates that the connection pool
+  // caller has relased a connection.
+  std::function<void()> release_callback_;
 };
 
 class MockInstance : public Instance {
@@ -59,6 +63,9 @@ public:
   MockCancellable* newConnectionImpl(Callbacks& cb);
   void poolFailure(PoolFailureReason reason);
   void poolReady(Network::MockClientConnection& conn);
+
+  // Invoked when connection_data_, having been assigned via poolReady is released.
+  MOCK_METHOD1(released, void(Network::MockClientConnection&));
 
   std::list<NiceMock<MockCancellable>> handles_;
   std::list<Callbacks*> callbacks_;
