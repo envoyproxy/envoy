@@ -500,7 +500,10 @@ public:
           return std::make_shared<HistogramImpl>(name, *this, std::string(name),
                                                  std::vector<Tag>());
         }) {
-    stats_options_.max_obj_name_length_ = 1000 * 1000;
+    // We divide by two here to get an effectively unlimited length. If we don't divide
+    // by two, we'll get an integer wrap in the maxNameLength addition, and the behavior
+    // will not be what we intend.
+    stats_options_.max_obj_name_length_ = std::numeric_limits<uint64_t>::max() / 2;
     alloc_ = std::make_unique<HeapStatDataAllocator>(stats_options_);
   }
 
