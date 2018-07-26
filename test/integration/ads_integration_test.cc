@@ -473,7 +473,7 @@ TEST_P(AdsIntegrationTest, Failure) {
 }
 
 // Regression test for the use-after-free crash when processing RDS update (#3953).
-TEST_P(AdsIntegrationTest, RdsCrash) {
+TEST_P(AdsIntegrationTest, RdsCrashNoRdsChanges) {
   initialize();
 
   // Send initial configuration.
@@ -500,6 +500,41 @@ TEST_P(AdsIntegrationTest, RdsCrash) {
   // Update existing RDS (no changes).
   sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "2");
+}
+
+// Regression test for the use-after-free crash when processing RDS update (#3953).
+TEST_P(AdsIntegrationTest, RdsCrashWithRdsChange) {
+  initialize();
+
+  // Send initial configuration.
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "1");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  // Validate that we can process a request.
+  makeSingleRequest();
+
+  // Update existing LDS (change stat_prefix).
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_1")}, "2");
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_1")}, "2");
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0", "rds_crash")},
+      "2");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+  // Update existing RDS (migrate traffic to cluster_1).
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_1")},
       "2");
 }
 
