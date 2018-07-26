@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <stack>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -82,8 +83,8 @@ private:
       RELEASE_ASSERT(monotonic_counter_ < std::numeric_limits<Symbol>::max(), "");
       current_symbol_ = ++monotonic_counter_;
     } else {
-      current_symbol_ = pool_.front();
-      pool_.pop_front();
+      current_symbol_ = pool_.top();
+      pool_.pop();
     }
   }
 
@@ -102,7 +103,7 @@ private:
   std::unordered_map<Symbol, std::string> decode_map_;
 
   // Free pool of symbols for re-use.
-  std::deque<Symbol> pool_;
+  std::stack<Symbol> pool_;
 };
 
 /**

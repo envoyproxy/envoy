@@ -45,7 +45,7 @@ void SymbolTableImpl::free(const SymbolVec& symbol_vec) {
     if ((encode_search->second).second == 0) {
       decode_map_.erase(decode_search);
       encode_map_.erase(encode_search);
-      pool_.push_back(symbol);
+      pool_.push(symbol);
     }
   }
 }
