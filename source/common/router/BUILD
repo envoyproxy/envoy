@@ -84,6 +84,7 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:utility_lib",
         "//source/common/config:rds_json_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/config:utility_lib",

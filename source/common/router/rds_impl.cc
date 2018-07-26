@@ -11,6 +11,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/utility.h"
 #include "common/config/rds_json.h"
 #include "common/config/subscription_factory.h"
 #include "common/config/utility.h"
@@ -97,7 +98,7 @@ Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {
 
 void RdsRouteConfigProviderImpl::onConfigUpdate(const ResourceVector& resources,
                                                 const std::string& version_info) {
-  last_updated_ = factory_context_.systemTimeSource().currentTime();
+  last_updated_ = ProdSystemTimeSource::instance_.currentTime();
 
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing RouteConfiguration for {} in onConfigUpdate()", route_config_name_);
