@@ -1,9 +1,9 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.network.thrift_proxy.v2alpha1;
+package envoy.config.filter.network.thrift_proxy.v2alpha1;
 option go_package = "v2";
 
-import "envoy/extensions/filters/network/thrift_proxy/v2alpha1/route.proto";
+import "envoy/config/filter/network/thrift_proxy/v2alpha1/route.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
