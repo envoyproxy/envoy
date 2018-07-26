@@ -152,6 +152,8 @@ class RdsRouteConfigProviderImpl : public RouteConfigProvider,
 public:
   ~RdsRouteConfigProviderImpl();
 
+  RdsRouteConfigSubscription& subscription() { return *subscription_; }
+
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override;
   absl::optional<ConfigInfo> configInfo() const override;
