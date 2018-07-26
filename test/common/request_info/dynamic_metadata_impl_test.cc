@@ -123,6 +123,8 @@ TEST_F(DynamicMetadataImplTest, HasData) {
   EXPECT_FALSE(dynamic_metadata().hasData<int>("test_2"));
   EXPECT_FALSE(dynamic_metadata().hasData<bool>("test_1"));
   EXPECT_FALSE(dynamic_metadata().hasData<bool>("test_2"));
+  EXPECT_TRUE(dynamic_metadata().hasDataWithName("test_1"));
+  EXPECT_FALSE(dynamic_metadata().hasDataWithName("test_2"));
 }
 
 } // namespace RequestInfo

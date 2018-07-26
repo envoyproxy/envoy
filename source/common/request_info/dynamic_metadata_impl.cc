@@ -24,7 +24,7 @@ void DynamicMetadataImpl::setDataGeneric(absl::string_view data_name, size_t typ
   data_storage_[static_cast<std::string>(data_name)] = {type_id, data, destructor};
 }
 
-void* DynamicMetadataImpl::getDataGeneric(absl::string_view data_name, size_t type_id) {
+void* DynamicMetadataImpl::getDataGeneric(absl::string_view data_name, size_t type_id) const {
   const auto& it = data_storage_.find(data_name);
 
   if (it == data_storage_.end()) {
@@ -39,10 +39,14 @@ void* DynamicMetadataImpl::getDataGeneric(absl::string_view data_name, size_t ty
   return it->second.ptr_;
 }
 
-bool DynamicMetadataImpl::hasDataGeneric(absl::string_view data_name, size_t type_id) {
+bool DynamicMetadataImpl::hasDataGeneric(absl::string_view data_name, size_t type_id) const {
   const auto& it = data_storage_.find(data_name);
 
   return (it != data_storage_.end() && it->second.typeid_ == type_id);
+}
+
+bool DynamicMetadataImpl::hasDataWithName(absl::string_view data_name) const {
+  return (data_storage_.find(data_name) != data_storage_.end());
 }
 
 } // namespace RequestInfo

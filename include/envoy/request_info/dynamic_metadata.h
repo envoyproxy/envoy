@@ -33,9 +33,21 @@ public:
     return *static_cast<T*>(getDataGeneric(data_name, Traits<T>::getTypeId()));
   }
 
-  template <typename T> bool hasData(absl::string_view data_name) {
+  /**
+   * @param data_name the name of the data being set.
+   * @return Whether data of the type and name specified exists in the 
+   * data store.
+   */
+  template <typename T> bool hasData(absl::string_view data_name) const {
     return hasDataGeneric(data_name, Traits<T>::getTypeId());
   }
+
+  /**
+   * @param data_name the name of the data being set.
+   * @return Whether data of any type and the name specified exists in the 
+   * data store.
+   */
+  virtual bool hasDataWithName(absl::string_view data_name) const PURE;
 
 protected:
   virtual void setDataGeneric(absl::string_view data_name, size_t type_id,
