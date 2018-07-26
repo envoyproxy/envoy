@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.thrift_proxy.v2alpha1;
+option go_package = "v2";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+// [#protodoc-title: Thrift route configuration]
+
+// [#comment:next free field: 3]
+message RouteConfiguration {
+  // The name of the route configuration. Reserved for future use in asynchronous route discovery.
+  string name = 1;
+
+  // The list of routes that will be matched, in order, against incoming requests. The first route
+  // that matches will be used.
+  repeated Route routes = 2 [(gogoproto.nullable) = false];
+}
+
+// [#comment:next free field: 3]
+message Route {
+  // Route matching prarameters.
+  RouteMatch match = 1 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+
+  // Route request to some upstream cluster.
+  RouteAction route = 2 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+}
+
+// [#comment:next free field: 2]
+message RouteMatch {
+  // If specified, the route must exactly match the request method name. As a special case, an
+  // empty string matches any request method name.
+  string method = 1;
+}
+
+// [#comment:next free field: 2]
+message RouteAction {
+  // Indicates the upstream cluster to which the request should be routed.
+  string cluster = 1 [(validate.rules).string.min_bytes = 1];
+}

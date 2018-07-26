@@ -17,20 +17,18 @@ namespace ThriftProxy {
  * UnframedTransportImpl implements the Thrift Unframed transport.
  * See https://github.com/apache/thrift/blob/master/doc/specs/thrift-rpc.md
  */
-class UnframedTransportImpl : public TransportImplBase {
+class UnframedTransportImpl : public Transport {
 public:
-  UnframedTransportImpl(TransportCallbacks& callbacks) : TransportImplBase(callbacks) {}
+  UnframedTransportImpl() {}
 
   // Transport
   const std::string& name() const override { return TransportNames::get().UNFRAMED; }
-  bool decodeFrameStart(Buffer::Instance&) override {
-    onFrameStart(absl::optional<uint32_t>());
+  TransportType type() const override { return TransportType::Unframed; }
+  bool decodeFrameStart(Buffer::Instance&, absl::optional<uint32_t>& size) override {
+    size.reset();
     return true;
   }
-  bool decodeFrameEnd(Buffer::Instance&) override {
-    onFrameComplete();
-    return true;
-  }
+  bool decodeFrameEnd(Buffer::Instance&) override { return true; }
   void encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) override {
     buffer.move(message);
   }

@@ -26,9 +26,9 @@ bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string& n
 
     uint16_t version = BufferHelper::peekU16(buffer);
     if (BinaryProtocolImpl::isMagic(version)) {
-      setProtocol(std::make_unique<BinaryProtocolImpl>(callbacks_));
+      setProtocol(std::make_unique<BinaryProtocolImpl>());
     } else if (CompactProtocolImpl::isMagic(version)) {
-      setProtocol(std::make_unique<CompactProtocolImpl>(callbacks_));
+      setProtocol(std::make_unique<CompactProtocolImpl>());
     } else {
       throw EnvoyException(
           fmt::format("unknown thrift auto protocol message start {:04x}", version));
@@ -44,6 +44,16 @@ bool AutoProtocolImpl::readMessageEnd(Buffer::Instance& buffer) {
   RELEASE_ASSERT(protocol_ != nullptr, "");
   return protocol_->readMessageEnd(buffer);
 }
+
+class AutoProtocolConfigFactory : public ProtocolFactoryBase<AutoProtocolImpl> {
+public:
+  AutoProtocolConfigFactory() : ProtocolFactoryBase(ProtocolNames::get().AUTO) {}
+};
+
+/**
+ * Static registration for the auto protocol. @see RegisterFactory.
+ */
+static Registry::RegisterFactory<AutoProtocolConfigFactory, NamedProtocolConfigFactory> register_;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

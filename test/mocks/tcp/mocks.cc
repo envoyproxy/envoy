@@ -1,7 +1,8 @@
 #include "mocks.h"
 
 #include "gmock/gmock.h"
-#include "gtest/gtest.h"
+
+using testing::ReturnRef;
 
 using testing::Invoke;
 using testing::ReturnRef;
