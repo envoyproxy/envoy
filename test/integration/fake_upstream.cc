@@ -452,7 +452,7 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr* connect
     }
     *connection = std::make_unique<FakeRawConnection>(consumeConnection());
   }
-  (*connection)->initialize();
+  VERIFY_ASSERTION((*connection)->initialize());
   VERIFY_ASSERTION((*connection)->readDisable(false));
   VERIFY_ASSERTION((*connection)->enableHalfClose(enable_half_close_));
   return AssertionSuccess();
