@@ -151,21 +151,6 @@ HeapStatData* HeapStatDataAllocator::alloc(const std::string& name) {
   return existing_data;
 }
 
-void HeapStatDataAllocator::free(HeapStatData& data) {
-  ASSERT(data.ref_count_ > 0);
-  if (--data.ref_count_ > 0) {
-    return;
-  }
-
-  {
-    Thread::LockGuard lock(mutex_);
-    size_t key_removed = stats_.erase(&data);
-    ASSERT(key_removed == 1);
-  }
-
-  delete &data;
-}
-
 /**
  * Counter implementation that wraps a StatData. StatData must have data members:
  *    std::atomic<int64_t> value_;
@@ -330,6 +315,22 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
     }
   }
   return names;
+}
+
+// TODO(jmarantz): move this below HeapStatDataAllocator::alloc.
+void HeapStatDataAllocator::free(HeapStatData& data) {
+  ASSERT(data.ref_count_ > 0);
+  if (--data.ref_count_ > 0) {
+    return;
+  }
+
+  {
+    Thread::LockGuard lock(mutex_);
+    size_t key_removed = stats_.erase(&data);
+    ASSERT(key_removed == 1);
+  }
+
+  delete &data;
 }
 
 template <class StatData>

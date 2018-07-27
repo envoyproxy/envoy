@@ -426,13 +426,9 @@ private:
     }
   };
 
-  // TODO(jmarantz): storing the set of stats as a string-set wastes an
-  // enourmous amount of of memory, because all the stats are composed using the
-  // same set of cluster names and patterns found in
-  // source/common/config/well_known_names.cc. This should eventually be changed to
-  // store a symbol-table of decomposed stat segments (e.g. split on "." to start) and
-  // arrays referencing those segments. The segments can be ref-counted so they
-  // no longer consume memory once deleted.
+  // TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/3927 which can
+  // help reorganize the heap stats using a ref-counted symbol table to compress
+  // the stat strings.
   typedef std::unordered_set<HeapStatData*, HeapStatHash_, HeapStatCompare_> StatSet;
 
   // An unordered set of HeapStatData pointers which keys off the key()
