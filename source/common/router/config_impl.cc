@@ -54,6 +54,9 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) 
   for (const auto& origin : config.allow_origin()) {
     allow_origin_.push_back(origin);
   }
+  for (const auto& regex : config.allow_origin_regex()) {
+    allow_origin_regex_.push_back(RegexUtil::parseRegex(regex));
+  }
   allow_methods_ = config.allow_methods();
   allow_headers_ = config.allow_headers();
   expose_headers_ = config.expose_headers();
@@ -255,6 +258,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
+      idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), idle_timeout)),
       max_grpc_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), max_grpc_timeout)),
       runtime_(loadRuntimeData(route.match())), loader_(factory_context.runtime()),
       host_redirect_(route.redirect().host_redirect()),
@@ -266,9 +270,13 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       total_cluster_weight_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route().weighted_clusters(), total_weight, 100UL)),
-      request_headers_parser_(HeaderParser::configure(route.route().request_headers_to_add())),
-      response_headers_parser_(HeaderParser::configure(route.route().response_headers_to_add(),
-                                                       route.route().response_headers_to_remove())),
+      route_action_request_headers_parser_(
+          HeaderParser::configure(route.route().request_headers_to_add())),
+      route_action_response_headers_parser_(HeaderParser::configure(
+          route.route().response_headers_to_add(), route.route().response_headers_to_remove())),
+      request_headers_parser_(HeaderParser::configure(route.request_headers_to_add())),
+      response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
+                                                       route.response_headers_to_remove())),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route)),
@@ -365,8 +373,10 @@ Http::WebSocketProxyPtr RouteEntryImplBase::createWebSocketProxy(
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
                                                 const RequestInfo::RequestInfo& request_info,
                                                 bool insert_envoy_original_path) const {
-  // Append user-specified request headers in the following order: route-level headers,
-  // virtual host level headers and finally global connection manager level headers.
+  // Append user-specified request headers in the following order: route-action-level headers,
+  // route-level headers, virtual host level headers and finally global connection manager level
+  // headers.
+  route_action_request_headers_parser_->evaluateHeaders(headers, request_info);
   request_headers_parser_->evaluateHeaders(headers, request_info);
   vhost_.requestHeaderParser().evaluateHeaders(headers, request_info);
   vhost_.globalRouteConfig().requestHeaderParser().evaluateHeaders(headers, request_info);
@@ -382,6 +392,10 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
 
 void RouteEntryImplBase::finalizeResponseHeaders(
     Http::HeaderMap& headers, const RequestInfo::RequestInfo& request_info) const {
+  // Append user-specified response headers in the following order: route-action-level headers,
+  // route-level headers, virtual host level headers and finally global connection manager level
+  // headers.
+  route_action_response_headers_parser_->evaluateHeaders(headers, request_info);
   response_headers_parser_->evaluateHeaders(headers, request_info);
   vhost_.responseHeaderParser().evaluateHeaders(headers, request_info);
   vhost_.globalRouteConfig().responseHeaderParser().evaluateHeaders(headers, request_info);
@@ -457,7 +471,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::api::v2::route::Route& route)
   std::multimap<std::string, std::string> ret;
   if (route.has_metadata()) {
     const auto filter_metadata = route.metadata().filter_metadata().find(
-        Extensions::HttpFilters::HttpFilterNames::get().ROUTER);
+        Extensions::HttpFilters::HttpFilterNames::get().Router);
     if (filter_metadata == route.metadata().filter_metadata().end()) {
       return ret;
     }
@@ -537,7 +551,7 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
     }
     begin = end;
   }
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {
@@ -710,7 +724,7 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
     ssl_requirements_ = SslRequirements::ALL;
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   for (const auto& route : virtual_host.routes()) {

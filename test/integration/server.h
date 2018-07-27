@@ -7,6 +7,7 @@
 #include <string>
 
 #include "envoy/server/options.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
 #include "common/common/lock_guard.h"
@@ -49,8 +50,8 @@ public:
     return local_address_ip_version_;
   }
   std::chrono::seconds drainTime() const override { return std::chrono::seconds(1); }
-  spdlog::level::level_enum logLevel() const override { NOT_IMPLEMENTED; }
-  const std::string& logFormat() const override { NOT_IMPLEMENTED; }
+  spdlog::level::level_enum logLevel() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  const std::string& logFormat() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   std::chrono::seconds parentShutdownTime() const override { return std::chrono::seconds(2); }
   const std::string& logPath() const override { return log_path_; }
   uint64_t restartEpoch() const override { return 0; }
@@ -62,7 +63,7 @@ public:
   const std::string& serviceNodeName() const override { return service_node_name_; }
   const std::string& serviceZone() const override { return service_zone_; }
   uint64_t maxStats() const override { return 16384; }
-  uint64_t maxObjNameLength() const override { return 60; }
+  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
   bool hotRestartDisabled() const override { return false; }
 
   // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
@@ -76,6 +77,7 @@ private:
   const std::string service_cluster_name_;
   const std::string service_node_name_;
   const std::string service_zone_;
+  Stats::StatsOptionsImpl stats_options_;
   const std::string log_path_;
 };
 
@@ -138,9 +140,12 @@ public:
     return wrapped_scope_->histogram(name);
   }
 
+  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
+
 private:
   Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
+  Stats::StatsOptionsImpl stats_options_;
 };
 
 /**
@@ -168,6 +173,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
   }
+  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override {
@@ -196,6 +202,7 @@ private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
   SourceImpl source_;
+  Stats::StatsOptionsImpl stats_options_;
 };
 
 } // namespace Stats
@@ -219,7 +226,7 @@ public:
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
   Server::InstanceImpl& server() {
-    RELEASE_ASSERT(server_ != nullptr);
+    RELEASE_ASSERT(server_ != nullptr, "");
     return *server_;
   }
   void setOnWorkerListenerAddedCb(std::function<void()> on_worker_listener_added) {

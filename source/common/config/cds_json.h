@@ -3,6 +3,7 @@
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/cluster/circuit_breaker.pb.h"
 #include "envoy/json/json_object.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "absl/types/optional.h"
@@ -64,7 +65,8 @@ public:
    */
   static void translateCluster(const Json::Object& json_cluster,
                                const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
-                               envoy::api::v2::Cluster& cluster);
+                               envoy::api::v2::Cluster& cluster,
+                               const Stats::StatsOptions& stats_options);
 };
 
 } // namespace Config

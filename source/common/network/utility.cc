@@ -7,6 +7,11 @@
 #include <linux/netfilter_ipv4.h>
 #endif
 
+#ifndef IP6T_SO_ORIGINAL_DST
+// From linux/netfilter_ipv6/ip6_tables.h
+#define IP6T_SO_ORIGINAL_DST 80
+#endif
+
 #include <netinet/ip.h>
 #include <sys/socket.h>
 
@@ -20,6 +25,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/stats/stats.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
@@ -98,7 +104,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddress(const std::string&
     return std::make_shared<Address::Ipv6Instance>(sa6, v6only);
   }
   throwWithMalformedIp(ip_address);
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(const std::string& ip_address,
@@ -168,7 +174,7 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
   Address::InstanceConstSharedPtr ret;
 
   int rc = getifaddrs(&ifaddr);
-  RELEASE_ASSERT(!rc);
+  RELEASE_ASSERT(!rc, "");
 
   // man getifaddrs(3)
   for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
@@ -250,7 +256,7 @@ bool Utility::isLoopbackAddress(const Address::Instance& address) {
     absl::uint128 addr = address.ip()->ipv6()->address();
     return 0 == memcmp(&addr, &in6addr_loopback, sizeof(in6addr_loopback));
   }
-  NOT_IMPLEMENTED;
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
 Address::InstanceConstSharedPtr Utility::getCanonicalIpv4LoopbackAddress() {
@@ -285,21 +291,42 @@ Address::InstanceConstSharedPtr Utility::getAddressWithPort(const Address::Insta
   case Network::Address::IpVersion::v6:
     return std::make_shared<Address::Ipv6Instance>(address.ip()->addressAsString(), port);
   }
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 Address::InstanceConstSharedPtr Utility::getOriginalDst(int fd) {
 #ifdef SOL_IP
   sockaddr_storage orig_addr;
   socklen_t addr_len = sizeof(sockaddr_storage);
-  int status = getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
+  int socket_domain;
+  socklen_t domain_len = sizeof(socket_domain);
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  int status = os_syscalls.getsockopt(fd, SOL_SOCKET, SO_DOMAIN, &socket_domain, &domain_len);
 
-  if (status == 0) {
-    // TODO(mattklein123): IPv6 support. See github issue #1094.
-    ASSERT(orig_addr.ss_family == AF_INET);
+  if (status != 0) {
+    return nullptr;
+  }
+
+  if (socket_domain == AF_INET) {
+    status = os_syscalls.getsockopt(fd, SOL_IP, SO_ORIGINAL_DST, &orig_addr, &addr_len);
+  } else if (socket_domain == AF_INET6) {
+    status = os_syscalls.getsockopt(fd, SOL_IPV6, IP6T_SO_ORIGINAL_DST, &orig_addr, &addr_len);
+  } else {
+    return nullptr;
+  }
+
+  if (status != 0) {
+    return nullptr;
+  }
+
+  switch (orig_addr.ss_family) {
+  case AF_INET:
     return Address::InstanceConstSharedPtr{
         new Address::Ipv4Instance(reinterpret_cast<sockaddr_in*>(&orig_addr))};
-  } else {
+  case AF_INET6:
+    return Address::InstanceConstSharedPtr{
+        new Address::Ipv6Instance(reinterpret_cast<sockaddr_in6&>(orig_addr))};
+  default:
     return nullptr;
   }
 #else
@@ -384,7 +411,7 @@ Utility::protobufAddressToAddress(const envoy::api::v2::core::Address& proto_add
   case envoy::api::v2::core::Address::kPipe:
     return std::make_shared<Address::PipeInstance>(proto_address.pipe().path());
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

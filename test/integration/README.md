@@ -106,3 +106,82 @@ if the changes will be needed by one specific test file, or will be likely
 reused in other integration tests. If it's likely be reused, please add the
 appropriate functions to existing utilities or add new test utilities. If it's
 likely a one-off change, it can be scoped to the existing test file.
+
+
+# Deflaking tests
+
+The instructions below assume the developer is running tests natively with bazel
+rather than in docker. For developers using docker the best workaround today is
+to replace `//test/...` on the relevant `ci/do_ci.sh`with the command lines
+referenced below and remember to back those changes out before sending the fix
+upstream!
+
+## Reproducing test flakes
+
+The first step of fixing test flakes is reproducing the test flake. In general
+if you have written a test which flakes, you can start by running
+
+``
+bazel test [test_name] --runs_per_test=1000
+``
+
+Which runs the full test many times. If this works, great!  If not, it's worth
+trying to stress your system more by running more tests in parallel, by setting
+`--jobs` and `--local_resources.`
+
+Once you've managed to reproduce a failure it may be beneficial to limit your
+test run to the specific failing test(s) with `--gtest_filter`. This may cause
+the test to flake less often (i.e. if two tests are interfering with each other,
+scoping to your specific test name may harm rather than help reproducibility.)
+but if it works it lets you iterate faster.
+
+Another helpful tip for debugging is turn turn up Envoy trace logs with
+`--test_arg="-l trace"`. Again if the test failure is due to a race, this may make
+it harder to reproduce, and it may also hide any custom logging you add, but it's a
+handy thing to know of to follow the general flow.
+
+The full command might look something like
+
+```
+bazel test //test/integration:http2_upstream_integration_test \
+--test_arg=--gtest_filter="IpVersions/Http2UpstreamIntegrationTest.RouterRequestAndResponseWithBodyNoBuffer/IPv6" \
+--jobs 60 --local_resources 100000000000,100000000000,10000000 --test_arg="-l trace"
+```
+
+## Debugging test flakes
+
+Once you've managed to reproduce your test flake, you get to figure out what's
+going on. If your failure mode isn't documented below, ideally some combination
+of cerr << logging and trace logs will help you sort out what is going on (and
+please add to this document as you figure it out!)
+
+## Unexpected disconnects
+
+As commented in `HttpIntegrationTest::cleanupUpstreamAndDownstream()`, the
+tear-down sequence between upstream, Envoy, and client is somewhat sensitive to
+ordering. If a given unit test does not use the provided member variables, for
+example opens multiple client or upstream connections, the test author should be
+aware of test best practices for clean-up which boil down to "Clean up upstream
+first".
+
+Upstream connections run in their own threads, so if the client disconnects with
+open streams, there's a race where Envoy detects the disconnect, and kills the
+corresponding upstream stream, which is indistinguishable from an unexpected
+disconnect and triggers test failure. Because the client is run from the main
+thread, if upstream is closed first, the client will not detect the inverse
+close, so no test failure will occur.
+
+## Unparented upstream connections
+
+The most common failure mode here is if the test adds additional fake
+upstreams for *DS connections (ADS, EDS etc) which are not properly shut down
+(for a very sensitive test framework)
+
+The failure mode here is that during test teardown one closes the DS connection
+and then shuts down Envoy. Unfortunately as Envoy is running in its own thread,
+it will try to re-establish the *DS connection, sometimes creating a connection
+which is then "unparented". The solution here is to explicitly allow Envoy
+reconnects before closing the connection, using
+
+`my_ds_upstream_->set_allow_unexpected_disconnects(true);`
+

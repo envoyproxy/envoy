@@ -28,6 +28,10 @@ service RouteDiscoveryService {
   rpc StreamRoutes(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 
+  rpc IncrementalRoutes(stream IncrementalDiscoveryRequest)
+      returns (stream IncrementalDiscoveryResponse) {
+  }
+
   rpc FetchRoutes(DiscoveryRequest) returns (DiscoveryResponse) {
     option (google.api.http) = {
       post: "/v2/discovery:routes"

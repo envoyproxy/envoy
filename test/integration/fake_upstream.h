@@ -43,7 +43,10 @@ public:
 
   uint64_t bodyLength() { return body_.length(); }
   Buffer::Instance& body() { return body_; }
-  bool complete() { return end_stream_; }
+  bool complete() {
+    Thread::LockGuard lock(lock_);
+    return end_stream_;
+  }
   void encode100ContinueHeaders(const Http::HeaderMapImpl& headers);
   void encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
@@ -206,7 +209,12 @@ public:
       if (connected()) {
         f(connection_);
       } else {
-        RELEASE_ASSERT(allow_unexpected_disconnects_);
+        RELEASE_ASSERT(
+            allow_unexpected_disconnects_,
+            "The connection disconnected unexpectedly, and allow_unexpected_disconnects_ is false."
+            "\n See "
+            "https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md#"
+            "unexpected-disconnects");
       }
       callback_ready_event.notifyOne();
     });
@@ -242,7 +250,13 @@ public:
         allow_unexpected_disconnects_(allow_unexpected_disconnects) {
     shared_connection_.addDisconnectCallback([this] {
       Thread::LockGuard lock(lock_);
-      RELEASE_ASSERT(parented_ || allow_unexpected_disconnects_);
+      RELEASE_ASSERT(parented_ || allow_unexpected_disconnects_,
+                     "An queued upstream connection was torn down without being associated "
+                     "with a fake connection. Either manage the connection via "
+                     "waitForRawConnection() or waitForHttpConnection(), or "
+                     "set_allow_unexpected_disconnects(true).\n See "
+                     "https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md#"
+                     "unparented-upstream-connections");
     });
   }
 
@@ -263,7 +277,7 @@ private:
 /**
  * Base class for both fake raw connections and fake HTTP connections.
  */
-class FakeConnectionBase {
+class FakeConnectionBase : public Logger::Loggable<Logger::Id::testing> {
 public:
   virtual ~FakeConnectionBase() {
     ASSERT(initialized_);
@@ -317,7 +331,7 @@ public:
 
   // Http::ServerConnectionCallbacks
   Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder) override;
-  void onGoAway() override { NOT_IMPLEMENTED; }
+  void onGoAway() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 private:
   struct ReadFilter : public Network::ReadFilterBaseImpl {
@@ -341,7 +355,7 @@ typedef std::unique_ptr<FakeHttpConnection> FakeHttpConnectionPtr;
 /**
  * Fake raw connection for integration testing.
  */
-class FakeRawConnection : Logger::Loggable<Logger::Id::testing>, public FakeConnectionBase {
+class FakeRawConnection : public FakeConnectionBase {
 public:
   FakeRawConnection(SharedConnectionWrapper& shared_connection)
       : FakeConnectionBase(shared_connection) {}
@@ -421,10 +435,12 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
 
+  // Stops the dispatcher loop and joins the listening thread.
+  void cleanUp();
+
 protected:
   Stats::IsolatedStoreImpl stats_store_;
   const FakeHttpConnection::Type http_type_;
-  void cleanUp();
 
 private:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,

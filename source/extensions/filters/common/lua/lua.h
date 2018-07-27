@@ -368,6 +368,21 @@ public:
         [this]() { T::registerType(tls_slot_->getTyped<LuaThreadLocal>().state_.get()); });
   }
 
+  /**
+   * Return the number of bytes used by the runtime.
+   */
+  uint64_t runtimeBytesUsed() {
+    uint64_t bytes_used =
+        lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOUNT, 0) * 1024;
+    bytes_used += lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOUNTB, 0);
+    return bytes_used;
+  }
+
+  /**
+   * Force a full runtime GC.
+   */
+  void runtimeGC() { lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOLLECT, 0); }
+
 private:
   struct LuaThreadLocal : public ThreadLocal::ThreadLocalObject {
     LuaThreadLocal(const std::string& code);

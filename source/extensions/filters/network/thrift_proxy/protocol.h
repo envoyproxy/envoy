@@ -1,22 +1,32 @@
 #pragma once
 
 #include <memory>
-#include <stack>
 #include <string>
-#include <utility>
-#include <vector>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/registry/registry.h"
 
-#include "common/common/fmt.h"
-#include "common/common/macros.h"
+#include "common/common/assert.h"
+#include "common/config/utility.h"
 #include "common/singleton/const_singleton.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
+
+enum class ProtocolType {
+  Binary,
+  LaxBinary,
+  Compact,
+  Auto,
+
+  // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST PROTOCOL TYPE
+  LastProtocolType = Auto,
+};
 
 /**
  * Names of available Protocol implementations.
@@ -32,11 +42,23 @@ public:
   // Compact protocol
   const std::string COMPACT = "compact";
 
-  // JSON protocol
-  const std::string JSON = "json";
-
   // Auto-detection protocol
   const std::string AUTO = "auto";
+
+  const std::string& fromType(ProtocolType type) const {
+    switch (type) {
+    case ProtocolType::Binary:
+      return BINARY;
+    case ProtocolType::LaxBinary:
+      return LAX_BINARY;
+    case ProtocolType::Compact:
+      return COMPACT;
+    case ProtocolType::Auto:
+      return AUTO;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
 };
 
 typedef ConstSingleton<ProtocolNameValues> ProtocolNames;
@@ -79,48 +101,6 @@ enum class FieldType {
 };
 
 /**
- * ProtocolCallbacks are Thrift protocol-level callbacks.
- */
-class ProtocolCallbacks {
-public:
-  virtual ~ProtocolCallbacks() {}
-
-  /**
-   * Indicates that the start of a Thrift protocol message was detected.
-   * @param name the name of the message, if available
-   * @param msg_type the type of the message
-   * @param seq_id the message sequence id
-   */
-  virtual void messageStart(const absl::string_view name, MessageType msg_type,
-                            int32_t seq_id) PURE;
-
-  /**
-   * Indicates that the start of a Thrift protocol struct was detected.
-   * @param name the name of the struct, if available
-   */
-  virtual void structBegin(const absl::string_view name) PURE;
-
-  /**
-   * Indicates that the start of Thrift protocol struct field was detected.
-   * @param name the name of the field, if available
-   * @param field_type the type of the field
-   * @param field_id the field id
-   */
-  virtual void structField(const absl::string_view name, FieldType field_type,
-                           int16_t field_id) PURE;
-
-  /**
-   * Indicates that the end of a Thrift protocol struct was detected.
-   */
-  virtual void structEnd() PURE;
-
-  /**
-   * Indicates that the end of a Thrift protocol message was detected.
-   */
-  virtual void messageComplete() PURE;
-};
-
-/**
  * Protocol represents the operations necessary to implement the a generic Thrift protocol.
  * See https://github.com/apache/thrift/blob/master/doc/specs/thrift-protocol-spec.md
  */
@@ -128,7 +108,15 @@ class Protocol {
 public:
   virtual ~Protocol() {}
 
+  /**
+   * @return const std::string& the human-readable name of the protocol
+   */
   virtual const std::string& name() const PURE;
+
+  /**
+   * @return ProtocolType the protocol type
+   */
+  virtual ProtocolType type() const PURE;
 
   /**
    * Reads the start of a Thrift protocol message from the buffer and updates the name, msg_type,
@@ -339,104 +327,199 @@ public:
    * @throw EnvoyException if the data is not a valid set footer
    */
   virtual bool readBinary(Buffer::Instance& buffer, std::string& value) PURE;
+
+  /**
+   * Writes the start of a Thrift protocol message to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param name the message name
+   * @param msg_type the message's MessageType
+   * @param seq_id the message sequende ID
+   */
+  virtual void writeMessageBegin(Buffer::Instance& buffer, const std::string& name,
+                                 MessageType msg_type, int32_t seq_id) PURE;
+
+  /**
+   * Writes the end of a Thrift protocol message to the buffer.
+   * @param buffer Buffer::Instance to modify
+   */
+  virtual void writeMessageEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Writes the start of a Thrift struct to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param name the struct name, if known
+   */
+  virtual void writeStructBegin(Buffer::Instance& buffer, const std::string& name) PURE;
+
+  /**
+   * Writes the end of a Thrift struct to the buffer.
+   * @param buffer Buffer::Instance to modify
+   */
+  virtual void writeStructEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Writes the start of a Thrift struct field to the buffer
+   * @param buffer Buffer::Instance to modify
+   * @param name the field name, if known
+   * @param field_type the field's FieldType
+   * @param field_id the field ID
+   */
+  virtual void writeFieldBegin(Buffer::Instance& buffer, const std::string& name,
+                               FieldType field_type, int16_t field_id) PURE;
+
+  /**
+   * Writes the end of a Thrift struct field to the buffer.
+   * @param buffer Buffer::Instance to modify
+   */
+  virtual void writeFieldEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Writes the start of a Thrift map to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param key_type the map key FieldType
+   * @param value_type the map value FieldType
+   * @param size the number of key-value pairs in the map
+   */
+  virtual void writeMapBegin(Buffer::Instance& buffer, FieldType key_type, FieldType value_type,
+                             uint32_t size) PURE;
+
+  /**
+   * Writes the end of a Thrift map to the buffer.
+   * @param buffer Buffer::Instance to modify
+   */
+  virtual void writeMapEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Writes the start of a Thrift list to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param elem_type the list element FieldType
+   * @param size the number of list members
+   */
+  virtual void writeListBegin(Buffer::Instance& buffer, FieldType elem_type, uint32_t size) PURE;
+
+  /**
+   * Writes the end of a Thrift list to the buffer.
+   * @param buffer Buffer::Instance to modify
+   */
+  virtual void writeListEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Writes the start of a Thrift set to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param elem_type the set element FieldType
+   * @param size the number of set members
+   */
+  virtual void writeSetBegin(Buffer::Instance& buffer, FieldType elem_type, uint32_t size) PURE;
+
+  /**
+   * Writes the end of a Thrift set to the buffer.
+   * @param buffer Buffer::Instance to modify
+   */
+  virtual void writeSetEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Writes a boolean value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value bool to write
+   */
+  virtual void writeBool(Buffer::Instance& buffer, bool value) PURE;
+
+  /**
+   * Writes a byte value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value uint8_t to write
+   */
+  virtual void writeByte(Buffer::Instance& buffer, uint8_t value) PURE;
+
+  /**
+   * Writes a int16_t value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value int16_t to write
+   */
+  virtual void writeInt16(Buffer::Instance& buffer, int16_t value) PURE;
+
+  /**
+   * Writes a int32_t value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value int32_t to write
+   */
+  virtual void writeInt32(Buffer::Instance& buffer, int32_t value) PURE;
+
+  /**
+   * Writes a int64_t value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value int64_t to write
+   */
+  virtual void writeInt64(Buffer::Instance& buffer, int64_t value) PURE;
+
+  /**
+   * Writes a double value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value double to write
+   */
+  virtual void writeDouble(Buffer::Instance& buffer, double value) PURE;
+
+  /**
+   * Writes a string value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value std::string to write
+   */
+  virtual void writeString(Buffer::Instance& buffer, const std::string& value) PURE;
+
+  /**
+   * Writes a binary value to the buffer.
+   * @param buffer Buffer::Instance to modify
+   * @param value std::string to write
+   */
+  virtual void writeBinary(Buffer::Instance& buffer, const std::string& value) PURE;
 };
 
 typedef std::unique_ptr<Protocol> ProtocolPtr;
 
-/*
- * ProtocolImplBase provides a base class for Protocol implementations.
+/**
+ * Implemented by each Thrift protocol and registered via Registry::registerFactory or the
+ * convenience class RegisterFactory.
  */
-class ProtocolImplBase : public virtual Protocol {
+class NamedProtocolConfigFactory {
 public:
-  ProtocolImplBase(ProtocolCallbacks& callbacks) : callbacks_(callbacks) {}
+  virtual ~NamedProtocolConfigFactory() {}
 
-protected:
-  void onMessageStart(const absl::string_view name, MessageType msg_type, int32_t seq_id) const {
-    callbacks_.messageStart(name, msg_type, seq_id);
-  }
-  void onStructBegin(const absl::string_view name) const { callbacks_.structBegin(name); }
-  void onStructField(const absl::string_view name, FieldType field_type, int16_t field_id) const {
-    callbacks_.structField(name, field_type, field_id);
-  }
-  void onStructEnd() const { callbacks_.structEnd(); }
-  void onMessageComplete() const { callbacks_.messageComplete(); }
+  /**
+   * Create a particular Thrift protocol
+   * @return ProtocolFactoryCb the protocol
+   */
+  virtual ProtocolPtr createProtocol() PURE;
 
-  ProtocolCallbacks& callbacks_;
+  /**
+   * @return std::string the identifying name for a particular implementation of thrift protocol
+   * produced by the factory.
+   */
+  virtual std::string name() PURE;
+
+  /**
+   * Convenience method to lookup a factory by type.
+   * @param ProtocolType the protocol type
+   * @return NamedProtocolConfigFactory& for the ProtocolType
+   */
+  static NamedProtocolConfigFactory& getFactory(ProtocolType type) {
+    const std::string& name = ProtocolNames::get().fromType(type);
+    return Envoy::Config::Utility::getAndCheckFactory<NamedProtocolConfigFactory>(name);
+  }
 };
 
 /**
- * AutoProtocolImpl attempts to distinguish between the Thrift binary (strict mode only) and
- * compact protocols and then delegates subsequent decoding operations to the appropriate Protocol
- * implementation.
+ * ProtocolFactoryBase provides a template for a trivial NamedProtocolConfigFactory.
  */
-class AutoProtocolImpl : public ProtocolImplBase {
-public:
-  AutoProtocolImpl(ProtocolCallbacks& callbacks)
-      : ProtocolImplBase(callbacks), name_(ProtocolNames::get().AUTO) {}
+template <class ProtocolImpl> class ProtocolFactoryBase : public NamedProtocolConfigFactory {
+  ProtocolPtr createProtocol() override { return std::move(std::make_unique<ProtocolImpl>()); }
 
-  // Protocol
-  const std::string& name() const override { return name_; }
-  bool readMessageBegin(Buffer::Instance& buffer, std::string& name, MessageType& msg_type,
-                        int32_t& seq_id) override;
-  bool readMessageEnd(Buffer::Instance& buffer) override;
-  bool readStructBegin(Buffer::Instance& buffer, std::string& name) override {
-    return protocol_->readStructBegin(buffer, name);
-  }
-  bool readStructEnd(Buffer::Instance& buffer) override { return protocol_->readStructEnd(buffer); }
-  bool readFieldBegin(Buffer::Instance& buffer, std::string& name, FieldType& field_type,
-                      int16_t& field_id) override {
-    return protocol_->readFieldBegin(buffer, name, field_type, field_id);
-  }
-  bool readFieldEnd(Buffer::Instance& buffer) override { return protocol_->readFieldEnd(buffer); }
-  bool readMapBegin(Buffer::Instance& buffer, FieldType& key_type, FieldType& value_type,
-                    uint32_t& size) override {
-    return protocol_->readMapBegin(buffer, key_type, value_type, size);
-  }
-  bool readMapEnd(Buffer::Instance& buffer) override { return protocol_->readMapEnd(buffer); }
-  bool readListBegin(Buffer::Instance& buffer, FieldType& elem_type, uint32_t& size) override {
-    return protocol_->readListBegin(buffer, elem_type, size);
-  }
-  bool readListEnd(Buffer::Instance& buffer) override { return protocol_->readListEnd(buffer); }
-  bool readSetBegin(Buffer::Instance& buffer, FieldType& elem_type, uint32_t& size) override {
-    return protocol_->readSetBegin(buffer, elem_type, size);
-  }
-  bool readSetEnd(Buffer::Instance& buffer) override { return protocol_->readSetEnd(buffer); }
-  bool readBool(Buffer::Instance& buffer, bool& value) override {
-    return protocol_->readBool(buffer, value);
-  }
-  bool readByte(Buffer::Instance& buffer, uint8_t& value) override {
-    return protocol_->readByte(buffer, value);
-  }
-  bool readInt16(Buffer::Instance& buffer, int16_t& value) override {
-    return protocol_->readInt16(buffer, value);
-  }
-  bool readInt32(Buffer::Instance& buffer, int32_t& value) override {
-    return protocol_->readInt32(buffer, value);
-  }
-  bool readInt64(Buffer::Instance& buffer, int64_t& value) override {
-    return protocol_->readInt64(buffer, value);
-  }
-  bool readDouble(Buffer::Instance& buffer, double& value) override {
-    return protocol_->readDouble(buffer, value);
-  }
-  bool readString(Buffer::Instance& buffer, std::string& value) override {
-    return protocol_->readString(buffer, value);
-  }
-  bool readBinary(Buffer::Instance& buffer, std::string& value) override {
-    return protocol_->readBinary(buffer, value);
-  }
+  std::string name() override { return name_; }
 
-  /*
-   * Explicitly set the protocol. Public to simplify testing.
-   */
-  void setProtocol(ProtocolPtr&& proto) {
-    protocol_ = std::move(proto);
-    name_ = fmt::format("{}({})", protocol_->name(), ProtocolNames::get().AUTO);
-  }
+protected:
+  ProtocolFactoryBase(const std::string& name) : name_(name) {}
 
 private:
-  ProtocolPtr protocol_{};
-  std::string name_;
+  const std::string name_;
 };
 
 } // namespace ThriftProxy

@@ -15,11 +15,12 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
   }
 }
 
-bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection,
-                                               const Envoy::Http::HeaderMap& headers) const {
+bool RoleBasedAccessControlEngineImpl::allowed(
+    const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+    const envoy::api::v2::core::Metadata& metadata) const {
   bool matched = false;
   for (const auto& policy : policies_) {
-    if (policy.matches(connection, headers)) {
+    if (policy.matches(connection, headers, metadata)) {
       matched = true;
       break;
     }

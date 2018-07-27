@@ -1,11 +1,13 @@
 #pragma once
 
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/utility.h"
 #include "common/config/cds_json.h"
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
+#include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "fmt/printf.h"
@@ -46,8 +48,10 @@ inline std::string clustersJson(const std::vector<std::string>& clusters) {
 inline envoy::api::v2::Cluster parseClusterFromJson(const std::string& json_string) {
   envoy::api::v2::Cluster cluster;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
+  Stats::StatsOptionsImpl stats_options;
   Config::CdsJson::translateCluster(*json_object_ptr,
-                                    absl::optional<envoy::api::v2::core::ConfigSource>(), cluster);
+                                    absl::optional<envoy::api::v2::core::ConfigSource>(), cluster,
+                                    stats_options);
   return cluster;
 }
 
@@ -66,7 +70,8 @@ parseSdsClusterFromJson(const std::string& json_string,
                         const envoy::api::v2::core::ConfigSource eds_config) {
   envoy::api::v2::Cluster cluster;
   auto json_object_ptr = Json::Factory::loadFromString(json_string);
-  Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster);
+  Stats::StatsOptionsImpl stats_options;
+  Config::CdsJson::translateCluster(*json_object_ptr, eds_config, cluster, stats_options);
   return cluster;
 }
 

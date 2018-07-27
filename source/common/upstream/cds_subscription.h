@@ -26,7 +26,8 @@ public:
                   const envoy::api::v2::core::ConfigSource& cds_config,
                   const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config,
                   ClusterManager& cm, Event::Dispatcher& dispatcher,
-                  Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info);
+                  Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
+                  const Stats::StatsOptions& stats_options);
 
 private:
   // Config::Subscription
@@ -42,7 +43,7 @@ private:
     // We should never hit this at runtime, since this legacy adapter is only used by CdsApiImpl
     // that doesn't do dynamic modification of resources.
     UNREFERENCED_PARAMETER(resources);
-    NOT_IMPLEMENTED;
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
   // Http::RestApiFetcher
@@ -55,6 +56,7 @@ private:
   Config::SubscriptionCallbacks<envoy::api::v2::Cluster>* callbacks_ = nullptr;
   Config::SubscriptionStats stats_;
   const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config_;
+  const Stats::StatsOptions& stats_options_;
 };
 
 } // namespace Upstream

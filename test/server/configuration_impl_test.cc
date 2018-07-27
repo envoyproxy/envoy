@@ -242,7 +242,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap = TestUtility::parseBootstrapFromJson(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
-  sink.set_name(Extensions::StatSinks::StatsSinkNames::get().STATSD);
+  sink.set_name(Extensions::StatSinks::StatsSinkNames::get().Statsd);
   auto& field_map = *sink.mutable_config()->mutable_fields();
   field_map["tcp_cluster_name"].set_string_value("fake_cluster");
 

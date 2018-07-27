@@ -118,7 +118,7 @@ private:
       return "String";
     }
 
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   struct Value {
@@ -312,7 +312,7 @@ void Field::buildRapidJsonDocument(const Field& field, rapidjson::Value& value,
     break;
   }
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -557,7 +557,7 @@ bool ObjectHandler::StartObject() {
     state_ = expectKeyOrEndObject;
     return true;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -576,7 +576,7 @@ bool ObjectHandler::EndObject(rapidjson::SizeType) {
     }
     return true;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -587,7 +587,7 @@ bool ObjectHandler::Key(const char* value, rapidjson::SizeType size, bool) {
     state_ = expectValueOrStartObjectArray;
     return true;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -611,7 +611,7 @@ bool ObjectHandler::StartArray() {
     state_ = expectArrayValueOrEndArray;
     return true;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -631,7 +631,7 @@ bool ObjectHandler::EndArray(rapidjson::SizeType) {
 
     return true;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -661,7 +661,7 @@ bool ObjectHandler::String(const char* value, rapidjson::SizeType size, bool) {
 
 bool ObjectHandler::RawNumber(const char*, rapidjson::SizeType, bool) {
   // Only called if kParseNumbersAsStrings is set as a parse flag, which it is not.
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 bool ObjectHandler::handleValueEvent(FieldSharedPtr ptr) {
@@ -737,7 +737,7 @@ FieldSharedPtr parseYamlNode(YAML::Node node) {
   case YAML::NodeType::Undefined:
     throw EnvoyException("Undefined YAML value");
   }
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 } // namespace

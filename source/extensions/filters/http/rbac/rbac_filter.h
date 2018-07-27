@@ -6,6 +6,8 @@
 #include "envoy/http/filter.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/common/logger.h"
+
 #include "extensions/filters/common/rbac/engine_impl.h"
 
 namespace Envoy {
@@ -80,7 +82,8 @@ typedef std::shared_ptr<RoleBasedAccessControlFilterConfig>
 /**
  * A filter that provides role-based access control authorization for HTTP requests.
  */
-class RoleBasedAccessControlFilter : public Http::StreamDecoderFilter {
+class RoleBasedAccessControlFilter : public Http::StreamDecoderFilter,
+                                     public Logger::Loggable<Logger::Id::rbac> {
 public:
   RoleBasedAccessControlFilter(RoleBasedAccessControlFilterConfigSharedPtr config)
       : config_(config) {}

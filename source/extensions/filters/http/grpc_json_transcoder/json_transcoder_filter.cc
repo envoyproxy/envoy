@@ -14,6 +14,7 @@
 
 #include "google/api/annotations.pb.h"
 #include "google/api/http.pb.h"
+#include "google/api/httpbody.pb.h"
 #include "grpc_transcoding/json_request_translator.h"
 #include "grpc_transcoding/path_matcher_utility.h"
 #include "grpc_transcoding/response_to_json_translator.h"
@@ -91,7 +92,7 @@ JsonTranscoderConfig::JsonTranscoderConfig(
     }
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   for (const auto& file : descriptor_set.file()) {
@@ -222,6 +223,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::decodeHeaders(Http::HeaderMap& h
     // just pass-through the request to upstream.
     return Http::FilterHeadersStatus::Continue;
   }
+  has_http_body_output_ = !method_->server_streaming() && hasHttpBodyAsOutputType();
 
   headers.removeContentLength();
   headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Grpc);
@@ -340,6 +342,12 @@ Http::FilterDataStatus JsonTranscoderFilter::encodeData(Buffer::Instance& data, 
     return Http::FilterDataStatus::Continue;
   }
 
+  // TODO(dio): Add support for streaming case.
+  if (has_http_body_output_) {
+    buildResponseFromHttpBodyOutput(*response_headers_, data);
+    return Http::FilterDataStatus::StopIterationAndBuffer;
+  }
+
   response_in_.move(data);
 
   if (end_stream) {
@@ -413,6 +421,36 @@ bool JsonTranscoderFilter::readToBuffer(Protobuf::io::ZeroCopyInputStream& strea
     }
   }
   return false;
+}
+
+void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& response_headers,
+                                                           Buffer::Instance& data) {
+  std::vector<Grpc::Frame> frames;
+  decoder_.decode(data, frames);
+  if (frames.empty()) {
+    return;
+  }
+
+  google::api::HttpBody http_body;
+  for (auto& frame : frames) {
+    if (frame.length_ > 0) {
+      Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
+      http_body.ParseFromZeroCopyStream(&stream);
+      const auto& body = http_body.data();
+
+      // TODO(mrice32): This string conversion is currently required because body has a different
+      // type within Google. Remove when the string types merge.
+      data.add(ProtobufTypes::String(body));
+
+      response_headers.insertContentType().value(http_body.content_type());
+      response_headers.insertContentLength().value(body.size());
+      return;
+    }
+  }
+}
+
+bool JsonTranscoderFilter::hasHttpBodyAsOutputType() {
+  return method_->output_type()->full_name() == google::api::HttpBody::descriptor()->full_name();
 }
 
 } // namespace GrpcJsonTranscoder

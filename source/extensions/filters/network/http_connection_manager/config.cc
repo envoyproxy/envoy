@@ -84,7 +84,8 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
 Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
     const Json::Object& json_config, Server::Configuration::FactoryContext& context) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager proto_config;
-  Config::FilterJson::translateHttpConnectionManager(json_config, proto_config);
+  Config::FilterJson::translateHttpConnectionManager(json_config, proto_config,
+                                                     context.scope().statsOptions());
   return createFilterFactoryFromProtoTyped(proto_config, context);
 }
 
@@ -128,6 +129,9 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       route_config_provider_manager_(route_config_provider_manager),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
+      idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(config, idle_timeout)),
+      stream_idle_timeout_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
       drain_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, drain_timeout, 5000)),
       generate_request_id_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, generate_request_id, true)),
       date_provider_(date_provider),
@@ -159,7 +163,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     forward_client_cert_ = Http::ForwardClientCertType::AlwaysForwardOnly;
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const auto& set_current_client_cert_details = config.set_current_client_cert_details();
@@ -168,9 +172,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   }
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, subject, false)) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::Subject);
-  }
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(set_current_client_cert_details, san, false)) {
-    set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::SAN);
   }
   if (set_current_client_cert_details.uri()) {
     set_current_client_cert_details_.push_back(Http::ClientCertDetailsType::URI);
@@ -199,7 +200,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       tracing_operation_name = Tracing::OperationName::Egress;
       break;
     default:
-      NOT_REACHED;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
     for (const std::string& header : tracing_config.request_headers_for_tags()) {
@@ -216,10 +217,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     tracing_config_.reset(new Http::TracingConnectionManagerConfig(
         {tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
          overall_sampling}));
-  }
-
-  if (config.has_idle_timeout()) {
-    idle_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, idle_timeout));
   }
 
   for (const auto& access_log : config.access_log()) {
@@ -245,7 +242,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     codec_type_ = CodecType::HTTP2;
     break;
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   const auto& filters = config.http_filters();
@@ -323,7 +320,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     }
   }
 
-  NOT_REACHED;
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 void HttpConnectionManagerConfig::createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) {

@@ -756,10 +756,10 @@ void FaultFilterTest::TestPerFilterConfigFault(
     const Router::RouteSpecificFilterConfig* vhost_fault) {
 
   ON_CALL(filter_callbacks_.route_->route_entry_,
-          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().FAULT))
+          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().Fault))
       .WillByDefault(Return(route_fault));
   ON_CALL(filter_callbacks_.route_->route_entry_.virtual_host_,
-          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().FAULT))
+          perFilterConfig(Extensions::HttpFilters::HttpFilterNames::get().Fault))
       .WillByDefault(Return(vhost_fault));
 
   const std::string upstream_cluster("www1");

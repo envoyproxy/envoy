@@ -12,8 +12,9 @@
 namespace Envoy {
 namespace Stats {
 
-ThreadLocalStoreImpl::ThreadLocalStoreImpl(StatDataAllocator& alloc)
-    : alloc_(alloc), default_scope_(createScope("")),
+ThreadLocalStoreImpl::ThreadLocalStoreImpl(const Stats::StatsOptions& stats_options,
+                                           StatDataAllocator& alloc)
+    : stats_options_(stats_options), alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
       num_last_resort_stats_(default_scope_->counter("stats.overflow")), source_(*this) {}
 
@@ -181,8 +182,14 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
         make_stat(parent_.alloc_, name, std::move(tag_extracted_name), std::move(tags));
     if (stat == nullptr) {
       parent_.num_last_resort_stats_.inc();
+      // TODO(jbuckland) Performing the fallback from non-heap allocator to heap allocator should be
+      // the responsibility of the non-heap allocator, not the client of the non-heap allocator.
+      // This branch will never be used in the non-hot-restart case, since the parent_.alloc_ object
+      // will throw instead of returning a nullptr; we should remove the assumption that this
+      // branching case is always available.
       stat =
-          make_stat(parent_.heap_allocator_, name, std::move(tag_extracted_name), std::move(tags));
+          make_stat(parent_.heap_allocator_, name.substr(0, parent_.statsOptions().maxNameLength()),
+                    std::move(tag_extracted_name), std::move(tags));
       ASSERT(stat != nullptr);
     }
     central_ref = stat;

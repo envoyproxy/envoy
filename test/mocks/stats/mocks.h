@@ -145,9 +145,11 @@ public:
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
   MOCK_METHOD1(histogram, Histogram&(const std::string& name));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
+  MOCK_CONST_METHOD0(statsOptions, const Stats::StatsOptions&());
 
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;
+  StatsOptionsImpl stats_options_;
 };
 
 /**

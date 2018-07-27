@@ -219,8 +219,21 @@ public:
     do {
       envoy::service::load_stats::v2::LoadStatsRequest local_loadstats_request;
       loadstats_stream_->waitForGrpcMessage(*dispatcher_, local_loadstats_request);
-
+      // Sanity check and clear the measured load report interval.
+      for (auto& cluster_stats : *local_loadstats_request.mutable_cluster_stats()) {
+        const uint32_t actual_load_report_interval_ms =
+            Protobuf::util::TimeUtil::DurationToMilliseconds(cluster_stats.load_report_interval());
+        // Turns out libevent timers aren't that accurate; without this adjustment we see things
+        // like "expected 500, actual 497". Tweak as needed if races are observed.
+        EXPECT_GE(actual_load_report_interval_ms, load_report_interval_ms_ - 100);
+        // Allow for some skew in test environment.
+        EXPECT_LT(actual_load_report_interval_ms, load_report_interval_ms_ + 1000);
+        cluster_stats.mutable_load_report_interval()->Clear();
+      }
       mergeLoadStats(loadstats_request, local_loadstats_request);
+      if (!loadstats_request.cluster_stats().empty()) {
+        ENVOY_LOG_MISC(debug, "HTD {}", loadstats_request.cluster_stats()[0].DebugString());
+      }
 
       EXPECT_STREQ("POST", loadstats_stream_->headers().Method()->value().c_str());
       EXPECT_STREQ("/envoy.service.load_stats.v2.LoadReportingService/StreamLoadStats",
@@ -252,7 +265,8 @@ public:
 
   void requestLoadStatsResponse(const std::vector<std::string>& clusters) {
     envoy::service::load_stats::v2::LoadStatsResponse loadstats_response;
-    loadstats_response.mutable_load_reporting_interval()->set_nanos(500000000); // 500ms
+    loadstats_response.mutable_load_reporting_interval()->MergeFrom(
+        Protobuf::util::TimeUtil::MillisecondsToDuration(load_report_interval_ms_));
     for (const auto& cluster : clusters) {
       loadstats_response.add_clusters(cluster);
     }
@@ -277,14 +291,6 @@ public:
     return locality_stats;
   }
 
-  void cleanupUpstreamConnection() {
-    codec_client_->close();
-    if (fake_upstream_connection_ != nullptr) {
-      fake_upstream_connection_->close();
-      fake_upstream_connection_->waitForDisconnect();
-    }
-  }
-
   void cleanupLoadStatsConnection() {
     if (fake_loadstats_connection_ != nullptr) {
       fake_loadstats_connection_->close();
@@ -295,7 +301,7 @@ public:
   void sendAndReceiveUpstream(uint32_t endpoint_index, uint32_t response_code = 200) {
     initiateClientConnection();
     waitForUpstreamResponse(endpoint_index, response_code);
-    cleanupUpstreamConnection();
+    cleanupUpstreamAndDownstream();
   }
 
   static constexpr uint32_t upstream_endpoints_ = 5;
@@ -312,6 +318,7 @@ public:
 
   const uint64_t request_size_ = 1024;
   const uint64_t response_size_ = 512;
+  const uint32_t load_report_interval_ms_ = 500;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, LoadStatsIntegrationTest,
@@ -390,8 +397,23 @@ TEST_P(LoadStatsIntegrationTest, Success) {
   EXPECT_LE(5, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
 
-  // A LoadStatsResponse arrives before the expiration of the reporting interval.
+  // A LoadStatsResponse arrives before the expiration of the reporting
+  // interval. Since we are keep tracking cluster_0, stats rollover.
   requestLoadStatsResponse({"cluster_0"});
+  sendAndReceiveUpstream(1);
+  requestLoadStatsResponse({"cluster_0"});
+  sendAndReceiveUpstream(1);
+  sendAndReceiveUpstream(1);
+
+  waitForLoadStatsRequest({localityStats("winter", 3, 0, 0)});
+
+  EXPECT_EQ(6, test_server_->counter("load_reporter.requests")->value());
+  EXPECT_LE(6, test_server_->counter("load_reporter.responses")->value());
+  EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
+
+  // As above, but stop tracking cluster_0 and only get the requests since the
+  // response.
+  requestLoadStatsResponse({});
   sendAndReceiveUpstream(1);
   requestLoadStatsResponse({"cluster_0"});
   sendAndReceiveUpstream(1);
@@ -399,8 +421,8 @@ TEST_P(LoadStatsIntegrationTest, Success) {
 
   waitForLoadStatsRequest({localityStats("winter", 2, 0, 0)});
 
-  EXPECT_EQ(6, test_server_->counter("load_reporter.requests")->value());
-  EXPECT_LE(6, test_server_->counter("load_reporter.responses")->value());
+  EXPECT_EQ(8, test_server_->counter("load_reporter.requests")->value());
+  EXPECT_LE(7, test_server_->counter("load_reporter.responses")->value());
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
 
   cleanupLoadStatsConnection();
@@ -515,7 +537,7 @@ TEST_P(LoadStatsIntegrationTest, InProgress) {
   waitForLoadStatsRequest({localityStats("winter", 0, 0, 1)});
 
   waitForUpstreamResponse(0, 503);
-  cleanupUpstreamConnection();
+  cleanupUpstreamAndDownstream();
 
   EXPECT_EQ(1, test_server_->counter("load_reporter.requests")->value());
   EXPECT_LE(2, test_server_->counter("load_reporter.responses")->value());
@@ -544,7 +566,7 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
   response_->waitForEndStream();
   ASSERT_TRUE(response_->complete());
   EXPECT_STREQ("503", response_->headers().Status()->value().c_str());
-  cleanupUpstreamConnection();
+  cleanupUpstreamAndDownstream();
 
   waitForLoadStatsRequest({}, 1);
 

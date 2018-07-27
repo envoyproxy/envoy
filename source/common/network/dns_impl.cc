@@ -56,7 +56,7 @@ DnsResolverImpl::DnsResolverImpl(
     }
     const std::string resolvers_csv = StringUtil::join(resolver_addrs, ",");
     int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());
-    RELEASE_ASSERT(result == ARES_SUCCESS);
+    RELEASE_ASSERT(result == ARES_SUCCESS, "");
   }
 }
 

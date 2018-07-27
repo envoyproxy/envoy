@@ -3,15 +3,55 @@ Version history
 
 1.8.0 (Pending)
 ===============
+* access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>`
+  to filter based on the presence of Envoy response flags.
+* admin: added :http:get:`/hystrix_event_stream` as an endpoint for monitoring envoy's statistics
+  through `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
+* grpc-json: added support for building HTTP response from
+  `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
+* config: v1 disabled by default. v1 support remains available until October via flipping --v2-config-only=false.
+* config: v1 disabled by default. v1 support remains available until October via setting :option:`--allow-deprecated-v1-api`.
+* health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
+* health check: added support for :ref:`specifying jitter as a percentage <envoy_api_field_core.HealthCheck.interval_jitter_percent>`.
+* health_check: added support for :ref:`health check event logging <arch_overview_health_check_logging>`.
+* health_check: added support for specifying :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`
+  to HTTP health checker requests.
+* http: added support for a per-stream idle timeout. This applies at both :ref:`connection manager
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
+  and :ref:`per-route granularity <envoy_api_field_route.RouteAction.idle_timeout>`. The timeout
+  defaults to 5 minutes; if you have other timeouts (e.g. connection idle timeout, upstream
+  response per-retry) that are longer than this in duration, you may want to consider setting a
+  non-default per-stream idle timeout.
+* http: added support for a :ref:`per-stream idle timeout
+  <envoy_api_field_route.RouteAction.idle_timeout>`. This defaults to 5 minutes; if you have
+  other timeouts (e.g. connection idle timeout, upstream response per-retry) that are longer than
+  this in duration, you may want to consider setting a non-default per-stream idle timeout.
+* http: added generic :ref:`Upgrade support 
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`.
+* http: better handling of HEAD requests. Now sending transfer-encoding: chunked rather than content-length: 0.
 * http: response filters not applied to early error paths such as http_parser generated 400s.
+* http: :ref:`hpack_table_size <envoy_api_field_core.Http2ProtocolOptions.hpack_table_size>` now controls
+  dynamic table size of both: encoder and decoder.
+* listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
+  :ref:`destination_port <envoy_api_field_listener.FilterChainMatch.destination_port>` and
+  :ref:`prefix_ranges <envoy_api_field_listener.FilterChainMatch.prefix_ranges>`.
+* lua: added :ref:`connection() <config_http_filters_lua_connection_wrapper>` wrapper and *ssl()* API.
+* lua: added :ref:`requestInfo() <config_http_filters_lua_request_info_wrapper>` wrapper and *protocol()* API.
+* lua: added :ref:`requestInfo():dynamicMetadata() <config_http_filters_lua_request_info_dynamic_metadata_wrapper>` API.
+* proxy_protocol: added support for HAProxy Proxy Protocol v2 (AF_INET/AF_INET6 only).
 * ratelimit: added support for :repo:`api/envoy/service/ratelimit/v2/rls.proto`.
   Lyft's reference implementation of the `ratelimit <https://github.com/lyft/ratelimit>`_ service also supports the data-plane-api proto as of v1.1.0.
   Envoy can use either proto to send client requests to a ratelimit server with the use of the
   :ref:`use_data_plane_proto<envoy_api_field_config.ratelimit.v2.RateLimitServiceConfig.use_data_plane_proto>`
   boolean flag in the ratelimit configuration.
   Support for the legacy proto :repo:`source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
+* router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
 * tracing: added support for configuration of :ref:`tracing sampling
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
+* thrift_proxy: introduced thrift routing, moved configuration to correct location
+* upstream: added configuration option to the subset load balancer to take locality weights into account when
+  selecting a host from a subset.
+* access log: added RESPONSE_DURATION and RESPONSE_TX_DURATION.
 
 1.7.0
 ===============
@@ -26,6 +66,8 @@ Version history
 * access log: improved WebSocket logging.
 * admin: added :http:get:`/config_dump` for dumping the current configuration and associated xDS
   version information (if applicable).
+* admin: added :http:get:`/clusters?format=json` for outputing a JSON-serialized proto detailing
+  the current status of all clusters.
 * admin: added :http:get:`/stats/prometheus` as an alternative endpoint for getting stats in prometheus format.
 * admin: added :ref:`/runtime_modify endpoint <operations_admin_interface_runtime_modify>` to add or change runtime values.
 * admin: mutations must be sent as POSTs, rather than GETs. Mutations include:
@@ -43,8 +85,10 @@ Version history
   to close tcp_proxy upstream connections when health checks fail.
 * cluster: added :ref:`option <envoy_api_field_Cluster.drain_connections_on_host_removal>` to drain
   connections from hosts after they are removed from service discovery, regardless of health status.
-* cluster: fixed bug preventing the deletion of all endpoints in a priority.
-* debug: added symbolized stack traces (where supported).
+* cluster: fixed bug preventing the deletion of all endpoints in a priority
+* debug: added symbolized stack traces (where supported)
+* ext-authz filter: added support to raw HTTP authorization.
+* ext-authz filter: added support to gRPC responses to carry HTTP attributes.
 * grpc: support added for the full set of :ref:`Google gRPC call credentials
   <envoy_api_msg_core.GrpcService.GoogleGrpc.CallCredentials>`.
 * gzip filter: added :ref:`stats <gzip-statistics>` to the filter.
@@ -61,8 +105,7 @@ Version history
 * health check: health check connections can now be configured to use http/2.
 * health check http filter: added
   :ref:`generic header matching <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.headers>`
-  to trigger health check response. Deprecated the
-  :ref:`endpoint option <envoy_api_field_config.filter.http.health_check.v2.HealthCheck.endpoint>`.
+  to trigger health check response. Deprecated the endpoint option.
 * http: filters can now optionally support
   :ref:`virtual host <envoy_api_field_route.VirtualHost.per_filter_config>`,
   :ref:`route <envoy_api_field_route.Route.per_filter_config>`, and
@@ -85,8 +128,7 @@ Version history
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
   :ref:`application_protocols <envoy_api_field_listener.FilterChainMatch.application_protocols>`
   (e.g. ALPN for TLS protocol).
-* listeners: :ref:`sni_domains <envoy_api_field_listener.FilterChainMatch.sni_domains>` has been deprecated/renamed to
-  :ref:`server_names <envoy_api_field_listener.FilterChainMatch.server_names>`.
+* listeners: `sni_domains` has been deprecated/renamed to :ref:`server_names <envoy_api_field_listener.FilterChainMatch.server_names>`.
 * listeners: removed restriction on all filter chains having identical filters.
 * load balancer: added :ref:`weighted round robin
   <arch_overview_load_balancing_types_round_robin>` support. The round robin

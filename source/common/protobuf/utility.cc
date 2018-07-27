@@ -30,7 +30,7 @@ uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent&
     return 1000000;
   default:
     // Checked by schema.
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -49,7 +49,9 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
 }
 
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message) {
-  const auto status = Protobuf::util::JsonStringToMessage(json, &message);
+  Protobuf::util::JsonParseOptions options;
+  options.ignore_unknown_fields = true;
+  const auto status = Protobuf::util::JsonStringToMessage(json, &message, options);
   if (!status.ok()) {
     throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
   }
@@ -87,7 +89,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
 }
 
 std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& message,
-                                                  const bool pretty_print) {
+                                                  const bool pretty_print,
+                                                  const bool always_print_primitive_fields) {
   Protobuf::util::JsonPrintOptions json_options;
   // By default, proto field names are converted to camelCase when the message is converted to JSON.
   // Setting this option makes debugging easier because it keeps field names consistent in JSON
@@ -96,10 +99,15 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   if (pretty_print) {
     json_options.add_whitespace = true;
   }
+  // Primitive types such as int32s and enums will not be serialized if they have the default value.
+  // This flag disables that behavior.
+  if (always_print_primitive_fields) {
+    json_options.always_print_primitive_fields = true;
+  }
   ProtobufTypes::String json;
   const auto status = Protobuf::util::MessageToJsonString(message, &json, json_options);
   // This should always succeed unless something crash-worthy such as out-of-memory.
-  RELEASE_ASSERT(status.ok());
+  RELEASE_ASSERT(status.ok(), "");
   return json;
 }
 
@@ -180,7 +188,7 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
   }
 
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

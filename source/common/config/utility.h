@@ -173,7 +173,8 @@ public:
    */
   static void
   translateRdsConfig(const Json::Object& json_rds,
-                     envoy::config::filter::network::http_connection_manager::v2::Rds& rds);
+                     envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
+                     const Stats::StatsOptions& stats_options);
 
   /**
    * Convert a v1 LDS JSON config to v2 LDS envoy::api::v2::core::ConfigSource.
@@ -227,7 +228,7 @@ public:
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
 
     // Fail in an obvious way if a plugin does not return a proto.
-    RELEASE_ASSERT(config != nullptr);
+    RELEASE_ASSERT(config != nullptr, "");
 
     if (enclosing_message.has_config()) {
       MessageUtil::jsonConvert(enclosing_message.config(), *config);
@@ -251,7 +252,7 @@ public:
     ProtobufTypes::MessagePtr config = factory.createEmptyRouteConfigProto();
 
     // Fail in an obvious way if a plugin does not return a proto.
-    RELEASE_ASSERT(config != nullptr);
+    RELEASE_ASSERT(config != nullptr, "");
 
     MessageUtil::jsonConvert(source, *config);
     return config;
@@ -271,8 +272,11 @@ public:
    * It should be within the configured length limit. Throws on error.
    * @param error_prefix supplies the prefix to use in error messages.
    * @param name supplies the name to check for length limits.
+   * @param stats_options the top-level statsOptions struct, which contains the max stat name /
+   * suffix lengths for stats.
    */
-  static void checkObjNameLength(const std::string& error_prefix, const std::string& name);
+  static void checkObjNameLength(const std::string& error_prefix, const std::string& name,
+                                 const Stats::StatsOptions& stats_options);
 
   /**
    * Obtain gRPC async client factory from a envoy::api::v2::core::ApiConfigSource.
@@ -284,6 +288,14 @@ public:
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::api::v2::core::ApiConfigSource& api_config_source,
                                 Stats::Scope& scope);
+
+  /**
+   * Translate a set of cluster's hosts into a load assignment configuration.
+   * @param hosts cluster's list of hosts.
+   * @return envoy::api::v2::ClusterLoadAssignment a load assignment configuration.
+   */
+  static envoy::api::v2::ClusterLoadAssignment
+  translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts);
 };
 
 } // namespace Config

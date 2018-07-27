@@ -15,7 +15,10 @@
 
 #include "gtest/gtest.h"
 
+using testing::EndsWith;
+using testing::HasSubstr;
 using testing::MatchesRegex;
+using testing::Not;
 
 namespace Envoy {
 
@@ -134,8 +137,8 @@ TEST_P(IntegrationTest, IdleTimoutBasic) { testIdleTimeoutBasic(); }
 TEST_P(IntegrationTest, IdleTimeoutWithTwoRequests) { testIdleTimeoutWithTwoRequests(); }
 
 // Test hitting the bridge filter with too many response bytes to buffer. Given
-// the headers are not proxied, the connection manager will send a 500.
-TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
+// the headers are not proxied, the connection manager will send a local error reply.
+TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
   config_helper_.addFilter("{ name: envoy.grpc_http1_bridge, config: {} }");
   config_helper_.setBufferLimits(1024, 1024);
 
@@ -152,9 +155,11 @@ TEST_P(IntegrationTest, HittingEncoderFilterLimitBufferingHeaders) {
   waitForNextUpstreamRequest();
 
   // Send the overly large response. Because the grpc_http1_bridge filter buffers and buffer
-  // limits are exceeded, this will be translated into a 500 from Envoy.
+  // limits are exceeded, this will be translated into an unknown gRPC error.
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   upstream_request_->encodeData(1024 * 65, false);
+  fake_upstream_connection_->waitForDisconnect();
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
@@ -205,6 +210,64 @@ TEST_P(IntegrationTest, OverlyLongHeaders) { testOverlyLongHeaders(); }
 
 TEST_P(IntegrationTest, UpstreamProtocolError) { testUpstreamProtocolError(); }
 
+TEST_P(IntegrationTest, TestHead) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestHeaderMapImpl head_request{{":method", "HEAD"},
+                                       {":path", "/test/long/url"},
+                                       {":scheme", "http"},
+                                       {":authority", "host"}};
+
+  // Without an explicit content length, assume we chunk for HTTP/1.1
+  auto response = sendRequestAndWaitForResponse(head_request, 0, default_response_headers_, 0);
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_TRUE(response->headers().ContentLength() == nullptr);
+  ASSERT_TRUE(response->headers().TransferEncoding() != nullptr);
+  EXPECT_EQ(Http::Headers::get().TransferEncodingValues.Chunked,
+            response->headers().TransferEncoding()->value().c_str());
+  EXPECT_EQ(0, response->body().size());
+
+  // Preserve explicit content length.
+  Http::TestHeaderMapImpl content_length_response{{":status", "200"}, {"content-length", "12"}};
+  response = sendRequestAndWaitForResponse(head_request, 0, content_length_response, 0);
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  ASSERT_TRUE(response->headers().ContentLength() != nullptr);
+  EXPECT_STREQ(response->headers().ContentLength()->value().c_str(), "12");
+  EXPECT_TRUE(response->headers().TransferEncoding() == nullptr);
+  EXPECT_EQ(0, response->body().size());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// The Envoy HTTP/1.1 codec ASSERTs that T-E headers are cleared in
+// encodeHeaders, so to test upstreams explicitly sending T-E: chunked we have
+// to send raw HTTP.
+TEST_P(IntegrationTest, TestHeadWithExplicitTE) {
+  initialize();
+
+  auto tcp_client = makeTcpConnection(lookupPort("http"));
+  tcp_client->write("HEAD / HTTP/1.1\r\nHost: host\r\n\r\n");
+  auto fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  fake_upstream_connection->waitForData(FakeRawConnection::waitForInexactMatch("\r\n\r\n"));
+
+  fake_upstream_connection->write("HTTP/1.1 200 OK\r\nTransfer-encoding: chunked\r\n\r\n");
+  tcp_client->waitForData("\r\n\r\n", false);
+  std::string response = tcp_client->data();
+
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+  EXPECT_THAT(response, Not(HasSubstr("content-length")));
+  EXPECT_THAT(response, HasSubstr("transfer-encoding: chunked\r\n"));
+  EXPECT_THAT(response, EndsWith("\r\n\r\n"));
+
+  fake_upstream_connection->close();
+  fake_upstream_connection->waitForDisconnect();
+  tcp_client->close();
+}
+
 TEST_P(IntegrationTest, TestBind) {
   std::string address_string;
   if (GetParam() == Network::Address::IpVersion::v4) {
@@ -216,7 +279,6 @@ TEST_P(IntegrationTest, TestBind) {
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  // Request 1.
 
   auto response =
       codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
@@ -224,17 +286,14 @@ TEST_P(IntegrationTest, TestBind) {
                                                                  {":scheme", "http"},
                                                                  {":authority", "host"}},
                                          1024);
-
   fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
   std::string address =
       fake_upstream_connection_->connection().remoteAddress()->ip()->addressAsString();
   EXPECT_EQ(address, address_string);
   upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
   upstream_request_->waitForEndStream(*dispatcher_);
-  // Cleanup both downstream and upstream
-  codec_client_->close();
-  fake_upstream_connection_->close();
-  fake_upstream_connection_->waitForDisconnect();
+
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_P(IntegrationTest, TestFailedBind) {

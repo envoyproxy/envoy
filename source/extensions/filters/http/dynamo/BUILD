@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # AWS DynamoDB L7 HTTP filter (observability): https://aws.amazon.com/dynamodb/
 # Public docs: docs/root/configuration/http_filters/dynamodb_filter.rst
 
@@ -40,7 +41,10 @@ envoy_cc_library(
     name = "dynamo_utility_lib",
     srcs = ["dynamo_utility.cc"],
     hdrs = ["dynamo_utility.h"],
-    deps = ["//source/common/stats:stats_lib"],
+    deps = [
+        "//include/envoy/stats:stats_interface",
+        "//source/common/stats:stats_lib",
+    ],
 )
 
 envoy_cc_library(

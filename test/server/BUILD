@@ -161,6 +161,7 @@ envoy_cc_fuzz_test(
     corpus = "server_corpus",
     deps = [
         "//source/common/thread_local:thread_local_lib",
+        "//source/server:proto_descriptors_lib",
         "//source/server:server_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",
@@ -174,6 +175,7 @@ envoy_cc_test(
     srcs = ["server_test.cc"],
     data = [
         ":cluster_dupe_bootstrap.yaml",
+        ":cluster_health_check_bootstrap.yaml",
         ":empty_bootstrap.yaml",
         ":node_bootstrap.yaml",
         "//test/config/integration:server.json",

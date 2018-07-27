@@ -4,8 +4,10 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/registry/registry.h"
 
-#include "common/common/fmt.h"
+#include "common/common/assert.h"
+#include "common/config/utility.h"
 #include "common/singleton/const_singleton.h"
 
 #include "absl/types/optional.h"
@@ -14,6 +16,16 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
+
+enum class TransportType {
+  Framed,
+  Unframed,
+  Auto,
+
+  // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST TRANSPORT TYPE
+  LastTransportType = Auto,
+
+};
 
 /**
  * Names of available Transport implementations.
@@ -28,28 +40,22 @@ public:
 
   // Auto-detection transport
   const std::string AUTO = "auto";
+
+  const std::string& fromType(TransportType type) const {
+    switch (type) {
+    case TransportType::Framed:
+      return FRAMED;
+    case TransportType::Unframed:
+      return UNFRAMED;
+    case TransportType::Auto:
+      return AUTO;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
 };
 
 typedef ConstSingleton<TransportNameValues> TransportNames;
-
-/**
- * TransportCallbacks are Thrift transport-level callbacks.
- */
-class TransportCallbacks {
-public:
-  virtual ~TransportCallbacks() {}
-
-  /**
-   * Indicates the start of a Thrift transport frame was detected.
-   * @param size the size of the message, if available to the transport
-   */
-  virtual void transportFrameStart(absl::optional<uint32_t> size) PURE;
-
-  /**
-   * Indicates the end of a Thrift transport frame was detected.
-   */
-  virtual void transportFrameComplete() PURE;
-};
 
 /**
  * Transport represents a Thrift transport. The Thrift transport is nominally a generic,
@@ -67,20 +73,27 @@ public:
    */
   virtual const std::string& name() const PURE;
 
+  /**
+   * @return TransportType the transport type
+   */
+  virtual TransportType type() const PURE;
+
   /*
-   * decodeFrameStart decodes the start of a transport message, potentially invoking callbacks.
-   * If successful, the start of the frame is removed from the buffer.
+   * Decodes the start of a transport message. If successful, the start of the frame is removed
+   * from the buffer.
    *
    * @param buffer the currently buffered thrift data.
+   * @param size updated with the frame size on success. If frame size is not encoded, the size
+   *                is cleared on success.
    * @return bool true if a complete frame header was successfully consumed, false if more data
    *                 is required.
    * @throws EnvoyException if the data is not valid for this transport.
    */
-  virtual bool decodeFrameStart(Buffer::Instance& buffer) PURE;
+  virtual bool decodeFrameStart(Buffer::Instance& buffer, absl::optional<uint32_t>& size) PURE;
 
   /*
-   * decodeFrameEnd decodes the end of a transport message, potentially invoking callbacks.
-   * If successful, the end of the frame is removed from the buffer.
+   * Decodes the end of a transport message. If successful, the end of the frame is removed from
+   * the buffer.
    *
    * @param buffer the currently buffered thrift data.
    * @return bool true if a complete frame trailer was successfully consumed, false if more data
@@ -88,83 +101,63 @@ public:
    * @throws EnvoyException if the data is not valid for this transport.
    */
   virtual bool decodeFrameEnd(Buffer::Instance& buffer) PURE;
+
+  /**
+   * Wraps the given message buffer with the transport's header and trailer (if any). After
+   * encoding, message will be empty.
+   * @param buffer is the output buffer
+   * @param message a protocol-encoded message
+   * @throws EnvoyException if the message is too large for the transport
+   */
+  virtual void encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) PURE;
 };
 
 typedef std::unique_ptr<Transport> TransportPtr;
 
-/*
- * TransportImplBase provides a base class for Transport implementations.
+/**
+ * Implemented by each Thrift transport and registered via Registry::registerFactory or the
+ * convenience class RegisterFactory.
  */
-class TransportImplBase : public virtual Transport {
+class NamedTransportConfigFactory {
 public:
-  TransportImplBase(TransportCallbacks& callbacks) : callbacks_(callbacks) {}
+  virtual ~NamedTransportConfigFactory() {}
+
+  /**
+   * Create a particular Thrift transport.
+   * @return TransportPtr the transport
+   */
+  virtual TransportPtr createTransport() PURE;
+
+  /**
+   * @return std::string the identifying name for a particular implementation of thrift transport
+   * produced by the factory.
+   */
+  virtual std::string name() PURE;
+
+  /**
+   * Convenience method to lookup a factory by type.
+   * @param TransportType the transport type
+   * @return NamedTransportConfigFactory& for the TransportType
+   */
+  static NamedTransportConfigFactory& getFactory(TransportType type) {
+    const std::string& name = TransportNames::get().fromType(type);
+    return Envoy::Config::Utility::getAndCheckFactory<NamedTransportConfigFactory>(name);
+  }
+};
+
+/**
+ * TransportFactoryBase provides a template for a trivial NamedTransportConfigFactory.
+ */
+template <class TransportImpl> class TransportFactoryBase : public NamedTransportConfigFactory {
+  TransportPtr createTransport() override { return std::move(std::make_unique<TransportImpl>()); }
+
+  std::string name() override { return name_; }
 
 protected:
-  void onFrameStart(absl::optional<uint32_t> size) const { callbacks_.transportFrameStart(size); }
-  void onFrameComplete() const { callbacks_.transportFrameComplete(); }
-
-  TransportCallbacks& callbacks_;
-};
-
-/**
- * FramedTransportImpl implements the Thrift Framed transport.
- * See https://github.com/apache/thrift/blob/master/doc/specs/thrift-rpc.md
- */
-class FramedTransportImpl : public TransportImplBase {
-public:
-  FramedTransportImpl(TransportCallbacks& callbacks) : TransportImplBase(callbacks) {}
-
-  // Transport
-  const std::string& name() const override { return TransportNames::get().FRAMED; }
-  bool decodeFrameStart(Buffer::Instance& buffer) override;
-  bool decodeFrameEnd(Buffer::Instance& buffer) override;
-
-  static const int32_t MaxFrameSize = 0xFA0000;
-};
-
-/**
- * UnframedTransportImpl implements the Thrift Unframed transport.
- * See https://github.com/apache/thrift/blob/master/doc/specs/thrift-rpc.md
- */
-class UnframedTransportImpl : public TransportImplBase {
-public:
-  UnframedTransportImpl(TransportCallbacks& callbacks) : TransportImplBase(callbacks) {}
-
-  // Transport
-  const std::string& name() const override { return TransportNames::get().UNFRAMED; }
-  bool decodeFrameStart(Buffer::Instance&) override {
-    onFrameStart(absl::optional<uint32_t>());
-    return true;
-  }
-  bool decodeFrameEnd(Buffer::Instance&) override {
-    onFrameComplete();
-    return true;
-  }
-};
-
-/**
- * AutoTransportImpl implements Transport and attempts to distinguish between the Thrift framed and
- * unframed transports. Once the transport is detected, subsequent operations are delegated to the
- * appropriate implementation.
- */
-class AutoTransportImpl : public TransportImplBase {
-public:
-  AutoTransportImpl(TransportCallbacks& callbacks)
-      : TransportImplBase(callbacks), name_(TransportNames::get().AUTO){};
-
-  // Transport
-  const std::string& name() const override { return name_; }
-  bool decodeFrameStart(Buffer::Instance& buffer) override;
-  bool decodeFrameEnd(Buffer::Instance& buffer) override;
+  TransportFactoryBase(const std::string& name) : name_(name) {}
 
 private:
-  void setTransport(TransportPtr&& transport) {
-    transport_ = std::move(transport);
-    name_ = fmt::format("{}({})", transport_->name(), TransportNames::get().AUTO);
-  }
-
-  TransportPtr transport_{};
-  std::string name_;
+  const std::string name_;
 };
 
 } // namespace ThriftProxy

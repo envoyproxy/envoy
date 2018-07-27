@@ -10,7 +10,7 @@
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
-#include "extensions/filters/common/ext_authz/ext_authz_impl.h"
+#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 #include "extensions/filters/network/ext_authz/ext_authz.h"
 
 namespace Envoy {

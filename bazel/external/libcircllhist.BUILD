@@ -6,4 +6,8 @@ cc_library(
     ],
     includes = ["src"],
     visibility = ["//visibility:public"],
+    copts = select({
+            "@envoy//bazel:windows_x86_64": ["-DWIN32"],
+            "//conditions:default": [],
+           }),
 )

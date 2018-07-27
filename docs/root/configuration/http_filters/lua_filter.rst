@@ -290,6 +290,28 @@ under the filter name i.e. *envoy.lua*. Below is an example of a *metadata* in a
 
 Returns a :ref:`metadata object <config_http_filters_lua_metadata_wrapper>`.
 
+requestInfo()
+^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  requestInfo = handle:requestInfo()
+
+Returns :repo:`information <include/request_info/request_info.h>` related to the current request.
+
+Returns a :ref:`request info object <config_http_filters_lua_request_info_wrapper>`.
+
+connection()
+^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  connection = handle:connection()
+
+Returns the current request's underlying :repo:`connection <include/envoy/network/connection.h>`.
+
+Returns a :ref:`connection object <config_http_filters_lua_connection_wrapper>`.
+
 .. _config_http_filters_lua_header_wrapper:
 
 Header object API
@@ -390,7 +412,7 @@ get()
   metadata:get(key)
 
 Gets a metadata. *key* is a string that supplies the metadata key. Returns the corresponding
-value of the given metadata key. The type of the value can be: *null*, *boolean*, *number*,
+value of the given metadata key. The type of the value can be: *nil*, *boolean*, *number*,
 *string* and *table*.
 
 __pairs()
@@ -403,3 +425,89 @@ __pairs()
 
 Iterates through every *metadata* entry. *key* is a string that supplies a *metadata*
 key. *value* is *metadata* entry value.
+
+.. _config_http_filters_lua_request_info_wrapper:
+
+Request info object API
+-----------------------
+
+protocol()
+^^^^^^^^^^
+
+.. code-block:: lua
+
+  requestInfo:protocol()
+
+Returns the string representation of :repo:`HTTP protocol <include/envoy/http/protocol.h>`
+used by the current request. The possible values are: *HTTP/1.0*, *HTTP/1.1*, and *HTTP/2*.
+
+dynamicMetadata()
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+  requestInfo:dynamicMetadata()
+
+Returns a :ref:`dynamic metadata object <config_http_filters_lua_request_info_dynamic_metadata_wrapper>`.
+
+.. _config_http_filters_lua_request_info_dynamic_metadata_wrapper:
+
+Dynamic metadata object API
+---------------------------
+
+get()
+^^^^^
+
+.. code-block:: lua
+
+  dynamicMetadata:get(filterName)
+
+  -- to get a value from a returned table.
+  dynamicMetadata:get(filterName)[key]
+
+Gets an entry in dynamic metadata struct. *filterName* is a string that supplies the filter name, e.g. *envoy.lb*.
+Returns the corresponding *table* of a given *filterName*.
+
+set()
+^^^^^
+
+.. code-block:: lua
+
+  dynamicMetadata:set(filterName, key, value)
+
+Sets key-value pair of a *filterName*'s metadata. *filterName* is a key specifying the target filter name,
+e.g. *envoy.lb*. The type of *key* and *value* is *string*.
+
+__pairs()
+^^^^^^^^^
+
+.. code-block:: lua
+
+  for key, value in pairs(dynamicMetadata) do
+  end
+
+Iterates through every *dynamicMetadata* entry. *key* is a string that supplies a *dynamicMetadata*
+key. *value* is *dynamicMetadata* entry value.
+
+.. _config_http_filters_lua_connection_wrapper:
+
+Connection object API
+---------------------
+
+ssl()
+^^^^^^^^
+
+.. code-block:: lua
+
+  if connection:ssl() == nil then
+    print("plain")
+  else
+    print("secure")
+  end
+
+Returns :repo:`SSL connection <include/envoy/ssl/connection.h>` object when the connection is
+secured and *nil* when it is not.
+
+.. note::
+
+  Currently the SSL connection object has no exposed APIs.

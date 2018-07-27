@@ -99,7 +99,7 @@ TEST(ClientSslAuthConfigFactoryTest, DoubleRegistrationTest) {
       (Registry::RegisterFactory<ClientSslAuthConfigFactory,
                                  Server::Configuration::NamedNetworkFilterConfigFactory>()),
       EnvoyException,
-      fmt::format("Double registration for name: '{}'", NetworkFilterNames::get().CLIENT_SSL_AUTH));
+      fmt::format("Double registration for name: '{}'", NetworkFilterNames::get().ClientSslAuth));
 }
 
 } // namespace ClientSslAuth

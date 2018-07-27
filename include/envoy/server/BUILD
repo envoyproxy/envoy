@@ -111,6 +111,7 @@ envoy_cc_library(
     hdrs = ["options.h"],
     deps = [
         "//include/envoy/network:address_interface",
+        "//include/envoy/stats:stats_interface",
     ],
 )
 
@@ -178,5 +179,22 @@ envoy_cc_library(
         "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "resource_monitor_interface",
+    hdrs = ["resource_monitor.h"],
+    deps = [
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
+    name = "resource_monitor_config_interface",
+    hdrs = ["resource_monitor_config.h"],
+    deps = [
+        ":resource_monitor_interface",
+        "//include/envoy/event:dispatcher_interface",
     ],
 )

@@ -80,6 +80,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
+        "@envoy_api//envoy/type:http_status_cc",
     ],
 )
 

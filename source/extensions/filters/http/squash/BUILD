@@ -1,4 +1,5 @@
 licenses(["notice"])  # Apache 2
+
 # L7 HTTP filter that implements the Squash microservice debugger
 # Public docs: docs/root/configuration/http_filters/squash_filter.rst
 

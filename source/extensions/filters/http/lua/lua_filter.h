@@ -18,7 +18,7 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
     return ProtobufWkt::Struct::default_instance();
   }
   const auto& metadata = callbacks->route()->routeEntry()->metadata();
-  const auto& filter_it = metadata.filter_metadata().find(HttpFilterNames::get().LUA);
+  const auto& filter_it = metadata.filter_metadata().find(HttpFilterNames::get().Lua);
   if (filter_it == metadata.filter_metadata().end()) {
     return ProtobufWkt::Struct::default_instance();
   }
@@ -68,6 +68,17 @@ public:
    * route entry.
    */
   virtual const ProtobufWkt::Struct& metadata() const PURE;
+
+  /**
+   * @return RequestInfo::RequestInfo& the current request info handle. This handle is mutable to
+   * accomodate write API e.g. setDynamicMetadata().
+   */
+  virtual RequestInfo::RequestInfo& requestInfo() PURE;
+
+  /**
+   * @return const const Network::Connection* the current network connection handle.
+   */
+  virtual const Network::Connection* connection() const PURE;
 };
 
 class Filter;
@@ -101,7 +112,7 @@ public:
     Responded
   };
 
-  StreamHandleWrapper(Filters::Common::Lua::CoroutinePtr&& coroutine, Http::HeaderMap& headers,
+  StreamHandleWrapper(Filters::Common::Lua::Coroutine& coroutine, Http::HeaderMap& headers,
                       bool end_stream, Filter& filter, FilterCallbacks& callbacks);
 
   Http::FilterHeadersStatus start(int function_ref);
@@ -122,7 +133,8 @@ public:
             {"logDebug", static_luaLogDebug},       {"logInfo", static_luaLogInfo},
             {"logWarn", static_luaLogWarn},         {"logErr", static_luaLogErr},
             {"logCritical", static_luaLogCritical}, {"httpCall", static_luaHttpCall},
-            {"respond", static_luaRespond}};
+            {"respond", static_luaRespond},         {"requestInfo", static_luaRequestInfo},
+            {"connection", static_luaConnection}};
   }
 
 private:
@@ -177,6 +189,16 @@ private:
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaMetadata);
 
   /**
+   * @return a handle to the request info.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaRequestInfo);
+
+  /**
+   * @return a handle to the network connection.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaConnection);
+
+  /**
    * Log a message to the Envoy log.
    * @param 1 (string): The log message.
    */
@@ -202,13 +224,15 @@ private:
     body_wrapper_.reset();
     trailers_wrapper_.reset();
     metadata_wrapper_.reset();
+    request_info_wrapper_.reset();
+    connection_wrapper_.reset();
   }
 
   // Http::AsyncClient::Callbacks
   void onSuccess(Http::MessagePtr&&) override;
   void onFailure(Http::AsyncClient::FailureReason) override;
 
-  Filters::Common::Lua::CoroutinePtr coroutine_;
+  Filters::Common::Lua::Coroutine& coroutine_;
   Http::HeaderMap& headers_;
   bool end_stream_;
   bool headers_continued_{};
@@ -221,6 +245,8 @@ private:
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<RequestInfoWrapper> request_info_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::ConnectionWrapper> connection_wrapper_;
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
@@ -236,6 +262,8 @@ public:
   Filters::Common::Lua::CoroutinePtr createCoroutine() { return lua_state_.createCoroutine(); }
   int requestFunctionRef() { return lua_state_.getGlobalRef(request_function_slot_); }
   int responseFunctionRef() { return lua_state_.getGlobalRef(response_function_slot_); }
+  uint64_t runtimeBytesUsed() { return lua_state_.runtimeBytesUsed(); }
+  void runtimeGC() { return lua_state_.runtimeGC(); }
 
   Upstream::ClusterManager& cluster_manager_;
 
@@ -265,8 +293,8 @@ public:
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
-    return doHeaders(request_stream_wrapper_, decoder_callbacks_, config_->requestFunctionRef(),
-                     headers, end_stream);
+    return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_,
+                     config_->requestFunctionRef(), headers, end_stream);
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(request_stream_wrapper_, data, end_stream);
@@ -283,8 +311,8 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
-    return doHeaders(response_stream_wrapper_, encoder_callbacks_, config_->responseFunctionRef(),
-                     headers, end_stream);
+    return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
+                     config_->responseFunctionRef(), headers, end_stream);
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(response_stream_wrapper_, data, end_stream);
@@ -310,6 +338,8 @@ private:
     void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
     const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
+    RequestInfo::RequestInfo& requestInfo() override { return callbacks_->requestInfo(); }
+    const Network::Connection* connection() const override { return callbacks_->connection(); }
 
     Filter& parent_;
     Http::StreamDecoderFilterCallbacks* callbacks_{};
@@ -328,6 +358,8 @@ private:
     void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
     const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
+    RequestInfo::RequestInfo& requestInfo() override { return callbacks_->requestInfo(); }
+    const Network::Connection* connection() const override { return callbacks_->connection(); }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};
@@ -335,8 +367,10 @@ private:
 
   typedef Filters::Common::Lua::LuaDeathRef<StreamHandleWrapper> StreamHandleRef;
 
-  Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle, FilterCallbacks& callbacks,
-                                      int function_ref, Http::HeaderMap& headers, bool end_stream);
+  Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle,
+                                      Filters::Common::Lua::CoroutinePtr& coroutine,
+                                      FilterCallbacks& callbacks, int function_ref,
+                                      Http::HeaderMap& headers, bool end_stream);
   Http::FilterDataStatus doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
 
@@ -346,6 +380,21 @@ private:
   StreamHandleRef request_stream_wrapper_;
   StreamHandleRef response_stream_wrapper_;
   bool destroyed_{};
+
+  // These coroutines used to be owned by the stream handles. After investigating #3570, it
+  // became clear that there is a circular memory reference when a coroutine yields. Basically,
+  // the coroutine holds a reference to the stream wrapper. I'm not completely sure why this is,
+  // but I think it is because the yield happens via a stream handle method, so the runtime must
+  // hold a reference so that it can return out of the yield through the object. So now we hold
+  // the coroutine references at the same level as the stream handles so that when the filter is
+  // destroyed the circular reference is broken and both objects are cleaned up.
+  //
+  // Note that the above explanation probably means that we don't need to hold a reference to the
+  // coroutine at all and it would be taken care of automatically via a runtime internal reference
+  // when a yield happens. However, given that I don't fully understand the runtime internals, this
+  // seems like a safer fix for now.
+  Filters::Common::Lua::CoroutinePtr request_coroutine_;
+  Filters::Common::Lua::CoroutinePtr response_coroutine_;
 };
 
 } // namespace Lua
