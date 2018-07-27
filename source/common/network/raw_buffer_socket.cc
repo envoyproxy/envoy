@@ -17,25 +17,22 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   bool end_stream = false;
   do {
     // 16K read is arbitrary. TODO(mattklein123) PERF: Tune the read size.
-    std::tuple<int, int> result = buffer.read(callbacks_->fd(), 16384);
-    const int rc = std::get<0>(result);
-    const int error = std::get<1>(result);
-    ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), rc);
+    Api::SysCallResult result = buffer.read(callbacks_->fd(), 16384);
+    ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.rc_);
 
-    if (rc == 0) {
+    if (result.rc_ == 0) {
       // Remote close.
       end_stream = true;
       break;
-    } else if (rc == -1) {
+    } else if (result.rc_ == -1) {
       // Remote error (might be no data).
-      ENVOY_CONN_LOG(trace, "read error: {}", callbacks_->connection(), error);
-      if (error != EAGAIN) {
+      ENVOY_CONN_LOG(trace, "read error: {}", callbacks_->connection(), result.errno_);
+      if (result.errno_ != EAGAIN) {
         action = PostIoAction::Close;
       }
-
       break;
     } else {
-      bytes_read += rc;
+      bytes_read += result.rc_;
       if (callbacks_->shouldDrainReadBuffer()) {
         callbacks_->setReadBufferReady();
         break;
@@ -61,22 +58,20 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
       action = PostIoAction::KeepOpen;
       break;
     }
-    std::tuple<int, int> result = buffer.write(callbacks_->fd());
-    const int rc = std::get<0>(result);
-    const int error = std::get<1>(result);
-    ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), rc);
-    if (rc == -1) {
-      ENVOY_CONN_LOG(trace, "write error: {} ({})", callbacks_->connection(), error,
-                     strerror(error));
-      if (error == EAGAIN) {
+    Api::SysCallResult result = buffer.write(callbacks_->fd());
+    ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.rc_);
+
+    if (result.rc_ == -1) {
+      ENVOY_CONN_LOG(trace, "write error: {} ({})", callbacks_->connection(), result.errno_,
+                     strerror(result.errno_));
+      if (result.errno_ == EAGAIN) {
         action = PostIoAction::KeepOpen;
       } else {
         action = PostIoAction::Close;
       }
-
       break;
     } else {
-      bytes_written += rc;
+      bytes_written += result.rc_;
     }
   } while (true);
 
