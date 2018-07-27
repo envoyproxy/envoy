@@ -273,6 +273,13 @@ private:
   const std::vector<Tag> tags_;
 };
 
+// Partially implements a StaDataAllocator, leaving alloc & free for subclasses.
+// We templatize on StatData rather than defining a virtual base StatData class
+// for performance reasons; stat increment is on the hot path.
+//
+// The two production derivations cover using a fixed block of shared-memory for
+// hot restart stat continuity, and heap allocation for more efficient RAM usage
+// for when hot-restart is not required.
 template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
   /**
