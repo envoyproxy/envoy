@@ -332,9 +332,28 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     // out to all of the thread local configurations.
 
     // Should we save this update and merge it with other updates?
+    //
+    // Note that we can only _safely_ merge updates that have no added/removed hosts. That is,
+    // only those updates that signal a change in host healthcheck state, weight or metadata.
+    //
+    // We've discussed merging updates related to hosts being added/removed, but it's really
+    // tricky to merge those given that downstream consumers of these updates expect to see the
+    // full list of updates, not a condensed one. This is because they use the broadcasted
+    // HostSharedPtrs within internal maps to track hosts. If we fail to broadcast the entire list
+    // of removals, these maps will leak those HostSharedPtrs.
+    //
+    // See https://github.com/envoyproxy/envoy/pull/3941 for more context.
+
     bool scheduled = false;
-    if (cluster.info()->lbConfig().has_update_merge_window()) {
-      scheduled = scheduleUpdate(cluster, priority, hosts_added, hosts_removed);
+    bool merging_enabled = cluster.info()->lbConfig().has_update_merge_window();
+
+    if (merging_enabled) {
+      // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
+      bool is_mergeable = !hosts_added.size() && !hosts_removed.size();
+
+      // If this is not mergeable, we should cancel any scheduled updates since
+      // we'll deliver it immediately.
+      scheduled = scheduleUpdate(cluster, priority, is_mergeable);
     }
 
     // If an update was not scheduled for later, deliver it immediately.
@@ -353,9 +372,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
   }
 }
 
-bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priority,
-                                        const HostVector& hosts_added,
-                                        const HostVector& hosts_removed) {
+bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable) {
   const auto& update_merge_window = cluster.info()->lbConfig().update_merge_window();
   const auto timeout = DurationUtil::durationToMilliseconds(update_merge_window);
   PendingUpdatesByPriorityMapPtr updates_by_prio;
@@ -380,68 +397,29 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
   }
 
   // Has an update_merge_window gone by since the last update? If so, don't schedule
-  // the update so it can be applied immediately as long as there's no active timer
-  // (to avoid changing the order of updates).
-  const auto delta = std::chrono::steady_clock::now() - updates->last_updated;
+  // the update so it can be applied immediately. Ditto if this is not a mergeable update.
+  const auto delta = std::chrono::steady_clock::now() - updates->last_updated_;
   const uint64_t delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
-  if (delta_ms > timeout && updates->timer == nullptr) {
-    updates->last_updated = std::chrono::steady_clock::now();
+  if (delta_ms > timeout || !mergeable) {
+    // If there was a pending update, we count this update as merged update.
+    if (updates->disableTimer()) {
+      cm_stats_.merged_updates_.inc();
+    }
+
+    updates->last_updated_ = std::chrono::steady_clock::now();
     return false;
   }
 
-  // Record the updates that should be applied when the timer fires.
-  // Handle the case when a pair of add/remove cancels out.
-  //
-  // A few notes:
-  // * if a host's health changed, we won't see that as an add or remove
-  //   so there's no need to check for health changes here. The fact that
-  //   we got called with no added/removed hosts implies a health or metadata
-  //   change, so we just forward the empty vectors along.
-  // * if while we are merging updates we see a host multiple times (e.g.:
-  //   add -> remove -> add), we deal with the cancellations and we always
-  //   propagate the latest version of that host.
-  // * we track hosts by their address since the Host ptr will most likely change
-  //   as it gets materialized out of an EDS change, and an address is considered
-  //   the unique constant identifier for a host.
-  for (const auto& host : hosts_added) {
-    const auto& addr = host->address()->asString();
-    // Is adding this host cancelling a previous remove?
-    if (updates->removed.count(addr) == 1) {
-      updates->removed.erase(addr);
-
-      // If it was previously added, store the latest one.
-      if (updates->added.count(addr) == 1) {
-        updates->added[addr] = host;
-      }
-    } else {
-      // No previous remove, just store.
-      updates->added[addr] = host;
-    }
-  }
-
-  // Same dance as above.
-  for (const auto& host : hosts_removed) {
-    const auto& addr = host->address()->asString();
-    // Is removing this host cancelling a previous add?
-    if (updates->added.count(addr) == 1) {
-      updates->added.erase(addr);
-
-      // If it was previously removed, store the latest one.
-      if (updates->removed.count(addr) == 1) {
-        updates->removed[addr] = host;
-      }
-    } else {
-      // No previous add, just store.
-      updates->removed[addr] = host;
-    }
-  }
-
   // If there's no timer, create one.
-  if (updates->timer == nullptr) {
-    updates->timer = dispatcher_.createTimer([this, &cluster, priority, &updates]() -> void {
+  if (updates->timer_ == nullptr) {
+    updates->timer_ = dispatcher_.createTimer([this, &cluster, priority, updates]() -> void {
       applyUpdates(cluster, priority, updates);
     });
-    updates->timer->enableTimer(std::chrono::milliseconds(timeout));
+  }
+
+  // Ensure there's a timer set to deliver these updates.
+  if (!updates->timer_enabled_) {
+    updates->enableTimer(timeout);
   }
 
   return true;
@@ -450,24 +428,18 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
 void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
                                       PendingUpdatesPtr updates) {
   // Deliver pending updates.
-  const HostVector& hosts_added = fromMap(updates->added);
-  const HostVector& hosts_removed = fromMap(updates->removed);
+
+  // Remember that these merged updates are _only_ for updates related to
+  // HC/weight/metadata changes. That's why added/removed are empty. All
+  // adds/removals were already immediately broadcasted.
+  const HostVector hosts_added;
+  const HostVector hosts_removed;
+
   postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
+
   cm_stats_.merged_updates_.inc();
-
-  // Reset everything.
-  updates->timer = nullptr;
-  updates->added.clear();
-  updates->removed.clear();
-  updates->last_updated = std::chrono::steady_clock::now();
-}
-
-HostVector ClusterManagerImpl::fromMap(HostMap map) const {
-  HostVector hosts;
-  for (const auto& host_pair : map) {
-    hosts.push_back(host_pair.second);
-  }
-  return hosts;
+  updates->timer_enabled_ = false;
+  updates->last_updated_ = std::chrono::steady_clock::now();
 }
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,

@@ -367,13 +367,24 @@ private:
   // This map is ordered so that config dumping is consistent.
   typedef std::map<std::string, ClusterDataPtr> ClusterMap;
 
-  // Track hosts by their address (as a string).
-  using HostMap = std::map<std::string, HostSharedPtr>;
   struct PendingUpdates {
-    Event::TimerPtr timer;
-    HostMap added;
-    HostMap removed;
-    MonotonicTime last_updated;
+    Event::TimerPtr timer_;
+    bool timer_enabled_;
+    MonotonicTime last_updated_;
+    void enableTimer(const uint64_t timeout) {
+      if (timer_ != nullptr) {
+        timer_->enableTimer(std::chrono::milliseconds(timeout));
+        timer_enabled_ = true;
+      }
+    }
+    bool disableTimer() {
+      bool was_enabled = timer_enabled_;
+      if (timer_ != nullptr) {
+        timer_->disableTimer();
+        timer_enabled_ = false;
+      }
+      return was_enabled;
+    }
   };
   using PendingUpdatesPtr = std::shared_ptr<PendingUpdates>;
   using PendingUpdatesByPriorityMap = std::unordered_map<uint32_t, PendingUpdatesPtr>;
@@ -381,9 +392,7 @@ private:
   using ClusterUpdatesMap = std::unordered_map<std::string, PendingUpdatesByPriorityMapPtr>;
 
   void applyUpdates(const Cluster& cluster, uint32_t priority, PendingUpdatesPtr updates);
-  bool scheduleUpdate(const Cluster& cluster, uint32_t priority, const HostVector& hosts_added,
-                      const HostVector& hosts_removed);
-  HostVector fromMap(HostMap map) const;
+  bool scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable);
   void createOrUpdateThreadLocalCluster(ClusterData& cluster);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
   static ClusterManagerStats generateStats(Stats::Scope& scope);

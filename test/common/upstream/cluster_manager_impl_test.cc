@@ -1693,427 +1693,103 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   factory_.tls_.shutdownThread();
 }
 
+// Tests that all the HC/weight/metadata changes are delivered in one go, as long as
+// there's no hosts changes in between.
+// Also tests that if hosts are added/removed between mergeable updates, delivery will
+// happen and the scheduled update will be canceled.
 TEST_F(ClusterManagerImplTest, MergedUpdates) {
   createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
   EXPECT_CALL(local_cluster_update_, post(_, _, _))
-      .WillRepeatedly(Invoke([](uint32_t priority, const HostVector& hosts_added,
-                                const HostVector& hosts_removed) -> void {
-        static int call = 0;
-
-        switch (call) {
-        case 0:
-          EXPECT_EQ(0, priority);
-          EXPECT_EQ(0, hosts_added.size());
-          EXPECT_EQ(1, hosts_removed.size());
-          break;
-        case 1:
-          EXPECT_EQ(0, priority);
-          EXPECT_EQ(0, hosts_added.size());
-          EXPECT_EQ(1, hosts_removed.size());
-          break;
-        case 2:
-          EXPECT_EQ(0, priority);
-          EXPECT_EQ(2, hosts_added.size());
-          EXPECT_EQ(0, hosts_removed.size());
-          break;
-        }
-
-        ++call;
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // 1st removal.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(0, hosts_added.size());
+        EXPECT_EQ(1, hosts_removed.size());
+      }))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // Triggerd by the 2 HC updates, it's a merged update so no added/removed
+        // hosts.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(0, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // 1st removed host added back.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(1, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // 1st removed host removed again, plus the 3 HC/weight/metadata updates that were
+        // waiting for delivery.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(0, hosts_added.size());
+        EXPECT_EQ(1, hosts_removed.size());
       }));
 
+  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
   const Cluster& cluster = cluster_manager_->clusters().begin()->second;
   HostVectorSharedPtr hosts(
       new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
   HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
-  HostVector hosts_added{};
-  HostVector hosts_removed{};
+  HostVector hosts_added;
+  HostVector hosts_removed;
 
-  // No timer needs to be mocked at this point, since the first update should be applied
-  // immediately.
+  // The first update should be applied immediately, since it's not mergeable.
   hosts_removed.push_back((*hosts)[0]);
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.merged_updates").value());
 
-  // Now we need the timer to be ready, since createTimer() will be call given that this update
-  // _will_ be delayed.
-  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+  // This calls should be merged, since there are not added/removed hosts.
   hosts_removed.clear();
-  hosts_removed.push_back((*hosts)[1]);
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.merged_updates").value());
 
   // Ensure the merged updates were applied.
   timer->callback_();
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
 
-  // Prepare a new timer for the next round of updates.
-  timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
-
-  // Add them back.
+  // Add the host back, the update should be immediately applied.
   hosts_removed.clear();
   hosts_added.push_back((*hosts)[0]);
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
+
+  // Now emit 3 updates that should be scheduled: metadata, HC, and weight.
   hosts_added.clear();
-  hosts_added.push_back((*hosts)[1]);
+
+  (*hosts)[0]->metadata(buildMetadata("v1"));
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
 
-  // Ensure the merged updates were applied again.
-  timer->callback_();
+  (*hosts)[0]->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  (*hosts)[0]->weight(100);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
+  // Updates not delivered yet.
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
+
+  // Remove the host again, should cancel the scheduled update and be delivered immediately.
+  hosts_removed.push_back((*hosts)[0]);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+
   EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.merged_updates").value());
-}
-
-TEST_F(ClusterManagerImplTest, MergedUpdatesAddRemoveAdd) {
-  createWithLocalClusterUpdate();
-
-  // Ensure we see the right set of added/removed hosts on every call.
-  uint32_t calls = 0;
-  EXPECT_CALL(local_cluster_update_, post(_, _, _))
-      .WillRepeatedly(Invoke([&calls](uint32_t priority, const HostVector& hosts_added,
-                                      const HostVector& hosts_removed) -> void {
-        switch (calls) {
-        case 0:
-          // First immediate call, nothing was added/removed.
-          EXPECT_EQ(0, priority);
-          EXPECT_EQ(0, hosts_added.size());
-          EXPECT_EQ(0, hosts_removed.size());
-          break;
-        case 1:
-          // Merged call, add/remove/add is merged as 1 add.
-          EXPECT_EQ(0, priority);
-          EXPECT_EQ(1, hosts_added.size());
-          EXPECT_EQ(0, hosts_removed.size());
-          break;
-        }
-
-        ++calls;
-      }));
-
-  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
-  HostVectorSharedPtr hosts(
-      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
-  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
-  HostVector hosts_added{};
-  HostVector hosts_removed{};
-
-  // No timer needs to be mocked at this point, since the first update should be applied
-  // immediately.
-  // No added/removed hosts (emulate metadata or health change).
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Now we need the timer to be ready, since createTimer() will be call given that this update
-  // _will_ be delayed.
-  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
-
-  // Add the host.
-  hosts_added.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11003"));
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Remove it.
-  hosts_added.clear();
-  hosts_removed.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11003"));
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Add it again.
-  hosts_added.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11003"));
-  hosts_removed.clear();
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Ensure the merged updates were applied.
-  timer->callback_();
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
-
-  // postThreadLocalClusterUpdate() calls.
-  EXPECT_EQ(2, calls);
-}
-
-TEST_F(ClusterManagerImplTest, MergedUpdatesRemoveAddRemove) {
-  createWithLocalClusterUpdate();
-
-  // Ensure we see the right set of added/removed hosts on every call.
-  uint32_t calls = 0;
-  EXPECT_CALL(local_cluster_update_, post(_, _, _))
-      .WillRepeatedly(Invoke([&calls](uint32_t priority, const HostVector& hosts_added,
-                                      const HostVector& hosts_removed) -> void {
-        switch (calls) {
-        case 0:
-          // First immediate call, nothing was added/removed.
-          EXPECT_EQ(0, priority);
-          EXPECT_EQ(0, hosts_added.size());
-          EXPECT_EQ(0, hosts_removed.size());
-          break;
-        case 1:
-          // Merged call, remove/add/remove is merged as 1 remove.
-          EXPECT_EQ(0, priority);
-          EXPECT_EQ(0, hosts_added.size());
-          EXPECT_EQ(1, hosts_removed.size());
-          break;
-        }
-
-        ++calls;
-      }));
-
-  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
-  HostVectorSharedPtr hosts(
-      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
-  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
-  HostVector hosts_added{};
-  HostVector hosts_removed{};
-
-  // No timer needs to be mocked at this point, since the first update should be applied
-  // immediately.
-  // No added/removed hosts (emulate metadata or health change).
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Now we need the timer to be ready, since createTimer() will be call given that this update
-  // _will_ be delayed.
-  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
-
-  // Remove a host.
-  hosts_added.clear();
-  hosts_removed.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11002"));
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Add it back.
-  hosts_added.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11002"));
-  hosts_removed.clear();
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Remove it again.
-  hosts_added.clear();
-  hosts_removed.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11002"));
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Ensure the merged updates were applied.
-  timer->callback_();
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
-
-  // postThreadLocalClusterUpdate() calls.
-  EXPECT_EQ(2, calls);
-}
-
-TEST_F(ClusterManagerImplTest, MergedUpdatesHostChangesInPlace) {
-  createWithLocalClusterUpdate();
-
-  // Ensure we see the right set of added/removed hosts on every call.
-  uint32_t calls = 0;
-  EXPECT_CALL(local_cluster_update_, post(_, _, _))
-      .WillRepeatedly(Invoke([&calls](uint32_t priority, const HostVector& hosts_added,
-                                      const HostVector& hosts_removed) -> void {
-        switch (calls) {
-        case 0:
-          // First immediate call, nothing was added/removed.
-          EXPECT_EQ(0, priority);
-          EXPECT_EQ(0, hosts_added.size());
-          EXPECT_EQ(0, hosts_removed.size());
-          break;
-        case 1:
-          // Merged call, failed/active/failed is merged as 1 call.
-          // Note, note, note: the host gets updated in place in the original
-          // list of hosts in this case, so nothing expected here.
-          EXPECT_EQ(0, priority);
-          EXPECT_EQ(0, hosts_added.size());
-          EXPECT_EQ(0, hosts_removed.size());
-          break;
-        }
-
-        ++calls;
-      }));
-
-  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
-  HostVectorSharedPtr hosts(
-      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
-  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
-  HostVector hosts_added{};
-  HostVector hosts_removed{};
-
-  // No timer needs to be mocked at this point, since the first update should be applied
-  // immediately.
-  // No added/removed hosts (emulate metadata or health change).
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Now we need the timer to be ready, since createTimer() will be call given that this update
-  // _will_ be delayed.
-  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
-
-  // Host becomes failed (no need to actually change it here).
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-  // Host becomes active.
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-  // Host becomes failed again.
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Ensure the merged updates were applied.
-  timer->callback_();
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
-
-  // postThreadLocalClusterUpdate() calls.
-  EXPECT_EQ(2, calls);
-}
-
-TEST_F(ClusterManagerImplTest, MergedUpdatesMetadataLatest) {
-  createWithLocalClusterUpdate();
-
-  // Ensure we see the right set of added/removed hosts on every call.
-  uint32_t calls = 0;
-  EXPECT_CALL(local_cluster_update_, post(_, _, _))
-      .WillRepeatedly(Invoke([&calls](uint32_t priority, const HostVector& hosts_added,
-                                      const HostVector& hosts_removed) -> void {
-        switch (calls) {
-        case 0:
-          // First immediate call, nothing was added/removed.
-          EXPECT_EQ(0, priority);
-          EXPECT_EQ(0, hosts_added.size());
-          EXPECT_EQ(0, hosts_removed.size());
-          break;
-        case 1:
-          // Merged call, add/remove/add is merged as 1 add.
-          // We should see the latest metadata.
-          EXPECT_EQ(0, priority);
-          EXPECT_EQ(1, hosts_added.size());
-          EXPECT_EQ(0, hosts_removed.size());
-          EXPECT_EQ(Config::Metadata::metadataValue(*hosts_added[0]->metadata(),
-                                                    Config::MetadataFilters::get().ENVOY_LB,
-                                                    "version")
-                        .string_value(),
-                    std::string("v1"));
-          break;
-        }
-
-        ++calls;
-      }));
-
-  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
-  HostVectorSharedPtr hosts(
-      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
-  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
-  HostVector hosts_added{};
-  HostVector hosts_removed{};
-
-  // No timer needs to be mocked at this point, since the first update should be applied
-  // immediately.
-  // No added/removed hosts (emulate metadata or health change).
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Now we need the timer to be ready, since createTimer() will be call given that this update
-  // _will_ be delayed.
-  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
-
-  // Add the host without metadata.
-  hosts_added.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11003"));
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Remove it.
-  hosts_added.clear();
-  hosts_removed.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11003"));
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Add it again, with metadata.
-  auto host = makeTestHost(cluster.info(), "tcp://127.0.0.1:11003");
-  host->metadata(buildMetadata("v1"));
-  hosts_added.push_back(host);
-  hosts_removed.clear();
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Ensure the merged updates were applied.
-  timer->callback_();
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
-
-  // postThreadLocalClusterUpdate() calls.
-  EXPECT_EQ(2, calls);
-}
-
-TEST_F(ClusterManagerImplTest, MergedUpdatesWeightLatest) {
-  createWithLocalClusterUpdate();
-
-  // Ensure we see the right set of added/removed hosts on every call.
-  uint32_t calls = 0;
-  EXPECT_CALL(local_cluster_update_, post(_, _, _))
-      .WillRepeatedly(Invoke([&calls](uint32_t priority, const HostVector& hosts_added,
-                                      const HostVector& hosts_removed) -> void {
-        switch (calls) {
-        case 0:
-          // First immediate call, nothing was added/removed.
-          EXPECT_EQ(0, priority);
-          EXPECT_EQ(0, hosts_added.size());
-          EXPECT_EQ(0, hosts_removed.size());
-          break;
-        case 1:
-          // Merged call, add/remove/add is merged as 1 add.
-          // We should the latest weight
-          EXPECT_EQ(0, priority);
-          EXPECT_EQ(1, hosts_added.size());
-          EXPECT_EQ(0, hosts_removed.size());
-          EXPECT_EQ(hosts_added[0]->weight(), 100);
-          break;
-        }
-
-        ++calls;
-      }));
-
-  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
-  HostVectorSharedPtr hosts(
-      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
-  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
-  HostVector hosts_added{};
-  HostVector hosts_removed{};
-
-  // No timer needs to be mocked at this point, since the first update should be applied
-  // immediately.
-  // No added/removed hosts (emulate metadata or health change).
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Now we need the timer to be ready, since createTimer() will be call given that this update
-  // _will_ be delayed.
-  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
-
-  // Add the host with some weight.
-  auto host = makeTestHost(cluster.info(), "tcp://127.0.0.1:11003");
-  host->weight(50);
-  hosts_added.push_back(host);
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Remove it.
-  hosts_added.clear();
-  hosts_removed.push_back(makeTestHost(cluster.info(), "tcp://127.0.0.1:11003"));
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Add it again, with a new weight.
-  auto updated_host = makeTestHost(cluster.info(), "tcp://127.0.0.1:11003");
-  updated_host->weight(100);
-  hosts_added.push_back(updated_host);
-  hosts_removed.clear();
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-
-  // Ensure the merged updates were applied.
-  timer->callback_();
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
-
-  // postThreadLocalClusterUpdate() calls.
-  EXPECT_EQ(2, calls);
 }
 
 class ClusterManagerInitHelperTest : public testing::Test {
