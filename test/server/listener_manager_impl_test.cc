@@ -406,6 +406,58 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
+// Make sure that a listener is created on IPv4 ony setups.
+TEST_F(ListenerManagerImplTest, AddListenerOnIpv4OnlySetups) {
+  InSequence s;
+
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  ON_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillByDefault(Return(-1));
+
+  const std::string listener_foo_json = R"EOF(
+  {
+    "name": "foo",
+    "address": "tcp://127.0.0.1:1234",
+    "filters": [],
+    "drain_type": "default"
+  }
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
+  checkStats(1, 0, 0, 0, 1, 0);
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
+// Make sure that a listener is created on IPv6 ony setups.
+TEST_F(ListenerManagerImplTest, AddListenerOnIpv6OnlySetups) {
+  InSequence s;
+
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  ON_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillByDefault(Return(-1));
+
+  const std::string listener_foo_json = R"EOF(
+  {
+    "name": "foo",
+    "address": "tcp://127.0.0.1:1234",
+    "filters": [],
+    "drain_type": "default"
+  }
+  )EOF";
+
+  ListenerHandle* listener_foo = expectListenerCreate(false);
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
+
+  EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromJson(listener_foo_json), "", true));
+  checkStats(1, 0, 0, 0, 1, 0);
+  EXPECT_CALL(*listener_foo, onDestroy());
+}
+
 // Make sure that a listener that is not modifiable cannot be updated or removed.
 TEST_F(ListenerManagerImplTest, UpdateRemoveNotModifiableListener) {
   ON_CALL(system_time_source_, currentTime())
