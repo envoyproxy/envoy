@@ -16,7 +16,6 @@ namespace Stats {
  */
 class StatName {
 public:
-  StatName() {}
   virtual ~StatName(){};
   virtual std::string toString() const PURE;
 };

@@ -38,7 +38,7 @@ void SymbolTableImpl::free(const SymbolVec& symbol_vec) {
     auto encode_search = encode_map_.find(decode_search->second);
     ASSERT(encode_search != encode_map_.end());
 
-    (encode_search->second.ref_count_)--;
+    encode_search->second.ref_count_--;
     // If that was the last remaining client usage of the symbol, erase the the current
     // mappings and add the now-unused symbol to the reuse pool.
     if (encode_search->second.ref_count_ == 0) {
@@ -58,14 +58,14 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
     // pointing to it in the encode_map_. This allows us to only store the string once.
     std::string str = std::string(sv);
 
-    auto decode_insert = decode_map_.insert({current_symbol_, std::move(str)});
+    auto decode_insert = decode_map_.insert({next_symbol_, std::move(str)});
     ASSERT(decode_insert.second);
 
     auto encode_insert = encode_map_.insert(
-        {decode_insert.first->second, {.symbol_ = current_symbol_, .ref_count_ = 1}});
+        {decode_insert.first->second, {.symbol_ = next_symbol_, .ref_count_ = 1}});
     ASSERT(encode_insert.second);
 
-    result = current_symbol_;
+    result = next_symbol_;
     newSymbol();
   } else {
     // If the insertion didn't take place, return the actual value at that location and up the

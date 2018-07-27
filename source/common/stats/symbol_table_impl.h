@@ -88,9 +88,9 @@ private:
   void newSymbol() {
     if (pool_.empty()) {
       ASSERT(monotonic_counter_ < std::numeric_limits<Symbol>::max());
-      current_symbol_ = ++monotonic_counter_;
+      next_symbol_ = ++monotonic_counter_;
     } else {
-      current_symbol_ = pool_.top();
+      next_symbol_ = pool_.top();
       pool_.pop();
     }
   }
@@ -99,7 +99,7 @@ private:
 
   // Stores the symbol to be used at next insertion. This should exist ahead of insertion time so
   // that if insertion succeeds, the value written is the correct one.
-  Symbol current_symbol_ = 0;
+  Symbol next_symbol_ = 0;
 
   // If the free pool is exhausted, we monotonically increase this counter.
   Symbol monotonic_counter_ = 0;
@@ -111,6 +111,8 @@ private:
   std::unordered_map<Symbol, std::string> decode_map_;
 
   // Free pool of symbols for re-use.
+  // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
+  // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_;
 };
 
