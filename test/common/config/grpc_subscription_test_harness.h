@@ -40,7 +40,7 @@ public:
     }));
     subscription_.reset(
         new GrpcEdsSubscriptionImpl(node_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_),
-                                    dispatcher_, *method_descriptor_, stats_));
+                                    dispatcher_, random_, *method_descriptor_, stats_));
   }
 
   ~GrpcSubscriptionTestHarness() { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
@@ -129,6 +129,7 @@ public:
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
+  Runtime::MockRandomGenerator random_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
   envoy::api::v2::core::Node node_;

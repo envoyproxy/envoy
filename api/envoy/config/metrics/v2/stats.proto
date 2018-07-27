@@ -21,6 +21,7 @@ message StatsSink {
   // * :ref:`envoy.statsd <envoy_api_msg_config.metrics.v2.StatsdSink>`
   // * :ref:`envoy.dog_statsd <envoy_api_msg_config.metrics.v2.DogStatsdSink>`
   // * :ref:`envoy.metrics_service <envoy_api_msg_config.metrics.v2.MetricsServiceConfig>`
+  // * :ref:`envoy.stat_sinks.hystrix <envoy_api_msg_config.metrics.v2.HystrixSink>`
   //
   // Sinks optionally support tagged/multiple dimensional metrics.
   string name = 1;
@@ -199,4 +200,28 @@ message DogStatsdSink {
   }
 
   reserved 2;
+}
+
+// Stats configuration proto schema for built-in *envoy.stat_sinks.hystrix* sink.
+// The sink emits stats in `text/event-stream
+// <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_
+// formatted stream for use by `Hystrix dashboard
+// <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
+//
+// Note that only a single HystrixSink should be configured.
+//
+// Streaming is started through an admin endpoint :http:get:`/hystrix_event_stream`.
+message HystrixSink {
+  // The number of buckets the rolling statistical window is divided into.
+  //
+  // Each time the sink is flushed, all relevant Envoy statistics are sampled and
+  // added to the rolling window (removing the oldest samples in the window
+  // in the process). The sink then outputs the aggregate statistics across the
+  // current rolling window to the event stream(s).
+  //
+  // rolling_window(ms) = stats_flush_interval(ms) * num_of_buckets
+  //
+  // More detailed explanation can be found in `Hystix wiki
+  // <https://github.com/Netflix/Hystrix/wiki/Metrics-and-Monitoring#hystrixrollingnumber>`_.
+  int64 num_buckets = 1;
 }

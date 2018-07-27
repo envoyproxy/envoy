@@ -17,7 +17,9 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   bool end_stream = false;
   do {
     // 16K read is arbitrary. TODO(mattklein123) PERF: Tune the read size.
-    int rc = buffer.read(callbacks_->fd(), 16384);
+    std::tuple<int, int> result = buffer.read(callbacks_->fd(), 16384);
+    const int rc = std::get<0>(result);
+    const int error = std::get<1>(result);
     ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), rc);
 
     if (rc == 0) {
@@ -26,8 +28,8 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
       break;
     } else if (rc == -1) {
       // Remote error (might be no data).
-      ENVOY_CONN_LOG(trace, "read error: {}", callbacks_->connection(), errno);
-      if (errno != EAGAIN) {
+      ENVOY_CONN_LOG(trace, "read error: {}", callbacks_->connection(), error);
+      if (error != EAGAIN) {
         action = PostIoAction::Close;
       }
 
@@ -59,12 +61,14 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
       action = PostIoAction::KeepOpen;
       break;
     }
-    int rc = buffer.write(callbacks_->fd());
+    std::tuple<int, int> result = buffer.write(callbacks_->fd());
+    const int rc = std::get<0>(result);
+    const int error = std::get<1>(result);
     ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), rc);
     if (rc == -1) {
-      ENVOY_CONN_LOG(trace, "write error: {} ({})", callbacks_->connection(), errno,
-                     strerror(errno));
-      if (errno == EAGAIN) {
+      ENVOY_CONN_LOG(trace, "write error: {} ({})", callbacks_->connection(), error,
+                     strerror(error));
+      if (error == EAGAIN) {
         action = PostIoAction::KeepOpen;
       } else {
         action = PostIoAction::Close;

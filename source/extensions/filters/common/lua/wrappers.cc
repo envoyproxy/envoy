@@ -26,7 +26,7 @@ int BufferWrapper::luaGetBytes(lua_State* state) {
   return 1;
 }
 
-void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value& value) {
+void MetadataMapHelper::setValue(lua_State* state, const ProtobufWkt::Value& value) {
   ProtobufWkt::Value::KindCase kind = value.kind_case();
 
   switch (kind) {
@@ -72,11 +72,11 @@ void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value& va
   }
 
   default:
-    NOT_REACHED;
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
-void MetadataMapWrapper::createTable(
+void MetadataMapHelper::createTable(
     lua_State* state,
     const Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Value>& fields) {
   lua_createtable(state, 0, fields.size());
@@ -98,7 +98,7 @@ int MetadataMapIterator::luaPairsIterator(lua_State* state) {
   }
 
   lua_pushstring(state, current_->first.c_str());
-  parent_.setValue(state, current_->second);
+  MetadataMapHelper::setValue(state, current_->second);
 
   current_++;
   return 2;
@@ -111,7 +111,7 @@ int MetadataMapWrapper::luaGet(lua_State* state) {
     return 0;
   }
 
-  setValue(state, filter_it->second);
+  MetadataMapHelper::setValue(state, filter_it->second);
   return 1;
 }
 
@@ -122,6 +122,20 @@ int MetadataMapWrapper::luaPairs(lua_State* state) {
 
   iterator_.reset(MetadataMapIterator::create(state, *this), true);
   lua_pushcclosure(state, MetadataMapIterator::static_luaPairsIterator, 1);
+  return 1;
+}
+
+int ConnectionWrapper::luaSsl(lua_State* state) {
+  const auto& ssl = connection_->ssl();
+  if (ssl != nullptr) {
+    if (ssl_connection_wrapper_.get() != nullptr) {
+      ssl_connection_wrapper_.pushStack();
+    } else {
+      ssl_connection_wrapper_.reset(SslConnectionWrapper::create(state, ssl), true);
+    }
+  } else {
+    lua_pushnil(state);
+  }
   return 1;
 }
 

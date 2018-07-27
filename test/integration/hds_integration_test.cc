@@ -60,14 +60,6 @@ public:
     hds_stream_ = hds_fake_connection_->waitForNewStream(*dispatcher_);
   }
 
-  void cleanupUpstreamConnection() {
-    codec_client_->close();
-    if (fake_upstream_connection_ != nullptr) {
-      fake_upstream_connection_->close();
-      fake_upstream_connection_->waitForDisconnect();
-    }
-  }
-
   void cleanupHdsConnection() {
     if (hds_fake_connection_ != nullptr) {
       hds_fake_connection_->close();

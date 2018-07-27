@@ -21,17 +21,20 @@ public:
   SystemTime startTime() const override { return start_time_; }
   MonotonicTime startTimeMonotonic() const override { return start_time_monotonic_; }
 
-  void addBytesReceived(uint64_t) override { NOT_IMPLEMENTED; }
+  void addBytesReceived(uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   uint64_t bytesReceived() const override { return 1; }
   absl::optional<Http::Protocol> protocol() const override { return protocol_; }
   void protocol(Http::Protocol protocol) override { protocol_ = protocol; }
   absl::optional<uint32_t> responseCode() const override { return response_code_; }
-  void addBytesSent(uint64_t) override { NOT_IMPLEMENTED; }
+  void addBytesSent(uint64_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   uint64_t bytesSent() const override { return 2; }
-
-  bool getResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) const override {
+  bool intersectResponseFlags(uint64_t response_flags) const override {
+    return (response_flags_ & response_flags) != 0;
+  }
+  bool hasResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) const override {
     return response_flags_ & response_flag;
   }
+  bool hasAnyResponseFlag() const override { return response_flags_ != 0; }
   void setResponseFlag(Envoy::RequestInfo::ResponseFlag response_flag) override {
     response_flags_ |= response_flag;
   }

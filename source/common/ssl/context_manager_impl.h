@@ -22,26 +22,19 @@ public:
   ContextManagerImpl(Runtime::Loader& runtime) : runtime_(runtime) {}
   ~ContextManagerImpl();
 
-  /**
-   * Allocated contexts are owned by the caller. However, we need to be able to iterate them for
-   * admin purposes. When a caller frees a context it will tell us to release it also from the list
-   * of contexts.
-   */
-  void releaseContext(Context* context);
-
   // Ssl::ContextManager
-  Ssl::ClientContextPtr createSslClientContext(Stats::Scope& scope,
-                                               const ClientContextConfig& config) override;
-  Ssl::ServerContextPtr
+  Ssl::ClientContextSharedPtr createSslClientContext(Stats::Scope& scope,
+                                                     const ClientContextConfig& config) override;
+  Ssl::ServerContextSharedPtr
   createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
                          const std::vector<std::string>& server_names) override;
   size_t daysUntilFirstCertExpires() const override;
   void iterateContexts(std::function<void(const Context&)> callback) override;
 
 private:
+  void removeEmptyContexts();
   Runtime::Loader& runtime_;
-  std::list<Context*> contexts_;
-  mutable std::shared_timed_mutex contexts_lock_;
+  std::list<std::weak_ptr<Context>> contexts_;
 };
 
 } // namespace Ssl

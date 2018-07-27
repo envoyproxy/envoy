@@ -9,6 +9,7 @@ load(
 load(
     "//source/extensions:all_extensions.bzl",
     "envoy_all_extensions",
+    "envoy_windows_extensions",
 )
 
 envoy_package()
@@ -37,12 +38,18 @@ envoy_cc_library(
         "//source/server:options_lib",
         "//source/server:server_lib",
         "//source/server:test_hooks_lib",
-    ] + envoy_all_extensions(),
+    ] + select({
+        "//bazel:windows_x86_64": envoy_windows_extensions(),
+        "//conditions:default": envoy_all_extensions(),
+    }),
 )
 
 envoy_cc_library(
     name = "envoy_main_entry_lib",
     srcs = ["main.cc"],
+    external_deps = [
+        "abseil_symbolize",
+    ],
     deps = [
         ":envoy_main_common_lib",
     ],

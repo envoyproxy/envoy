@@ -63,7 +63,7 @@ bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_
 thread_local uint8_t Filter::buf_[Config::TLS_MAX_CLIENT_HELLO];
 
 Filter::Filter(const ConfigSharedPtr config) : config_(config), ssl_(config_->newSsl()) {
-  RELEASE_ASSERT(sizeof(buf_) >= config_->maxClientHelloSize());
+  RELEASE_ASSERT(sizeof(buf_) >= config_->maxClientHelloSize(), "");
 
   SSL_set_app_data(ssl_.get(), this);
   SSL_set_accept_state(ssl_.get());
@@ -144,9 +144,10 @@ void Filter::onRead() {
   // platforms.
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   ssize_t n = os_syscalls.recv(cb_->socket().fd(), buf_, config_->maxClientHelloSize(), MSG_PEEK);
+  const int error = errno; // Latch errno right after the recv call.
   ENVOY_LOG(trace, "tls inspector: recv: {}", n);
 
-  if (n == -1 && errno == EAGAIN) {
+  if (n == -1 && error == EAGAIN) {
     return;
   } else if (n < 0) {
     config_->stats().read_error_.inc();
@@ -209,7 +210,7 @@ void Filter::parseClientHello(const void* data, size_t len) {
       } else {
         config_->stats().alpn_not_found_.inc();
       }
-      cb_->socket().setDetectedTransportProtocol(TransportSockets::TransportSocketNames::get().TLS);
+      cb_->socket().setDetectedTransportProtocol(TransportSockets::TransportSocketNames::get().Tls);
     } else {
       config_->stats().tls_not_found_.inc();
     }

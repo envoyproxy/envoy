@@ -54,6 +54,7 @@ namespace Http {
   COUNTER  (downstream_rq_4xx)                                                                     \
   COUNTER  (downstream_rq_5xx)                                                                     \
   HISTOGRAM(downstream_rq_time)                                                                    \
+  COUNTER  (downstream_rq_idle_timeout)                                                            \
   COUNTER  (rs_too_large)
 // clang-format on
 
@@ -138,7 +139,7 @@ enum class ForwardClientCertType {
  * Configuration for the fields of the client cert, used for populating the current client cert
  * information to the next hop.
  */
-enum class ClientCertDetailsType { Cert, Subject, SAN, URI, DNS };
+enum class ClientCertDetailsType { Cert, Subject, URI, DNS };
 
 /**
  * Abstract configuration for the connection manager.
@@ -191,7 +192,13 @@ public:
   /**
    * @return optional idle timeout for incoming connection manager connections.
    */
-  virtual const absl::optional<std::chrono::milliseconds>& idleTimeout() PURE;
+  virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+
+  /**
+   * @return per-stream idle timeout for incoming connection manager connections. Zero indicates a
+   *         disabled idle timeout.
+   */
+  virtual std::chrono::milliseconds streamIdleTimeout() const PURE;
 
   /**
    * @return Router::RouteConfigProvider& the configuration provider used to acquire a route

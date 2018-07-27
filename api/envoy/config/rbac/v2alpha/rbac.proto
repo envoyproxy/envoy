@@ -3,6 +3,7 @@ syntax = "proto3";
 import "validate/validate.proto";
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/route/route.proto";
+import "envoy/type/matcher/metadata.proto";
 
 package envoy.config.rbac.v2alpha;
 option go_package = "v2alpha";
@@ -15,12 +16,11 @@ option go_package = "v2alpha";
 //
 // Here is an example of RBAC configuration. It has two policies:
 //
-// * Service account "cluster.local/ns/default/sa/admin" has full access (empty permission entry
-//   means full access) to the service.
+// * Service account "cluster.local/ns/default/sa/admin" has full access to the service, and so
+//   does "cluster.local/ns/default/sa/superuser".
 //
-// * Any user (empty principal entry means any user) can read ("GET") the service at paths with
-//   prefix "/products" or suffix "/reviews" when request header "version" set to either "v1" or
-//   "v2".
+// * Any user can read ("GET") the service at paths with prefix "/products", so long as the
+//   destination port is either 80 or 443.
 //
 //  .. code-block:: yaml
 //
@@ -111,6 +111,14 @@ message Permission {
 
     // A port number that describes the destination port connecting to.
     uint32 destination_port = 6 [(validate.rules).uint32.lte = 65535];
+
+    // Metadata that describes additional information about the action.
+    envoy.type.matcher.MetadataMatcher metadata = 7;
+
+    // Negates matching the provided permission. For instance, if the value of `not_rule` would
+    // match, this permission would not match. Conversely, if the value of `not_rule` would not
+    // match, this permission would match.
+    Permission not_rule = 8;
   }
 }
 
@@ -150,5 +158,13 @@ message Principal {
 
     // A header (or psuedo-header such as :path or :method) on the incoming HTTP request.
     envoy.api.v2.route.HeaderMatcher header = 6;
+
+    // Metadata that describes additional information about the principal.
+    envoy.type.matcher.MetadataMatcher metadata = 7;
+
+    // Negates matching the provided principal. For instance, if the value of `not_id` would match,
+    // this principal would not match. Conversely, if the value of `not_id` would not match, this
+    // principal would match.
+    Principal not_id = 8;
   }
 }

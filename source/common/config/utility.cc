@@ -25,15 +25,19 @@ void Utility::translateApiConfigSource(const std::string& cluster, uint32_t refr
                                        envoy::api::v2::core::ApiConfigSource& api_config_source) {
   // TODO(junr03): document the option to chose an api type once we have created
   // stronger constraints around v2.
-  if (api_type == ApiType::get().RestLegacy) {
-    api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
-  } else if (api_type == ApiType::get().Rest) {
-    api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
-  } else {
-    ASSERT(api_type == ApiType::get().Grpc);
+  if (api_type == ApiType::get().Grpc) {
     api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
+    envoy::api::v2::core::GrpcService* grpc_service = api_config_source.add_grpc_services();
+    grpc_service->mutable_envoy_grpc()->set_cluster_name(cluster);
+  } else {
+    if (api_type == ApiType::get().RestLegacy) {
+      api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
+    } else if (api_type == ApiType::get().Rest) {
+      api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
+    }
+    api_config_source.add_cluster_names(cluster);
   }
-  api_config_source.add_cluster_names(cluster);
+
   api_config_source.mutable_refresh_delay()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
 }
@@ -83,26 +87,21 @@ void Utility::checkApiConfigSourceNames(
   const bool is_grpc =
       (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
 
-  if (api_config_source.cluster_names().size() == 0 &&
-      api_config_source.grpc_services().size() == 0) {
+  if (api_config_source.cluster_names().empty() && api_config_source.grpc_services().empty()) {
     throw EnvoyException("API configs must have either a gRPC service or a cluster name defined");
   }
 
   if (is_grpc) {
-    if (api_config_source.cluster_names().size() != 0) {
-      ENVOY_LOG_MISC(warn, "Setting a cluster name for API config source type "
-                           "envoy::api::v2::core::ConfigSource::GRPC is deprecated");
-    }
-    if (api_config_source.cluster_names().size() > 1) {
+    if (!api_config_source.cluster_names().empty()) {
       throw EnvoyException(
-          "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified");
+          "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified.");
     }
     if (api_config_source.grpc_services().size() > 1) {
       throw EnvoyException(
           "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
     }
   } else {
-    if (api_config_source.grpc_services().size() != 0) {
+    if (!api_config_source.grpc_services().empty()) {
       throw EnvoyException("envoy::api::v2::core::ConfigSource, if not of type gRPC, must not have "
                            "a gRPC service specified");
     }
@@ -178,11 +177,12 @@ void Utility::translateCdsConfig(const Json::Object& json_config,
 
 void Utility::translateRdsConfig(
     const Json::Object& json_rds,
-    envoy::config::filter::network::http_connection_manager::v2::Rds& rds) {
+    envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
+    const Stats::StatsOptions& stats_options) {
   json_rds.validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
 
   const std::string name = json_rds.getString("route_config_name", "");
-  checkObjNameLength("Invalid route_config name", name);
+  checkObjNameLength("Invalid route_config name", name, stats_options);
   rds.set_route_config_name(name);
 
   translateApiConfigSource(json_rds.getString("cluster"),
@@ -205,11 +205,12 @@ Utility::createTagProducer(const envoy::config::bootstrap::v2::Bootstrap& bootst
   return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());
 }
 
-void Utility::checkObjNameLength(const std::string& error_prefix, const std::string& name) {
-  if (name.length() > Stats::RawStatData::maxObjNameLength()) {
+void Utility::checkObjNameLength(const std::string& error_prefix, const std::string& name,
+                                 const Stats::StatsOptions& stats_options) {
+  if (name.length() > stats_options.maxNameLength()) {
     throw EnvoyException(fmt::format("{}: Length of {} ({}) exceeds allowed maximum length ({})",
                                      error_prefix, name, name.length(),
-                                     Stats::RawStatData::maxObjNameLength()));
+                                     stats_options.maxNameLength()));
   }
 }
 
@@ -219,13 +220,24 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
   Utility::checkApiConfigSourceNames(api_config_source);
 
   envoy::api::v2::core::GrpcService grpc_service;
-  if (api_config_source.cluster_names().empty()) {
-    grpc_service.MergeFrom(api_config_source.grpc_services(0));
-  } else {
-    grpc_service.mutable_envoy_grpc()->set_cluster_name(api_config_source.cluster_names(0));
-  }
+  grpc_service.MergeFrom(api_config_source.grpc_services(0));
 
   return async_client_manager.factoryForGrpcService(grpc_service, scope, false);
+}
+
+envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts) {
+  envoy::api::v2::ClusterLoadAssignment load_assignment;
+  envoy::api::v2::endpoint::LocalityLbEndpoints* locality_lb_endpoints =
+      load_assignment.add_endpoints();
+  // Since this LocalityLbEndpoints is built from hosts list, set the default weight to 1.
+  locality_lb_endpoints->mutable_load_balancing_weight()->set_value(1);
+  for (const envoy::api::v2::core::Address& host : hosts) {
+    envoy::api::v2::endpoint::LbEndpoint* lb_endpoint = locality_lb_endpoints->add_lb_endpoints();
+    lb_endpoint->mutable_endpoint()->mutable_address()->MergeFrom(host);
+    lb_endpoint->mutable_load_balancing_weight()->set_value(1);
+  }
+  return load_assignment;
 }
 
 } // namespace Config

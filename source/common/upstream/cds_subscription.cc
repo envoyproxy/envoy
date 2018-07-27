@@ -16,10 +16,11 @@ CdsSubscription::CdsSubscription(
     Config::SubscriptionStats stats, const envoy::api::v2::core::ConfigSource& cds_config,
     const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm,
     Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-    const LocalInfo::LocalInfo& local_info)
+    const LocalInfo::LocalInfo& local_info, const Stats::StatsOptions& stats_options)
     : RestApiFetcher(cm, cds_config.api_config_source().cluster_names()[0], dispatcher, random,
                      Config::Utility::apiConfigSourceRefreshDelay(cds_config.api_config_source())),
-      local_info_(local_info), stats_(stats), eds_config_(eds_config) {
+      local_info_(local_info), stats_(stats), eds_config_(eds_config),
+      stats_options_(stats_options) {
   const auto& api_config_source = cds_config.api_config_source();
   UNREFERENCED_PARAMETER(api_config_source);
   // If we are building an CdsSubscription, the ConfigSource should be REST_LEGACY.
@@ -46,7 +47,7 @@ void CdsSubscription::parseResponse(const Http::Message& response) {
 
   Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> resources;
   for (const Json::ObjectSharedPtr& cluster : clusters) {
-    Config::CdsJson::translateCluster(*cluster, eds_config_, *resources.Add());
+    Config::CdsJson::translateCluster(*cluster, eds_config_, *resources.Add(), stats_options_);
   }
 
   std::pair<std::string, uint64_t> hash =

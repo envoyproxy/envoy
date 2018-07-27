@@ -14,15 +14,20 @@ class GrpcSubscriptionImplTest : public GrpcSubscriptionTestHarness, public test
 TEST_F(GrpcSubscriptionImplTest, StreamCreationFailure) {
   InSequence s;
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(nullptr));
+
   EXPECT_CALL(callbacks_, onConfigUpdateFailed(_));
+  EXPECT_CALL(random_, random());
   EXPECT_CALL(*timer_, enableTimer(_));
   subscription_->start({"cluster0", "cluster1"}, callbacks_);
+
   verifyStats(2, 0, 0, 1, 0);
   // Ensure this doesn't cause an issue by sending a request, since we don't
   // have a gRPC stream.
   subscription_->updateResources({"cluster2"});
+
   // Retry and succeed.
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+
   expectSendMessage({"cluster2"}, "");
   timer_cb_();
   verifyStats(3, 0, 0, 1, 0);
@@ -35,6 +40,7 @@ TEST_F(GrpcSubscriptionImplTest, RemoteStreamClose) {
   Http::HeaderMapPtr trailers{new Http::TestHeaderMapImpl{}};
   subscription_->grpcMux().onReceiveTrailingMetadata(std::move(trailers));
   EXPECT_CALL(*timer_, enableTimer(_));
+  EXPECT_CALL(random_, random());
   subscription_->grpcMux().onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
   verifyStats(1, 0, 0, 0, 0);
   // Retry and succeed.

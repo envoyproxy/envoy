@@ -1,5 +1,6 @@
 #pragma once
 
+#include <sys/ioctl.h>
 #include <sys/mman.h>   // for mode_t
 #include <sys/socket.h> // for sockaddr
 #include <sys/stat.h>
@@ -13,6 +14,22 @@
 namespace Envoy {
 namespace Api {
 
+/**
+ * SysCallResult holds the rc and errno values resulting from a system call.
+ */
+struct SysCallResult {
+
+  /**
+   * The return code from the system call.
+   */
+  int rc_;
+
+  /**
+   * The errno value as captured after the system call.
+   */
+  int errno_;
+};
+
 class OsSysCalls {
 public:
   virtual ~OsSysCalls() {}
@@ -21,6 +38,11 @@ public:
    * @see bind (man 2 bind)
    */
   virtual int bind(int sockfd, const sockaddr* addr, socklen_t addrlen) PURE;
+
+  /**
+   * @see ioctl (man 2 ioctl)
+   */
+  virtual int ioctl(int sockfd, unsigned long int request, void* argp) PURE;
 
   /**
    * Open file by full_path with given flags and mode.

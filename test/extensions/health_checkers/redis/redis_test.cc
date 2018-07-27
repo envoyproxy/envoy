@@ -26,27 +26,9 @@ class RedisHealthCheckerTest
     : public testing::Test,
       public Extensions::NetworkFilters::RedisProxy::ConnPool::ClientFactory {
 public:
-  RedisHealthCheckerTest() : cluster_(new NiceMock<Upstream::MockCluster>()) {}
-
-  void setupExistsHealthcheckDeprecated() {
-    const std::string yaml = R"EOF(
-    timeout: 1s
-    interval: 1s
-    no_traffic_interval: 5s
-    interval_jitter: 1s
-    unhealthy_threshold: 1
-    healthy_threshold: 1
-    # Using the deprecated redis_health_check should work.
-    redis_health_check:
-      key: foo
-    )EOF";
-
-    const auto& hc_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
-    const auto& redis_config = getRedisHealthCheckConfig(hc_config);
-
-    health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
-                                                 runtime_, random_, *this));
-  }
+  RedisHealthCheckerTest()
+      : cluster_(new NiceMock<Upstream::MockCluster>()),
+        event_logger_(new Upstream::MockHealthCheckEventLogger()) {}
 
   void setup() {
     const std::string yaml = R"EOF(
@@ -64,8 +46,9 @@ public:
     const auto& hc_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
     const auto& redis_config = getRedisHealthCheckConfig(hc_config);
 
-    health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
-                                                 runtime_, random_, *this));
+    health_checker_.reset(
+        new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_, runtime_, random_,
+                               Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
   }
 
   void setupExistsHealthcheck() {
@@ -85,8 +68,9 @@ public:
     const auto& hc_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
     const auto& redis_config = getRedisHealthCheckConfig(hc_config);
 
-    health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
-                                                 runtime_, random_, *this));
+    health_checker_.reset(
+        new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_, runtime_, random_,
+                               Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
   }
 
   void setupDontReuseConnection() {
@@ -106,8 +90,9 @@ public:
     const auto& hc_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
     const auto& redis_config = getRedisHealthCheckConfig(hc_config);
 
-    health_checker_.reset(new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_,
-                                                 runtime_, random_, *this));
+    health_checker_.reset(
+        new RedisHealthChecker(*cluster_, hc_config, redis_config, dispatcher_, runtime_, random_,
+                               Upstream::HealthCheckEventLoggerPtr(event_logger_), *this));
   }
 
   Extensions::NetworkFilters::RedisProxy::ConnPool::ClientPtr
@@ -145,6 +130,7 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  Upstream::MockHealthCheckEventLogger* event_logger_{};
   Event::MockTimer* timeout_timer_{};
   Event::MockTimer* interval_timer_{};
   Extensions::NetworkFilters::RedisProxy::ConnPool::MockClient* client_{};
@@ -181,6 +167,7 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   interval_timer_->callback_();
 
   // Failure
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
@@ -248,57 +235,7 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   interval_timer_->callback_();
 
   // Failure, exists
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
-  response->type(Extensions::NetworkFilters::RedisProxy::RespType::Integer);
-  response->asInteger() = 1;
-  pool_callbacks_->onResponse(std::move(response));
-
-  expectExistsRequestCreate();
-  interval_timer_->callback_();
-
-  // Failure, no value
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
-  pool_callbacks_->onResponse(std::move(response));
-
-  EXPECT_CALL(*client_, close());
-
-  EXPECT_EQ(3UL, cluster_->info_->stats_store_.counter("health_check.attempt").value());
-  EXPECT_EQ(1UL, cluster_->info_->stats_store_.counter("health_check.success").value());
-  EXPECT_EQ(2UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
-}
-
-TEST_F(RedisHealthCheckerTest, ExistsDeprecated) {
-  InSequence s;
-  setupExistsHealthcheckDeprecated();
-
-  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
-
-  expectSessionCreate();
-  expectClientCreate();
-  expectExistsRequestCreate();
-  health_checker_->start();
-
-  client_->runHighWatermarkCallbacks();
-  client_->runLowWatermarkCallbacks();
-
-  // Success
-  EXPECT_CALL(*timeout_timer_, disableTimer());
-  EXPECT_CALL(*interval_timer_, enableTimer(_));
-  Extensions::NetworkFilters::RedisProxy::RespValuePtr response(
-      new Extensions::NetworkFilters::RedisProxy::RespValue());
-  response->type(Extensions::NetworkFilters::RedisProxy::RespType::Integer);
-  response->asInteger() = 0;
-  pool_callbacks_->onResponse(std::move(response));
-
-  expectExistsRequestCreate();
-  interval_timer_->callback_();
-
-  // Failure, exists
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   response.reset(new Extensions::NetworkFilters::RedisProxy::RespValue());
@@ -350,6 +287,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   interval_timer_->callback_();
 
   // The connection will close on failure.
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   EXPECT_CALL(*client_, close());

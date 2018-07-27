@@ -39,6 +39,29 @@ TEST(HealthCheckerFactoryTest, createRedis) {
               .get()));
 }
 
+TEST(HealthCheckerFactoryTest, createRedisWithoutKey) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    custom_health_check:
+      name: envoy.health_checkers.redis
+      config:
+    )EOF";
+
+  NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
+
+  RedisHealthCheckerFactory factory;
+  EXPECT_NE(
+      nullptr,
+      dynamic_cast<CustomRedisHealthChecker*>(
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
+              .get()));
+}
+
 TEST(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
   const std::string yaml = R"EOF(
     timeout: 1s
@@ -57,37 +80,12 @@ TEST(HealthCheckerFactoryTest, createRedisViaUpstreamHealthCheckerFactory) {
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
-  EXPECT_NE(nullptr,
-            dynamic_cast<CustomRedisHealthChecker*>(
-                Upstream::HealthCheckerFactory::create(Upstream::parseHealthCheckFromV2Yaml(yaml),
-                                                       cluster, runtime, random, dispatcher)
-                    .get()));
-}
-
-TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedConfig) {
-  const std::string yaml = R"EOF(
-    timeout: 1s
-    interval: 1s
-    no_traffic_interval: 5s
-    interval_jitter: 1s
-    unhealthy_threshold: 1
-    healthy_threshold: 1
-    # Using the deprecated redis_health_check should work.
-    redis_health_check:
-      key: foo
-    )EOF";
-
-  NiceMock<Upstream::MockCluster> cluster;
-  Runtime::MockLoader runtime;
-  Runtime::MockRandomGenerator random;
-  Event::MockDispatcher dispatcher;
-  EXPECT_NE(nullptr,
-            dynamic_cast<CustomRedisHealthChecker*>(
-                // Always use Upstream's HealthCheckerFactory when creating instance using
-                // deprecated config.
-                Upstream::HealthCheckerFactory::create(Upstream::parseHealthCheckFromV2Yaml(yaml),
-                                                       cluster, runtime, random, dispatcher)
-                    .get()));
+  AccessLog::MockAccessLogManager log_manager;
+  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
+                         Upstream::HealthCheckerFactory::create(
+                             Upstream::parseHealthCheckFromV2Yaml(yaml), cluster, runtime, random,
+                             dispatcher, log_manager)
+                             .get()));
 }
 
 TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfig) {
@@ -105,13 +103,14 @@ TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfig) {
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
-  EXPECT_NE(nullptr,
-            dynamic_cast<CustomRedisHealthChecker*>(
-                // Always use Upstream's HealthCheckerFactory when creating instance using
-                // deprecated config.
-                Upstream::HealthCheckerFactory::create(Upstream::parseHealthCheckFromV1Json(json),
-                                                       cluster, runtime, random, dispatcher)
-                    .get()));
+  AccessLog::MockAccessLogManager log_manager;
+  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
+                         // Always use Upstream's HealthCheckerFactory when creating instance using
+                         // deprecated config.
+                         Upstream::HealthCheckerFactory::create(
+                             Upstream::parseHealthCheckFromV1Json(json), cluster, runtime, random,
+                             dispatcher, log_manager)
+                             .get()));
 }
 
 TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfigWithKey) {
@@ -130,13 +129,14 @@ TEST(HealthCheckerFactoryTest, createRedisWithDeprecatedV1JsonConfigWithKey) {
   Runtime::MockLoader runtime;
   Runtime::MockRandomGenerator random;
   Event::MockDispatcher dispatcher;
-  EXPECT_NE(nullptr,
-            dynamic_cast<CustomRedisHealthChecker*>(
-                // Always use Upstream's HealthCheckerFactory when creating instance using
-                // deprecated config.
-                Upstream::HealthCheckerFactory::create(Upstream::parseHealthCheckFromV1Json(json),
-                                                       cluster, runtime, random, dispatcher)
-                    .get()));
+  AccessLog::MockAccessLogManager log_manager;
+  EXPECT_NE(nullptr, dynamic_cast<CustomRedisHealthChecker*>(
+                         // Always use Upstream's HealthCheckerFactory when creating instance using
+                         // deprecated config.
+                         Upstream::HealthCheckerFactory::create(
+                             Upstream::parseHealthCheckFromV1Json(json), cluster, runtime, random,
+                             dispatcher, log_manager)
+                             .get()));
 }
 
 } // namespace RedisHealthChecker

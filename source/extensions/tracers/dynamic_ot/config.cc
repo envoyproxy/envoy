@@ -23,7 +23,7 @@ DynamicOpenTracingTracerFactory::createHttpTracer(const Json::Object& json_confi
   return std::make_unique<Tracing::HttpTracerImpl>(std::move(dynamic_driver), server.localInfo());
 }
 
-std::string DynamicOpenTracingTracerFactory::name() { return TracerNames::get().DYNAMIC_OT; }
+std::string DynamicOpenTracingTracerFactory::name() { return TracerNames::get().DynamicOt; }
 
 /**
  * Static registration for the dynamic opentracing tracer. @see RegisterFactory.

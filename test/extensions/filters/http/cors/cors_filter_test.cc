@@ -164,7 +164,6 @@ TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByWildcard) {
       {"access-control-allow-origin", "test-host"},
       {"access-control-allow-methods", "GET"},
       {"access-control-allow-headers", "content-type"},
-      {"access-control-expose-headers", "content-type"},
       {"access-control-max-age", "0"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -229,7 +228,6 @@ TEST_F(CorsFilterTest, ValidOptionsRequestWithAllowCredentialsTrue) {
       {"access-control-allow-credentials", "true"},
       {"access-control-allow-methods", "GET"},
       {"access-control-allow-headers", "content-type"},
-      {"access-control-expose-headers", "content-type"},
       {"access-control-max-age", "0"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -254,7 +252,6 @@ TEST_F(CorsFilterTest, ValidOptionsRequestWithAllowCredentialsFalse) {
       {"access-control-allow-origin", "localhost"},
       {"access-control-allow-methods", "GET"},
       {"access-control-allow-headers", "content-type"},
-      {"access-control-expose-headers", "content-type"},
       {"access-control-max-age", "0"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -316,6 +313,27 @@ TEST_F(CorsFilterTest, EncodeWithAllowCredentialsTrue) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
   EXPECT_EQ("localhost", response_headers.get_("access-control-allow-origin"));
   EXPECT_EQ("true", response_headers.get_("access-control-allow-credentials"));
+
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers_));
+}
+
+TEST_F(CorsFilterTest, EncodeWithExposeHeaders) {
+  Http::TestHeaderMapImpl request_headers{{"origin", "localhost"}};
+  cors_policy_->expose_headers_ = "custom-header-1";
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  Http::TestHeaderMapImpl continue_headers{{":status", "100"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_.encode100ContinueHeaders(continue_headers));
+
+  Http::TestHeaderMapImpl response_headers{};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ("localhost", response_headers.get_("access-control-allow-origin"));
+  EXPECT_EQ("custom-header-1", response_headers.get_("access-control-expose-headers"));
 
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers_));
@@ -437,7 +455,6 @@ TEST_F(CorsFilterTest, NoRouteCorsEntry) {
       {"access-control-allow-origin", "localhost"},
       {"access-control-allow-methods", "GET"},
       {"access-control-allow-headers", "content-type"},
-      {"access-control-expose-headers", "content-type"},
       {"access-control-max-age", "0"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -466,7 +483,6 @@ TEST_F(CorsFilterTest, NoVHostCorsEntry) {
       {":status", "200"},
       {"access-control-allow-origin", "localhost"},
       {"access-control-allow-headers", "content-type"},
-      {"access-control-expose-headers", "content-type"},
       {"access-control-max-age", "0"},
   };
   EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
@@ -474,6 +490,54 @@ TEST_F(CorsFilterTest, NoVHostCorsEntry) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_.decodeHeaders(request_headers, false));
   EXPECT_EQ(true, IsCorsRequest());
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers_));
+}
+
+TEST_F(CorsFilterTest, OptionsRequestMatchingOriginByRegex) {
+  Http::TestHeaderMapImpl request_headers{{":method", "OPTIONS"},
+                                          {"origin", "www.envoyproxy.io"},
+                                          {"access-control-request-method", "GET"}};
+
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "200"},
+      {"access-control-allow-origin", "www.envoyproxy.io"},
+      {"access-control-allow-methods", "GET"},
+      {"access-control-allow-headers", "content-type"},
+      {"access-control-max-age", "0"},
+  };
+
+  cors_policy_->allow_origin_.clear();
+  cors_policy_->allow_origin_regex_.push_back(std::regex(".*"));
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(true, IsCorsRequest());
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.encodeTrailers(request_headers_));
+}
+
+TEST_F(CorsFilterTest, OptionsRequestNotMatchingOriginByRegex) {
+  Http::TestHeaderMapImpl request_headers{{":method", "OPTIONS"},
+                                          {"origin", "www.envoyproxy.com"},
+                                          {"access-control-request-method", "GET"}};
+
+  cors_policy_->allow_origin_.clear();
+  cors_policy_->allow_origin_regex_.push_back(std::regex(".*.envoyproxy.io"));
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, false)).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(false, IsCorsRequest());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(data_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_.decodeTrailers(request_headers_));
 

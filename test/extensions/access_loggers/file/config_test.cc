@@ -37,7 +37,7 @@ TEST(FileAccessLogConfigTest, ConfigureFromProto) {
   EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
                             "Provided name for static registration lookup was empty.");
 
-  config.set_name(AccessLogNames::get().FILE);
+  config.set_name(AccessLogNames::get().File);
 
   AccessLog::InstanceSharedPtr log = AccessLog::AccessLogFactory::fromProto(config, context);
 
@@ -53,7 +53,7 @@ TEST(FileAccessLogConfigTest, ConfigureFromProto) {
 TEST(FileAccessLogConfigTest, FileAccessLogTest) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::AccessLogInstanceFactory>::getFactory(
-          AccessLogNames::get().FILE);
+          AccessLogNames::get().File);
   ASSERT_NE(nullptr, factory);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();

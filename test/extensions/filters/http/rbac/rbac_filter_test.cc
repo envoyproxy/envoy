@@ -46,13 +46,9 @@ public:
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
-  void setDestinationPort(uint16_t port, int times = 2) {
+  void setDestinationPort(uint16_t port) {
     address_ = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", port, false);
-    auto& expect = EXPECT_CALL(connection_, localAddress());
-    if (times > 0) {
-      expect.Times(times);
-    }
-    expect.WillRepeatedly(ReturnRef(address_));
+    ON_CALL(connection_, localAddress()).WillByDefault(ReturnRef(address_));
   }
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
@@ -94,7 +90,7 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
-  setDestinationPort(456, 0);
+  setDestinationPort(456);
 
   envoy::config::filter::http::rbac::v2::RBACPerRoute route_config;
   route_config.mutable_rbac()->mutable_rules()->set_action(
@@ -102,10 +98,10 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
   NiceMock<Filters::Common::RBAC::MockEngine> engine{route_config.rbac().rules()};
   NiceMock<MockRoleBasedAccessControlRouteSpecificFilterConfig> per_route_config_{route_config};
 
-  EXPECT_CALL(engine, allowed(_, _)).WillRepeatedly(Return(true));
+  EXPECT_CALL(engine, allowed(_, _, _)).WillRepeatedly(Return(true));
   EXPECT_CALL(per_route_config_, engine()).WillRepeatedly(ReturnRef(engine));
 
-  EXPECT_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().RBAC))
+  EXPECT_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Rbac))
       .WillRepeatedly(Return(&per_route_config_));
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(headers_, true));

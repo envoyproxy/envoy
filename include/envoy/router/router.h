@@ -99,6 +99,11 @@ public:
    */
   virtual const std::list<std::string>& allowOrigins() const PURE;
 
+  /*
+   * @return std::list<std::regex>& regexes that match allowed origins.
+   */
+  virtual const std::list<std::regex>& allowOriginRegexes() const PURE;
+
   /**
    * @return std::string access-control-allow-methods value.
    */
@@ -466,6 +471,12 @@ public:
    * @return std::chrono::milliseconds the route's timeout.
    */
   virtual std::chrono::milliseconds timeout() const PURE;
+
+  /**
+   * @return optional<std::chrono::milliseconds> the route's idle timeout. Zero indicates a
+   *         disabled idle timeout, while nullopt indicates deference to the global timeout.
+   */
+  virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
    * @return absl::optional<std::chrono::milliseconds> the maximum allowed timeout value derived

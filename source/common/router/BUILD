@@ -100,6 +100,7 @@ envoy_cc_library(
     hdrs = ["rds_subscription.h"],
     deps = [
         "//include/envoy/config:subscription_interface",
+        "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/config:rds_json_lib",
         "//source/common/config:utility_lib",
@@ -123,6 +124,7 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:backoff_lib",
         "//source/common/common:utility_lib",
         "//source/common/grpc:common_lib",
         "//source/common/http:codes_lib",

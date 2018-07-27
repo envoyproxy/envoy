@@ -16,7 +16,7 @@ namespace Squash {
 class SquashFilterConfigFactory
     : public Common::FactoryBase<envoy::config::filter::http::squash::v2::Squash> {
 public:
-  SquashFilterConfigFactory() : FactoryBase(HttpFilterNames::get().SQUASH) {}
+  SquashFilterConfigFactory() : FactoryBase(HttpFilterNames::get().Squash) {}
 
   Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string&,

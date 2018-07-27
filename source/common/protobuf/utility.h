@@ -71,11 +71,16 @@ uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent&
 // @param field_name supplies the field name in the message.
 // @param max_value supplies the maximum allowed integral value (e.g., 100, 10000, etc.).
 // @param default_value supplies the default if the field is not present.
+//
+// TODO(anirudhmurali): Recommended to capture and validate NaN values in PGV
+// Issue: https://github.com/lyft/protoc-gen-validate/issues/85
 #define PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(message, field_name, max_value,             \
                                                        default_value)                              \
-  ((message).has_##field_name()                                                                    \
-       ? ProtobufPercentHelper::convertPercent((message).field_name().value(), max_value)          \
-       : ProtobufPercentHelper::checkAndReturnDefault(default_value, max_value))
+  (!std::isnan((message).field_name().value())                                                     \
+       ? (message).has_##field_name()                                                              \
+             ? ProtobufPercentHelper::convertPercent((message).field_name().value(), max_value)    \
+             : ProtobufPercentHelper::checkAndReturnDefault(default_value, max_value)              \
+       : throw EnvoyException(fmt::format("Value not in the range of 0..100 range.")))
 
 namespace Envoy {
 
@@ -226,10 +231,13 @@ public:
    * Extract JSON as string from a google.protobuf.Message.
    * @param message message of type type.googleapis.com/google.protobuf.Message.
    * @param pretty_print whether the returned JSON should be formatted.
+   * @param always_print_primitive_fields whether to include primitive fields set to their default
+   * values, e.g. an int32 set to 0 or a bool set to false.
    * @return std::string of formatted JSON object.
    */
   static std::string getJsonStringFromMessage(const Protobuf::Message& message,
-                                              bool pretty_print = false);
+                                              bool pretty_print = false,
+                                              bool always_print_primitive_fields = false);
 
   /**
    * Extract JSON object from a google.protobuf.Message.
