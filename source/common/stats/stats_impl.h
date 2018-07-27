@@ -280,6 +280,12 @@ private:
 // The two production derivations cover using a fixed block of shared-memory for
 // hot restart stat continuity, and heap allocation for more efficient RAM usage
 // for when hot-restart is not required.
+//
+// Also note that RawStatData needs to live in a shared memory block, and it's
+// possible, but not obvious, that a vptr would be usable across processes. In
+// any case, RawStatData is currently allocated with calloc() rather than new,
+// so the usual C++ compiler assistance for setting up vptrs will not be
+// available. This could be resolved with placed new.
 template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
   /**
