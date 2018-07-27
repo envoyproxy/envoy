@@ -17,13 +17,14 @@ namespace ThriftProxy {
  * FramedTransportImpl implements the Thrift Framed transport.
  * See https://github.com/apache/thrift/blob/master/doc/specs/thrift-rpc.md
  */
-class FramedTransportImpl : public TransportImplBase {
+class FramedTransportImpl : public Transport {
 public:
-  FramedTransportImpl(TransportCallbacks& callbacks) : TransportImplBase(callbacks) {}
+  FramedTransportImpl() {}
 
   // Transport
   const std::string& name() const override { return TransportNames::get().FRAMED; }
-  bool decodeFrameStart(Buffer::Instance& buffer) override;
+  TransportType type() const override { return TransportType::Framed; }
+  bool decodeFrameStart(Buffer::Instance& buffer, absl::optional<uint32_t>& size) override;
   bool decodeFrameEnd(Buffer::Instance& buffer) override;
   void encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) override;
 

@@ -459,6 +459,7 @@ private:
 
       // The value of next_free_index is the final size of the trie_.
       trie_.resize(next_free_index);
+      trie_.shrink_to_fit();
     }
 
     // Thin wrapper around computeBranch output to facilitate code readability.

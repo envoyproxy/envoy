@@ -73,6 +73,7 @@ public:
   static FormatterPtr defaultAccessLogFormatter();
   static const std::string& protocolToString(const absl::optional<Http::Protocol>& protocol);
   static std::string durationToString(const absl::optional<std::chrono::nanoseconds>& time);
+  static std::string durationToString(const std::chrono::nanoseconds& time);
 
 private:
   AccessLogFormatUtils();

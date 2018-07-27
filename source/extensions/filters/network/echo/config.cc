@@ -34,7 +34,7 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
 
-  std::string name() override { return NetworkFilterNames::get().ECHO; }
+  std::string name() override { return NetworkFilterNames::get().Echo; }
 };
 
 /**

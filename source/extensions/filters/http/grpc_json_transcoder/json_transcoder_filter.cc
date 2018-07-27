@@ -437,9 +437,13 @@ void JsonTranscoderFilter::buildResponseFromHttpBodyOutput(Http::HeaderMap& resp
       Buffer::ZeroCopyInputStreamImpl stream(std::move(frame.data_));
       http_body.ParseFromZeroCopyStream(&stream);
       const auto& body = http_body.data();
-      data.add(body);
+
+      // TODO(mrice32): This string conversion is currently required because body has a different
+      // type within Google. Remove when the string types merge.
+      data.add(ProtobufTypes::String(body));
+
       response_headers.insertContentType().value(http_body.content_type());
-      response_headers.insertContentLength().value(body.length());
+      response_headers.insertContentLength().value(body.size());
       return;
     }
   }

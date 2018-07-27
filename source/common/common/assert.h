@@ -53,9 +53,6 @@ namespace Envoy {
 // reports.
 #define NOT_IMPLEMENTED_GCOVR_EXCL_LINE PANIC("not implemented")
 
-// Deprecated: use NOT_IMPLEMENTED_GCOVR_EXCL_LINE instead.
-#define NOT_IMPLEMENTED NOT_IMPLEMENTED_GCOVR_EXCL_LINE
-
 // NOT_REACHED_GCOVR_EXCL_LINE is for spots the compiler insists on having a return, but where we
 // know that it shouldn't be possible to arrive there, assuming no horrendous bugs. For example,
 // after a switch (some_enum) with all enum values included in the cases. The macro name includes

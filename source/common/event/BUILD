@@ -59,7 +59,6 @@ envoy_cc_library(
     hdrs = ["libevent.h"],
     external_deps = [
         "event",
-        "event_pthreads",
     ],
     deps = [
         "//source/common/common:assert_lib",
@@ -73,7 +72,6 @@ envoy_cc_library(
     hdrs = ["dispatched_thread.h"],
     external_deps = [
         "event",
-        "event_pthreads",
     ],
     deps = [
         ":dispatcher_lib",

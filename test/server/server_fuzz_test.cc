@@ -3,6 +3,7 @@
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
+#include "server/proto_descriptors.h"
 #include "server/server.h"
 #include "server/test_hooks.h"
 
@@ -23,6 +24,8 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
   Thread::MutexBasicLockable fakelock;
   TestComponentFactory component_factory;
   ThreadLocal::InstanceImpl thread_local_instance;
+
+  RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
 
   {
     const std::string bootstrap_path = TestEnvironment::temporaryPath("bootstrap.pb_text");

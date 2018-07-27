@@ -4,16 +4,11 @@
 
 #include "extensions/filters/network/thrift_proxy/framed_transport_impl.h"
 
-#include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
-#include "test/mocks/buffer/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -21,63 +16,68 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 TEST(FramedTransportTest, Name) {
-  StrictMock<MockTransportCallbacks> cb;
-  FramedTransportImpl transport(cb);
+  FramedTransportImpl transport;
   EXPECT_EQ(transport.name(), "framed");
+}
+
+TEST(FramedTransportTest, Type) {
+  FramedTransportImpl transport;
+  EXPECT_EQ(transport.type(), TransportType::Framed);
 }
 
 TEST(FramedTransportTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
-  StrictMock<MockTransportCallbacks> cb;
-  FramedTransportImpl transport(cb);
+  FramedTransportImpl transport;
+  absl::optional<uint32_t> size = 1;
 
-  EXPECT_FALSE(transport.decodeFrameStart(buffer));
+  EXPECT_FALSE(transport.decodeFrameStart(buffer, size));
+  EXPECT_EQ(absl::optional<uint32_t>(1), size);
 
   addRepeated(buffer, 3, 0);
 
-  EXPECT_FALSE(transport.decodeFrameStart(buffer));
+  EXPECT_FALSE(transport.decodeFrameStart(buffer, size));
+  EXPECT_EQ(absl::optional<uint32_t>(1), size);
 }
 
 TEST(FramedTransportTest, InvalidFrameSize) {
-  StrictMock<MockTransportCallbacks> cb;
-  FramedTransportImpl transport(cb);
+  FramedTransportImpl transport;
 
   {
     Buffer::OwnedImpl buffer;
     addInt32(buffer, -1);
 
-    EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer), EnvoyException,
+    absl::optional<uint32_t> size = 1;
+    EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, size), EnvoyException,
                               "invalid thrift framed transport frame size -1");
+    EXPECT_EQ(absl::optional<uint32_t>(1), size);
   }
 
   {
     Buffer::OwnedImpl buffer;
     addInt32(buffer, 0x7fffffff);
 
-    EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer), EnvoyException,
+    absl::optional<uint32_t> size = 1;
+    EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, size), EnvoyException,
                               "invalid thrift framed transport frame size 2147483647");
+    EXPECT_EQ(absl::optional<uint32_t>(1), size);
   }
 }
 
 TEST(FramedTransportTest, DecodeFrameStart) {
-  StrictMock<MockTransportCallbacks> cb;
-  EXPECT_CALL(cb, transportFrameStart(absl::optional<uint32_t>(100U)));
-
-  FramedTransportImpl transport(cb);
+  FramedTransportImpl transport;
 
   Buffer::OwnedImpl buffer;
   addInt32(buffer, 100);
-
   EXPECT_EQ(buffer.length(), 4);
-  EXPECT_TRUE(transport.decodeFrameStart(buffer));
+
+  absl::optional<uint32_t> size;
+  EXPECT_TRUE(transport.decodeFrameStart(buffer, size));
+  EXPECT_EQ(absl::optional<uint32_t>(100U), size);
   EXPECT_EQ(buffer.length(), 0);
 }
 
 TEST(FramedTransportTest, DecodeFrameEnd) {
-  StrictMock<MockTransportCallbacks> cb;
-  EXPECT_CALL(cb, transportFrameComplete());
-
-  FramedTransportImpl transport(cb);
+  FramedTransportImpl transport;
 
   Buffer::OwnedImpl buffer;
 
@@ -85,9 +85,7 @@ TEST(FramedTransportTest, DecodeFrameEnd) {
 }
 
 TEST(FramedTransportTest, EncodeFrame) {
-  StrictMock<MockTransportCallbacks> cb;
-
-  FramedTransportImpl transport(cb);
+  FramedTransportImpl transport;
 
   {
     Buffer::OwnedImpl message;

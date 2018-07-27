@@ -16,6 +16,12 @@ namespace Network {
 namespace Address {
 
 /**
+ * Returns true if the given family is supported on this machine.
+ * @param domain the IP family.
+ */
+bool ipFamilySupported(int domain);
+
+/**
  * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
  * a Network::Address::Instance and return a pointer to it. Raises an EnvoyException on failure.
  * @param ss a valid address with family AF_INET, AF_INET6 or AF_UNIX.

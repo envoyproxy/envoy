@@ -18,7 +18,7 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
     return ProtobufWkt::Struct::default_instance();
   }
   const auto& metadata = callbacks->route()->routeEntry()->metadata();
-  const auto& filter_it = metadata.filter_metadata().find(HttpFilterNames::get().LUA);
+  const auto& filter_it = metadata.filter_metadata().find(HttpFilterNames::get().Lua);
   if (filter_it == metadata.filter_metadata().end()) {
     return ProtobufWkt::Struct::default_instance();
   }
