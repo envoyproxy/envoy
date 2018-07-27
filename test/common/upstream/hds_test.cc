@@ -260,6 +260,8 @@ TEST_F(HdsTest, TestStreamConnectionFailure) {
   retry_timer_cb_();
 }
 
+// TODO(lilika): Add unit tests for HdsDelegate::sendResponse() with healthy and
+// unhealthy endpoints.
 TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessage(_, _));
