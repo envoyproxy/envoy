@@ -419,7 +419,7 @@ void ConnectionManagerImpl::ActiveStream::resetIdleTimer() {
 void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   connection_manager_.stats_.named_.downstream_rq_idle_timeout_.inc();
   // If headers have not been sent to the user, send a 408.
-  if (response_headers_ != nullptr) {
+  if (request_headers_ == nullptr || response_headers_ != nullptr) {
     // TODO(htuch): We could send trailers here with an x-envoy timeout header
     // or gRPC status code, and/or set H2 RST_STREAM error.
     connection_manager_.doEndStream(*this);

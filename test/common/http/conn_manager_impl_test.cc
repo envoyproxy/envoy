@@ -1120,30 +1120,27 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNotConfigured) {
 }
 
 // When the global timeout is configured, the timer is enabled before we receive
-// headers.
+// headers, if it fires we don't face plant.
 TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutGlobal) {
   stream_idle_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_))
       .Times(1)
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+      .WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
         Event::MockTimer* idle_timer =
             new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
         EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10)));
-        StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+        conn_manager_->newStream(response_encoder_);
 
-        HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}}};
-        EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10)));
-        decoder->decodeHeaders(std::move(headers), false);
-
-        data.drain(4);
+        EXPECT_CALL(*idle_timer, disableTimer());
+        idle_timer->callback_();
       }));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
-  EXPECT_EQ(0U, stats_.named_.downstream_rq_idle_timeout_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_idle_timeout_.value());
 }
 
 // Per-route timeouts override the global stream idle timeout.
