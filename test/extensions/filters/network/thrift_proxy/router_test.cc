@@ -1,5 +1,5 @@
-#include "envoy/extensions/filters/network/thrift_proxy/v2alpha1/route.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v2alpha1/route.pb.validate.h"
+#include "envoy/config/filter/network/thrift_proxy/v2alpha1/route.pb.h"
+#include "envoy/config/filter/network/thrift_proxy/v2alpha1/route.pb.validate.h"
 #include "envoy/tcp/conn_pool.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -38,9 +38,9 @@ namespace Router {
 
 namespace {
 
-envoy::extensions::filters::network::thrift_proxy::v2alpha1::RouteConfiguration
+envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration
 parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
-  envoy::extensions::filters::network::thrift_proxy::v2alpha1::RouteConfiguration route_config;
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration route_config;
   MessageUtil::loadFromYaml(yaml, route_config);
   MessageUtil::validate(route_config);
   return route_config;
@@ -582,7 +582,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   RouteMatcher matcher(config);
@@ -611,7 +611,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   RouteMatcher matcher(config);

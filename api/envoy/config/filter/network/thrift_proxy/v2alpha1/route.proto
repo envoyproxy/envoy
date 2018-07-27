@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.network.thrift_proxy.v2alpha1;
+package envoy.config.filter.network.thrift_proxy.v2alpha1;
 option go_package = "v2";
 
 import "validate/validate.proto";

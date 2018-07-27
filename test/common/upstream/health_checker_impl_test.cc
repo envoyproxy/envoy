@@ -322,6 +322,24 @@ public:
             key: user-agent
             value: CoolEnvoy/HC
           append: false
+        - header:
+            key: x-protocol
+            value: "%PROTOCOL%"
+        - header:
+            key: x-upstream-metadata
+            value: "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
+        - header:
+            key: x-downstream-remote-address-without-port
+            value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+        - header:
+            key: x-downstream-local-address
+            value: "%DOWNSTREAM_LOCAL_ADDRESS%"
+        - header:
+            key: x-downstream-local-address-without-port
+            value: "%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%"
+        - header:
+            key: x-start-time
+            value: "%START_TIME(%s.%9f)%"
     )EOF";
 
     health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
@@ -697,15 +715,28 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithCustomHostValue) {
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
-  const Http::LowerCaseString headerOk("x-envoy-ok");
-  const Http::LowerCaseString headerCool("x-envoy-cool");
-  const Http::LowerCaseString headerAwesome("x-envoy-awesome");
+  const Http::LowerCaseString header_ok("x-envoy-ok");
+  const Http::LowerCaseString header_cool("x-envoy-cool");
+  const Http::LowerCaseString header_awesome("x-envoy-awesome");
+  const Http::LowerCaseString upstream_metadata("x-upstream-metadata");
+  const Http::LowerCaseString protocol("x-protocol");
+  const Http::LowerCaseString downstream_remote_address_without_port(
+      "x-downstream-remote-address-without-port");
+  const Http::LowerCaseString downstream_local_address("x-downstream-local-address");
+  const Http::LowerCaseString downstream_local_address_without_port(
+      "x-downstream-local-address-without-port");
+  const Http::LowerCaseString start_time("x-start-time");
 
-  const std::string valueOk = "ok";
-  const std::string valueCool = "cool";
-  const std::string valueAwesome = "awesome";
+  const std::string value_ok = "ok";
+  const std::string value_cool = "cool";
+  const std::string value_awesome = "awesome";
 
-  const std::string valueUserAgent = "CoolEnvoy/HC";
+  const std::string value_user_agent = "CoolEnvoy/HC";
+  const std::string value_upstream_metadata = "value";
+  const std::string value_protocol = "HTTP/1.1";
+  const std::string value_downstream_remote_address_without_port = "127.0.0.1";
+  const std::string value_downstream_local_address = "127.0.0.1:0";
+  const std::string value_downstream_local_address_without_port = "127.0.0.1";
 
   setupServiceValidationWithAdditionalHeaders();
   // requires non-empty `service_name` in config.
@@ -713,20 +744,39 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
       .WillOnce(Return(true));
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  auto metadata = TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
+      R"EOF(
+        filter_metadata:
+          namespace:
+            key: value
+      )EOF");
 
+  std::string current_start_time;
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", metadata)};
   cluster_->info_->stats().upstream_cx_total_.inc();
   expectSessionCreate();
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
-      .WillOnce(Invoke([&](const Http::HeaderMap& headers, bool) {
-        EXPECT_EQ(headers.get(headerOk)->value().c_str(), valueOk);
-        EXPECT_EQ(headers.get(headerCool)->value().c_str(), valueCool);
-        EXPECT_EQ(headers.get(headerAwesome)->value().c_str(), valueAwesome);
+      .WillRepeatedly(Invoke([&](const Http::HeaderMap& headers, bool) {
+        EXPECT_EQ(headers.get(header_ok)->value().c_str(), value_ok);
+        EXPECT_EQ(headers.get(header_cool)->value().c_str(), value_cool);
+        EXPECT_EQ(headers.get(header_awesome)->value().c_str(), value_awesome);
 
-        EXPECT_EQ(headers.UserAgent()->value().c_str(), valueUserAgent);
+        EXPECT_EQ(headers.UserAgent()->value().c_str(), value_user_agent);
+        EXPECT_EQ(headers.get(upstream_metadata)->value().c_str(), value_upstream_metadata);
+
+        EXPECT_EQ(headers.get(protocol)->value().c_str(), value_protocol);
+        EXPECT_EQ(headers.get(downstream_remote_address_without_port)->value().c_str(),
+                  value_downstream_remote_address_without_port);
+        EXPECT_EQ(headers.get(downstream_local_address)->value().c_str(),
+                  value_downstream_local_address);
+        EXPECT_EQ(headers.get(downstream_local_address_without_port)->value().c_str(),
+                  value_downstream_local_address_without_port);
+
+        EXPECT_NE(headers.get(start_time)->value().c_str(), current_start_time);
+        current_start_time = headers.get(start_time)->value().c_str();
       }));
   health_checker_->start();
 
@@ -738,6 +788,10 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
   absl::optional<std::string> health_checked_cluster("locations-production-iad");
   respond(0, "200", false, true, false, health_checked_cluster);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
 }
 
 TEST_F(HttpHealthCheckerImplTest, ServiceDoesNotMatchFail) {
@@ -775,8 +829,6 @@ TEST_F(HttpHealthCheckerImplTest, ServiceNotPresentInResponseFail) {
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
   EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
-  ;
-  ;
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};

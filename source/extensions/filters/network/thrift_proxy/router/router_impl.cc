@@ -1,6 +1,6 @@
 #include "extensions/filters/network/thrift_proxy/router/router_impl.h"
 
-#include "envoy/extensions/filters/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
+#include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
@@ -13,7 +13,7 @@ namespace ThriftProxy {
 namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
-    const envoy::extensions::filters::network::thrift_proxy::v2alpha1::Route& route)
+    const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
     : cluster_name_(route.route().cluster()) {}
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
@@ -23,7 +23,7 @@ const RouteEntry* RouteEntryImplBase::routeEntry() const { return this; }
 RouteConstSharedPtr RouteEntryImplBase::clusterEntry() const { return shared_from_this(); }
 
 MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
-    const envoy::extensions::filters::network::thrift_proxy::v2alpha1::Route& route)
+    const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
     : RouteEntryImplBase(route), method_name_(route.match().method()) {}
 
 RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const std::string& method_name) const {
@@ -35,7 +35,7 @@ RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const std::string& method_
 }
 
 RouteMatcher::RouteMatcher(
-    const envoy::extensions::filters::network::thrift_proxy::v2alpha1::RouteConfiguration& config) {
+    const envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration& config) {
   for (const auto& route : config.routes()) {
     routes_.emplace_back(new MethodNameRouteEntryImpl(route));
   }
