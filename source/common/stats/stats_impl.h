@@ -273,7 +273,7 @@ private:
   const std::vector<Tag> tags_;
 };
 
-// Partially implements a StaDataAllocator, leaving alloc & free for subclasses.
+// Partially implements a StatDataAllocator, leaving alloc & free for subclasses.
 // We templatize on StatData rather than defining a virtual base StatData class
 // for performance reasons; stat increment is on the hot path.
 //
@@ -416,7 +416,6 @@ struct HeapStatData {
 class HeapStatDataAllocator : public StatDataAllocatorImpl<HeapStatData> {
 public:
   explicit HeapStatDataAllocator(const StatsOptions& options) : StatDataAllocatorImpl(options) {}
-  // HeapStatDataAllocator() {}
   ~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 
   // StatDataAllocator
