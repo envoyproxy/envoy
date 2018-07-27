@@ -116,7 +116,7 @@ public:
   NiceMock<Stats::MockStore> scope_;
   NiceMock<Server::MockInstance> server_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  RouteConfigProviderSharedPtr rds_;
+  RouteConfigProviderPtr rds_;
 };
 
 TEST_F(RdsImplTest, RdsAndStatic) {
@@ -375,8 +375,8 @@ public:
     EXPECT_CALL(*cluster.info_, addedViaApi());
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&factory_context_.dispatcher_);
-    provider_ = route_config_provider_manager_->getRdsRouteConfigProvider(rds_, factory_context_,
-                                                                          "foo_prefix.");
+    provider_ = route_config_provider_manager_->createRdsRouteConfigProvider(rds_, factory_context_,
+                                                                             "foo_prefix.");
   }
 
   RouteConfigProviderManagerImplTest() {
@@ -390,7 +390,7 @@ public:
   Stats::StatsOptionsImpl stats_options_;
   envoy::config::filter::network::http_connection_manager::v2::Rds rds_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  RouteConfigProviderSharedPtr provider_;
+  RouteConfigProviderPtr provider_;
 };
 
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
@@ -429,8 +429,8 @@ virtual_hosts:
   EXPECT_CALL(factory_context_, systemTimeSource()).WillRepeatedly(ReturnRef(system_time_source_));
 
   // Only static route.
-  RouteConfigProviderSharedPtr static_config =
-      route_config_provider_manager_->getStaticRouteConfigProvider(
+  RouteConfigProviderPtr static_config =
+      route_config_provider_manager_->createStaticRouteConfigProvider(
           parseRouteConfigurationFromV2Yaml(config_yaml), factory_context_);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump2 =
@@ -510,9 +510,8 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
 
   // Because this get has the same cluster and route_config_name, the provider returned is just a
   // shared_ptr to the same provider as the one above.
-  RouteConfigProviderSharedPtr provider2 =
-      route_config_provider_manager_->getRdsRouteConfigProvider(rds_, factory_context_,
-                                                                "foo_prefix");
+  RouteConfigProviderPtr provider2 = route_config_provider_manager_->createRdsRouteConfigProvider(
+      rds_, factory_context_, "foo_prefix");
   // So this means that both provider have same subscription.
   EXPECT_NE(provider_, provider2);
   EXPECT_EQ(&dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_).subscription(),
@@ -538,16 +537,13 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type());
   new Event::MockTimer(&factory_context_.dispatcher_);
-  RouteConfigProviderSharedPtr provider3 =
-      route_config_provider_manager_->getRdsRouteConfigProvider(rds2, factory_context_,
-                                                                "foo_prefix");
+  RouteConfigProviderPtr provider3 = route_config_provider_manager_->createRdsRouteConfigProvider(
+      rds2, factory_context_, "foo_prefix");
   EXPECT_NE(provider3, provider_);
-  EXPECT_EQ(1UL, provider3.use_count());
 
-  std::vector<RouteConfigProviderSharedPtr> configured_providers =
+  std::vector<RouteConfigProvider*> configured_providers =
       route_config_provider_manager_->getRdsRouteConfigProviders();
   EXPECT_EQ(2UL, configured_providers.size());
-  EXPECT_EQ(2UL, provider3.use_count());
 
   provider_.reset();
   provider2.reset();
@@ -557,7 +553,7 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   // now we should only have the provider pointed at by provider3.
   configured_providers = route_config_provider_manager_->getRdsRouteConfigProviders();
   EXPECT_EQ(1UL, configured_providers.size());
-  EXPECT_EQ(provider3, configured_providers.front());
+  EXPECT_EQ(provider3.get(), configured_providers.front());
 
   provider3.reset();
   configured_providers.clear();
