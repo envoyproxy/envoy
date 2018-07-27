@@ -36,7 +36,7 @@ public:
 
   // For testing purposes only.
   size_t size() const override {
-    RELEASE_ASSERT(encode_map_.size() == decode_map_.size(), "");
+    ASSERT(encode_map_.size() == decode_map_.size());
     return encode_map_.size();
   }
 
@@ -87,7 +87,7 @@ private:
   // Stages a new symbol for use. To be called after a successful insertion.
   void newSymbol() {
     if (pool_.empty()) {
-      RELEASE_ASSERT(monotonic_counter_ < std::numeric_limits<Symbol>::max(), "");
+      ASSERT(monotonic_counter_ < std::numeric_limits<Symbol>::max());
       current_symbol_ = ++monotonic_counter_;
     } else {
       current_symbol_ = pool_.top();

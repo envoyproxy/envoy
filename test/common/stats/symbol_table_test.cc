@@ -53,7 +53,7 @@ TEST_F(StatNameTest, TestSuccessfulDecode) {
 
 TEST_F(StatNameTest, TestBadDecodes) {
   {
-    // If a symbol doesn't exist, decoding it should trigger a RELEASE_ASSERT() and crash.
+    // If a symbol doesn't exist, decoding it should trigger an ASSERT() and crash.
     SymbolVec bad_symbol_vec = {0};
     EXPECT_DEATH(decodeSymbolVec(bad_symbol_vec), "");
   }

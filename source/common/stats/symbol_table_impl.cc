@@ -33,10 +33,10 @@ std::string SymbolTableImpl::decode(const SymbolVec& symbol_vec) const {
 void SymbolTableImpl::free(const SymbolVec& symbol_vec) {
   for (const Symbol symbol : symbol_vec) {
     auto decode_search = decode_map_.find(symbol);
-    RELEASE_ASSERT(decode_search != decode_map_.end(), "");
+    ASSERT(decode_search != decode_map_.end());
 
     auto encode_search = encode_map_.find(decode_search->second);
-    RELEASE_ASSERT(encode_search != encode_map_.end(), "");
+    ASSERT(encode_search != encode_map_.end());
 
     (encode_search->second.ref_count_)--;
     // If that was the last remaining client usage of the symbol, erase the the current
@@ -59,11 +59,11 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
     std::string str = std::string(sv);
 
     auto decode_insert = decode_map_.insert({current_symbol_, std::move(str)});
-    RELEASE_ASSERT(decode_insert.second, "");
+    ASSERT(decode_insert.second);
 
     auto encode_insert = encode_map_.insert(
         {decode_insert.first->second, {.symbol_ = current_symbol_, .ref_count_ = 1}});
-    RELEASE_ASSERT(encode_insert.second, "");
+    ASSERT(encode_insert.second);
 
     result = current_symbol_;
     newSymbol();
@@ -78,7 +78,7 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
 
 absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const {
   auto search = decode_map_.find(symbol);
-  RELEASE_ASSERT(search != decode_map_.end(), "");
+  ASSERT(search != decode_map_.end());
   return search->second;
 }
 
