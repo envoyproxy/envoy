@@ -161,6 +161,7 @@ envoy_cc_fuzz_test(
     corpus = "server_corpus",
     deps = [
         "//source/common/thread_local:thread_local_lib",
+        "//source/server:proto_descriptors_lib",
         "//source/server:server_lib",
         "//test/integration:integration_lib",
         "//test/mocks/server:server_mocks",

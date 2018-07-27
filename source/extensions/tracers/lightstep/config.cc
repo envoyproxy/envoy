@@ -31,7 +31,7 @@ Tracing::HttpTracerPtr LightstepTracerFactory::createHttpTracer(const Json::Obje
   return std::make_unique<Tracing::HttpTracerImpl>(std::move(lightstep_driver), server.localInfo());
 }
 
-std::string LightstepTracerFactory::name() { return TracerNames::get().LIGHTSTEP; }
+std::string LightstepTracerFactory::name() { return TracerNames::get().Lightstep; }
 
 /**
  * Static registration for the lightstep tracer. @see RegisterFactory.

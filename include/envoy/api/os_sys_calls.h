@@ -14,6 +14,22 @@
 namespace Envoy {
 namespace Api {
 
+/**
+ * SysCallResult holds the rc and errno values resulting from a system call.
+ */
+struct SysCallResult {
+
+  /**
+   * The return code from the system call.
+   */
+  int rc_;
+
+  /**
+   * The errno value as captured after the system call.
+   */
+  int errno_;
+};
+
 class OsSysCalls {
 public:
   virtual ~OsSysCalls() {}

@@ -18,7 +18,7 @@ class RoleBasedAccessControlFilterConfigFactory
     : public Common::FactoryBase<envoy::config::filter::http::rbac::v2::RBAC,
                                  envoy::config::filter::http::rbac::v2::RBACPerRoute> {
 public:
-  RoleBasedAccessControlFilterConfigFactory() : FactoryBase(HttpFilterNames::get().RBAC) {}
+  RoleBasedAccessControlFilterConfigFactory() : FactoryBase(HttpFilterNames::get().Rbac) {}
 
 private:
   Http::FilterFactoryCb

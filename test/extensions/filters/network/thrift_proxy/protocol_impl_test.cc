@@ -24,10 +24,16 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
+TEST(ProtocolNames, FromType) {
+  for (int i = 0; i <= static_cast<int>(ProtocolType::LastProtocolType); i++) {
+    ProtocolType type = static_cast<ProtocolType>(i);
+    EXPECT_NE("", ProtocolNames::get().fromType(type));
+  }
+}
+
 TEST(AutoProtocolTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
-  NiceMock<MockProtocolCallbacks> cb;
-  AutoProtocolImpl proto(cb);
+  AutoProtocolImpl proto;
   std::string name = "-";
   MessageType msg_type = MessageType::Oneway;
   int32_t seq_id = -1;
@@ -41,8 +47,7 @@ TEST(AutoProtocolTest, NotEnoughData) {
 
 TEST(AutoProtocolTest, UnknownProtocol) {
   Buffer::OwnedImpl buffer;
-  NiceMock<MockProtocolCallbacks> cb;
-  AutoProtocolImpl proto(cb);
+  AutoProtocolImpl proto;
   std::string name = "-";
   MessageType msg_type = MessageType::Oneway;
   int32_t seq_id = -1;
@@ -59,8 +64,7 @@ TEST(AutoProtocolTest, UnknownProtocol) {
 TEST(AutoProtocolTest, ReadMessageBegin) {
   // Binary Protocol
   {
-    NiceMock<MockProtocolCallbacks> cb;
-    AutoProtocolImpl proto(cb);
+    AutoProtocolImpl proto;
     std::string name = "-";
     MessageType msg_type = MessageType::Oneway;
     int32_t seq_id = -1;
@@ -79,12 +83,12 @@ TEST(AutoProtocolTest, ReadMessageBegin) {
     EXPECT_EQ(seq_id, 1);
     EXPECT_EQ(buffer.length(), 0);
     EXPECT_EQ(proto.name(), "binary(auto)");
+    EXPECT_EQ(proto.type(), ProtocolType::Binary);
   }
 
   // Compact protocol
   {
-    NiceMock<MockProtocolCallbacks> cb;
-    AutoProtocolImpl proto(cb);
+    AutoProtocolImpl proto;
     std::string name = "-";
     MessageType msg_type = MessageType::Oneway;
     int32_t seq_id = 1;
@@ -101,13 +105,13 @@ TEST(AutoProtocolTest, ReadMessageBegin) {
     EXPECT_EQ(seq_id, 0x0102);
     EXPECT_EQ(buffer.length(), 0);
     EXPECT_EQ(proto.name(), "compact(auto)");
+    EXPECT_EQ(proto.type(), ProtocolType::Compact);
   }
 }
 
 TEST(AutoProtocolTest, ReadDelegation) {
   NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
-  NiceMock<MockProtocolCallbacks> dummy_cb;
-  AutoProtocolImpl auto_proto(dummy_cb);
+  AutoProtocolImpl auto_proto;
   auto_proto.setProtocol(ProtocolPtr{proto});
 
   // readMessageBegin
@@ -232,8 +236,7 @@ TEST(AutoProtocolTest, ReadDelegation) {
 
 TEST(AutoProtocolTest, WriteDelegation) {
   NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
-  NiceMock<MockProtocolCallbacks> dummy_cb;
-  AutoProtocolImpl auto_proto(dummy_cb);
+  AutoProtocolImpl auto_proto;
   auto_proto.setProtocol(ProtocolPtr{proto});
 
   // writeMessageBegin
@@ -319,9 +322,13 @@ TEST(AutoProtocolTest, WriteDelegation) {
 }
 
 TEST(AutoProtocolTest, Name) {
-  NiceMock<MockProtocolCallbacks> cb;
-  AutoProtocolImpl proto(cb);
+  AutoProtocolImpl proto;
   EXPECT_EQ(proto.name(), "auto");
+}
+
+TEST(AutoProtocolTest, Type) {
+  AutoProtocolImpl proto;
+  EXPECT_EQ(proto.type(), ProtocolType::Auto);
 }
 
 } // namespace ThriftProxy
