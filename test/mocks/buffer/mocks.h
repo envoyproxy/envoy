@@ -103,6 +103,13 @@ MATCHER_P(BufferStringEqual, rhs, rhs) {
   return TestUtility::buffersEqual(arg, buffer);
 }
 
+MATCHER_P(BufferStringContains, rhs,
+          string(negation ? "doesn't contain" : "contains") + " \"" + rhs +
+              "\"") {
+  *result_listener << "\"" << arg.toString() << "\"";
+  return arg.toString().find(rhs) != string::npos;
+}
+
 ACTION_P(AddBufferToString, target_string) {
   auto bufferToString = [](const Buffer::OwnedImpl& buf) -> std::string { return buf.toString(); };
   target_string->append(bufferToString(arg0));
