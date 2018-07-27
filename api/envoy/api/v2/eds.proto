@@ -6,6 +6,7 @@ option java_generic_services = true;
 
 import "envoy/api/v2/discovery.proto";
 import "envoy/api/v2/endpoint/endpoint.proto";
+import "envoy/type/percent.proto";
 
 import "google/api/annotations.proto";
 
@@ -50,12 +51,35 @@ message ClusterLoadAssignment {
 
   // Load balancing policy settings.
   message Policy {
-    // Percentage of traffic (0-100) that should be dropped. This
-    // action allows protection of upstream hosts should they unable to
-    // recover from an outage or should they be unable to autoscale and hence
-    // overall incoming traffic volume need to be trimmed to protect them.
-    // [#v2-api-diff: This is known as maintenance mode in v1.]
-    double drop_overload = 1 [(validate.rules).double = {gte: 0, lte: 100}];
+    reserved 1;
+
+    message DropOverload {
+      // Identifier for the policy specifying the drop.
+      string category = 1 [(validate.rules).string.min_bytes = 1];
+
+      // Percentage of traffic that should be dropped for the category.
+      envoy.type.Percent drop_percentage = 2;
+    }
+    // Action to trim the overall incoming traffic to protect the upstream
+    // hosts. This action allows protection in case the hosts are unable to
+    // recover from an outage, or unable to autoscale or unable to handle
+    // incoming traffic volume for any reason.
+    //
+    // At the client each category is applied one after the other to generate
+    // the 'actual' drop percentage on all outgoing traffic. For example:
+    //
+    // .. code-block:: json
+    //
+    //  { "drop_overloads": [
+    //      { "category": "throttle", "drop_percentage": 60 }
+    //      { "category": "lb", "drop_percentage": 50 }
+    //  ]}
+    //
+    // The actual drop percentages applied to the traffic at the clients will be
+    //    "throttle"_drop = 60%
+    //    "lb"_drop = 20%  // 50% of the remaining 'actual' load, which is 40%.
+    //    actual_outgoing_load = 20% // remaining after applying all categories.
+    repeated DropOverload drop_overloads = 2;
   }
 
   // Load balancing policy settings.

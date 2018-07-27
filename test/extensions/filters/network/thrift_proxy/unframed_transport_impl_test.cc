@@ -2,15 +2,11 @@
 
 #include "extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
 
-#include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-using testing::StrictMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -18,39 +14,37 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 TEST(UnframedTransportTest, Name) {
-  StrictMock<MockTransportCallbacks> cb;
-  UnframedTransportImpl transport(cb);
+  UnframedTransportImpl transport;
   EXPECT_EQ(transport.name(), "unframed");
 }
 
-TEST(UnframedTransportTest, DecodeFrameStart) {
-  StrictMock<MockTransportCallbacks> cb;
-  EXPECT_CALL(cb, transportFrameStart(absl::optional<uint32_t>()));
+TEST(UnframedTransportTest, Type) {
+  UnframedTransportImpl transport;
+  EXPECT_EQ(transport.type(), TransportType::Unframed);
+}
 
-  UnframedTransportImpl transport(cb);
+TEST(UnframedTransportTest, DecodeFrameStart) {
+  UnframedTransportImpl transport;
 
   Buffer::OwnedImpl buffer;
   addInt32(buffer, 0xDEADBEEF);
-
   EXPECT_EQ(buffer.length(), 4);
-  EXPECT_TRUE(transport.decodeFrameStart(buffer));
+
+  absl::optional<uint32_t> size = 1;
+  EXPECT_TRUE(transport.decodeFrameStart(buffer, size));
+  EXPECT_FALSE(size.has_value());
   EXPECT_EQ(buffer.length(), 4);
 }
 
 TEST(UnframedTransportTest, DecodeFrameEnd) {
-  StrictMock<MockTransportCallbacks> cb;
-  EXPECT_CALL(cb, transportFrameComplete());
-
-  UnframedTransportImpl transport(cb);
+  UnframedTransportImpl transport;
 
   Buffer::OwnedImpl buffer;
   EXPECT_TRUE(transport.decodeFrameEnd(buffer));
 }
 
 TEST(UnframedTransportTest, EncodeFrame) {
-  StrictMock<MockTransportCallbacks> cb;
-
-  UnframedTransportImpl transport(cb);
+  UnframedTransportImpl transport;
 
   Buffer::OwnedImpl message;
   message.add("fake message");

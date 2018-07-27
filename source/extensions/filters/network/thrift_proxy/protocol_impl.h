@@ -13,39 +13,24 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-/*
- * ProtocolImplBase provides a base class for Protocol implementations.
- */
-class ProtocolImplBase : public virtual Protocol {
-public:
-  ProtocolImplBase(ProtocolCallbacks& callbacks) : callbacks_(callbacks) {}
-
-protected:
-  void onMessageStart(const absl::string_view name, MessageType msg_type, int32_t seq_id) const {
-    callbacks_.messageStart(name, msg_type, seq_id);
-  }
-  void onStructBegin(const absl::string_view name) const { callbacks_.structBegin(name); }
-  void onStructField(const absl::string_view name, FieldType field_type, int16_t field_id) const {
-    callbacks_.structField(name, field_type, field_id);
-  }
-  void onStructEnd() const { callbacks_.structEnd(); }
-  void onMessageComplete() const { callbacks_.messageComplete(); }
-
-  ProtocolCallbacks& callbacks_;
-};
-
 /**
  * AutoProtocolImpl attempts to distinguish between the Thrift binary (strict mode only) and
  * compact protocols and then delegates subsequent decoding operations to the appropriate Protocol
  * implementation.
  */
-class AutoProtocolImpl : public ProtocolImplBase {
+class AutoProtocolImpl : public Protocol {
 public:
-  AutoProtocolImpl(ProtocolCallbacks& callbacks)
-      : ProtocolImplBase(callbacks), name_(ProtocolNames::get().AUTO) {}
+  AutoProtocolImpl() : name_(ProtocolNames::get().AUTO) {}
 
   // Protocol
   const std::string& name() const override { return name_; }
+  ProtocolType type() const override {
+    if (protocol_ != nullptr) {
+      return protocol_->type();
+    }
+    return ProtocolType::Auto;
+  }
+
   bool readMessageBegin(Buffer::Instance& buffer, std::string& name, MessageType& msg_type,
                         int32_t& seq_id) override;
   bool readMessageEnd(Buffer::Instance& buffer) override;
