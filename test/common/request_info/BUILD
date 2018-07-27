@@ -29,14 +29,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "string_accessor_impl_test",
-    srcs = ["string_accessor_impl_test.cc"],
-    deps = [
-        "//source/common/request_info:string_accessor_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = [

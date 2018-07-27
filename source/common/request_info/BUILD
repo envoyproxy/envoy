@@ -27,14 +27,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "string_accessor_lib",
-    hdrs = ["string_accessor_impl.h"],
-    deps = [
-        "//include/envoy/request_info:string_accessor_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
