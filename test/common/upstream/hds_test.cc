@@ -38,13 +38,38 @@ public:
       retry_timer_cb_ = timer_cb;
       return retry_timer_;
     }));
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
-      server_response_timer_cb_ = timer_cb;
-      return server_response_timer_;
-    }));
+    EXPECT_CALL(dispatcher_, createTimer_(_))
+        .Times(AtLeast(1))
+        .WillOnce(Invoke([this](Event::TimerCb timer_cb) {
+          server_response_timer_cb_ = timer_cb;
+          return server_response_timer_;
+        }));
     hds_delegate_.reset(new HdsDelegate(node_, stats_store_, Grpc::AsyncClientPtr(async_client_),
                                         dispatcher_, runtime_, stats_store_, ssl_context_manager_,
                                         secret_manager_, random_, test_factory_));
+  }
+  envoy::service::discovery::v2::HealthCheckSpecifier* simpleMessage() {
+
+    envoy::service::discovery::v2::HealthCheckSpecifier* msg =
+        new envoy::service::discovery::v2::HealthCheckSpecifier;
+    msg->mutable_interval()->set_seconds(1);
+
+    auto* health_check = msg->add_health_check();
+    health_check->set_cluster_name("anna");
+    health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
+    health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
+    health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
+    health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
+    health_check->mutable_health_checks(0)->mutable_grpc_health_check();
+    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_use_http2(false);
+    health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
+
+    auto* socket_address =
+        health_check->add_endpoints()->add_endpoints()->mutable_address()->mutable_socket_address();
+    socket_address->set_address("127.0.0.0");
+    socket_address->set_port_value(1234);
+
+    return msg;
   }
 
   envoy::api::v2::core::Node node_;
@@ -60,7 +85,8 @@ public:
   Event::MockTimer* server_response_timer_;
   Event::TimerCb server_response_timer_cb_;
 
-  ClusterInfoConstSharedPtr info_;
+  std::shared_ptr<Upstream::MockClusterInfo> cluster_info_{
+      new NiceMock<Upstream::MockClusterInfo>()};
   std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier> message;
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
@@ -183,8 +209,8 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   health_check2->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck2");
 
   // Process message
-  info_.reset(new NiceMock<Upstream::MockClusterInfo>());
-  EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _)).WillRepeatedly(Return(info_));
+  EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _))
+      .WillRepeatedly(Return(cluster_info_));
   hds_delegate_->processMessage(std::move(message));
 
   // Check Correctness
@@ -232,6 +258,48 @@ TEST_F(HdsTest, TestStreamConnectionFailure) {
   // Test connection failure and retry
   createHdsDelegate();
   retry_timer_cb_();
+}
+
+TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
+  EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessage(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message.reset(simpleMessage());
+
+  Network::MockClientConnection* connection_ = new NiceMock<Network::MockClientConnection>();
+  EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillRepeatedly(Return(connection_));
+  EXPECT_CALL(*server_response_timer_, enableTimer(_)).Times(2);
+  EXPECT_CALL(async_stream_, sendMessage(_, false));
+  EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _))
+      .WillOnce(Return(cluster_info_));
+  EXPECT_CALL(*connection_, setBufferLimits(_));
+  EXPECT_CALL(dispatcher_, deferredDelete_(_));
+  // Process message
+  hds_delegate_->onReceiveMessage(std::move(message));
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Send Response
+  auto msg = hds_delegate_->sendResponse();
+
+  // Correctness
+  EXPECT_EQ(msg.endpoint_health_response().endpoints_health(0).health_status(),
+            envoy::api::v2::core::HealthStatus::UNHEALTHY);
+  EXPECT_EQ(msg.endpoint_health_response()
+                .endpoints_health(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .address(),
+            "127.0.0.0");
+  EXPECT_EQ(msg.endpoint_health_response()
+                .endpoints_health(0)
+                .endpoint()
+                .address()
+                .socket_address()
+                .port_value(),
+            1234);
 }
 
 } // namespace Upstream
