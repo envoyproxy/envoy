@@ -198,9 +198,10 @@ public:
                     fake_upstreams_[0]->localAddress()->ip()->port()));
   }
 
-  envoy::api::v2::Listener buildListener(const std::string& name, const std::string& route_config) {
-    return TestUtility::parseYaml<envoy::api::v2::Listener>(
-        fmt::format(R"EOF(
+  envoy::api::v2::Listener buildListener(const std::string& name, const std::string& route_config,
+                                         const std::string& stat_prefix = "ads_test") {
+    return TestUtility::parseYaml<envoy::api::v2::Listener>(fmt::format(
+        R"EOF(
       name: {}
       address:
         socket_address:
@@ -210,14 +211,14 @@ public:
         filters:
         - name: envoy.http_connection_manager
           config:
-            stat_prefix: ads_test
+            stat_prefix: {}
             codec_type: HTTP2
             rds:
               route_config_name: {}
               config_source: {{ ads: {{}} }}
             http_filters: [{{ name: envoy.router }}]
     )EOF",
-                    name, Network::Test::getLoopbackAddressString(ipVersion()), route_config));
+        name, Network::Test::getLoopbackAddressString(ipVersion()), stat_prefix, route_config));
   }
 
   envoy::api::v2::RouteConfiguration buildRouteConfig(const std::string& name,
@@ -468,6 +469,79 @@ TEST_P(AdsIntegrationTest, Failure) {
       compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1", {"route_config_0"}));
 
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  makeSingleRequest();
+}
+
+// Regression test for the use-after-free crash when processing RDS update (#3953).
+TEST_P(AdsIntegrationTest, RdsAfterLdsWithNoRdsChanges) {
+  initialize();
+
+  // Send initial configuration.
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "1");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  // Validate that we can process a request.
+  makeSingleRequest();
+
+  // Update existing LDS (change stat_prefix).
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0", "rds_crash")},
+      "2");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+  // Update existing RDS (no changes).
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "2");
+
+  // Validate that we can process a request again
+  makeSingleRequest();
+}
+
+// Regression test for the use-after-free crash when processing RDS update (#3953).
+TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
+  initialize();
+
+  // Send initial configuration.
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "1");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  // Validate that we can process a request.
+  makeSingleRequest();
+
+  // Update existing LDS (change stat_prefix).
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_1")}, "2");
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_1")}, "2");
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0", "rds_crash")},
+      "2");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+  // Update existing RDS (migrate traffic to cluster_1).
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_1")},
+      "2");
+
+  // Validate that we can process a request after RDS update
+  test_server_->waitForCounterGe("http.ads_test.rds.route_config_0.config_reload", 2);
   makeSingleRequest();
 }
 
