@@ -11,7 +11,6 @@ DynamicMetadataImpl::~DynamicMetadataImpl() {
       it.second.destructor_(it.second.ptr_);
     }
   }
-  data_storage_.clear();
 }
 
 void DynamicMetadataImpl::setDataGeneric(absl::string_view data_name, size_t type_id, void* data,

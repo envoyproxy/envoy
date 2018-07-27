@@ -25,14 +25,10 @@ envoy_cc_library(
     srcs = ["dynamic_metadata.cc"],
     hdrs = ["dynamic_metadata.h"],
     external_deps = ["abseil_optional"],
-    deps = [
-    ],
 )
 
 envoy_cc_library(
     name = "string_accessor_interface",
     hdrs = ["string_accessor.h"],
     external_deps = ["abseil_optional"],
-    deps = [
-    ],
 )
