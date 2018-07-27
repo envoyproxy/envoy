@@ -48,6 +48,7 @@ Version history
 * router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
 * tracing: added support for configuration of :ref:`tracing sampling
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
+* thrift_proxy: introduced thrift routing, moved configuration to correct location
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
   selecting a host from a subset.
 * access log: added RESPONSE_DURATION and RESPONSE_TX_DURATION.

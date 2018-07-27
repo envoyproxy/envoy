@@ -3,8 +3,8 @@
 #include <map>
 #include <string>
 
-#include "envoy/extensions/filters/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v2alpha1/thrift_proxy.pb.validate.h"
+#include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
+#include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.validate.h"
 #include "envoy/stats/stats.h"
 
 #include "extensions/filters/network/common/factory_base.h"
@@ -23,13 +23,13 @@ namespace ThriftProxy {
  */
 class ThriftProxyFilterConfigFactory
     : public Common::FactoryBase<
-          envoy::extensions::filters::network::thrift_proxy::v2alpha1::ThriftProxy> {
+          envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy> {
 public:
   ThriftProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().ThriftProxy) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::network::thrift_proxy::v2alpha1::ThriftProxy& proto_config,
+      const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
 
@@ -38,7 +38,7 @@ class ConfigImpl : public Config,
                    public ThriftFilters::FilterChainFactory,
                    Logger::Loggable<Logger::Id::config> {
 public:
-  ConfigImpl(const envoy::extensions::filters::network::thrift_proxy::v2alpha1::ThriftProxy& config,
+  ConfigImpl(const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy& config,
              Server::Configuration::FactoryContext& context);
 
   // ThriftFilters::FilterChainFactory
@@ -62,8 +62,8 @@ private:
   Server::Configuration::FactoryContext& context_;
   const std::string stats_prefix_;
   ThriftFilterStats stats_;
-  envoy::extensions::filters::network::thrift_proxy::v2alpha1::ThriftProxy_TransportType transport_;
-  envoy::extensions::filters::network::thrift_proxy::v2alpha1::ThriftProxy_ProtocolType proto_;
+  envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_TransportType transport_;
+  envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_ProtocolType proto_;
   std::unique_ptr<Router::RouteMatcher> route_matcher_;
 
   std::list<ThriftFilters::FilterFactoryCb> filter_factories_;

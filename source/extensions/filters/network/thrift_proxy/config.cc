@@ -25,52 +25,50 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace {
 
-typedef std::map<
-    envoy::extensions::filters::network::thrift_proxy::v2alpha1::ThriftProxy_TransportType,
-    TransportType>
+typedef std::map<envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_TransportType,
+                 TransportType>
     TransportTypeMap;
 
 static const TransportTypeMap& transportTypeMap() {
-  CONSTRUCT_ON_FIRST_USE(TransportTypeMap,
-                         {
-                             {envoy::extensions::filters::network::thrift_proxy::v2alpha1::
-                                  ThriftProxy_TransportType_AUTO_TRANSPORT,
-                              TransportType::Auto},
-                             {envoy::extensions::filters::network::thrift_proxy::v2alpha1::
-                                  ThriftProxy_TransportType_FRAMED,
-                              TransportType::Framed},
-                             {envoy::extensions::filters::network::thrift_proxy::v2alpha1::
-                                  ThriftProxy_TransportType_UNFRAMED,
-                              TransportType::Unframed},
-                         });
+  CONSTRUCT_ON_FIRST_USE(
+      TransportTypeMap,
+      {
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::
+               ThriftProxy_TransportType_AUTO_TRANSPORT,
+           TransportType::Auto},
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_TransportType_FRAMED,
+           TransportType::Framed},
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::
+               ThriftProxy_TransportType_UNFRAMED,
+           TransportType::Unframed},
+      });
 }
 
-typedef std::map<
-    envoy::extensions::filters::network::thrift_proxy::v2alpha1::ThriftProxy_ProtocolType,
-    ProtocolType>
+typedef std::map<envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_ProtocolType,
+                 ProtocolType>
     ProtocolTypeMap;
 
 static const ProtocolTypeMap& protocolTypeMap() {
-  CONSTRUCT_ON_FIRST_USE(ProtocolTypeMap, {
-                                              {envoy::extensions::filters::network::thrift_proxy::
-                                                   v2alpha1::ThriftProxy_ProtocolType_AUTO_PROTOCOL,
-                                               ProtocolType::Auto},
-                                              {envoy::extensions::filters::network::thrift_proxy::
-                                                   v2alpha1::ThriftProxy_ProtocolType_BINARY,
-                                               ProtocolType::Binary},
-                                              {envoy::extensions::filters::network::thrift_proxy::
-                                                   v2alpha1::ThriftProxy_ProtocolType_LAX_BINARY,
-                                               ProtocolType::LaxBinary},
-                                              {envoy::extensions::filters::network::thrift_proxy::
-                                                   v2alpha1::ThriftProxy_ProtocolType_COMPACT,
-                                               ProtocolType::Compact},
-                                          });
+  CONSTRUCT_ON_FIRST_USE(
+      ProtocolTypeMap,
+      {
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::
+               ThriftProxy_ProtocolType_AUTO_PROTOCOL,
+           ProtocolType::Auto},
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_ProtocolType_BINARY,
+           ProtocolType::Binary},
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::
+               ThriftProxy_ProtocolType_LAX_BINARY,
+           ProtocolType::LaxBinary},
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_ProtocolType_COMPACT,
+           ProtocolType::Compact},
+      });
 }
 
 } // namespace
 
 Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::network::thrift_proxy::v2alpha1::ThriftProxy& proto_config,
+    const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Config> filter_config(new ConfigImpl(proto_config, context));
 
@@ -87,7 +85,7 @@ static Registry::RegisterFactory<ThriftProxyFilterConfigFactory,
     registered_;
 
 ConfigImpl::ConfigImpl(
-    const envoy::extensions::filters::network::thrift_proxy::v2alpha1::ThriftProxy& config,
+    const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy& config,
     Server::Configuration::FactoryContext& context)
     : context_(context), stats_prefix_(fmt::format("thrift.{}.", config.stat_prefix())),
       stats_(ThriftFilterStats::generateStats(stats_prefix_, context_.scope())),
