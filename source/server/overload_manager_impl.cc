@@ -55,14 +55,14 @@ bool OverloadActionImpl::updateResourcePressure(const std::string& name, double 
   const bool active = isActive();
 
   auto it = triggers_.find(name);
-  RELEASE_ASSERT(it != triggers_.end(), "");
+  ASSERT(it != triggers_.end());
   if (it->second->updateValue(pressure)) {
     if (it->second->isFired()) {
       const auto result = fired_triggers_.insert(name);
-      RELEASE_ASSERT(result.second, "");
+      ASSERT(result.second);
     } else {
       const auto result = fired_triggers_.erase(name);
-      RELEASE_ASSERT(result == 1, "");
+      ASSERT(result == 1);
     }
   }
 
@@ -115,7 +115,7 @@ OverloadManagerImpl::OverloadManagerImpl(
 }
 
 void OverloadManagerImpl::start() {
-  RELEASE_ASSERT(!started_, "");
+  ASSERT(!started_);
   started_ = true;
   timer_ = dispatcher_.createTimer([this]() -> void {
     for (auto& resource : resources_) {
@@ -130,7 +130,7 @@ void OverloadManagerImpl::start() {
 void OverloadManagerImpl::registerForAction(const std::string& action,
                                             Event::Dispatcher& dispatcher,
                                             std::function<void(bool)> callback) {
-  RELEASE_ASSERT(!started_, "");
+  ASSERT(!started_);
 
   if (actions_.find(action) == actions_.end()) {
     ENVOY_LOG(debug, "No overload action configured for {}.", action);
@@ -143,23 +143,23 @@ void OverloadManagerImpl::registerForAction(const std::string& action,
 
 void OverloadManagerImpl::updateResourcePressure(const std::string& resource, double pressure) {
   auto action_range = resource_to_actions_.equal_range(resource);
-  std::for_each(action_range.first, action_range.second,
-                [&](ResourceToActionMap::value_type& entry) {
-                  const std::string& action = entry.second;
-                  auto action_it = actions_.find(action);
-                  RELEASE_ASSERT(action_it != actions_.end(), "");
-                  if (action_it->second.updateResourcePressure(resource, pressure)) {
-                    const bool is_active = action_it->second.isActive();
-                    ENVOY_LOG(info, "Overload action {} has become {}", action,
-                              is_active ? "active" : "inactive");
-                    auto callback_range = action_to_callbacks_.equal_range(action);
-                    std::for_each(callback_range.first, callback_range.second,
-                                  [&](ActionToCallbackMap::value_type& cb_entry) {
-                                    auto& cb = cb_entry.second;
-                                    cb.dispatcher_.post([&]() { cb.callback_(is_active); });
-                                  });
-                  }
-                });
+  std::for_each(
+      action_range.first, action_range.second, [&](ResourceToActionMap::value_type& entry) {
+        const std::string& action = entry.second;
+        auto action_it = actions_.find(action);
+        ASSERT(action_it != actions_.end());
+        if (action_it->second.updateResourcePressure(resource, pressure)) {
+          const bool is_active = action_it->second.isActive();
+          ENVOY_LOG(info, "Overload action {} has become {}", action,
+                    is_active ? "active" : "inactive");
+          auto callback_range = action_to_callbacks_.equal_range(action);
+          std::for_each(callback_range.first, callback_range.second,
+                        [&](ActionToCallbackMap::value_type& cb_entry) {
+                          auto& cb = cb_entry.second;
+                          cb.dispatcher_.post([&, is_active]() { cb.callback_(is_active); });
+                        });
+        }
+      });
 }
 
 void OverloadManagerImpl::Resource::update() {

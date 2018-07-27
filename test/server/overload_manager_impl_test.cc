@@ -83,7 +83,7 @@ protected:
   envoy::config::overload::v2alpha::OverloadManager parseConfig(const std::string& config) {
     envoy::config::overload::v2alpha::OverloadManager proto;
     bool success = Protobuf::TextFormat::ParseFromString(config, &proto);
-    RELEASE_ASSERT(success, "");
+    ASSERT(success);
     return proto;
   }
 
@@ -133,7 +133,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
     cb_count++;
   });
   manager.registerForAction("envoy.overload_actions.unknown_action", dispatcher_,
-                            [&](bool) { RELEASE_ASSERT(false, ""); });
+                            [&](bool) { ASSERT(false); });
   manager.start();
 
   factory1_.monitor_->setPressure(0.5);
