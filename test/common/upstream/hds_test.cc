@@ -76,48 +76,40 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
   createHdsDelegate();
 
   // Create Message
+  // - Cluster "anna" with 3 endpoints
+  // - Cluster "voronoi" with 3 endpoints
   message.reset(new envoy::service::discovery::v2::HealthCheckSpecifier);
   message->mutable_interval()->set_seconds(1);
 
   auto* health_check = message->add_health_check();
   health_check->set_cluster_name("anna");
 
-  auto* socket_address =
-      health_check->add_endpoints()->add_endpoints()->mutable_address()->mutable_socket_address();
-  socket_address->set_address("127.0.0.0");
-  socket_address->set_port_value(1234);
+  auto* address = health_check->add_endpoints()->add_endpoints()->mutable_address();
+  address->mutable_socket_address()->set_address("127.0.0.0");
+  address->mutable_socket_address()->set_port_value(1234);
 
-  auto* socket_address2 = health_check->mutable_endpoints(0)
-                              ->add_endpoints()
-                              ->mutable_address()
-                              ->mutable_socket_address();
-  socket_address2->set_address("127.0.0.1");
-  socket_address2->set_port_value(2345);
+  auto* address2 = health_check->mutable_endpoints(0)->add_endpoints()->mutable_address();
+  address2->mutable_socket_address()->set_address("127.0.0.1");
+  address2->mutable_socket_address()->set_port_value(2345);
 
-  auto* socket_address3 =
-      health_check->add_endpoints()->add_endpoints()->mutable_address()->mutable_socket_address();
-  socket_address3->set_address("127.0.1.0");
-  socket_address3->set_port_value(8765);
+  auto* address3 = health_check->add_endpoints()->add_endpoints()->mutable_address();
+  address3->mutable_socket_address()->set_address("127.0.1.0");
+  address3->mutable_socket_address()->set_port_value(8765);
 
   auto* health_check2 = message->add_health_check();
   health_check2->set_cluster_name("voronoi");
 
-  auto* socket_address4 =
-      health_check2->add_endpoints()->add_endpoints()->mutable_address()->mutable_socket_address();
-  socket_address4->set_address("128.0.0.0");
-  socket_address4->set_port_value(1234);
+  auto* address4 = health_check2->add_endpoints()->add_endpoints()->mutable_address();
+  address4->mutable_socket_address()->set_address("128.0.0.0");
+  address4->mutable_socket_address()->set_port_value(1234);
 
-  auto* socket_address5 = health_check2->mutable_endpoints(0)
-                              ->add_endpoints()
-                              ->mutable_address()
-                              ->mutable_socket_address();
-  socket_address5->set_address("128.0.0.1");
-  socket_address5->set_port_value(2345);
+  auto* address5 = health_check2->mutable_endpoints(0)->add_endpoints()->mutable_address();
+  address5->mutable_socket_address()->set_address("128.0.0.1");
+  address5->mutable_socket_address()->set_port_value(2345);
 
-  auto* socket_address6 =
-      health_check2->add_endpoints()->add_endpoints()->mutable_address()->mutable_socket_address();
-  socket_address6->set_address("128.0.1.0");
-  socket_address6->set_port_value(8765);
+  auto* address6 = health_check2->add_endpoints()->add_endpoints()->mutable_address();
+  address6->mutable_socket_address()->set_address("128.0.1.0");
+  address6->mutable_socket_address()->set_port_value(8765);
 
   // Process message
   EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _)).Times(2);
@@ -155,6 +147,8 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   createHdsDelegate();
 
   // Create Message
+  // - Cluster "anna" with 2 health_checks
+  // - Cluster "minkowski" with 1 health_check
   message.reset(new envoy::service::discovery::v2::HealthCheckSpecifier);
   message->mutable_interval()->set_seconds(1);
 
@@ -206,8 +200,8 @@ TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
   message.reset(new envoy::service::discovery::v2::HealthCheckSpecifier);
   message->mutable_interval()->set_seconds(1);
 
-  EXPECT_CALL(*server_response_timer_, enableTimer(_)).Times(AtLeast(1));
   // Process message
+  EXPECT_CALL(*server_response_timer_, enableTimer(_)).Times(AtLeast(1));
   hds_delegate_->onReceiveMessage(std::move(message));
 }
 
@@ -220,9 +214,9 @@ TEST_F(HdsTest, TestMinimalSendResponse) {
   message.reset(new envoy::service::discovery::v2::HealthCheckSpecifier);
   message->mutable_interval()->set_seconds(1);
 
+  // Process message and send 2 responses
   EXPECT_CALL(*server_response_timer_, enableTimer(_)).Times(AtLeast(1));
   EXPECT_CALL(async_stream_, sendMessage(_, _)).Times(2);
-  // Process message
   hds_delegate_->onReceiveMessage(std::move(message));
   hds_delegate_->sendResponse();
   server_response_timer_cb_();
@@ -235,6 +229,7 @@ TEST_F(HdsTest, TestStreamConnectionFailure) {
   EXPECT_CALL(*retry_timer_, enableTimer(_));
   EXPECT_CALL(async_stream_, sendMessage(_, _));
 
+  // Test connection failure and retry
   createHdsDelegate();
   retry_timer_cb_();
 }

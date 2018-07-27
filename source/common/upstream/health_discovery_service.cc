@@ -58,7 +58,8 @@ void HdsDelegate::handleFailure() {
 }
 
 // TODO(lilika): Add support for the same endpoint in different clusters/ports
-void HdsDelegate::sendResponse() {
+envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse
+HdsDelegate::sendResponse() {
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse response;
   for (auto& cluster : hds_clusters_) {
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
@@ -81,6 +82,7 @@ void HdsDelegate::sendResponse() {
   stream_->sendMessage(response, false);
   stats_.responses_.inc();
   setServerResponseTimer();
+  return response;
 }
 
 void HdsDelegate::onCreateInitialMetadata(Http::HeaderMap& metadata) {
@@ -96,21 +98,20 @@ void HdsDelegate::processMessage(
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
   ASSERT(message);
 
-  for (auto& cluster : message->health_check()) {
+  for (auto& cluster_health_check : message->health_check()) {
     // Create HdsCluster config
-    ENVOY_LOG(debug, "Creating HdsCluster config");
     envoy::api::v2::core::BindConfig bind_config;
 
     clusters_config_.emplace_back();
     envoy::api::v2::Cluster& cluster_config = clusters_config_.back();
 
-    cluster_config.set_name(cluster.cluster_name());
+    cluster_config.set_name(cluster_health_check.cluster_name());
     cluster_config.mutable_connect_timeout()->set_seconds(ClusterTimeoutSeconds);
     cluster_config.mutable_per_connection_buffer_limit_bytes()->set_value(
         ClusterConnectionBufferLimitBytes);
 
     // Add endpoints to cluster
-    for (auto& locality_endpoints : cluster.endpoints()) {
+    for (auto& locality_endpoints : cluster_health_check.endpoints()) {
       for (auto& endpoint : locality_endpoints.endpoints()) {
         cluster_config.add_hosts()->MergeFrom(endpoint.address());
       }
@@ -118,8 +119,8 @@ void HdsDelegate::processMessage(
 
     // TODO(lilika): Add support for optional per-endpoint health checks
 
-    // Add healthcheckers to cluster
-    for (auto& health_check : cluster.health_checks()) {
+    // Add healthchecks to cluster
+    for (auto& health_check : cluster_health_check.health_checks()) {
       cluster_config.add_health_checks()->MergeFrom(health_check);
     }
 
@@ -182,10 +183,11 @@ HdsCluster::HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& 
                                          ssl_context_manager_, secret_manager_, added_via_api_);
 
   for (const auto& host : cluster.hosts()) {
-    initial_hosts_->emplace_back(HostSharedPtr{new HostImpl(
-        info_, "", resolveProtoAddress2(host), envoy::api::v2::core::Metadata::default_instance(),
-        1, envoy::api::v2::core::Locality().default_instance(),
-        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())});
+    initial_hosts_->emplace_back(HostSharedPtr{
+        new HostImpl(info_, "", Network::Address::resolveProtoAddress(host),
+                     envoy::api::v2::core::Metadata::default_instance(), 1,
+                     envoy::api::v2::core::Locality().default_instance(),
+                     envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())});
   }
   initialize([] {});
 }
@@ -212,12 +214,7 @@ ClusterInfoConstSharedPtr ProdClusterInfoFactory::createClusterInfo(
                                            ssl_context_manager, secret_manager, added_via_api);
 }
 
-HostsPerLocalityConstSharedPtr HdsCluster::createHealthyHostLists(const HostsPerLocality& hosts) {
-  return hosts.filter([](const Host& host) { return host.healthy(); });
-}
-
 void HdsCluster::initialize(std::function<void()> callback) {
-  ASSERT(initialization_complete_callback_ == nullptr);
   initialization_complete_callback_ = callback;
   for (const auto& host : *initial_hosts_) {
     host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
@@ -225,16 +222,9 @@ void HdsCluster::initialize(std::function<void()> callback) {
 
   auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   auto healthy = createHealthyHostList(*initial_hosts_);
-  ENVOY_LOG(debug, "About to update the priority set.");
+
   first_host_set.updateHosts(initial_hosts_, healthy, HostsPerLocalityImpl::empty(),
                              HostsPerLocalityImpl::empty(), {}, *initial_hosts_, {});
-  initial_hosts_ = nullptr;
-  ENVOY_LOG(debug, "Updated the priority set.");
-}
-
-const Network::Address::InstanceConstSharedPtr
-HdsCluster::resolveProtoAddress2(const envoy::api::v2::core::Address& address) {
-  return Network::Address::resolveProtoAddress(address);
 }
 
 void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) { NOT_IMPLEMENTED; }

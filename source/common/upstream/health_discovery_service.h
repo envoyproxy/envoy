@@ -25,39 +25,37 @@ public:
 };
 
 /**
- * Implementation of Upstream::Cluster for hds clusters (clusters that are used
+ * Implementation of Upstream::Cluster for hds clusters, clusters that are used
  * by HdsDelegates
  */
 
 class HdsCluster : public Cluster, Logger::Loggable<Logger::Id::upstream> {
 public:
   static ClusterSharedPtr create();
+  HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
+             const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
+             Ssl::ContextManager& ssl_context_manager, Secret::SecretManager& secret_manager,
+             bool added_via_api, ClusterInfoFactory& info_factory);
 
+  // From Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
   PrioritySet& prioritySet() override { return priority_set_; }
   const PrioritySet& prioritySet() const override { return priority_set_; }
-
   void setOutlierDetector(const Outlier::DetectorSharedPtr& outlier_detector);
-
   HealthChecker* healthChecker() override { return health_checker_.get(); }
   ClusterInfoConstSharedPtr info() const override { return info_; }
   Outlier::Detector* outlierDetector() override { return outlier_detector_.get(); }
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
-  HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
-             const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
-             Ssl::ContextManager& ssl_context_manager, Secret::SecretManager& secret_manager,
-             bool added_via_api, ClusterInfoFactory& info_factory);
-  const Network::Address::InstanceConstSharedPtr
-  resolveProtoAddress2(const envoy::api::v2::core::Address& address);
 
 protected:
   PrioritySetImpl priority_set_;
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
   Runtime::Loader& runtime_;
+
+  // Creates a vector containing any healthy hosts
   static HostVectorConstSharedPtr createHealthyHostList(const HostVector& hosts);
-  static HostsPerLocalityConstSharedPtr createHealthyHostLists(const HostsPerLocality& hosts);
 
 private:
   std::function<void()> initialization_complete_callback_;
@@ -90,6 +88,12 @@ struct HdsDelegateStats {
   ALL_HDS_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+/**
+ * The HdsDelegate class is responsible for receiving requests from a management
+ * server with a set of hosts to healthcheck, healthchecking them, and reporting
+ * back the results.
+ */
+
 class HdsDelegate
     : Grpc::TypedAsyncStreamCallbacks<envoy::service::discovery::v2::HealthCheckSpecifier>,
       Logger::Loggable<Logger::Id::upstream> {
@@ -107,17 +111,20 @@ public:
       std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) override;
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
-  void sendResponse();
+  envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse sendResponse();
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RetryDelayMilliseconds = 5000;
   static constexpr uint32_t ClusterConnectionBufferLimitBytes = 12345;
   static constexpr uint32_t ClusterTimeoutSeconds = 1;
   uint32_t server_response_ms_ = 1000;
 
+  // Processes the management server requests
   void
   processMessage(std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message);
 
+  // Establishes a connection with the management server
   void establishNewStream();
+
   std::vector<HdsClusterPtr> hdsClusters() { return hds_clusters_; };
   std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
 
