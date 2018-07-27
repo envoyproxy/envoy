@@ -37,10 +37,11 @@ public:
    * @param name the stat name to encode.
    * @return StatNamePtr a unique_ptr to the StatName class encapsulating the symbol vector.
    */
-  virtual StatNamePtr encode(const absl::string_view name) PURE;
+  virtual StatNamePtr encode(absl::string_view name) PURE;
 
   /**
    * Returns the size of a SymbolTable, as measured in number of symbols stored.
+   * @return size_t the size of the table.
    */
   virtual size_t size() const PURE;
 };

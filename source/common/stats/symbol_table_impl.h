@@ -32,7 +32,7 @@ using SymbolVec = std::vector<Symbol>;
  */
 class SymbolTableImpl : public SymbolTable {
 public:
-  StatNamePtr encode(const absl::string_view name) override;
+  StatNamePtr encode(absl::string_view name) override;
 
   // For testing purposes only.
   size_t size() const override {
@@ -82,17 +82,18 @@ private:
    * @param symbol the individual symbol to be decoded.
    * @return absl::string_view the decoded string.
    */
-  absl::string_view fromSymbol(const Symbol symbol) const;
+  absl::string_view fromSymbol(Symbol symbol) const;
 
   // Stages a new symbol for use. To be called after a successful insertion.
   void newSymbol() {
     if (pool_.empty()) {
-      ASSERT(monotonic_counter_ < std::numeric_limits<Symbol>::max());
       next_symbol_ = ++monotonic_counter_;
     } else {
       next_symbol_ = pool_.top();
       pool_.pop();
     }
+    // This should catch integer overflow for the new symbol.
+    ASSERT(monotonic_counter_ != 0);
   }
 
   Symbol monotonicCounter() { return monotonic_counter_; }
