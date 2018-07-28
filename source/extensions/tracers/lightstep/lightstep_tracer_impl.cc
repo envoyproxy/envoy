@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <thread>
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/base64.h"
@@ -150,8 +151,11 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
     tls_options.use_thread = false;
     tls_options.use_single_key_propagation = true;
     tls_options.logger_sink = LightStepLogger{};
-    tls_options.max_buffered_spans = std::function<size_t()>{
-        [this] { return runtime_.snapshot().getInteger("tracing.lightstep.min_flush_spans", 5U); }};
+    static const size_t default_min_flush_spans = 2'000U / std::thread::hardware_concurrency();
+    tls_options.max_buffered_spans = std::function<size_t()>{[this] {
+      return runtime_.snapshot().getInteger("tracing.lightstep.min_flush_spans",
+                                            default_min_flush_spans);
+    }};
     tls_options.metrics_observer.reset(new LightStepMetricsObserver{*this});
     tls_options.transporter.reset(new LightStepTransporter{*this});
     std::shared_ptr<lightstep::LightStepTracer> tracer =
