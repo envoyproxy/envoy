@@ -388,7 +388,7 @@ const std::string Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
                   },
                   "denominator" : {
                     "type" : "string",
-                    "enum" : ["HUNDRED", "THOUSAND", "TEN_THOUSAND", "HUNDRED_THOUSAND", "MILLION"]
+                    "enum" : ["HUNDRED", "TEN_THOUSAND", "MILLION"]
                   }
                 },
                 "required": ["numerator", "denominator"],
@@ -1042,7 +1042,7 @@ const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
               },
               "denominator" : {
                 "type" : "string",
-                "enum" : ["HUNDRED", "THOUSAND", "TEN_THOUSAND", "HUNDRED_THOUSAND", "MILLION"]
+                "enum" : ["HUNDRED", "TEN_THOUSAND", "MILLION"]
               }
             },
             "required": ["numerator", "denominator"],

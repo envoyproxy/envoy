@@ -24,12 +24,8 @@ envoy::type::FractionalPercent::DenominatorType
 stringToFractionalPercentDenominatorType(const std::string denominator) {
   if (denominator == "HUNDRED") {
     return envoy::type::FractionalPercent::HUNDRED;
-  } else if (denominator == "THOUSAND") {
-    return envoy::type::FractionalPercent::THOUSAND;
   } else if (denominator == "TEN_THOUSAND") {
     return envoy::type::FractionalPercent::TEN_THOUSAND;
-  } else if (denominator == "HUNDRED_THOUSAND") {
-    return envoy::type::FractionalPercent::HUNDRED_THOUSAND;
   } else if (denominator == "MILLION") {
     return envoy::type::FractionalPercent::MILLION;
   } else {
@@ -42,12 +38,8 @@ uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent&
   switch (percent.denominator()) {
   case envoy::type::FractionalPercent::HUNDRED:
     return 100;
-  case envoy::type::FractionalPercent::THOUSAND:
-    return 1000;
   case envoy::type::FractionalPercent::TEN_THOUSAND:
     return 10000;
-  case envoy::type::FractionalPercent::HUNDRED_THOUSAND:
-    return 100000;
   case envoy::type::FractionalPercent::MILLION:
     return 1000000;
   default:
