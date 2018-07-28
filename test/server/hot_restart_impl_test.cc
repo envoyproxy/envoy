@@ -91,13 +91,12 @@ TEST_F(HotRestartImplTest, versionString) {
 }
 
 // See also StatsImplTest.RawTruncateWithoutAllocator.
-TEST_F(HotRestartImplTest, RawTruncateWithAllocator) {
+TEST_F(HotRestartImplTest, RawAllocTooLarge) {
   setup();
 
   const std::string long_string(hot_restart_->statsOptions().maxNameLength() + 1, 'A');
-  Stats::RawStatData* stat{};
-  EXPECT_LOG_CONTAINS("warning", "is too long with", stat = hot_restart_->alloc(long_string));
-  hot_restart_->free(*stat);
+  EXPECT_DEATH_LOG_TO_STDERR(hot_restart_->alloc(long_string), "name.length");
+  //"name\\.length\\(\\) \\<\\= options\\_.statsOptions\\(\\)\\.maxNameLength\\(\\)");
 }
 
 // Check consistency of internal stat representation
@@ -117,16 +116,6 @@ TEST_F(HotRestartImplTest, Consistency) {
   EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_1), expected_hash);
   EXPECT_EQ(name_1, stat_1->key());
   hot_restart_->free(*stat_1);
-
-  // If a stat name is truncated, we expect that its internal representation is the same as if it
-  // had been initialized with the already-truncated name.
-  const std::string name_2(max_name_length + 1, 'A');
-  Stats::RawStatData* stat_2 = hot_restart_->alloc(name_2);
-  const std::string stat_hex_dump_2 = Hex::encode(reinterpret_cast<uint8_t*>(stat_2), stat_size);
-  EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_2), expected_hash);
-  EXPECT_EQ(name_1, stat_2->key());
-  EXPECT_NE(name_2, stat_2->key()); // Was truncated.
-  hot_restart_->free(*stat_2);
 }
 
 TEST_F(HotRestartImplTest, RawAlloc) {
@@ -170,16 +159,6 @@ TEST_F(HotRestartImplTest, crossAlloc) {
   EXPECT_EQ(stat1, stat1_prime);
   EXPECT_EQ(stat3, stat3_prime);
   EXPECT_EQ(stat5, stat5_prime);
-}
-
-TEST_F(HotRestartImplTest, truncateKey) {
-  setup();
-
-  std::string key1(options_.statsOptions().maxNameLength(), 'a');
-  Stats::RawStatData* stat1 = hot_restart_->alloc(key1);
-  std::string key2 = key1 + "a";
-  Stats::RawStatData* stat2 = hot_restart_->alloc(key2);
-  EXPECT_EQ(stat1, stat2);
 }
 
 TEST_F(HotRestartImplTest, allocFail) {

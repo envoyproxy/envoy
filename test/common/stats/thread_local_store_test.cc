@@ -387,7 +387,7 @@ TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
   InSequence s;
   store_->initializeThreading(main_thread_dispatcher_, tls_);
 
-  EXPECT_CALL(alloc_, alloc("foo")).WillOnce(Return(nullptr));
+  EXPECT_CALL(alloc_, alloc(absl::string_view("foo"))).WillOnce(Return(nullptr));
   Counter& c1 = store_->counter("foo");
   EXPECT_EQ(1UL, store_->counter("stats.overflow").value());
 
@@ -399,6 +399,49 @@ TEST_F(StatsThreadLocalStoreTest, AllocFailed) {
 
   // Includes overflow but not the failsafe stat which we allocated from the heap.
   EXPECT_CALL(alloc_, free(_));
+}
+
+TEST_F(StatsThreadLocalStoreTest, Truncation) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  // First, with a successful RawStatData allocation:
+  const uint64_t max_name_length = options_.maxNameLength();
+  const std::string name_1(max_name_length + 1, 'A');
+
+  EXPECT_CALL(alloc_, alloc(_));
+  store_->counter(name_1);
+
+  // The stats did not overflow yet.
+  EXPECT_EQ(0UL, store_->counter("stats.overflow").value());
+
+  // The name will be truncated, so we won't be able to find it with the entire name.
+  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
+
+  // But we can find it based on the expected truncation.
+  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
+
+  // The same should be true with heap allocation, which occurs when the default
+  // allocator fails.
+  const std::string name_2(max_name_length + 1, 'B');
+  EXPECT_CALL(alloc_, alloc(_)).WillOnce(Return(nullptr));
+  store_->counter(name_2);
+
+  // Same deal: the name will be truncated, so we won't be able to find it with the entire name.
+  EXPECT_EQ(nullptr, TestUtility::findCounter(*store_, name_1).get());
+
+  // But we can find it based on the expected truncation.
+  EXPECT_NE(nullptr, TestUtility::findCounter(*store_, name_1.substr(0, max_name_length)).get());
+
+  // Now the stats have overflowed.
+  EXPECT_EQ(1UL, store_->counter("stats.overflow").value());
+
+  store_->shutdownThreading();
+  tls_.shutdownThread();
+
+  // Includes overflow, and the first raw-allocated stat, but not the failsafe stat which we
+  // allocated from the heap.
+  EXPECT_CALL(alloc_, free(_)).Times(2);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {

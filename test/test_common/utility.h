@@ -344,10 +344,10 @@ public:
   TestAllocator(const StatsOptions& stats_options) : RawStatDataAllocator(stats_options) {}
   ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
 
-  RawStatData* alloc(const std::string& name) override {
+  RawStatData* alloc(absl::string_view name) override {
     Stats::StatsOptionsImpl stats_options;
     stats_options.max_obj_name_length_ = 127;
-    CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[name];
+    CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[std::string(name)];
     if (!stat_ref) {
       stat_ref.reset(static_cast<RawStatData*>(
           ::calloc(RawStatData::structSizeWithOptions(stats_options), 1)));
@@ -378,7 +378,7 @@ class MockedTestAllocator : public RawStatDataAllocator {
 public:
   MockedTestAllocator(const StatsOptions& stats_options)
       : RawStatDataAllocator(stats_options), alloc_(stats_options) {
-    ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](const std::string& name) -> RawStatData* {
+    ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
       return alloc_.alloc(name);
     }));
 
@@ -386,10 +386,10 @@ public:
       return alloc_.free(data);
     }));
 
-    EXPECT_CALL(*this, alloc("stats.overflow"));
+    EXPECT_CALL(*this, alloc(absl::string_view("stats.overflow")));
   }
 
-  MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
+  MOCK_METHOD1(alloc, RawStatData*(absl::string_view name));
   MOCK_METHOD1(free, void(RawStatData& data));
 
   TestAllocator alloc_;

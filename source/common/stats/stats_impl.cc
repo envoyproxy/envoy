@@ -137,8 +137,11 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 
 HeapStatData::HeapStatData(absl::string_view key) : name_(key.data(), key.size()) {}
 
-HeapStatData* HeapStatDataAllocator::alloc(const std::string& name) {
-  auto data = std::make_unique<HeapStatData>(truncateStatName(name));
+HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) {
+  // Do not truncate here for non-hot-restart case; truncate at the call-site in
+  // ThreadLocalStoreImpl::ScopeImpl::safeMakeStat() only when allocating a heap-stat
+  // as a fallback when we've exhausted our shared-memory block.
+  auto data = std::make_unique<HeapStatData>(name);
   Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data.get());
   HeapStatData* existing_data = *ret.first;
@@ -333,19 +336,6 @@ void HeapStatDataAllocator::free(HeapStatData& data) {
   delete &data;
 }
 
-template <class StatData>
-absl::string_view StatDataAllocatorImpl<StatData>::truncateStatName(absl::string_view key) {
-  const uint64_t max_length = stats_options_.maxNameLength();
-  if (key.size() > max_length) {
-    ENVOY_LOG_MISC(
-        warn,
-        "Statistic '{}' is too long with {} characters, it will be truncated to {} characters", key,
-        key.size(), max_length);
-    return absl::string_view(key.data(), max_length);
-  }
-  return key;
-}
-
 void RawStatData::initialize(absl::string_view key, const StatsOptions& stats_options) {
   ASSERT(!initialized());
   ASSERT(key.size() <= stats_options.maxNameLength());
@@ -413,7 +403,7 @@ void SourceImpl::clearCache() {
 }
 
 template <class StatData>
-CounterSharedPtr StatDataAllocatorImpl<StatData>::makeCounter(const std::string& name,
+CounterSharedPtr StatDataAllocatorImpl<StatData>::makeCounter(absl::string_view name,
                                                               std::string&& tag_extracted_name,
                                                               std::vector<Tag>&& tags) {
   StatData* data = alloc(name);
@@ -425,7 +415,7 @@ CounterSharedPtr StatDataAllocatorImpl<StatData>::makeCounter(const std::string&
 }
 
 template <class StatData>
-GaugeSharedPtr StatDataAllocatorImpl<StatData>::makeGauge(const std::string& name,
+GaugeSharedPtr StatDataAllocatorImpl<StatData>::makeGauge(absl::string_view name,
                                                           std::string&& tag_extracted_name,
                                                           std::vector<Tag>&& tags) {
   StatData* data = alloc(name);

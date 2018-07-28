@@ -295,9 +295,9 @@ public:
       : stats_options_(stats_options) {}
 
   // StatDataAllocator
-  CounterSharedPtr makeCounter(const std::string& name, std::string&& tag_extracted_name,
+  CounterSharedPtr makeCounter(absl::string_view name, std::string&& tag_extracted_name,
                                std::vector<Tag>&& tags) override;
-  GaugeSharedPtr makeGauge(const std::string& name, std::string&& tag_extracted_name,
+  GaugeSharedPtr makeGauge(absl::string_view name, std::string&& tag_extracted_name,
                            std::vector<Tag>&& tags) override;
 
   /**
@@ -307,7 +307,7 @@ public:
    *         by name if one already exists with the same name. This is used for intra-process
    *         scope swapping as well as inter-process hot restart.
    */
-  virtual StatData* alloc(const std::string& name) PURE;
+  virtual StatData* alloc(absl::string_view name) PURE;
 
   /**
    * Free a raw stat data block. The allocator should handle reference counting and only truly
@@ -315,15 +315,6 @@ public:
    * @param data the data returned by alloc().
    */
   virtual void free(StatData& data) PURE;
-
-  /**
-   * Truncates a stat name based on the options passed into the constructor,
-   * issuing a warning if a truncation was needed.
-   *
-   * @param stat_name The original stat name.
-   * @return absl::string_view The stat name, truncated if needed to meet limits in stat_options_.
-   */
-  absl::string_view truncateStatName(absl::string_view stat_name);
 
   /**
    * @return const StatsOptions& The options passed into the constructor.
@@ -425,7 +416,7 @@ public:
   ~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 
   // StatDataAllocator
-  HeapStatData* alloc(const std::string& name) override;
+  HeapStatData* alloc(absl::string_view name) override;
   void free(HeapStatData& data) override;
 
 private:

@@ -178,12 +178,24 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   if (!central_ref) {
     std::vector<Tag> tags;
     std::string tag_extracted_name = parent_.getTagsForName(name, tags);
+    absl::string_view truncated_name = name;
+    const uint64_t max_length = parent_.statsOptions().maxNameLength();
+    // Note that the heap-allocator does not truncate itself; we have to
+    // truncate here if we are using heap-allocation as a fallback due to an
+    // exahusted shared-memroy block
+    if (truncated_name.size() > max_length) {
+      ENVOY_LOG_MISC(
+          warn,
+          "Statistic '{}' is too long with {} characters, it will be truncated to {} characters",
+          name, name.size(), max_length);
+      truncated_name = absl::string_view(name.data(), max_length);
+    }
     std::shared_ptr<StatType> stat =
-        make_stat(parent_.alloc_, name, std::move(tag_extracted_name), std::move(tags));
+        make_stat(parent_.alloc_, truncated_name, std::move(tag_extracted_name), std::move(tags));
     if (stat == nullptr) {
       parent_.num_last_resort_stats_.inc();
-      stat =
-          make_stat(parent_.heap_allocator_, name, std::move(tag_extracted_name), std::move(tags));
+      stat = make_stat(parent_.heap_allocator_, truncated_name, std::move(tag_extracted_name),
+                       std::move(tags));
       ASSERT(stat != nullptr);
     }
     central_ref = stat;
@@ -213,7 +225,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
 
   return safeMakeStat<Counter>(
       final_name, central_cache_.counters_,
-      [](StatDataAllocator& allocator, const std::string& name, std::string&& tag_extracted_name,
+      [](StatDataAllocator& allocator, absl::string_view name, std::string&& tag_extracted_name,
          std::vector<Tag>&& tags) -> CounterSharedPtr {
         return allocator.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
       },
@@ -247,7 +259,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
 
   return safeMakeStat<Gauge>(
       final_name, central_cache_.gauges_,
-      [](StatDataAllocator& allocator, const std::string& name, std::string&& tag_extracted_name,
+      [](StatDataAllocator& allocator, absl::string_view name, std::string&& tag_extracted_name,
          std::vector<Tag>&& tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
       },

@@ -488,14 +488,14 @@ TEST(TagProducerTest, CheckConstructor) {
       "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
 }
 
-// Validate truncation behavior of HeapStatData.
-// Note: a similar test using RawStatData* is in test/server/hot_restart_impl_test.cc.
-TEST(RawStatDataTest, HeapTruncate) {
+// No truncation occurs in the implementation of HeapStatData.
+TEST(RawStatDataTest, HeapNoTruncate) {
   Stats::StatsOptionsImpl stats_options;
   HeapStatDataAllocator alloc(stats_options);
   const std::string long_string(stats_options.maxNameLength() + 1, 'A');
   HeapStatData* stat{};
-  EXPECT_LOG_CONTAINS("warning", "is too long with", stat = alloc.alloc(long_string));
+  EXPECT_NO_LOGS(stat = alloc.alloc(long_string));
+  EXPECT_EQ(stat->key(), long_string);
   alloc.free(*stat);
 }
 

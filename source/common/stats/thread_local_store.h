@@ -230,7 +230,7 @@ private:
 
     template <class StatType>
     using MakeStatFn =
-        std::function<std::shared_ptr<StatType>(StatDataAllocator&, const std::string& name,
+        std::function<std::shared_ptr<StatType>(StatDataAllocator&, absl::string_view name,
                                                 std::string&& tag_extracted_name,
                                                 std::vector<Tag>&& tags)>;
 
