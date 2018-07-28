@@ -412,8 +412,12 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
 
   // If there's no timer, create one.
   if (updates->timer_ == nullptr) {
-    updates->timer_ = dispatcher_.createTimer([this, &cluster, priority, updates]() -> void {
-      applyUpdates(cluster, priority, updates);
+    std::weak_ptr<PendingUpdates> weak_ptr(updates);
+    updates->timer_ = dispatcher_.createTimer([this, &cluster, priority, weak_ptr]() -> void {
+      auto updates = weak_ptr.lock();
+      if (updates) {
+        applyUpdates(cluster, priority, updates);
+      }
     });
   }
 
