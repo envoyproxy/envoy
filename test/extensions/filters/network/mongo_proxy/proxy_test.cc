@@ -87,13 +87,15 @@ public:
 
   void setupDelayFault(bool enable_fault) {
     envoy::config::filter::fault::v2::FaultDelay fault{};
-    fault.set_percent(50);
+    fault.mutable_percent()->set_numerator(50);
+    fault.mutable_percent()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
     fault.mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
 
     fault_config_.reset(new FaultConfig(fault));
 
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled(_, _)).Times(AnyNumber());
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("mongo.fault.fixed_delay.percent", 50))
+    EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled(_, _, _)).Times(AnyNumber());
+    EXPECT_CALL(runtime_.snapshot_,
+                sampleFeatureEnabled("mongo.fault.fixed_delay.percent", 50, 100))
         .WillOnce(Return(enable_fault));
 
     if (enable_fault) {

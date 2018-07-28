@@ -129,12 +129,14 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
 }
 
 bool FaultFilter::isDelayEnabled() {
-  bool enabled = config_->runtime().snapshot().featureEnabled(DELAY_PERCENT_KEY,
-                                                              fault_settings_->delayPercent());
+  bool enabled = config_->runtime().snapshot().sampleFeatureEnabled(
+      DELAY_PERCENT_KEY, fault_settings_->delayPercent().numerator(),
+      ProtobufPercentHelper::fractionalPercentDenominatorToInt(fault_settings_->delayPercent()));
 
   if (!downstream_cluster_delay_percent_key_.empty()) {
-    enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_delay_percent_key_,
-                                                            fault_settings_->delayPercent());
+    enabled |= config_->runtime().snapshot().sampleFeatureEnabled(
+        downstream_cluster_delay_percent_key_, fault_settings_->delayPercent().numerator(),
+        ProtobufPercentHelper::fractionalPercentDenominatorToInt(fault_settings_->delayPercent()));
   }
 
   return enabled;

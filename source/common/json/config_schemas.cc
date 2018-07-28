@@ -379,9 +379,20 @@ const std::string Json::Schema::MONGO_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
             "type" : "object",
             "properties" : {
               "percent" : {
-                "type" : "integer",
-                "minimum" : 0,
-                "maximum" : 100
+                "type" : "object",
+                "properties" : {
+                  "numerator" : {
+                    "type" : "integer",
+                    "minimum" : 0,
+                    "maximum" : 100
+                  },
+                  "denominator" : {
+                    "type" : "string",
+                    "enum" : ["HUNDRED", "THOUSAND", "TEN_THOUSAND", "HUNDRED_THOUSAND", "MILLION"]
+                  }
+                },
+                "required": ["numerator", "denominator"],
+                "additionalProperties" : false
               },
               "duration_ms" : {
                 "type" : "integer",
@@ -1022,9 +1033,20 @@ const std::string Json::Schema::FAULT_HTTP_FILTER_SCHEMA(R"EOF(
             "enum" : ["fixed"]
           },
           "fixed_delay_percent" : {
-            "type" : "integer",
-            "minimum" : 0,
-            "maximum" : 100
+            "type" : "object",
+            "properties" : {
+              "numerator" : {
+                "type" : "integer",
+                "minimum" : 0,
+                "maximum" : 100
+              },
+              "denominator" : {
+                "type" : "string",
+                "enum" : ["HUNDRED", "THOUSAND", "TEN_THOUSAND", "HUNDRED_THOUSAND", "MILLION"]
+              }
+            },
+            "required": ["numerator", "denominator"],
+            "additionalProperties" : false
           },
           "fixed_duration_ms" : {
             "type" : "integer",

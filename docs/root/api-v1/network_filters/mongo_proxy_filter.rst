@@ -39,14 +39,17 @@ incoming data up until the timer event fires will be a part of the delay.
 
   {
     "fixed_delay": {
-      "percent": "...",
+      "percent": {
+        "numerator": "...",
+        "denominator": "..."
+      },
       "duration_ms": "..."
     }
   }
 
 percent
-  *(required, integer)* Probability of an eligible MongoDB operation to be affected by the
-  injected fault when there is no active fault. Valid values are integers in a range of [0, 100].
+  *(required, envoy.type.FractionalPercent)* Probability of an eligible MongoDB operation to be
+  affected by the injected fault when there is no active fault.
 
 duration_ms
   *(required, integer)* Non-negative delay duration in milliseconds.

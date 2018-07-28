@@ -28,7 +28,10 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectJson) {
   {
     "delay" : {
       "type" : "fixed",
-      "fixed_delay_percent" : 100,
+      "fixed_delay_percent" : {
+        "numerator" : 100,
+        "denominator" : "HUNDRED"
+      },
       "fixed_duration_ms" : 5000
     }
   }
@@ -45,7 +48,9 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectJson) {
 
 TEST(FaultFilterConfigTest, FaultFilterCorrectProto) {
   envoy::config::filter::http::fault::v2::HTTPFault config{};
-  config.mutable_delay()->set_percent(100);
+  config.mutable_delay()->mutable_percent()->set_numerator(100);
+  config.mutable_delay()->mutable_percent()->set_denominator(
+      envoy::type::FractionalPercent::HUNDRED);
   config.mutable_delay()->mutable_fixed_delay()->set_seconds(5);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;

@@ -104,11 +104,11 @@ public:
   FaultConfig(const envoy::config::filter::fault::v2::FaultDelay& fault_config)
       : delay_percent_(fault_config.percent()),
         duration_ms_(PROTOBUF_GET_MS_REQUIRED(fault_config, fixed_delay)) {}
-  uint32_t delayPercent() const { return delay_percent_; }
+  envoy::type::FractionalPercent delayPercent() const { return delay_percent_; }
   uint64_t delayDuration() const { return duration_ms_; }
 
 private:
-  const uint32_t delay_percent_;
+  const envoy::type::FractionalPercent delay_percent_;
   const uint64_t duration_ms_;
 };
 
