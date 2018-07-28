@@ -1058,6 +1058,13 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   }
 }
 
+HeaderMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
+  if (!response_trailers_) {
+    response_trailers_ = std::make_unique<Http::HeaderMapImpl>();
+  }
+  return *response_trailers_;
+}
+
 void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilter& filter,
                                                          Buffer::Instance& data, bool streaming) {
   if (state_.filter_call_state_ == 0 ||
@@ -1099,8 +1106,14 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
                    end_stream);
 
   request_info_.addBytesSent(data.length());
-  response_encoder_->encodeData(data, end_stream);
-  maybeEndEncode(end_stream);
+  if (end_stream && response_trailers_) {
+    response_encoder_->encodeData(data, false);
+    response_encoder_->encodeTrailers(*response_trailers_);
+    maybeEndEncode(true);
+  } else {
+    response_encoder_->encodeData(data, end_stream);
+    maybeEndEncode(end_stream);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilter* filter,
@@ -1471,6 +1484,10 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::cre
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data,
                                                                       bool streaming) {
   return parent_.addEncodedData(*this, data, streaming);
+}
+
+HeaderMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {
+  return parent_.addEncodedTrailers();
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::

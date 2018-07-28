@@ -396,6 +396,13 @@ public:
   virtual void addEncodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
+   * Provides a trailer map that can be used to modify the trailers for a response. Used when
+   * trailers need to be injected into a response and the upstream response did not contain any
+   * trailers (in which case encodeTrailers is not called).
+   */
+  virtual HeaderMap& addEncodedTrailers() PURE;
+
+  /**
    * Called when an encoder filter goes over its high watermark.
    */
   virtual void onEncoderFilterAboveWriteBufferHighWatermark() PURE;

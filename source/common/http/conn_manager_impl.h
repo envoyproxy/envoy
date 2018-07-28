@@ -229,6 +229,7 @@ private:
 
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data, bool streaming) override;
+    HeaderMap& addEncodedTrailers() override;
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
     void onEncoderFilterBelowWriteBufferLowWatermark() override;
     void setEncoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
@@ -272,6 +273,7 @@ private:
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
+    HeaderMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, const std::string& body,
                         std::function<void(HeaderMap& headers)> modify_headers);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
