@@ -335,6 +335,7 @@ public:
 } // namespace Http
 
 namespace Stats {
+
 /**
  * This is a heap test allocator that works similar to how the shared memory allocator works in
  * terms of reference counting, etc.
@@ -375,8 +376,7 @@ private:
 
 class MockedTestAllocator : public RawStatDataAllocator {
 public:
-  MockedTestAllocator(const StatsOptions& stats_options)
-      : /*RawStatDataAllocator(stats_options), */ alloc_(stats_options) {
+  MockedTestAllocator(const StatsOptions& stats_options) : alloc_(stats_options) {
     ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
       return alloc_.alloc(name);
     }));

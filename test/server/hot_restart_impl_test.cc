@@ -98,7 +98,8 @@ TEST_F(HotRestartImplTest, RawAllocTooLarge) {
   // fallback heap-allocated stats. But we have an assertion that the size
   /// is appropriate in the hot-restart allocator.
   const std::string long_string(stats_options_.maxNameLength() + 1, 'A');
-  EXPECT_DEATH_LOG_TO_STDERR(hot_restart_->alloc(long_string), "name.length");
+  EXPECT_LOG_CONTAINS("error", "exceeded max length",
+                      EXPECT_EQ(nullptr, hot_restart_->alloc(long_string)));
 }
 
 // Check consistency of internal raw stat representation by comparing hash of
