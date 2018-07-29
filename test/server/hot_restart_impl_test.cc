@@ -94,18 +94,19 @@ TEST_F(HotRestartImplTest, versionString) {
 TEST_F(HotRestartImplTest, RawAllocTooLarge) {
   setup();
 
-  const std::string long_string(hot_restart_->statsOptions().maxNameLength() + 1, 'A');
+  const std::string long_string(stats_options_.maxNameLength() + 1, 'A');
   EXPECT_DEATH_LOG_TO_STDERR(hot_restart_->alloc(long_string), "name.length");
-  //"name\\.length\\(\\) \\<\\= options\\_.statsOptions\\(\\)\\.maxNameLength\\(\\)");
 }
 
-// Check consistency of internal stat representation
+// Check consistency of internal raw stat representation by comparing hash of
+// memory contents against a previously recorded value.
 TEST_F(HotRestartImplTest, Consistency) {
   setup();
 
-  // Generate a stat, encode it to hex, and take the hash of that hex string. We expect the hash to
-  // vary only when the internal representation of a stat has been intentionally changed, in which
-  // case SharedMemory::VERSION should be incremented as well.
+  // Generate a stat, encode it to hex, and take the hash of that hex string. We
+  // expect the hash to vary only when the internal representation of a stat has
+  // been intentionally changed, in which case SharedMemory::VERSION should be
+  // incremented as well.
   const uint64_t expected_hash = 1874506077228772558;
   const uint64_t max_name_length = stats_options_.maxNameLength();
 

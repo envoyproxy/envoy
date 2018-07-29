@@ -491,7 +491,7 @@ TEST(TagProducerTest, CheckConstructor) {
 // No truncation occurs in the implementation of HeapStatData.
 TEST(RawStatDataTest, HeapNoTruncate) {
   Stats::StatsOptionsImpl stats_options;
-  HeapStatDataAllocator alloc(stats_options);
+  HeapStatDataAllocator alloc; //(/*stats_options*/);
   const std::string long_string(stats_options.maxNameLength() + 1, 'A');
   HeapStatData* stat{};
   EXPECT_NO_LOGS(stat = alloc.alloc(long_string));
@@ -502,7 +502,7 @@ TEST(RawStatDataTest, HeapNoTruncate) {
 // Note: a similar test using RawStatData* is in test/server/hot_restart_impl_test.cc.
 TEST(RawStatDataTest, HeapAlloc) {
   Stats::StatsOptionsImpl stats_options;
-  HeapStatDataAllocator alloc(stats_options);
+  HeapStatDataAllocator alloc; //(stats_options);
   HeapStatData* stat_1 = alloc.alloc("ref_name");
   ASSERT_NE(stat_1, nullptr);
   HeapStatData* stat_2 = alloc.alloc("ref_name");

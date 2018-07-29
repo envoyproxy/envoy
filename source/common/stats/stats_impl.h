@@ -204,8 +204,7 @@ struct RawStatData {
 
   /**
    * Returns the size of this struct, accounting for the length of name_
-   * and padding for alignment. Required for the HeapRawStatDataAllocator, which does not truncate
-   * at a maximum stat name length.
+   * and padding for alignment.
    */
   static uint64_t structSize(uint64_t name_size);
 
@@ -291,8 +290,8 @@ public:
   /**
    * @param stats_options The stat optinos, which must live longer than the allocator.
    */
-  explicit StatDataAllocatorImpl(const StatsOptions& stats_options)
-      : stats_options_(stats_options) {}
+  explicit StatDataAllocatorImpl(/*const StatsOptions& stats_options*/) {}
+  //: stats_options_(stats_options) {}
 
   // StatDataAllocator
   CounterSharedPtr makeCounter(absl::string_view name, std::string&& tag_extracted_name,
@@ -315,17 +314,13 @@ public:
    * @param data the data returned by alloc().
    */
   virtual void free(StatData& data) PURE;
-
-  /**
-   * @return const StatsOptions& The options passed into the constructor.
-   */
-  const StatsOptions& statsOptions() const override { return stats_options_; }
-
-private:
-  const StatsOptions& stats_options_;
 };
 
-using RawStatDataAllocator = StatDataAllocatorImpl<RawStatData>;
+class RawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
+public:
+  // StatsDataAllocator
+  bool requiresBoundedStatNameSize() const override { return true; }
+};
 
 /**
  * Implementation of HistogramStatistics for circllhist.
@@ -412,12 +407,15 @@ struct HeapStatData {
  */
 class HeapStatDataAllocator : public StatDataAllocatorImpl<HeapStatData> {
 public:
-  explicit HeapStatDataAllocator(const StatsOptions& options) : StatDataAllocatorImpl(options) {}
+  HeapStatDataAllocator() {}
   ~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 
-  // StatDataAllocator
+  // StatDataAllocatorImpl
   HeapStatData* alloc(absl::string_view name) override;
   void free(HeapStatData& data) override;
+
+  // StatsDataAllocator
+  bool requiresBoundedStatNameSize() const override { return false; }
 
 private:
   struct HeapStatHash_ {
@@ -487,23 +485,17 @@ public:
       : counters_([this](const std::string& name) -> CounterSharedPtr {
           std::string tag_extracted_name = name;
           std::vector<Tag> tags;
-          return alloc_->makeCounter(name, std::move(tag_extracted_name), std::move(tags));
+          return alloc_.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
         }),
         gauges_([this](const std::string& name) -> GaugeSharedPtr {
           std::string tag_extracted_name = name;
           std::vector<Tag> tags;
-          return alloc_->makeGauge(name, std::move(tag_extracted_name), std::move(tags));
+          return alloc_.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
         }),
         histograms_([this](const std::string& name) -> HistogramSharedPtr {
           return std::make_shared<HistogramImpl>(name, *this, std::string(name),
                                                  std::vector<Tag>());
-        }) {
-    // We divide by two here to get an effectively unlimited length. If we don't divide
-    // by two, we'll get an integer wrap in the maxNameLength addition, and the behavior
-    // will not be what we intend.
-    stats_options_.max_obj_name_length_ = std::numeric_limits<uint64_t>::max() / 2;
-    alloc_ = std::make_unique<HeapStatDataAllocator>(stats_options_);
-  }
+        }) {}
 
   // Stats::Scope
   Counter& counter(const std::string& name) override { return counters_.get(name); }
@@ -546,11 +538,11 @@ private:
     const std::string prefix_;
   };
 
-  StatsOptionsImpl stats_options_;
-  std::unique_ptr<HeapStatDataAllocator> alloc_;
+  HeapStatDataAllocator alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
+  const StatsOptionsImpl stats_options_;
 };
 
 } // namespace Stats

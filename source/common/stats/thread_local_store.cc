@@ -14,7 +14,7 @@ namespace Stats {
 
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(const Stats::StatsOptions& stats_options,
                                            StatDataAllocator& alloc)
-    : alloc_(alloc), heap_allocator_(stats_options), default_scope_(createScope("")),
+    : stats_options_(stats_options), alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
       num_last_resort_stats_(default_scope_->counter("stats.overflow")), source_(*this) {}
 
@@ -156,6 +156,26 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id) {
   }
 }
 
+absl::string_view ThreadLocalStoreImpl::truncateStatNameIfNeeded(absl::string_view name) {
+  // If the main allocator requires stat name truncation, warn and truncate, before
+  // attempting to allocate.
+  if (alloc_.requiresBoundedStatNameSize()) {
+    const uint64_t max_length = stats_options_.maxNameLength();
+
+    // Note that the heap-allocator does not truncate itself; we have to
+    // truncate here if we are using heap-allocation as a fallback due to an
+    // exahusted shared-memroy block
+    if (name.size() > max_length) {
+      ENVOY_LOG_MISC(
+          warn,
+          "Statistic '{}' is too long with {} characters, it will be truncated to {} characters",
+          name, name.size(), max_length);
+      name = absl::string_view(name.data(), max_length);
+    }
+  }
+  return name;
+}
+
 std::atomic<uint64_t> ThreadLocalStoreImpl::ScopeImpl::next_scope_id_;
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() { parent_.releaseScopeCrossThread(this); }
@@ -178,18 +198,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   if (!central_ref) {
     std::vector<Tag> tags;
     std::string tag_extracted_name = parent_.getTagsForName(name, tags);
-    absl::string_view truncated_name = name;
-    const uint64_t max_length = parent_.statsOptions().maxNameLength();
-    // Note that the heap-allocator does not truncate itself; we have to
-    // truncate here if we are using heap-allocation as a fallback due to an
-    // exahusted shared-memroy block
-    if (truncated_name.size() > max_length) {
-      ENVOY_LOG_MISC(
-          warn,
-          "Statistic '{}' is too long with {} characters, it will be truncated to {} characters",
-          name, name.size(), max_length);
-      truncated_name = absl::string_view(name.data(), max_length);
-    }
+    absl::string_view truncated_name = parent_.truncateStatNameIfNeeded(name);
     std::shared_ptr<StatType> stat =
         make_stat(parent_.alloc_, truncated_name, std::move(tag_extracted_name), std::move(tags));
     if (stat == nullptr) {

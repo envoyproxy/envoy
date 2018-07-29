@@ -195,7 +195,7 @@ public:
 
   Source& source() override { return source_; }
 
-  const Stats::StatsOptions& statsOptions() const override { return alloc_.statsOptions(); }
+  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
 
 private:
   struct TlsCacheEntry {
@@ -274,9 +274,10 @@ private:
   void clearScopeFromCaches(uint64_t scope_id);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
+  absl::string_view truncateStatNameIfNeeded(absl::string_view name);
 
+  const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;
-  HeapStatDataAllocator heap_allocator_;
   Event::Dispatcher* main_thread_dispatcher_{};
   ThreadLocal::SlotPtr tls_;
   mutable Thread::MutexBasicLockable lock_;
@@ -287,6 +288,7 @@ private:
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
+  HeapStatDataAllocator heap_allocator_;
   SourceImpl source_;
 };
 

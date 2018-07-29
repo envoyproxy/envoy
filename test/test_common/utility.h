@@ -341,17 +341,17 @@ namespace Stats {
  */
 class TestAllocator : public RawStatDataAllocator {
 public:
-  TestAllocator(const StatsOptions& stats_options) : RawStatDataAllocator(stats_options) {}
+  TestAllocator(const StatsOptions& stats_options) : stats_options_(stats_options) {}
   ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
 
   RawStatData* alloc(absl::string_view name) override {
-    Stats::StatsOptionsImpl stats_options;
-    stats_options.max_obj_name_length_ = 127;
+    // Stats::StatsOptionsImpl stats_options;
+    // stats_options.max_obj_name_length_ = 127;
     CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[std::string(name)];
     if (!stat_ref) {
       stat_ref.reset(static_cast<RawStatData*>(
-          ::calloc(RawStatData::structSizeWithOptions(stats_options), 1)));
-      stat_ref->initialize(name, stats_options);
+          ::calloc(RawStatData::structSizeWithOptions(stats_options_), 1)));
+      stat_ref->initialize(name, stats_options_);
     } else {
       stat_ref->ref_count_++;
     }
@@ -372,12 +372,13 @@ public:
 private:
   static void freeAdapter(RawStatData* data) { ::free(data); }
   std::unordered_map<std::string, CSmartPtr<RawStatData, freeAdapter>> stats_;
+  const StatsOptions& stats_options_;
 };
 
 class MockedTestAllocator : public RawStatDataAllocator {
 public:
   MockedTestAllocator(const StatsOptions& stats_options)
-      : RawStatDataAllocator(stats_options), alloc_(stats_options) {
+      : /*RawStatDataAllocator(stats_options), */ alloc_(stats_options) {
     ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
       return alloc_.alloc(name);
     }));
@@ -386,11 +387,15 @@ public:
       return alloc_.free(data);
     }));
 
+    // ON_CALL(*this, requiresBoundedStatNameSize()).WillByDefault.Invoke([] -> bool { return true;
+    // });
+
     EXPECT_CALL(*this, alloc(absl::string_view("stats.overflow")));
   }
 
   MOCK_METHOD1(alloc, RawStatData*(absl::string_view name));
   MOCK_METHOD1(free, void(RawStatData& data));
+  // MOCK_METHOD0(requiresBoundedStatNameSize, bool());
 
   TestAllocator alloc_;
 };

@@ -42,7 +42,6 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
-  const Stats::StatsOptions& stats_options = options_.statsOptions();
 
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
@@ -53,7 +52,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
     }
 #endif
     if (restarter_.get() == nullptr) {
-      restarter_.reset(new Server::HotRestartNopImpl(stats_options));
+      restarter_.reset(new Server::HotRestartNopImpl());
     }
 
     tls_.reset(new ThreadLocal::InstanceImpl);
@@ -70,7 +69,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
     break;
   }
   case Server::Mode::Validate:
-    restarter_.reset(new Server::HotRestartNopImpl(stats_options));
+    restarter_.reset(new Server::HotRestartNopImpl());
     Logger::Registry::initialize(options_.logLevel(), options_.logFormat(), restarter_->logLock());
     break;
   }

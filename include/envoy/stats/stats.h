@@ -481,9 +481,9 @@ public:
                                    std::vector<Tag>&& tags) PURE;
 
   /**
-   * @return const StatsOptions& the options used to initialize the allocator.
+   * Determines whether this stats allocator requires bounded stat-name size.
    */
-  virtual const StatsOptions& statsOptions() const PURE;
+  virtual bool requiresBoundedStatNameSize() const PURE;
 
   // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At
   // the moment, histograms don't fit the same pattern of counters and gaugaes

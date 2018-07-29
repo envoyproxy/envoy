@@ -178,7 +178,6 @@ public:
 private:
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
-  Stats::StatsOptionsImpl stats_options_;
   Stats::HeapStatDataAllocator stats_allocator_;
 };
 
