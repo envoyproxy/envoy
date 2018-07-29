@@ -210,7 +210,7 @@ public:
           encodeHeaders(std::move(headers), end_stream);
         },
         [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
-        stream_destroyed_, code, body);
+        stream_destroyed_, code, body, is_head_request_);
   }
   void encode100ContinueHeaders(HeaderMapPtr&& headers) override {
     encode100ContinueHeaders_(*headers);
@@ -234,6 +234,7 @@ public:
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
   bool is_grpc_request_{};
+  bool is_head_request_{false};
   bool stream_destroyed_{};
 };
 

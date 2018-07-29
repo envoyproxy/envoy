@@ -45,7 +45,6 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
     return Http::FilterHeadersStatus::Continue;
   }
   is_grpc_web_request_ = true;
-
   // Remove content-length header since it represents http1.1 payload size, not the sum of the h2
   // DATA frame payload lengths. https://http2.github.io/http2-spec/#malformed This effectively
   // switches to chunked encoding which is the default for h2
