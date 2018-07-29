@@ -282,9 +282,9 @@ private:
 //
 // Also note that RawStatData needs to live in a shared memory block, and it's
 // possible, but not obvious, that a vptr would be usable across processes. In
-// any case, RawStatData is currently allocated with calloc() rather than new,
-// so the usual C++ compiler assistance for setting up vptrs will not be
-// available. This could be resolved with placed new.
+// any case, RawStatData is allocated from a shared-memory block rather than via
+// new, so the usual C++ compiler assistance for setting up vptrs will not be
+// available. This could be resolved with placed new, or another nesting level.
 template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
   /**

@@ -345,8 +345,6 @@ public:
   ~TestAllocator() { EXPECT_TRUE(stats_.empty()); }
 
   RawStatData* alloc(absl::string_view name) override {
-    // Stats::StatsOptionsImpl stats_options;
-    // stats_options.max_obj_name_length_ = 127;
     CSmartPtr<RawStatData, freeAdapter>& stat_ref = stats_[std::string(name)];
     if (!stat_ref) {
       stat_ref.reset(static_cast<RawStatData*>(
@@ -387,15 +385,11 @@ public:
       return alloc_.free(data);
     }));
 
-    // ON_CALL(*this, requiresBoundedStatNameSize()).WillByDefault.Invoke([] -> bool { return true;
-    // });
-
     EXPECT_CALL(*this, alloc(absl::string_view("stats.overflow")));
   }
 
   MOCK_METHOD1(alloc, RawStatData*(absl::string_view name));
   MOCK_METHOD1(free, void(RawStatData& data));
-  // MOCK_METHOD0(requiresBoundedStatNameSize, bool());
 
   TestAllocator alloc_;
 };

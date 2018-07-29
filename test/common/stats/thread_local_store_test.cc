@@ -10,6 +10,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_split.h"
@@ -415,7 +416,7 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   const std::string name_1(max_name_length + 1, 'A');
 
   EXPECT_CALL(*alloc_, alloc(_));
-  store_->counter(name_1);
+  EXPECT_LOG_CONTAINS("warning", "is too long with", store_->counter(name_1));
 
   // The stats did not overflow yet.
   EXPECT_EQ(0UL, store_->counter("stats.overflow").value());

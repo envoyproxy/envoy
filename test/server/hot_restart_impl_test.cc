@@ -90,10 +90,13 @@ TEST_F(HotRestartImplTest, versionString) {
   }
 }
 
-// See also StatsImplTest.RawTruncateWithoutAllocator.
 TEST_F(HotRestartImplTest, RawAllocTooLarge) {
   setup();
 
+  // When running in a server, we depend on ThreadLocalStore to do name
+  // truncation, to ensure consistency names between shared-memory stats and
+  // fallback heap-allocated stats. But we have an assertion that the size
+  /// is appropriate in the hot-restart allocator.
   const std::string long_string(stats_options_.maxNameLength() + 1, 'A');
   EXPECT_DEATH_LOG_TO_STDERR(hot_restart_->alloc(long_string), "name.length");
 }
