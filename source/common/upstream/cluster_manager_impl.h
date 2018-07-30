@@ -384,6 +384,7 @@ private:
     }
 
     Event::TimerPtr timer_;
+    // TODO(rgs1): this should be part of Event::Timer's interface.
     bool timer_enabled_{};
     // This is default constructed to the clock's epoch:
     // https://en.cppreference.com/w/cpp/chrono/time_point/time_point
