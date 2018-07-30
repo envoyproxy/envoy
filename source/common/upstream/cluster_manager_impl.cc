@@ -402,6 +402,10 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
   const uint64_t delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
   if (delta_ms > timeout || !mergeable) {
     // If there was a pending update, we cancel the pending merged update.
+    //
+    // Note: it's possible that even though we are outside of a merge window (delta_ms > timeout),
+    // a timer is enabled. This race condition is fine, since we'll disable the timer here and
+    // deliver the update immediately.
     if (updates->disableTimer()) {
       cm_stats_.merged_updates_cancelled_.inc();
     }
