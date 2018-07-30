@@ -157,7 +157,7 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
                     std::for_each(callback_range.first, callback_range.second,
                                   [&](ActionToCallbackMap::value_type& cb_entry) {
                                     auto& cb = cb_entry.second;
-                                    cb.dispatcher_.post([&, is_active]() { cb.callback_(state); });
+                                    cb.dispatcher_.post([&, state]() { cb.callback_(state); });
                                   });
                   }
                 });
