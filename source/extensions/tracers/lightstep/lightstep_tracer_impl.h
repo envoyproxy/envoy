@@ -60,6 +60,13 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
 
+  // If the default min_flush_spans value is too small, spans can be dropped between reports.
+  // Hence, we choose a number that's large enough, but divide by the number of CPUs since Envoy
+  // creates separate tracers for each thread.
+  //
+  // See https://github.com/lightstep/lightstep-tracer-cpp/issues/106
+  static const size_t default_min_flush_spans = 2'000U / std::thread::hardware_concurrency();
+
   // Tracer::OpenTracingDriver
   opentracing::Tracer& tracer() override;
   PropagationMode propagationMode() const override { return propagation_mode_; }
