@@ -361,7 +361,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
         cm_stats_.regular_updates_.inc();
       } else {
         // Or are we outside a merge window?
-        if (!scheduled) {
+        if (merging_enabled && !scheduled) {
           cm_stats_.merged_updates_offwindow_.inc();
         }
       }
