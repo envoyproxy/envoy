@@ -15,6 +15,7 @@ api_proto_library_internal(
         "//envoy/api/v2/core:config_source",
         "//envoy/config/metrics/v2:metrics_service",
         "//envoy/config/metrics/v2:stats",
+        "//envoy/config/overload/v2alpha:overload",
         "//envoy/config/ratelimit/v2:rls",
         "//envoy/config/trace/v2:trace",
     ],

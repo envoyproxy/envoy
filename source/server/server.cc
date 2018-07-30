@@ -247,6 +247,12 @@ void InstanceImpl::initialize(Options& options,
 
   loadServerFlags(initial_config.flagsPath());
 
+  // Initialize the overload manager early so other modules can register for actions.
+  overload_manager_.reset(new OverloadManagerImpl(
+      dispatcher(), stats(),
+      bootstrap_.has_overload_manager() ? bootstrap_.overload_manager()
+                                        : envoy::config::overload::v2alpha::OverloadManager()));
+
   // Workers get created first so they register for thread local updates.
   listener_manager_.reset(new ListenerManagerImpl(
       *this, listener_component_factory_, worker_factory_, ProdSystemTimeSource::instance_));
@@ -403,6 +409,8 @@ RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm
 }
 
 void InstanceImpl::run() {
+  overload_manager_->start();
+
   RunHelper helper(*dispatcher_, clusterManager(), restarter_, access_log_manager_, init_manager_,
                    [this]() -> void { startWorkers(); });
 
