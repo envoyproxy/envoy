@@ -132,8 +132,9 @@ void HdsDelegate::processMessage(
                                               info_factory_));
 
     for (auto& health_check : cluster_config.health_checks()) {
+      AccessLog::AccessLogManagerPtr log_manager;
       health_checkers_.push_back(Upstream::HealthCheckerFactory::create(
-          health_check, *hds_clusters_.back(), runtime_, random_, dispatcher_));
+          health_check, *hds_clusters_.back(), runtime_, random_, dispatcher_, *log_manager));
     }
   }
 }
@@ -192,7 +193,7 @@ HdsCluster::HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& 
   initialize([] {});
 }
 
-ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED; }
+ClusterSharedPtr HdsCluster::create() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 HostVectorConstSharedPtr HdsCluster::createHealthyHostList(const HostVector& hosts) {
   HostVectorSharedPtr healthy_list(new HostVector());
@@ -227,7 +228,9 @@ void HdsCluster::initialize(std::function<void()> callback) {
                              HostsPerLocalityImpl::empty(), {}, *initial_hosts_, {});
 }
 
-void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) { NOT_IMPLEMENTED; }
+void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
 
 } // namespace Upstream
 } // namespace Envoy
