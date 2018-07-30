@@ -128,12 +128,13 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   OverloadManagerImpl manager(dispatcher_, parseConfig(config));
   bool is_active = false;
   int cb_count = 0;
-  manager.registerForAction("envoy.overload_actions.dummy_action", dispatcher_, [&](bool value) {
-    is_active = value;
-    cb_count++;
-  });
+  manager.registerForAction("envoy.overload_actions.dummy_action", dispatcher_,
+                            [&](OverloadActionState state) {
+                              is_active = state == OverloadActionState::Active;
+                              cb_count++;
+                            });
   manager.registerForAction("envoy.overload_actions.unknown_action", dispatcher_,
-                            [&](bool) { ASSERT(false); });
+                            [&](OverloadActionState) { ASSERT(false); });
   manager.start();
 
   factory1_.monitor_->setPressure(0.5);

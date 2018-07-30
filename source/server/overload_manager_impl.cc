@@ -11,7 +11,7 @@ namespace Server {
 
 namespace {
 
-class ThresholdTriggerImpl : public OverloadActionImpl::Trigger {
+class ThresholdTriggerImpl : public OverloadAction::Trigger {
 public:
   ThresholdTriggerImpl(const envoy::config::overload::v2alpha::ThresholdTrigger& config)
       : threshold_(config.value()) {}
@@ -31,8 +31,7 @@ private:
 
 } // namespace
 
-OverloadActionImpl::OverloadActionImpl(
-    const envoy::config::overload::v2alpha::OverloadAction& config) {
+OverloadAction::OverloadAction(const envoy::config::overload::v2alpha::OverloadAction& config) {
   for (const auto& trigger_config : config.triggers()) {
     TriggerPtr trigger;
 
@@ -51,7 +50,7 @@ OverloadActionImpl::OverloadActionImpl(
   }
 }
 
-bool OverloadActionImpl::updateResourcePressure(const std::string& name, double pressure) {
+bool OverloadAction::updateResourcePressure(const std::string& name, double pressure) {
   const bool active = isActive();
 
   auto it = triggers_.find(name);
@@ -69,7 +68,7 @@ bool OverloadActionImpl::updateResourcePressure(const std::string& name, double 
   return active != isActive();
 }
 
-bool OverloadActionImpl::isActive() const { return !fired_triggers_.empty(); }
+bool OverloadAction::isActive() const { return !fired_triggers_.empty(); }
 
 OverloadManagerImpl::OverloadManagerImpl(
     Event::Dispatcher& dispatcher, const envoy::config::overload::v2alpha::OverloadManager& config)
@@ -129,7 +128,7 @@ void OverloadManagerImpl::start() {
 
 void OverloadManagerImpl::registerForAction(const std::string& action,
                                             Event::Dispatcher& dispatcher,
-                                            std::function<void(bool)> callback) {
+                                            OverloadActionCb callback) {
   ASSERT(!started_);
 
   if (actions_.find(action) == actions_.end()) {
@@ -143,23 +142,25 @@ void OverloadManagerImpl::registerForAction(const std::string& action,
 
 void OverloadManagerImpl::updateResourcePressure(const std::string& resource, double pressure) {
   auto action_range = resource_to_actions_.equal_range(resource);
-  std::for_each(
-      action_range.first, action_range.second, [&](ResourceToActionMap::value_type& entry) {
-        const std::string& action = entry.second;
-        auto action_it = actions_.find(action);
-        ASSERT(action_it != actions_.end());
-        if (action_it->second.updateResourcePressure(resource, pressure)) {
-          const bool is_active = action_it->second.isActive();
-          ENVOY_LOG(info, "Overload action {} has become {}", action,
-                    is_active ? "active" : "inactive");
-          auto callback_range = action_to_callbacks_.equal_range(action);
-          std::for_each(callback_range.first, callback_range.second,
-                        [&](ActionToCallbackMap::value_type& cb_entry) {
-                          auto& cb = cb_entry.second;
-                          cb.dispatcher_.post([&, is_active]() { cb.callback_(is_active); });
-                        });
-        }
-      });
+  std::for_each(action_range.first, action_range.second,
+                [&](ResourceToActionMap::value_type& entry) {
+                  const std::string& action = entry.second;
+                  auto action_it = actions_.find(action);
+                  ASSERT(action_it != actions_.end());
+                  if (action_it->second.updateResourcePressure(resource, pressure)) {
+                    const bool is_active = action_it->second.isActive();
+                    const auto state =
+                        is_active ? OverloadActionState::Active : OverloadActionState::Inactive;
+                    ENVOY_LOG(info, "Overload action {} has become {}", action,
+                              is_active ? "active" : "inactive");
+                    auto callback_range = action_to_callbacks_.equal_range(action);
+                    std::for_each(callback_range.first, callback_range.second,
+                                  [&](ActionToCallbackMap::value_type& cb_entry) {
+                                    auto& cb = cb_entry.second;
+                                    cb.dispatcher_.post([&, is_active]() { cb.callback_(state); });
+                                  });
+                  }
+                });
 }
 
 void OverloadManagerImpl::Resource::update() {

@@ -15,9 +15,9 @@
 namespace Envoy {
 namespace Server {
 
-class OverloadActionImpl {
+class OverloadAction {
 public:
-  OverloadActionImpl(const envoy::config::overload::v2alpha::OverloadAction& config);
+  OverloadAction(const envoy::config::overload::v2alpha::OverloadAction& config);
 
   // Updates the current pressure for the given resource and returns whether the action
   // has changed state.
@@ -31,10 +31,10 @@ public:
     virtual ~Trigger() {}
 
     // Updates the current value of the metric and returns whether the trigger has changed state.
-    virtual bool updateValue(double value) = 0;
+    virtual bool updateValue(double value) PURE;
 
     // Returns whether the trigger is currently fired or not.
-    virtual bool isFired() const = 0;
+    virtual bool isFired() const PURE;
   };
   typedef std::unique_ptr<Trigger> TriggerPtr;
 
@@ -48,10 +48,11 @@ public:
   OverloadManagerImpl(Event::Dispatcher& dispatcher,
                       const envoy::config::overload::v2alpha::OverloadManager& config);
 
+  void start();
+
   // Server::OverloadManager
-  void start() override;
   void registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
-                         std::function<void(bool)> callback) override;
+                         OverloadActionCb callback) override;
 
 private:
   class Resource : public ResourceMonitor::Callbacks {
@@ -73,10 +74,10 @@ private:
   };
 
   struct ActionCallback {
-    ActionCallback(Event::Dispatcher& dispatcher, std::function<void(bool)> callback)
+    ActionCallback(Event::Dispatcher& dispatcher, OverloadActionCb callback)
         : dispatcher_(dispatcher), callback_(callback) {}
     Event::Dispatcher& dispatcher_;
-    std::function<void(bool)> callback_;
+    OverloadActionCb callback_;
   };
 
   void updateResourcePressure(const std::string& resource, double pressure);
@@ -86,7 +87,7 @@ private:
   const std::chrono::milliseconds refresh_interval_;
   Event::TimerPtr timer_;
   std::unordered_map<std::string, Resource> resources_;
-  std::unordered_map<std::string, OverloadActionImpl> actions_;
+  std::unordered_map<std::string, OverloadAction> actions_;
 
   typedef std::unordered_multimap<std::string, std::string> ResourceToActionMap;
   ResourceToActionMap resource_to_actions_;
