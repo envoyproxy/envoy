@@ -28,15 +28,15 @@ TEST(FramedTransportTest, Type) {
 TEST(FramedTransportTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
   FramedTransportImpl transport;
-  absl::optional<uint32_t> size = 1;
+  MessageMetadata metadata;
 
-  EXPECT_FALSE(transport.decodeFrameStart(buffer, size));
-  EXPECT_EQ(absl::optional<uint32_t>(1), size);
+  EXPECT_FALSE(transport.decodeFrameStart(buffer, metadata));
+  EXPECT_THAT(metadata, IsEmptyMetadata());
 
   addRepeated(buffer, 3, 0);
 
-  EXPECT_FALSE(transport.decodeFrameStart(buffer, size));
-  EXPECT_EQ(absl::optional<uint32_t>(1), size);
+  EXPECT_FALSE(transport.decodeFrameStart(buffer, metadata));
+  EXPECT_THAT(metadata, IsEmptyMetadata());
 }
 
 TEST(FramedTransportTest, InvalidFrameSize) {
@@ -46,20 +46,20 @@ TEST(FramedTransportTest, InvalidFrameSize) {
     Buffer::OwnedImpl buffer;
     addInt32(buffer, -1);
 
-    absl::optional<uint32_t> size = 1;
-    EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, size), EnvoyException,
+    MessageMetadata metadata;
+    EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "invalid thrift framed transport frame size -1");
-    EXPECT_EQ(absl::optional<uint32_t>(1), size);
+    EXPECT_THAT(metadata, IsEmptyMetadata());
   }
 
   {
     Buffer::OwnedImpl buffer;
     addInt32(buffer, 0x7fffffff);
 
-    absl::optional<uint32_t> size = 1;
-    EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, size), EnvoyException,
+    MessageMetadata metadata;
+    EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "invalid thrift framed transport frame size 2147483647");
-    EXPECT_EQ(absl::optional<uint32_t>(1), size);
+    EXPECT_THAT(metadata, IsEmptyMetadata());
   }
 }
 
@@ -70,9 +70,9 @@ TEST(FramedTransportTest, DecodeFrameStart) {
   addInt32(buffer, 100);
   EXPECT_EQ(buffer.length(), 4);
 
-  absl::optional<uint32_t> size;
-  EXPECT_TRUE(transport.decodeFrameStart(buffer, size));
-  EXPECT_EQ(absl::optional<uint32_t>(100U), size);
+  MessageMetadata metadata;
+  EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
+  EXPECT_THAT(metadata, HasOnlyFrameSize(100U));
   EXPECT_EQ(buffer.length(), 0);
 }
 
@@ -88,11 +88,12 @@ TEST(FramedTransportTest, EncodeFrame) {
   FramedTransportImpl transport;
 
   {
+    MessageMetadata metadata;
     Buffer::OwnedImpl message;
     message.add("fake message");
 
     Buffer::OwnedImpl buffer;
-    transport.encodeFrame(buffer, message);
+    transport.encodeFrame(buffer, metadata, message);
 
     EXPECT_EQ(0, message.length());
     EXPECT_EQ(std::string("\0\0\0\xC"
@@ -102,9 +103,10 @@ TEST(FramedTransportTest, EncodeFrame) {
   }
 
   {
+    MessageMetadata metadata;
     Buffer::OwnedImpl message;
     Buffer::OwnedImpl buffer;
-    EXPECT_THROW_WITH_MESSAGE(transport.encodeFrame(buffer, message), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(transport.encodeFrame(buffer, metadata, message), EnvoyException,
                               "invalid thrift framed transport frame size 0");
   }
 }

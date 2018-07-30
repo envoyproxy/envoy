@@ -15,7 +15,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer, absl::optional<uint32_t>& size) {
+bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMetadata& metadata) {
   if (transport_ == nullptr) {
     // Not enough data to select a transport.
     if (buffer.length() < 8) {
@@ -27,8 +27,7 @@ bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer, absl::optiona
 
     if (size > 0 && size <= FramedTransportImpl::MaxFrameSize) {
       // TODO(zuercher): Spec says max size is 16,384,000 (0xFA0000). Apache C++ TFramedTransport
-      // is configurable, but defaults to 256 MB (0x1000000). THeaderTransport will take up to ~1GB
-      // (0x3FFFFFFF) when it falls back to framed mode.
+      // is configurable, but defaults to 256 MB (0x1000000).
       if (BinaryProtocolImpl::isMagic(proto_start) || CompactProtocolImpl::isMagic(proto_start)) {
         setTransport(std::make_unique<FramedTransportImpl>());
       }
@@ -51,7 +50,7 @@ bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer, absl::optiona
     }
   }
 
-  return transport_->decodeFrameStart(buffer, size);
+  return transport_->decodeFrameStart(buffer, metadata);
 }
 
 bool AutoTransportImpl::decodeFrameEnd(Buffer::Instance& buffer) {
@@ -59,9 +58,10 @@ bool AutoTransportImpl::decodeFrameEnd(Buffer::Instance& buffer) {
   return transport_->decodeFrameEnd(buffer);
 }
 
-void AutoTransportImpl::encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) {
-  RELEASE_ASSERT(transport_ != nullptr, "");
-  transport_->encodeFrame(buffer, message);
+void AutoTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMetadata& metadata,
+                                    Buffer::Instance& message) {
+  RELEASE_ASSERT(transport_ != nullptr, "auto transport cannot encode before transport detection");
+  transport_->encodeFrame(buffer, metadata, message);
 }
 
 class AutoTransportConfigFactory : public TransportFactoryBase<AutoTransportImpl> {

@@ -26,8 +26,7 @@ public:
   // Protocol
   const std::string& name() const override { return ProtocolNames::get().COMPACT; }
   ProtocolType type() const override { return ProtocolType::Compact; }
-  bool readMessageBegin(Buffer::Instance& buffer, std::string& name, MessageType& msg_type,
-                        int32_t& seq_id) override;
+  bool readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) override;
   bool readMessageEnd(Buffer::Instance& buffer) override;
   bool readStructBegin(Buffer::Instance& buffer, std::string& name) override;
   bool readStructEnd(Buffer::Instance& buffer) override;
@@ -49,8 +48,7 @@ public:
   bool readDouble(Buffer::Instance& buffer, double& value) override;
   bool readString(Buffer::Instance& buffer, std::string& value) override;
   bool readBinary(Buffer::Instance& buffer, std::string& value) override;
-  void writeMessageBegin(Buffer::Instance& buffer, const std::string& name, MessageType msg_type,
-                         int32_t seq_id) override;
+  void writeMessageBegin(Buffer::Instance& buffer, const MessageMetadata& metadata) override;
   void writeMessageEnd(Buffer::Instance& buffer) override;
   void writeStructBegin(Buffer::Instance& buffer, const std::string& name) override;
   void writeStructEnd(Buffer::Instance& buffer) override;

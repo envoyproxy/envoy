@@ -135,6 +135,17 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "metadata_test",
+    srcs = ["metadata_test.cc"],
+    extension_name = "envoy.filters.network.thrift_proxy",
+    deps = [
+        "//source/extensions/filters/network/thrift_proxy:metadata_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "protocol_impl_test",
     srcs = ["protocol_impl_test.cc"],
     extension_name = "envoy.filters.network.thrift_proxy",

@@ -14,8 +14,8 @@ envoy_cc_library(
     hdrs = ["app_exception_impl.h"],
     deps = [
         ":protocol_interface",
+        ":thrift_lib",
         "//include/envoy/buffer:buffer_interface",
-        "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
     ],
 )
 
@@ -35,6 +35,7 @@ envoy_cc_library(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
+        ":app_exception_lib",
         ":conn_manager_lib",
         ":decoder_lib",
         ":protocol_lib",
@@ -89,6 +90,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "metadata_lib",
+    srcs = ["metadata.cc"],
+    hdrs = ["metadata.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        ":thrift_lib",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
     name = "protocol_converter_lib",
     hdrs = [
         "protocol_converter.h",
@@ -107,6 +119,8 @@ envoy_cc_library(
     ],
     external_deps = ["abseil_optional"],
     deps = [
+        ":metadata_lib",
+        ":thrift_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
@@ -149,10 +163,22 @@ envoy_cc_library(
     hdrs = ["transport.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        ":buffer_helper_lib",
+        ":metadata_lib",
+        ":thrift_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
+        "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "thrift_lib",
+    hdrs = ["thrift.h"],
+    deps = [
+        "//source/common/common:assert_lib",
         "//source/common/singleton:const_singleton",
     ],
 )
@@ -170,7 +196,9 @@ envoy_cc_library(
         "unframed_transport_impl.h",
     ],
     deps = [
+        ":app_exception_lib",
         ":buffer_helper_lib",
+        ":metadata_lib",
         ":protocol_lib",
         ":transport_interface",
         "//source/common/common:assert_lib",

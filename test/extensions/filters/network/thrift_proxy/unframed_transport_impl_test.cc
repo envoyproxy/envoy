@@ -30,9 +30,9 @@ TEST(UnframedTransportTest, DecodeFrameStart) {
   addInt32(buffer, 0xDEADBEEF);
   EXPECT_EQ(buffer.length(), 4);
 
-  absl::optional<uint32_t> size = 1;
-  EXPECT_TRUE(transport.decodeFrameStart(buffer, size));
-  EXPECT_FALSE(size.has_value());
+  MessageMetadata metadata;
+  EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
+  EXPECT_THAT(metadata, IsEmptyMetadata());
   EXPECT_EQ(buffer.length(), 4);
 }
 
@@ -46,11 +46,13 @@ TEST(UnframedTransportTest, DecodeFrameEnd) {
 TEST(UnframedTransportTest, EncodeFrame) {
   UnframedTransportImpl transport;
 
+  MessageMetadata metadata;
+
   Buffer::OwnedImpl message;
   message.add("fake message");
 
   Buffer::OwnedImpl buffer;
-  transport.encodeFrame(buffer, message);
+  transport.encodeFrame(buffer, metadata, message);
 
   EXPECT_EQ(0, message.length());
   EXPECT_EQ("fake message", buffer.toString());

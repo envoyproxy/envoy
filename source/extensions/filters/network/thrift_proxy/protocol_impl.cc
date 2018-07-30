@@ -17,8 +17,23 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string& name,
-                                        MessageType& msg_type, int32_t& seq_id) {
+void AutoProtocolImpl::setType(ProtocolType type) {
+  if (!protocol_) {
+    switch (type) {
+    case ProtocolType::Binary:
+      setProtocol(std::make_unique<BinaryProtocolImpl>());
+      break;
+    case ProtocolType::Compact:
+      setProtocol(std::make_unique<CompactProtocolImpl>());
+      break;
+    default:
+      // Ignored: attempt protocol detection.
+      break;
+    }
+  }
+}
+
+bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) {
   if (protocol_ == nullptr) {
     if (buffer.length() < 2) {
       return false;
@@ -26,18 +41,18 @@ bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string& n
 
     uint16_t version = BufferHelper::peekU16(buffer);
     if (BinaryProtocolImpl::isMagic(version)) {
-      setProtocol(std::make_unique<BinaryProtocolImpl>());
+      setType(ProtocolType::Binary);
     } else if (CompactProtocolImpl::isMagic(version)) {
-      setProtocol(std::make_unique<CompactProtocolImpl>());
-    } else {
+      setType(ProtocolType::Compact);
+    }
+
+    if (!protocol_) {
       throw EnvoyException(
           fmt::format("unknown thrift auto protocol message start {:04x}", version));
     }
-
-    ASSERT(protocol_ != nullptr);
   }
 
-  return protocol_->readMessageBegin(buffer, name, msg_type, seq_id);
+  return protocol_->readMessageBegin(buffer, metadata);
 }
 
 bool AutoProtocolImpl::readMessageEnd(Buffer::Instance& buffer) {

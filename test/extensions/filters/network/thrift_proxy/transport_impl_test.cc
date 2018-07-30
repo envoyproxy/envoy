@@ -30,15 +30,15 @@ TEST(TransportNames, FromType) {
 TEST(AutoTransportTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
   AutoTransportImpl transport;
-  absl::optional<uint32_t> size = 100;
+  MessageMetadata metadata;
 
-  EXPECT_FALSE(transport.decodeFrameStart(buffer, size));
-  EXPECT_EQ(absl::optional<uint32_t>(100), size);
+  EXPECT_FALSE(transport.decodeFrameStart(buffer, metadata));
+  EXPECT_THAT(metadata, IsEmptyMetadata());
 
   addRepeated(buffer, 7, 0);
 
-  EXPECT_FALSE(transport.decodeFrameStart(buffer, size));
-  EXPECT_EQ(absl::optional<uint32_t>(100), size);
+  EXPECT_FALSE(transport.decodeFrameStart(buffer, metadata));
+  EXPECT_THAT(metadata, IsEmptyMetadata());
 }
 
 TEST(AutoTransportTest, UnknownTransport) {
@@ -50,10 +50,10 @@ TEST(AutoTransportTest, UnknownTransport) {
     addInt32(buffer, 0);
     addInt32(buffer, 0);
 
-    absl::optional<uint32_t> size = 100;
-    EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, size), EnvoyException,
+    MessageMetadata metadata;
+    EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "unknown thrift auto transport frame start 00 00 00 00 00 00 00 00");
-    EXPECT_EQ(absl::optional<uint32_t>(100), size);
+    EXPECT_THAT(metadata, IsEmptyMetadata());
   }
 
   // Looks like framed, but fails protocol check.
@@ -62,10 +62,10 @@ TEST(AutoTransportTest, UnknownTransport) {
     addInt32(buffer, 0xFF);
     addInt32(buffer, 0);
 
-    absl::optional<uint32_t> size = 100;
-    EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, size), EnvoyException,
+    MessageMetadata metadata;
+    EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "unknown thrift auto transport frame start 00 00 00 ff 00 00 00 00");
-    EXPECT_EQ(absl::optional<uint32_t>(100), size);
+    EXPECT_THAT(metadata, IsEmptyMetadata());
   }
 }
 
@@ -78,9 +78,9 @@ TEST(AutoTransportTest, DecodeFrameStart) {
     addInt16(buffer, 0x8001);
     addInt16(buffer, 0);
 
-    absl::optional<uint32_t> size;
-    EXPECT_TRUE(transport.decodeFrameStart(buffer, size));
-    EXPECT_EQ(absl::optional<uint32_t>(255), size);
+    MessageMetadata metadata;
+    EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
+    EXPECT_THAT(metadata, HasOnlyFrameSize(255U));
     EXPECT_EQ(transport.name(), "framed(auto)");
     EXPECT_EQ(transport.type(), TransportType::Framed);
     EXPECT_EQ(buffer.length(), 4);
@@ -94,9 +94,9 @@ TEST(AutoTransportTest, DecodeFrameStart) {
     addInt16(buffer, 0x8201);
     addInt16(buffer, 0);
 
-    absl::optional<uint32_t> size;
-    EXPECT_TRUE(transport.decodeFrameStart(buffer, size));
-    EXPECT_EQ(absl::optional<uint32_t>(4095), size);
+    MessageMetadata metadata;
+    EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
+    EXPECT_THAT(metadata, HasOnlyFrameSize(4095U));
     EXPECT_EQ(transport.name(), "framed(auto)");
     EXPECT_EQ(transport.type(), TransportType::Framed);
     EXPECT_EQ(buffer.length(), 4);
@@ -109,9 +109,9 @@ TEST(AutoTransportTest, DecodeFrameStart) {
     addInt16(buffer, 0x8001);
     addRepeated(buffer, 6, 0);
 
-    absl::optional<uint32_t> size = 1;
-    EXPECT_TRUE(transport.decodeFrameStart(buffer, size));
-    EXPECT_FALSE(size.has_value());
+    MessageMetadata metadata;
+    EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
+    EXPECT_THAT(metadata, IsEmptyMetadata());
     EXPECT_EQ(transport.name(), "unframed(auto)");
     EXPECT_EQ(transport.type(), TransportType::Unframed);
     EXPECT_EQ(buffer.length(), 8);
@@ -124,9 +124,9 @@ TEST(AutoTransportTest, DecodeFrameStart) {
     addInt16(buffer, 0x8201);
     addRepeated(buffer, 6, 0);
 
-    absl::optional<uint32_t> size = 1;
-    EXPECT_TRUE(transport.decodeFrameStart(buffer, size));
-    EXPECT_FALSE(size.has_value());
+    MessageMetadata metadata;
+    EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
+    EXPECT_THAT(metadata, IsEmptyMetadata());
     EXPECT_EQ(transport.name(), "unframed(auto)");
     EXPECT_EQ(transport.type(), TransportType::Unframed);
     EXPECT_EQ(buffer.length(), 8);
@@ -140,8 +140,9 @@ TEST(AutoTransportTest, DecodeFrameEnd) {
   addInt16(buffer, 0x8001);
   addInt16(buffer, 0);
 
-  absl::optional<uint32_t> size;
-  EXPECT_TRUE(transport.decodeFrameStart(buffer, size));
+  MessageMetadata metadata;
+  EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
+
   EXPECT_EQ(buffer.length(), 4);
 
   EXPECT_TRUE(transport.decodeFrameEnd(buffer));
@@ -153,11 +154,12 @@ TEST(AutoTransportTest, EncodeFrame) {
   AutoTransportImpl transport;
   transport.setTransport(TransportPtr{mock_transport});
 
+  MessageMetadata metadata;
   Buffer::OwnedImpl buffer;
   Buffer::OwnedImpl message;
 
-  EXPECT_CALL(*mock_transport, encodeFrame(Ref(buffer), Ref(message)));
-  transport.encodeFrame(buffer, message);
+  EXPECT_CALL(*mock_transport, encodeFrame(Ref(buffer), Ref(metadata), Ref(message)));
+  transport.encodeFrame(buffer, metadata, message);
 }
 
 TEST(AutoTransportTest, Name) {

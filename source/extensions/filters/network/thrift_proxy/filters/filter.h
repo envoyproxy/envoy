@@ -20,20 +20,6 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace ThriftFilters {
 
-class DirectResponse {
-public:
-  virtual ~DirectResponse() {}
-
-  /**
-   * Encodes the response via the given Protocol.
-   * @param proto the Protocol to be used for message encoding
-   * @param buffer the Buffer into which the message should be encoded
-   */
-  virtual void encode(ThriftProxy::Protocol& proto, Buffer::Instance& buffer) PURE;
-};
-
-typedef std::unique_ptr<DirectResponse> DirectResponsePtr;
-
 /**
  * Decoder filter callbacks add additional callbacks.
  */
@@ -77,9 +63,9 @@ public:
 
   /**
    * Create a locally generated response using the provided response object.
-   * @param response DirectResponsePtr the response to send to the downstream client
+   * @param response DirectResponse the response to send to the downstream client
    */
-  virtual void sendLocalReply(DirectResponsePtr&& response) PURE;
+  virtual void sendLocalReply(const ThriftProxy::DirectResponse& response) PURE;
 
   /**
    * Indicates the start of an upstream response. May only be called once.
@@ -142,9 +128,10 @@ public:
   /**
    * Indicates the start of a Thrift transport frame was detected. Unframed transports generate
    * simulated start messages.
-   * @param size the size of the message, if available to the transport
+   * @param metadata MessageMetadataSharedPtr describing as much as is currently known about the
+   *                                          message
    */
-  virtual FilterStatus transportBegin(absl::optional<uint32_t> size) PURE;
+  virtual FilterStatus transportBegin(MessageMetadataSharedPtr metadata) PURE;
 
   /**
    * Indicates the end of a Thrift transport frame was detected. Unframed transport generate
@@ -154,13 +141,10 @@ public:
 
   /**
    * Indicates that the start of a Thrift protocol message was detected.
-   * @param name the name of the message, if available
-   * @param msg_type the type of the message
-   * @param seq_id the message sequence id
+   * @param metadata MessageMetadataSharedPtr describing the message
    * @return FilterStatus to indicate if filter chain iteration should continue
    */
-  virtual FilterStatus messageBegin(absl::string_view name, MessageType msg_type,
-                                    int32_t seq_id) PURE;
+  virtual FilterStatus messageBegin(MessageMetadataSharedPtr metadata) PURE;
 
   /**
    * Indicates that the end of a Thrift protocol message was detected.
