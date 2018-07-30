@@ -175,7 +175,7 @@ public:
         monotonic_time_source_));
   }
 
-  void createWithLocalClusterUpdate(const bool enable_merge_window=true) {
+  void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
     std::string yaml = R"EOF(
   static_resources:
     clusters:
