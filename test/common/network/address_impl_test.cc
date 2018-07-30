@@ -64,9 +64,9 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
   }
 
   // Bind the socket to the desired address and port.
-  const int rc = addr_port->bind(listen_fd);
-  const int err = errno;
-  ASSERT_EQ(rc, 0) << addr_port->asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
+  const Api::SysCallResult result = addr_port->bind(listen_fd);
+  ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
+                           << "\nerrno: " << result.errno_;
 
   // Do a bare listen syscall. Not bothering to accept connections as that would
   // require another thread.
@@ -85,9 +85,9 @@ void testSocketBindAndConnect(Network::Address::IpVersion ip_version, bool v6onl
     makeFdBlocking(client_fd);
 
     // Connect to the server.
-    const int rc = addr_port->connect(client_fd);
-    const int err = errno;
-    ASSERT_EQ(rc, 0) << addr_port->asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
+    const Api::SysCallResult result = addr_port->connect(client_fd);
+    ASSERT_EQ(result.rc_, 0) << addr_port->asString() << "\nerror: " << strerror(result.errno_)
+                             << "\nerrno: " << result.errno_;
   };
 
   client_connect(addr_port);
@@ -314,9 +314,9 @@ TEST(PipeInstanceTest, UnlinksExistingFile) {
     ASSERT_GE(listen_fd, 0) << address.asString();
     ScopedFdCloser closer(listen_fd);
 
-    const int rc = address.bind(listen_fd);
-    const int err = errno;
-    ASSERT_EQ(rc, 0) << address.asString() << "\nerror: " << strerror(err) << "\nerrno: " << err;
+    const Api::SysCallResult result = address.bind(listen_fd);
+    ASSERT_EQ(result.rc_, 0) << address.asString() << "\nerror: " << strerror(result.errno_)
+                             << "\nerrno: " << result.errno_;
   };
 
   const std::string path = TestEnvironment::unixDomainSocketPath("UnlinksExistingFile.sock");
