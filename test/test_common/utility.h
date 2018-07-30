@@ -376,17 +376,8 @@ private:
 
 class MockedTestAllocator : public RawStatDataAllocator {
 public:
-  MockedTestAllocator(const StatsOptions& stats_options) : alloc_(stats_options) {
-    ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
-      return alloc_.alloc(name);
-    }));
-
-    ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
-      return alloc_.free(data);
-    }));
-
-    EXPECT_CALL(*this, alloc(absl::string_view("stats.overflow")));
-  }
+  MockedTestAllocator(const StatsOptions& stats_options);
+  virtual ~MockedTestAllocator();
 
   MOCK_METHOD1(alloc, RawStatData*(absl::string_view name));
   MOCK_METHOD1(free, void(RawStatData& data));

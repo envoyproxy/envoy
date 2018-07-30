@@ -197,6 +197,9 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   std::shared_ptr<StatType>& central_ref = central_cache_map[name];
   if (!central_ref) {
     std::vector<Tag> tags;
+
+    // Tag extraction occurs on the original, untruncated name so the extraction
+    // can complete properly, even if the tag values are partially truncated.
     std::string tag_extracted_name = parent_.getTagsForName(name, tags);
     absl::string_view truncated_name = parent_.truncateStatNameIfNeeded(name);
     std::shared_ptr<StatType> stat =

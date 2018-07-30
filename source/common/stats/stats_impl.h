@@ -288,10 +288,9 @@ private:
 template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
   /**
-   * @param stats_options The stat optinos, which must live longer than the allocator.
+   * @param stats_options The stat options, which must live longer than the allocator.
    */
-  explicit StatDataAllocatorImpl(/*const StatsOptions& stats_options*/) {}
-  //: stats_options_(stats_options) {}
+  StatDataAllocatorImpl() {}
 
   // StatDataAllocator
   CounterSharedPtr makeCounter(absl::string_view name, std::string&& tag_extracted_name,
