@@ -404,7 +404,7 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
   // If there's no timer, create one.
   if (updates->timer_ == nullptr) {
     updates->timer_ = dispatcher_.createTimer([this, &cluster, priority, &updates]() -> void {
-      applyUpdates(cluster, priority, updates);
+      applyUpdates(cluster, priority, *updates);
     });
   }
 
@@ -417,7 +417,7 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
 }
 
 void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
-                                      PendingUpdatesPtr& updates) {
+                                      PendingUpdates& updates) {
   // Deliver pending updates.
 
   // Remember that these merged updates are _only_ for updates related to
@@ -429,8 +429,8 @@ void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
   postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
 
   cm_stats_.merged_updates_.inc();
-  updates->timer_enabled_ = false;
-  updates->last_updated_ = std::chrono::steady_clock::now();
+  updates.timer_enabled_ = false;
+  updates.last_updated_ = std::chrono::steady_clock::now();
 }
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,

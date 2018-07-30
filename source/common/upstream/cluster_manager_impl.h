@@ -369,7 +369,7 @@ private:
 
   struct PendingUpdates {
     Event::TimerPtr timer_;
-    bool timer_enabled_;
+    bool timer_enabled_{};
     MonotonicTime last_updated_;
     void enableTimer(const uint64_t timeout) {
       if (timer_ != nullptr) {
@@ -391,7 +391,7 @@ private:
   using PendingUpdatesByPriorityMapPtr = std::unique_ptr<PendingUpdatesByPriorityMap>;
   using ClusterUpdatesMap = std::unordered_map<std::string, PendingUpdatesByPriorityMapPtr>;
 
-  void applyUpdates(const Cluster& cluster, uint32_t priority, PendingUpdatesPtr& updates);
+  void applyUpdates(const Cluster& cluster, uint32_t priority, PendingUpdates& updates);
   bool scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable);
   void createOrUpdateThreadLocalCluster(ClusterData& cluster);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
