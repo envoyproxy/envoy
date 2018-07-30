@@ -74,6 +74,28 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
   }
 
   {
+    RequestInfoFormatter ttlb_duration_format("RESPONSE_TX_DURATION");
+
+    absl::optional<std::chrono::nanoseconds> dur_upstream = std::chrono::nanoseconds(10000000);
+    EXPECT_CALL(request_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur_upstream));
+    absl::optional<std::chrono::nanoseconds> dur_downstream = std::chrono::nanoseconds(25000000);
+    EXPECT_CALL(request_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(dur_downstream));
+
+    EXPECT_EQ("15", ttlb_duration_format.format(header, header, header, request_info));
+  }
+
+  {
+    RequestInfoFormatter ttlb_duration_format("RESPONSE_TX_DURATION");
+
+    absl::optional<std::chrono::nanoseconds> dur_upstream;
+    EXPECT_CALL(request_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur_upstream));
+    absl::optional<std::chrono::nanoseconds> dur_downstream;
+    EXPECT_CALL(request_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(dur_downstream));
+
+    EXPECT_EQ("-", ttlb_duration_format.format(header, header, header, request_info));
+  }
+
+  {
     RequestInfoFormatter bytes_received_format("BYTES_RECEIVED");
     EXPECT_CALL(request_info, bytesReceived()).WillOnce(Return(1));
     EXPECT_EQ("1", bytes_received_format.format(header, header, header, request_info));

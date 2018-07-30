@@ -29,7 +29,7 @@ public:
     return std::make_unique<Envoy::ProtobufWkt::Empty>();
   }
 
-  std::string name() override { return ListenerFilterNames::get().ORIGINAL_DST; }
+  std::string name() override { return ListenerFilterNames::get().OriginalDst; }
 };
 
 /**

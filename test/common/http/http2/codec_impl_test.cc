@@ -783,6 +783,34 @@ TEST_P(Http2CodecImplTest, TestCodecHeaderLimits) {
   request_encoder_->encodeHeaders(request_headers, false);
 }
 
+TEST_P(Http2CodecImplTest, TestCodecHeaderCompression) {
+  initialize();
+
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, true));
+  request_encoder_->encodeHeaders(request_headers, true);
+
+  TestHeaderMapImpl response_headers{{":status", "200"}, {"compression", "test"}};
+  EXPECT_CALL(response_decoder_, decodeHeaders_(_, true));
+  response_encoder_->encodeHeaders(response_headers, true);
+
+  // Sanity check to verify that state of encoders and decoders matches.
+  EXPECT_EQ(nghttp2_session_get_hd_deflate_dynamic_table_size(server_.session()),
+            nghttp2_session_get_hd_inflate_dynamic_table_size(client_.session()));
+  EXPECT_EQ(nghttp2_session_get_hd_deflate_dynamic_table_size(client_.session()),
+            nghttp2_session_get_hd_inflate_dynamic_table_size(server_.session()));
+
+  // Verify that headers are compressed only when both client and server advertise table size > 0:
+  if (client_http2settings_.hpack_table_size_ && server_http2settings_.hpack_table_size_) {
+    EXPECT_NE(0, nghttp2_session_get_hd_deflate_dynamic_table_size(client_.session()));
+    EXPECT_NE(0, nghttp2_session_get_hd_deflate_dynamic_table_size(server_.session()));
+  } else {
+    EXPECT_EQ(0, nghttp2_session_get_hd_deflate_dynamic_table_size(client_.session()));
+    EXPECT_EQ(0, nghttp2_session_get_hd_deflate_dynamic_table_size(server_.session()));
+  }
+}
+
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy

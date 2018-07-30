@@ -288,6 +288,14 @@ public:
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::api::v2::core::ApiConfigSource& api_config_source,
                                 Stats::Scope& scope);
+
+  /**
+   * Translate a set of cluster's hosts into a load assignment configuration.
+   * @param hosts cluster's list of hosts.
+   * @return envoy::api::v2::ClusterLoadAssignment a load assignment configuration.
+   */
+  static envoy::api::v2::ClusterLoadAssignment
+  translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts);
 };
 
 } // namespace Config

@@ -122,7 +122,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
   Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
   NiceMock<Event::MockDispatcher> dispatcher_;
-  LocalInfo::MockLocalInfo local_info_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Secret::MockSecretManager secret_manager_;
 };
 
@@ -191,6 +191,27 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolClusterFail) {
       create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
       "cluster: Both HTTP1 and HTTP2 options may only be configured with non-default "
       "'protocol_selection' values");
+}
+
+TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
+  const std::string yaml = R"EOF(
+ static_resources:
+  clusters:
+  - name: service_google
+    connect_timeout: 0.25s
+    health_checks:
+      - timeout: 1s
+        interval: 1s
+        http_health_check:
+          path: "/blah"
+      - timeout: 1s
+        interval: 1s
+        http_health_check:
+          path: "/"
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+                            "Multiple health checks not supported");
 }
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {

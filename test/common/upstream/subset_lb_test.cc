@@ -1433,6 +1433,26 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
   EXPECT_EQ(host_set_.healthy_hosts_per_locality_->get()[1][0], lb_->chooseHost(&context));
 }
 
+TEST_P(SubsetLoadBalancerTest, GaugesUpdatedOnDestroy) {
+  EXPECT_CALL(subset_info_, fallbackPolicy())
+      .WillRepeatedly(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+
+  std::vector<std::set<std::string>> subset_keys = {{"version"}};
+  EXPECT_CALL(subset_info_, subsetKeys()).WillRepeatedly(ReturnRef(subset_keys));
+
+  init({
+      {"tcp://127.0.0.1:80", {{"version", "1.0"}}},
+  });
+
+  EXPECT_EQ(1U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(0U, stats_.lb_subsets_removed_.value());
+
+  lb_ = nullptr;
+
+  EXPECT_EQ(0U, stats_.lb_subsets_active_.value());
+  EXPECT_EQ(1U, stats_.lb_subsets_removed_.value());
+}
+
 INSTANTIATE_TEST_CASE_P(UpdateOrderings, SubsetLoadBalancerTest,
                         testing::ValuesIn({REMOVES_FIRST, SIMULTANEOUS}));
 

@@ -72,11 +72,9 @@ protected:
     void onUpstreamData(Buffer::Instance& data, bool end_stream);
 
     // Network::ConnectionCallbacks
-    void onEvent(Network::ConnectionEvent event) override {
-      parent_.onConnectionEvent(*this, event);
-    }
-    void onAboveWriteBufferHighWatermark() override {}
-    void onBelowWriteBufferLowWatermark() override {}
+    void onEvent(Network::ConnectionEvent event) override;
+    void onAboveWriteBufferHighWatermark() override;
+    void onBelowWriteBufferLowWatermark() override;
 
     ConnPoolImpl& parent_;
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
@@ -85,6 +83,7 @@ protected:
     Event::TimerPtr connect_timer_;
     Stats::TimespanPtr conn_length_;
     uint64_t remaining_requests_;
+    bool timed_out_;
   };
 
   typedef std::unique_ptr<ActiveConn> ActiveConnPtr;

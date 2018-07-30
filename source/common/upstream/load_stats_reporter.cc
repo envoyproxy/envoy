@@ -120,8 +120,11 @@ void LoadStatsReporter::onReceiveMessage(
 void LoadStatsReporter::startLoadReportPeriod() {
   // Once a cluster is tracked, we don't want to reset its stats between reports
   // to avoid racing between request/response.
-  std::unordered_map<absl::string_view, std::chrono::steady_clock::duration, StringViewHash>
-      existing_clusters;
+  // TODO(htuch): They key here could be absl::string_view, but this causes
+  // problems due to referencing of temporaries in the below loop with Google's
+  // internal string type. Consider this optimization when the string types
+  // converge.
+  std::unordered_map<std::string, std::chrono::steady_clock::duration> existing_clusters;
   for (const std::string& cluster_name : message_->clusters()) {
     if (clusters_.count(cluster_name) > 0) {
       existing_clusters.emplace(cluster_name, clusters_[cluster_name]);

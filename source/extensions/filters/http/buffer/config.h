@@ -17,7 +17,7 @@ class BufferFilterFactory
     : public Common::FactoryBase<envoy::config::filter::http::buffer::v2::Buffer,
                                  envoy::config::filter::http::buffer::v2::BufferPerRoute> {
 public:
-  BufferFilterFactory() : FactoryBase(HttpFilterNames::get().BUFFER) {}
+  BufferFilterFactory() : FactoryBase(HttpFilterNames::get().Buffer) {}
 
   Http::FilterFactoryCb
   createFilterFactory(const Json::Object& json_config, const std::string& stats_prefix,

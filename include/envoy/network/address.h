@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/os_sys_calls.h"
 #include "envoy/common/pure.h"
 
 #include "absl/numeric/int128.h"
@@ -128,19 +129,19 @@ public:
    * Bind a socket to this address. The socket should have been created with a call to socket() on
    * an Instance of the same address family.
    * @param fd supplies the platform socket handle.
-   * @return 0 for success and -1 for failure. The error code associated with a failure will
-   * be accessible in a plaform dependent fashion (e.g. errno for Unix platforms).
+   * @return a Api::SysCallResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
+   *   is successful, errno_ shouldn't be used.
    */
-  virtual int bind(int fd) const PURE;
+  virtual Api::SysCallResult bind(int fd) const PURE;
 
   /**
    * Connect a socket to this address. The socket should have been created with a call to socket()
    * on this object.
    * @param fd supplies the platform socket handle.
-   * @return 0 for success and -1 for failure. The error code associated with a failure will
-   * be accessible in a plaform dependent fashion (e.g. errno for Unix platforms).
+   * @return a Api::SysCallResult with rc_ = 0 for success and rc_ = -1 for failure. If the call
+   *   is successful, errno_ shouldn't be used.
    */
-  virtual int connect(int fd) const PURE;
+  virtual Api::SysCallResult connect(int fd) const PURE;
 
   /**
    * @return the IP address information IFF type() == Type::Ip, otherwise nullptr.
@@ -150,9 +151,8 @@ public:
   /**
    * Create a socket for this address.
    * @param type supplies the socket type to create.
-   * @return the file descriptor naming the socket for success and -1 for failure. The error
-   * code associated with a failure will be accessible in a plaform dependent fashion (e.g.
-   * errno for Unix platforms).
+   * @return the file descriptor naming the socket. In case of a failure, the program would be
+   *   aborted.
    */
   virtual int socket(SocketType type) const PURE;
 

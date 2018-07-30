@@ -13,11 +13,11 @@ namespace ListenerFilters {
 class ListenerFilterNameValues {
 public:
   // Original destination listener filter
-  const std::string ORIGINAL_DST = "envoy.listener.original_dst";
+  const std::string OriginalDst = "envoy.listener.original_dst";
   // Proxy Protocol listener filter
-  const std::string PROXY_PROTOCOL = "envoy.listener.proxy_protocol";
+  const std::string ProxyProtocol = "envoy.listener.proxy_protocol";
   // TLS Inspector listener filter
-  const std::string TLS_INSPECTOR = "envoy.listener.tls_inspector";
+  const std::string TlsInspector = "envoy.listener.tls_inspector";
 };
 
 typedef ConstSingleton<ListenerFilterNameValues> ListenerFilterNames;
