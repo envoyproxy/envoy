@@ -376,16 +376,16 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
   const auto timeout = DurationUtil::durationToMilliseconds(update_merge_window);
 
   // Find pending updates for this cluster.
-  if (updates_map_.count(cluster.info()->name()) != 1) {
-    updates_map_[cluster.info()->name()] = std::make_unique<PendingUpdatesByPriorityMap>();
+  auto& updates_by_prio = updates_map_[cluster.info()->name()];
+  if (!updates_by_prio) {
+    updates_by_prio.reset(new PendingUpdatesByPriorityMap());
   }
-  PendingUpdatesByPriorityMapPtr& updates_by_prio = updates_map_[cluster.info()->name()];
 
   // Find pending updates for this priority.
-  if (updates_by_prio->count(priority) != 1) {
-    (*updates_by_prio)[priority] = std::make_unique<PendingUpdates>();
+  auto& updates = (*updates_by_prio)[priority];
+  if (!updates) {
+    updates.reset(new PendingUpdates());
   }
-  PendingUpdatesPtr& updates = (*updates_by_prio)[priority];
 
   // Has an update_merge_window gone by since the last update? If so, don't schedule
   // the update so it can be applied immediately. Ditto if this is not a mergeable update.
