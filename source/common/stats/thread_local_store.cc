@@ -164,7 +164,7 @@ absl::string_view ThreadLocalStoreImpl::truncateStatNameIfNeeded(absl::string_vi
 
     // Note that the heap-allocator does not truncate itself; we have to
     // truncate here if we are using heap-allocation as a fallback due to an
-    // exahusted shared-memroy block
+    // exahusted shared-memory block
     if (name.size() > max_length) {
       ENVOY_LOG_MISC(
           warn,

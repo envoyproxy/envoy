@@ -144,7 +144,9 @@ HotRestartImpl::HotRestartImpl(Options& options)
 Stats::RawStatData* HotRestartImpl::alloc(absl::string_view name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
   Thread::LockGuard lock(stat_lock_);
-  // The name is truncated in ThreadLocalStore before this is called.
+  // In production, the name is truncated in ThreadLocalStore before this
+  // is called. This is just a sanity check to make sure that actually happens;
+  // it is coded as an if/return-null to facilitate testing.
   size_t max_length = options_.statsOptions().maxNameLength();
   if (name.length() > max_length) {
     ENVOY_LOG(error, "HotRestartImpl::alloc({}) exceeded max length {}", name, max_length);

@@ -287,11 +287,6 @@ private:
 // available. This could be resolved with placed new, or another nesting level.
 template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
-  /**
-   * @param stats_options The stat options, which must live longer than the allocator.
-   */
-  StatDataAllocatorImpl() {}
-
   // StatDataAllocator
   CounterSharedPtr makeCounter(absl::string_view name, std::string&& tag_extracted_name,
                                std::vector<Tag>&& tags) override;
