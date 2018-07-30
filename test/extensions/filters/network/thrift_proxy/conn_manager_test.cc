@@ -426,6 +426,48 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin
   EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
 }
 
+TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) {
+  initializeFilter();
+  addSeq(buffer_, {
+                      0x00, 0x00, 0x00, 0x64, // header: 100 bytes
+                      0x0f, 0xff, 0x00, 0x00, // magic, flags
+                      0x00, 0x00, 0x00, 0x01, // sequence id
+                      0x00, 0x01, 0x00, 0x02, // header size 4, binary proto, 2 transforms
+                      0x01, 0x02, 0x00, 0x00, // transforms: 1, 2; padding
+                  });
+
+  std::string err = "Unknown transform 1";
+  uint8_t len = 41 + err.length();
+  addSeq(write_buffer_, {
+                            0x00, 0x00, 0x00, len,  // header frame size
+                            0x0f, 0xff, 0x00, 0x00, // magic, flags
+                            0x00, 0x00, 0x00, 0x00, // sequence id 0
+                            0x00, 0x01, 0x00, 0x00, // header size 4, binary, 0 transforms
+                            0x00, 0x00,             // header padding
+                            0x80, 0x01, 0x00, 0x03, // binary, exception
+                            0x00, 0x00, 0x00, 0x00, // message name ""
+                            0x00, 0x00, 0x00, 0x00, // sequence id
+                            0x0b, 0x00, 0x01,       // begin string field
+                        });
+  addInt32(write_buffer_, err.length());
+  addString(write_buffer_, err);
+  addSeq(write_buffer_, {
+                            0x08, 0x00, 0x02,       // begin i32 field
+                            0x00, 0x00, 0x00, 0x05, // missing result
+                            0x00,                   // stop field
+                        });
+
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, false))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
+        EXPECT_EQ(bufferToString(write_buffer_), bufferToString(buffer));
+      }));
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+}
+
 TEST_F(ThriftConnectionManagerTest, OnEvent) {
   // No active calls
   {
@@ -704,6 +746,46 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
   EXPECT_CALL(*decoder_filter_, resetUpstreamConnection());
+  EXPECT_EQ(true, callbacks->upstreamData(write_buffer_));
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(0U, store_.counter("test.response").value());
+  EXPECT_EQ(0U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
+  EXPECT_EQ(0U, store_.counter("test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+  EXPECT_EQ(1U, store_.counter("test.response_decoding_error").value());
+}
+
+TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
+  initializeFilter();
+  writeMessage(buffer_, TransportType::Header, ProtocolType::Binary, MessageType::Call, 0x0F);
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+
+  // Response with unknown transform
+  addSeq(write_buffer_, {
+                            0x00, 0x00, 0x00, 0x64, // header: 100 bytes
+                            0x0f, 0xff, 0x00, 0x00, // magic, flags
+                            0x00, 0x00, 0x00, 0x01, // sequence id
+                            0x00, 0x01, 0x00, 0x02, // header size 4, binary proto, 2 transforms
+                            0x01, 0x02, 0x00, 0x00, // transforms: 1, 2; padding
+                        });
+
+  callbacks->startUpstreamResponse(TransportType::Header, ProtocolType::Binary);
+
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
   EXPECT_EQ(true, callbacks->upstreamData(write_buffer_));
 
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();

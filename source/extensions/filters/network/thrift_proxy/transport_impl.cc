@@ -8,6 +8,7 @@
 #include "extensions/filters/network/thrift_proxy/buffer_helper.h"
 #include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
 #include "extensions/filters/network/thrift_proxy/framed_transport_impl.h"
+#include "extensions/filters/network/thrift_proxy/header_transport_impl.h"
 #include "extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
 
 namespace Envoy {
@@ -25,7 +26,16 @@ bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMetada
     int32_t size = BufferHelper::peekI32(buffer);
     uint16_t proto_start = BufferHelper::peekU16(buffer, 4);
 
-    if (size > 0 && size <= FramedTransportImpl::MaxFrameSize) {
+    // Currently, transport detection depends on the following:
+    // 1. Protocol may only be binary or compact, which start with 0x8001 or 0x8201.
+    // 2. If unframed transport, size will appear negative due to leading protocol bytes.
+    // 3. If header transport, size is followed by 0x0FFF which is distinct from leading
+    //    protocol bytes.
+    // 4. For framed transport, size is followed by protocol bytes.
+    if (size > 0 && size <= HeaderTransportImpl::MaxFrameSize &&
+        HeaderTransportImpl::isMagic(proto_start)) {
+      setTransport(std::make_unique<HeaderTransportImpl>());
+    } else if (size > 0 && size <= FramedTransportImpl::MaxFrameSize) {
       // TODO(zuercher): Spec says max size is 16,384,000 (0xFA0000). Apache C++ TFramedTransport
       // is configurable, but defaults to 256 MB (0x1000000).
       if (BinaryProtocolImpl::isMagic(proto_start) || CompactProtocolImpl::isMagic(proto_start)) {

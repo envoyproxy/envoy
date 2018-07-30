@@ -781,6 +781,119 @@ TEST(DecoderTest, OnData) {
   EXPECT_TRUE(underflow);
 }
 
+TEST(DecoderTest, OnDataWithProtocolHint) {
+  NiceMock<MockTransport>* transport = new NiceMock<MockTransport>();
+  NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
+  NiceMock<MockDecoderCallbacks> callbacks;
+  StrictMock<ThriftFilters::MockDecoderFilter> filter;
+  ON_CALL(callbacks, newDecoderFilter()).WillByDefault(ReturnRef(filter));
+
+  InSequence dummy;
+  Decoder decoder(TransportPtr{transport}, ProtocolPtr{proto}, callbacks);
+  Buffer::OwnedImpl buffer;
+
+  EXPECT_CALL(*transport, decodeFrameStart(Ref(buffer), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setFrameSize(100);
+        metadata.setProtocol(ProtocolType::Binary);
+        return true;
+      }));
+  EXPECT_CALL(*proto, type()).WillOnce(Return(ProtocolType::Auto));
+  EXPECT_CALL(*proto, setType(ProtocolType::Binary));
+  EXPECT_CALL(filter, transportBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> ThriftFilters::FilterStatus {
+        EXPECT_TRUE(metadata->hasFrameSize());
+        EXPECT_EQ(100U, metadata->frameSize());
+
+        EXPECT_TRUE(metadata->hasProtocol());
+        EXPECT_EQ(ProtocolType::Binary, metadata->protocol());
+
+        return ThriftFilters::FilterStatus::Continue;
+      }));
+
+  EXPECT_CALL(*proto, readMessageBegin(Ref(buffer), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setMethodName("name");
+        metadata.setMessageType(MessageType::Call);
+        metadata.setSequenceId(100);
+        return true;
+      }));
+  EXPECT_CALL(filter, messageBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr metadata) -> ThriftFilters::FilterStatus {
+        EXPECT_TRUE(metadata->hasMethodName());
+        EXPECT_TRUE(metadata->hasMessageType());
+        EXPECT_TRUE(metadata->hasSequenceId());
+        EXPECT_EQ("name", metadata->methodName());
+        EXPECT_EQ(MessageType::Call, metadata->messageType());
+        EXPECT_EQ(100U, metadata->sequenceId());
+        return ThriftFilters::FilterStatus::Continue;
+      }));
+
+  EXPECT_CALL(*proto, readStructBegin(Ref(buffer), _)).WillOnce(Return(true));
+  EXPECT_CALL(filter, structBegin(absl::string_view()))
+      .WillOnce(Return(ThriftFilters::FilterStatus::Continue));
+
+  EXPECT_CALL(*proto, readFieldBegin(Ref(buffer), _, _, _))
+      .WillOnce(DoAll(SetArgReferee<2>(FieldType::Stop), Return(true)));
+  EXPECT_CALL(*proto, readStructEnd(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(filter, structEnd()).WillOnce(Return(ThriftFilters::FilterStatus::Continue));
+
+  EXPECT_CALL(*proto, readMessageEnd(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(filter, messageEnd()).WillOnce(Return(ThriftFilters::FilterStatus::Continue));
+
+  EXPECT_CALL(*transport, decodeFrameEnd(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(filter, transportEnd()).WillOnce(Return(ThriftFilters::FilterStatus::Continue));
+
+  bool underflow = false;
+  EXPECT_EQ(ThriftFilters::FilterStatus::Continue, decoder.onData(buffer, underflow));
+  EXPECT_TRUE(underflow);
+}
+
+TEST(DecoderTest, OnDataWithInconsistentProtocolHint) {
+  NiceMock<MockTransport>* transport = new NiceMock<MockTransport>();
+  NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
+  NiceMock<MockDecoderCallbacks> callbacks;
+  StrictMock<ThriftFilters::MockDecoderFilter> filter;
+  ON_CALL(callbacks, newDecoderFilter()).WillByDefault(ReturnRef(filter));
+
+  InSequence dummy;
+  Decoder decoder(TransportPtr{transport}, ProtocolPtr{proto}, callbacks);
+  Buffer::OwnedImpl buffer;
+
+  EXPECT_CALL(*transport, decodeFrameStart(Ref(buffer), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setFrameSize(100);
+        metadata.setProtocol(ProtocolType::Binary);
+        return true;
+      }));
+  EXPECT_CALL(*proto, type()).WillRepeatedly(Return(ProtocolType::Compact));
+
+  bool underflow = false;
+  EXPECT_THROW_WITH_MESSAGE(decoder.onData(buffer, underflow), EnvoyException,
+                            "transport reports protocol binary, but configured for compact");
+}
+
+TEST(DecoderTest, OnDataThrowsTransportAppException) {
+  NiceMock<MockTransport>* transport = new NiceMock<MockTransport>();
+  NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
+  NiceMock<MockDecoderCallbacks> callbacks;
+  StrictMock<ThriftFilters::MockDecoderFilter> filter;
+  ON_CALL(callbacks, newDecoderFilter()).WillByDefault(ReturnRef(filter));
+
+  InSequence dummy;
+  Decoder decoder(TransportPtr{transport}, ProtocolPtr{proto}, callbacks);
+  Buffer::OwnedImpl buffer;
+
+  EXPECT_CALL(*transport, decodeFrameStart(Ref(buffer), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setAppException(AppExceptionType::InvalidTransform, "unknown xform");
+        return true;
+      }));
+
+  bool underflow = false;
+  EXPECT_THROW_WITH_MESSAGE(decoder.onData(buffer, underflow), AppException, "unknown xform");
+}
+
 TEST(DecoderTest, OnDataResumes) {
   NiceMock<MockTransport>* transport = new NiceMock<MockTransport>();
   NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
