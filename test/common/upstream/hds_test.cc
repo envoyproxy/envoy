@@ -4,6 +4,7 @@
 #include "common/stats/stats_impl.h"
 #include "common/upstream/health_discovery_service.h"
 
+#include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -46,7 +47,7 @@ public:
         }));
     hds_delegate_.reset(new HdsDelegate(node_, stats_store_, Grpc::AsyncClientPtr(async_client_),
                                         dispatcher_, runtime_, stats_store_, ssl_context_manager_,
-                                        secret_manager_, random_, test_factory_));
+                                        secret_manager_, random_, test_factory_, log_manager_));
   }
   envoy::service::discovery::v2::HealthCheckSpecifier* simpleMessage() {
 
@@ -94,6 +95,7 @@ public:
   Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
   Secret::MockSecretManager secret_manager_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
 };
 
 TEST_F(HdsTest, TestProcessMessageEndpoints) {

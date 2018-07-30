@@ -102,7 +102,8 @@ public:
               Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
               Runtime::Loader& runtime, Envoy::Stats::Store& stats,
               Ssl::ContextManager& ssl_context_manager, Secret::SecretManager& secret_manager,
-              Runtime::RandomGenerator& random, ClusterInfoFactory& info_factory);
+              Runtime::RandomGenerator& random, ClusterInfoFactory& info_factory,
+              AccessLog::AccessLogManager& access_log_manager);
 
   // Grpc::TypedAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
@@ -153,6 +154,7 @@ private:
   std::vector<envoy::api::v2::Cluster> clusters_config_;
   std::vector<HdsClusterPtr> hds_clusters_;
   ClusterInfoFactory& info_factory_;
+  AccessLog::AccessLogManager& access_log_manager_;
 };
 
 typedef std::unique_ptr<HdsDelegate> HdsDelegatePtr;

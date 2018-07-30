@@ -10,14 +10,15 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
                          Runtime::Loader& runtime, Envoy::Stats::Store& stats,
                          Ssl::ContextManager& ssl_context_manager,
                          Secret::SecretManager& secret_manager, Runtime::RandomGenerator& random,
-                         ClusterInfoFactory& info_factory)
+                         ClusterInfoFactory& info_factory,
+                         AccessLog::AccessLogManager& access_log_manager)
     : stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_delegate."))},
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")),
       runtime_(runtime), store_stats(stats), ssl_context_manager_(ssl_context_manager),
       secret_manager_(secret_manager), random_(random), dispatcher_(dispatcher),
-      info_factory_(info_factory) {
+      info_factory_(info_factory), access_log_manager_(access_log_manager) {
   health_check_request_.mutable_node()->MergeFrom(node);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   server_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
@@ -132,9 +133,9 @@ void HdsDelegate::processMessage(
                                               info_factory_));
 
     for (auto& health_check : cluster_config.health_checks()) {
-      AccessLog::AccessLogManagerPtr log_manager;
-      health_checkers_.push_back(Upstream::HealthCheckerFactory::create(
-          health_check, *hds_clusters_.back(), runtime_, random_, dispatcher_, *log_manager));
+      health_checkers_.push_back(
+          Upstream::HealthCheckerFactory::create(health_check, *hds_clusters_.back(), runtime_,
+                                                 random_, dispatcher_, access_log_manager_));
     }
   }
 }
