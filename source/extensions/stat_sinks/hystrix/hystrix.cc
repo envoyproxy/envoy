@@ -10,6 +10,7 @@
 #include "common/http/headers.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -41,6 +42,16 @@ void ClusterStatsCache::printRollingWindow(absl::string_view name, RollingWindow
   out_str << std::endl;
 }
 
+std::string ClusterStatsCache::printTimingHistogram() {
+  std::stringstream out_str;
+  bool is_first = true;
+  for (std::pair<std::string, double> element : timing_) {
+    HystrixSink::addDoubleToStream(element.first, element.second, out_str, is_first);
+    is_first = false;
+  }
+  return out_str.str();
+}
+
 // Add new value to rolling window, in place of oldest one.
 void HystrixSink::pushNewValue(RollingWindow& rolling_window, uint64_t value) {
   if (rolling_window.empty()) {
@@ -65,7 +76,8 @@ uint64_t HystrixSink::getRollingValue(RollingWindow rolling_window) {
 }
 
 void HystrixSink::updateRollingWindowMap(const Upstream::ClusterInfo& cluster_info,
-                                         ClusterStatsCache& cluster_stats_cache) {
+                                         ClusterStatsCache& cluster_stats_cache,
+                                         std::unordered_map<std::string, double>& histogram) {
   const std::string cluster_name = cluster_info.name();
   Upstream::ClusterStats& cluster_stats = cluster_info.stats();
   Stats::Scope& cluster_stats_scope = cluster_info.statsScope();
@@ -100,6 +112,8 @@ void HystrixSink::updateRollingWindowMap(const Upstream::ClusterInfo& cluster_in
   uint64_t total = errors + timeouts + success + rejected;
   pushNewValue(cluster_stats_cache.total_, total);
 
+  cluster_stats_cache.timing_ = histogram;
+
   ENVOY_LOG(trace, "{}", printRollingWindows());
 }
 
@@ -113,6 +127,11 @@ void HystrixSink::addStringToStream(absl::string_view key, absl::string_view val
 
 void HystrixSink::addIntToStream(absl::string_view key, uint64_t value, std::stringstream& info,
                                  bool is_first) {
+  addInfoToStream(key, std::to_string(value), info, is_first);
+}
+
+void HystrixSink::addDoubleToStream(absl::string_view key, double value, std::stringstream& info,
+                                    bool is_first) {
   addInfoToStream(key, std::to_string(value), info, is_first);
 }
 
@@ -159,7 +178,7 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
   addIntToStream("rollingCountResponsesFromCache", 0, ss);
 
   // Envoy's "circuit breaker" has similar meaning to hystrix's isolation
-  // so we count upstream_rq_pending_overflow and present it as ss
+  // so we count upstream_rq_pending_overflow and present it as rollingCountSemaphoreRejected
   addIntToStream("rollingCountSemaphoreRejected", rejected, ss);
 
   // Hystrix's short circuit is not similar to Envoy's since it is triggered by 503 responses
@@ -172,11 +191,7 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
   addIntToStream("rollingCountBadRequests", 0, ss);
   addIntToStream("currentConcurrentExecutionCount", 0, ss);
   addIntToStream("latencyExecute_mean", 0, ss);
-
-  // TODO trabetti : add histogram information once available by PR #2932
-  addInfoToStream(
-      "latencyExecute",
-      "{\"0\":0,\"25\":0,\"50\":0,\"75\":0,\"90\":0,\"95\":0,\"99\":0,\"99.5\":0,\"100\":0}", ss);
+  addInfoToStream("latencyExecute", "{" + cluster_stats_cache.printTimingHistogram() + "}", ss);
   addIntToStream("propertyValue_circuitBreakerRequestVolumeThreshold", 0, ss);
   addIntToStream("propertyValue_circuitBreakerSleepWindowInMilliseconds", 0, ss);
   addIntToStream("propertyValue_circuitBreakerErrorThresholdPercentage", 0, ss);
@@ -304,6 +319,31 @@ void HystrixSink::flush(Stats::Source&) {
   incCounter();
   std::stringstream ss;
   Upstream::ClusterManager::ClusterInfoMap clusters = server_.clusterManager().clusters();
+
+  // Save a map of the relevant histograms per cluster in a convenient format.
+  std::unordered_map<std::string, std::unordered_map<std::string, double>> time_histograms;
+  for (const Stats::ParentHistogramSharedPtr histogram : server_.stats().histograms()) {
+    // histogram->name() on clusters of the format "cluster.cluster_name.histogram_name"
+    // i.e. "cluster.service1.upstream_rq_time".
+    std::vector<std::string> split_name = absl::StrSplit(histogram->name(), ".");
+    if (split_name[0] == "clusters" && split_name[2] == "upstream_rq_time") {
+      std::unordered_map<std::string, double> hist_map;
+      for (size_t i = 0; i < histogram->cumulativeStatistics().supportedQuantiles().size(); ++i) {
+        if (histogram->cumulativeStatistics().supportedQuantiles()[i] == 0.999) {
+          // Envoy provide 99.9 percentile, while Hystrix shows 99.5, so there is a small
+          // inaccuracy, which is probably ok since the dashboard is for general information.
+          // Alternatively, we could approximate by the average between 99 and 99.9.
+          hist_map["99.5"] = histogram->cumulativeStatistics().computedQuantiles()[i];
+        } else {
+          hist_map[std::to_string(
+              int(100 * histogram->cumulativeStatistics().supportedQuantiles()[i]))] =
+              histogram->cumulativeStatistics().computedQuantiles()[i];
+        }
+      }
+      time_histograms[split_name[1]] = hist_map;
+    }
+  }
+
   for (auto& cluster : clusters) {
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.second.get().info();
 
@@ -314,7 +354,8 @@ void HystrixSink::flush(Stats::Source&) {
     }
 
     // update rolling window with cluster stats
-    updateRollingWindowMap(*cluster_info, *cluster_stats_cache_ptr);
+    updateRollingWindowMap(*cluster_info, *cluster_stats_cache_ptr,
+                           time_histograms[cluster_info->name()]);
 
     // append it to stream to be sent
     addClusterStatsToStream(

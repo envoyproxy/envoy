@@ -26,6 +26,8 @@ struct ClusterStatsCache {
   void printToStream(std::stringstream& out_str);
   void printRollingWindow(absl::string_view name, RollingWindow rolling_window,
                           std::stringstream& out_str);
+  std::string printTimingHistogram();
+
   std::string cluster_name_;
 
   // Rolling windows
@@ -34,6 +36,8 @@ struct ClusterStatsCache {
   RollingWindow total_;
   RollingWindow timeouts_;
   RollingWindow rejected_;
+
+  std::unordered_map<std::string, double> timing_;
 };
 
 typedef std::unique_ptr<ClusterStatsCache> ClusterStatsCachePtr;
@@ -78,7 +82,8 @@ public:
    * Calculate values needed to create the stream and write into the map.
    */
   void updateRollingWindowMap(const Upstream::ClusterInfo& cluster_info,
-                              ClusterStatsCache& cluster_stats_cache);
+                              ClusterStatsCache& cluster_stats_cache,
+                              std::unordered_map<std::string, double>& histogram);
   /**
    * Clear map.
    */
@@ -94,27 +99,34 @@ public:
    */
   uint64_t getRollingValue(RollingWindow rolling_window);
 
-private:
+  /**
+   * Format the given key and value to "key"=value, and adding to the stringstream.
+   */
+  static void addInfoToStream(absl::string_view key, absl::string_view value,
+                              std::stringstream& info, bool is_first = false);
+
+  /**
+   * Format the given key and double value to "key"=<string of uint64_t>, and adding to the
+   * stringstream.
+   */
+  static void addDoubleToStream(absl::string_view key, double value, std::stringstream& info,
+                                bool is_first);
+
   /**
    * Format the given key and absl::string_view value to "key"="value", and adding to the
    * stringstream.
    */
-  void addStringToStream(absl::string_view key, absl::string_view value, std::stringstream& info,
-                         bool is_first = false);
+  static void addStringToStream(absl::string_view key, absl::string_view value,
+                                std::stringstream& info, bool is_first = false);
 
   /**
    * Format the given key and uint64_t value to "key"=<string of uint64_t>, and adding to the
    * stringstream.
    */
-  void addIntToStream(absl::string_view key, uint64_t value, std::stringstream& info,
-                      bool is_first = false);
+  static void addIntToStream(absl::string_view key, uint64_t value, std::stringstream& info,
+                             bool is_first = false);
 
-  /**
-   * Format the given key and value to "key"=value, and adding to the stringstream.
-   */
-  void addInfoToStream(absl::string_view key, absl::string_view value, std::stringstream& info,
-                       bool is_first = false);
-
+private:
   /**
    * Generate HystrixCommand event stream.
    */
