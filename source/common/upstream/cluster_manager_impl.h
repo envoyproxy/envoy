@@ -369,6 +369,7 @@ private:
 
   struct PendingUpdates {
     void enableTimer(const uint64_t timeout) {
+      ASSERT(!timer_enabled_);
       if (timer_ != nullptr) {
         timer_->enableTimer(std::chrono::milliseconds(timeout));
         timer_enabled_ = true;
