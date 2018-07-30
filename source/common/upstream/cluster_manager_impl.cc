@@ -345,11 +345,11 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     // See https://github.com/envoyproxy/envoy/pull/3941 for more context.
 
     bool scheduled = false;
-    bool merging_enabled = cluster.info()->lbConfig().has_update_merge_window();
+    const bool merging_enabled = cluster.info()->lbConfig().has_update_merge_window();
 
     if (merging_enabled) {
       // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
-      bool is_mergeable = !hosts_added.size() && !hosts_removed.size();
+      const bool is_mergeable = !hosts_added.size() && !hosts_removed.size();
 
       // If this is not mergeable, we should cancel any scheduled updates since
       // we'll deliver it immediately.
