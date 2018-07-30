@@ -343,7 +343,6 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     // of removals, these maps will leak those HostSharedPtrs.
     //
     // See https://github.com/envoyproxy/envoy/pull/3941 for more context.
-
     bool scheduled = false;
     const bool merging_enabled = cluster.info()->lbConfig().has_update_merge_window();
 

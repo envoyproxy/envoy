@@ -378,7 +378,7 @@ private:
       }
     }
     bool disableTimer() {
-      bool was_enabled = timer_enabled_;
+      const bool was_enabled = timer_enabled_;
       if (timer_ != nullptr) {
         timer_->disableTimer();
         timer_enabled_ = false;
