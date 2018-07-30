@@ -356,16 +356,7 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
 
     // If an update was not scheduled for later, deliver it immediately.
     if (!scheduled) {
-      // Is this a regular update?
-      if (!is_mergeable) {
-        cm_stats_.regular_updates_.inc();
-      } else {
-        // Or are we outside a merge window?
-        if (merging_enabled && !scheduled) {
-          cm_stats_.merged_updates_offwindow_.inc();
-        }
-      }
-
+      cm_stats_.cluster_updated_.inc();
       postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
     }
   });
@@ -400,14 +391,21 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
   // the update so it can be applied immediately. Ditto if this is not a mergeable update.
   const auto delta = std::chrono::steady_clock::now() - updates->last_updated_;
   const uint64_t delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
-  if (delta_ms > timeout || !mergeable) {
+  const bool offwindow = delta_ms > timeout;
+  if (offwindow || !mergeable) {
     // If there was a pending update, we cancel the pending merged update.
     //
     // Note: it's possible that even though we are outside of a merge window (delta_ms > timeout),
     // a timer is enabled. This race condition is fine, since we'll disable the timer here and
     // deliver the update immediately.
+
+    // Why wasn't the update scheduled for later delivery?
+    if (mergeable && offwindow) {
+      cm_stats_.update_merge_offwindow_.inc();
+    }
+
     if (updates->disableTimer()) {
-      cm_stats_.merged_updates_cancelled_.inc();
+      cm_stats_.update_merge_cancelled_.inc();
     }
 
     updates->last_updated_ = std::chrono::steady_clock::now();
@@ -441,7 +439,7 @@ void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
 
   postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
 
-  cm_stats_.merged_updates_.inc();
+  cm_stats_.cluster_updated_via_merge_.inc();
   updates.timer_enabled_ = false;
   updates.last_updated_ = std::chrono::steady_clock::now();
 }

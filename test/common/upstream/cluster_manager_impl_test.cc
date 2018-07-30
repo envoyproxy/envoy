@@ -175,8 +175,8 @@ public:
         monotonic_time_source_));
   }
 
-  void createWithLocalClusterUpdate() {
-    const std::string yaml = R"EOF(
+  void createWithLocalClusterUpdate(const bool enable_merge_window=true) {
+    std::string yaml = R"EOF(
   static_resources:
     clusters:
     - name: cluster_1
@@ -190,9 +190,16 @@ public:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11002
+  )EOF";
+    const std::string merge_window = R"EOF(
       common_lb_config:
         update_merge_window: 3s
   )EOF";
+
+    if (enable_merge_window) {
+      yaml += merge_window;
+    }
+
     const auto& bootstrap = parseBootstrapFromV2Yaml(yaml);
 
     cluster_manager_.reset(new TestClusterManagerImpl(
@@ -1745,8 +1752,9 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   hosts_removed.push_back((*hosts)[0]);
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.regular_updates").value());
-  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.merged_updates").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 
   // This calls should be merged, since there are not added/removed hosts.
   hosts_removed.clear();
@@ -1754,21 +1762,24 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.regular_updates").value());
-  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.merged_updates").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 
   // Ensure the merged updates were applied.
   timer->callback_();
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.regular_updates").value());
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 
   // Add the host back, the update should be immediately applied.
   hosts_removed.clear();
   hosts_added.push_back((*hosts)[0]);
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.regular_updates").value());
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
+  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 
   // Now emit 3 updates that should be scheduled: metadata, HC, and weight.
   hosts_added.clear();
@@ -1786,16 +1797,82 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
 
   // Updates not delivered yet.
-  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.merged_updates_cancelled").value());
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
+  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 
   // Remove the host again, should cancel the scheduled update and be delivered immediately.
   hosts_removed.push_back((*hosts)[0]);
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
 
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates_cancelled").value());
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
+  EXPECT_EQ(3, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
+
+}
+
+// Tests that mergeable updates outside of a window get applied immediately.
+TEST_F(ClusterManagerImplTest, MergedUpdatesOffWindow) {
+  createWithLocalClusterUpdate();
+
+  // Ensure we see the right set of added/removed hosts on every call.
+  EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // HC update, immediately delivered.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(0, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }));
+
+  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
+  HostVectorSharedPtr hosts(
+      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_added;
+  HostVector hosts_removed;
+
+  // The first update should be applied immediately, because even though it's mergeable
+  // it's outside a merge window.
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.update_merge_offwindow").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
+}
+
+// Tests that mergeable updates outside of a window get applied immediately when
+// merging is disabled, and that the counters are correct.
+TEST_F(ClusterManagerImplTest, MergedUpdatesOffWindowDisabled) {
+  createWithLocalClusterUpdate(false);
+
+  // Ensure we see the right set of added/removed hosts on every call.
+  EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // HC update, immediately delivered.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(0, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }));
+
+  const Cluster& cluster = cluster_manager_->clusters().begin()->second;
+  HostVectorSharedPtr hosts(
+      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_added;
+  HostVector hosts_removed;
+
+  // The first update should be applied immediately, because even though it's mergeable
+  // and outside a merge window, merging is disabled.
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
+      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_offwindow").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 }
 
 class ClusterManagerInitHelperTest : public testing::Test {
