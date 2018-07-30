@@ -1809,7 +1809,6 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   EXPECT_EQ(3, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
-
 }
 
 // Tests that mergeable updates outside of a window get applied immediately.
