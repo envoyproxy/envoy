@@ -359,11 +359,11 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
       // Is this a regular update?
       if (!is_mergeable) {
         cm_stats_.regular_updates_.inc();
-      }
-
-      // Or are we outside a merge window?
-      if (is_mergeable && !scheduled) {
-        cm_stats_.merged_updates_offwindow_.inc();
+      } else {
+        // Or are we outside a merge window?
+        if (!scheduled) {
+          cm_stats_.merged_updates_offwindow_.inc();
+        }
       }
 
       postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
