@@ -138,7 +138,10 @@ private:
   COUNTER(cluster_added)                                                                           \
   COUNTER(cluster_modified)                                                                        \
   COUNTER(cluster_removed)                                                                         \
+  COUNTER(regular_updates)                                                                         \
   COUNTER(merged_updates)                                                                          \
+  COUNTER(merged_updates_cancelled)                                                                \
+  COUNTER(merged_updates_offwindow)                                                                \
   GAUGE  (active_clusters)                                                                         \
   GAUGE  (warming_clusters)
 // clang-format on

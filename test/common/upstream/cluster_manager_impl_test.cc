@@ -1745,6 +1745,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   hosts_removed.push_back((*hosts)[0]);
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.regular_updates").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.merged_updates").value());
 
   // This calls should be merged, since there are not added/removed hosts.
@@ -1753,10 +1754,12 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.regular_updates").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.merged_updates").value());
 
   // Ensure the merged updates were applied.
   timer->callback_();
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.regular_updates").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
 
   // Add the host back, the update should be immediately applied.
@@ -1764,6 +1767,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   hosts_added.push_back((*hosts)[0]);
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.regular_updates").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
 
   // Now emit 3 updates that should be scheduled: metadata, HC, and weight.
@@ -1782,6 +1786,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
 
   // Updates not delivered yet.
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.merged_updates_cancelled").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
 
   // Remove the host again, should cancel the scheduled update and be delivered immediately.
@@ -1789,7 +1794,8 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
 
-  EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.merged_updates").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates_cancelled").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.merged_updates").value());
 }
 
 class ClusterManagerInitHelperTest : public testing::Test {

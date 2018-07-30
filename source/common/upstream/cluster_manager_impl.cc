@@ -345,11 +345,10 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     // See https://github.com/envoyproxy/envoy/pull/3941 for more context.
     bool scheduled = false;
     const bool merging_enabled = cluster.info()->lbConfig().has_update_merge_window();
+    // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
+    const bool is_mergeable = !hosts_added.size() && !hosts_removed.size();
 
     if (merging_enabled) {
-      // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
-      const bool is_mergeable = !hosts_added.size() && !hosts_removed.size();
-
       // If this is not mergeable, we should cancel any scheduled updates since
       // we'll deliver it immediately.
       scheduled = scheduleUpdate(cluster, priority, is_mergeable);
@@ -357,6 +356,16 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
 
     // If an update was not scheduled for later, deliver it immediately.
     if (!scheduled) {
+      // Is this a regular update?
+      if (!is_mergeable) {
+        cm_stats_.regular_updates_.inc();
+      }
+
+      // Or are we outside a merge window?
+      if (is_mergeable && !scheduled) {
+        cm_stats_.merged_updates_offwindow_.inc();
+      }
+
       postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
     }
   });
@@ -392,9 +401,9 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
   const auto delta = std::chrono::steady_clock::now() - updates->last_updated_;
   const uint64_t delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
   if (delta_ms > timeout || !mergeable) {
-    // If there was a pending update, we count this update as merged update.
+    // If there was a pending update, we cancel the pending merged update.
     if (updates->disableTimer()) {
-      cm_stats_.merged_updates_.inc();
+      cm_stats_.merged_updates_cancelled_.inc();
     }
 
     updates->last_updated_ = std::chrono::steady_clock::now();
