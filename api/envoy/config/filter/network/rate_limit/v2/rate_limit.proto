@@ -21,7 +21,7 @@ message RateLimit {
 
   // The rate limit descriptor list to use in the rate limit service request.
   repeated envoy.api.v2.ratelimit.RateLimitDescriptor descriptors = 3
-      [(validate.rules).repeated .min_items = 1];
+      [(validate.rules).repeated.min_items = 1];
 
   // The timeout in milliseconds for the rate limit service RPC. If not
   // set, this defaults to 20ms.

@@ -114,7 +114,7 @@ message TcpProxy {
 
     // The route table for the filter. All filter instances must have a route
     // table, even if it is empty.
-    repeated TCPRoute routes = 1 [(validate.rules).repeated .min_items = 1];
+    repeated TCPRoute routes = 1 [(validate.rules).repeated.min_items = 1];
   }
 
   // TCP Proxy filter configuration using deprecated V1 format. This is required for complex

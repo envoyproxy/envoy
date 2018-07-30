@@ -28,7 +28,7 @@ message GrpcJsonTranscoder {
   // the transcoder will translate. If the service name doesn't exist in ``proto_descriptor``,
   // Envoy will fail at startup. The ``proto_descriptor`` may contain more services than
   // the service names specified here, but they won't be translated.
-  repeated string services = 2 [(validate.rules).repeated .min_items = 1];
+  repeated string services = 2 [(validate.rules).repeated.min_items = 1];
 
   message PrintOptions {
     // Whether to add spaces, line breaks and indentation to make the JSON

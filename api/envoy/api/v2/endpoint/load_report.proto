@@ -80,7 +80,7 @@ message ClusterStats {
 
   // Need at least one.
   repeated UpstreamLocalityStats upstream_locality_stats = 2
-      [(validate.rules).repeated .min_items = 1];
+      [(validate.rules).repeated.min_items = 1];
 
   // Cluster-level stats such as total_successful_requests may be computed by
   // summing upstream_locality_stats. In addition, below there are additional
