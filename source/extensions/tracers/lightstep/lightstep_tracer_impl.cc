@@ -151,7 +151,14 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
     tls_options.use_thread = false;
     tls_options.use_single_key_propagation = true;
     tls_options.logger_sink = LightStepLogger{};
+
+    // If the default min_flush_spans value is too small, spans can be dropped between reports.
+    // Hence, we choose a number that's large enough, but divide by the number of CPUs since Envoy
+    // creates separate tracers for each thread.
+    //
+    // See https://github.com/lightstep/lightstep-tracer-cpp/issues/106
     static const size_t default_min_flush_spans = 2'000U / std::thread::hardware_concurrency();
+
     tls_options.max_buffered_spans = std::function<size_t()>{[this] {
       return runtime_.snapshot().getInteger("tracing.lightstep.min_flush_spans",
                                             default_min_flush_spans);
