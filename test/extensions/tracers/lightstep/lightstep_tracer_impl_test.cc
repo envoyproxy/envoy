@@ -181,8 +181,8 @@ TEST_F(LightStepDriverTest, FlushSeveralSpans) {
             return &request;
           }));
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("tracing.lightstep.min_flush_spans", LightStepDriver::min_flush_spans))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans",
+                                             LightStepDriver::default_min_flush_spans))
       .Times(AtLeast(1))
       .WillRepeatedly(Return(2));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
@@ -242,8 +242,8 @@ TEST_F(LightStepDriverTest, FlushOneFailure) {
             return &request;
           }));
 
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("tracing.lightstep.min_flush_spans", LightStepDriver::min_flush_spans))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans",
+                                             LightStepDriver::default_min_flush_spans))
       .WillOnce(Return(1));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
@@ -360,8 +360,8 @@ TEST_F(LightStepDriverTest, FlushOneSpanGrpcFailure) {
 
             return &request;
           }));
-  EXPECT_CALL(runtime_.snapshot_,
-              getInteger("tracing.lightstep.min_flush_spans", LightStepDriver::min_flush_spans))
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.min_flush_spans",
+                                             LightStepDriver::default_min_flush_spans))
       .WillOnce(Return(1));
   EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.lightstep.request_timeout", 5000U))
       .WillOnce(Return(5000U));
