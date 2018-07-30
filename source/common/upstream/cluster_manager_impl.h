@@ -368,9 +368,6 @@ private:
   typedef std::map<std::string, ClusterDataPtr> ClusterMap;
 
   struct PendingUpdates {
-    Event::TimerPtr timer_;
-    bool timer_enabled_{};
-    MonotonicTime last_updated_;
     void enableTimer(const uint64_t timeout) {
       if (timer_ != nullptr) {
         timer_->enableTimer(std::chrono::milliseconds(timeout));
@@ -385,6 +382,16 @@ private:
       }
       return was_enabled;
     }
+
+    Event::TimerPtr timer_;
+    bool timer_enabled_{};
+    // This is default constructed to the clock's epoch:
+    // https://en.cppreference.com/w/cpp/chrono/time_point/time_point
+    //
+    // This will usually be the computer's boot time, which means that given a not very large
+    // `Cluster.CommonLbConfig.update_merge_window`, the first update will trigger immediately
+    // (the expected behavior).
+    MonotonicTime last_updated_;
   };
   using PendingUpdatesPtr = std::unique_ptr<PendingUpdates>;
   using PendingUpdatesByPriorityMap = std::unordered_map<uint32_t, PendingUpdatesPtr>;
