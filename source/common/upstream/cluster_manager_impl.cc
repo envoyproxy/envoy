@@ -423,8 +423,8 @@ void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
   // Remember that these merged updates are _only_ for updates related to
   // HC/weight/metadata changes. That's why added/removed are empty. All
   // adds/removals were already immediately broadcasted.
-  const HostVector hosts_added;
-  const HostVector hosts_removed;
+  static const HostVector hosts_added;
+  static const HostVector hosts_removed;
 
   postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
 
