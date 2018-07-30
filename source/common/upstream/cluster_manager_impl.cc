@@ -374,26 +374,18 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
 bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable) {
   const auto& update_merge_window = cluster.info()->lbConfig().update_merge_window();
   const auto timeout = DurationUtil::durationToMilliseconds(update_merge_window);
-  PendingUpdatesByPriorityMapPtr updates_by_prio;
-  PendingUpdatesPtr updates;
 
   // Find pending updates for this cluster.
-  const auto updates_by_prio_it = updates_map_.find(cluster.info()->name());
-  if (updates_by_prio_it != updates_map_.end()) {
-    updates_by_prio = updates_by_prio_it->second;
-  } else {
-    updates_by_prio = std::make_shared<PendingUpdatesByPriorityMap>();
-    updates_map_[cluster.info()->name()] = updates_by_prio;
+  if (updates_map_.count(cluster.info()->name()) != 1) {
+    updates_map_[cluster.info()->name()] = std::make_unique<PendingUpdatesByPriorityMap>();
   }
+  PendingUpdatesByPriorityMapPtr& updates_by_prio = updates_map_[cluster.info()->name()];
 
   // Find pending updates for this priority.
-  const auto updates_it = updates_by_prio->find(priority);
-  if (updates_it != updates_by_prio->end()) {
-    updates = updates_it->second;
-  } else {
-    updates = std::make_shared<PendingUpdates>();
-    (*updates_by_prio)[priority] = updates;
+  if (updates_by_prio->count(priority) != 1) {
+    (*updates_by_prio)[priority] = std::make_unique<PendingUpdates>();
   }
+  PendingUpdatesPtr& updates = (*updates_by_prio)[priority];
 
   // Has an update_merge_window gone by since the last update? If so, don't schedule
   // the update so it can be applied immediately. Ditto if this is not a mergeable update.
@@ -411,12 +403,8 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
 
   // If there's no timer, create one.
   if (updates->timer_ == nullptr) {
-    std::weak_ptr<PendingUpdates> weak_ptr(updates);
-    updates->timer_ = dispatcher_.createTimer([this, &cluster, priority, weak_ptr]() -> void {
-      auto updates = weak_ptr.lock();
-      if (updates) {
-        applyUpdates(cluster, priority, updates);
-      }
+    updates->timer_ = dispatcher_.createTimer([this, &cluster, priority, &updates]() -> void {
+      applyUpdates(cluster, priority, updates);
     });
   }
 
@@ -429,7 +417,7 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
 }
 
 void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
-                                      PendingUpdatesPtr updates) {
+                                      PendingUpdatesPtr& updates) {
   // Deliver pending updates.
 
   // Remember that these merged updates are _only_ for updates related to

@@ -386,12 +386,12 @@ private:
       return was_enabled;
     }
   };
-  using PendingUpdatesPtr = std::shared_ptr<PendingUpdates>;
+  using PendingUpdatesPtr = std::unique_ptr<PendingUpdates>;
   using PendingUpdatesByPriorityMap = std::unordered_map<uint32_t, PendingUpdatesPtr>;
-  using PendingUpdatesByPriorityMapPtr = std::shared_ptr<PendingUpdatesByPriorityMap>;
+  using PendingUpdatesByPriorityMapPtr = std::unique_ptr<PendingUpdatesByPriorityMap>;
   using ClusterUpdatesMap = std::unordered_map<std::string, PendingUpdatesByPriorityMapPtr>;
 
-  void applyUpdates(const Cluster& cluster, uint32_t priority, PendingUpdatesPtr updates);
+  void applyUpdates(const Cluster& cluster, uint32_t priority, PendingUpdatesPtr& updates);
   bool scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable);
   void createOrUpdateThreadLocalCluster(ClusterData& cluster);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
