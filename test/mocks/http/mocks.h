@@ -464,19 +464,17 @@ MATCHER_P(HeaderMapEqualRef, rhs, "") {
 // Test that a HeaderMapPtr argument includes a given key-value pair, e.g.,
 //  HeaderHasValue("Upgrade", "WebSocket")
 MATCHER_P2(HeaderHasValue, key, value,
-           string(negation ? "doesn't have" : "has") + " a header " + key +
-               " with value \"" + value + "\"") {
-  const Envoy::Http::HeaderEntry* entry =
-      arg->get(Envoy::Http::LowerCaseString(key));
+           std::string(negation ? "doesn't have" : "has") + " a header " + key + " with value \"" +
+               value + "\"") {
+  const Envoy::Http::HeaderEntry* entry = arg->get(Envoy::Http::LowerCaseString(key));
   return entry != nullptr && entry->value() == value;
 }
 
 // Like HeaderHasValue, but matches against a (const) HeaderMap& argument.
 MATCHER_P2(HeaderHasValueRef, key, value,
-           string(negation ? "doesn't have" : "has") + " a header " + key +
-               " with value \"" + value + "\"") {
-  const Envoy::Http::HeaderEntry* entry =
-      arg.get(Envoy::Http::LowerCaseString(key));
+           std::string(negation ? "doesn't have" : "has") + " a header " + key + " with value \"" +
+               value + "\"") {
+  const Envoy::Http::HeaderEntry* entry = arg.get(Envoy::Http::LowerCaseString(key));
   return entry != nullptr && entry->value() == value;
 }
 } // namespace Envoy
