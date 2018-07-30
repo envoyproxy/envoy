@@ -23,10 +23,11 @@ const Http::HeaderMap* getZeroContentLengthHeader() {
 RawHttpClientImpl::RawHttpClientImpl(
     const std::string& cluster_name, Upstream::ClusterManager& cluster_manager,
     const absl::optional<std::chrono::milliseconds>& timeout, const std::string& path_prefix,
-    const std::vector<Http::LowerCaseString>& response_headers_to_remove)
+    const Http::LowerCaseStrUnorderedSet& response_headers_to_remove,
+    const Http::LowerCaseStrUnorderedSet& allowed_request_headers)
     : cluster_name_(cluster_name), path_prefix_(path_prefix),
-      response_headers_to_remove_(response_headers_to_remove), timeout_(timeout),
-      cm_(cluster_manager) {}
+      response_headers_to_remove_(response_headers_to_remove),
+      allowed_request_headers_(allowed_request_headers), timeout_(timeout), cm_(cluster_manager) {}
 
 RawHttpClientImpl::~RawHttpClientImpl() { ASSERT(!callbacks_); }
 
@@ -43,15 +44,16 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   callbacks_ = &callbacks;
 
   Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>(*getZeroContentLengthHeader());
-  for (const auto& header : request.attributes().request().http().headers()) {
-    const Http::LowerCaseString key{header.first};
-    if (key != Http::Headers::get().ContentLength) {
-      if (key == Http::Headers::get().Path && !path_prefix_.empty()) {
+  for (const auto& allowed_header : allowed_request_headers_) {
+    const auto& request_header =
+        request.attributes().request().http().headers().find(allowed_header.get());
+    if (request_header != request.attributes().request().http().headers().cend()) {
+      if (allowed_header == Http::Headers::get().Path && !path_prefix_.empty()) {
         std::string value;
-        absl::StrAppend(&value, path_prefix_, header.second);
-        headers->addCopy(key, value);
+        absl::StrAppend(&value, path_prefix_, request_header->second);
+        headers->addCopy(allowed_header, value);
       } else {
-        headers->addCopy(key, header.second);
+        headers->addCopy(allowed_header, request_header->second);
       }
     }
   }
