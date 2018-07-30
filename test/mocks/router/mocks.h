@@ -318,8 +318,6 @@ public:
   MOCK_METHOD2(createStaticRouteConfigProvider,
                RouteConfigProviderPtr(const envoy::api::v2::RouteConfiguration& route_config,
                                       Server::Configuration::FactoryContext& factory_context));
-  MOCK_METHOD0(getRdsRouteConfigProviders, std::vector<RouteConfigProvider*>());
-  MOCK_METHOD0(getStaticRouteConfigProviders, std::vector<RouteConfigProvider*>());
 };
 
 } // namespace Router
