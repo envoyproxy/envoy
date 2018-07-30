@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <thread>
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/base64.h"
@@ -35,6 +36,14 @@ void LightStepLogger::operator()(lightstep::LogLevel level,
 
 LightStepDriver::LightStepTransporter::LightStepTransporter(LightStepDriver& driver)
     : driver_(driver) {}
+
+// If the default min_flush_spans value is too small, spans can be dropped between reports.
+// Hence, we choose a number that's large enough, but divide by the number of CPUs since Envoy
+// creates separate tracers for each thread.
+//
+// See https://github.com/lightstep/lightstep-tracer-cpp/issues/106
+const size_t LightStepDriver::default_min_flush_spans =
+    2'000U / std::thread::hardware_concurrency();
 
 LightStepDriver::LightStepTransporter::~LightStepTransporter() {
   if (active_request_ != nullptr) {
