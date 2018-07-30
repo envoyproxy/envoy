@@ -50,18 +50,6 @@ public:
   virtual RouteConfigProviderPtr
   createStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,
                                   Server::Configuration::FactoryContext& factory_context) PURE;
-
-  /**
-   * @return std::vector<Router::RouteConfigProvider*> a list of all the
-   * dynamic (RDS) RouteConfigProviders currently loaded.
-   */
-  virtual std::vector<RouteConfigProvider*> getRdsRouteConfigProviders() PURE;
-
-  /**
-   * @return std::vector<Router::RouteConfigProvider*> a list of all the
-   * static RouteConfigProviders currently loaded.
-   */
-  virtual std::vector<RouteConfigProvider*> getStaticRouteConfigProviders() PURE;
 };
 
 } // namespace Router

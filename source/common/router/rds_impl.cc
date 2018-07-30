@@ -197,29 +197,6 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& ad
   RELEASE_ASSERT(config_tracker_entry_, "");
 }
 
-std::vector<RouteConfigProvider*> RouteConfigProviderManagerImpl::getRdsRouteConfigProviders() {
-  std::vector<RouteConfigProvider*> ret;
-  ret.reserve(route_config_subscriptions_.size());
-  for (const auto& element : route_config_subscriptions_) {
-    // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
-    // in the RdsRouteConfigSubscription destructor, and the single threaded nature
-    // of this code, locking the weak_ptr will not fail.
-    auto subscription = element.second.lock();
-    ASSERT(subscription);
-    ASSERT(subscription->route_config_providers_.size() > 0);
-    ret.push_back(*subscription->route_config_providers_.begin());
-  }
-  return ret;
-};
-
-std::vector<RouteConfigProvider*> RouteConfigProviderManagerImpl::getStaticRouteConfigProviders() {
-  std::vector<RouteConfigProvider*> ret;
-
-  ret.assign(static_route_config_providers_.begin(), static_route_config_providers_.end());
-
-  return ret;
-};
-
 Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteConfigProvider(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix) {
@@ -253,7 +230,7 @@ Router::RouteConfigProviderPtr RouteConfigProviderManagerImpl::createRdsRouteCon
   Router::RouteConfigProviderPtr new_provider{
       new RdsRouteConfigProviderImpl(std::move(subscription), factory_context)};
   return new_provider;
-};
+}
 
 RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigProvider(
     const envoy::api::v2::RouteConfiguration& route_config,
@@ -264,29 +241,36 @@ RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigPr
   return provider;
 }
 
-ProtobufTypes::MessagePtr RouteConfigProviderManagerImpl::dumpRouteConfigs() {
+std::unique_ptr<envoy::admin::v2alpha::RoutesConfigDump>
+RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
   auto config_dump = std::make_unique<envoy::admin::v2alpha::RoutesConfigDump>();
 
-  for (const auto& provider : getRdsRouteConfigProviders()) {
-    auto config_info = provider->configInfo();
-    if (config_info) {
-      auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
-      dynamic_config->set_version_info(config_info.value().version_);
-      dynamic_config->mutable_route_config()->MergeFrom(config_info.value().config_);
-      TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
-                                            *(dynamic_config->mutable_last_updated()));
+  for (const auto& element : route_config_subscriptions_) {
+    // Because the RouteConfigProviderManager's weak_ptrs only get cleaned up
+    // in the RdsRouteConfigSubscription destructor, and the single threaded nature
+    // of this code, locking the weak_ptr will not fail.
+    auto subscription = element.second.lock();
+    ASSERT(subscription);
+    ASSERT(subscription->route_config_providers_.size() > 0);
+
+    auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
+    if (subscription->config_info_) {
+      dynamic_config->set_version_info(subscription->config_info_.value().last_config_version_);
+      dynamic_config->mutable_route_config()->MergeFrom(subscription->route_config_proto_);
     }
+    TimestampUtil::systemClockToTimestamp(subscription->last_updated_,
+                                          *dynamic_config->mutable_last_updated());
   }
 
-  for (const auto& provider : getStaticRouteConfigProviders()) {
+  for (const auto& provider : static_route_config_providers_) {
     ASSERT(provider->configInfo());
     auto* static_config = config_dump->mutable_static_route_configs()->Add();
     static_config->mutable_route_config()->MergeFrom(provider->configInfo().value().config_);
     TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
-                                          *(static_config->mutable_last_updated()));
+                                          *static_config->mutable_last_updated());
   }
 
-  return ProtobufTypes::MessagePtr{std::move(config_dump)};
+  return config_dump;
 }
 
 } // namespace Router

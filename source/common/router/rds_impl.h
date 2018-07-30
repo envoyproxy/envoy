@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
@@ -184,10 +185,9 @@ class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
 public:
   RouteConfigProviderManagerImpl(Server::Admin& admin);
 
-  // RouteConfigProviderManager
-  std::vector<RouteConfigProvider*> getRdsRouteConfigProviders() override;
-  std::vector<RouteConfigProvider*> getStaticRouteConfigProviders() override;
+  std::unique_ptr<envoy::admin::v2alpha::RoutesConfigDump> dumpRouteConfigs() const;
 
+  // RouteConfigProviderManager
   RouteConfigProviderPtr createRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       Server::Configuration::FactoryContext& factory_context,
@@ -198,8 +198,6 @@ public:
                                   Server::Configuration::FactoryContext& factory_context) override;
 
 private:
-  ProtobufTypes::MessagePtr dumpRouteConfigs();
-
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map
   // as in ConfigTracker. I.e. the ProviderImpls would have an EntryOwner for these lists
   // Then the lifetime management stuff is centralized and opaque. Plus the copypasta
