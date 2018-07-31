@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.filters.network.thrift_proxy.v2alpha1.router;
+package envoy.config.filter.network.thrift_proxy.v2alpha1.router;
 option go_package = "router";
 
 // [#protodoc-title: Thrift Router]

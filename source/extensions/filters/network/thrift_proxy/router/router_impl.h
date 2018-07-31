@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/extensions/filters/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
+#include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/load_balancer.h"
 
@@ -26,8 +26,7 @@ class RouteEntryImplBase : public RouteEntry,
                            public Route,
                            public std::enable_shared_from_this<RouteEntryImplBase> {
 public:
-  RouteEntryImplBase(
-      const envoy::extensions::filters::network::thrift_proxy::v2alpha1::Route& route);
+  RouteEntryImplBase(const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route);
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -49,7 +48,7 @@ typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedP
 class MethodNameRouteEntryImpl : public RouteEntryImplBase {
 public:
   MethodNameRouteEntryImpl(
-      const envoy::extensions::filters::network::thrift_proxy::v2alpha1::Route& route);
+      const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route);
 
   const std::string& methodName() const { return method_name_; }
 
@@ -62,8 +61,7 @@ private:
 
 class RouteMatcher {
 public:
-  RouteMatcher(
-      const envoy::extensions::filters::network::thrift_proxy::v2alpha1::RouteConfiguration&);
+  RouteMatcher(const envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration&);
 
   RouteConstSharedPtr route(const std::string& method_name) const;
 
@@ -114,7 +112,7 @@ private:
     // Tcp::ConnectionPool::Callbacks
     void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
-    void onPoolReady(Tcp::ConnectionPool::ConnectionData& conn,
+    void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                      Upstream::HostDescriptionConstSharedPtr host) override;
 
     void onRequestComplete();
@@ -129,7 +127,7 @@ private:
     const int32_t seq_id_;
 
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
-    Tcp::ConnectionPool::ConnectionData* conn_data_{};
+    Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
     TransportPtr transport_;
     ProtocolType proto_type_{ProtocolType::Auto};

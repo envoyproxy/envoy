@@ -4,7 +4,9 @@
 #include <functional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
@@ -34,12 +36,14 @@ public:
    * @return RouteConfigProviderPtr a new route configuration provider based on the supplied proto
    *         configuration.
    */
-  static RouteConfigProviderSharedPtr
+  static RouteConfigProviderPtr
   create(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
              config,
          Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
          RouteConfigProviderManager& route_config_provider_manager);
 };
+
+class RouteConfigProviderManagerImpl;
 
 /**
  * Implementation of RouteConfigProvider that holds a static route configuration.
@@ -47,7 +51,9 @@ public:
 class StaticRouteConfigProviderImpl : public RouteConfigProvider {
 public:
   StaticRouteConfigProviderImpl(const envoy::api::v2::RouteConfiguration& config,
-                                Server::Configuration::FactoryContext& factory_context);
+                                Server::Configuration::FactoryContext& factory_context,
+                                RouteConfigProviderManagerImpl& route_config_provider_manager);
+  ~StaticRouteConfigProviderImpl();
 
   // Router::RouteConfigProvider
   Router::ConfigConstSharedPtr config() override { return config_; }
@@ -60,6 +66,7 @@ private:
   ConfigConstSharedPtr config_;
   envoy::api::v2::RouteConfiguration route_config_proto_;
   SystemTime last_updated_;
+  RouteConfigProviderManagerImpl& route_config_provider_manager_;
 };
 
 /**
@@ -79,36 +86,24 @@ struct RdsStats {
   ALL_RDS_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-class RouteConfigProviderManagerImpl;
+class RdsRouteConfigProviderImpl;
 
 /**
- * Implementation of RouteConfigProvider that fetches the route configuration dynamically using
- * the RDS API.
+ * A class that fetches the route configuration dynamically using the RDS API and updates them to
+ * RDS config providers.
  */
-class RdsRouteConfigProviderImpl
-    : public RouteConfigProvider,
-      public Init::Target,
+class RdsRouteConfigSubscription
+    : public Init::Target,
       Envoy::Config::SubscriptionCallbacks<envoy::api::v2::RouteConfiguration>,
       Logger::Loggable<Logger::Id::router> {
 public:
-  ~RdsRouteConfigProviderImpl();
+  ~RdsRouteConfigSubscription();
 
   // Init::Target
   void initialize(std::function<void()> callback) override {
     initialize_callback_ = callback;
     subscription_->start({route_config_name_}, *this);
   }
-
-  // Router::RouteConfigProvider
-  Router::ConfigConstSharedPtr config() override;
-  absl::optional<ConfigInfo> configInfo() const override {
-    if (!config_info_) {
-      return {};
-    } else {
-      return ConfigInfo{route_config_proto_, config_info_.value().last_config_version_};
-    }
-  }
-  SystemTime lastUpdated() const override { return last_updated_; }
 
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const ResourceVector& resources, const std::string& version_info) override;
@@ -118,18 +113,12 @@ public:
   }
 
 private:
-  struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
-    ThreadLocalConfig(ConfigConstSharedPtr initial_config) : config_(initial_config) {}
-
-    ConfigConstSharedPtr config_;
-  };
-
   struct LastConfigInfo {
     uint64_t last_config_hash_;
     std::string last_config_version_;
   };
 
-  RdsRouteConfigProviderImpl(
+  RdsRouteConfigSubscription(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       const std::string& manager_identifier, Server::Configuration::FactoryContext& factory_context,
       const std::string& stat_prefix,
@@ -138,19 +127,55 @@ private:
   void registerInitTarget(Init::Manager& init_manager);
   void runInitializeCallbackIfAny();
 
-  Server::Configuration::FactoryContext& factory_context_;
   std::unique_ptr<Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>> subscription_;
-  ThreadLocal::SlotPtr tls_;
-  std::string config_source_;
+  std::function<void()> initialize_callback_;
   const std::string route_config_name_;
-  absl::optional<LastConfigInfo> config_info_;
   Stats::ScopePtr scope_;
   RdsStats stats_;
-  std::function<void()> initialize_callback_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
   const std::string manager_identifier_;
-  envoy::api::v2::RouteConfiguration route_config_proto_;
+  SystemTimeSource& time_source_;
   SystemTime last_updated_;
+  absl::optional<LastConfigInfo> config_info_;
+  envoy::api::v2::RouteConfiguration route_config_proto_;
+  std::unordered_set<RdsRouteConfigProviderImpl*> route_config_providers_;
+
+  friend class RouteConfigProviderManagerImpl;
+  friend class RdsRouteConfigProviderImpl;
+};
+
+typedef std::shared_ptr<RdsRouteConfigSubscription> RdsRouteConfigSubscriptionSharedPtr;
+
+/**
+ * Implementation of RouteConfigProvider that fetches the route configuration dynamically using
+ * the subscription.
+ */
+class RdsRouteConfigProviderImpl : public RouteConfigProvider,
+                                   Logger::Loggable<Logger::Id::router> {
+public:
+  ~RdsRouteConfigProviderImpl();
+
+  RdsRouteConfigSubscription& subscription() { return *subscription_; }
+  void onConfigUpdate();
+
+  // Router::RouteConfigProvider
+  Router::ConfigConstSharedPtr config() override;
+  absl::optional<ConfigInfo> configInfo() const override;
+  SystemTime lastUpdated() const override { return subscription_->last_updated_; }
+
+private:
+  struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {
+    ThreadLocalConfig(ConfigConstSharedPtr initial_config) : config_(initial_config) {}
+
+    ConfigConstSharedPtr config_;
+  };
+
+  RdsRouteConfigProviderImpl(RdsRouteConfigSubscriptionSharedPtr&& subscription,
+                             Server::Configuration::FactoryContext& factory_context);
+
+  RdsRouteConfigSubscriptionSharedPtr subscription_;
+  Server::Configuration::FactoryContext& factory_context_;
+  ThreadLocal::SlotPtr tls_;
 
   friend class RouteConfigProviderManagerImpl;
 };
@@ -160,32 +185,29 @@ class RouteConfigProviderManagerImpl : public RouteConfigProviderManager,
 public:
   RouteConfigProviderManagerImpl(Server::Admin& admin);
 
-  // RouteConfigProviderManager
-  std::vector<RouteConfigProviderSharedPtr> getRdsRouteConfigProviders() override;
-  std::vector<RouteConfigProviderSharedPtr> getStaticRouteConfigProviders() override;
+  std::unique_ptr<envoy::admin::v2alpha::RoutesConfigDump> dumpRouteConfigs() const;
 
-  RouteConfigProviderSharedPtr getRdsRouteConfigProvider(
+  // RouteConfigProviderManager
+  RouteConfigProviderPtr createRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       Server::Configuration::FactoryContext& factory_context,
       const std::string& stat_prefix) override;
 
-  RouteConfigProviderSharedPtr
-  getStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,
-                               Server::Configuration::FactoryContext& factory_context) override;
+  RouteConfigProviderPtr
+  createStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,
+                                  Server::Configuration::FactoryContext& factory_context) override;
 
 private:
-  ProtobufTypes::MessagePtr dumpRouteConfigs();
-
   // TODO(jsedgwick) These two members are prime candidates for the owned-entry list/map
   // as in ConfigTracker. I.e. the ProviderImpls would have an EntryOwner for these lists
-  // Then the lifetime management stuff is centralized and opaque. Plus the copypasta
-  // in getRdsRouteConfigProviders()/getStaticRouteConfigProviders() goes away.
-  std::unordered_map<std::string, std::weak_ptr<RdsRouteConfigProviderImpl>>
-      route_config_providers_;
-  std::vector<std::weak_ptr<RouteConfigProvider>> static_route_config_providers_;
+  // Then the lifetime management stuff is centralized and opaque.
+  std::unordered_map<std::string, std::weak_ptr<RdsRouteConfigSubscription>>
+      route_config_subscriptions_;
+  std::unordered_set<RouteConfigProvider*> static_route_config_providers_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
 
-  friend class RdsRouteConfigProviderImpl;
+  friend class RdsRouteConfigSubscription;
+  friend class StaticRouteConfigProviderImpl;
 };
 
 } // namespace Router

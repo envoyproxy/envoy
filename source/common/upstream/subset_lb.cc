@@ -544,7 +544,11 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostVector& hosts_added,
   }
 }
 
-HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(uint32_t priority) {
+HostSetImplPtr
+SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(uint32_t priority,
+                                                      uint32_t over_provisioning_factor) {
+  UNREFERENCED_PARAMETER(over_provisioning_factor);
+  // Use original hostset's over_provisioning_factor.
   RELEASE_ASSERT(priority < original_priority_set_.hostSetsPerPriority().size(), "");
   return HostSetImplPtr{new HostSubsetImpl(*original_priority_set_.hostSetsPerPriority()[priority],
                                            locality_weight_aware_)};

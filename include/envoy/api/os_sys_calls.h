@@ -14,6 +14,22 @@
 namespace Envoy {
 namespace Api {
 
+/**
+ * SysCallResult holds the rc and errno values resulting from a system call.
+ */
+struct SysCallResult {
+
+  /**
+   * The return code from the system call.
+   */
+  int rc_;
+
+  /**
+   * The errno value as captured after the system call.
+   */
+  int errno_;
+};
+
 class OsSysCalls {
 public:
   virtual ~OsSysCalls() {}
@@ -96,6 +112,11 @@ public:
    * @see man 2 getsockopt
    */
   virtual int getsockopt(int sockfd, int level, int optname, void* optval, socklen_t* optlen) PURE;
+
+  /**
+   * @see man 2 socket
+   */
+  virtual int socket(int domain, int type, int protocol) PURE;
 };
 
 typedef std::unique_ptr<OsSysCalls> OsSysCallsPtr;

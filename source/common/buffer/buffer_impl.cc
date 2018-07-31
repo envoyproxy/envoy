@@ -94,9 +94,9 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
   static_cast<LibEventInstance&>(rhs).postProcess();
 }
 
-std::tuple<int, int> OwnedImpl::read(int fd, uint64_t max_length) {
+Api::SysCallResult OwnedImpl::read(int fd, uint64_t max_length) {
   if (max_length == 0) {
-    return std::make_tuple(0, 0);
+    return {0, 0};
   }
   constexpr uint64_t MaxSlices = 2;
   RawSlice slices[MaxSlices];
@@ -117,7 +117,7 @@ std::tuple<int, int> OwnedImpl::read(int fd, uint64_t max_length) {
   const ssize_t rc = os_syscalls.readv(fd, iov, static_cast<int>(num_slices_to_read));
   const int error = errno;
   if (rc < 0) {
-    return std::make_tuple(rc, error);
+    return {static_cast<int>(rc), error};
   }
   uint64_t num_slices_to_commit = 0;
   uint64_t bytes_to_commit = rc;
@@ -131,7 +131,7 @@ std::tuple<int, int> OwnedImpl::read(int fd, uint64_t max_length) {
   }
   ASSERT(num_slices_to_commit <= num_slices);
   commit(slices, num_slices_to_commit);
-  return std::make_tuple(rc, error);
+  return {static_cast<int>(rc), error};
 }
 
 uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
@@ -152,7 +152,7 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
   return result_ptr.pos;
 }
 
-std::tuple<int, int> OwnedImpl::write(int fd) {
+Api::SysCallResult OwnedImpl::write(int fd) {
   constexpr uint64_t MaxSlices = 16;
   RawSlice slices[MaxSlices];
   const uint64_t num_slices = std::min(getRawSlices(slices, MaxSlices), MaxSlices);
@@ -166,7 +166,7 @@ std::tuple<int, int> OwnedImpl::write(int fd) {
     }
   }
   if (num_slices_to_write == 0) {
-    return std::make_tuple(0, 0);
+    return {0, 0};
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
   const ssize_t rc = os_syscalls.writev(fd, iov, num_slices_to_write);
@@ -174,7 +174,7 @@ std::tuple<int, int> OwnedImpl::write(int fd) {
   if (rc > 0) {
     drain(static_cast<uint64_t>(rc));
   }
-  return std::make_tuple(static_cast<int>(rc), error);
+  return {static_cast<int>(rc), error};
 }
 
 OwnedImpl::OwnedImpl() : buffer_(evbuffer_new()) {}

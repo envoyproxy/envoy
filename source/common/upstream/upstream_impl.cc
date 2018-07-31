@@ -234,17 +234,16 @@ double HostSetImpl::effectiveLocalityWeight(uint32_t index) const {
   const double locality_healthy_ratio = 1.0 * locality_healthy_hosts.size() / locality_hosts.size();
   const uint32_t weight = (*locality_weights_)[index];
   // Health ranges from 0-1.0, and is the ratio of healthy hosts to total hosts, modified by the
-  // somewhat arbitrary overprovision factor of kOverProvisioningFactor.
-  // Eventually the overprovision factor will likely be made configurable.
+  // over provisioning factor.
   const double effective_locality_health_ratio =
-      std::min(1.0, (kOverProvisioningFactor / 100.0) * locality_healthy_ratio);
+      std::min(1.0, (over_provisioning_factor() / 100.0) * locality_healthy_ratio);
   return weight * effective_locality_health_ratio;
 }
 
-HostSet& PrioritySetImpl::getOrCreateHostSet(uint32_t priority) {
+HostSet& PrioritySetImpl::getOrCreateHostSet(uint32_t priority, uint32_t over_provisioning_factor) {
   if (host_sets_.size() < priority + 1) {
     for (size_t i = host_sets_.size(); i <= priority; ++i) {
-      HostSetImplPtr host_set = createHostSet(i);
+      HostSetImplPtr host_set = createHostSet(i, over_provisioning_factor);
       host_set->addMemberUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
                                          const HostVector& hosts_removed) {
         runUpdateCallbacks(priority, hosts_added, hosts_removed);
@@ -422,9 +421,12 @@ ClusterSharedPtr ClusterImplBase::create(
 
   if (!cluster.health_checks().empty()) {
     // TODO(htuch): Need to support multiple health checks in v2.
-    ASSERT(cluster.health_checks().size() == 1);
-    new_cluster->setHealthChecker(HealthCheckerFactory::create(
-        cluster.health_checks()[0], *new_cluster, runtime, random, dispatcher, log_manager));
+    if (cluster.health_checks().size() != 1) {
+      throw EnvoyException("Multiple health checks not supported");
+    } else {
+      new_cluster->setHealthChecker(HealthCheckerFactory::create(
+          cluster.health_checks()[0], *new_cluster, runtime, random, dispatcher, log_manager));
+    }
   }
 
   new_cluster->setOutlierDetector(Outlier::DetectorImplFactory::createForCluster(

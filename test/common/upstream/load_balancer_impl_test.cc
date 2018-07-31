@@ -115,6 +115,21 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet());
 }
 
+TEST_P(LoadBalancerBaseTest, OverProvisioningFactor) {
+
+  // Default over provisioning factor 1.4 makes P0 receives 70% load.
+  updateHostSet(host_set_, 4, 2);
+  updateHostSet(failover_host_set_, 4, 2);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(70, 30));
+
+  // Set over provisioning factor to 1, now it should be proportioned to healthy ratio.
+  host_set_.set_over_provisioning_factor(100);
+  updateHostSet(host_set_, 4, 2);
+  failover_host_set_.set_over_provisioning_factor(100);
+  updateHostSet(failover_host_set_, 4, 2);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(50, 50));
+}
+
 TEST_P(LoadBalancerBaseTest, GentleFailover) {
   // With 100% of P=0 hosts healthy, P=0 gets all the load.
   updateHostSet(host_set_, 1, 1);

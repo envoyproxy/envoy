@@ -12,6 +12,7 @@ import "google/api/annotations.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
+import "google/protobuf/wrappers.proto";
 
 option (gogoproto.equal_all) = true;
 
@@ -58,7 +59,7 @@ message ClusterLoadAssignment {
       string category = 1 [(validate.rules).string.min_bytes = 1];
 
       // Percentage of traffic that should be dropped for the category.
-      envoy.type.Percent drop_percentage = 2;
+      envoy.type.FractionalPercent drop_percentage = 2;
     }
     // Action to trim the overall incoming traffic to protect the upstream
     // hosts. This action allows protection in case the hosts are unable to
@@ -80,6 +81,12 @@ message ClusterLoadAssignment {
     //    "lb"_drop = 20%  // 50% of the remaining 'actual' load, which is 40%.
     //    actual_outgoing_load = 20% // remaining after applying all categories.
     repeated DropOverload drop_overloads = 2;
+
+    // Priority levels and localities are considered overprovisioned with this
+    // factor (in percentage). This means that we don't consider a priority
+    // level or locality unhealthy until the percentage of healthy hosts
+    // multiplied by the over provisioning factor drops below 100.
+    google.protobuf.UInt32Value over_provisioning_factor = 3 [(validate.rules).uint32.gt = 0];
   }
 
   // Load balancing policy settings.
