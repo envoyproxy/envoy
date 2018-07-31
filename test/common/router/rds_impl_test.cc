@@ -560,7 +560,9 @@ virtual_hosts:
   RouteConfigProviderPtr provider3 = route_config_provider_manager_->createRdsRouteConfigProvider(
       rds2, factory_context_, "foo_prefix");
   EXPECT_NE(provider3, provider_);
-  dynamic_cast<RdsRouteConfigProviderImpl&>(*provider3).subscription().onConfigUpdate(route_configs, "provider3");
+  dynamic_cast<RdsRouteConfigProviderImpl&>(*provider3)
+      .subscription()
+      .onConfigUpdate(route_configs, "provider3");
 
   EXPECT_EQ(2UL,
             route_config_provider_manager_->dumpRouteConfigs()->dynamic_route_configs().size());
