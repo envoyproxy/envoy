@@ -399,11 +399,15 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
     // a timer is enabled. This race condition is fine, since we'll disable the timer here and
     // deliver the update immediately.
 
-    // Why wasn't the update scheduled for later delivery?
+    // Why wasn't the update scheduled for later delivery? We keep some stats that are helpful
+    // to understand why merging did not happen. There's 2 things we are tracking here:
+
+    // 1) Was this update out of a merge window?
     if (mergeable && out_of_merge_window) {
       cm_stats_.update_out_of_merge_window_.inc();
     }
 
+    // 2) Were there previous updates that we are cancelling (and delivering immediately)?
     if (updates->disableTimer()) {
       cm_stats_.update_merge_cancelled_.inc();
     }
