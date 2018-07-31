@@ -220,6 +220,11 @@ const std::string Json::Schema::CLIENT_SSL_NETWORK_FILTER_SCHEMA(R"EOF(
         "type" : "integer",
         "minimum" : 0,
         "exclusiveMinimum" : true
+      },
+      "request_timeout_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
       }
     },
     "required": ["auth_api_cluster", "stat_prefix"],
@@ -235,6 +240,11 @@ const std::string Json::Schema::RDS_CONFIGURATION_SCHEMA(R"EOF(
       "cluster" : {"type": "string"},
       "route_config_name" : {"type": "string"},
       "refresh_delay_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
+      "request_timeout_ms" : {
         "type" : "integer",
         "minimum" : 0,
         "exclusiveMinimum" : true
@@ -1147,9 +1157,14 @@ const std::string Json::Schema::CLUSTER_MANAGER_SCHEMA(R"EOF(
             "type" : "integer",
             "minimum" : 0,
             "exclusiveMinimum" : true
+          },
+          "request_timeout_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
           }
         },
-        "required" : ["cluster", "refresh_delay_ms"],
+        "required" : ["cluster", "refresh_delay_ms", "request_timeout_ms"],
         "additionalProperties" : false
       },
       "cds" : {
@@ -1157,6 +1172,11 @@ const std::string Json::Schema::CLUSTER_MANAGER_SCHEMA(R"EOF(
         "properties" : {
           "cluster" : {"type" : "object"},
           "refresh_delay_ms" : {
+            "type" : "integer",
+            "minimum" : 0,
+            "exclusiveMinimum" : true
+          },
+          "request_timeout_ms" : {
             "type" : "integer",
             "minimum" : 0,
             "exclusiveMinimum" : true
@@ -1216,6 +1236,11 @@ const std::string Json::Schema::LDS_CONFIG_SCHEMA(R"EOF(
         "type" : "string"
       },
       "refresh_delay_ms" : {
+        "type" : "integer",
+        "minimum" : 0,
+        "exclusiveMinimum" : true
+      },
+      "request_timeout_ms" : {
         "type" : "integer",
         "minimum" : 0,
         "exclusiveMinimum" : true

@@ -18,8 +18,10 @@ LdsSubscription::LdsSubscription(Config::SubscriptionStats stats,
                                  Runtime::RandomGenerator& random,
                                  const LocalInfo::LocalInfo& local_info,
                                  const Stats::StatsOptions& stats_options)
-    : RestApiFetcher(cm, lds_config.api_config_source().cluster_names()[0], dispatcher, random,
-                     Config::Utility::apiConfigSourceRefreshDelay(lds_config.api_config_source())),
+    : RestApiFetcher(
+          cm, lds_config.api_config_source().cluster_names()[0], dispatcher, random,
+          Config::Utility::apiConfigSourceRefreshDelay(lds_config.api_config_source()),
+          Config::Utility::apiConfigSourceRequestTimeout(lds_config.api_config_source())),
       local_info_(local_info), stats_(stats), stats_options_(stats_options) {
   const auto& api_config_source = lds_config.api_config_source();
   UNREFERENCED_PARAMETER(lds_config);
@@ -28,6 +30,7 @@ LdsSubscription::LdsSubscription(Config::SubscriptionStats stats,
   // TODO(htuch): Add support for multiple clusters, #1170.
   ASSERT(api_config_source.cluster_names().size() == 1);
   ASSERT(api_config_source.has_refresh_delay());
+  ASSERT(api_config_source.has_request_timeout());
   Envoy::Config::Utility::checkClusterAndLocalInfo("lds", api_config_source.cluster_names()[0], cm,
                                                    local_info);
 }

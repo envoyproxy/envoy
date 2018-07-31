@@ -75,6 +75,13 @@ public:
   apiConfigSourceRefreshDelay(const envoy::api::v2::core::ApiConfigSource& api_config_source);
 
   /**
+   * Extract request_timeout as a std::chrono::milliseconds from
+   * envoy::api::v2::core::ApiConfigSource.
+   */
+  static std::chrono::milliseconds
+  apiConfigSourceRequestTimeout(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+
+  /**
    * Populate an envoy::api::v2::core::ApiConfigSource.
    * @param cluster supplies the cluster name for the ApiConfigSource.
    * @param refresh_delay_ms supplies the refresh delay for the ApiConfigSource in ms.
@@ -83,7 +90,7 @@ public:
    * populate.
    */
   static void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
-                                       const std::string& api_type,
+                                       uint32_t request_timeout_ms, const std::string& api_type,
                                        envoy::api::v2::core::ApiConfigSource& api_config_source);
 
   /**

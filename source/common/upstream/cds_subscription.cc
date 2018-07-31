@@ -17,8 +17,10 @@ CdsSubscription::CdsSubscription(
     const absl::optional<envoy::api::v2::core::ConfigSource>& eds_config, ClusterManager& cm,
     Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, const Stats::StatsOptions& stats_options)
-    : RestApiFetcher(cm, cds_config.api_config_source().cluster_names()[0], dispatcher, random,
-                     Config::Utility::apiConfigSourceRefreshDelay(cds_config.api_config_source())),
+    : RestApiFetcher(
+          cm, cds_config.api_config_source().cluster_names()[0], dispatcher, random,
+          Config::Utility::apiConfigSourceRefreshDelay(cds_config.api_config_source()),
+          Config::Utility::apiConfigSourceRequestTimeout(cds_config.api_config_source())),
       local_info_(local_info), stats_(stats), eds_config_(eds_config),
       stats_options_(stats_options) {
   const auto& api_config_source = cds_config.api_config_source();
@@ -28,6 +30,7 @@ CdsSubscription::CdsSubscription(
   // TODO(htuch): Add support for multiple clusters, #1170.
   ASSERT(api_config_source.cluster_names().size() == 1);
   ASSERT(api_config_source.has_refresh_delay());
+  ASSERT(api_config_source.has_request_timeout());
 }
 
 void CdsSubscription::createRequest(Http::Message& request) {

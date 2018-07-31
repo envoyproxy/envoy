@@ -55,6 +55,7 @@ protected:
     envoy::api::v2::core::ConfigSource eds_config;
     eds_config.mutable_api_config_source()->add_cluster_names("sds");
     eds_config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
+    eds_config.mutable_api_config_source()->mutable_request_timeout()->set_seconds(1);
     sds_cluster_ = parseSdsClusterFromJson(raw_config, eds_config);
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
     Upstream::MockCluster cluster;

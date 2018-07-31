@@ -336,7 +336,8 @@
         "lb_type": "round_robin",
         "hosts": [{"url": "tcp://discovery.yourcompany.net:80"}]
       },
-      "refresh_delay_ms": 30000
+      "refresh_delay_ms": 30000,
+      "request_timeout_ms": 1000
     },
 
     "cds": {

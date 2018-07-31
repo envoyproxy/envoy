@@ -44,6 +44,9 @@ message ApiConfigSource {
 
   // For REST APIs, the delay between successive polls.
   google.protobuf.Duration refresh_delay = 3 [(gogoproto.stdduration) = true];
+
+  // For REST APIs, the request timeout.
+  google.protobuf.Duration request_timeout = 5 [(gogoproto.stdduration) = true];
 }
 
 // Aggregated Discovery Service (ADS) options. This is currently empty, but when
