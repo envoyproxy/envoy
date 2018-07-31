@@ -61,5 +61,9 @@ int OsSysCallsImpl::getsockopt(int sockfd, int level, int optname, void* optval,
   return ::getsockopt(sockfd, level, optname, optval, optlen);
 }
 
+int OsSysCallsImpl::socket(int domain, int type, int protocol) {
+  return ::socket(domain, type, protocol);
+}
+
 } // namespace Api
 } // namespace Envoy
