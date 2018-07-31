@@ -1812,7 +1812,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
 }
 
 // Tests that mergeable updates outside of a window get applied immediately.
-TEST_F(ClusterManagerImplTest, MergedUpdatesOffWindow) {
+TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
   createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
@@ -1838,13 +1838,13 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOffWindow) {
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
-  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.update_merge_offwindow").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 }
 
 // Tests that mergeable updates outside of a window get applied immediately when
 // merging is disabled, and that the counters are correct.
-TEST_F(ClusterManagerImplTest, MergedUpdatesOffWindowDisabled) {
+TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindowDisabled) {
   createWithLocalClusterUpdate(false);
 
   // Ensure we see the right set of added/removed hosts on every call.
@@ -1870,7 +1870,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOffWindowDisabled) {
       hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
-  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_offwindow").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 }
 
