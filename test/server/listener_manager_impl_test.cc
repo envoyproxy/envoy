@@ -448,7 +448,7 @@ TEST_F(ListenerManagerImplTest, AddListenerOnIpv6OnlySetups) {
   const std::string listener_foo_json = R"EOF(
   {
     "name": "foo",
-    "address": "tcp://127.0.0.1:1234",
+    "address": "tcp://[::0001]:1234",
     "filters": [],
     "drain_type": "default"
   }
