@@ -312,7 +312,7 @@ public:
 
 class RawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
 public:
-  // StatsDataAllocator
+  // StatDataAllocator
   bool requiresBoundedStatNameSize() const override { return true; }
 };
 
@@ -408,7 +408,7 @@ public:
   HeapStatData* alloc(absl::string_view name) override;
   void free(HeapStatData& data) override;
 
-  // StatsDataAllocator
+  // StatDataAllocator
   bool requiresBoundedStatNameSize() const override { return false; }
 
 private:
