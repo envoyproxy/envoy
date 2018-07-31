@@ -253,13 +253,13 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
     ASSERT(subscription);
     ASSERT(subscription->route_config_providers_.size() > 0);
 
-    auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
     if (subscription->config_info_) {
+      auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
       dynamic_config->set_version_info(subscription->config_info_.value().last_config_version_);
       dynamic_config->mutable_route_config()->MergeFrom(subscription->route_config_proto_);
+      TimestampUtil::systemClockToTimestamp(subscription->last_updated_,
+                                            *dynamic_config->mutable_last_updated());
     }
-    TimestampUtil::systemClockToTimestamp(subscription->last_updated_,
-                                          *dynamic_config->mutable_last_updated());
   }
 
   for (const auto& provider : static_route_config_providers_) {

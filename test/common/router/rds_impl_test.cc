@@ -560,6 +560,7 @@ virtual_hosts:
   RouteConfigProviderPtr provider3 = route_config_provider_manager_->createRdsRouteConfigProvider(
       rds2, factory_context_, "foo_prefix");
   EXPECT_NE(provider3, provider_);
+  dynamic_cast<RdsRouteConfigProviderImpl&>(*provider3).subscription().onConfigUpdate(route_configs, "provider3");
 
   EXPECT_EQ(2UL,
             route_config_provider_manager_->dumpRouteConfigs()->dynamic_route_configs().size());
@@ -573,8 +574,8 @@ virtual_hosts:
       route_config_provider_manager_->dumpRouteConfigs()->dynamic_route_configs();
   EXPECT_EQ(1UL, dynamic_route_configs.size());
 
-  // Make sure the left one is provider3, which hasn't received route config yet.
-  EXPECT_FALSE(dynamic_route_configs[0].has_route_config());
+  // Make sure the left one is provider3
+  EXPECT_EQ("provider3", dynamic_route_configs[0].version_info());
 
   provider3.reset();
 
