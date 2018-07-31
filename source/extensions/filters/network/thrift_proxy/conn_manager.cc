@@ -30,7 +30,7 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
 
 void ConnectionManager::dispatch() {
   if (stopped_) {
-    ENVOY_LOG(error, "thrift filter stopped");
+    ENVOY_CONN_LOG(debug, "thrift filter stopped", read_callbacks_->connection());
     return;
   }
 
@@ -44,7 +44,7 @@ void ConnectionManager::dispatch() {
       }
     }
   } catch (const EnvoyException& ex) {
-    ENVOY_LOG(error, "thrift error: {}", ex.what());
+    ENVOY_CONN_LOG(error, "thrift error: {}", read_callbacks_->connection(), ex.what());
     stats_.request_decoding_error_.inc();
 
     // Use the current rpc to send an error downstream, if possible.
@@ -56,6 +56,7 @@ void ConnectionManager::dispatch() {
 }
 
 void ConnectionManager::continueDecoding() {
+  ENVOY_CONN_LOG(debug, "thrift filter continued", read_callbacks_->connection());
   stopped_ = false;
   dispatch();
 }
@@ -72,6 +73,9 @@ void ConnectionManager::resetAllRpcs() {
 
 void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
   read_callbacks_ = &callbacks;
+
+  read_callbacks_->connection().addConnectionCallbacks(*this);
+  read_callbacks_->connection().enableHalfClose(true);
 }
 
 void ConnectionManager::onEvent(Network::ConnectionEvent event) {
@@ -87,7 +91,7 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
 }
 
 ThriftFilters::DecoderFilter& ConnectionManager::newDecoderFilter() {
-  ENVOY_LOG(debug, "new decoder filter");
+  ENVOY_LOG(trace, "new decoder filter");
 
   ActiveRpcPtr new_rpc(new ActiveRpc(*this));
   new_rpc->createFilterChain();
@@ -270,7 +274,8 @@ bool ConnectionManager::ActiveRpc::upstreamData(Buffer::Instance& buffer) {
     }
     return complete;
   } catch (const EnvoyException& ex) {
-    ENVOY_LOG(error, "thrift response error: {}", ex.what());
+    ENVOY_CONN_LOG(error, "thrift response error: {}", parent_.read_callbacks_->connection(),
+                   ex.what());
     parent_.stats_.response_decoding_error_.inc();
 
     onError(ex.what());
@@ -281,7 +286,6 @@ bool ConnectionManager::ActiveRpc::upstreamData(Buffer::Instance& buffer) {
 
 void ConnectionManager::ActiveRpc::resetDownstreamConnection() {
   parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-  parent_.doDeferredRpcDestroy(*this);
 }
 
 } // namespace ThriftProxy

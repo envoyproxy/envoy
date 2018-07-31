@@ -106,7 +106,7 @@ private:
                     absl::string_view method_name, MessageType msg_type, int32_t seq_id);
     ~UpstreamRequest();
 
-    void start();
+    ThriftFilters::FilterStatus start();
     void resetStream();
 
     // Tcp::ConnectionPool::Callbacks

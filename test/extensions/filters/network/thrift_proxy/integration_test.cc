@@ -263,6 +263,22 @@ TEST_P(ThriftConnManagerIntegrationTest, Oneway) {
   EXPECT_EQ(1U, counter->value());
 }
 
+TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClose) {
+  initializeOneway();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->write(request_bytes_.toString());
+  tcp_client->close();
+
+  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  Buffer::OwnedImpl upstream_request(
+      fake_upstream_connection->waitForData(request_bytes_.length()));
+  EXPECT_EQ(request_bytes_.toString(), upstream_request.toString());
+
+  Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_oneway");
+  EXPECT_EQ(1U, counter->value());
+}
+
 } // namespace ThriftProxy
 } // namespace NetworkFilters
 } // namespace Extensions
