@@ -224,8 +224,9 @@ private:
  */
 class HostSetImpl : public HostSet {
 public:
-  HostSetImpl(uint32_t priority)
-      : priority_(priority), hosts_(new HostVector()), healthy_hosts_(new HostVector()) {}
+  HostSetImpl(uint32_t priority, uint32_t over_provisioning_factor)
+      : priority_(priority), over_provisioning_factor_(over_provisioning_factor),
+        hosts_(new HostVector()), healthy_hosts_(new HostVector()) {}
 
   void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
                    HostsPerLocalityConstSharedPtr hosts_per_locality,
@@ -255,6 +256,7 @@ public:
   LocalityWeightsConstSharedPtr localityWeights() const override { return locality_weights_; }
   absl::optional<uint32_t> chooseLocality() override;
   uint32_t priority() const override { return priority_; }
+  uint32_t over_provisioning_factor() const override { return over_provisioning_factor_; }
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
@@ -266,6 +268,7 @@ private:
   double effectiveLocalityWeight(uint32_t index) const;
 
   uint32_t priority_;
+  uint32_t over_provisioning_factor_;
   HostVectorConstSharedPtr hosts_;
   HostVectorConstSharedPtr healthy_hosts_;
   HostsPerLocalityConstSharedPtr hosts_per_locality_{HostsPerLocalityImpl::empty()};
@@ -303,12 +306,13 @@ public:
   }
   std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() override { return host_sets_; }
   // Get the host set for this priority level, creating it if necessary.
-  HostSet& getOrCreateHostSet(uint32_t priority);
+  HostSet& getOrCreateHostSet(uint32_t priority,
+                              uint32_t over_provisioning_factor = kDefaultOverProvisioningFactor);
 
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
-  virtual HostSetImplPtr createHostSet(uint32_t priority) {
-    return HostSetImplPtr{new HostSetImpl(priority)};
+  virtual HostSetImplPtr createHostSet(uint32_t priority, uint32_t over_provisioning_factor) {
+    return HostSetImplPtr{new HostSetImpl(priority, over_provisioning_factor)};
   }
 
 private:

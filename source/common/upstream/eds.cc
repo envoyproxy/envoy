@@ -12,6 +12,7 @@
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/sds_subscription.h"
 
 namespace Envoy {
@@ -80,6 +81,9 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
   // Track whether we rebuilt any LB structures.
   bool cluster_rebuilt = false;
 
+  const uint32_t over_provisioning_factor = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      cluster_load_assignment.policy(), over_provisioning_factor, kDefaultOverProvisioningFactor);
+
   // Loop over existing priorities not present in the config. This will empty out any priorities
   // the config update did not refer to
   auto& priority_state = priority_state_manager.priorityState();
@@ -88,9 +92,9 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
       if (locality_weights_map_.size() <= i) {
         locality_weights_map_.resize(i + 1);
       }
-      cluster_rebuilt |=
-          updateHostsPerLocality(i, *priority_state[i].first, locality_weights_map_[i],
-                                 priority_state[i].second, priority_state_manager);
+      cluster_rebuilt |= updateHostsPerLocality(i, over_provisioning_factor,
+                                                *priority_state[i].first, locality_weights_map_[i],
+                                                priority_state[i].second, priority_state_manager);
     }
   }
 
@@ -103,8 +107,9 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
     if (locality_weights_map_.size() <= i) {
       locality_weights_map_.resize(i + 1);
     }
-    cluster_rebuilt |= updateHostsPerLocality(i, empty_hosts, locality_weights_map_[i],
-                                              empty_locality_map, priority_state_manager);
+    cluster_rebuilt |=
+        updateHostsPerLocality(i, over_provisioning_factor, empty_hosts, locality_weights_map_[i],
+                               empty_locality_map, priority_state_manager);
   }
 
   if (!cluster_rebuilt) {
@@ -116,11 +121,13 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
   onPreInitComplete();
 }
 
-bool EdsClusterImpl::updateHostsPerLocality(const uint32_t priority, const HostVector& new_hosts,
+bool EdsClusterImpl::updateHostsPerLocality(const uint32_t priority,
+                                            const uint32_t over_provisioning_factor,
+                                            const HostVector& new_hosts,
                                             LocalityWeightsMap& locality_weights_map,
                                             LocalityWeightsMap& new_locality_weights_map,
                                             PriorityStateManager& priority_state_manager) {
-  const auto& host_set = priority_set_.getOrCreateHostSet(priority);
+  const auto& host_set = priority_set_.getOrCreateHostSet(priority, over_provisioning_factor);
   HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
 
   HostVector hosts_added;
