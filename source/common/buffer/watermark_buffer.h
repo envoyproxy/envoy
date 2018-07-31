@@ -28,9 +28,9 @@ public:
   void drain(uint64_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
-  std::tuple<int, int> read(int fd, uint64_t max_length) override;
+  Api::SysCallResult read(int fd, uint64_t max_length) override;
   uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
-  std::tuple<int, int> write(int fd) override;
+  Api::SysCallResult write(int fd) override;
   void postProcess() override { checkLowWatermark(); }
 
   void setWatermarks(uint32_t watermark) { setWatermarks(watermark / 2, watermark); }

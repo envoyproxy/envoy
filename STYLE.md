@@ -1,6 +1,6 @@
 # C++ coding style
 
-* The Envoy source code is formatted using clang-format. Thus all white space, etc.
+* The Envoy source code is formatted using clang-format. Thus all white spaces, etc.
   issues are taken care of automatically. The Travis tests will automatically check
   the code format and fail. There are make targets that can both check the format
   (check_format) as well as fix the code format for you (fix_format).
@@ -96,7 +96,7 @@ A few general notes on our error handling philosophy:
   silently be ignored and should crash the process either via the C++ allocation error exception, an
   explicit `RELEASE_ASSERT` following a third party library call, or an obvious crash on a subsequent
   line via null pointer dereference. This rule is again based on the philosophy that the engineering
-  costs of properly handling these cases is not worth it. Time is better spent designing proper system
+  costs of properly handling these cases are not worth it. Time is better spent designing proper system
   controls that shed load if resource usage becomes too high, etc.
 * The "less is more" error handling philosophy described in the previous two points is primarily
   based on the fact that restarts are designed to be fast, reliable and cheap.

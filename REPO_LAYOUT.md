@@ -28,7 +28,7 @@ are:
 ## [source/](source/)
 
 * [common/](source/common/): Core Envoy code (not specific to extensions) that is also not
-  specific to a standalone server implementation. I.e., this is code that could be used if Envoy
+  specific to a standalone server implementation. I.e., this is the code that could be used if Envoy
   were eventually embedded as a library.
 * [docs/](source/docs/): Miscellaneous developer/design documentation that is not relevant for
   the public user documentation.

@@ -409,8 +409,8 @@ public:
     return asString() == other.asString();
   }
 
-  MOCK_CONST_METHOD1(bind, int(int));
-  MOCK_CONST_METHOD1(connect, int(int));
+  MOCK_CONST_METHOD1(bind, Api::SysCallResult(int));
+  MOCK_CONST_METHOD1(connect, Api::SysCallResult(int));
   MOCK_CONST_METHOD0(ip, Address::Ip*());
   MOCK_CONST_METHOD1(socket, int(Address::SocketType));
   MOCK_CONST_METHOD0(type, Address::Type());

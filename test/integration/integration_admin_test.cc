@@ -21,12 +21,12 @@ TEST_P(IntegrationAdminTest, HealthCheck) {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("http"), "GET", "/healthcheck", "", downstreamProtocol(), version_);
+      lookupPort("http"), "POST", "/healthcheck", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/healthcheck/fail", "",
-                                                downstreamProtocol(), version_);
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/healthcheck/fail",
+                                                "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
@@ -35,7 +35,7 @@ TEST_P(IntegrationAdminTest, HealthCheck) {
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/healthcheck/ok", "",
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/healthcheck/ok", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
@@ -60,39 +60,39 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   initialize();
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/logging", "", downstreamProtocol(), version_);
+      lookupPort("admin"), "POST", "/logging", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 
   // Bad level
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/logging?level=blah",
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/logging?level=blah",
                                                 "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 
   // Bad logger
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/logging?blah=info",
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/logging?blah=info",
                                                 "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
 
   // This is going to stomp over custom log levels that are set on the command line.
   response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/logging?level=warning", "", downstreamProtocol(), version_);
+      lookupPort("admin"), "POST", "/logging?level=warning", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   for (const Logger::Logger& logger : Logger::Registry::loggers()) {
     EXPECT_EQ("warning", logger.levelString());
   }
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/logging?assert=trace",
-                                                "", downstreamProtocol(), version_);
+  response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/logging?assert=trace", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
 
   const char* level_name = spdlog::level::level_names[default_log_level_];
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
                                                 fmt::format("/logging?level={}", level_name), "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
@@ -224,7 +224,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_THAT(response->body(), testing::HasSubstr("added_via_api"));
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/cpuprofiler", "",
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/cpuprofiler", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("400", response->headers().Status()->value().c_str());
@@ -236,7 +236,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/reset_counters", "",
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST", "/reset_counters", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
@@ -341,12 +341,12 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
 
   initialize();
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/cpuprofiler?enable=y", "", downstreamProtocol(), version_);
+      lookupPort("admin"), "POST", "/cpuprofiler?enable=y", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 
-  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/cpuprofiler?enable=n",
-                                                "", downstreamProtocol(), version_);
+  response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/cpuprofiler?enable=n", "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
