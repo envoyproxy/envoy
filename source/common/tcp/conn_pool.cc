@@ -46,8 +46,10 @@ void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {
 
 void ConnPoolImpl::assignConnection(ActiveConn& conn, ConnectionPool::Callbacks& callbacks) {
   ASSERT(conn.wrapper_ == nullptr);
-  conn.wrapper_ = std::make_unique<ConnectionWrapper>(conn);
-  callbacks.onPoolReady(*conn.wrapper_, conn.real_host_description_);
+  conn.wrapper_ = std::make_shared<ConnectionWrapper>(conn);
+
+  callbacks.onPoolReady(std::make_unique<ConnectionDataImpl>(conn.wrapper_),
+                        conn.real_host_description_);
 }
 
 void ConnPoolImpl::checkForDrained() {
@@ -124,6 +126,8 @@ void ConnPoolImpl::onConnectionEvent(ActiveConn& conn, Network::ConnectionEvent 
           host_->cluster().stats().upstream_cx_destroy_remote_with_active_rq_.inc();
         }
         host_->cluster().stats().upstream_cx_destroy_with_active_rq_.inc();
+
+        conn.wrapper_->release(true);
       }
 
       removed = conn.removeFromList(busy_conns_);
@@ -259,23 +263,29 @@ ConnPoolImpl::ConnectionWrapper::ConnectionWrapper(ActiveConn& parent) : parent_
   parent_.parent_.host_->stats().rq_active_.inc();
 }
 
-ConnPoolImpl::ConnectionWrapper::~ConnectionWrapper() {
-  parent_.parent_.host_->cluster().stats().upstream_rq_active_.dec();
-  parent_.parent_.host_->stats().rq_active_.dec();
+Network::ClientConnection& ConnPoolImpl::ConnectionWrapper::connection() {
+  ASSERT(!released_);
+  return *parent_.conn_;
 }
-
-Network::ClientConnection& ConnPoolImpl::ConnectionWrapper::connection() { return *parent_.conn_; }
 
 void ConnPoolImpl::ConnectionWrapper::addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& cb) {
   ASSERT(!released_);
   callbacks_ = &cb;
 }
 
-void ConnPoolImpl::ConnectionWrapper::release() {
-  ASSERT(!released_);
-  released_ = true;
-  callbacks_ = nullptr;
-  parent_.parent_.onConnReleased(parent_);
+void ConnPoolImpl::ConnectionWrapper::release(bool closed) {
+  // Allow multiple calls: connection close and destruction of ConnectionDataImplPtr will both
+  // result in this call.
+  if (!released_) {
+    released_ = true;
+    callbacks_ = nullptr;
+    if (!closed) {
+      parent_.parent_.onConnReleased(parent_);
+    }
+
+    parent_.parent_.host_->cluster().stats().upstream_rq_active_.dec();
+    parent_.parent_.host_->stats().rq_active_.dec();
+  }
 }
 
 ConnPoolImpl::PendingRequest::PendingRequest(ConnPoolImpl& parent,

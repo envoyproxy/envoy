@@ -68,7 +68,8 @@ public:
 
   void createAdsConnection(FakeUpstream& upstream) {
     ads_upstream_ = &upstream;
-    ads_connection_ = ads_upstream_->waitForHttpConnection(*dispatcher_);
+    AssertionResult result = ads_upstream_->waitForHttpConnection(*dispatcher_, ads_connection_);
+    RELEASE_ASSERT(result, result.message());
   }
 
   void cleanUpAdsConnection() {
@@ -76,8 +77,10 @@ public:
 
     // Don't ASSERT fail if an ADS reconnect ends up unparented.
     ads_upstream_->set_allow_unexpected_disconnects(true);
-    ads_connection_->close();
-    ads_connection_->waitForDisconnect();
+    AssertionResult result = ads_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = ads_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
     ads_connection_.reset();
   }
 
@@ -126,7 +129,7 @@ public:
                           const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
                           const std::string& expected_error_message = "") {
     envoy::api::v2::DiscoveryRequest discovery_request;
-    ads_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+    VERIFY_ASSERTION(ads_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
 
     // TODO(PiotrSikora): Remove this hack once fixed internally.
     if (!(expected_type_url == discovery_request.type_url())) {
@@ -198,9 +201,10 @@ public:
                     fake_upstreams_[0]->localAddress()->ip()->port()));
   }
 
-  envoy::api::v2::Listener buildListener(const std::string& name, const std::string& route_config) {
-    return TestUtility::parseYaml<envoy::api::v2::Listener>(
-        fmt::format(R"EOF(
+  envoy::api::v2::Listener buildListener(const std::string& name, const std::string& route_config,
+                                         const std::string& stat_prefix = "ads_test") {
+    return TestUtility::parseYaml<envoy::api::v2::Listener>(fmt::format(
+        R"EOF(
       name: {}
       address:
         socket_address:
@@ -210,14 +214,14 @@ public:
         filters:
         - name: envoy.http_connection_manager
           config:
-            stat_prefix: ads_test
+            stat_prefix: {}
             codec_type: HTTP2
             rds:
               route_config_name: {}
               config_source: {{ ads: {{}} }}
             http_filters: [{{ name: envoy.router }}]
     )EOF",
-                    name, Network::Test::getLoopbackAddressString(ipVersion()), route_config));
+        name, Network::Test::getLoopbackAddressString(ipVersion()), stat_prefix, route_config));
   }
 
   envoy::api::v2::RouteConfiguration buildRouteConfig(const std::string& name,
@@ -266,7 +270,8 @@ public:
     AdsIntegrationBaseTest::initialize();
     if (ads_stream_ == nullptr) {
       createAdsConnection(*(fake_upstreams_[1]));
-      ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+      AssertionResult result = ads_connection_->waitForNewStream(*dispatcher_, ads_stream_);
+      RELEASE_ASSERT(result, result.message());
       ads_stream_->startGrpcStream();
     }
   }
@@ -471,6 +476,79 @@ TEST_P(AdsIntegrationTest, Failure) {
   makeSingleRequest();
 }
 
+// Regression test for the use-after-free crash when processing RDS update (#3953).
+TEST_P(AdsIntegrationTest, RdsAfterLdsWithNoRdsChanges) {
+  initialize();
+
+  // Send initial configuration.
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "1");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  // Validate that we can process a request.
+  makeSingleRequest();
+
+  // Update existing LDS (change stat_prefix).
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0", "rds_crash")},
+      "2");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+  // Update existing RDS (no changes).
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "2");
+
+  // Validate that we can process a request again
+  makeSingleRequest();
+}
+
+// Regression test for the use-after-free crash when processing RDS update (#3953).
+TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
+  initialize();
+
+  // Send initial configuration.
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "1");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+
+  // Validate that we can process a request.
+  makeSingleRequest();
+
+  // Update existing LDS (change stat_prefix).
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_1")}, "2");
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_1")}, "2");
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0", "rds_crash")},
+      "2");
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 2);
+
+  // Update existing RDS (migrate traffic to cluster_1).
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_1")},
+      "2");
+
+  // Validate that we can process a request after RDS update
+  test_server_->waitForCounterGe("http.ads_test.rds.route_config_0.config_reload", 2);
+  makeSingleRequest();
+}
+
 class AdsFailIntegrationTest : public AdsIntegrationBaseTest,
                                public Grpc::GrpcClientIntegrationParamTest {
 public:
@@ -511,7 +589,7 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsFailIntegrationTest,
 TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
   initialize();
   createAdsConnection(*fake_upstreams_[1]);
-  ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+  ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, ads_stream_));
   ads_stream_->startGrpcStream();
   ads_stream_->finishGrpcStream(Grpc::Status::Internal);
 }
@@ -564,7 +642,7 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsConfigIntegrationTest,
 TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {
   initialize();
   createAdsConnection(*fake_upstreams_[1]);
-  ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+  ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, ads_stream_));
   ads_stream_->startGrpcStream();
   ads_stream_->finishGrpcStream(Grpc::Status::Ok);
 }
@@ -585,7 +663,7 @@ TEST_P(AdsIntegrationTest, XdsBatching) {
 
   pre_worker_start_test_steps_ = [this]() {
     createAdsConnection(*fake_upstreams_.back());
-    ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+    ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, ads_stream_));
     ads_stream_->startGrpcStream();
 
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",

@@ -183,6 +183,8 @@ void ConditionalInitializer::waitReady() {
 ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
 ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
 
+constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
+
 namespace Http {
 
 // Satisfy linker
@@ -226,4 +228,24 @@ bool TestHeaderMapImpl::has(const std::string& key) { return get(LowerCaseString
 bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nullptr; }
 
 } // namespace Http
+
+namespace Stats {
+
+MockedTestAllocator::MockedTestAllocator(const StatsOptions& stats_options)
+    : alloc_(stats_options) {
+  ON_CALL(*this, alloc(_)).WillByDefault(Invoke([this](absl::string_view name) -> RawStatData* {
+    return alloc_.alloc(name);
+  }));
+
+  ON_CALL(*this, free(_)).WillByDefault(Invoke([this](RawStatData& data) -> void {
+    return alloc_.free(data);
+  }));
+
+  EXPECT_CALL(*this, alloc(absl::string_view("stats.overflow")));
+}
+
+MockedTestAllocator::~MockedTestAllocator() {}
+
+} // namespace Stats
+
 } // namespace Envoy

@@ -73,7 +73,8 @@ bool AutonomousUpstream::createNetworkFilterChain(Network::Connection& connectio
   shared_connections_.emplace_back(new SharedConnectionWrapper(connection, true));
   AutonomousHttpConnectionPtr http_connection(
       new AutonomousHttpConnection(*shared_connections_.back(), stats_store_, http_type_, *this));
-  http_connection->initialize();
+  testing::AssertionResult result = http_connection->initialize();
+  RELEASE_ASSERT(result, result.message());
   http_connections_.push_back(std::move(http_connection));
   return true;
 }

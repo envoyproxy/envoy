@@ -60,26 +60,22 @@ bool BinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string&
   msg_type = type;
   seq_id = BufferHelper::drainI32(buffer);
 
-  onMessageStart(absl::string_view(name), msg_type, seq_id);
   return true;
 }
 
 bool BinaryProtocolImpl::readMessageEnd(Buffer::Instance& buffer) {
   UNREFERENCED_PARAMETER(buffer);
-  onMessageComplete();
   return true;
 }
 
 bool BinaryProtocolImpl::readStructBegin(Buffer::Instance& buffer, std::string& name) {
   UNREFERENCED_PARAMETER(buffer);
   name.clear(); // binary protocol does not transmit struct names
-  onStructBegin(absl::string_view(name));
   return true;
 }
 
 bool BinaryProtocolImpl::readStructEnd(Buffer::Instance& buffer) {
   UNREFERENCED_PARAMETER(buffer);
-  onStructEnd();
   return true;
 }
 
@@ -110,7 +106,6 @@ bool BinaryProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& n
   name.clear(); // binary protocol does not transmit field names
   field_type = type;
 
-  onStructField(absl::string_view(name), field_type, field_id);
   return true;
 }
 
@@ -402,7 +397,6 @@ bool LaxBinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::stri
   seq_id = BufferHelper::peekI32(buffer, 1);
   buffer.drain(5);
 
-  onMessageStart(absl::string_view(name), msg_type, seq_id);
   return true;
 }
 
@@ -412,6 +406,27 @@ void LaxBinaryProtocolImpl::writeMessageBegin(Buffer::Instance& buffer, const st
   BufferHelper::writeI8(buffer, static_cast<int8_t>(msg_type));
   BufferHelper::writeI32(buffer, seq_id);
 }
+
+class BinaryProtocolConfigFactory : public ProtocolFactoryBase<BinaryProtocolImpl> {
+public:
+  BinaryProtocolConfigFactory() : ProtocolFactoryBase(ProtocolNames::get().BINARY) {}
+};
+
+/**
+ * Static registration for the binary protocol. @see RegisterFactory.
+ */
+static Registry::RegisterFactory<BinaryProtocolConfigFactory, NamedProtocolConfigFactory> register_;
+
+class LaxBinaryProtocolConfigFactory : public ProtocolFactoryBase<LaxBinaryProtocolImpl> {
+public:
+  LaxBinaryProtocolConfigFactory() : ProtocolFactoryBase(ProtocolNames::get().LAX_BINARY) {}
+};
+
+/**
+ * Static registration for the auto protocol. @see RegisterFactory.
+ */
+static Registry::RegisterFactory<LaxBinaryProtocolConfigFactory, NamedProtocolConfigFactory>
+    register_lax_;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

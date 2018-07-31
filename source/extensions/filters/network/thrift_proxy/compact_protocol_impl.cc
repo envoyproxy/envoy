@@ -72,13 +72,11 @@ bool CompactProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string
   msg_type = type;
   seq_id = id;
 
-  onMessageStart(absl::string_view(name), msg_type, seq_id);
   return true;
 }
 
 bool CompactProtocolImpl::readMessageEnd(Buffer::Instance& buffer) {
   UNREFERENCED_PARAMETER(buffer);
-  onMessageComplete();
   return true;
 }
 
@@ -91,7 +89,6 @@ bool CompactProtocolImpl::readStructBegin(Buffer::Instance& buffer, std::string&
   last_field_id_stack_.push(last_field_id_);
   last_field_id_ = 0;
 
-  onStructBegin(absl::string_view(name));
   return true;
 }
 
@@ -105,7 +102,6 @@ bool CompactProtocolImpl::readStructEnd(Buffer::Instance& buffer) {
   last_field_id_ = last_field_id_stack_.top();
   last_field_id_stack_.pop();
 
-  onStructEnd();
   return true;
 }
 
@@ -124,7 +120,6 @@ bool CompactProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& 
     field_type = FieldType::Stop;
     buffer.drain(1);
 
-    onStructField(absl::string_view(name), field_type, field_id);
     return true;
   }
 
@@ -166,7 +161,6 @@ bool CompactProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& 
 
   buffer.drain(id_size + 1);
 
-  onStructField(absl::string_view(name), field_type, field_id);
   return true;
 }
 
@@ -459,7 +453,7 @@ void CompactProtocolImpl::writeFieldBeginInternal(
                                       static_cast<int8_t>(compact_field_type));
   } else {
     BufferHelper::writeI8(buffer, static_cast<int8_t>(compact_field_type));
-    BufferHelper::writeI16(buffer, field_id);
+    BufferHelper::writeZigZagI32(buffer, static_cast<int32_t>(field_id));
   }
 
   last_field_id_ = field_id;
@@ -622,6 +616,17 @@ CompactProtocolImpl::CompactFieldType CompactProtocolImpl::convertFieldType(Fiel
         fmt::format("unknown protocol field type {}", static_cast<int8_t>(field_type)));
   }
 }
+
+class CompactProtocolConfigFactory : public ProtocolFactoryBase<CompactProtocolImpl> {
+public:
+  CompactProtocolConfigFactory() : ProtocolFactoryBase(ProtocolNames::get().COMPACT) {}
+};
+
+/**
+ * Static registration for the binary protocol. @see RegisterFactory.
+ */
+static Registry::RegisterFactory<CompactProtocolConfigFactory, NamedProtocolConfigFactory>
+    register_;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

@@ -139,7 +139,7 @@ private:
   absl::optional<std::string> user_agent_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   std::chrono::milliseconds stream_idle_timeout_;
-  Router::RouteConfigProviderSharedPtr route_config_provider_;
+  Router::RouteConfigProviderPtr route_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
   Http::DateProvider& date_provider_;

@@ -551,10 +551,10 @@ ClientConnectionImpl::ClientConnectionImpl(
   }
 
   if (source_address != nullptr) {
-    const int rc = source_address->bind(fd());
-    if (rc < 0) {
+    const Api::SysCallResult result = source_address->bind(fd());
+    if (result.rc_ < 0) {
       ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
-                     strerror(errno));
+                     strerror(result.errno_));
       bind_error_ = true;
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect".
@@ -568,19 +568,19 @@ ClientConnectionImpl::ClientConnectionImpl(
 
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
-  const int rc = socket_->remoteAddress()->connect(fd());
-  if (rc == 0) {
+  const Api::SysCallResult result = socket_->remoteAddress()->connect(fd());
+  if (result.rc_ == 0) {
     // write will become ready.
     ASSERT(connecting_);
   } else {
-    ASSERT(rc == -1);
-    if (errno == EINPROGRESS) {
+    ASSERT(result.rc_ == -1);
+    if (result.errno_ == EINPROGRESS) {
       ASSERT(connecting_);
       ENVOY_CONN_LOG(debug, "connection in progress", *this);
     } else {
       immediate_error_event_ = ConnectionEvent::RemoteClose;
       connecting_ = false;
-      ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, errno);
+      ENVOY_CONN_LOG(debug, "immediate connection error: {}", *this, result.errno_);
 
       // Trigger a write event. This is needed on OSX and seems harmless on Linux.
       file_event_->activate(Event::FileReadyType::Write);

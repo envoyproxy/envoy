@@ -8,8 +8,11 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+
+using testing::AssertionResult;
 
 namespace Envoy {
 namespace {
@@ -49,17 +52,20 @@ public:
     HttpIntegrationTest::initialize();
   }
 
-  void waitForAccessLogConnection() {
-    fake_access_log_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
+  ABSL_MUST_USE_RESULT
+  AssertionResult waitForAccessLogConnection() {
+    return fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_access_log_connection_);
   }
 
-  void waitForAccessLogStream() {
-    access_log_request_ = fake_access_log_connection_->waitForNewStream(*dispatcher_);
+  ABSL_MUST_USE_RESULT
+  AssertionResult waitForAccessLogStream() {
+    return fake_access_log_connection_->waitForNewStream(*dispatcher_, access_log_request_);
   }
 
-  void waitForAccessLogRequest(const std::string& expected_request_msg_yaml) {
+  ABSL_MUST_USE_RESULT
+  AssertionResult waitForAccessLogRequest(const std::string& expected_request_msg_yaml) {
     envoy::service::accesslog::v2::StreamAccessLogsMessage request_msg;
-    access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg);
+    VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
     EXPECT_STREQ("POST", access_log_request_->headers().Method()->value().c_str());
     EXPECT_STREQ("/envoy.service.accesslog.v2.AccessLogService/StreamAccessLogs",
                  access_log_request_->headers().Path()->value().c_str());
@@ -78,12 +84,16 @@ public:
     log_entry->mutable_common_properties()->clear_time_to_last_downstream_tx_byte();
     log_entry->mutable_request()->clear_request_id();
     EXPECT_EQ(request_msg.DebugString(), expected_request_msg.DebugString());
+
+    return AssertionSuccess();
   }
 
   void cleanup() {
     if (fake_access_log_connection_ != nullptr) {
-      fake_access_log_connection_->close();
-      fake_access_log_connection_->waitForDisconnect();
+      AssertionResult result = fake_access_log_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_access_log_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
   }
 
@@ -97,9 +107,9 @@ INSTANTIATE_TEST_CASE_P(IpVersionsCientType, AccessLogIntegrationTest,
 // Test a basic full access logging flow.
 TEST_P(AccessLogIntegrationTest, BasicAccessLogFlow) {
   testRouterNotFound();
-  waitForAccessLogConnection();
-  waitForAccessLogStream();
-  waitForAccessLogRequest(fmt::format(R"EOF(
+  ASSERT_TRUE(waitForAccessLogConnection());
+  ASSERT_TRUE(waitForAccessLogStream());
+  ASSERT_TRUE(waitForAccessLogRequest(fmt::format(R"EOF(
 identifier:
   node:
     id: node_name
@@ -124,13 +134,13 @@ http_logs:
         value: 404
       response_headers_bytes: 54
 )EOF",
-                                      VersionInfo::version()));
+                                                  VersionInfo::version())));
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
-  waitForAccessLogRequest(R"EOF(
+  ASSERT_TRUE(waitForAccessLogRequest(R"EOF(
 http_logs:
   log_entry:
     common_properties:
@@ -146,7 +156,7 @@ http_logs:
       response_code:
         value: 404
       response_headers_bytes: 54
-)EOF");
+)EOF"));
 
   // Send an empty response and end the stream. This should never happen but make sure nothing
   // breaks and we make a new stream on a follow up request.
@@ -168,8 +178,8 @@ http_logs:
                                                 downstream_protocol_, version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("404", response->headers().Status()->value().c_str());
-  waitForAccessLogStream();
-  waitForAccessLogRequest(fmt::format(R"EOF(
+  ASSERT_TRUE(waitForAccessLogStream());
+  ASSERT_TRUE(waitForAccessLogRequest(fmt::format(R"EOF(
 identifier:
   node:
     id: node_name
@@ -194,7 +204,7 @@ http_logs:
         value: 404
       response_headers_bytes: 54
 )EOF",
-                                      VersionInfo::version()));
+                                                  VersionInfo::version())));
 
   cleanup();
 }

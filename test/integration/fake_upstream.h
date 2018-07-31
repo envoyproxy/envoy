@@ -56,10 +56,24 @@ public:
   const Http::HeaderMap& headers() { return *headers_; }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
-  void waitForHeadersComplete();
-  void waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length);
-  void waitForEndStream(Event::Dispatcher& client_dispatcher);
-  void waitForReset();
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForHeadersComplete(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length,
+              std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForEndStream(Event::Dispatcher& client_dispatcher,
+                   std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForReset(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // gRPC convenience methods.
   void startGrpcStream();
@@ -81,26 +95,43 @@ public:
     ENVOY_LOG(debug, "Received gRPC message: {}", message.DebugString());
     decoded_grpc_frames_.erase(decoded_grpc_frames_.begin());
   }
-  template <class T> void waitForGrpcMessage(Event::Dispatcher& client_dispatcher, T& message) {
+  template <class T>
+  ABSL_MUST_USE_RESULT testing::AssertionResult
+  waitForGrpcMessage(Event::Dispatcher& client_dispatcher, T& message,
+                     std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
+    auto end_time = std::chrono::steady_clock::now() + timeout;
     ENVOY_LOG(debug, "Waiting for gRPC message...");
     if (!decoded_grpc_frames_.empty()) {
       decodeGrpcFrame(message);
-      return;
+      return AssertionSuccess();
     }
-    waitForData(client_dispatcher, 5);
+    if (!waitForData(client_dispatcher, 5, timeout)) {
+      return testing::AssertionFailure() << "Timed out waiting for start of gRPC message.";
+    }
     {
       Thread::LockGuard lock(lock_);
-      EXPECT_TRUE(grpc_decoder_.decode(body(), decoded_grpc_frames_));
+      if (!grpc_decoder_.decode(body(), decoded_grpc_frames_)) {
+        return testing::AssertionFailure()
+               << "Couldn't decode gRPC data frame: " << body().toString();
+      }
     }
     if (decoded_grpc_frames_.size() < 1) {
-      waitForData(client_dispatcher, grpc_decoder_.length());
+      timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
+          end_time - std::chrono::steady_clock::now());
+      if (!waitForData(client_dispatcher, grpc_decoder_.length(), timeout)) {
+        return testing::AssertionFailure() << "Timed out waiting for end of gRPC message.";
+      }
       {
         Thread::LockGuard lock(lock_);
-        EXPECT_TRUE(grpc_decoder_.decode(body(), decoded_grpc_frames_));
+        if (!grpc_decoder_.decode(body(), decoded_grpc_frames_)) {
+          return testing::AssertionFailure()
+                 << "Couldn't decode gRPC data frame: " << body().toString();
+        }
       }
     }
     decodeGrpcFrame(message);
     ENVOY_LOG(debug, "Received gRPC message: {}", message.DebugString());
+    return AssertionSuccess();
   }
 
   // Http::StreamDecoder
@@ -196,29 +227,41 @@ public:
   // wait-for-completion. If the connection is disconnected, either prior to post or when the
   // dispatcher schedules the callback, we silently ignore if allow_unexpected_disconnects_
   // is set.
-  void executeOnDispatcher(std::function<void(Network::Connection&)> f) {
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  executeOnDispatcher(std::function<void(Network::Connection&)> f,
+                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
     Thread::LockGuard lock(lock_);
     if (disconnected_) {
-      return;
+      return testing::AssertionSuccess();
     }
     Thread::CondVar callback_ready_event;
-    connection_.dispatcher().post([this, f, &callback_ready_event]() -> void {
-      // The use of connected() here, vs. !disconnected_, is because we want to use the lock_
-      // acquisition to briefly serialize. This avoids us entering this completion and issuing a
-      // notifyOne() until the wait() is ready to receive it below.
-      if (connected()) {
-        f(connection_);
-      } else {
-        RELEASE_ASSERT(
-            allow_unexpected_disconnects_,
-            "The connection disconnected unexpectedly, and allow_unexpected_disconnects_ is false."
-            "\n See "
-            "https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md#"
-            "unexpected-disconnects");
-      }
-      callback_ready_event.notifyOne();
-    });
-    callback_ready_event.wait(lock_);
+    bool unexpected_disconnect = false;
+    connection_.dispatcher().post(
+        [this, f, &callback_ready_event, &unexpected_disconnect]() -> void {
+          // The use of connected() here, vs. !disconnected_, is because we want to use the lock_
+          // acquisition to briefly serialize. This avoids us entering this completion and issuing a
+          // notifyOne() until the wait() is ready to receive it below.
+          if (connected()) {
+            f(connection_);
+          } else {
+            unexpected_disconnect = true;
+          }
+          callback_ready_event.notifyOne();
+        });
+    Thread::CondVar::WaitStatus status = callback_ready_event.waitFor(lock_, timeout);
+    if (status == Thread::CondVar::WaitStatus::Timeout) {
+      return testing::AssertionFailure() << "Timed out while executing on dispatcher.";
+    }
+    if (unexpected_disconnect && !allow_unexpected_disconnects_) {
+      return testing::AssertionFailure()
+             << "The connection disconnected unexpectedly, and allow_unexpected_disconnects_ is "
+                "false."
+                "\n See "
+                "https://github.com/envoyproxy/envoy/blob/master/test/integration/README.md#"
+                "unexpected-disconnects";
+    }
+    return testing::AssertionSuccess();
   }
 
 private:
@@ -284,20 +327,38 @@ public:
     ASSERT(disconnect_callback_handle_ != nullptr);
     shared_connection_.removeDisconnectCallback(disconnect_callback_handle_);
   }
-  void close();
-  void readDisable(bool disable);
-  // By default waitForDisconnect and waitForHalfClose assume the next event is a disconnect and
-  // fails an assert if an unexpected event occurs. If a caller truly wishes to wait until
-  // disconnect, set ignore_spurious_events = true.
-  void waitForDisconnect(bool ignore_spurious_events = false);
-  void waitForHalfClose(bool ignore_spurious_events = false);
 
-  virtual void initialize() {
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult close(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  readDisable(bool disable, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  // By default waitForDisconnect and waitForHalfClose assume the next event is
+  // a disconnect and return an AssertionFailure if an unexpected event occurs.
+  // If a caller truly wishes to wait until disconnect, set
+  // ignore_spurious_events = true.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForDisconnect(bool ignore_spurious_events = false,
+                    std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForHalfClose(bool ignore_spurious_events = false,
+                   std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
+  virtual testing::AssertionResult initialize() {
     initialized_ = true;
     disconnect_callback_handle_ =
         shared_connection_.addDisconnectCallback([this] { connection_event_.notifyOne(); });
+    return testing::AssertionSuccess();
   }
-  void enableHalfClose(bool enabled);
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  enableHalfClose(bool enabled, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   SharedConnectionWrapper& shared_connection() { return shared_connection_; }
   // The same caveats apply here as in SharedConnectionWrapper::connection().
   Network::Connection& connection() const { return shared_connection_.connection(); }
@@ -323,11 +384,16 @@ public:
   enum class Type { HTTP1, HTTP2 };
 
   FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type);
+
   // By default waitForNewStream assumes the next event is a new stream and
-  // fails an assert if an unexpected event occurs. If a caller truly wishes to
-  // wait for a new stream, set ignore_spurious_events = true.
-  FakeStreamPtr waitForNewStream(Event::Dispatcher& client_dispatcher,
-                                 bool ignore_spurious_events = false);
+  // returns AssertionFaliure if an unexpected event occurs. If a caller truly
+  // wishes to wait for a new stream, set ignore_spurious_events = true. Returns
+  // the new stream via the stream argument.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForNewStream(Event::Dispatcher& client_dispatcher, FakeStreamPtr& stream,
+                   bool ignore_spurious_events = false,
+                   std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Http::ServerConnectionCallbacks
   Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder) override;
@@ -361,17 +427,36 @@ public:
       : FakeConnectionBase(shared_connection) {}
   typedef const std::function<bool(const std::string&)> ValidatorFunction;
 
-  std::string waitForData(uint64_t num_bytes);
-  // Wait until data_validator returns true.
-  // example usage: waitForData(FakeRawConnection::waitForInexactMatch("foo"));
-  std::string waitForData(const ValidatorFunction& data_validator);
-  void write(const std::string& data, bool end_stream = false);
+  // Writes to data. If data is nullptr, discards the received data.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForData(uint64_t num_bytes, std::string* data = nullptr,
+              std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
-  void initialize() override {
-    shared_connection_.executeOnDispatcher([this](Network::Connection& connection) {
-      connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
-    });
-    FakeConnectionBase::initialize();
+  // Wait until data_validator returns true.
+  // example usage:
+  // std::string data;
+  // ASSERT_TRUE(waitForData(FakeRawConnection::waitForInexactMatch("foo"), &data));
+  // EXPECT_EQ(data, "foobar");
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForData(const ValidatorFunction& data_validator, std::string* data = nullptr,
+              std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult write(const std::string& data, bool end_stream = false,
+                                 std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult initialize() override {
+    testing::AssertionResult result =
+        shared_connection_.executeOnDispatcher([this](Network::Connection& connection) {
+          connection.addReadFilter(Network::ReadFilterSharedPtr{new ReadFilter(*this)});
+        });
+    if (!result) {
+      return result;
+    }
+    return FakeConnectionBase::initialize();
   }
 
   // Creates a ValidatorFunction which returns true when data_to_wait_for is
@@ -413,15 +498,26 @@ public:
   ~FakeUpstream();
 
   FakeHttpConnection::Type httpType() { return http_type_; }
-  FakeHttpConnectionPtr waitForHttpConnection(Event::Dispatcher& client_dispatcher);
-  FakeRawConnectionPtr
-  waitForRawConnection(std::chrono::milliseconds wait_for_ms = std::chrono::milliseconds{10000});
+
+  // Returns the new connection via the connection argument.
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForHttpConnection(Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForRawConnection(FakeRawConnectionPtr& connection,
+                       std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   Network::Address::InstanceConstSharedPtr localAddress() const { return socket_->localAddress(); }
 
   // Wait for one of the upstreams to receive a connection
-  static FakeHttpConnectionPtr
+  ABSL_MUST_USE_RESULT
+  static testing::AssertionResult
   waitForHttpConnection(Event::Dispatcher& client_dispatcher,
-                        std::vector<std::unique_ptr<FakeUpstream>>& upstreams);
+                        std::vector<std::unique_ptr<FakeUpstream>>& upstreams,
+                        FakeHttpConnectionPtr& connection,
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {

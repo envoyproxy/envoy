@@ -38,12 +38,6 @@ cc_library(
 )
 
 cc_library(
-    name = "event_pthreads",
-    srcs = ["thirdparty_build/lib/libevent_pthreads.a"],
-    deps = [":event"],
-)
-
-cc_library(
     name = "luajit",
     srcs = select({
         ":windows_x86_64": ["thirdparty_build/lib/luajit.lib"],

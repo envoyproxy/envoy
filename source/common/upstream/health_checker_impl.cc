@@ -10,6 +10,7 @@
 #include "common/config/well_known_names.h"
 #include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
+#include "common/network/address_impl.h"
 #include "common/router/router.h"
 #include "common/upstream/host_utility.h"
 
@@ -98,7 +99,13 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::HttpActiveHealthCheckSession(
     HttpHealthCheckerImpl& parent, const HostSharedPtr& host)
-    : ActiveHealthCheckSession(parent, host), parent_(parent) {}
+    : ActiveHealthCheckSession(parent, host), parent_(parent),
+      hostname_(parent_.host_value_.empty() ? parent_.cluster_.info()->name()
+                                            : parent_.host_value_),
+      protocol_(parent_.codec_client_type_ == Http::CodecClient::Type::HTTP1
+                    ? Http::Protocol::Http11
+                    : Http::Protocol::Http2),
+      local_address_(std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1")) {}
 
 HttpHealthCheckerImpl::HttpActiveHealthCheckSession::~HttpActiveHealthCheckSession() {
   if (client_) {
@@ -127,9 +134,6 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
   }
 }
 
-const RequestInfo::RequestInfoImpl
-    HttpHealthCheckerImpl::HttpActiveHealthCheckSession::REQUEST_INFO;
-
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn =
@@ -144,13 +148,15 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
 
   Http::HeaderMapImpl request_headers{
       {Http::Headers::get().Method, "GET"},
-      {Http::Headers::get().Host,
-       parent_.host_value_.empty() ? parent_.cluster_.info()->name() : parent_.host_value_},
+      {Http::Headers::get().Host, hostname_},
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
   Router::FilterUtility::setUpstreamScheme(request_headers, *parent_.cluster_.info());
-
-  parent_.request_headers_parser_->evaluateHeaders(request_headers, REQUEST_INFO);
+  RequestInfo::RequestInfoImpl request_info(protocol_);
+  request_info.setDownstreamLocalAddress(local_address_);
+  request_info.setDownstreamRemoteAddress(local_address_);
+  request_info.onUpstreamHostSelected(host_);
+  parent_.request_headers_parser_->evaluateHeaders(request_headers, request_info);
   request_encoder_->encodeHeaders(request_headers, true);
   request_encoder_ = nullptr;
 }

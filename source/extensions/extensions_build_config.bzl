@@ -88,6 +88,12 @@ EXTENSIONS = {
     "envoy.stat_sinks.statsd":                          "//source/extensions/stat_sinks/statsd:config",
 
     #
+    # Thrift filters
+    #
+
+    "envoy.filters.thrift.router":                      "//source/extensions/filters/network/thrift_proxy/router:config",
+
+    #
     # Tracers
     #
 

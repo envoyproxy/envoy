@@ -72,12 +72,16 @@ public:
   void cleanup() {
     codec_client_->close();
     if (fake_lua_connection_ != nullptr) {
-      fake_lua_connection_->close();
-      fake_lua_connection_->waitForDisconnect();
+      AssertionResult result = fake_lua_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_lua_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
     if (fake_upstream_connection_ != nullptr) {
-      fake_upstream_connection_->close();
-      fake_upstream_connection_->waitForDisconnect();
+      AssertionResult result = fake_upstream_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_upstream_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
   }
 
@@ -234,9 +238,9 @@ config:
                                           {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  fake_lua_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-  lua_request_ = fake_lua_connection_->waitForNewStream(*dispatcher_);
-  lua_request_->waitForEndStream(*dispatcher_);
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_lua_connection_));
+  ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, lua_request_));
+  ASSERT_TRUE(lua_request_->waitForEndStream(*dispatcher_));
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl response_data1("good");
@@ -292,9 +296,9 @@ config:
                                           {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  fake_lua_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-  lua_request_ = fake_lua_connection_->waitForNewStream(*dispatcher_);
-  lua_request_->waitForEndStream(*dispatcher_);
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_lua_connection_));
+  ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, lua_request_));
+  ASSERT_TRUE(lua_request_->waitForEndStream(*dispatcher_));
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, true);
 
