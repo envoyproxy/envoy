@@ -18,6 +18,14 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "dynamic_metadata_interface_lib",
+    srcs = ["dynamic_metadata.cc"],
+    deps = [
+        "//include/envoy/request_info:dynamic_metadata_interface_hdr",
+    ],
+)
+
+envoy_cc_library(
     name = "dynamic_metadata_lib",
     srcs = ["dynamic_metadata_impl.cc"],
     hdrs = ["dynamic_metadata_impl.h"],
