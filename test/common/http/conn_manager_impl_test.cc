@@ -381,6 +381,8 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
 
   EXPECT_EQ(1U, stats_.named_.downstream_rq_2xx_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_2xx_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_completed_.value());
+  EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
@@ -435,6 +437,8 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
   EXPECT_EQ(1U, listener_stats_.downstream_rq_1xx_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_rq_2xx_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_2xx_.value());
+  EXPECT_EQ(2U, stats_.named_.downstream_rq_completed_.value());
+  EXPECT_EQ(2U, listener_stats_.downstream_rq_completed_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFiltersProxyingDisabled) {
@@ -1918,6 +1922,8 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_rq_3xx_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_3xx_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_completed_.value());
+  EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
