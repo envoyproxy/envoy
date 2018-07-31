@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
 
@@ -100,6 +102,12 @@ MATCHER_P(BufferStringEqual, rhs, rhs) {
 
   Buffer::OwnedImpl buffer(rhs);
   return TestUtility::buffersEqual(arg, buffer);
+}
+
+MATCHER_P(BufferStringContains, rhs,
+          std::string(negation ? "doesn't contain" : "contains") + " \"" + rhs + "\"") {
+  *result_listener << "\"" << arg.toString() << "\"";
+  return arg.toString().find(rhs) != std::string::npos;
 }
 
 ACTION_P(AddBufferToString, target_string) {
