@@ -421,9 +421,9 @@ private:
     }
   };
 
-  // TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/3927 which can
-  // help reorganize the heap stats using a ref-counted symbol table to compress
-  // the stat strings.
+  // TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/3927 and
+  //  https://github.com/envoyproxy/envoy/issues/3585, which can help reorganize
+  // the heap stats using a ref-counted symbol table to compress the stat strings.
   typedef std::unordered_set<HeapStatData*, HeapStatHash_, HeapStatCompare_> StatSet;
 
   // An unordered set of HeapStatData pointers which keys off the key()

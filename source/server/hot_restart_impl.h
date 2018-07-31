@@ -141,7 +141,6 @@ public:
   // RawStatDataAllocator
   Stats::RawStatData* alloc(absl::string_view name) override;
   void free(Stats::RawStatData& data) override;
-  bool requiresBoundedStatNameSize() const override { return true; }
 
 private:
   enum class RpcMessageType {

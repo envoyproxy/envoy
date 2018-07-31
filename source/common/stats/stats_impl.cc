@@ -138,9 +138,8 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
 HeapStatData::HeapStatData(absl::string_view key) : name_(key.data(), key.size()) {}
 
 HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) {
-  // Do not truncate here for non-hot-restart case; truncate at the call-site in
-  // ThreadLocalStoreImpl::ScopeImpl::safeMakeStat() only when allocating a heap-stat
-  // as a fallback when we've exhausted our shared-memory block.
+  // Any expected truncation of name is done at the callsite. No truncation is
+  // required to use this allocator.
   auto data = std::make_unique<HeapStatData>(name);
   Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data.get());
