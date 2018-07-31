@@ -68,7 +68,8 @@ public:
 
   void createAdsConnection(FakeUpstream& upstream) {
     ads_upstream_ = &upstream;
-    ads_connection_ = ads_upstream_->waitForHttpConnection(*dispatcher_);
+    AssertionResult result = ads_upstream_->waitForHttpConnection(*dispatcher_, ads_connection_);
+    RELEASE_ASSERT(result, result.message());
   }
 
   void cleanUpAdsConnection() {
@@ -76,8 +77,10 @@ public:
 
     // Don't ASSERT fail if an ADS reconnect ends up unparented.
     ads_upstream_->set_allow_unexpected_disconnects(true);
-    ads_connection_->close();
-    ads_connection_->waitForDisconnect();
+    AssertionResult result = ads_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = ads_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
     ads_connection_.reset();
   }
 
@@ -126,7 +129,7 @@ public:
                           const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
                           const std::string& expected_error_message = "") {
     envoy::api::v2::DiscoveryRequest discovery_request;
-    ads_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+    VERIFY_ASSERTION(ads_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
 
     // TODO(PiotrSikora): Remove this hack once fixed internally.
     if (!(expected_type_url == discovery_request.type_url())) {
@@ -267,7 +270,8 @@ public:
     AdsIntegrationBaseTest::initialize();
     if (ads_stream_ == nullptr) {
       createAdsConnection(*(fake_upstreams_[1]));
-      ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+      AssertionResult result = ads_connection_->waitForNewStream(*dispatcher_, ads_stream_);
+      RELEASE_ASSERT(result, result.message());
       ads_stream_->startGrpcStream();
     }
   }
@@ -585,7 +589,7 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsFailIntegrationTest,
 TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
   initialize();
   createAdsConnection(*fake_upstreams_[1]);
-  ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+  ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, ads_stream_));
   ads_stream_->startGrpcStream();
   ads_stream_->finishGrpcStream(Grpc::Status::Internal);
 }
@@ -638,7 +642,7 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsConfigIntegrationTest,
 TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {
   initialize();
   createAdsConnection(*fake_upstreams_[1]);
-  ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+  ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, ads_stream_));
   ads_stream_->startGrpcStream();
   ads_stream_->finishGrpcStream(Grpc::Status::Ok);
 }
@@ -659,7 +663,7 @@ TEST_P(AdsIntegrationTest, XdsBatching) {
 
   pre_worker_start_test_steps_ = [this]() {
     createAdsConnection(*fake_upstreams_.back());
-    ads_stream_ = ads_connection_->waitForNewStream(*dispatcher_);
+    ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, ads_stream_));
     ads_stream_->startGrpcStream();
 
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",

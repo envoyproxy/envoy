@@ -220,8 +220,10 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   // will interpret that as an unexpected disconnect. The codec client is not
   // subject to the same failure mode.
   if (fake_upstream_connection_) {
-    fake_upstream_connection_->close();
-    fake_upstream_connection_->waitForDisconnect();
+    AssertionResult result = fake_upstream_connection_->close();
+    RELEASE_ASSERT(result, result.message());
+    result = fake_upstream_connection_->waitForDisconnect();
+    RELEASE_ASSERT(result, result.message());
   }
   if (codec_client_) {
     codec_client_->close();
@@ -231,13 +233,17 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
 void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
-    fake_upstream_connection_ =
-        fake_upstreams_[upstream_index]->waitForHttpConnection(*dispatcher_);
+    AssertionResult result = fake_upstreams_[upstream_index]->waitForHttpConnection(
+        *dispatcher_, fake_upstream_connection_);
+    RELEASE_ASSERT(result, result.message());
   }
   // Wait for the next stream on the upstream connection.
-  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
+  AssertionResult result =
+      fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
+  RELEASE_ASSERT(result, result.message());
   // Wait for the stream to be completely received.
-  upstream_request_->waitForEndStream(*dispatcher_);
+  result = upstream_request_->waitForEndStream(*dispatcher_);
+  RELEASE_ASSERT(result, result.message());
 }
 
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
@@ -450,12 +456,12 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeRequestComplete() {
                                                           {":authority", "host"}});
   auto response = std::move(encoder_decoder.second);
 
-  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
 
-  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
-  upstream_request_->waitForHeadersComplete();
-  fake_upstream_connection_->close();
-  fake_upstream_connection_->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   response->waitForEndStream();
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
@@ -484,8 +490,8 @@ void HttpIntegrationTest::testRouterUpstreamDisconnectBeforeResponseComplete(
                                                                    {":authority", "host"}});
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
-  fake_upstream_connection_->close();
-  fake_upstream_connection_->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     codec_client_->waitForDisconnect();
@@ -514,17 +520,17 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeRequestComplete(
                                                           {":scheme", "http"},
                                                           {":authority", "host"}});
   auto response = std::move(encoder_decoder.second);
-  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
-  upstream_request_->waitForHeadersComplete();
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   codec_client_->close();
 
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
-    fake_upstream_connection_->waitForDisconnect();
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
-    upstream_request_->waitForReset();
-    fake_upstream_connection_->close();
-    fake_upstream_connection_->waitForDisconnect();
+    ASSERT_TRUE(upstream_request_->waitForReset());
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
   EXPECT_FALSE(upstream_request_->complete());
@@ -550,11 +556,11 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
   codec_client_->close();
 
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
-    fake_upstream_connection_->waitForDisconnect();
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
-    upstream_request_->waitForReset();
-    fake_upstream_connection_->close();
-    fake_upstream_connection_->waitForDisconnect();
+    ASSERT_TRUE(upstream_request_->waitForReset());
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
   EXPECT_TRUE(upstream_request_->complete());
@@ -574,19 +580,19 @@ void HttpIntegrationTest::testRouterUpstreamResponseBeforeRequestComplete() {
                                                           {":scheme", "http"},
                                                           {":authority", "host"}});
   auto response = std::move(encoder_decoder.second);
-  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
-  upstream_request_->waitForHeadersComplete();
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(512, true);
   response->waitForEndStream();
 
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
-    fake_upstream_connection_->waitForDisconnect();
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
-    upstream_request_->waitForReset();
-    fake_upstream_connection_->close();
-    fake_upstream_connection_->waitForDisconnect();
+    ASSERT_TRUE(upstream_request_->waitForReset());
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
@@ -618,10 +624,10 @@ void HttpIntegrationTest::testRetry() {
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
 
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
-    fake_upstream_connection_->waitForDisconnect();
-    fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   } else {
-    upstream_request_->waitForReset();
+    ASSERT_TRUE(upstream_request_->waitForReset());
   }
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
@@ -669,10 +675,10 @@ void HttpIntegrationTest::testGrpcRetry() {
   upstream_request_->encodeHeaders(
       Http::TestHeaderMapImpl{{":status", "200"}, {"grpc-status", "1"}}, false);
   if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
-    fake_upstream_connection_->waitForDisconnect();
-    fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   } else {
-    upstream_request_->waitForReset();
+    ASSERT_TRUE(upstream_request_->waitForReset());
   }
   waitForNextUpstreamRequest();
 
@@ -780,7 +786,7 @@ void HttpIntegrationTest::testHittingEncoderFilterLimit() {
   // be buffered, the stream will be reset, and the connection will disconnect.
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   upstream_request_->encodeData(1024 * 65, false);
-  fake_upstream_connection_->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
@@ -800,14 +806,14 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
                                                           {"expect", "100-continue"}});
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
-  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   // The continue headers should arrive immediately.
   response->waitForContinueHeaders();
-  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send the rest of the request.
   codec_client_->sendData(*request_encoder_, 10, true);
-  upstream_request_->waitForEndStream(*dispatcher_);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   // Verify the Expect header is stripped.
   EXPECT_EQ(nullptr, upstream_request_->headers().get(Http::Headers::get().Expect));
   if (via.empty()) {
@@ -872,8 +878,8 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
   auto response = std::move(encoder_decoder.second);
 
   // Wait for the request headers to be received upstream.
-  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   if (continue_before_upstream_complete) {
     // This case tests sending on 100-Continue headers before the client has sent all the
@@ -883,7 +889,7 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
   }
   // Send all of the request data and wait for it to be received upstream.
   codec_client_->sendData(*request_encoder_, 10, true);
-  upstream_request_->waitForEndStream(*dispatcher_);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   if (!continue_before_upstream_complete) {
     // This case tests forwarding 100-Continue after the client has sent all data.
@@ -931,7 +937,7 @@ void HttpIntegrationTest::testIdleTimeoutBasic() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
 
   // Do not send any requests and validate if idle time out kicks in.
-  fake_upstream_connection_->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
 }
 
@@ -985,7 +991,7 @@ void HttpIntegrationTest::testIdleTimeoutWithTwoRequests() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
 
   // Do not send any requests and validate if idle time out kicks in.
-  fake_upstream_connection_->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_idle_timeout", 1);
 }
 
@@ -1016,7 +1022,7 @@ void HttpIntegrationTest::testUpstreamDisconnectWithTwoRequests() {
   // Response 1.
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   upstream_request_->encodeData(512, true);
-  fake_upstream_connection_->close();
+  ASSERT_TRUE(fake_upstream_connection_->close());
   response->waitForEndStream();
 
   EXPECT_TRUE(upstream_request_->complete());
@@ -1026,7 +1032,7 @@ void HttpIntegrationTest::testUpstreamDisconnectWithTwoRequests() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
 
   // Response 2.
-  fake_upstream_connection_->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   fake_upstream_connection_.reset();
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
@@ -1405,12 +1411,14 @@ void HttpIntegrationTest::testUpstreamProtocolError() {
       {":method", "GET"}, {":path", "/test/long/url"}, {":authority", "host"}});
   auto response = std::move(encoder_decoder.second);
 
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   // TODO(mattklein123): Waiting for exact amount of data is a hack. This needs to
   // be fixed.
-  fake_upstream_connection->waitForData(187);
-  fake_upstream_connection->write("bad protocol data!");
-  fake_upstream_connection->waitForDisconnect();
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(187, &data));
+  ASSERT_TRUE(fake_upstream_connection->write("bad protocol data!"));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   codec_client_->waitForDisconnect();
 
   EXPECT_TRUE(response->complete());
@@ -1442,11 +1450,11 @@ void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   codec_client_->sendReset(*request_encoder_);
 
   if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
-    fake_upstream_connection_->waitForDisconnect();
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   } else {
-    upstream_request_->waitForReset();
-    fake_upstream_connection_->close();
-    fake_upstream_connection_->waitForDisconnect();
+    ASSERT_TRUE(upstream_request_->waitForReset());
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
   codec_client_->close();

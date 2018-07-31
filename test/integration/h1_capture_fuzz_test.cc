@@ -37,9 +37,8 @@ public:
         break;
       case test::integration::Event::kUpstreamSendBytes:
         if (fake_upstream_connection == nullptr) {
-          fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection(max_wait_ms_);
-          // If we timed out, we fail out.
-          if (fake_upstream_connection == nullptr) {
+          if (!fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection, max_wait_ms_)) {
+            // If we timed out, we fail out.
             tcp_client->close();
             return;
           }
@@ -49,7 +48,10 @@ public:
           tcp_client->close();
           return;
         }
-        fake_upstream_connection->write(event.upstream_send_bytes());
+        {
+          AssertionResult result = fake_upstream_connection->write(event.upstream_send_bytes());
+          RELEASE_ASSERT(result, result.message());
+        }
         break;
       case test::integration::Event::kUpstreamRecvBytes:
         // TODO(htuch): Should we wait for some data?
@@ -61,9 +63,11 @@ public:
     }
     if (fake_upstream_connection != nullptr) {
       if (fake_upstream_connection->connected()) {
-        fake_upstream_connection->close();
+        AssertionResult result = fake_upstream_connection->close();
+        RELEASE_ASSERT(result, result.message());
       }
-      fake_upstream_connection->waitForDisconnect(true);
+      AssertionResult result = fake_upstream_connection->waitForDisconnect(true);
+      RELEASE_ASSERT(result, result.message());
     }
     tcp_client->close();
   }
