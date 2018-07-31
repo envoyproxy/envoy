@@ -37,6 +37,105 @@ bool regexStartsWithDot(absl::string_view regex) {
 
 } // namespace
 
+std::string Utility::sanitizeStatsName(const std::string& name) {
+  std::string stats_name = name;
+  std::replace(stats_name.begin(), stats_name.end(), ':', '_');
+  std::replace(stats_name.begin(), stats_name.end(), '\0', '_');
+  return stats_name;
+}
+
+/**
+ * Counter implementation that wraps a StatData. StatData must have data members:
+ *    std::atomic<int64_t> value_;
+ *    std::atomic<int64_t> pending_increment_;
+ *    std::atomic<int16_t> flags_;
+ *    std::atomic<int16_t> ref_count_;
+ */
+template <class StatData> class CounterImpl : public Counter, public MetricImpl {
+public:
+  CounterImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
+              std::string&& tag_extracted_name, std::vector<Tag>&& tags)
+      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
+        alloc_(alloc) {}
+  ~CounterImpl() { alloc_.free(data_); }
+
+  // Stats::Counter
+  void add(uint64_t amount) override {
+    data_.value_ += amount;
+    data_.pending_increment_ += amount;
+    data_.flags_ |= Flags::Used;
+  }
+
+  void inc() override { add(1); }
+  uint64_t latch() override { return data_.pending_increment_.exchange(0); }
+  void reset() override { data_.value_ = 0; }
+  bool used() const override { return data_.flags_ & Flags::Used; }
+  uint64_t value() const override { return data_.value_; }
+
+private:
+  StatData& data_;
+  StatDataAllocatorImpl<StatData>& alloc_;
+};
+
+/**
+ * Gauge implementation that wraps a StatData.
+ */
+template <class StatData> class GaugeImpl : public Gauge, public MetricImpl {
+public:
+  GaugeImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
+            std::string&& tag_extracted_name, std::vector<Tag>&& tags)
+      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
+        alloc_(alloc) {}
+  ~GaugeImpl() { alloc_.free(data_); }
+
+  // Stats::Gauge
+  virtual void add(uint64_t amount) override {
+    data_.value_ += amount;
+    data_.flags_ |= Flags::Used;
+  }
+  virtual void dec() override { sub(1); }
+  virtual void inc() override { add(1); }
+  virtual void set(uint64_t value) override {
+    data_.value_ = value;
+    data_.flags_ |= Flags::Used;
+  }
+  virtual void sub(uint64_t amount) override {
+    ASSERT(data_.value_ >= amount);
+    ASSERT(used());
+    data_.value_ -= amount;
+  }
+  virtual uint64_t value() const override { return data_.value_; }
+  bool used() const override { return data_.flags_ & Flags::Used; }
+
+private:
+  StatData& data_;
+  StatDataAllocatorImpl<StatData>& alloc_;
+};
+
+template <class StatData>
+CounterSharedPtr StatDataAllocatorImpl<StatData>::makeCounter(absl::string_view name,
+                                                              std::string&& tag_extracted_name,
+                                                              std::vector<Tag>&& tags) {
+  StatData* data = alloc(name);
+  if (data == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<CounterImpl<StatData>>(*data, *this, std::move(tag_extracted_name),
+                                                 std::move(tags));
+}
+
+template <class StatData>
+GaugeSharedPtr StatDataAllocatorImpl<StatData>::makeGauge(absl::string_view name,
+                                                          std::string&& tag_extracted_name,
+                                                          std::vector<Tag>&& tags) {
+  StatData* data = alloc(name);
+  if (data == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<GaugeImpl<StatData>>(*data, *this, std::move(tag_extracted_name),
+                                               std::move(tags));
+}
+
 // Normally the compiler would do this, but because name_ is a flexible-array-length
 // element, the compiler can't. RawStatData is put into an array in HotRestartImpl, so
 // it's important that each element starts on the required alignment for the type.
@@ -48,11 +147,45 @@ uint64_t RawStatData::structSizeWithOptions(const StatsOptions& stats_options) {
   return structSize(stats_options.maxNameLength());
 }
 
-std::string Utility::sanitizeStatsName(const std::string& name) {
-  std::string stats_name = name;
-  std::replace(stats_name.begin(), stats_name.end(), ':', '_');
-  std::replace(stats_name.begin(), stats_name.end(), '\0', '_');
-  return stats_name;
+void RawStatData::initialize(absl::string_view key, const StatsOptions& stats_options) {
+  ASSERT(!initialized());
+  ASSERT(key.size() <= stats_options.maxNameLength());
+  ref_count_ = 1;
+  memcpy(name_, key.data(), key.size());
+  name_[key.size()] = '\0';
+}
+
+HeapStatData::HeapStatData(absl::string_view key) : name_(key.data(), key.size()) {}
+
+HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) {
+  // Any expected truncation of name is done at the callsite. No truncation is
+  // required to use this allocator.
+  auto data = std::make_unique<HeapStatData>(name);
+  Thread::ReleasableLockGuard lock(mutex_);
+  auto ret = stats_.insert(data.get());
+  HeapStatData* existing_data = *ret.first;
+  lock.release();
+
+  if (ret.second) {
+    return data.release();
+  }
+  ++existing_data->ref_count_;
+  return existing_data;
+}
+
+void HeapStatDataAllocator::free(HeapStatData& data) {
+  ASSERT(data.ref_count_ > 0);
+  if (--data.ref_count_ > 0) {
+    return;
+  }
+
+  {
+    Thread::LockGuard lock(mutex_);
+    size_t key_removed = stats_.erase(&data);
+    ASSERT(key_removed == 1);
+  }
+
+  delete &data;
 }
 
 TagExtractorImpl::TagExtractorImpl(const std::string& name, const std::string& regex,
@@ -134,92 +267,6 @@ bool TagExtractorImpl::extractTag(const std::string& stat_name, std::vector<Tag>
   PERF_RECORD(perf, "re-miss", name_);
   return false;
 }
-
-HeapStatData::HeapStatData(absl::string_view key) : name_(key.data(), key.size()) {}
-
-HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) {
-  // Any expected truncation of name is done at the callsite. No truncation is
-  // required to use this allocator.
-  auto data = std::make_unique<HeapStatData>(name);
-  Thread::ReleasableLockGuard lock(mutex_);
-  auto ret = stats_.insert(data.get());
-  HeapStatData* existing_data = *ret.first;
-  lock.release();
-
-  if (ret.second) {
-    return data.release();
-  }
-  ++existing_data->ref_count_;
-  return existing_data;
-}
-
-/**
- * Counter implementation that wraps a StatData. StatData must have data members:
- *    std::atomic<int64_t> value_;
- *    std::atomic<int64_t> pending_increment_;
- *    std::atomic<int16_t> flags_;
- *    std::atomic<int16_t> ref_count_;
- */
-template <class StatData> class CounterImpl : public Counter, public MetricImpl {
-public:
-  CounterImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
-              std::string&& tag_extracted_name, std::vector<Tag>&& tags)
-      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
-        alloc_(alloc) {}
-  ~CounterImpl() { alloc_.free(data_); }
-
-  // Stats::Counter
-  void add(uint64_t amount) override {
-    data_.value_ += amount;
-    data_.pending_increment_ += amount;
-    data_.flags_ |= Flags::Used;
-  }
-
-  void inc() override { add(1); }
-  uint64_t latch() override { return data_.pending_increment_.exchange(0); }
-  void reset() override { data_.value_ = 0; }
-  bool used() const override { return data_.flags_ & Flags::Used; }
-  uint64_t value() const override { return data_.value_; }
-
-private:
-  StatData& data_;
-  StatDataAllocatorImpl<StatData>& alloc_;
-};
-
-/**
- * Gauge implementation that wraps a StatData.
- */
-template <class StatData> class GaugeImpl : public Gauge, public MetricImpl {
-public:
-  GaugeImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
-            std::string&& tag_extracted_name, std::vector<Tag>&& tags)
-      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
-        alloc_(alloc) {}
-  ~GaugeImpl() { alloc_.free(data_); }
-
-  // Stats::Gauge
-  virtual void add(uint64_t amount) override {
-    data_.value_ += amount;
-    data_.flags_ |= Flags::Used;
-  }
-  virtual void dec() override { sub(1); }
-  virtual void inc() override { add(1); }
-  virtual void set(uint64_t value) override {
-    data_.value_ = value;
-    data_.flags_ |= Flags::Used;
-  }
-  virtual void sub(uint64_t amount) override {
-    ASSERT(data_.value_ >= amount);
-    ASSERT(used());
-    data_.value_ -= amount;
-  }
-  virtual uint64_t value() const override { return data_.value_; }
-  bool used() const override { return data_.flags_ & Flags::Used; }
-
-private:
-  StatData& data_;
-  StatDataAllocatorImpl<StatData>& alloc_;
-};
 
 TagProducerImpl::TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config) {
   // To check name conflict.
@@ -319,30 +366,6 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
   return names;
 }
 
-// TODO(jmarantz): move this below HeapStatDataAllocator::alloc.
-void HeapStatDataAllocator::free(HeapStatData& data) {
-  ASSERT(data.ref_count_ > 0);
-  if (--data.ref_count_ > 0) {
-    return;
-  }
-
-  {
-    Thread::LockGuard lock(mutex_);
-    size_t key_removed = stats_.erase(&data);
-    ASSERT(key_removed == 1);
-  }
-
-  delete &data;
-}
-
-void RawStatData::initialize(absl::string_view key, const StatsOptions& stats_options) {
-  ASSERT(!initialized());
-  ASSERT(key.size() <= stats_options.maxNameLength());
-  ref_count_ = 1;
-  memcpy(name_, key.data(), key.size());
-  name_[key.size()] = '\0';
-}
-
 HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_ptr)
     : computed_quantiles_(supportedQuantiles().size(), 0.0) {
   hist_approx_quantile(histogram_ptr, supportedQuantiles().data(), supportedQuantiles().size(),
@@ -399,30 +422,6 @@ void SourceImpl::clearCache() {
   counters_.reset();
   gauges_.reset();
   histograms_.reset();
-}
-
-template <class StatData>
-CounterSharedPtr StatDataAllocatorImpl<StatData>::makeCounter(absl::string_view name,
-                                                              std::string&& tag_extracted_name,
-                                                              std::vector<Tag>&& tags) {
-  StatData* data = alloc(name);
-  if (data == nullptr) {
-    return nullptr;
-  }
-  return std::make_shared<CounterImpl<StatData>>(*data, *this, std::move(tag_extracted_name),
-                                                 std::move(tags));
-}
-
-template <class StatData>
-GaugeSharedPtr StatDataAllocatorImpl<StatData>::makeGauge(absl::string_view name,
-                                                          std::string&& tag_extracted_name,
-                                                          std::vector<Tag>&& tags) {
-  StatData* data = alloc(name);
-  if (data == nullptr) {
-    return nullptr;
-  }
-  return std::make_shared<GaugeImpl<StatData>>(*data, *this, std::move(tag_extracted_name),
-                                               std::move(tags));
 }
 
 template class StatDataAllocatorImpl<HeapStatData>;
