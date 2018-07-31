@@ -157,11 +157,12 @@ private:
     void doData(bool end_stream) override {
       parent_.decodeData(this, *parent_.buffered_request_data_, end_stream);
     }
-    void doTrailers() override { parent_.decodeTrailers(this, *parent_.request_trailers_); }
+    void doTrailers() override { parent_.decodeTrailers(this); }
     const HeaderMapPtr& trailers() override { return parent_.request_trailers_; }
 
     // Http::StreamDecoderFilterCallbacks
     void addDecodedData(Buffer::Instance& data, bool streaming) override;
+    void addDecodedTrailers(HeaderMapPtr&& trailers) override;
     void continueDecoding() override;
     const Buffer::Instance* decodingBuffer() override {
       return parent_.buffered_request_data_.get();
@@ -224,12 +225,12 @@ private:
     void doData(bool end_stream) override {
       parent_.encodeData(this, *parent_.buffered_response_data_, end_stream);
     }
-    void doTrailers() override { parent_.encodeTrailers(this, *parent_.response_trailers_); }
+    void doTrailers() override { parent_.encodeTrailers(this); }
     const HeaderMapPtr& trailers() override { return parent_.response_trailers_; }
 
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data, bool streaming) override;
-    HeaderMap& addEncodedTrailers() override;
+    void addEncodedTrailers(HeaderMapPtr&& trailers) override;
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
     void onEncoderFilterBelowWriteBufferLowWatermark() override;
     void setEncoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
@@ -268,18 +269,19 @@ private:
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream);
     const Network::Connection* connection();
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
+    void addDecodedTrailers(HeaderMapPtr&& trailers);
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream);
-    void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
+    void decodeTrailers(ActiveStreamDecoderFilter* filter);
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
-    HeaderMap& addEncodedTrailers();
+    void addEncodedTrailers(HeaderMapPtr&& trailers);
     void sendLocalReply(bool is_grpc_request, Code code, const std::string& body,
                         std::function<void(HeaderMap& headers)> modify_headers);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
-    void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
+    void encodeTrailers(ActiveStreamEncoderFilter* filter);
     void maybeEndEncode(bool end_stream);
     uint64_t streamId() { return stream_id_; }
 

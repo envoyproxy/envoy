@@ -191,6 +191,11 @@ public:
   virtual void addDecodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
+   * Adds decoded trailers. This will overwrite any existing trailers should any already exist.
+   */
+  virtual void addDecodedTrailers(HeaderMapPtr&& trailers) PURE;
+
+  /**
    * Create a locally generated response using the provided response_code and body_text parameters.
    * If the request was a gRPC request the local reply will be encoded as a gRPC response with a 200
    * HTTP response code and grpc-status and grpc-message headers mapped from the provided
@@ -396,11 +401,9 @@ public:
   virtual void addEncodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
-   * Provides a trailer map that can be used to modify the trailers for a response. Used when
-   * trailers need to be injected into a response and the upstream response did not contain any
-   * trailers (in which case encodeTrailers is not called).
+   * Adds encoded trailers. This will overwrite any existing trailers should any already exist.
    */
-  virtual HeaderMap& addEncodedTrailers() PURE;
+  virtual void addEncodedTrailers(HeaderMapPtr&& trailers) PURE;
 
   /**
    * Called when an encoder filter goes over its high watermark.
