@@ -4,9 +4,13 @@ load("@io_bazel_rules_go//proto:def.bzl", "go_grpc_library", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
 
 _PY_SUFFIX = "_py"
+
 _CC_SUFFIX = "_cc"
+
 _GO_PROTO_SUFFIX = "_go_proto"
+
 _GO_GRPC_SUFFIX = "_go_grpc"
+
 _GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/data-plane-api/api/"
 
 def _Suffix(d, suffix):

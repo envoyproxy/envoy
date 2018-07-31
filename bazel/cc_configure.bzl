@@ -1,4 +1,7 @@
-load("@bazel_tools//tools/cpp:cc_configure.bzl", _upstream_cc_autoconf_impl = "cc_autoconf_impl")
+load(
+    "@bazel_tools//tools/cpp:cc_configure.bzl",
+    _upstream_cc_autoconf_impl = "cc_autoconf_impl",
+)
 load("@bazel_tools//tools/cpp:lib_cc_configure.bzl", "get_cpu_value")
 load("@bazel_tools//tools/cpp:unix_cc_configure.bzl", "find_cc")
 
@@ -82,7 +85,6 @@ def cc_autoconf_impl(repository_ctx):
     return _upstream_cc_autoconf_impl(repository_ctx, overriden_tools = overriden_tools)
 
 cc_autoconf = repository_rule(
-    implementation = cc_autoconf_impl,
     attrs = {
         "_envoy_cc_wrapper": attr.label(default = "@envoy//bazel:cc_wrapper.py"),
     },
@@ -118,6 +120,7 @@ cc_autoconf = repository_rule(
         "VS120COMNTOOLS",
         "VS140COMNTOOLS",
     ],
+    implementation = cc_autoconf_impl,
 )
 
 def cc_configure():

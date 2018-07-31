@@ -126,10 +126,10 @@ def _default_envoy_build_config_impl(ctx):
     ctx.symlink(ctx.attr.config, "extensions_build_config.bzl")
 
 _default_envoy_build_config = repository_rule(
-    implementation = _default_envoy_build_config_impl,
     attrs = {
         "config": attr.label(default = "@envoy//source/extensions:extensions_build_config.bzl"),
     },
+    implementation = _default_envoy_build_config_impl,
 )
 
 def _default_envoy_api_impl(ctx):
@@ -147,10 +147,10 @@ def _default_envoy_api_impl(ctx):
         ctx.symlink(ctx.path(ctx.attr.api).dirname.get_child(d), d)
 
 _default_envoy_api = repository_rule(
-    implementation = _default_envoy_api_impl,
     attrs = {
         "api": attr.label(default = "@envoy//api:BUILD"),
     },
+    implementation = _default_envoy_api_impl,
 )
 
 # Python dependencies. If these become non-trivial, we might be better off using a virtualenv to

@@ -18,6 +18,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -30,6 +31,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 using testing::SaveArg;
 using testing::WithArg;
 using testing::_;
@@ -62,8 +64,10 @@ protected:
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
-    cluster_.reset(new EdsClusterImpl(sds_cluster_, runtime_, stats_, ssl_context_manager_,
-                                      local_info_, cm_, dispatcher_, random_, false));
+    Stats::ScopePtr stats_scope;
+    EXPECT_CALL(factory_context_, stats()).WillRepeatedly(ReturnRef(stats_));
+    cluster_.reset(new EdsClusterImpl(sds_cluster_, runtime_, false, factory_context_,
+                                      std::move(stats_scope)));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
   }
 
@@ -123,6 +127,7 @@ protected:
   Http::MockAsyncClientRequest request_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 
 TEST_F(SdsTest, Shutdown) {

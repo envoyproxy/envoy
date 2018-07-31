@@ -59,8 +59,12 @@ public:
 
   void setup(const std::string& json) {
     NiceMock<MockClusterManager> cm;
-    cluster_.reset(new OriginalDstCluster(parseClusterFromJson(json), runtime_, stats_store_,
-                                          ssl_context_manager_, cm, dispatcher_, false));
+    NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+    Envoy::Stats::ScopePtr scope;
+    EXPECT_CALL(factory_context, clusterManager()).WillRepeatedly(ReturnRef(cm));
+    EXPECT_CALL(factory_context, stats()).WillRepeatedly(ReturnRef(stats_store_));
+    cluster_.reset(new OriginalDstCluster(parseClusterFromJson(json), runtime_, false,
+                                          factory_context, std::move(scope)));
     cluster_->prioritySet().addMemberUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();

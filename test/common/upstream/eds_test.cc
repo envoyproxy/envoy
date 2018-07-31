@@ -9,6 +9,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -51,8 +52,12 @@ protected:
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
-    cluster_.reset(new EdsClusterImpl(eds_cluster_, runtime_, stats_, ssl_context_manager_,
-                                      local_info_, cm_, dispatcher_, random_, false));
+    NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+    Envoy::Stats::ScopePtr scope;
+    EXPECT_CALL(factory_context, clusterManager()).WillRepeatedly(ReturnRef(cm_));
+    EXPECT_CALL(factory_context, stats()).WillRepeatedly(ReturnRef(stats_));
+    cluster_.reset(
+        new EdsClusterImpl(eds_cluster_, runtime_, false, factory_context, std::move(scope)));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
   }
 
