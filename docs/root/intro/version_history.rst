@@ -22,7 +22,7 @@ Version history
   defaults to 5 minutes; if you have other timeouts (e.g. connection idle timeout, upstream
   response per-retry) that are longer than this in duration, you may want to consider setting a
   non-default per-stream idle timeout.
-* http: added downstream_rq_completed counter for :ref:`total requests completed <config_http_conn_man_stats_per_listener>`, including on a :ref:`per-listener basis <config_http_conn_man_stats_per_listener>.
+* http: added downstream_rq_completed counter for :ref:`total requests completed <config_http_conn_man_stats>`, including on a :ref:`per-listener basis <config_http_conn_man_stats_per_listener>`.
 * http: added support for a :ref:`per-stream idle timeout
   <envoy_api_field_route.RouteAction.idle_timeout>`. This defaults to 5 minutes; if you have
   other timeouts (e.g. connection idle timeout, upstream response per-retry) that are longer than
