@@ -48,6 +48,11 @@ public:
   const Outlier::Detector* outlierDetector() const override { return outlier_detector_.get(); }
   void initialize(std::function<void()> callback) override;
 
+  void startHealthchecks(AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
+                         Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher);
+
+  std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
+
 protected:
   PrioritySetImpl priority_set_;
   HealthCheckerSharedPtr health_checker_;
@@ -67,6 +72,7 @@ private:
   Secret::SecretManager& secret_manager_;
   bool added_via_api_;
   HostVectorSharedPtr initial_hosts_;
+  std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
 };
 
 typedef std::shared_ptr<HdsCluster> HdsClusterPtr;
@@ -114,9 +120,17 @@ public:
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse sendResponse();
   // TODO(htuch): Make this configurable or some static.
+
+  // How often we retry to establish a stream
   const uint32_t RetryDelayMilliseconds = 5000;
+
+  // Soft limit on size of the cluster’s connections read and write buffers.
   static constexpr uint32_t ClusterConnectionBufferLimitBytes = 12345;
+
+  // The timeout for new network connections to hosts in the cluster.
   static constexpr uint32_t ClusterTimeoutSeconds = 1;
+
+  // How often envoy reports the healthcheck results to the server
   uint32_t server_response_ms_ = 1000;
 
   // Processes the management server requests
@@ -127,7 +141,6 @@ public:
   void establishNewStream();
 
   std::vector<HdsClusterPtr> hdsClusters() { return hds_clusters_; };
-  std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
 
 private:
   void setRetryTimer();
@@ -137,7 +150,7 @@ private:
   Grpc::AsyncClientPtr async_client_;
   Grpc::AsyncStream* stream_{};
   const Protobuf::MethodDescriptor& service_method_;
-  Event::TimerPtr retry_timer_;
+  Event::TimerPtr hds_retry_timer_;
   envoy::service::discovery::v2::HealthCheckRequest health_check_request_;
   std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier> health_check_message_;
   std::vector<std::string> clusters_;
@@ -148,10 +161,7 @@ private:
   Runtime::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
 
-  Event::TimerPtr server_response_timer_;
-
-  std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
-  std::vector<envoy::api::v2::Cluster> clusters_config_;
+  Event::TimerPtr hds_stream_response_timer_;
   std::vector<HdsClusterPtr> hds_clusters_;
   ClusterInfoFactory& info_factory_;
   AccessLog::AccessLogManager& access_log_manager_;

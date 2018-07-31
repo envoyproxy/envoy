@@ -216,7 +216,8 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   hds_delegate_->processMessage(std::move(message));
 
   // Check Correctness
-  EXPECT_EQ(hds_delegate_->healthCheckers().size(), 3);
+  EXPECT_EQ(hds_delegate_->hdsClusters()[0]->healthCheckers().size(), 2);
+  EXPECT_EQ(hds_delegate_->hdsClusters()[1]->healthCheckers().size(), 1);
 }
 
 TEST_F(HdsTest, TestMinimalOnReceiveMessage) {

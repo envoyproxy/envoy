@@ -20,17 +20,17 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
       secret_manager_(secret_manager), random_(random), dispatcher_(dispatcher),
       info_factory_(info_factory), access_log_manager_(access_log_manager) {
   health_check_request_.mutable_node()->MergeFrom(node);
-  retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
-  server_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
+  hds_retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
+  hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
   establishNewStream();
 }
 
 void HdsDelegate::setRetryTimer() {
-  retry_timer_->enableTimer(std::chrono::milliseconds(RetryDelayMilliseconds));
+  hds_retry_timer_->enableTimer(std::chrono::milliseconds(RetryDelayMilliseconds));
 }
 
 void HdsDelegate::setServerResponseTimer() {
-  server_response_timer_->enableTimer(std::chrono::milliseconds(server_response_ms_));
+  hds_stream_response_timer_->enableTimer(std::chrono::milliseconds(server_response_ms_));
 }
 
 void HdsDelegate::establishNewStream() {
@@ -62,14 +62,12 @@ void HdsDelegate::handleFailure() {
 envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse
 HdsDelegate::sendResponse() {
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse response;
-  for (auto& cluster : hds_clusters_) {
+  for (const auto& cluster : hds_clusters_) {
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
       for (const auto& host : hosts->hosts()) {
         auto* endpoint = response.mutable_endpoint_health_response()->add_endpoints_health();
-        endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
-            host->address()->ip()->addressAsString());
-        endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
-            host->address()->ip()->port());
+        Network::Utility::addressToProtobufAddress(
+            *host->address(), *endpoint->mutable_endpoint()->mutable_address());
         // TODO(lilika): Add support for more granular options of envoy::api::v2::core::HealthStatus
         if (host->healthy()) {
           endpoint->set_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
@@ -99,12 +97,10 @@ void HdsDelegate::processMessage(
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
   ASSERT(message);
 
-  for (auto& cluster_health_check : message->health_check()) {
+  for (const auto& cluster_health_check : message->health_check()) {
     // Create HdsCluster config
-    envoy::api::v2::core::BindConfig bind_config;
-
-    clusters_config_.emplace_back();
-    envoy::api::v2::Cluster& cluster_config = clusters_config_.back();
+    static const envoy::api::v2::core::BindConfig bind_config;
+    envoy::api::v2::Cluster cluster_config;
 
     cluster_config.set_name(cluster_health_check.cluster_name());
     cluster_config.mutable_connect_timeout()->set_seconds(ClusterTimeoutSeconds);
@@ -112,8 +108,8 @@ void HdsDelegate::processMessage(
         ClusterConnectionBufferLimitBytes);
 
     // Add endpoints to cluster
-    for (auto& locality_endpoints : cluster_health_check.endpoints()) {
-      for (auto& endpoint : locality_endpoints.endpoints()) {
+    for (const auto& locality_endpoints : cluster_health_check.endpoints()) {
+      for (const auto& endpoint : locality_endpoints.endpoints()) {
         cluster_config.add_hosts()->MergeFrom(endpoint.address());
       }
     }
@@ -132,11 +128,7 @@ void HdsDelegate::processMessage(
                                               ssl_context_manager_, secret_manager_, false,
                                               info_factory_));
 
-    for (auto& health_check : cluster_config.health_checks()) {
-      health_checkers_.push_back(
-          Upstream::HealthCheckerFactory::create(health_check, *hds_clusters_.back(), runtime_,
-                                                 random_, dispatcher_, access_log_manager_));
-    }
+    hds_clusters_.back()->startHealthchecks(access_log_manager_, runtime_, random_, dispatcher_);
   }
 }
 
@@ -150,11 +142,7 @@ void HdsDelegate::onReceiveMessage(
   // Process the HealthCheckSpecifier message
   processMessage(std::move(message));
 
-  // Initializing HealthCheckers
-  for (auto& health_checker : health_checkers_) {
-    health_checker->start();
-  }
-
+  // Set response
   server_response_ms_ = PROTOBUF_GET_MS_REQUIRED(*message, interval);
   setServerResponseTimer();
 }
@@ -165,7 +153,7 @@ void HdsDelegate::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
 
 void HdsDelegate::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
   ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
-  server_response_timer_->disableTimer();
+  hds_stream_response_timer_->disableTimer();
   stream_ = nullptr;
   handleFailure();
 }
@@ -185,11 +173,11 @@ HdsCluster::HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& 
                                          ssl_context_manager_, secret_manager_, added_via_api_);
 
   for (const auto& host : cluster.hosts()) {
-    initial_hosts_->emplace_back(HostSharedPtr{
+    initial_hosts_->emplace_back(
         new HostImpl(info_, "", Network::Address::resolveProtoAddress(host),
                      envoy::api::v2::core::Metadata::default_instance(), 1,
                      envoy::api::v2::core::Locality().default_instance(),
-                     envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance())});
+                     envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
   }
   initialize([] {});
 }
@@ -214,6 +202,17 @@ ClusterInfoConstSharedPtr ProdClusterInfoFactory::createClusterInfo(
 
   return std::make_unique<ClusterInfoImpl>(cluster, bind_config, runtime, stats,
                                            ssl_context_manager, secret_manager, added_via_api);
+}
+
+void HdsCluster::startHealthchecks(AccessLog::AccessLogManager& access_log_manager,
+                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                                   Event::Dispatcher& dispatcher) {
+
+  for (auto& health_check : cluster_.health_checks()) {
+    health_checkers_.push_back(Upstream::HealthCheckerFactory::create(
+        health_check, *this, runtime, random, dispatcher, access_log_manager));
+    health_checkers_.back()->start();
+  }
 }
 
 void HdsCluster::initialize(std::function<void()> callback) {
