@@ -38,8 +38,8 @@ public:
                Runtime::Loader& runtime, Upstream::ClusterManager& cm)
       : local_info_(local_info), scope_(scope), runtime_(runtime), cm_(cm),
         cluster_name_(config.grpc_service().envoy_grpc().cluster_name()),
-        response_headers_to_remove_(config.http_service().response_headers_to_remove().begin(),
-                                    config.http_service().response_headers_to_remove().end()),
+        response_headers_to_remove_(
+            toResponseHeaders(config.http_service().response_headers_to_remove())),
         allowed_request_headers_(toRequestHeaders(config.http_service().allowed_request_headers())),
         failure_mode_allow_(config.failure_mode_allow()) {}
 
@@ -58,12 +58,27 @@ public:
 private:
   static Http::LowerCaseStrUnorderedSet toRequestHeaders(
       const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& request_headers) {
-    Http::LowerCaseStrUnorderedSet allowed_headers(request_headers.begin(), request_headers.end());
-    allowed_headers.insert(Http::Headers::get().Path);
-    allowed_headers.insert(Http::Headers::get().Method);
-    allowed_headers.insert(Http::Headers::get().Host);
+    Http::LowerCaseStrUnorderedSet allowed_headers;
+    allowed_headers.reserve(request_headers.size() + 3);
+    for (const auto& header : request_headers) {
+      allowed_headers.emplace(Http::LowerCaseString(header));
+    }
+    allowed_headers.emplace(Http::Headers::get().Path);
+    allowed_headers.emplace(Http::Headers::get().Method);
+    allowed_headers.emplace(Http::Headers::get().Host);
     return allowed_headers;
   }
+
+  static Http::LowerCaseStrUnorderedSet toResponseHeaders(
+      const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& response_headers) {
+    Http::LowerCaseStrUnorderedSet headers_to_remove;
+    headers_to_remove.reserve(response_headers.size());
+    for (const auto& header : response_headers) {
+      headers_to_remove.emplace(Http::LowerCaseString(header));
+    }
+    return headers_to_remove;
+  }
+
   const LocalInfo::LocalInfo& local_info_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
