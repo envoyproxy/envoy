@@ -18,10 +18,12 @@ MockCancellable::~MockCancellable() {}
 MockUpstreamCallbacks::MockUpstreamCallbacks() {}
 MockUpstreamCallbacks::~MockUpstreamCallbacks() {}
 
-MockConnectionData::MockConnectionData() {
-  ON_CALL(*this, connection()).WillByDefault(ReturnRef(connection_));
+MockConnectionData::MockConnectionData() {}
+MockConnectionData::~MockConnectionData() {
+  if (release_callback_) {
+    release_callback_();
+  }
 }
-MockConnectionData::~MockConnectionData() {}
 
 MockInstance::MockInstance() {
   ON_CALL(*this, newConnection(_)).WillByDefault(Invoke([&](Callbacks& cb) -> Cancellable* {
@@ -44,12 +46,16 @@ void MockInstance::poolFailure(PoolFailureReason reason) {
   cb->onPoolFailure(reason, host_);
 }
 
-void MockInstance::poolReady() {
+void MockInstance::poolReady(Network::MockClientConnection& conn) {
   Callbacks* cb = callbacks_.front();
   callbacks_.pop_front();
   handles_.pop_front();
 
-  cb->onPoolReady(connection_data_, host_);
+  ON_CALL(*connection_data_, connection()).WillByDefault(ReturnRef(conn));
+
+  connection_data_->release_callback_ = [&]() -> void { released(conn); };
+
+  cb->onPoolReady(std::move(connection_data_), host_);
 }
 
 } // namespace ConnectionPool
