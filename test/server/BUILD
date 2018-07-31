@@ -113,6 +113,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "overload_manager_impl_test",
+    srcs = ["overload_manager_impl_test.cc"],
+    deps = [
+        "//include/envoy/registry",
+        "//source/extensions/resource_monitors/common:factory_base_lib",
+        "//source/server:overload_manager_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "lds_api_test",
     srcs = ["lds_api_test.cc"],
     data = [

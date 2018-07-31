@@ -160,6 +160,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "overload_manager_lib",
+    srcs = ["overload_manager_impl.cc"],
+    hdrs = ["overload_manager_impl.h"],
+    deps = [
+        "//include/envoy/server:overload_manager_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/config:utility_lib",
+        "//source/server:resource_monitor_config_lib",
+        "@envoy_api//envoy/config/overload/v2alpha:overload_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "lds_api_lib",
     srcs = ["lds_api.cc"],
     hdrs = ["lds_api.h"],

@@ -198,3 +198,10 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "overload_manager_interface",
+    hdrs = ["overload_manager.h"],
+    deps = [
+    ],
+)
