@@ -180,7 +180,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
-      system_time_source_(system_time_source) {
+      system_time_source_(system_time_source), dispatcher_(main_thread_dispatcher) {
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
@@ -330,7 +330,35 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
                                                            const HostVector& hosts_removed) {
     // This fires when a cluster is about to have an updated member set. We need to send this
     // out to all of the thread local configurations.
-    postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
+
+    // Should we save this update and merge it with other updates?
+    //
+    // Note that we can only _safely_ merge updates that have no added/removed hosts. That is,
+    // only those updates that signal a change in host healthcheck state, weight or metadata.
+    //
+    // We've discussed merging updates related to hosts being added/removed, but it's really
+    // tricky to merge those given that downstream consumers of these updates expect to see the
+    // full list of updates, not a condensed one. This is because they use the broadcasted
+    // HostSharedPtrs within internal maps to track hosts. If we fail to broadcast the entire list
+    // of removals, these maps will leak those HostSharedPtrs.
+    //
+    // See https://github.com/envoyproxy/envoy/pull/3941 for more context.
+    bool scheduled = false;
+    const bool merging_enabled = cluster.info()->lbConfig().has_update_merge_window();
+    // Remember: we only merge updates with no adds/removes — just hc/weight/metadata changes.
+    const bool is_mergeable = !hosts_added.size() && !hosts_removed.size();
+
+    if (merging_enabled) {
+      // If this is not mergeable, we should cancel any scheduled updates since
+      // we'll deliver it immediately.
+      scheduled = scheduleUpdate(cluster, priority, is_mergeable);
+    }
+
+    // If an update was not scheduled for later, deliver it immediately.
+    if (!scheduled) {
+      cm_stats_.cluster_updated_.inc();
+      postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
+    }
   });
 
   // Finally, if the cluster has any hosts, post updates cross-thread so the per-thread load
@@ -341,6 +369,83 @@ void ClusterManagerImpl::onClusterInit(Cluster& cluster) {
     }
     postThreadLocalClusterUpdate(cluster, host_set->priority(), host_set->hosts(), HostVector{});
   }
+}
+
+bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable) {
+  const auto& update_merge_window = cluster.info()->lbConfig().update_merge_window();
+  const auto timeout = DurationUtil::durationToMilliseconds(update_merge_window);
+
+  // Find pending updates for this cluster.
+  auto& updates_by_prio = updates_map_[cluster.info()->name()];
+  if (!updates_by_prio) {
+    updates_by_prio.reset(new PendingUpdatesByPriorityMap());
+  }
+
+  // Find pending updates for this priority.
+  auto& updates = (*updates_by_prio)[priority];
+  if (!updates) {
+    updates.reset(new PendingUpdates());
+  }
+
+  // Has an update_merge_window gone by since the last update? If so, don't schedule
+  // the update so it can be applied immediately. Ditto if this is not a mergeable update.
+  const auto delta = std::chrono::steady_clock::now() - updates->last_updated_;
+  const uint64_t delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
+  const bool out_of_merge_window = delta_ms > timeout;
+  if (out_of_merge_window || !mergeable) {
+    // If there was a pending update, we cancel the pending merged update.
+    //
+    // Note: it's possible that even though we are outside of a merge window (delta_ms > timeout),
+    // a timer is enabled. This race condition is fine, since we'll disable the timer here and
+    // deliver the update immediately.
+
+    // Why wasn't the update scheduled for later delivery? We keep some stats that are helpful
+    // to understand why merging did not happen. There's 2 things we are tracking here:
+
+    // 1) Was this update out of a merge window?
+    if (mergeable && out_of_merge_window) {
+      cm_stats_.update_out_of_merge_window_.inc();
+    }
+
+    // 2) Were there previous updates that we are cancelling (and delivering immediately)?
+    if (updates->disableTimer()) {
+      cm_stats_.update_merge_cancelled_.inc();
+    }
+
+    updates->last_updated_ = std::chrono::steady_clock::now();
+    return false;
+  }
+
+  // If there's no timer, create one.
+  if (updates->timer_ == nullptr) {
+    updates->timer_ = dispatcher_.createTimer([this, &cluster, priority, &updates]() -> void {
+      applyUpdates(cluster, priority, *updates);
+    });
+  }
+
+  // Ensure there's a timer set to deliver these updates.
+  if (!updates->timer_enabled_) {
+    updates->enableTimer(timeout);
+  }
+
+  return true;
+}
+
+void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
+                                      PendingUpdates& updates) {
+  // Deliver pending updates.
+
+  // Remember that these merged updates are _only_ for updates related to
+  // HC/weight/metadata changes. That's why added/removed are empty. All
+  // adds/removals were already immediately broadcasted.
+  static const HostVector hosts_added;
+  static const HostVector hosts_removed;
+
+  postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
+
+  cm_stats_.cluster_updated_via_merge_.inc();
+  updates.timer_enabled_ = false;
+  updates.last_updated_ = std::chrono::steady_clock::now();
 }
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
@@ -468,6 +573,9 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
   if (removed) {
     cm_stats_.cluster_removed_.inc();
     updateGauges();
+    // Did we ever deliver merged updates for this cluster?
+    // No need to manually disable timers, this should take care of it.
+    updates_map_.erase(cluster_name);
   }
 
   return removed;
