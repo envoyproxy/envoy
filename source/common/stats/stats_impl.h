@@ -89,7 +89,6 @@ private:
    * @return std::string the prefix, or "" if no prefix found.
    */
   static std::string extractRegexPrefix(absl::string_view regex);
-
   const std::string name_;
   const std::string prefix_;
   const std::string substr_;
@@ -245,33 +244,6 @@ struct RawStatData {
   char name_[];
 };
 
-/**
- * Implementation of the Metric interface. Virtual inheritance is used because the interfaces that
- * will inherit from Metric will have other base classes that will also inherit from Metric.
- */
-class MetricImpl : public virtual Metric {
-public:
-  MetricImpl(const std::string& name, std::string&& tag_extracted_name, std::vector<Tag>&& tags)
-      : name_(name), tag_extracted_name_(std::move(tag_extracted_name)), tags_(std::move(tags)) {}
-
-  const std::string& name() const override { return name_; }
-  const std::string& tagExtractedName() const override { return tag_extracted_name_; }
-  const std::vector<Tag>& tags() const override { return tags_; }
-
-protected:
-  /**
-   * Flags used by all stats types to figure out whether they have been used.
-   */
-  struct Flags {
-    static const uint8_t Used = 0x1;
-  };
-
-private:
-  const std::string name_;
-  const std::string tag_extracted_name_;
-  const std::vector<Tag> tags_;
-};
-
 // Partially implements a StatDataAllocator, leaving alloc & free for subclasses.
 // We templatize on StatData rather than defining a virtual base StatData class
 // for performance reasons; stat increment is on the hot path.
@@ -314,6 +286,52 @@ class RawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
 public:
   // StatDataAllocator
   bool requiresBoundedStatNameSize() const override { return true; }
+};
+
+/**
+ * This structure is an alternate backing store for both CounterImpl and GaugeImpl. It is designed
+ * so that it can be allocated efficiently from the heap on demand.
+ */
+struct HeapStatData {
+  explicit HeapStatData(absl::string_view key);
+
+  /**
+   * @returns absl::string_view the name as a string_view.
+   */
+  absl::string_view key() const { return name_; }
+
+  std::atomic<uint64_t> value_{0};
+  std::atomic<uint64_t> pending_increment_{0};
+  std::atomic<uint16_t> flags_{0};
+  std::atomic<uint16_t> ref_count_{1};
+  std::string name_;
+};
+
+/**
+ * Implementation of the Metric interface. Virtual inheritance is used because the interfaces that
+ * will inherit from Metric will have other base classes that will also inherit from Metric.
+ */
+class MetricImpl : public virtual Metric {
+public:
+  MetricImpl(const std::string& name, std::string&& tag_extracted_name, std::vector<Tag>&& tags)
+      : name_(name), tag_extracted_name_(std::move(tag_extracted_name)), tags_(std::move(tags)) {}
+
+  const std::string& name() const override { return name_; }
+  const std::string& tagExtractedName() const override { return tag_extracted_name_; }
+  const std::vector<Tag>& tags() const override { return tags_; }
+
+protected:
+  /**
+   * Flags used by all stats types to figure out whether they have been used.
+   */
+  struct Flags {
+    static const uint8_t Used = 0x1;
+  };
+
+private:
+  const std::string name_;
+  const std::string tag_extracted_name_;
+  const std::vector<Tag> tags_;
 };
 
 /**
@@ -374,25 +392,6 @@ private:
   absl::optional<std::vector<CounterSharedPtr>> counters_;
   absl::optional<std::vector<GaugeSharedPtr>> gauges_;
   absl::optional<std::vector<ParentHistogramSharedPtr>> histograms_;
-};
-
-/**
- * This structure is an alternate backing store for both CounterImpl and GaugeImpl. It is designed
- * so that it can be allocated efficiently from the heap on demand.
- */
-struct HeapStatData {
-  explicit HeapStatData(absl::string_view key);
-
-  /**
-   * @returns absl::string_view the name as a string_view.
-   */
-  absl::string_view key() const { return name_; }
-
-  std::atomic<uint64_t> value_{0};
-  std::atomic<uint64_t> pending_increment_{0};
-  std::atomic<uint16_t> flags_{0};
-  std::atomic<uint16_t> ref_count_{1};
-  std::string name_;
 };
 
 /**
@@ -470,32 +469,13 @@ private:
   Allocator alloc_;
 };
 
-/**
- * Store implementation that is isolated from other stores.
- */
 class IsolatedStoreImpl : public Store {
 public:
-  IsolatedStoreImpl()
-      : counters_([this](const std::string& name) -> CounterSharedPtr {
-          std::string tag_extracted_name = name;
-          std::vector<Tag> tags;
-          return alloc_.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
-        }),
-        gauges_([this](const std::string& name) -> GaugeSharedPtr {
-          std::string tag_extracted_name = name;
-          std::vector<Tag> tags;
-          return alloc_.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
-        }),
-        histograms_([this](const std::string& name) -> HistogramSharedPtr {
-          return std::make_shared<HistogramImpl>(name, *this, std::string(name),
-                                                 std::vector<Tag>());
-        }) {}
+  IsolatedStoreImpl();
 
   // Stats::Scope
   Counter& counter(const std::string& name) override { return counters_.get(name); }
-  ScopePtr createScope(const std::string& name) override {
-    return ScopePtr{new ScopeImpl(*this, name)};
-  }
+  ScopePtr createScope(const std::string& name) override;
   void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
   Gauge& gauge(const std::string& name) override { return gauges_.get(name); }
   Histogram& histogram(const std::string& name) override {
@@ -512,26 +492,6 @@ public:
   }
 
 private:
-  struct ScopeImpl : public Scope {
-    ScopeImpl(IsolatedStoreImpl& parent, const std::string& prefix)
-        : parent_(parent), prefix_(Utility::sanitizeStatsName(prefix)) {}
-
-    // Stats::Scope
-    ScopePtr createScope(const std::string& name) override {
-      return ScopePtr{new ScopeImpl(parent_, prefix_ + name)};
-    }
-    void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-    Counter& counter(const std::string& name) override { return parent_.counter(prefix_ + name); }
-    Gauge& gauge(const std::string& name) override { return parent_.gauge(prefix_ + name); }
-    Histogram& histogram(const std::string& name) override {
-      return parent_.histogram(prefix_ + name);
-    }
-    const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
-
-    IsolatedStoreImpl& parent_;
-    const std::string prefix_;
-  };
-
   HeapStatDataAllocator alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
