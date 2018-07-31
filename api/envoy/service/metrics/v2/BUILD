@@ -10,7 +10,7 @@ api_proto_library_internal(
     deps = [
         "//envoy/api/v2/core:base",
         "//envoy/api/v2/core:grpc_service",
-        "@promotheus_metrics_model//:client_model",
+        "@prometheus_metrics_model//:client_model",
     ],
 )
 
@@ -19,6 +19,6 @@ api_go_grpc_library(
     proto = ":metrics_service",
     deps = [
         "//envoy/api/v2/core:base_go_proto",
-        "@promotheus_metrics_model//:client_model_go_proto",
+        "@prometheus_metrics_model//:client_model_go_proto",
     ],
 )
