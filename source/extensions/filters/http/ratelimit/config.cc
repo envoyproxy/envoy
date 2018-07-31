@@ -26,7 +26,7 @@ Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, timeout, 20);
   return
       [filter_config, timeout_ms, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamDecoderFilter(std::make_shared<Filter>(
+        callbacks.addStreamFilter(std::make_shared<Filter>(
             filter_config, context.rateLimitClient(std::chrono::milliseconds(timeout_ms))));
       };
 }

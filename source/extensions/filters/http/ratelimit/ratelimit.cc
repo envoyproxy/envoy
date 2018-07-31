@@ -87,6 +87,39 @@ void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callb
   callbacks_ = &callbacks;
 }
 
+Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::HeaderMap&) {
+  return Http::FilterHeadersStatus::Continue;
+}
+
+Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) {
+  if (headers_to_add_) {
+    headers_to_add_->iterate(
+        [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+          Http::HeaderString k;
+          k.setCopy(header.key().c_str(), header.key().size());
+          Http::HeaderString v;
+          v.setCopy(header.value().c_str(), header.value().size());
+
+          static_cast<Http::HeaderMapImpl*>(context)->addViaMove(std::move(k), std::move(v));
+          return Http::HeaderMap::Iterate::Continue;
+        },
+        &headers);
+    headers_to_add_ = nullptr;
+  }
+
+  return Http::FilterHeadersStatus::Continue;
+}
+
+Http::FilterDataStatus Filter::encodeData(Buffer::Instance&, bool) {
+  return Http::FilterDataStatus::Continue;
+}
+
+Http::FilterTrailersStatus Filter::encodeTrailers(Http::HeaderMap&) {
+  return Http::FilterTrailersStatus::Continue;
+}
+
+void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks&) {}
+
 void Filter::onDestroy() {
   if (state_ == State::Calling) {
     state_ = State::Complete;
@@ -94,8 +127,9 @@ void Filter::onDestroy() {
   }
 }
 
-void Filter::complete(RateLimit::LimitStatus status) {
+void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& headers) {
   state_ = State::Complete;
+  headers_to_add_ = std::move(headers);
 
   switch (status) {
   case RateLimit::LimitStatus::OK:
@@ -123,7 +157,21 @@ void Filter::complete(RateLimit::LimitStatus status) {
   if (status == RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
-    callbacks_->sendLocalReply(Http::Code::TooManyRequests, "", nullptr);
+    callbacks_->sendLocalReply(Http::Code::TooManyRequests, "", [this](Http::HeaderMap& headers) {
+      if (headers_to_add_) {
+        headers_to_add_->iterate(
+            [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+              Http::HeaderString k;
+              k.setCopy(header.key().c_str(), header.key().size());
+              Http::HeaderString v;
+              v.setCopy(header.value().c_str(), header.value().size());
+
+              static_cast<Http::HeaderMapImpl*>(context)->addViaMove(std::move(k), std::move(v));
+              return Http::HeaderMap::Iterate::Continue;
+            },
+            &headers);
+      }
+    });
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::RateLimited);
   } else if (!initiating_call_) {
     callbacks_->continueDecoding();

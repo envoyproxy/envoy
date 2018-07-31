@@ -73,7 +73,7 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
  * HTTP rate limit filter. Depending on the route configuration, this filter calls the global
  * rate limiting service before allowing further filter iteration.
  */
-class Filter : public Http::StreamDecoderFilter, public RateLimit::RequestCallbacks {
+class Filter : public Http::StreamFilter, public RateLimit::RequestCallbacks {
 public:
   Filter(FilterConfigSharedPtr config, RateLimit::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
@@ -87,8 +87,15 @@ public:
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap& trailers) override;
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
+  // Http::StreamEncoderFilter
+  Http::FilterHeadersStatus encode100ContinueHeaders(Http::HeaderMap& headers) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
+  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
+  void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
+
   // RateLimit::RequestCallbacks
-  void complete(RateLimit::LimitStatus status) override;
+  void complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& headers) override;
 
 private:
   void initiateCall(const Http::HeaderMap& headers);
@@ -105,6 +112,7 @@ private:
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
+  Http::HeaderMapPtr headers_to_add_;
 };
 
 } // namespace RateLimitFilter
