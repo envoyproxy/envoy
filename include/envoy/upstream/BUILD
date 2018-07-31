@@ -9,6 +9,11 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "adaptive_concurrency_limit_interface",
+    hdrs = ["adaptive_concurrency_limit.h"],
+)
+
+envoy_cc_library(
     name = "cluster_manager_interface",
     hdrs = ["cluster_manager.h"],
     deps = [
