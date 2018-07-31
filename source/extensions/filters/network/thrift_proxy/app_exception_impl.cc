@@ -12,14 +12,9 @@ static const std::string StopField = "";
 
 void AppException::encode(MessageMetadata& metadata, ThriftProxy::Protocol& proto,
                           Buffer::Instance& buffer) const {
-  // Handle cases where the exception occurs before the message name (e.g. some header transport
-  // errors).
-  if (!metadata.hasMethodName()) {
-    metadata.setMethodName("");
-  }
-  if (!metadata.hasSequenceId()) {
-    metadata.setSequenceId(0);
-  }
+  ASSERT(metadata.hasMethodName());
+  ASSERT(metadata.hasSequenceId());
+
   metadata.setMessageType(MessageType::Exception);
 
   proto.writeMessageBegin(buffer, metadata);

@@ -110,6 +110,12 @@ TEST(HeaderMapTest, Iteration) {
   }
 }
 
+TEST(HeaderMapTest, CopyConstructor) {
+  HeaderMap headers({{"first", "1"}, {"second", "2"}, {"third", "3"}});
+  HeaderMap copy(headers);
+  EXPECT_EQ(copy, headers);
+}
+
 TEST(MessageMetadataTest, Fields) {
   MessageMetadata metadata;
 

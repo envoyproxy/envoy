@@ -115,6 +115,7 @@ envoy_extension_cc_test(
     deps = [
         ":mocks",
         ":utility_lib",
+        "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
         "//source/extensions/filters/network/thrift_proxy:decoder_lib",
         "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",

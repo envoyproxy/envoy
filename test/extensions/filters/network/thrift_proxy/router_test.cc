@@ -443,6 +443,36 @@ TEST_F(ThriftRouterTest, UpstreamDataTriggersReset) {
   destroyRouter();
 }
 
+TEST_F(ThriftRouterTest, UnexpectedUpstreamRemoteClose) {
+  initializeRouter();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::String);
+
+  EXPECT_CALL(callbacks_, sendLocalReply(_))
+      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
+        auto& app_ex = dynamic_cast<const AppException&>(response);
+        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
+        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+      }));
+  router_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+TEST_F(ThriftRouterTest, UnexpectedUpstreamLocalClose) {
+  initializeRouter();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::String);
+
+  EXPECT_CALL(callbacks_, sendLocalReply(_))
+      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
+        auto& app_ex = dynamic_cast<const AppException&>(response);
+        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
+        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+      }));
+  router_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 TEST_F(ThriftRouterTest, UnexpectedRouterDestroyBeforeUpstreamConnect) {
   initializeRouter();
   startRequest(MessageType::Call);

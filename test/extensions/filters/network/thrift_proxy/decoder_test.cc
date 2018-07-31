@@ -1,5 +1,6 @@
 #include "common/buffer/buffer_impl.h"
 
+#include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "extensions/filters/network/thrift_proxy/decoder.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
@@ -870,6 +871,27 @@ TEST(DecoderTest, OnDataWithInconsistentProtocolHint) {
   bool underflow = false;
   EXPECT_THROW_WITH_MESSAGE(decoder.onData(buffer, underflow), EnvoyException,
                             "transport reports protocol binary, but configured for compact");
+}
+
+TEST(DecoderTest, OnDataThrowsTransportAppException) {
+  NiceMock<MockTransport>* transport = new NiceMock<MockTransport>();
+  NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
+  NiceMock<MockDecoderCallbacks> callbacks;
+  StrictMock<ThriftFilters::MockDecoderFilter> filter;
+  ON_CALL(callbacks, newDecoderFilter()).WillByDefault(ReturnRef(filter));
+
+  InSequence dummy;
+  Decoder decoder(TransportPtr{transport}, ProtocolPtr{proto}, callbacks);
+  Buffer::OwnedImpl buffer;
+
+  EXPECT_CALL(*transport, decodeFrameStart(Ref(buffer), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setAppException(AppExceptionType::InvalidTransform, "unknown xform");
+        return true;
+      }));
+
+  bool underflow = false;
+  EXPECT_THROW_WITH_MESSAGE(decoder.onData(buffer, underflow), AppException, "unknown xform");
 }
 
 TEST(DecoderTest, OnDataResumes) {
