@@ -58,25 +58,25 @@ public:
 private:
   static Http::LowerCaseStrUnorderedSet toRequestHeaders(
       const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& request_headers) {
-    Http::LowerCaseStrUnorderedSet allowed_headers;
-    allowed_headers.reserve(request_headers.size() + 3);
+    Http::LowerCaseStrUnorderedSet headers;
+    headers.reserve(request_headers.size() + 3);
+    headers.emplace(Http::Headers::get().Path);
+    headers.emplace(Http::Headers::get().Method);
+    headers.emplace(Http::Headers::get().Host);
     for (const auto& header : request_headers) {
-      allowed_headers.emplace(Http::LowerCaseString(header));
+      headers.emplace(header);
     }
-    allowed_headers.emplace(Http::Headers::get().Path);
-    allowed_headers.emplace(Http::Headers::get().Method);
-    allowed_headers.emplace(Http::Headers::get().Host);
-    return allowed_headers;
+    return headers;
   }
 
   static Http::LowerCaseStrUnorderedSet toResponseHeaders(
       const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& response_headers) {
-    Http::LowerCaseStrUnorderedSet headers_to_remove;
-    headers_to_remove.reserve(response_headers.size());
+    Http::LowerCaseStrUnorderedSet headers;
+    headers.reserve(response_headers.size());
     for (const auto& header : response_headers) {
-      headers_to_remove.emplace(Http::LowerCaseString(header));
+      headers.emplace(header);
     }
-    return headers_to_remove;
+    return headers;
   }
 
   const LocalInfo::LocalInfo& local_info_;
