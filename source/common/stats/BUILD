@@ -17,6 +17,7 @@ envoy_cc_library(
         "libcircllhist",
     ],
     deps = [
+        ":utility_lib",
         "//include/envoy/common:time_interface",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
@@ -41,4 +42,10 @@ envoy_cc_library(
         ":stats_lib",
         "//include/envoy/thread_local:thread_local_interface",
     ],
+)
+
+envoy_cc_library(
+    name = "utility_lib",
+    srcs = ["utility.cc"],
+    hdrs = ["utility.h"],
 )

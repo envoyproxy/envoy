@@ -13,6 +13,7 @@
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/config/well_known_names.h"
+#include "common/stats/utility.h"
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/match.h"
@@ -213,13 +214,6 @@ TagProducerImpl::addDefaultExtractors(const envoy::config::metrics::v2::StatsCon
     }
   }
   return names;
-}
-
-std::string Utility::sanitizeStatsName(const std::string& name) {
-  std::string stats_name = name;
-  std::replace(stats_name.begin(), stats_name.end(), ':', '_');
-  std::replace(stats_name.begin(), stats_name.end(), '\0', '_');
-  return stats_name;
 }
 
 /**
