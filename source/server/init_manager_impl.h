@@ -1,6 +1,7 @@
 #pragma once
 
 #include <list>
+#include <memory>
 
 #include "envoy/init/init.h"
 

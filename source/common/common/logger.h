@@ -44,6 +44,7 @@ namespace Logger {
   FUNCTION(router)               \
   FUNCTION(runtime)              \
   FUNCTION(stats)                \
+  FUNCTION(secret)               \
   FUNCTION(testing)              \
   FUNCTION(thrift)               \
   FUNCTION(tracing)              \

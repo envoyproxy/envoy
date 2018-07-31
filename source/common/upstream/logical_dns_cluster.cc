@@ -15,21 +15,20 @@
 namespace Envoy {
 namespace Upstream {
 
-LogicalDnsCluster::LogicalDnsCluster(const envoy::api::v2::Cluster& cluster,
-                                     Runtime::Loader& runtime, Stats::Store& stats,
-                                     Ssl::ContextManager& ssl_context_manager,
-                                     const LocalInfo::LocalInfo& local_info,
-                                     Network::DnsResolverSharedPtr dns_resolver,
-                                     ThreadLocal::SlotAllocator& tls, ClusterManager& cm,
-                                     Event::Dispatcher& dispatcher, bool added_via_api)
-    : ClusterImplBase(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
-                      cm.clusterManagerFactory().secretManager(), added_via_api),
+LogicalDnsCluster::LogicalDnsCluster(
+    const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime, Stats::Store& stats,
+    Ssl::ContextManager& ssl_context_manager, Network::DnsResolverSharedPtr dns_resolver,
+    ThreadLocal::SlotAllocator& tls, ClusterManager& cm, Event::Dispatcher& dispatcher,
+    bool added_via_api,
+    Secret::DynamicTlsCertificateSecretProviderFactoryContext& secret_provider_context)
+    : ClusterImplBase(cluster, runtime, stats, ssl_context_manager, cm, added_via_api,
+                      secret_provider_context),
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
       tls_(tls.allocateSlot()),
       resolve_timer_(dispatcher.createTimer([this]() -> void { startResolve(); })),
-      local_info_(local_info),
+      local_info_(secret_provider_context.local_info()),
       load_assignment_(cluster.has_load_assignment()
                            ? cluster.load_assignment()
                            : Config::Utility::translateClusterHosts(cluster.hosts())) {

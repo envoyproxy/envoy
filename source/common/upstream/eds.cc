@@ -17,13 +17,14 @@
 namespace Envoy {
 namespace Upstream {
 
-EdsClusterImpl::EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                               Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                               const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
-                               Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                               bool added_via_api)
-    : BaseDynamicClusterImpl(cluster, cm.bindConfig(), runtime, stats, ssl_context_manager,
-                             cm.clusterManagerFactory().secretManager(), added_via_api),
+EdsClusterImpl::EdsClusterImpl(
+    const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime, Stats::Store& stats,
+    Ssl::ContextManager& ssl_context_manager, const LocalInfo::LocalInfo& local_info,
+    ClusterManager& cm, Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+    bool added_via_api,
+    Secret::DynamicTlsCertificateSecretProviderFactoryContext& secret_provider_context)
+    : BaseDynamicClusterImpl(cluster, runtime, stats, ssl_context_manager, cm, added_via_api,
+                             secret_provider_context),
       cm_(cm), local_info_(local_info),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()

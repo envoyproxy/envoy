@@ -14,6 +14,7 @@
 #include "common/network/socket_option_factory.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/secret/dynamic_secret_provider_factory_impl.h"
 
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
@@ -226,11 +227,17 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         filter_chain_match.application_protocols().begin(),
         filter_chain_match.application_protocols().end());
 
-    addFilterChain(PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0),
-                   destination_ips, server_names, filter_chain_match.transport_protocol(),
-                   application_protocols,
-                   config_factory.createTransportSocketFactory(*message, *this, server_names),
-                   parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), *this));
+    Secret::DynamicTlsCertificateSecretProviderFactoryContextImpl secret_provider_context(
+        parent_.server_.localInfo(), parent_.server_.dispatcher(), parent_.server_.random(),
+        parent_.server_.stats(), parent_.server_.clusterManager());
+    Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        parent_.server_.sslContextManager(), *listener_scope_, parent_.server_.clusterManager(),
+        initManager(), secret_provider_context);
+    addFilterChain(
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
+        server_names, filter_chain_match.transport_protocol(), application_protocols,
+        config_factory.createTransportSocketFactory(*message, factory_context, server_names),
+        parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), *this));
 
     need_tls_inspector |= filter_chain_match.transport_protocol() == "tls" ||
                           (filter_chain_match.transport_protocol().empty() &&

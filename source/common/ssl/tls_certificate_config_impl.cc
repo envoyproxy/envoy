@@ -1,5 +1,7 @@
 #include "common/ssl/tls_certificate_config_impl.h"
 
+#include <memory>
+
 #include "envoy/common/exception.h"
 
 #include "common/config/datasource.h"

@@ -33,6 +33,7 @@ envoy_cc_test(
         "//source/common/ssl:ssl_socket_lib",
         "//source/extensions/transport_sockets/ssl:config",
         "//test/common/grpc:grpc_client_integration_lib",
+        "//test/mocks/init:init_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:network_utility_lib",

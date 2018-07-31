@@ -4,6 +4,7 @@
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/registry/registry.h"
 
+#include "common/common/utility.h"
 #include "common/config/datasource.h"
 
 namespace Envoy {
@@ -20,6 +21,9 @@ std::shared_ptr<grpc::ChannelCredentials> CredsUtility::sslChannelCredentials(
         .pem_cert_chain = Config::DataSource::read(ssl_credentials.cert_chain(), true),
     };
     return grpc::SslCredentials(ssl_credentials_options);
+  }
+  if (StringUtil::startsWith(google_grpc.target_uri().c_str(), "unix:")) {
+    return grpc::experimental::LocalCredentials(UDS);
   }
   return nullptr;
 }
