@@ -34,7 +34,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
   ASSERT_TRUE(fake_upstream_connection->write("hello"));
   tcp_client->waitForData("hello");
@@ -56,7 +56,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->write("hello");
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
   ASSERT_TRUE(fake_upstream_connection->write("world"));
   ASSERT_TRUE(fake_upstream_connection->close());
@@ -74,7 +74,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->write("hello");
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
   ASSERT_TRUE(fake_upstream_connection->write("world"));
   tcp_client->waitForData("world");
@@ -94,7 +94,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->write(data);
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(data.size()));
   ASSERT_TRUE(fake_upstream_connection->write(data));
   tcp_client->waitForData(data);
@@ -128,7 +128,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamFlush) {
   std::string data(size, 'a');
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   tcp_client->readDisable(true);
   tcp_client->write("", true);
 
@@ -167,7 +167,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
   std::string data(size, 'a');
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->readDisable(true));
   ASSERT_TRUE(fake_upstream_connection->write("", true));
 
@@ -197,7 +197,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
   std::string data(size, 'a');
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->readDisable(true));
   ASSERT_TRUE(fake_upstream_connection->write("", true));
 
@@ -241,7 +241,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
   ASSERT_TRUE(fake_upstream_connection->write("hello"));
   tcp_client->waitForData("hello");
@@ -286,7 +286,7 @@ TEST_P(TcpProxyIntegrationTest, ShutdownWithOpenConnections) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->write("hello");
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
   ASSERT_TRUE(fake_upstream_connection->write("world"));
   tcp_client->waitForData("world");
@@ -343,7 +343,7 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
   std::string data(1024 * 16, 'a');
   tcp_client->write(data);
@@ -397,7 +397,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  AssertionResult result = fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection_);
+  AssertionResult result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_);
   RELEASE_ASSERT(result, result.message());
 }
 

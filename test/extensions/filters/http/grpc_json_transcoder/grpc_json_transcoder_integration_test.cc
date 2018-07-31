@@ -71,9 +71,8 @@ protected:
       response = codec_client_->makeHeaderOnlyRequest(request_headers);
     }
 
-    ASSERT_TRUE(
-        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, &fake_upstream_connection_));
-    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, &upstream_request_));
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
     if (!grpc_request_messages.empty()) {
       ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 

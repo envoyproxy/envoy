@@ -312,9 +312,9 @@ public:
     if (use_eds_) {
       pre_worker_start_test_steps_ = [this]() {
         AssertionResult result =
-            fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, &eds_connection_);
+            fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, eds_connection_);
         RELEASE_ASSERT(result, result.message());
-        result = eds_connection_->waitForNewStream(*dispatcher_, &eds_stream_);
+        result = eds_connection_->waitForNewStream(*dispatcher_, eds_stream_);
         RELEASE_ASSERT(result, result.message());
         eds_stream_->startGrpcStream();
 

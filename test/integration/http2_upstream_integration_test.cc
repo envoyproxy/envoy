@@ -97,8 +97,8 @@ void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
                                                           {":authority", "host"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, &fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, &upstream_request_));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send part of the request body and ensure it is received upstream.
   codec_client_->sendData(*request_encoder_, bytes, false);
@@ -138,8 +138,8 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
                                                           {":authority", "host"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, &fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, &upstream_request_));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send some request data.
   codec_client_->sendData(*request_encoder_, 1024, false);
@@ -177,8 +177,8 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
                                                           {":authority", "host"}});
   Http::StreamEncoder* encoder1 = &encoder_decoder1.first;
   auto response1 = std::move(encoder_decoder1.second);
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, &fake_upstream_connection_));
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, &upstream_request1));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request1));
 
   // Start request 2
   auto encoder_decoder2 =
@@ -190,7 +190,7 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
   auto response2 = std::move(encoder_decoder2.second);
   // DO NOT SUBMIT replace other ASSERT_TRUE with ASSERT (?)
   // (in places like this, ASSERT_TRUE is probably fine)
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, &upstream_request2));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));
 
   // Finish request 1
   codec_client_->sendData(*encoder1, request1_bytes, true);
@@ -304,12 +304,12 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
       codec_client_->sendData(*encoders[i], 0, true);
     }
   }
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, &fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   for (uint32_t i = 0; i < num_requests; ++i) {
     FakeStreamPtr stream;
     upstream_requests.emplace_back();
     ASSERT_TRUE(
-        fake_upstream_connection_->waitForNewStream(*dispatcher_, &upstream_requests.back()));
+        fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_requests.back()));
   }
   for (uint32_t i = 0; i < num_requests; ++i) {
     if (i % 15 != 0) {

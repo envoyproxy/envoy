@@ -252,7 +252,7 @@ TEST_P(IntegrationTest, TestHeadWithExplicitTE) {
   auto tcp_client = makeTcpConnection(lookupPort("http"));
   tcp_client->write("HEAD / HTTP/1.1\r\nHost: host\r\n\r\n");
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("\r\n\r\n"), &data));
@@ -290,12 +290,12 @@ TEST_P(IntegrationTest, TestBind) {
                                                                  {":scheme", "http"},
                                                                  {":authority", "host"}},
                                          1024);
-  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, &fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_NE(fake_upstream_connection_, nullptr);
   std::string address =
       fake_upstream_connection_->connection().remoteAddress()->ip()->addressAsString();
   EXPECT_EQ(address, address_string);
-  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, &upstream_request_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_NE(upstream_request_, nullptr);
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 

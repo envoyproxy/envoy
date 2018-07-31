@@ -124,7 +124,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionDownstreamDisconnect) {
   if (old_style_websockets_) {
     test_server_->waitForCounterGe("tcp.websocket.downstream_cx_total", 1);
   }
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(&headersRead, &data));
   validateInitialUpstreamData(data);
@@ -177,7 +177,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionUpstreamDisconnect) {
   tcp_client = makeTcpConnection(lookupPort("http"));
   // Send websocket upgrade request
   tcp_client->write(upgrade_req_str_);
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(&headersRead, &data));
   validateInitialUpstreamData(data);
@@ -220,7 +220,7 @@ TEST_P(WebsocketIntegrationTest, EarlyData) {
   tcp_client = makeTcpConnection(lookupPort("http"));
   // Send early data alongside websocket upgrade request
   tcp_client->write(upgrade_req_str + early_data_req_str);
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
   // Wait for both the upgrade, and the early data.
   std::string data;
@@ -268,7 +268,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketConnectionIdleTimeout) {
   // The request path gets rewritten from /websocket/test to /websocket.
   // The size of headers received by the destination is 228 bytes.
   tcp_client->write(upgrade_req_str_);
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(&headersRead, &data));
   validateInitialUpstreamData(data);
@@ -341,7 +341,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketLogging) {
   // The request path gets rewritten from /websocket/test to /websocket.
   // The size of headers received by the destination is 228 bytes.
   tcp_client->write(upgrade_req_str_);
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(228, &data));
   // Accept websocket upgrade request
@@ -407,7 +407,7 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
   if (old_style_websockets_) {
     test_server_->waitForCounterGe("tcp.websocket.downstream_cx_total", 1);
   }
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(&headersRead, &data));
   validateInitialUpstreamData(data);
@@ -511,7 +511,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
     IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
     tcp_client->write(upgrade_req_str + early_data_req_str);
     FakeRawConnectionPtr fake_upstream_connection;
-    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+    ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
     // Make sure the full payload arrives.
     ASSERT_TRUE(fake_upstream_connection->waitForData(
         FakeRawConnection::waitForInexactMatch(early_data_req_str.c_str())));
@@ -534,7 +534,7 @@ TEST_P(WebsocketIntegrationTest, BidirectionalChunkedData) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
   tcp_client->write(upgrade_req_str);
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(
       FakeRawConnection::waitForInexactMatch("SomeWebSocketPayload")));
 

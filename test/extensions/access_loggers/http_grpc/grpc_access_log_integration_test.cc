@@ -54,12 +54,12 @@ public:
 
   ABSL_MUST_USE_RESULT
   AssertionResult waitForAccessLogConnection() {
-    return fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, &fake_access_log_connection_);
+    return fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_access_log_connection_);
   }
 
   ABSL_MUST_USE_RESULT
   AssertionResult waitForAccessLogStream() {
-    return fake_access_log_connection_->waitForNewStream(*dispatcher_, &access_log_request_);
+    return fake_access_log_connection_->waitForNewStream(*dispatcher_, access_log_request_);
   }
 
   ABSL_MUST_USE_RESULT

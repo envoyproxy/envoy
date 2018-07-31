@@ -148,9 +148,9 @@ public:
 
   void waitForLoadStatsStream() {
     AssertionResult result =
-        load_report_upstream_->waitForHttpConnection(*dispatcher_, &fake_loadstats_connection_);
+        load_report_upstream_->waitForHttpConnection(*dispatcher_, fake_loadstats_connection_);
     RELEASE_ASSERT(result, result.message());
-    result = fake_loadstats_connection_->waitForNewStream(*dispatcher_, &loadstats_stream_);
+    result = fake_loadstats_connection_->waitForNewStream(*dispatcher_, loadstats_stream_);
     RELEASE_ASSERT(result, result.message());
   }
 
@@ -250,9 +250,9 @@ public:
 
   void waitForUpstreamResponse(uint32_t endpoint_index, uint32_t response_code = 200) {
     AssertionResult result = service_upstream_[endpoint_index]->waitForHttpConnection(
-        *dispatcher_, &fake_upstream_connection_);
+        *dispatcher_, fake_upstream_connection_);
     RELEASE_ASSERT(result, result.message());
-    result = fake_upstream_connection_->waitForNewStream(*dispatcher_, &upstream_request_);
+    result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
     RELEASE_ASSERT(result, result.message());
     result = upstream_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());

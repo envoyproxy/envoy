@@ -181,7 +181,7 @@ TEST_P(ThriftConnManagerIntegrationTest, Success) {
   tcp_client->write(request_bytes_.toString());
 
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
   Buffer::OwnedImpl upstream_request(data);
@@ -207,7 +207,7 @@ TEST_P(ThriftConnManagerIntegrationTest, IDLException) {
   tcp_client->write(request_bytes_.toString());
 
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
   Buffer::OwnedImpl upstream_request(data);
@@ -233,7 +233,7 @@ TEST_P(ThriftConnManagerIntegrationTest, Exception) {
   tcp_client->write(request_bytes_.toString());
 
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
   Buffer::OwnedImpl upstream_request(data);
@@ -259,7 +259,7 @@ TEST_P(ThriftConnManagerIntegrationTest, Oneway) {
   tcp_client->write(request_bytes_.toString());
 
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
   Buffer::OwnedImpl upstream_request(data);

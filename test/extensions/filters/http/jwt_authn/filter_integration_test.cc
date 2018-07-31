@@ -110,9 +110,9 @@ public:
 
   void waitForJwksResponse(const std::string& status, const std::string& jwks_body) {
     AssertionResult result =
-        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, &fake_jwks_connection_);
+        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_jwks_connection_);
     RELEASE_ASSERT(result, result.message());
-    result = fake_jwks_connection_->waitForNewStream(*dispatcher_, &jwks_request_);
+    result = fake_jwks_connection_->waitForNewStream(*dispatcher_, jwks_request_);
     RELEASE_ASSERT(result, result.message());
     result = jwks_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());

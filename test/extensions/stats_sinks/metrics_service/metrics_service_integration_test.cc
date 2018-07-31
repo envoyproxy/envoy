@@ -53,13 +53,13 @@ public:
   ABSL_MUST_USE_RESULT
   AssertionResult waitForMetricsServiceConnection() {
     return fake_upstreams_[1]->waitForHttpConnection(*dispatcher_,
-                                                     &fake_metrics_service_connection_);
+                                                     fake_metrics_service_connection_);
   }
 
   ABSL_MUST_USE_RESULT
   AssertionResult waitForMetricsStream() {
     return fake_metrics_service_connection_->waitForNewStream(*dispatcher_,
-                                                              &metrics_service_request_);
+                                                              metrics_service_request_);
   }
 
   ABSL_MUST_USE_RESULT

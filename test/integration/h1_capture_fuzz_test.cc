@@ -37,7 +37,7 @@ public:
         break;
       case test::integration::Event::kUpstreamSendBytes:
         if (fake_upstream_connection == nullptr) {
-          if (!fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection, max_wait_ms_)) {
+          if (!fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection, max_wait_ms_)) {
             // If we timed out, we fail out.
             tcp_client->close();
             return;

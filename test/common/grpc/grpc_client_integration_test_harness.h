@@ -339,12 +339,11 @@ public:
     EXPECT_NE(request->grpc_request_, nullptr);
 
     if (!fake_connection_) {
-      AssertionResult result =
-          fake_upstream_->waitForHttpConnection(dispatcher_, &fake_connection_);
+      AssertionResult result = fake_upstream_->waitForHttpConnection(dispatcher_, fake_connection_);
       RELEASE_ASSERT(result, result.message());
     }
     fake_streams_.emplace_back();
-    AssertionResult result = fake_connection_->waitForNewStream(dispatcher_, &fake_streams_.back());
+    AssertionResult result = fake_connection_->waitForNewStream(dispatcher_, fake_streams_.back());
     RELEASE_ASSERT(result, result.message());
     auto& fake_stream = *fake_streams_.back();
     request->fake_stream_ = &fake_stream;
@@ -373,12 +372,11 @@ public:
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
     if (!fake_connection_) {
-      AssertionResult result =
-          fake_upstream_->waitForHttpConnection(dispatcher_, &fake_connection_);
+      AssertionResult result = fake_upstream_->waitForHttpConnection(dispatcher_, fake_connection_);
       RELEASE_ASSERT(result, result.message());
     }
     fake_streams_.emplace_back();
-    AssertionResult result = fake_connection_->waitForNewStream(dispatcher_, &fake_streams_.back());
+    AssertionResult result = fake_connection_->waitForNewStream(dispatcher_, fake_streams_.back());
     RELEASE_ASSERT(result, result.message());
     auto& fake_stream = *fake_streams_.back();
     stream->fake_stream_ = &fake_stream;

@@ -75,9 +75,9 @@ public:
 
   void waitForRatelimitRequest() {
     AssertionResult result =
-        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, &fake_ratelimit_connection_);
+        fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_ratelimit_connection_);
     RELEASE_ASSERT(result, result.message());
-    result = fake_ratelimit_connection_->waitForNewStream(*dispatcher_, &ratelimit_request_);
+    result = fake_ratelimit_connection_->waitForNewStream(*dispatcher_, ratelimit_request_);
     RELEASE_ASSERT(result, result.message());
     envoy::service::ratelimit::v2::RateLimitRequest request_msg;
     result = ratelimit_request_->waitForGrpcMessage(*dispatcher_, request_msg);
@@ -104,9 +104,9 @@ public:
 
   void waitForSuccessfulUpstreamResponse() {
     AssertionResult result =
-        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, &fake_upstream_connection_);
+        fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
     RELEASE_ASSERT(result, result.message());
-    result = fake_upstream_connection_->waitForNewStream(*dispatcher_, &upstream_request_);
+    result = fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_);
     RELEASE_ASSERT(result, result.message());
     result = upstream_request_->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());
@@ -224,7 +224,7 @@ TEST_P(RatelimitIntegrationTest, Timeout) {
 
 TEST_P(RatelimitIntegrationTest, ConnectImmediateDisconnect) {
   initiateClientConnection();
-  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, &fake_ratelimit_connection_));
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_ratelimit_connection_));
   ASSERT_TRUE(fake_ratelimit_connection_->close());
   ASSERT_TRUE(fake_ratelimit_connection_->waitForDisconnect(true));
   fake_ratelimit_connection_ = nullptr;

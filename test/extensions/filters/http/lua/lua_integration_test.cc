@@ -238,8 +238,8 @@ config:
                                           {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, &fake_lua_connection_));
-  ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, &lua_request_));
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_lua_connection_));
+  ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, lua_request_));
   ASSERT_TRUE(lua_request_->waitForEndStream(*dispatcher_));
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, false);
@@ -296,8 +296,8 @@ config:
                                           {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, &fake_lua_connection_));
-  ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, &lua_request_));
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_lua_connection_));
+  ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, lua_request_));
   ASSERT_TRUE(lua_request_->waitForEndStream(*dispatcher_));
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, true);

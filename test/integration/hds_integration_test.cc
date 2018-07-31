@@ -54,9 +54,9 @@ public:
 
   void waitForHdsStream() {
     AssertionResult result =
-        hds_upstream_->waitForHttpConnection(*dispatcher_, &fake_hds_connection_);
+        hds_upstream_->waitForHttpConnection(*dispatcher_, fake_hds_connection_);
     RELEASE_ASSERT(result, result.message());
-    result = fake_hds_connection_->waitForNewStream(*dispatcher_, &hds_stream_);
+    result = fake_hds_connection_->waitForNewStream(*dispatcher_, hds_stream_);
     RELEASE_ASSERT(result, result.message());
   }
 
@@ -103,8 +103,8 @@ TEST_P(HdsIntegrationTest, Simple) {
   server_health_check_specifier.mutable_interval()->set_nanos(500000000); // 500ms
 
   // Server <--> Envoy
-  ASSERT_TRUE(hds_upstream_->waitForHttpConnection(*dispatcher_, &fake_hds_connection_));
-  ASSERT_TRUE(fake_hds_connection_->waitForNewStream(*dispatcher_, &hds_stream_));
+  ASSERT_TRUE(hds_upstream_->waitForHttpConnection(*dispatcher_, fake_hds_connection_));
+  ASSERT_TRUE(fake_hds_connection_->waitForNewStream(*dispatcher_, hds_stream_));
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg));
 
   EXPECT_EQ(0, test_server_->counter("hds_delegate.requests")->value());

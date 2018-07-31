@@ -56,20 +56,24 @@ public:
   const Http::HeaderMap& headers() { return *headers_; }
   void setAddServedByHeader(bool add_header) { add_served_by_header_ = add_header; }
   const Http::HeaderMapPtr& trailers() { return trailers_; }
+
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
-  waitForHeadersComplete(std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
+  waitForHeadersComplete(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length,
-              std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
+              std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForEndStream(Event::Dispatcher& client_dispatcher,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
+                   std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
-  waitForReset(std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
+  waitForReset(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // gRPC convenience methods.
   void startGrpcStream();
@@ -94,7 +98,7 @@ public:
   template <class T>
   ABSL_MUST_USE_RESULT testing::AssertionResult
   waitForGrpcMessage(Event::Dispatcher& client_dispatcher, T& message,
-                     std::chrono::milliseconds timeout = std::chrono::milliseconds(10000)) {
+                     std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
     auto end_time = std::chrono::steady_clock::now() + timeout;
     ENVOY_LOG(debug, "Waiting for gRPC message...");
     if (!decoded_grpc_frames_.empty()) {
@@ -226,7 +230,7 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   executeOnDispatcher(std::function<void(Network::Connection&)> f,
-                      std::chrono::milliseconds timeout = std::chrono::milliseconds(10000)) {
+                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
     Thread::LockGuard lock(lock_);
     if (disconnected_) {
       return testing::AssertionSuccess();
@@ -323,12 +327,14 @@ public:
     ASSERT(disconnect_callback_handle_ != nullptr);
     shared_connection_.removeDisconnectCallback(disconnect_callback_handle_);
   }
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult close(std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
-  close(std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
-  ABSL_MUST_USE_RESULT
-  testing::AssertionResult
-  readDisable(bool disable, std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
+  readDisable(bool disable, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   // By default waitForDisconnect and waitForHalfClose assume the next event is
   // a disconnect and return an AssertionFailure if an unexpected event occurs.
   // If a caller truly wishes to wait until disconnect, set
@@ -336,11 +342,12 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForDisconnect(bool ignore_spurious_events = false,
-                    std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
+                    std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForHalfClose(bool ignore_spurious_events = false,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
+                   std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
   virtual testing::AssertionResult initialize() {
@@ -351,8 +358,7 @@ public:
   }
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
-  enableHalfClose(bool enabled,
-                  std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
+  enableHalfClose(bool enabled, std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   SharedConnectionWrapper& shared_connection() { return shared_connection_; }
   // The same caveats apply here as in SharedConnectionWrapper::connection().
   Network::Connection& connection() const { return shared_connection_.connection(); }
@@ -378,14 +384,16 @@ public:
   enum class Type { HTTP1, HTTP2 };
 
   FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type);
+
   // By default waitForNewStream assumes the next event is a new stream and
   // returns AssertionFaliure if an unexpected event occurs. If a caller truly
-  // wishes to wait for a new stream, set ignore_spurious_events = true.
+  // wishes to wait for a new stream, set ignore_spurious_events = true. Returns
+  // the new stream via the stream argument.
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
-  waitForNewStream(Event::Dispatcher& client_dispatcher, FakeStreamPtr* stream,
+  waitForNewStream(Event::Dispatcher& client_dispatcher, FakeStreamPtr& stream,
                    bool ignore_spurious_events = false,
-                   std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
+                   std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Http::ServerConnectionCallbacks
   Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder) override;
@@ -423,7 +431,8 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForData(uint64_t num_bytes, std::string* data = nullptr,
-              std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
+              std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   // Wait until data_validator returns true.
   // example usage:
   // std::string data;
@@ -432,11 +441,11 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForData(const ValidatorFunction& data_validator, std::string* data = nullptr,
-              std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
+              std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   ABSL_MUST_USE_RESULT
-  testing::AssertionResult
-  write(const std::string& data, bool end_stream = false,
-        std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
+  testing::AssertionResult write(const std::string& data, bool end_stream = false,
+                                 std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult initialize() override {
@@ -489,14 +498,17 @@ public:
   ~FakeUpstream();
 
   FakeHttpConnection::Type httpType() { return http_type_; }
+
+  // Returns the new connection via the connection argument.
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
-  waitForHttpConnection(Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr* connection,
-                        std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
+  waitForHttpConnection(Event::Dispatcher& client_dispatcher, FakeHttpConnectionPtr& connection,
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
-  waitForRawConnection(FakeRawConnectionPtr* connection,
-                       std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
+  waitForRawConnection(FakeRawConnectionPtr& connection,
+                       std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
   Network::Address::InstanceConstSharedPtr localAddress() const { return socket_->localAddress(); }
 
   // Wait for one of the upstreams to receive a connection
@@ -504,8 +516,8 @@ public:
   static testing::AssertionResult
   waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                         std::vector<std::unique_ptr<FakeUpstream>>& upstreams,
-                        FakeHttpConnectionPtr* connection,
-                        std::chrono::milliseconds timeout = std::chrono::milliseconds(10000));
+                        FakeHttpConnectionPtr& connection,
+                        std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {

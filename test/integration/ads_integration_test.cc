@@ -68,7 +68,7 @@ public:
 
   void createAdsConnection(FakeUpstream& upstream) {
     ads_upstream_ = &upstream;
-    AssertionResult result = ads_upstream_->waitForHttpConnection(*dispatcher_, &ads_connection_);
+    AssertionResult result = ads_upstream_->waitForHttpConnection(*dispatcher_, ads_connection_);
     RELEASE_ASSERT(result, result.message());
   }
 
@@ -270,7 +270,7 @@ public:
     AdsIntegrationBaseTest::initialize();
     if (ads_stream_ == nullptr) {
       createAdsConnection(*(fake_upstreams_[1]));
-      AssertionResult result = ads_connection_->waitForNewStream(*dispatcher_, &ads_stream_);
+      AssertionResult result = ads_connection_->waitForNewStream(*dispatcher_, ads_stream_);
       RELEASE_ASSERT(result, result.message());
       ads_stream_->startGrpcStream();
     }
@@ -589,7 +589,7 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsFailIntegrationTest,
 TEST_P(AdsFailIntegrationTest, ConnectDisconnect) {
   initialize();
   createAdsConnection(*fake_upstreams_[1]);
-  ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, &ads_stream_));
+  ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, ads_stream_));
   ads_stream_->startGrpcStream();
   ads_stream_->finishGrpcStream(Grpc::Status::Internal);
 }
@@ -642,7 +642,7 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, AdsConfigIntegrationTest,
 TEST_P(AdsConfigIntegrationTest, EdsClusterWithAdsConfigSource) {
   initialize();
   createAdsConnection(*fake_upstreams_[1]);
-  ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, &ads_stream_));
+  ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, ads_stream_));
   ads_stream_->startGrpcStream();
   ads_stream_->finishGrpcStream(Grpc::Status::Ok);
 }
@@ -663,7 +663,7 @@ TEST_P(AdsIntegrationTest, XdsBatching) {
 
   pre_worker_start_test_steps_ = [this]() {
     createAdsConnection(*fake_upstreams_.back());
-    ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, &ads_stream_));
+    ASSERT_TRUE(ads_connection_->waitForNewStream(*dispatcher_, ads_stream_));
     ads_stream_->startGrpcStream();
 
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",

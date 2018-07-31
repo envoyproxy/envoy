@@ -183,6 +183,8 @@ void ConditionalInitializer::waitReady() {
 ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
 ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
 
+constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
+
 namespace Http {
 
 // Satisfy linker

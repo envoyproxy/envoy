@@ -33,13 +33,13 @@ public:
 
     if (!fake_squash_connection_) {
       AssertionResult result =
-          fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, &fake_squash_connection_);
+          fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_squash_connection_);
       RELEASE_ASSERT(result, result.message());
     }
 
     FakeStreamPtr request_stream;
     AssertionResult result =
-        fake_squash_connection_->waitForNewStream(*dispatcher_, &request_stream);
+        fake_squash_connection_->waitForNewStream(*dispatcher_, request_stream);
     RELEASE_ASSERT(result, result.message());
     result = request_stream->waitForEndStream(*dispatcher_);
     RELEASE_ASSERT(result, result.message());

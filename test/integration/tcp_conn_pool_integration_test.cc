@@ -153,7 +153,7 @@ TEST_P(TcpConnPoolIntegrationTest, SingleRequest) {
   tcp_client->write(request);
 
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   ASSERT_TRUE(fake_upstream_connection->waitForData(request.size()));
   ASSERT_TRUE(fake_upstream_connection->write(response));
 
@@ -172,7 +172,7 @@ TEST_P(TcpConnPoolIntegrationTest, MultipleRequests) {
   // send request 1
   tcp_client->write(request1);
   FakeRawConnectionPtr fake_upstream_connection1;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection1));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection1));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection1->waitForData(request1.size(), &data));
   EXPECT_EQ(request1, data);
@@ -180,7 +180,7 @@ TEST_P(TcpConnPoolIntegrationTest, MultipleRequests) {
   // send request 2
   tcp_client->write(request2);
   FakeRawConnectionPtr fake_upstream_connection2;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(&fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
   ASSERT_TRUE(fake_upstream_connection2->waitForData(request2.size(), &data));
   EXPECT_EQ(request2, data);
 

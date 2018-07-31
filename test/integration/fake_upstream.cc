@@ -271,7 +271,7 @@ AssertionResult FakeConnectionBase::waitForHalfClose(bool ignore_spurious_events
 }
 
 AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_dispatcher,
-                                                     FakeStreamPtr* stream,
+                                                     FakeStreamPtr& stream,
                                                      bool ignore_spurious_events,
                                                      milliseconds timeout) {
   auto end_time = std::chrono::steady_clock::now() + timeout;
@@ -296,7 +296,7 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
   if (new_streams_.empty()) {
     return AssertionFailure() << "Expected new stream event, but got a different event.";
   }
-  *stream = std::move(new_streams_.front());
+  stream = std::move(new_streams_.front());
   new_streams_.pop_front();
   return AssertionSuccess();
 }
@@ -382,7 +382,7 @@ void FakeUpstream::threadRoutine() {
 }
 
 AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
-                                                    FakeHttpConnectionPtr* connection,
+                                                    FakeHttpConnectionPtr& connection,
                                                     milliseconds timeout) {
   auto end_time = std::chrono::steady_clock::now() + timeout;
   {
@@ -401,18 +401,18 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
     if (new_connections_.empty()) {
       return AssertionFailure() << "Got a new connection event, but didn't create a connection.";
     }
-    *connection =
+    connection =
         std::make_unique<FakeHttpConnection>(consumeConnection(), stats_store_, http_type_);
   }
-  VERIFY_ASSERTION((*connection)->initialize());
-  VERIFY_ASSERTION((*connection)->readDisable(false));
+  VERIFY_ASSERTION(connection->initialize());
+  VERIFY_ASSERTION(connection->readDisable(false));
   return AssertionSuccess();
 }
 
 AssertionResult
 FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                     std::vector<std::unique_ptr<FakeUpstream>>& upstreams,
-                                    FakeHttpConnectionPtr* connection, milliseconds timeout) {
+                                    FakeHttpConnectionPtr& connection, milliseconds timeout) {
   auto end_time = std::chrono::steady_clock::now() + timeout;
   while (std::chrono::steady_clock::now() < end_time) {
     for (auto it = upstreams.begin(); it != upstreams.end(); ++it) {
@@ -426,11 +426,11 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         // Run the client dispatcher since we may need to process window updates, etc.
         client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
       } else {
-        *connection = std::make_unique<FakeHttpConnection>(
+        connection = std::make_unique<FakeHttpConnection>(
             upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_);
         lock.release();
-        VERIFY_ASSERTION((*connection)->initialize());
-        VERIFY_ASSERTION((*connection)->readDisable(false));
+        VERIFY_ASSERTION(connection->initialize());
+        VERIFY_ASSERTION(connection->readDisable(false));
         return AssertionSuccess();
       }
     }
@@ -438,7 +438,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
   return AssertionFailure() << "Timed out waiting for HTTP connection.";
 }
 
-AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr* connection,
+AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connection,
                                                    milliseconds timeout) {
   {
     Thread::LockGuard lock(lock_);
@@ -450,11 +450,11 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr* connect
     if (new_connections_.empty()) {
       return AssertionFailure() << "Timed out waiting for raw connection";
     }
-    *connection = std::make_unique<FakeRawConnection>(consumeConnection());
+    connection = std::make_unique<FakeRawConnection>(consumeConnection());
   }
-  VERIFY_ASSERTION((*connection)->initialize());
-  VERIFY_ASSERTION((*connection)->readDisable(false));
-  VERIFY_ASSERTION((*connection)->enableHalfClose(enable_half_close_));
+  VERIFY_ASSERTION(connection->initialize());
+  VERIFY_ASSERTION(connection->readDisable(false));
+  VERIFY_ASSERTION(connection->enableHalfClose(enable_half_close_));
   return AssertionSuccess();
 }
 

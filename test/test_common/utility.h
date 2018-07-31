@@ -76,12 +76,12 @@ namespace Envoy {
   } while (false)
 
 #define VERIFY_ASSERTION(statement)                                                                \
-  {                                                                                                \
+  do {                                                                                             \
     ::testing::AssertionResult status = statement;                                                 \
     if (!status) {                                                                                 \
       return status;                                                                               \
     }                                                                                              \
-  }
+  } while (false)
 
 // Random number generator which logs its seed to stderr. To repeat a test run with a non-zero seed
 // one can run the test with --test_arg=--gtest_random_seed=[seed]
@@ -271,6 +271,8 @@ public:
     }
     return result;
   }
+
+  static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
 };
 
 /**
