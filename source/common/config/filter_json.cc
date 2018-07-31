@@ -250,11 +250,16 @@ void FilterJson::translateMongoProxy(
   JSON_UTIL_SET_STRING(json_config, proto_config, access_log);
   if (json_config.hasObject("fault")) {
     const auto json_fault = json_config.getObject("fault")->getObject("fixed_delay");
-    const auto json_percent = json_fault->getObject("percent");
     auto* delay = proto_config.mutable_delay();
+
     delay->set_type(envoy::config::filter::fault::v2::FaultDelay::FIXED);
-    JSON_UTIL_SET_FRACTIONALPERCENT(*json_percent, *delay, percent);
+    delay->set_percent(static_cast<uint32_t>(json_fault->getInteger("percent")));
     JSON_UTIL_SET_DURATION_FROM_FIELD(*json_fault, *delay, fixed_delay, duration);
+
+    if (json_fault->hasObject("percentage")) {
+      const auto json_percentage = json_fault->getObject("percentage");
+      JSON_UTIL_SET_FRACTIONALPERCENT(*json_percentage, *delay, percentage);
+    }
   }
 }
 
@@ -276,11 +281,15 @@ void FilterJson::translateFaultFilter(
   }
 
   if (!json_config_delay->empty()) {
-    const auto json_percent = json_config_delay->getObject("fixed_delay_percent");
     auto* delay = proto_config.mutable_delay();
     delay->set_type(envoy::config::filter::fault::v2::FaultDelay::FIXED);
-    JSON_UTIL_SET_FRACTIONALPERCENT(*json_percent, *delay, percent);
+    delay->set_percent(static_cast<uint32_t>(json_config_delay->getInteger("fixed_delay_percent")));
     JSON_UTIL_SET_DURATION_FROM_FIELD(*json_config_delay, *delay, fixed_delay, fixed_duration);
+
+    if (json_config_delay->hasObject("fixed_delay_percentage")) {
+      const auto json_percentage = json_config_delay->getObject("fixed_delay_percentage");
+      JSON_UTIL_SET_FRACTIONALPERCENT(*json_percentage, *delay, percentage);
+    }
   }
 
   for (const auto json_header_matcher : json_config.getObjectArray("headers", true)) {

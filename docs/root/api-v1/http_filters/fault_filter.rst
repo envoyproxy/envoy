@@ -77,10 +77,7 @@ Delay
 
   {
     "type" : "...",
-    "fixed_delay_percent" : {
-      "numerator" : "...",
-      "denominator" : "..."
-    },
+    "fixed_delay_percent" : "...",
     "fixed_duration_ms" : "..."
   }
 
@@ -89,8 +86,9 @@ type:
   injected. Currently only *fixed* delay type (step function) is supported.
 
 fixed_delay_percent:
-  *(required, envoy.type.FractionalPercent)* The percentage of requests that will be delayed for
-  the duration specified by *fixed_duration_ms*.
+  *(required, integer)* The percentage of requests that will
+  be delayed for the duration specified by *fixed_duration_ms*. Valid
+  values range from 0 to 100.
 
 fixed_duration_ms:
   *(required, integer)* The delay duration in milliseconds. Must be greater than 0.

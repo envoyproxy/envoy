@@ -119,12 +119,9 @@ TEST(MongoFilterConfigTest, InvalidFaultsMissingMs) {
   std::string json_string = R"EOF(
   {
     "stat_prefix": "my_stat_prefix",
-    "fault": {
+    "fault" : {
       "fixed_delay": {
-        "delay_percent": {
-          "numerator": 1,
-          "denominator": "HUNDRED"
-        }
+        "delay_percent": 1
       }
     }
   }
@@ -139,10 +136,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsNegativeMs) {
     "stat_prefix": "my_stat_prefix",
     "fault" : {
       "fixed_delay": {
-        "percent": {
-          "numerator": 1,
-          "denominator": "HUNDRED"
-        },
+        "percent": 1,
         "duration_ms": -1
       }
     }
@@ -159,10 +153,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsDelayPercent) {
       "stat_prefix": "my_stat_prefix",
       "fault" : {
         "fixed_delay": {
-          "percent": {
-            "numerator": 101,
-            "denominator": "HUNDRED"
-          },
+          "percent": 101,
           "duration_ms": 1
         }
       }
@@ -178,10 +169,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsDelayPercent) {
       "stat_prefix": "my_stat_prefix",
       "fault" : {
         "fixed_delay": {
-          "percent": {
-            "numerator": -1,
-            "denominator": "HUNDRED"
-          },
+          "percent": -1,
           "duration_ms": 1
         }
       }
@@ -199,10 +187,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsType) {
       "stat_prefix": "my_stat_prefix",
       "fault" : {
         "fixed_delay": {
-          "percent": {
-            "numerator": "df",
-            "denominator": "HUNDRED"
-          },
+          "percent": "df",
           "duration_ms": 1
         }
       }
@@ -218,10 +203,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsType) {
       "stat_prefix": "my_stat_prefix",
       "fault" : {
         "fixed_delay": {
-          "percent": {
-            "numerator": 3,
-            "denominator": "HUNDRED"
-          },
+          "percent": 3,
           "duration_ms": "ab"
         }
       }
@@ -237,10 +219,7 @@ TEST(MongoFilterConfigTest, InvalidFaultsType) {
       "stat_prefix": "my_stat_prefix",
       "fault" : {
         "fixed_delay": {
-          "percent": {
-            "numerator": 3,
-            "denominator": "HUNDRED"
-          },
+          "percent": 3,
           "duration_ms": "0"
         }
       }
@@ -257,10 +236,7 @@ TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
     "stat_prefix": "my_stat_prefix",
     "fault" : {
       "fixed_delay": {
-        "percent": {
-          "numerator": 1,
-          "denominator": "HUNDRED"
-        },
+        "percent": 1,
         "duration_ms": 1
       }
     }
@@ -279,9 +255,7 @@ TEST(MongoFilterConfigTest, CorrectFaultConfiguration) {
 TEST(MongoFilterConfigTest, CorrectFaultConfigurationInProto) {
   envoy::config::filter::network::mongo_proxy::v2::MongoProxy config{};
   config.set_stat_prefix("my_stat_prefix");
-  config.mutable_delay()->mutable_percent()->set_numerator(50);
-  config.mutable_delay()->mutable_percent()->set_denominator(
-      envoy::type::FractionalPercent::HUNDRED);
+  config.mutable_delay()->set_percent(50);
   config.mutable_delay()->mutable_fixed_delay()->set_seconds(500);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;

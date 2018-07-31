@@ -34,6 +34,7 @@ namespace MongoProxy {
 class MongoRuntimeConfigKeys {
 public:
   const std::string FixedDelayPercent{"mongo.fault.fixed_delay.percent"};
+  const std::string FixedDelayPercentage{"mongo.fault.fixed_delay.percentage"};
   const std::string FixedDelayDurationMs{"mongo.fault.fixed_delay.duration_ms"};
   const std::string LoggingEnabled{"mongo.logging_enabled"};
   const std::string ProxyEnabled{"mongo.proxy_enabled"};
@@ -102,13 +103,15 @@ typedef std::shared_ptr<AccessLog> AccessLogSharedPtr;
 class FaultConfig {
 public:
   FaultConfig(const envoy::config::filter::fault::v2::FaultDelay& fault_config)
-      : delay_percent_(fault_config.percent()),
+      : delay_percent_(fault_config.percent()), delay_percentage_(fault_config.percentage()),
         duration_ms_(PROTOBUF_GET_MS_REQUIRED(fault_config, fixed_delay)) {}
-  envoy::type::FractionalPercent delayPercent() const { return delay_percent_; }
+  uint32_t delayPercent() const { return delay_percent_; }
+  envoy::type::FractionalPercent delayPercentage() const { return delay_percentage_; }
   uint64_t delayDuration() const { return duration_ms_; }
 
 private:
-  const envoy::type::FractionalPercent delay_percent_;
+  const uint32_t delay_percent_;
+  const envoy::type::FractionalPercent delay_percentage_;
   const uint64_t duration_ms_;
 };
 

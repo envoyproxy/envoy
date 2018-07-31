@@ -24,8 +24,13 @@ message FaultDelay {
   // supported.
   FaultDelayType type = 1 [(validate.rules).enum.defined_only = true];
 
-  // The percentage of operations/connection requests on which the delay will be injected.
-  envoy.type.FractionalPercent percent = 2;
+  // An integer between 0-100 indicating the percentage of operations/connection requests
+  // on which the delay will be injected.
+  //
+  // .. attention::
+  //
+  //   This field is deprecated and `percentage` should be used instead.
+  uint32 percent = 2 [(validate.rules).uint32.lte = 100, deprecated = true];
 
   oneof fault_delay_secifier {
     option (validate.required) = true;
@@ -38,4 +43,7 @@ message FaultDelay {
     google.protobuf.Duration fixed_delay = 3
         [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
   }
+
+  // The percentage of operations/connection requests on which the delay will be injected.
+  envoy.type.FractionalPercent percentage = 4;
 }
