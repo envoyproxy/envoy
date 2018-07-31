@@ -66,6 +66,16 @@ TEST(StatsIsolatedStoreImplTest, All) {
   EXPECT_EQ(2UL, store.gauges().size());
 }
 
+TEST(StatsIsolatedStoreImplTest, LongStatName) {
+  IsolatedStoreImpl store;
+  Stats::StatsOptionsImpl stats_options;
+  const std::string long_string(stats_options.maxNameLength() + 1, 'A');
+
+  ScopePtr scope = store.createScope("scope.");
+  Counter& counter = scope->counter(long_string);
+  EXPECT_EQ(absl::StrCat("scope.", long_string), counter.name());
+}
+
 /**
  * Test stats macros. @see stats_macros.h
  */
@@ -478,40 +488,26 @@ TEST(TagProducerTest, CheckConstructor) {
       "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
 }
 
-// Check consistency of internal stat representation
-TEST(RawStatDataTest, Consistency) {
-  HeapRawStatDataAllocator alloc;
-  // Generate a stat, encode it to hex, and take the hash of that hex string. We expect the hash to
-  // vary only when the internal representation of a stat has been intentionally changed, in which
-  // case SharedMemory::VERSION should be incremented as well.
-  uint64_t expected_hash = 1874506077228772558;
+// No truncation occurs in the implementation of HeapStatData.
+TEST(RawStatDataTest, HeapNoTruncate) {
   Stats::StatsOptionsImpl stats_options;
-  uint64_t max_name_length = stats_options.maxNameLength();
-
-  const std::string name_1(max_name_length, 'A');
-  RawStatData* stat_1 = alloc.alloc(name_1);
-  std::string stat_hex_dump_1 =
-      Hex::encode(reinterpret_cast<uint8_t*>(stat_1), sizeof(RawStatData) + max_name_length);
-  EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_1), expected_hash);
-  alloc.free(*stat_1);
-
-  // If a stat name is truncated, we expect that its internal representation is the same as if it
-  // had been initialized with the already-truncated name.
-  const std::string name_2(max_name_length + 1, 'A');
-  RawStatData* stat_2 = alloc.alloc(name_2);
-  std::string stat_hex_dump_2 =
-      Hex::encode(reinterpret_cast<uint8_t*>(stat_2), sizeof(RawStatData) + max_name_length);
-  EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_2), expected_hash);
-  alloc.free(*stat_2);
+  HeapStatDataAllocator alloc; //(/*stats_options*/);
+  const std::string long_string(stats_options.maxNameLength() + 1, 'A');
+  HeapStatData* stat{};
+  EXPECT_NO_LOGS(stat = alloc.alloc(long_string));
+  EXPECT_EQ(stat->key(), long_string);
+  alloc.free(*stat);
 }
 
+// Note: a similar test using RawStatData* is in test/server/hot_restart_impl_test.cc.
 TEST(RawStatDataTest, HeapAlloc) {
-  HeapRawStatDataAllocator alloc;
-  RawStatData* stat_1 = alloc.alloc("ref_name");
+  Stats::StatsOptionsImpl stats_options;
+  HeapStatDataAllocator alloc; //(stats_options);
+  HeapStatData* stat_1 = alloc.alloc("ref_name");
   ASSERT_NE(stat_1, nullptr);
-  RawStatData* stat_2 = alloc.alloc("ref_name");
+  HeapStatData* stat_2 = alloc.alloc("ref_name");
   ASSERT_NE(stat_2, nullptr);
-  RawStatData* stat_3 = alloc.alloc("not_ref_name");
+  HeapStatData* stat_3 = alloc.alloc("not_ref_name");
   ASSERT_NE(stat_3, nullptr);
   EXPECT_EQ(stat_1, stat_2);
   EXPECT_NE(stat_1, stat_3);
@@ -519,19 +515,6 @@ TEST(RawStatDataTest, HeapAlloc) {
   alloc.free(*stat_1);
   alloc.free(*stat_2);
   alloc.free(*stat_3);
-}
-
-TEST(RawStatDataTest, Truncate) {
-  // RawStatData::truncateAndInit(absl::string_view key, const StatsOptions& stats_options) will
-  // truncate and log to ENVOY_LOG_MISC if given a key longer than the allowed
-  // stats_options.maxNameLength(). This mechanism is also tested in HotRestartImplTest.truncateKey.
-  Stats::StatsOptionsImpl stats_options;
-  const std::string long_string(stats_options.maxNameLength() + 1, 'A');
-  RawStatData* stat =
-      static_cast<RawStatData*>(::calloc(RawStatData::structSizeWithOptions(stats_options), 1));
-  EXPECT_LOG_CONTAINS("warning", "is too long with",
-                      stat->truncateAndInit(long_string, stats_options));
-  ::free(stat);
 }
 
 TEST(SourceImplTest, Caching) {

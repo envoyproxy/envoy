@@ -39,21 +39,10 @@ using testing::_;
 namespace Envoy {
 namespace Server {
 
-class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                       public Stats::RawStatDataAllocator {
+class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-public:
-  AdminStatsTest() {
-    ON_CALL(*this, alloc(_))
-        .WillByDefault(Invoke(
-            [this](const std::string& name) -> Stats::RawStatData* { return alloc_.alloc(name); }));
-
-    ON_CALL(*this, free(_)).WillByDefault(Invoke([this](Stats::RawStatData& data) -> void {
-      return alloc_.free(data);
-    }));
-
-    EXPECT_CALL(*this, alloc("stats.overflow"));
-    store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_, *this);
+  AdminStatsTest() : alloc_(options_) {
+    store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_, alloc_);
     store_->addSink(sink_);
   }
 
@@ -64,14 +53,11 @@ public:
     return AdminImpl::statsAsJson(all_stats, all_histograms, used_only, true);
   }
 
-  MOCK_METHOD1(alloc, Stats::RawStatData*(const std::string& name));
-  MOCK_METHOD1(free, void(Stats::RawStatData& data));
-
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Stats::TestAllocator alloc_;
-  Stats::MockSink sink_;
   Stats::StatsOptionsImpl options_;
+  Stats::MockedTestAllocator alloc_;
+  Stats::MockSink sink_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> store_;
 };
 
@@ -121,7 +107,7 @@ TEST_P(AdminStatsTest, StatsAsJson) {
 
   store_->mergeHistograms([]() -> void {});
 
-  EXPECT_CALL(*this, free(_));
+  EXPECT_CALL(alloc_, free(_));
 
   std::map<std::string, uint64_t> all_stats;
 
@@ -257,7 +243,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
 
   store_->mergeHistograms([]() -> void {});
 
-  EXPECT_CALL(*this, free(_));
+  EXPECT_CALL(alloc_, free(_));
 
   std::map<std::string, uint64_t> all_stats;
 
@@ -795,6 +781,7 @@ TEST_P(AdminInstanceTest, PostRequest) {
 
 class PrometheusStatsFormatterTest : public testing::Test {
 protected:
+  PrometheusStatsFormatterTest() /*: alloc_(stats_options_)*/ {}
   void addCounter(const std::string& name, std::vector<Stats::Tag> cluster_tags) {
     std::string tname = std::string(name);
     counters_.push_back(alloc_.makeCounter(name, std::move(tname), std::move(cluster_tags)));
@@ -805,7 +792,8 @@ protected:
     gauges_.push_back(alloc_.makeGauge(name, std::move(tname), std::move(cluster_tags)));
   }
 
-  Stats::HeapRawStatDataAllocator alloc_;
+  Stats::StatsOptionsImpl stats_options_;
+  Stats::HeapStatDataAllocator alloc_;
   std::vector<Stats::CounterSharedPtr> counters_;
   std::vector<Stats::GaugeSharedPtr> gauges_;
 };
