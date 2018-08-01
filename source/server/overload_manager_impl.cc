@@ -31,11 +31,15 @@ private:
   absl::optional<double> value_;
 };
 
+std::string StatsName(const std::string& a, const std::string& b) {
+  return absl::StrCat("overload.", a, b);
+}
+
 } // namespace
 
 OverloadAction::OverloadAction(const envoy::config::overload::v2alpha::OverloadAction& config,
                                Stats::Scope& stats_scope)
-    : active_gauge_(stats_scope.gauge(absl::StrCat(config.name(), ".active"))) {
+    : active_gauge_(stats_scope.gauge(StatsName(config.name(), ".active"))) {
   for (const auto& trigger_config : config.triggers()) {
     TriggerPtr trigger;
 
@@ -174,9 +178,9 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
 OverloadManagerImpl::Resource::Resource(const std::string& name, ResourceMonitorPtr monitor,
                                         OverloadManagerImpl& manager, Stats::Scope& stats_scope)
     : name_(name), monitor_(std::move(monitor)), manager_(manager), pending_update_(false),
-      pressure_gauge_(stats_scope.gauge(absl::StrCat(name, ".pressure"))),
-      failed_updates_counter_(stats_scope.counter(absl::StrCat(name, ".failed_updates"))),
-      skipped_updates_counter_(stats_scope.counter(absl::StrCat(name, ".skipped_updates"))) {}
+      pressure_gauge_(stats_scope.gauge(StatsName(name, ".pressure"))),
+      failed_updates_counter_(stats_scope.counter(StatsName(name, ".failed_updates"))),
+      skipped_updates_counter_(stats_scope.counter(StatsName(name, ".skipped_updates"))) {}
 
 void OverloadManagerImpl::Resource::update() {
   if (!pending_update_) {

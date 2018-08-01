@@ -142,9 +142,11 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
                             [&](OverloadActionState) { EXPECT_TRUE(false); });
   manager.start();
 
-  Stats::Gauge& active_gauge = stats_.gauge("envoy.overload_actions.dummy_action.active");
-  Stats::Gauge& pressure_gauge1 = stats_.gauge("envoy.resource_monitors.fake_resource1.pressure");
-  Stats::Gauge& pressure_gauge2 = stats_.gauge("envoy.resource_monitors.fake_resource2.pressure");
+  Stats::Gauge& active_gauge = stats_.gauge("overload.envoy.overload_actions.dummy_action.active");
+  Stats::Gauge& pressure_gauge1 =
+      stats_.gauge("overload.envoy.resource_monitors.fake_resource1.pressure");
+  Stats::Gauge& pressure_gauge2 =
+      stats_.gauge("overload.envoy.resource_monitors.fake_resource2.pressure");
 
   factory1_.monitor_->setPressure(0.5);
   timer_cb_();
@@ -189,7 +191,7 @@ TEST_F(OverloadManagerImplTest, FailedUpdates) {
   OverloadManagerImpl manager(dispatcher_, stats_, parseConfig(getConfig()));
   manager.start();
   Stats::Counter& failed_updates =
-      stats_.counter("envoy.resource_monitors.fake_resource1.failed_updates");
+      stats_.counter("overload.envoy.resource_monitors.fake_resource1.failed_updates");
 
   factory1_.monitor_->setError();
   timer_cb_();
@@ -208,7 +210,7 @@ TEST_F(OverloadManagerImplTest, SkippedUpdates) {
   OverloadManagerImpl manager(dispatcher_, stats_, parseConfig(getConfig()));
   manager.start();
   Stats::Counter& skipped_updates =
-      stats_.counter("envoy.resource_monitors.fake_resource1.skipped_updates");
+      stats_.counter("overload.envoy.resource_monitors.fake_resource1.skipped_updates");
 
   timer_cb_();
   EXPECT_EQ(0, skipped_updates.value());
