@@ -69,25 +69,38 @@ private:
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory {
 public:
-  ClientSslSocketFactory(const ClientContextConfig& config, Ssl::ContextManager& manager,
+  ClientSslSocketFactory(ClientContextConfigPtr config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope);
 
   Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
 
 private:
+  // Will be called when config_ is changed
+  void onConfigUpdate();
+
+  Ssl::ContextManager& manager_;
+  Stats::Scope& stats_scope_;
+  ClientContextConfigPtr config_;
   ClientContextSharedPtr ssl_ctx_;
 };
 
 class ServerSslSocketFactory : public Network::TransportSocketFactory {
 public:
-  ServerSslSocketFactory(const ServerContextConfig& config, Ssl::ContextManager& manager,
+  ServerSslSocketFactory(ServerContextConfigPtr config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope, const std::vector<std::string>& server_names);
 
   Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
 
 private:
+  // Will be called when config_ is changed
+  void onConfigUpdate();
+
+  Ssl::ContextManager& manager_;
+  Stats::Scope& stats_scope_;
+  ServerContextConfigPtr config_;
+  const std::vector<std::string> server_names_;
   ServerContextSharedPtr ssl_ctx_;
 };
 
