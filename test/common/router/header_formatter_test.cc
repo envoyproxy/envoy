@@ -473,6 +473,15 @@ route:
     - header:
         key: "x-metadata"
         value: "%UPSTREAM_METADATA([\"namespace\", \"%key%\"])%"
+    - header:
+        key: "x-metadata-missing"
+        value: "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
+    - header:
+        key: "x-metadata-missing-with-prefix"
+        value: "prefix-%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
+    - header:
+        key: "x-metadata-missing-with-suffix"
+        value: "%UPSTREAM_METADATA([\"namespace\", \"key\"])%-suffix"
   )EOF";
 
   HeaderParserPtr req_header_parser =
@@ -521,6 +530,10 @@ route:
 
   EXPECT_TRUE(headerMap.has("x-metadata"));
   EXPECT_EQ("value", headerMap.get_("x-metadata"));
+
+  EXPECT_FALSE(headerMap.has("x-metadata-missing"));
+  EXPECT_FALSE(headerMap.has("x-metadata-missing-with-prefix"));
+  EXPECT_FALSE(headerMap.has("x-metadata-missing-with-suffix"));
 }
 
 TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {

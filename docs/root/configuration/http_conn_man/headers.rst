@@ -438,6 +438,12 @@ used to delimit variable names.
   doubling it. For example, to emit a header with the value ``100%``, the custom header value in
   the Envoy configuration must be ``100%%``.
 
+.. attention::
+
+  For a compound pattern, i.e. a combination of literal and supported variables, e.g.
+  **prefix-%UPSTREAM_METADATA(["namespace", "key"])%-suffix**, when the variable is formatted
+  as an empty string, the corresponding header value will not be appended or updated.
+
 Supported variable names are:
 
 %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%

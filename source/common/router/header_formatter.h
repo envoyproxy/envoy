@@ -6,6 +6,8 @@
 
 #include "envoy/access_log/access_log.h"
 
+#include "common/common/empty_string.h"
+
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -77,7 +79,13 @@ public:
   const std::string format(const Envoy::RequestInfo::RequestInfo& request_info) const override {
     std::string buf;
     for (const auto& formatter : formatters_) {
-      buf += formatter->format(request_info);
+      const auto& formatted = formatter->format(request_info);
+      // If one of the formatted values is empty, don't set or append the corresponding header
+      // value.
+      if (formatted.empty()) {
+        return EMPTY_STRING;
+      }
+      buf += formatted;
     }
     return buf;
   };
