@@ -44,7 +44,7 @@ struct RawStatData {
 
   /**
    * Due to the flexible-array-length of name_, c-style allocation
-   * and initialization are neccessary.
+   * and initialization are necessary.
    */
   RawStatData() = delete;
   ~RawStatData() = delete;

@@ -1,7 +1,7 @@
+#include "common/stats/utility.h"
+
 #include <algorithm>
 #include <string>
-
-#include "common/stats/utility.h"
 
 namespace Envoy {
 namespace Stats {
