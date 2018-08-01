@@ -1,5 +1,6 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/fmt.h"
 #include "common/config/cds_json.h"
@@ -8,7 +9,6 @@
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"

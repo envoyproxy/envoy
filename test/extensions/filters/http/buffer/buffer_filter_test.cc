@@ -3,9 +3,9 @@
 
 #include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/stats/stats.h"
 
 #include "common/http/header_map_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "extensions/filters/http/buffer/buffer_filter.h"
 #include "extensions/filters/http/well_known_names.h"

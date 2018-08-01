@@ -19,6 +19,10 @@ statistics. Any ``:`` character in the stats name is replaced with ``_``.
   cluster_added, Counter, Total clusters added (either via static config or CDS)
   cluster_modified, Counter, Total clusters modified (via CDS)
   cluster_removed, Counter, Total clusters removed (via CDS)
+  cluster_updated, Counter, Total cluster updates
+  cluster_updated_via_merge, Counter, Total cluster updates applied as merged updates
+  update_merge_cancelled, Counter, Total merged updates that got cancelled and delivered early
+  update_out_of_merge_window, Counter, Total updates which arrived out of a merge window
   active_clusters, Gauge, Number of currently active (warmed) clusters
   warming_clusters, Gauge, Number of currently warming (not active) clusters
 

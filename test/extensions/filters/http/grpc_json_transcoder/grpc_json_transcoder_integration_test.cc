@@ -71,10 +71,10 @@ protected:
       response = codec_client_->makeHeaderOnlyRequest(request_headers);
     }
 
-    fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-    upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
     if (!grpc_request_messages.empty()) {
-      upstream_request_->waitForEndStream(*dispatcher_);
+      ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
       Grpc::Decoder grpc_decoder;
       std::vector<Grpc::Frame> frames;
@@ -114,7 +114,7 @@ protected:
       }
       EXPECT_TRUE(upstream_request_->complete());
     } else {
-      upstream_request_->waitForReset();
+      ASSERT_TRUE(upstream_request_->waitForReset());
     }
 
     response->waitForEndStream();
@@ -136,8 +136,8 @@ protected:
     }
 
     codec_client_->close();
-    fake_upstream_connection_->close();
-    fake_upstream_connection_->waitForDisconnect();
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 };
 

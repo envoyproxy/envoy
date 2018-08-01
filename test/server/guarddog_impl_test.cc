@@ -3,9 +3,9 @@
 #include <memory>
 
 #include "envoy/common/time.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/utility.h"
-#include "common/stats/stats_impl.h"
 
 #include "server/guarddog_impl.h"
 
