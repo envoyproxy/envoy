@@ -53,6 +53,7 @@ public:
   MOCK_METHOD0(useRemoteAddress, bool());
   MOCK_CONST_METHOD0(xffNumTrustedHops, uint32_t());
   MOCK_CONST_METHOD0(skipXffAppend, bool());
+  MOCK_CONST_METHOD0(appendXForwardedPort, bool());
   MOCK_CONST_METHOD0(via, const std::string&());
   MOCK_METHOD0(forwardClientCert, Http::ForwardClientCertType());
   MOCK_CONST_METHOD0(setCurrentClientCertDetails,
@@ -1016,6 +1017,41 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
 
   EXPECT_FALSE(response_headers.has("keep-alive"));
   EXPECT_FALSE(response_headers.has("proxy-connection"));
+}
+
+// Verify when appending x-forwarded-port is turned on, the mutated header should have
+// x-forwarded-port appended.
+TEST_F(ConnectionManagerUtilityTest, appendXForwardedPort) {
+  EXPECT_CALL(config_, appendXForwardedPort()).WillOnce(Return(true));
+  const uint32_t port = 8000;
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  connection_.local_address_ =
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12", port);
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestHeaderMapImpl headers;
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.has(Headers::get().ForwardedPort));
+  EXPECT_EQ(fmt::FormatInt(port).str(), headers.get_(Headers::get().ForwardedPort));
+}
+
+TEST_F(ConnectionManagerUtilityTest, ignoreAppendXForwardedPort) {
+  EXPECT_CALL(config_, appendXForwardedPort()).WillOnce(Return(true));
+  const uint32_t port = 8000;
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  connection_.local_address_ =
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12", port);
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+
+  // Set by previous proxy.
+  const uint32_t previous_port = 9000;
+  TestHeaderMapImpl headers{
+      {Headers::get().ForwardedPort.get(), fmt::FormatInt(previous_port).str()}};
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.has(Headers::get().ForwardedPort));
+  EXPECT_NE(fmt::FormatInt(port).str(), headers.get_(Headers::get().ForwardedPort));
+  EXPECT_EQ(fmt::FormatInt(previous_port).str(), headers.get_(Headers::get().ForwardedPort));
 }
 
 } // namespace Http

@@ -328,6 +328,13 @@ It is a common case where a service wants to know what the originating protocol 
 of the connection terminated by front/edge Envoy. *x-forwarded-proto* contains this information. It
 will be set to either *http* or *https*.
 
+.. _config_http_conn_man_headers_x-forwarded-port:
+
+x-forwarded-port
+----------------
+
+This identifies the listener port value that the client used to connect to Envoy.
+
 .. _config_http_conn_man_headers_x-request-id:
 
 x-request-id

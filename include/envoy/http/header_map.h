@@ -248,6 +248,7 @@ private:
   HEADER_FUNC(Expect)                                                                              \
   HEADER_FUNC(ForwardedClientCert)                                                                 \
   HEADER_FUNC(ForwardedFor)                                                                        \
+  HEADER_FUNC(ForwardedPort)                                                                       \
   HEADER_FUNC(ForwardedProto)                                                                      \
   HEADER_FUNC(GrpcAcceptEncoding)                                                                  \
   HEADER_FUNC(GrpcMessage)                                                                         \

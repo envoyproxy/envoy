@@ -93,6 +93,13 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
   }
 
+  const auto& local_address = connection.localAddress();
+  // If x-forwarded-port is desired and remote hasn't set it (trusted proxy), we set it.
+  if (config.appendXForwardedPort() && !request_headers.ForwardedPort() &&
+      local_address != nullptr && local_address->type() == Network::Address::Type::Ip) {
+    request_headers.insertForwardedPort().value(local_address->ip()->port());
+  }
+
   // At this point we can determine whether this is an internal or external request. The
   // determination of internal status uses the following:
   // 1) After remote address/XFF appending, the XFF header must contain a *single* address.

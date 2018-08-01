@@ -241,6 +241,12 @@ public:
   virtual bool skipXffAppend() const PURE;
 
   /**
+   * @return bool whether to append x-forwarded-port header that is filled by the listener's port
+   *              value or not.
+   */
+  virtual bool appendXForwardedPort() const PURE;
+
+  /**
    * @return const absl::optional<std::string>& value of via header to add to requests and response
    *                                            headers if set.
    */
@@ -290,5 +296,5 @@ public:
    */
   virtual const Http::Http1Settings& http1Settings() const PURE;
 };
-}
+} // namespace Http
 } // namespace Envoy
