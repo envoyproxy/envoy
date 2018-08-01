@@ -51,7 +51,8 @@ bool BinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetad
   buffer.drain(8);
 
   if (name_len > 0) {
-    metadata.setMethodName(std::string(static_cast<char*>(buffer.linearize(name_len)), name_len));
+    metadata.setMethodName(
+        std::string(static_cast<const char*>(buffer.linearize(name_len)), name_len));
     buffer.drain(name_len);
   } else {
     metadata.setMethodName("");
@@ -252,7 +253,7 @@ bool BinaryProtocolImpl::readString(Buffer::Instance& buffer, std::string& value
   }
 
   buffer.drain(4);
-  value.assign(static_cast<char*>(buffer.linearize(str_len)), str_len);
+  value.assign(static_cast<const char*>(buffer.linearize(str_len)), str_len);
   buffer.drain(str_len);
   return true;
 }
@@ -385,7 +386,8 @@ bool LaxBinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMe
 
   buffer.drain(4);
   if (name_len > 0) {
-    metadata.setMethodName(std::string(static_cast<char*>(buffer.linearize(name_len)), name_len));
+    metadata.setMethodName(
+        std::string(static_cast<const char*>(buffer.linearize(name_len)), name_len));
     buffer.drain(name_len);
   } else {
     metadata.setMethodName("");

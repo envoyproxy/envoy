@@ -63,7 +63,8 @@ bool CompactProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMeta
   buffer.drain(id_size + name_len_size + 2);
 
   if (name_len > 0) {
-    metadata.setMethodName(std::string(static_cast<char*>(buffer.linearize(name_len)), name_len));
+    metadata.setMethodName(
+        std::string(static_cast<const char*>(buffer.linearize(name_len)), name_len));
     buffer.drain(name_len);
   } else {
     metadata.setMethodName("");
@@ -372,7 +373,7 @@ bool CompactProtocolImpl::readString(Buffer::Instance& buffer, std::string& valu
   }
 
   buffer.drain(len_size);
-  value.assign(static_cast<char*>(buffer.linearize(str_len)), str_len);
+  value.assign(static_cast<const char*>(buffer.linearize(str_len)), str_len);
   buffer.drain(str_len);
   return true;
 }
