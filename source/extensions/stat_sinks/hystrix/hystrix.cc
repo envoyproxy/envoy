@@ -18,7 +18,8 @@ namespace StatSinks {
 namespace Hystrix {
 
 const uint64_t HystrixSink::DEFAULT_NUM_BUCKETS;
-
+static const std::vector<double> hystrix_quantiles = {0,    0.25, 0.5,   0.75, 0.90,
+                                                      0.95, 0.99, 0.995, 1};
 ClusterStatsCache::ClusterStatsCache(const std::string& cluster_name)
     : cluster_name_(cluster_name) {}
 
@@ -42,14 +43,12 @@ void ClusterStatsCache::printRollingWindow(absl::string_view name, RollingWindow
   out_str << std::endl;
 }
 
-std::string ClusterStatsCache::printTimingHistogram() {
-  std::stringstream out_str;
+void ClusterStatsCache::addHistogramToStream(std::stringstream& ss) {
   bool is_first = true;
   for (std::pair<std::string, double> element : timing_) {
-    HystrixSink::addDoubleToStream(element.first, element.second, out_str, is_first);
+    HystrixSink::addDoubleToStream(element.first, element.second, ss, is_first);
     is_first = false;
   }
-  return out_str.str();
 }
 
 // Add new value to rolling window, in place of oldest one.
@@ -191,7 +190,10 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
   addIntToStream("rollingCountBadRequests", 0, ss);
   addIntToStream("currentConcurrentExecutionCount", 0, ss);
   addIntToStream("latencyExecute_mean", 0, ss);
-  addInfoToStream("latencyExecute", "{" + cluster_stats_cache.printTimingHistogram() + "}", ss);
+  ss << ", \"latencyExecute\": {";
+  cluster_stats_cache.addHistogramToStream(ss);
+  ss << "}";
+  // addInfoToStream("latencyExecute", "{" + cluster_stats_cache.printTimingHistogram() + "}", ss);
   addIntToStream("propertyValue_circuitBreakerRequestVolumeThreshold", 0, ss);
   addIntToStream("propertyValue_circuitBreakerSleepWindowInMilliseconds", 0, ss);
   addIntToStream("propertyValue_circuitBreakerErrorThresholdPercentage", 0, ss);
@@ -321,26 +323,27 @@ void HystrixSink::flush(Stats::Source&) {
   Upstream::ClusterManager::ClusterInfoMap clusters = server_.clusterManager().clusters();
 
   // Save a map of the relevant histograms per cluster in a convenient format.
-  std::unordered_map<std::string, std::unordered_map<std::string, double>> time_histograms;
+  std::unordered_map<absl::string_view, std::unordered_map<std::string, double>, StringViewHash>
+      time_histograms;
   for (const Stats::ParentHistogramSharedPtr histogram : server_.stats().histograms()) {
     // histogram->name() on clusters of the format "cluster.cluster_name.histogram_name"
     // i.e. "cluster.service1.upstream_rq_time".
-    std::vector<std::string> split_name = absl::StrSplit(histogram->name(), ".");
-    if (split_name[0] == "clusters" && split_name[2] == "upstream_rq_time") {
-      std::unordered_map<std::string, double> hist_map;
+    const std::vector<absl::string_view> split_name = absl::StrSplit(histogram->name(), '.');
+    if (split_name[0] == "cluster" && split_name[2] == "upstream_rq_time") {
+      std::unordered_map<std::string, double>& hist_map = time_histograms[split_name[1]];
       for (size_t i = 0; i < histogram->cumulativeStatistics().supportedQuantiles().size(); ++i) {
-        if (histogram->cumulativeStatistics().supportedQuantiles()[i] == 0.999) {
-          // Envoy provide 99.9 percentile, while Hystrix shows 99.5, so there is a small
-          // inaccuracy, which is probably ok since the dashboard is for general information.
-          // Alternatively, we could approximate by the average between 99 and 99.9.
-          hist_map["99.5"] = histogram->cumulativeStatistics().computedQuantiles()[i];
-        } else {
-          hist_map[std::to_string(
-              int(100 * histogram->cumulativeStatistics().supportedQuantiles()[i]))] =
-              histogram->cumulativeStatistics().computedQuantiles()[i];
+        if (std::find(hystrix_quantiles.begin(), hystrix_quantiles.end(),
+                      histogram->cumulativeStatistics().supportedQuantiles()[i]) !=
+            hystrix_quantiles.end()) {
+          if (histogram->cumulativeStatistics().supportedQuantiles()[i] == 0.995) {
+            hist_map["99.5"] = histogram->cumulativeStatistics().computedQuantiles()[i];
+          } else {
+            hist_map[std::to_string(
+                int(100 * histogram->cumulativeStatistics().supportedQuantiles()[i]))] =
+                histogram->cumulativeStatistics().computedQuantiles()[i];
+          }
         }
       }
-      time_histograms[split_name[1]] = hist_map;
     }
   }
 

@@ -26,7 +26,7 @@ struct ClusterStatsCache {
   void printToStream(std::stringstream& out_str);
   void printRollingWindow(absl::string_view name, RollingWindow rolling_window,
                           std::stringstream& out_str);
-  std::string printTimingHistogram();
+  void addHistogramToStream(std::stringstream& ss);
 
   std::string cluster_name_;
 
