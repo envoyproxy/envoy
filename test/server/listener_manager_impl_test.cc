@@ -406,7 +406,7 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
-// Make sure that a listener creation does not fail on IPv4 ony setups when FilterChainMatch is not
+// Make sure that a listener creation does not fail on IPv4 only setups when FilterChainMatch is not
 // specified and we try to create default CidrRange. See convertDestinationIPsMapToTrie function for
 // more details.
 TEST_F(ListenerManagerImplTest, AddListenerOnIpv4OnlySetups) {
@@ -436,7 +436,7 @@ TEST_F(ListenerManagerImplTest, AddListenerOnIpv4OnlySetups) {
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
-// Make sure that a listener creation does not fail on IPv6 ony setups when FilterChainMatch is not
+// Make sure that a listener creation does not fail on IPv6 only setups when FilterChainMatch is not
 // specified and we try to create default CidrRange. See convertDestinationIPsMapToTrie function for
 // more details.
 TEST_F(ListenerManagerImplTest, AddListenerOnIpv6OnlySetups) {
