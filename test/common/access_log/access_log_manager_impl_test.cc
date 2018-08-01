@@ -1,6 +1,7 @@
 #include <memory>
 
 #include "common/access_log/access_log_manager_impl.h"
+#include "common/stats/isolated_store_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/access_log/mocks.h"

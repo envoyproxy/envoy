@@ -16,6 +16,7 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_impl.h"
+#include "common/stats/tag_producer_impl.h"
 
 namespace Envoy {
 namespace Config {

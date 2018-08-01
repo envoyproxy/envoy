@@ -38,11 +38,13 @@
 #include "common/network/utility.h"
 #include "common/profiler/profiler.h"
 #include "common/router/config_impl.h"
+#include "common/stats/histogram_impl.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/host_utility.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
 
+#include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 

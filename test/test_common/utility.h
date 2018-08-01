@@ -14,8 +14,10 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/c_smart_ptr.h"
+#include "common/common/thread.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/stats/raw_stat_data.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/test_common/printers.h"

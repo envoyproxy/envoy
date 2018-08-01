@@ -13,6 +13,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/block_memory_hash_set.h"
+#include "common/stats/raw_stat_data.h"
 #include "common/stats/stats_impl.h"
 
 namespace Envoy {
