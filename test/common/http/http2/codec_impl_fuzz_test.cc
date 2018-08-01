@@ -123,7 +123,7 @@ public:
     }
     case test::common::http::http2::DirectionalAction::kData: {
       if (state == StreamState::PendingDataOrTrailers) {
-        Buffer::OwnedImpl buf(std::string(directional_action.data(), 'a'));
+        Buffer::OwnedImpl buf(std::string(directional_action.data() % (1024 * 1024), 'a'));
         encoder.encodeData(buf, end_stream);
         state = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
       }
