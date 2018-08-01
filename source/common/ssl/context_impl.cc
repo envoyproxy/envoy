@@ -45,7 +45,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
 
   if (!SSL_CTX_set_strict_cipher_list(ctx_.get(), config.cipherSuites().c_str())) {
     std::vector<absl::string_view> ciphers =
-        StringUtil::splitToken(config.cipherSuites(), ":", false);
+        StringUtil::splitToken(config.cipherSuites(), ":+-![|]", false);
     std::vector<std::string> bad_ciphers;
     for (const auto& cipher : ciphers) {
       std::string cipher_str(cipher);
