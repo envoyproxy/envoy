@@ -16,7 +16,24 @@ envoy_cc_library(
         ":stat_data_allocator_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
-        "//source/common/stats:stats_lib",
+        "//source/common/common:thread_annotations",
+        "//source/common/common:thread_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "histogram_lib",
+    srcs = ["histogram.cc"],
+    hdrs = ["histogram.h"],
+    external_deps = [
+        "abseil_optional",
+        "libcircllhist",
+    ],
+    deps = [
+        ":metric_impl_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
+        "//source/common/common:utility_lib",
     ],
 )
 
@@ -25,8 +42,10 @@ envoy_cc_library(
     srcs = ["isolated_store_impl.cc"],
     hdrs = ["isolated_store_impl.h"],
     deps = [
+        ":histogram_lib",
+        ":stats_lib",
+        ":stats_options_lib",
         "//source/common/stats:heap_stat_data_lib",
-        "//source/common/stats:stats_lib",
     ],
 )
 
@@ -64,11 +83,8 @@ envoy_cc_library(
     name = "stats_lib",
     srcs = ["stats_impl.cc"],
     hdrs = ["stats_impl.h"],
-    external_deps = [
-        "abseil_optional",
-        "libcircllhist",
-    ],
     deps = [
+        ":histogram_lib",
         ":metric_impl_lib",
         ":raw_stat_data_lib",
         ":stats_options_lib",

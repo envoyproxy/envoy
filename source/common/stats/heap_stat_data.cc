@@ -2,7 +2,6 @@
 
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
-#include "common/stats/stats_impl.h"
 
 namespace Envoy {
 namespace Stats {

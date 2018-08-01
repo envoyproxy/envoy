@@ -9,7 +9,7 @@
 #include "common/common/block_memory_hash_set.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/stats_options_impl.h"
 
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"

@@ -19,6 +19,7 @@
 #include "common/common/utility.h"
 #include "common/network/utility.h"
 #include "common/stats/raw_stat_data.h"
+#include "common/stats/stats_options_impl.h"
 
 #include "absl/strings/string_view.h"
 

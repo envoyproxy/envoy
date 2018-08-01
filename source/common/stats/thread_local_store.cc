@@ -10,6 +10,8 @@
 #include "common/common/lock_guard.h"
 #include "common/stats/tag_producer_impl.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Stats {
 

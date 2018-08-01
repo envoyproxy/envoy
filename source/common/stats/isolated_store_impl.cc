@@ -6,6 +6,7 @@
 #include <string>
 
 #include "common/common/utility.h"
+#include "common/stats/histogram.h"
 #include "common/stats/utility.h"
 
 namespace Envoy {
