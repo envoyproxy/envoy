@@ -17,6 +17,7 @@ public:
   // DynamicMetadata
   void setData(absl::string_view data_name,
                std::unique_ptr<DynamicMetadataObject>&& data) override;
+  bool hasDataWithName(absl::string_view) const override;
   const DynamicMetadataObject* getDataGeneric(absl::string_view data_name) const override;
 
 private:

@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "envoy/common/exception.h"
+#include "common/common/fmt.h"
 #include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
@@ -39,7 +40,7 @@ public:
   template <typename T> const T& getData(absl::string_view data_name) const {
     const T* result = dynamic_cast<const T*>(getDataGeneric(data_name));
     if (!result) {
-      throw EnvoyException("Data stored under {} cannot be coerced to specified type", data_name);
+      throw EnvoyException(fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
     }
     return *result;
   }
@@ -50,7 +51,8 @@ public:
    * data store.
    */
   template <typename T> bool hasData(absl::string_view data_name) const {
-    return (dynamic_cast<const T*>(getDataGeneric(data_name)) != nullptr);
+    return (hasDataWithName(data_name) &&
+            (dynamic_cast<const T*>(getDataGeneric(data_name)) != nullptr));
   }
 
   /**
@@ -58,9 +60,7 @@ public:
    * @return Whether data of any type and the name specified exists in the
    * data store.
    */
-  bool hasDataWithName(absl::string_view data_name) const {
-    return (getDataGeneric(data_name) != nullptr);
-  }
+  virtual bool hasDataWithName(absl::string_view data_name) const PURE;
 
 protected:
   virtual const DynamicMetadataObject* getDataGeneric(absl::string_view data_name) const PURE;
