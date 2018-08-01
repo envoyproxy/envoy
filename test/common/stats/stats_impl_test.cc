@@ -8,6 +8,8 @@
 #include "common/common/hex.h"
 #include "common/config/well_known_names.h"
 #include "common/stats/stats_impl.h"
+#include "common/stats/tag_extractor_impl.h"
+#include "common/stats/tag_producer_impl.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/logging.h"

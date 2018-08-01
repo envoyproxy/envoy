@@ -8,6 +8,7 @@
 #include <unordered_set>
 
 #include "common/common/lock_guard.h"
+#include "common/stats/tag_producer_impl.h"
 
 namespace Envoy {
 namespace Stats {

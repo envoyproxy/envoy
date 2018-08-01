@@ -29,7 +29,6 @@ envoy_cc_library(
         "//source/common/common:perf_annotation_lib",
         "//source/common/common:thread_annotations",
         "//source/common/common:utility_lib",
-        "//source/common/config:well_known_names",
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
         "@envoy_api//envoy/config/metrics/v2:stats_cc",
@@ -55,11 +54,26 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "tag_producer_lib",
+    srcs = ["tag_producer_impl.cc"],
+    hdrs = ["tag_producer_impl.h"],
+    deps = [
+        ":tag_extractor_lib",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/common:perf_annotation_lib",
+        "//source/common/config:well_known_names",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/config/metrics/v2:stats_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "thread_local_store_lib",
     srcs = ["thread_local_store.cc"],
     hdrs = ["thread_local_store.h"],
     deps = [
         ":stats_lib",
+        ":tag_producer_lib",
         "//include/envoy/thread_local:thread_local_interface",
     ],
 )
