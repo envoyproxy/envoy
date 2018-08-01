@@ -165,6 +165,7 @@ envoy_cc_library(
     hdrs = ["overload_manager_impl.h"],
     deps = [
         "//include/envoy/server:overload_manager_interface",
+        "//include/envoy/stats:stats_interface",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
         "//source/server:resource_monitor_config_lib",

@@ -9,6 +9,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/server/resource_monitor.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/logger.h"
 
@@ -17,7 +18,8 @@ namespace Server {
 
 class OverloadAction {
 public:
-  OverloadAction(const envoy::config::overload::v2alpha::OverloadAction& config);
+  OverloadAction(const envoy::config::overload::v2alpha::OverloadAction& config,
+                 Stats::Scope& stats_scope);
 
   // Updates the current pressure for the given resource and returns whether the action
   // has changed state.
@@ -41,11 +43,12 @@ public:
 private:
   std::unordered_map<std::string, TriggerPtr> triggers_;
   std::unordered_set<std::string> fired_triggers_;
+  Stats::Gauge& active_gauge_;
 };
 
 class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadManager {
 public:
-  OverloadManagerImpl(Event::Dispatcher& dispatcher,
+  OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
                       const envoy::config::overload::v2alpha::OverloadManager& config);
 
   void start();
@@ -57,8 +60,8 @@ public:
 private:
   class Resource : public ResourceMonitor::Callbacks {
   public:
-    Resource(const std::string& name, ResourceMonitorPtr monitor, OverloadManagerImpl& manager)
-        : name_(name), monitor_(std::move(monitor)), manager_(manager), pending_update_(false) {}
+    Resource(const std::string& name, ResourceMonitorPtr monitor, OverloadManagerImpl& manager,
+             Stats::Scope& stats_scope);
 
     // ResourceMonitor::Callbacks
     void onSuccess(const ResourceUsage& usage) override;
@@ -71,6 +74,9 @@ private:
     ResourceMonitorPtr monitor_;
     OverloadManagerImpl& manager_;
     bool pending_update_;
+    Stats::Gauge& pressure_gauge_;
+    Stats::Counter& failed_updates_counter_;
+    Stats::Counter& skipped_updates_counter_;
   };
 
   struct ActionCallback {
