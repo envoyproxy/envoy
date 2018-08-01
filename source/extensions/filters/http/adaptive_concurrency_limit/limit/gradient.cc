@@ -51,7 +51,6 @@ void Gradient::update(const Common::SampleWindow& sample) {
     return;
   }
 
-  const std::chrono::nanoseconds rtt = sample.getAverageRtt();
   const double queue_size = getQueueSize(estimated_limit_);
 
   // Reduce the limit to reduce traffic and probe for a new min_rtt_.
@@ -69,31 +68,32 @@ void Gradient::update(const Common::SampleWindow& sample) {
     }
   }
 
-  min_rtt_.set(rtt);
-  const std::chrono::nanoseconds min_rtt = min_rtt_.get();
-
-  // The gradient is bounded between 0.5 and 1.0. 1.0 means that there is no queueing in the
-  // upstream within the configured rtt_tolerance, so the limit can be expanded.
-  // Anything less than 1.0 indicates that there is
-  // queueing, and thus the limit has to shrink. The lower bound is 0.5 to prevent
-  // aggressive load shedding due to outliers.
-  //
-  // For example, lets pretend that the min_rtt_ is 10ms, the rtt_tolerance_ is 2.0,
-  // and rtt for the sample is 15ms. This means that the gradient is going to be 1.0, and
-  // the estimated limit will increase. On the other hand if the rtt for the sample is greater
-  // than min_rtt_ * rtt_tolerance, then the gradient will be less than 1.0 and the limit
-  // will be reduced.
-  const double gradient = std::max(0.5, std::min(1.0, rtt_tolerance_ * min_rtt / rtt));
-
   uint32_t new_limit;
-  // Reduce the limit aggressively if there was a request failure.
   if (sample.didDrop()) {
+    // Reduce the limit aggressively if there was a request failure.
     new_limit = estimated_limit_ / 2;
-    // There is no need to grow the limit if less than half of the current limit is being used.
   } else if (sample.getMaxInFlightRequests() < estimated_limit_ / 2) {
+    // There is no need to grow the limit if less than half of the current limit is being used.
     return;
-    // Normal update to the limit.
   } else {
+    // Normal update to the limit.
+    const std::chrono::nanoseconds rtt = sample.getAverageRtt();
+    min_rtt_.set(rtt);
+    const std::chrono::nanoseconds min_rtt = min_rtt_.get();
+
+    // The gradient is bounded between 0.5 and 1.0. 1.0 means that there is no queueing in the
+    // upstream within the configured rtt_tolerance, so the limit can be expanded.
+    // Anything less than 1.0 indicates that there is
+    // queueing, and thus the limit has to shrink. The lower bound is 0.5 to prevent
+    // aggressive load shedding due to outliers.
+    //
+    // For example, lets pretend that the min_rtt_ is 10ms, the rtt_tolerance_ is 2.0,
+    // and rtt for the sample is 15ms. This means that the gradient is going to be 1.0, and
+    // the estimated limit will increase. On the other hand if the rtt for the sample is greater
+    // than min_rtt_ * rtt_tolerance, then the gradient will be less than 1.0 and the limit
+    // will be reduced.
+    const double gradient = std::max(0.5, std::min(1.0, rtt_tolerance_ * min_rtt / rtt));
+
     new_limit = estimated_limit_ * gradient + queue_size;
   }
 
@@ -103,16 +103,23 @@ void Gradient::update(const Common::SampleWindow& sample) {
     new_limit = std::max(min_limit_, static_cast<uint32_t>(estimated_limit_ * (1 - smoothing_) +
                                                            smoothing_ * new_limit));
   }
+
   new_limit = std::max(static_cast<uint32_t>(queue_size),
                        std::min(max_limit_, static_cast<uint32_t>(new_limit)));
 
-  ENVOY_LOG(debug,
-            "New estimated_limit for '{}'={} min_rtt={} ms win_rtt={} ms queue_size={} gradient={} "
-            "probe_countdown={}",
-            cluster_name_, estimated_limit_,
-            AccessLog::AccessLogFormatUtils::durationToString(min_rtt_.get()),
-            AccessLog::AccessLogFormatUtils::durationToString(rtt), queue_size, gradient,
-            probe_countdown_.value_or(-1));
+  if (sample.didDrop()) {
+    ENVOY_LOG(debug, "New estimated_limit for '{}'={} queue_size={} probe_countdown={} drop=true",
+              cluster_name_, estimated_limit_, queue_size, probe_countdown_.value_or(-1));
+  } else {
+    ENVOY_LOG(debug,
+              "New estimated_limit for '{}'={} min_rtt={} ms win_rtt={} ms queue_size={} "
+              "probe_countdown={} drop=false",
+              cluster_name_, estimated_limit_,
+              AccessLog::AccessLogFormatUtils::durationToString(min_rtt_.get()),
+              AccessLog::AccessLogFormatUtils::durationToString(sample.getAverageRtt()), queue_size,
+              probe_countdown_.value_or(-1));
+  }
+
   estimated_limit_ = new_limit;
 }
 
