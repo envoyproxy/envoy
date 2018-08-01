@@ -1,21 +1,6 @@
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 
-#include <string.h>
-
-#include <algorithm>
-#include <chrono>
-#include <string>
-
-#include "envoy/common/exception.h"
-
-#include "common/common/lock_guard.h"
-#include "common/common/perf_annotation.h"
-#include "common/common/thread.h"
-#include "common/common/utility.h"
-#include "common/stats/utility.h"
-
-#include "absl/strings/ascii.h"
-#include "absl/strings/match.h"
+#include <vector>
 
 namespace Envoy {
 namespace Stats {

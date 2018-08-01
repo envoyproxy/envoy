@@ -1,19 +1,11 @@
 #pragma once
 
-#include <algorithm>
-#include <functional>
-
 #include "envoy/stats/stats.h"
-
-#include "common/common/utility.h"
 
 #include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
-
-// TODO(jmarantz): rename this to source_impl.h -- this will have a pretty large
-// blast radius, as there are around ~60 references to this file.
 
 class SourceImpl : public Source {
 public:

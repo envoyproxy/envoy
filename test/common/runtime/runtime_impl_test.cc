@@ -1,9 +1,10 @@
 #include <memory>
 #include <string>
 
+#include "envoy/stats/stats.h"
+
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"

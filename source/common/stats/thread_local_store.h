@@ -12,7 +12,7 @@
 
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/histogram_impl.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 #include "common/stats/utility.h"
 
 #include "circllhist.h"

@@ -1,6 +1,6 @@
 #include <string>
 
-#include "common/stats/stats_impl.h"
+#include "envoy/stats/stats.h"
 
 #include "extensions/filters/http/dynamo/dynamo_utility.h"
 

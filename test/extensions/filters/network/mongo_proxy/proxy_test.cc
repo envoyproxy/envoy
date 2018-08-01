@@ -4,8 +4,7 @@
 #include <string>
 
 #include "envoy/config/filter/fault/v2/fault.pb.h"
-
-#include "common/stats/stats_impl.h"
+#include "envoy/stats/stats.h"
 
 #include "extensions/filters/network/mongo_proxy/bson_impl.h"
 #include "extensions/filters/network/mongo_proxy/codec_impl.h"

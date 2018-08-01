@@ -2,11 +2,11 @@
 #include <string>
 
 #include "envoy/http/codec.h"
+#include "envoy/stats/stats.h"
 
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http2/codec_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/mocks/http/mocks.h"
