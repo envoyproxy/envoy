@@ -1,6 +1,6 @@
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/hex.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 
 #include "server/hot_restart_impl.h"
 

@@ -8,7 +8,7 @@
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/protobuf/utility.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 
 #include "extensions/filters/network/ext_authz/ext_authz.h"
 

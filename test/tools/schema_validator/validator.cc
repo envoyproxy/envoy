@@ -1,7 +1,7 @@
 #include "test/tools/schema_validator/validator.h"
 
 #include "common/router/config_impl.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 
 #include "test/test_common/printers.h"
 

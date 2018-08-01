@@ -9,7 +9,7 @@
 #include "common/profiler/profiler.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 #include "common/stats/thread_local_store.h"
 
 #include "server/http/admin.h"

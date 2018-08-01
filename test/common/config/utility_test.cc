@@ -8,7 +8,7 @@
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"

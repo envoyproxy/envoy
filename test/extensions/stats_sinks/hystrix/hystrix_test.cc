@@ -2,7 +2,7 @@
 #include <memory>
 #include <sstream>
 
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 
 #include "extensions/stat_sinks/hystrix/hystrix.h"
 

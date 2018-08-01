@@ -5,12 +5,11 @@
 #include <utility>
 
 #include "envoy/common/exception.h"
-#include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/stats_options_impl.h"
 
 #include "absl/strings/string_view.h"
 

@@ -12,7 +12,6 @@
 
 #include "common/stats/histogram_impl.h"
 #include "common/stats/isolated_store_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "gmock/gmock.h"
 

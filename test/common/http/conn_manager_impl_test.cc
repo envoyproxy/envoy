@@ -22,7 +22,7 @@
 #include "common/http/websocket/ws_handler_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"

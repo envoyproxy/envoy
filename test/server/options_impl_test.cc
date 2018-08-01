@@ -6,7 +6,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/utility.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 
 #include "server/options_impl.h"
 

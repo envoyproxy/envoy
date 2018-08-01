@@ -34,7 +34,6 @@
 #include "common/config/well_known_names.h"
 #include "common/network/utility.h"
 #include "common/stats/isolated_store_impl.h"
-#include "common/stats/stats_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/locality.h"
 #include "common/upstream/outlier_detection_impl.h"

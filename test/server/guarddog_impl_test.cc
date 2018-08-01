@@ -5,7 +5,7 @@
 #include "envoy/common/time.h"
 
 #include "common/common/utility.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 
 #include "server/guarddog_impl.h"
 

@@ -13,7 +13,7 @@
 #include "common/common/lock_guard.h"
 #include "common/common/logger.h"
 #include "common/common/thread.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 
 #include "server/server.h"
 #include "server/test_hooks.h"
@@ -140,12 +140,12 @@ public:
     return wrapped_scope_->histogram(name);
   }
 
-  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
+  const StatsOptions& statsOptions() const override { return stats_options_; }
 
 private:
   Thread::MutexBasicLockable& lock_;
   ScopePtr wrapped_scope_;
-  Stats::StatsOptionsImpl stats_options_;
+  StatsOptionsImpl stats_options_;
 };
 
 /**
@@ -173,7 +173,7 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogram(name);
   }
-  const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
+  const StatsOptions& statsOptions() const override { return stats_options_; }
 
   // Stats::Store
   std::vector<CounterSharedPtr> counters() const override {
@@ -202,7 +202,7 @@ private:
   mutable Thread::MutexBasicLockable lock_;
   IsolatedStoreImpl store_;
   SourceImpl source_;
-  Stats::StatsOptionsImpl stats_options_;
+  StatsOptionsImpl stats_options_;
 };
 
 } // namespace Stats

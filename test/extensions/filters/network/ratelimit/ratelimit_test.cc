@@ -5,7 +5,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/config/filter_json.h"
 #include "common/json/json_loader.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 
 #include "extensions/filters/network/ratelimit/ratelimit.h"
 

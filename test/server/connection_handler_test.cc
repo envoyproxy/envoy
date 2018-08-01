@@ -2,7 +2,7 @@
 #include "common/network/address_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 
 #include "server/connection_handler_impl.h"
 

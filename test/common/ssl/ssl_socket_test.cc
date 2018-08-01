@@ -12,7 +12,7 @@
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_impl.h"
 #include "common/ssl/ssl_socket.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/source_impl.h"
 
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 

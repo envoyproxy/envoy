@@ -2,7 +2,8 @@
 
 #include <string>
 
-#include "common/stats/stats_impl.h"
+#include "common/common/fmt.h"
+#include "common/stats/source_impl.h"
 
 namespace Envoy {
 namespace Extensions {
