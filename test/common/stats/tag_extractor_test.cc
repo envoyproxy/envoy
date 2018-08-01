@@ -1,116 +1,18 @@
-#include <algorithm>
-#include <chrono>
 #include <string>
 
+#include "envoy/common/exception.h"
 #include "envoy/config/metrics/v2/stats.pb.h"
-#include "envoy/stats/stats_macros.h"
 
-#include "common/common/hex.h"
 #include "common/config/well_known_names.h"
-#include "common/stats/heap_stat_data.h"
-#include "common/stats/source_impl.h"
 #include "common/stats/tag_extractor_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
-#include "test/mocks/stats/mocks.h"
-#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
-using testing::NiceMock;
-using testing::ReturnPointee;
-
 namespace Envoy {
 namespace Stats {
-
-// TODO(jmarantz): break this up into distinct test files for each class, to match
-// the breakup of source_impl.h.
-
-TEST(StatsIsolatedStoreImplTest, All) {
-  IsolatedStoreImpl store;
-
-  ScopePtr scope1 = store.createScope("scope1.");
-  Counter& c1 = store.counter("c1");
-  Counter& c2 = scope1->counter("c2");
-  EXPECT_EQ("c1", c1.name());
-  EXPECT_EQ("scope1.c2", c2.name());
-  EXPECT_EQ("c1", c1.tagExtractedName());
-  EXPECT_EQ("scope1.c2", c2.tagExtractedName());
-  EXPECT_EQ(0, c1.tags().size());
-  EXPECT_EQ(0, c1.tags().size());
-
-  Gauge& g1 = store.gauge("g1");
-  Gauge& g2 = scope1->gauge("g2");
-  EXPECT_EQ("g1", g1.name());
-  EXPECT_EQ("scope1.g2", g2.name());
-  EXPECT_EQ("g1", g1.tagExtractedName());
-  EXPECT_EQ("scope1.g2", g2.tagExtractedName());
-  EXPECT_EQ(0, g1.tags().size());
-  EXPECT_EQ(0, g1.tags().size());
-
-  Histogram& h1 = store.histogram("h1");
-  Histogram& h2 = scope1->histogram("h2");
-  scope1->deliverHistogramToSinks(h2, 0);
-  EXPECT_EQ("h1", h1.name());
-  EXPECT_EQ("scope1.h2", h2.name());
-  EXPECT_EQ("h1", h1.tagExtractedName());
-  EXPECT_EQ("scope1.h2", h2.tagExtractedName());
-  EXPECT_EQ(0, h1.tags().size());
-  EXPECT_EQ(0, h2.tags().size());
-  h1.recordValue(200);
-  h2.recordValue(200);
-
-  ScopePtr scope2 = scope1->createScope("foo.");
-  EXPECT_EQ("scope1.foo.bar", scope2->counter("bar").name());
-
-  // Validate that we sanitize away bad characters in the stats prefix.
-  ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
-  EXPECT_EQ("scope1.foo___.bar", scope3->counter("bar").name());
-
-  EXPECT_EQ(4UL, store.counters().size());
-  EXPECT_EQ(2UL, store.gauges().size());
-}
-
-TEST(StatsIsolatedStoreImplTest, LongStatName) {
-  IsolatedStoreImpl store;
-  Stats::StatsOptionsImpl stats_options;
-  const std::string long_string(stats_options.maxNameLength() + 1, 'A');
-
-  ScopePtr scope = store.createScope("scope.");
-  Counter& counter = scope->counter(long_string);
-  EXPECT_EQ(absl::StrCat("scope.", long_string), counter.name());
-}
-
-/**
- * Test stats macros. @see stats_macros.h
- */
-// clang-format off
-#define ALL_TEST_STATS(COUNTER, GAUGE, HISTOGRAM)                                                  \
-  COUNTER  (test_counter)                                                                          \
-  GAUGE    (test_gauge)                                                                            \
-  HISTOGRAM(test_histogram)
-// clang-format on
-
-struct TestStats {
-  ALL_TEST_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
-};
-
-TEST(StatsMacros, All) {
-  IsolatedStoreImpl stats_store;
-  TestStats test_stats{ALL_TEST_STATS(POOL_COUNTER_PREFIX(stats_store, "test."),
-                                      POOL_GAUGE_PREFIX(stats_store, "test."),
-                                      POOL_HISTOGRAM_PREFIX(stats_store, "test."))};
-
-  Counter& counter = test_stats.test_counter_;
-  EXPECT_EQ("test.test_counter", counter.name());
-
-  Gauge& gauge = test_stats.test_gauge_;
-  EXPECT_EQ("test.test_gauge", gauge.name());
-
-  Histogram& histogram = test_stats.test_histogram_;
-  EXPECT_EQ("test.test_histogram", histogram.name());
-}
 
 TEST(TagExtractorTest, TwoSubexpressions) {
   TagExtractorImpl tag_extractor("cluster_name", "^cluster\\.((.+?)\\.)");
@@ -447,115 +349,6 @@ TEST(TagExtractorTest, ExtractRegexPrefix) {
 TEST(TagExtractorTest, CreateTagExtractorNoRegex) {
   EXPECT_THROW_WITH_REGEX(TagExtractorImpl::createTagExtractor("no such default tag", ""),
                           EnvoyException, "^No regex specified for tag specifier and no default");
-}
-
-TEST(TagProducerTest, CheckConstructor) {
-  envoy::config::metrics::v2::StatsConfig stats_config;
-
-  // Should pass there were no tag name conflict.
-  auto& tag_specifier1 = *stats_config.mutable_stats_tags()->Add();
-  tag_specifier1.set_tag_name("test.x");
-  tag_specifier1.set_fixed_value("xxx");
-  TagProducerImpl{stats_config};
-
-  // Should raise an error when duplicate tag names are specified.
-  auto& tag_specifier2 = *stats_config.mutable_stats_tags()->Add();
-  tag_specifier2.set_tag_name("test.x");
-  tag_specifier2.set_fixed_value("yyy");
-  EXPECT_THROW_WITH_MESSAGE(TagProducerImpl{stats_config}, EnvoyException,
-                            fmt::format("Tag name '{}' specified twice.", "test.x"));
-
-  // Also should raise an error when user defined tag name conflicts with Envoy's default tag names.
-  stats_config.clear_stats_tags();
-  stats_config.mutable_use_all_default_tags()->set_value(true);
-  auto& custom_tag_extractor = *stats_config.mutable_stats_tags()->Add();
-  custom_tag_extractor.set_tag_name(Config::TagNames::get().CLUSTER_NAME);
-  EXPECT_THROW_WITH_MESSAGE(
-      TagProducerImpl{stats_config}, EnvoyException,
-      fmt::format("Tag name '{}' specified twice.", Config::TagNames::get().CLUSTER_NAME));
-
-  // Non-default custom name without regex should throw
-  stats_config.mutable_use_all_default_tags()->set_value(true);
-  stats_config.clear_stats_tags();
-  custom_tag_extractor = *stats_config.mutable_stats_tags()->Add();
-  custom_tag_extractor.set_tag_name("test_extractor");
-  EXPECT_THROW_WITH_MESSAGE(
-      TagProducerImpl{stats_config}, EnvoyException,
-      "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
-
-  // Also empty regex should throw
-  stats_config.mutable_use_all_default_tags()->set_value(true);
-  stats_config.clear_stats_tags();
-  custom_tag_extractor = *stats_config.mutable_stats_tags()->Add();
-  custom_tag_extractor.set_tag_name("test_extractor");
-  custom_tag_extractor.set_regex("");
-  EXPECT_THROW_WITH_MESSAGE(
-      TagProducerImpl{stats_config}, EnvoyException,
-      "No regex specified for tag specifier and no default regex for name: 'test_extractor'");
-}
-
-// No truncation occurs in the implementation of HeapStatData.
-TEST(RawStatDataTest, HeapNoTruncate) {
-  Stats::StatsOptionsImpl stats_options;
-  HeapStatDataAllocator alloc; //(/*stats_options*/);
-  const std::string long_string(stats_options.maxNameLength() + 1, 'A');
-  HeapStatData* stat{};
-  EXPECT_NO_LOGS(stat = alloc.alloc(long_string));
-  EXPECT_EQ(stat->key(), long_string);
-  alloc.free(*stat);
-}
-
-// Note: a similar test using RawStatData* is in test/server/hot_restart_impl_test.cc.
-TEST(RawStatDataTest, HeapAlloc) {
-  Stats::StatsOptionsImpl stats_options;
-  HeapStatDataAllocator alloc; //(stats_options);
-  HeapStatData* stat_1 = alloc.alloc("ref_name");
-  ASSERT_NE(stat_1, nullptr);
-  HeapStatData* stat_2 = alloc.alloc("ref_name");
-  ASSERT_NE(stat_2, nullptr);
-  HeapStatData* stat_3 = alloc.alloc("not_ref_name");
-  ASSERT_NE(stat_3, nullptr);
-  EXPECT_EQ(stat_1, stat_2);
-  EXPECT_NE(stat_1, stat_3);
-  EXPECT_NE(stat_2, stat_3);
-  alloc.free(*stat_1);
-  alloc.free(*stat_2);
-  alloc.free(*stat_3);
-}
-
-TEST(SourceImplTest, Caching) {
-  NiceMock<MockStore> store;
-  std::vector<CounterSharedPtr> stored_counters;
-  std::vector<GaugeSharedPtr> stored_gauges;
-  std::vector<ParentHistogramSharedPtr> stored_histograms;
-
-  ON_CALL(store, counters()).WillByDefault(ReturnPointee(&stored_counters));
-  ON_CALL(store, gauges()).WillByDefault(ReturnPointee(&stored_gauges));
-  ON_CALL(store, histograms()).WillByDefault(ReturnPointee(&stored_histograms));
-
-  SourceImpl source(store);
-
-  // Once cached, new values should not be reflected by the return value.
-  stored_counters.push_back(std::make_shared<MockCounter>());
-  EXPECT_EQ(source.cachedCounters(), stored_counters);
-  stored_counters.push_back(std::make_shared<MockCounter>());
-  EXPECT_NE(source.cachedCounters(), stored_counters);
-
-  stored_gauges.push_back(std::make_shared<MockGauge>());
-  EXPECT_EQ(source.cachedGauges(), stored_gauges);
-  stored_gauges.push_back(std::make_shared<MockGauge>());
-  EXPECT_NE(source.cachedGauges(), stored_gauges);
-
-  stored_histograms.push_back(std::make_shared<MockParentHistogram>());
-  EXPECT_EQ(source.cachedHistograms(), stored_histograms);
-  stored_histograms.push_back(std::make_shared<MockParentHistogram>());
-  EXPECT_NE(source.cachedHistograms(), stored_histograms);
-
-  // After clearing, the new values should be reflected in the cache.
-  source.clearCache();
-  EXPECT_EQ(source.cachedCounters(), stored_counters);
-  EXPECT_EQ(source.cachedGauges(), stored_gauges);
-  EXPECT_EQ(source.cachedHistograms(), stored_histograms);
 }
 
 } // namespace Stats
