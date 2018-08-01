@@ -24,6 +24,9 @@ using testing::ReturnPointee;
 namespace Envoy {
 namespace Stats {
 
+// TODO(jmarantz): break this up into distinct test files for each class, to match
+// the breakup of stats_impl.h.
+
 TEST(StatsIsolatedStoreImplTest, All) {
   IsolatedStoreImpl store;
 
