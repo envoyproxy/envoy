@@ -10,17 +10,6 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "adaptive_concurrency_limit_lib",
-    srcs = ["adaptive_concurrency_limit_impl.cc"],
-    hdrs = ["adaptive_concurrency_limit_impl.h"],
-    external_deps = ["abseil_optional"],
-    deps = [
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/upstream:adaptive_concurrency_limit_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "cds_api_lib",
     srcs = ["cds_api_impl.cc"],
     hdrs = ["cds_api_impl.h"],

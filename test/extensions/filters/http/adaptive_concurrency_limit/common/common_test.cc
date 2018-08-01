@@ -23,7 +23,7 @@ TEST(CommonTest, MinimumMeasurement) {
 
 TEST(CommonTest, SampleWindow) {
   SampleWindow sample;
-  EXPECT_TRUE(sample.didDrop());
+  EXPECT_FALSE(sample.didDrop());
   EXPECT_EQ(0, sample.getSampleCount());
   EXPECT_EQ(0, sample.getMaxInFlightRequests());
   EXPECT_EQ(std::chrono::nanoseconds(INT64_MAX), sample.getMinRtt());

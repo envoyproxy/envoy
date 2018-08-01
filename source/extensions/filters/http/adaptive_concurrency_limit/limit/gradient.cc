@@ -30,7 +30,10 @@ Gradient::Gradient(
       estimated_limit_((PROTOBUF_GET_WRAPPED_REQUIRED(common_config, initial_limit))) {}
 
 double Gradient::getQueueSize(double estimated_limit) {
-  // FIX: lookup table for smaller estimated limits;
+  // The square root of the limit is used to get queue size
+  // because it is better than a fixed queue size that becomes too
+  // small for large limits. Moreover, it prevents the limit from growing
+  // too much by slowing down growth as the limit grows.
   return sqrt(estimated_limit);
 }
 
@@ -51,9 +54,7 @@ void Gradient::update(const Common::SampleWindow& sample) {
   const std::chrono::nanoseconds rtt = sample.getAverageRtt();
   const double queue_size = getQueueSize(estimated_limit_);
 
-  // Reset or probe for a new noload RTT and a new estimatedLimit. It's necessary to cut the limit
-  // in half to avoid having the limit drift upwards when the RTT is probed during heavy load.
-  // To avoid decreasing the limit too much we don't allow it to go lower than the queueSize.
+  // Reduce the limit to reduce traffic and probe for a new min_rtt_.
   if (probe_interval_.has_value() && probe_countdown_.has_value()) {
     probe_countdown_ = absl::optional<uint32_t>{probe_countdown_.value() - 1};
 
@@ -71,37 +72,39 @@ void Gradient::update(const Common::SampleWindow& sample) {
   min_rtt_.set(rtt);
   const std::chrono::nanoseconds min_rtt = min_rtt_.get();
 
-  // Rtt could be higher than rtt_noload because of smoothing rtt noload updates
-  // so set to 1.0 to indicate no queuing. Otherwise calculate the slope and don't
-  // allow it to be reduced by more than half to avoid aggressive load-sheding due to
-  // outliers.
+  // The gradient is bounded between 0.5 and 1.0. 1.0 means that there is no queueing in the
+  // upstream within the configured rtt_tolerance, so the limit can be expanded.
+  // Anything less than 1.0 indicates that there is
+  // queueing, and thus the limit has to shrink. The lower bound is 0.5 to prevent
+  // aggressive load shedding due to outliers.
+  //
+  // For example, lets pretend that the min_rtt_ is 10ms, the rtt_tolerance_ is 2.0,
+  // and rtt for the sample is 15ms. This means that the gradient is going to be 1.0, and
+  // the estimated limit will increase. On the other hand if the rtt for the sample is greater
+  // than min_rtt_ * rtt_tolerance, then the gradient will be less than 1.0 and the limit
+  // will be reduced.
   const double gradient = std::max(0.5, std::min(1.0, rtt_tolerance_ * min_rtt / rtt));
 
-  std::cerr << "Calculating new limit, min rtt " << AccessLog::AccessLogFormatUtils::durationToString(min_rtt) << " rtt " << AccessLog::AccessLogFormatUtils::durationToString(rtt) << " gradient " << gradient <<  " queue size " << queue_size << std::endl; 
   uint32_t new_limit;
-  // Reduce the limit aggressively if there was a drop.
+  // Reduce the limit aggressively if there was a request failure.
   if (sample.didDrop()) {
-    std::cerr << "dropped sample? " << sample.didDrop() << std::endl;
     new_limit = estimated_limit_ / 2;
-    // Don't grow the limit if we are app limited.
-    std::cerr << "Update (drop): estimated limit " << estimated_limit_ << " new_limit " << new_limit << std::endl;
+    // There is no need to grow the limit if less than half of the current limit is being used.
   } else if (sample.getMaxInFlightRequests() < estimated_limit_ / 2) {
-    std::cerr << "Update (app limited): estimated limit " << estimated_limit_ << " max in flight " << sample.getMaxInFlightRequests() << std::endl;
     return;
     // Normal update to the limit.
   } else {
     new_limit = estimated_limit_ * gradient + queue_size;
-    std::cerr << "Update (normal): estimated limit " << estimated_limit_ << " new limit " << new_limit << std::endl;
   }
 
-  // TODO: rethink this.
+  // If the limit is shrinking, smoothing is used to control how aggresive the shrinking of the
+  // limit actually is.
   if (new_limit < estimated_limit_) {
     new_limit = std::max(min_limit_, static_cast<uint32_t>(estimated_limit_ * (1 - smoothing_) +
                                                            smoothing_ * new_limit));
-    std::cerr << "shrinking limit, compared min_limit with " << static_cast<uint32_t>(estimated_limit_ * (1 - smoothing_) + smoothing_ * new_limit) << std::endl;
   }
   new_limit = std::max(static_cast<uint32_t>(queue_size),
-                       std::min(max_limit_, static_cast<uint32_t>(new_limit)));                   
+                       std::min(max_limit_, static_cast<uint32_t>(new_limit)));
 
   ENVOY_LOG(debug,
             "New estimated_limit for '{}'={} min_rtt={} ms win_rtt={} ms queue_size={} gradient={} "

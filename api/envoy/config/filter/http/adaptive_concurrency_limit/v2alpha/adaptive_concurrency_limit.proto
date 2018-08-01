@@ -11,17 +11,15 @@ import "gogoproto/gogo.proto";
 
 // Concurrency limit algorithm that adjust the limit based on the gradient of change in the
 // samples minimum Round Trip Time and absolute minimum RTT allowing for a queue of square root of
-// the current limit. Why square root?  Because it's better than a fixed queue size that becomes too
-// small for large limits but still prevents the limit from growing too much by slowing down
-// growth as the limit grows.
+// the current limit.
 message GradientLimitConfig {
   // Smoothing factor to limit how aggressively the estimated limit can shrink when queueing
-  // has been detected.
-  google.protobuf.DoubleValue smoothing = 1 [(validate.rules).double.gte = 0.2];
+  // has been detected. A value closer to 1.0 means that the limit can shrink more aggressively.
+  google.protobuf.DoubleValue smoothing = 1 [(validate.rules).double = {gte: 0.2, lte: 1.0}];
 
   // Tolerance for changes in minimum latency. This value indicated how much change in minimum
   // latency is tolerated before reducing the limit. For instance, a value of 2.0 means that a
-  // 2x increase in latency is acceptable.
+  // 2x increase in latency is acceptable. This value defends against outliers in latency data.
   google.protobuf.DoubleValue rtt_tolerance = 2 [(validate.rules).double.gte = 1];
 
   google.protobuf.UInt32Value probe_interval = 3;

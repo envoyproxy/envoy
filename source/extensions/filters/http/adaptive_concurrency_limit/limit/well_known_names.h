@@ -17,7 +17,6 @@ namespace Limit {
  */
 class NameValues {
 public:
-  // Heap monitor with statically configured max.
   const std::string GRADIENT = "envoy.filters.http.adaptive_concurrency_limit.limit.gradient";
 };
 

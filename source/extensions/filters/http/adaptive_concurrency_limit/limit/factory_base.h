@@ -40,8 +40,8 @@ private:
   virtual std::unique_ptr<Upstream::Limit<Data>>
   createLimitFromProtoTyped(const envoy::config::filter::http::adaptive_concurrency_limit::v2alpha::
                                 AdaptiveConcurrencyLimit::Limit::CommonConfig& common_config,
-                            const ConfigProto& limit_specific_config, Runtime::RandomGenerator& random,
-                            const std::string& cluster_name) PURE;
+                            const ConfigProto& limit_specific_config,
+                            Runtime::RandomGenerator& random, const std::string& cluster_name) PURE;
 
   const std::string name_;
 };
