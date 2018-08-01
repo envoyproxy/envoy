@@ -18,6 +18,7 @@ namespace Http {
 void CodeUtility::chargeBasicResponseStat(Stats::Scope& scope, const std::string& prefix,
                                           Code response_code) {
   // Build a dynamic stat for the response code and increment it.
+  scope.counter(fmt::format("{}upstream_rq_completed", prefix)).inc();
   scope.counter(fmt::format("{}upstream_rq_{}", prefix, groupStringForResponseCode(response_code)))
       .inc();
   scope.counter(fmt::format("{}upstream_rq_{}", prefix, enumToInt(response_code))).inc();
@@ -31,6 +32,7 @@ void CodeUtility::chargeResponseStat(const ResponseStatInfo& info) {
 
   // If the response is from a canary, also create canary stats.
   if (info.upstream_canary_) {
+    info.cluster_scope_.counter(fmt::format("{}canary.upstream_rq_completed", info.prefix_)).inc();
     info.cluster_scope_.counter(fmt::format("{}canary.upstream_rq_{}", info.prefix_, group_string))
         .inc();
     info.cluster_scope_.counter(fmt::format("{}canary.upstream_rq_{}", info.prefix_, response_code))
@@ -39,6 +41,8 @@ void CodeUtility::chargeResponseStat(const ResponseStatInfo& info) {
 
   // Split stats into external vs. internal.
   if (info.internal_request_) {
+    info.cluster_scope_.counter(fmt::format("{}internal.upstream_rq_completed", info.prefix_))
+        .inc();
     info.cluster_scope_
         .counter(fmt::format("{}internal.upstream_rq_{}", info.prefix_, group_string))
         .inc();
@@ -46,6 +50,8 @@ void CodeUtility::chargeResponseStat(const ResponseStatInfo& info) {
         .counter(fmt::format("{}internal.upstream_rq_{}", info.prefix_, response_code))
         .inc();
   } else {
+    info.cluster_scope_.counter(fmt::format("{}external.upstream_rq_completed", info.prefix_))
+        .inc();
     info.cluster_scope_
         .counter(fmt::format("{}external.upstream_rq_{}", info.prefix_, group_string))
         .inc();
@@ -56,6 +62,10 @@ void CodeUtility::chargeResponseStat(const ResponseStatInfo& info) {
 
   // Handle request virtual cluster.
   if (!info.request_vcluster_name_.empty()) {
+    info.global_scope_
+        .counter(fmt::format("vhost.{}.vcluster.{}.upstream_rq_completed", info.request_vhost_name_,
+                             info.request_vcluster_name_))
+        .inc();
     info.global_scope_
         .counter(fmt::format("vhost.{}.vcluster.{}.upstream_rq_{}", info.request_vhost_name_,
                              info.request_vcluster_name_, group_string))
@@ -68,6 +78,10 @@ void CodeUtility::chargeResponseStat(const ResponseStatInfo& info) {
 
   // Handle per zone stats.
   if (!info.from_zone_.empty() && !info.to_zone_.empty()) {
+    info.cluster_scope_
+        .counter(fmt::format("{}zone.{}.{}.upstream_rq_completed", info.prefix_, info.from_zone_,
+                             info.to_zone_))
+        .inc();
     info.cluster_scope_
         .counter(fmt::format("{}zone.{}.{}.upstream_rq_{}", info.prefix_, info.from_zone_,
                              info.to_zone_, group_string))
