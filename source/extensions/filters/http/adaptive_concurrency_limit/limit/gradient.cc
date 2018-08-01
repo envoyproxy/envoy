@@ -45,7 +45,7 @@ absl::optional<uint32_t> Gradient::nextProbeCountdown() {
 }
 
 void Gradient::update(const Common::SampleWindow& sample) {
-  if (sample.getSampleCount() == 0) {
+  if (sample.getSampleCount() == 0 && !sample.didDrop()) {
     ENVOY_LOG(debug, "Received SampleWindow with 0 samples for '{}' for its Gradient limit update",
               cluster_name_);
     return;

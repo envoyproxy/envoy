@@ -48,10 +48,10 @@ TEST(CommonTest, SampleWindow) {
   sample.addDroppedSample(30);
 
   EXPECT_TRUE(sample.didDrop());
-  EXPECT_EQ(10, sample.getSampleCount());
+  EXPECT_EQ(8, sample.getSampleCount());
   EXPECT_EQ(30, sample.getMaxInFlightRequests());
   EXPECT_EQ(std::chrono::nanoseconds(10000), sample.getMinRtt());
-  EXPECT_EQ(std::chrono::nanoseconds(12000), sample.getAverageRtt());
+  EXPECT_EQ(std::chrono::nanoseconds(15000), sample.getAverageRtt());
 }
 
 } // namespace Common

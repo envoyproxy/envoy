@@ -18,7 +18,6 @@ void SampleWindow::addSample(std::chrono::nanoseconds rtt, uint32_t inflight_req
 void SampleWindow::addDroppedSample(uint32_t inflight_requests) {
   did_drop_ = true;
   max_inflight_requests_.set(inflight_requests);
-  sample_count_++;
 }
 
 } // namespace Common
