@@ -6,6 +6,7 @@
 #include <string>
 
 #include "common/common/utility.h"
+#include "common/stats/heap_stat_data.h"
 #include "common/stats/stats_impl.h"
 #include "common/stats/utility.h"
 

@@ -15,6 +15,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
+#include "common/stats/stat_data_allocator.h"
 
 #include "absl/strings/string_view.h"
 
@@ -78,6 +79,12 @@ struct RawStatData {
   std::atomic<uint16_t> ref_count_;
   std::atomic<uint32_t> unused_;
   char name_[];
+};
+
+class RawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
+public:
+  // StatDataAllocator
+  bool requiresBoundedStatNameSize() const override { return true; }
 };
 
 } // namespace Stats

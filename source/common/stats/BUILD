@@ -9,11 +9,32 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "heap_stat_data_lib",
+    srcs = ["heap_stat_data.cc"],
+    hdrs = ["heap_stat_data.h"],
+    deps = [
+        ":stat_data_allocator_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
+        "//source/common/stats:stats_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "isolated_store_lib",
     srcs = ["isolated_store_impl.cc"],
     hdrs = ["isolated_store_impl.h"],
     deps = [
+        "//source/common/stats:heap_stat_data_lib",
         "//source/common/stats:stats_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "metric_impl_lib",
+    hdrs = ["metric_impl.h"],
+    deps = [
+        "//include/envoy/stats:stats_interface",
     ],
 )
 
@@ -22,9 +43,20 @@ envoy_cc_library(
     srcs = ["raw_stat_data.cc"],
     hdrs = ["raw_stat_data.h"],
     deps = [
+        ":stat_data_allocator_lib",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "stat_data_allocator_lib",
+    hdrs = ["stat_data_allocator.h"],
+    deps = [
+        ":metric_impl_lib",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/common:assert_lib",
     ],
 )
 
@@ -37,6 +69,7 @@ envoy_cc_library(
         "libcircllhist",
     ],
     deps = [
+        ":metric_impl_lib",
         ":raw_stat_data_lib",
         ":stats_options_lib",
         ":tag_extractor_lib",
@@ -93,6 +126,7 @@ envoy_cc_library(
     srcs = ["thread_local_store.cc"],
     hdrs = ["thread_local_store.h"],
     deps = [
+        ":heap_stat_data_lib",
         ":stats_lib",
         ":tag_producer_lib",
         "//include/envoy/thread_local:thread_local_interface",

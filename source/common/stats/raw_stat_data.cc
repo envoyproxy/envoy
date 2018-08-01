@@ -41,5 +41,7 @@ void RawStatData::initialize(absl::string_view key, const StatsOptions& stats_op
   name_[key.size()] = '\0';
 }
 
+template class StatDataAllocatorImpl<RawStatData>;
+
 } // namespace Stats
 } // namespace Envoy

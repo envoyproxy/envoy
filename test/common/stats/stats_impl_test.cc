@@ -7,6 +7,7 @@
 
 #include "common/common/hex.h"
 #include "common/config/well_known_names.h"
+#include "common/stats/heap_stat_data.h"
 #include "common/stats/stats_impl.h"
 #include "common/stats/tag_extractor_impl.h"
 #include "common/stats/tag_producer_impl.h"
