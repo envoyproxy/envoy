@@ -24,8 +24,8 @@ LogicalDnsCluster::LogicalDnsCluster(
       dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))),
-      tls_(tls.allocateSlot()),
-      resolve_timer_(factory_context.dispatcher().createTimer([this]() -> void { startResolve(); })),
+      tls_(tls.allocateSlot()), resolve_timer_(factory_context.dispatcher().createTimer(
+                                    [this]() -> void { startResolve(); })),
       local_info_(factory_context.local_info()),
       load_assignment_(cluster.has_load_assignment()
                            ? cluster.load_assignment()

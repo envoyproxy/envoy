@@ -470,8 +470,7 @@ public:
   void initialize(std::function<void()> callback) override;
 
 protected:
-  ClusterImplBase(const envoy::api::v2::Cluster& cluster,
-                  Runtime::Loader& runtime,
+  ClusterImplBase(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                   bool added_via_api,
                   Server::Configuration::TransportSocketFactoryContext& factory_context,
                   Stats::ScopePtr stats_scope);

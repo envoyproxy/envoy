@@ -10,7 +10,7 @@ namespace Configuration {
  * Implementation of TransportSocketFactoryContext.
  */
 class TransportSocketFactoryContextImpl : public TransportSocketFactoryContext {
- public:
+public:
   TransportSocketFactoryContextImpl(Ssl::ContextManager& context_manager, Stats::Scope& stats_scope,
                                     Upstream::ClusterManager& cm,
                                     const LocalInfo::LocalInfo& local_info,
@@ -37,7 +37,7 @@ class TransportSocketFactoryContextImpl : public TransportSocketFactoryContext {
 
   Stats::Store& stats() override { return stats_; }
 
- private:
+private:
   Ssl::ContextManager& context_manager_;
   Stats::Scope& stats_scope_;
   Upstream::ClusterManager& cluster_manager_;

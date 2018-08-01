@@ -352,9 +352,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-   name = "transport_socket_config_lib",
-  hdrs = ["transport_socket_config_impl.h"],
-  deps = [
-      "//include/envoy/server:transport_socket_config_interface",
-  ],
+    name = "transport_socket_config_lib",
+    hdrs = ["transport_socket_config_impl.h"],
+    deps = [
+        "//include/envoy/server:transport_socket_config_interface",
+    ],
 )

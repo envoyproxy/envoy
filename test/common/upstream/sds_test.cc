@@ -13,12 +13,13 @@
 #include "common/protobuf/protobuf.h"
 #include "common/upstream/eds.h"
 
+#include "server/transport_socket_config_impl.h"
+
 #include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -64,10 +65,14 @@ protected:
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
-    Stats::ScopePtr stats_scope;
-    EXPECT_CALL(factory_context_, stats()).WillRepeatedly(ReturnRef(stats_));
-    cluster_.reset(new EdsClusterImpl(sds_cluster_, runtime_, false, factory_context_,
-                                      std::move(stats_scope)));
+    Envoy::Stats::ScopePtr scope = stats_.createScope(
+        fmt::format("cluster.{}.", sds_cluster_.alt_stat_name().empty()
+                                       ? sds_cluster_.name()
+                                       : std::string(sds_cluster_.alt_stat_name())));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_);
+    cluster_.reset(
+        new EdsClusterImpl(sds_cluster_, runtime_, false, factory_context, std::move(scope)));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
   }
 
@@ -127,7 +132,6 @@ protected:
   Http::MockAsyncClientRequest request_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 
 TEST_F(SdsTest, Shutdown) {
