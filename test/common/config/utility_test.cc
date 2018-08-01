@@ -59,6 +59,11 @@ TEST(UtilityTest, ApiConfigSourceRefreshDelay) {
   EXPECT_EQ(1234, Utility::apiConfigSourceRefreshDelay(api_config_source).count());
 }
 
+TEST(UtilityTest, ApiConfigSourceDefaultRequestTimeout) {
+  envoy::api::v2::core::ApiConfigSource api_config_source;
+  EXPECT_EQ(1000, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
+}
+
 TEST(UtilityTest, ApiConfigSourceRequestTimeout) {
   envoy::api::v2::core::ApiConfigSource api_config_source;
   api_config_source.mutable_request_timeout()->CopyFrom(

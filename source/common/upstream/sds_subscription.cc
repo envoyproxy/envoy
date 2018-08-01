@@ -34,7 +34,6 @@ SdsSubscription::SdsSubscription(ClusterStats& stats,
   // TODO(htuch): Add support for multiple clusters, #1170.
   ASSERT(api_config_source.cluster_names().size() == 1);
   ASSERT(api_config_source.has_refresh_delay());
-  ASSERT(api_config_source.has_request_timeout());
 }
 
 void SdsSubscription::parseResponse(const Http::Message& response) {

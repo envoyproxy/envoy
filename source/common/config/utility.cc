@@ -164,7 +164,7 @@ std::chrono::milliseconds Utility::apiConfigSourceRefreshDelay(
 std::chrono::milliseconds Utility::apiConfigSourceRequestTimeout(
     const envoy::api::v2::core::ApiConfigSource& api_config_source) {
   if (!api_config_source.has_request_timeout()) {
-    throw EnvoyException("request_timeout is required for REST API configuration sources");
+    return std::chrono::milliseconds(1000);
   }
 
   return std::chrono::milliseconds(

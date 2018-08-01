@@ -221,7 +221,7 @@ TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
   api_config_source->add_cluster_names("static_cluster");
   api_config_source->mutable_refresh_delay()->set_seconds(1);
-  api_config_source->mutable_request_timeout()->set_seconds(1);
+  // request_timeout isn't configured explicitly
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
   Upstream::MockCluster cluster;
   cluster_map.emplace("static_cluster", cluster);
@@ -260,24 +260,6 @@ TEST_F(SubscriptionFactoryTest, HttpSubscriptionNoRefreshDelay) {
   EXPECT_THROW_WITH_MESSAGE(
       subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_), EnvoyException,
       "refresh_delay is required for REST API configuration sources");
-}
-
-// Confirm error when no request timeout is set (not checked by schema).
-TEST_F(SubscriptionFactoryTest, HttpSubscriptionNoRequestTimeout) {
-  envoy::api::v2::core::ConfigSource config;
-  auto* api_config_source = config.mutable_api_config_source();
-  api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
-  api_config_source->add_cluster_names("static_cluster");
-  api_config_source->mutable_refresh_delay()->set_seconds(1);
-  Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  Upstream::MockCluster cluster;
-  cluster_map.emplace("static_cluster", cluster);
-  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
-  EXPECT_CALL(cluster, info()).Times(2);
-  EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_), EnvoyException,
-      "request_timeout is required for REST API configuration sources");
 }
 
 TEST_F(SubscriptionFactoryTest, GrpcSubscription) {

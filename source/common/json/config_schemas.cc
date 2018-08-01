@@ -1164,7 +1164,7 @@ const std::string Json::Schema::CLUSTER_MANAGER_SCHEMA(R"EOF(
             "exclusiveMinimum" : true
           }
         },
-        "required" : ["cluster", "refresh_delay_ms", "request_timeout_ms"],
+        "required" : ["cluster", "refresh_delay_ms"],
         "additionalProperties" : false
       },
       "cds" : {

@@ -76,7 +76,8 @@ public:
 
   /**
    * Extract request_timeout as a std::chrono::milliseconds from
-   * envoy::api::v2::core::ApiConfigSource.
+   * envoy::api::v2::core::ApiConfigSource. If request_timeout isn't set in the config source, a
+   * default value of 1s will be returned.
    */
   static std::chrono::milliseconds
   apiConfigSourceRequestTimeout(const envoy::api::v2::core::ApiConfigSource& api_config_source);
