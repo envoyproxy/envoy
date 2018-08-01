@@ -1,7 +1,8 @@
+#include "envoy/stats/stats.h"
+
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/google_async_client_impl.h"
 #include "common/stats/isolated_store_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/tracing/mocks.h"

@@ -3,13 +3,13 @@
 
 #include "envoy/json/json_object.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/stats.h"
 
 #include "common/http/message_impl.h"
 #include "common/json/json_loader.h"
 #include "common/profiler/profiler.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-#include "common/stats/stats_impl.h"
 #include "common/stats/thread_local_store.h"
 
 #include "server/http/admin.h"

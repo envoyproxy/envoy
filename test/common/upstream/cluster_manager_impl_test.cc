@@ -11,7 +11,6 @@
 #include "common/network/socket_option_impl.h"
 #include "common/network/utility.h"
 #include "common/ssl/context_manager_impl.h"
-#include "common/stats/stats_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "test/common/upstream/utility.h"

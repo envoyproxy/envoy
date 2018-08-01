@@ -1,7 +1,7 @@
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
+#include "envoy/stats/stats.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/buffer_helper.h"
 #include "extensions/filters/network/thrift_proxy/config.h"

@@ -122,6 +122,7 @@ envoy_cc_library(
         "//source/common/common:block_memory_hash_set_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:utility_lib",
+        "//source/common/stats:raw_stat_data_lib",
         "//source/common/stats:stats_options_lib",
     ],
 )

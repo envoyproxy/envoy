@@ -1,7 +1,8 @@
+#include "envoy/stats/stats.h"
+
 #include "common/network/address_impl.h"
 #include "common/network/listener_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
