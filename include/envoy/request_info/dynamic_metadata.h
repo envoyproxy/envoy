@@ -3,6 +3,7 @@
 #include <atomic>
 #include <memory>
 
+#include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
 #include "absl/strings/string_view.h"
@@ -12,6 +13,11 @@ namespace RequestInfo {
 
 class DynamicMetadata {
 public:
+  class DynamicMetadataObject {
+   public:
+    virtual ~DynamicMetadataObject() {};
+  };
+
   virtual ~DynamicMetadata(){};
 
   /**
@@ -20,18 +26,22 @@ public:
    * Note that it is an error to call setData() twice with the same data_name; this is to
    * enforce a single authoritative source for each piece of data stored in DynamicMetadata. 
    */
-  template <typename T> void setData(absl::string_view data_name, std::unique_ptr<T>&& data) {
-    setDataGeneric(data_name, Traits<T>::getTypeId(), static_cast<void*>(data.release()),
-                   &Traits<T>::destructor);
-  }
+  virtual void setData(absl::string_view data_name,
+                       std::unique_ptr<DynamicMetadataObject>&& data) PURE;
 
   /**
    * @param data_name the name of the data being set.
    * @return a reference to the stored data.
    * Note that it is an error to access data that has not previously been set.
+   * This function will fail if the data stored under |data_name| cannot be
+   * dynamically cast to the type specified.
    */
   template <typename T> const T& getData(absl::string_view data_name) const {
-    return *static_cast<T*>(getDataGeneric(data_name, Traits<T>::getTypeId()));
+    const T* result = dynamic_cast<const T*>(getDataGeneric(data_name));
+    if (!result) {
+      throw EnvoyException("Data stored under {} cannot be coerced to specified type", data_name);
+    }
+    return *result;
   }
 
   /**
@@ -40,7 +50,7 @@ public:
    * data store.
    */
   template <typename T> bool hasData(absl::string_view data_name) const {
-    return hasDataGeneric(data_name, Traits<T>::getTypeId());
+    return (dynamic_cast<const T*>(getDataGeneric(data_name)) != nullptr);
   }
 
   /**
@@ -48,27 +58,12 @@ public:
    * @return Whether data of any type and the name specified exists in the
    * data store.
    */
-  virtual bool hasDataWithName(absl::string_view data_name) const PURE;
+  bool hasDataWithName(absl::string_view data_name) const {
+    return (getDataGeneric(data_name) != nullptr);
+  }
 
 protected:
-  virtual void setDataGeneric(absl::string_view data_name, size_t type_id,
-                              void* data, // Implementation must take ownership
-                              void (*destructor)(void*)) PURE;
-
-  virtual void* getDataGeneric(absl::string_view data_name, size_t type_id) const PURE;
-  virtual bool hasDataGeneric(absl::string_view data_name, size_t type_id) const PURE;
-
-private:
-  static std::atomic<size_t> type_id_index_;
-
-  template <typename T> class Traits {
-  public:
-    static size_t getTypeId() {
-      static const size_t type_id = type_id_index_.fetch_add(1);
-      return type_id;
-    }
-    static void destructor(void* ptr) { delete static_cast<T*>(ptr); }
-  };
+  virtual const DynamicMetadataObject* getDataGeneric(absl::string_view data_name) const PURE;
 };
 
 } // namespace RequestInfo
