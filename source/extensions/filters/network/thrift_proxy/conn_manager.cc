@@ -48,11 +48,11 @@ void ConnectionManager::dispatch() {
     return;
   } catch (const AppException& ex) {
     ENVOY_LOG(error, "thrift application exception: {}", ex.what());
-    if (!rpcs_.empty()) {
-      sendLocalReply(*(*rpcs_.begin())->metadata_, ex);
-    } else {
+    if (rpcs_.empty()) {
       MessageMetadata metadata;
       sendLocalReply(metadata, ex);
+    } else {
+      sendLocalReply(*(*rpcs_.begin())->metadata_, ex);
     }
   } catch (const EnvoyException& ex) {
     ENVOY_LOG(error, "thrift error: {}", ex.what());

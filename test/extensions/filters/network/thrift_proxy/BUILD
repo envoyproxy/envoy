@@ -41,6 +41,18 @@ envoy_extension_cc_test_library(
 )
 
 envoy_extension_cc_test(
+    name = "app_exception_impl_test",
+    srcs = ["app_exception_impl_test.cc"],
+    extension_name = "envoy.filters.network.thrift_proxy",
+    deps = [
+        ":mocks",
+        "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "binary_protocol_impl_test",
     srcs = ["binary_protocol_impl_test.cc"],
     extension_name = "envoy.filters.network.thrift_proxy",

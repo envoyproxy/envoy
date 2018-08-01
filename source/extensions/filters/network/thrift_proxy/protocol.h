@@ -40,13 +40,6 @@ public:
   virtual ProtocolType type() const PURE;
 
   /**
-   * For protocol-detecting implementations, set the underlying type based on external
-   * (e.g. transport-level) information).
-   * @param type ProtocolType to explicitly set
-   */
-  virtual void setType(ProtocolType) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-
-  /**
    * Reads the start of a Thrift protocol message from the buffer and updates the metadata
    * parameter with values from the message header. If successful, the message header is removed
    * from the buffer.

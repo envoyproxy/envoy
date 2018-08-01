@@ -17,22 +17,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-void AutoProtocolImpl::setType(ProtocolType type) {
-  if (!protocol_) {
-    switch (type) {
-    case ProtocolType::Binary:
-      setProtocol(std::make_unique<BinaryProtocolImpl>());
-      break;
-    case ProtocolType::Compact:
-      setProtocol(std::make_unique<CompactProtocolImpl>());
-      break;
-    default:
-      // Ignored: attempt protocol detection.
-      break;
-    }
-  }
-}
-
 bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) {
   if (protocol_ == nullptr) {
     if (buffer.length() < 2) {
@@ -41,9 +25,9 @@ bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetadat
 
     uint16_t version = BufferHelper::peekU16(buffer);
     if (BinaryProtocolImpl::isMagic(version)) {
-      setType(ProtocolType::Binary);
+      setProtocol(std::make_unique<BinaryProtocolImpl>());
     } else if (CompactProtocolImpl::isMagic(version)) {
-      setType(ProtocolType::Compact);
+      setProtocol(std::make_unique<CompactProtocolImpl>());
     }
 
     if (!protocol_) {
