@@ -12,11 +12,10 @@ namespace RequestInfo {
 class DynamicMetadataImpl : public DynamicMetadata {
 public:
   DynamicMetadataImpl() {}
-  ~DynamicMetadataImpl() override {};
+  ~DynamicMetadataImpl() override{};
 
   // DynamicMetadata
-  void setData(absl::string_view data_name,
-               std::unique_ptr<DynamicMetadataObject>&& data) override;
+  void setData(absl::string_view data_name, std::unique_ptr<DynamicMetadataObject>&& data) override;
   bool hasDataWithName(absl::string_view) const override;
   const DynamicMetadataObject* getDataGeneric(absl::string_view data_name) const override;
 

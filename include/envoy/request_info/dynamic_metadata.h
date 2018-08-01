@@ -4,8 +4,9 @@
 #include <memory>
 
 #include "envoy/common/exception.h"
-#include "common/common/fmt.h"
 #include "envoy/common/pure.h"
+
+#include "common/common/fmt.h"
 
 #include "absl/strings/string_view.h"
 
@@ -15,8 +16,8 @@ namespace RequestInfo {
 class DynamicMetadata {
 public:
   class DynamicMetadataObject {
-   public:
-    virtual ~DynamicMetadataObject() {};
+  public:
+    virtual ~DynamicMetadataObject(){};
   };
 
   virtual ~DynamicMetadata(){};
@@ -40,7 +41,8 @@ public:
   template <typename T> const T& getData(absl::string_view data_name) const {
     const T* result = dynamic_cast<const T*>(getDataGeneric(data_name));
     if (!result) {
-      throw EnvoyException(fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
+      throw EnvoyException(
+          fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
     }
     return *result;
   }

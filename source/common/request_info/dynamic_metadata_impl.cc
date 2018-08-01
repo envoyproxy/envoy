@@ -17,7 +17,8 @@ bool DynamicMetadataImpl::hasDataWithName(absl::string_view data_name) const {
   return data_storage_.count(data_name) > 0;
 }
 
-const DynamicMetadata::DynamicMetadataObject* DynamicMetadataImpl::getDataGeneric(absl::string_view data_name) const {
+const DynamicMetadata::DynamicMetadataObject*
+DynamicMetadataImpl::getDataGeneric(absl::string_view data_name) const {
   const auto& it = data_storage_.find(data_name);
 
   if (it == data_storage_.end()) {
