@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "common/common/fmt.h"
+#include "common/stats/isolated_store_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"

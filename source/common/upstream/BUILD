@@ -389,6 +389,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:metadata_lib",
         "//source/common/config:well_known_names",
+        "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/upstream:locality_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",

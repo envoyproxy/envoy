@@ -9,6 +9,26 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "isolated_store_lib",
+    srcs = ["isolated_store_impl.cc"],
+    hdrs = ["isolated_store_impl.h"],
+    deps = [
+        "//source/common/stats:stats_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "raw_stat_data_lib",
+    srcs = ["raw_stat_data.cc"],
+    hdrs = ["raw_stat_data.h"],
+    deps = [
+        "//include/envoy/stats:stats_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "stats_lib",
     srcs = ["stats_impl.cc"],
     hdrs = ["stats_impl.h"],
@@ -17,6 +37,7 @@ envoy_cc_library(
         "libcircllhist",
     ],
     deps = [
+        ":raw_stat_data_lib",
         ":stats_options_lib",
         ":tag_extractor_lib",
         ":utility_lib",

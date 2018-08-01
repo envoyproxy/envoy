@@ -12,6 +12,7 @@
 #include "common/common/perf_annotation.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
+#include "common/stats/raw_stat_data.h"
 #include "common/stats/utility.h"
 
 #include "absl/strings/ascii.h"
@@ -19,19 +20,6 @@
 
 namespace Envoy {
 namespace Stats {
-
-namespace {
-
-// Round val up to the next multiple of the natural alignment.
-// Note: this implementation only works because 8 is a power of 2.
-uint64_t roundUpMultipleNaturalAlignment(uint64_t val) {
-  const uint64_t multiple = alignof(RawStatData);
-  static_assert(multiple == 1 || multiple == 2 || multiple == 4 || multiple == 8 || multiple == 16,
-                "multiple must be a power of 2 for this algorithm to work");
-  return (val + multiple - 1) & ~(multiple - 1);
-}
-
-} // namespace
 
 /**
  * Counter implementation that wraps a StatData. StatData must have data members:
@@ -100,25 +88,6 @@ private:
   StatData& data_;
   StatDataAllocatorImpl<StatData>& alloc_;
 };
-
-// Normally the compiler would do this, but because name_ is a flexible-array-length
-// element, the compiler can't. RawStatData is put into an array in HotRestartImpl, so
-// it's important that each element starts on the required alignment for the type.
-uint64_t RawStatData::structSize(uint64_t name_size) {
-  return roundUpMultipleNaturalAlignment(sizeof(RawStatData) + name_size + 1);
-}
-
-uint64_t RawStatData::structSizeWithOptions(const StatsOptions& stats_options) {
-  return structSize(stats_options.maxNameLength());
-}
-
-void RawStatData::initialize(absl::string_view key, const StatsOptions& stats_options) {
-  ASSERT(!initialized());
-  ASSERT(key.size() <= stats_options.maxNameLength());
-  ref_count_ = 1;
-  memcpy(name_, key.data(), key.size());
-  name_[key.size()] = '\0';
-}
 
 HeapStatData::HeapStatData(absl::string_view key) : name_(key.data(), key.size()) {}
 
@@ -233,45 +202,6 @@ void SourceImpl::clearCache() {
   counters_.reset();
   gauges_.reset();
   histograms_.reset();
-}
-
-IsolatedStoreImpl::IsolatedStoreImpl()
-    : counters_([this](const std::string& name) -> CounterSharedPtr {
-        std::string tag_extracted_name = name;
-        std::vector<Tag> tags;
-        return alloc_.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
-      }),
-      gauges_([this](const std::string& name) -> GaugeSharedPtr {
-        std::string tag_extracted_name = name;
-        std::vector<Tag> tags;
-        return alloc_.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
-      }),
-      histograms_([this](const std::string& name) -> HistogramSharedPtr {
-        return std::make_shared<HistogramImpl>(name, *this, std::string(name), std::vector<Tag>());
-      }) {}
-
-struct IsolatedScopeImpl : public Scope {
-  IsolatedScopeImpl(IsolatedStoreImpl& parent, const std::string& prefix)
-      : parent_(parent), prefix_(Utility::sanitizeStatsName(prefix)) {}
-
-  // Stats::Scope
-  ScopePtr createScope(const std::string& name) override {
-    return ScopePtr{new IsolatedScopeImpl(parent_, prefix_ + name)};
-  }
-  void deliverHistogramToSinks(const Histogram&, uint64_t) override {}
-  Counter& counter(const std::string& name) override { return parent_.counter(prefix_ + name); }
-  Gauge& gauge(const std::string& name) override { return parent_.gauge(prefix_ + name); }
-  Histogram& histogram(const std::string& name) override {
-    return parent_.histogram(prefix_ + name);
-  }
-  const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
-
-  IsolatedStoreImpl& parent_;
-  const std::string prefix_;
-};
-
-ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
-  return ScopePtr{new IsolatedScopeImpl(*this, name)};
 }
 
 template class StatDataAllocatorImpl<HeapStatData>;

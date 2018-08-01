@@ -12,6 +12,7 @@
 #include "envoy/network/resolver.h"
 #include "envoy/network/transport_socket.h"
 
+#include "common/stats/isolated_store_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/mocks/event/mocks.h"
