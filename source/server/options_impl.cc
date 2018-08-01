@@ -9,7 +9,6 @@
 #include "common/common/logger.h"
 #include "common/common/macros.h"
 #include "common/common/version.h"
-#include "common/stats/source_impl.h"
 
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"

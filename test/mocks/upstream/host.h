@@ -7,7 +7,6 @@
 
 #include "envoy/upstream/upstream.h"
 
-
 #include "test/mocks/upstream/cluster_info.h"
 
 #include "gmock/gmock.h"
