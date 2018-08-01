@@ -24,6 +24,7 @@
 #include "common/grpc/common.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
+#include "common/stats/isolated_store_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "test/test_common/printers.h"

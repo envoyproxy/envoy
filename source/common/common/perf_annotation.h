@@ -30,7 +30,7 @@
  * Initiates a performance operation, storing its state in perf_var. A perf_var
  * can then be reported multiple times.
  */
-#define PERF_OPERATION(perf_var) Envoy::PerfOperation(perf_var)
+#define PERF_OPERATION(perf_var) Envoy::PerfOperation perf_var
 
 /**
  * Records performance data initiated with PERF_OPERATION. The category and description

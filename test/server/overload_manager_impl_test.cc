@@ -1,6 +1,8 @@
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"
 
+#include "common/stats/stats_impl.h"
+
 #include "server/overload_manager_impl.h"
 
 #include "extensions/resource_monitors/common/factory_base.h"
@@ -87,45 +89,48 @@ protected:
     return proto;
   }
 
+  std::string getConfig() {
+    return R"EOF(
+      refresh_interval {
+        seconds: 1
+      }
+      resource_monitors {
+        name: "envoy.resource_monitors.fake_resource1"
+      }
+      resource_monitors {
+        name: "envoy.resource_monitors.fake_resource2"
+      }
+      actions {
+        name: "envoy.overload_actions.dummy_action"
+        triggers {
+          name: "envoy.resource_monitors.fake_resource1"
+          threshold {
+            value: 0.9
+          }
+        }
+        triggers {
+          name: "envoy.resource_monitors.fake_resource2"
+          threshold {
+            value: 0.8
+          }
+        }
+      }
+    )EOF";
+  }
+
   FakeResourceMonitorFactory factory1_;
   FakeResourceMonitorFactory factory2_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  Stats::IsolatedStoreImpl stats_;
   Event::TimerCb timer_cb_;
 };
 
 TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   setDispatcherExpectation();
 
-  const std::string config = R"EOF(
-    refresh_interval {
-      seconds: 1
-    }
-    resource_monitors {
-      name: "envoy.resource_monitors.fake_resource1"
-    }
-    resource_monitors {
-      name: "envoy.resource_monitors.fake_resource2"
-    }
-    actions {
-      name: "envoy.overload_actions.dummy_action"
-      triggers {
-        name: "envoy.resource_monitors.fake_resource1"
-        threshold {
-          value: 0.9
-        }
-      }
-      triggers {
-        name: "envoy.resource_monitors.fake_resource2"
-        threshold {
-          value: 0.8
-        }
-      }
-    }
-  )EOF";
-
-  OverloadManagerImpl manager(dispatcher_, parseConfig(config));
+  OverloadManagerImpl manager(dispatcher_, stats_, parseConfig(getConfig()));
   bool is_active = false;
   int cb_count = 0;
   manager.registerForAction("envoy.overload_actions.dummy_action", dispatcher_,
@@ -134,24 +139,35 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
                               cb_count++;
                             });
   manager.registerForAction("envoy.overload_actions.unknown_action", dispatcher_,
-                            [&](OverloadActionState) { ASSERT(false); });
+                            [&](OverloadActionState) { EXPECT_TRUE(false); });
   manager.start();
+
+  Stats::Gauge& active_gauge = stats_.gauge("overload.envoy.overload_actions.dummy_action.active");
+  Stats::Gauge& pressure_gauge1 =
+      stats_.gauge("overload.envoy.resource_monitors.fake_resource1.pressure");
+  Stats::Gauge& pressure_gauge2 =
+      stats_.gauge("overload.envoy.resource_monitors.fake_resource2.pressure");
 
   factory1_.monitor_->setPressure(0.5);
   timer_cb_();
   EXPECT_FALSE(is_active);
   EXPECT_EQ(0, cb_count);
+  EXPECT_EQ(0, active_gauge.value());
+  EXPECT_EQ(50, pressure_gauge1.value());
 
   factory1_.monitor_->setPressure(0.95);
   timer_cb_();
   EXPECT_TRUE(is_active);
   EXPECT_EQ(1, cb_count);
+  EXPECT_EQ(1, active_gauge.value());
+  EXPECT_EQ(95, pressure_gauge1.value());
 
   // Callback should not be invoked if action active state has not changed
   factory1_.monitor_->setPressure(0.94);
   timer_cb_();
   EXPECT_TRUE(is_active);
   EXPECT_EQ(1, cb_count);
+  EXPECT_EQ(94, pressure_gauge1.value());
 
   // Different triggers firing but overall action remains active so no callback expected
   factory1_.monitor_->setPressure(0.5);
@@ -159,17 +175,52 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   timer_cb_();
   EXPECT_TRUE(is_active);
   EXPECT_EQ(1, cb_count);
+  EXPECT_EQ(50, pressure_gauge1.value());
+  EXPECT_EQ(90, pressure_gauge2.value());
 
   factory2_.monitor_->setPressure(0.4);
   timer_cb_();
   EXPECT_FALSE(is_active);
   EXPECT_EQ(2, cb_count);
+  EXPECT_EQ(0, active_gauge.value());
+  EXPECT_EQ(40, pressure_gauge2.value());
+}
 
-  factory1_.monitor_->setPressure(0.95);
+TEST_F(OverloadManagerImplTest, FailedUpdates) {
+  setDispatcherExpectation();
+  OverloadManagerImpl manager(dispatcher_, stats_, parseConfig(getConfig()));
+  manager.start();
+  Stats::Counter& failed_updates =
+      stats_.counter("overload.envoy.resource_monitors.fake_resource1.failed_updates");
+
   factory1_.monitor_->setError();
   timer_cb_();
-  EXPECT_FALSE(is_active);
-  EXPECT_EQ(2, cb_count);
+  EXPECT_EQ(1, failed_updates.value());
+  timer_cb_();
+  EXPECT_EQ(2, failed_updates.value());
+}
+
+TEST_F(OverloadManagerImplTest, SkippedUpdates) {
+  setDispatcherExpectation();
+
+  // Save the post callback instead of executing it.
+  Event::PostCb post_cb;
+  ON_CALL(dispatcher_, post(_)).WillByDefault(Invoke([&](Event::PostCb cb) { post_cb = cb; }));
+
+  OverloadManagerImpl manager(dispatcher_, stats_, parseConfig(getConfig()));
+  manager.start();
+  Stats::Counter& skipped_updates =
+      stats_.counter("overload.envoy.resource_monitors.fake_resource1.skipped_updates");
+
+  timer_cb_();
+  EXPECT_EQ(0, skipped_updates.value());
+  timer_cb_();
+  EXPECT_EQ(1, skipped_updates.value());
+  timer_cb_();
+  EXPECT_EQ(2, skipped_updates.value());
+  post_cb();
+  timer_cb_();
+  EXPECT_EQ(2, skipped_updates.value());
 }
 
 TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {
@@ -182,8 +233,8 @@ TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {
     }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, parseConfig(config)), EnvoyException,
-                          "Duplicate resource monitor .*");
+  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, stats_, parseConfig(config)),
+                          EnvoyException, "Duplicate resource monitor .*");
 }
 
 TEST_F(OverloadManagerImplTest, DuplicateOverloadAction) {
@@ -196,8 +247,8 @@ TEST_F(OverloadManagerImplTest, DuplicateOverloadAction) {
     }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, parseConfig(config)), EnvoyException,
-                          "Duplicate overload action .*");
+  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, stats_, parseConfig(config)),
+                          EnvoyException, "Duplicate overload action .*");
 }
 
 TEST_F(OverloadManagerImplTest, UnknownTrigger) {
@@ -213,8 +264,8 @@ TEST_F(OverloadManagerImplTest, UnknownTrigger) {
     }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, parseConfig(config)), EnvoyException,
-                          "Unknown trigger resource .*");
+  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, stats_, parseConfig(config)),
+                          EnvoyException, "Unknown trigger resource .*");
 }
 
 TEST_F(OverloadManagerImplTest, DuplicateTrigger) {
@@ -239,8 +290,8 @@ TEST_F(OverloadManagerImplTest, DuplicateTrigger) {
     }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, parseConfig(config)), EnvoyException,
-                          "Duplicate trigger .*");
+  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, stats_, parseConfig(config)),
+                          EnvoyException, "Duplicate trigger .*");
 }
 } // namespace
 } // namespace Server

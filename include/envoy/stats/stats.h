@@ -15,6 +15,7 @@
 
 namespace Envoy {
 namespace Event {
+
 class Dispatcher;
 }
 

@@ -26,6 +26,7 @@
 #include "common/http/default_server_string.h"
 #include "common/http/utility.h"
 #include "common/network/raw_buffer_socket.h"
+#include "common/stats/isolated_store_impl.h"
 #include "common/stats/stats_impl.h"
 
 #include "server/http/config_tracker_impl.h"

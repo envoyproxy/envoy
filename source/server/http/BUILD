@@ -52,6 +52,8 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/profiler:profiler_lib",
         "//source/common/router:config_lib",
+        "//source/common/stats:histogram_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/upstream:host_utility_lib",
         "//source/extensions/access_loggers/file:file_access_log_lib",

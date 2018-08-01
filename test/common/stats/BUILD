@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["stats_impl_test.cc"],
     deps = [
         "//source/common/common:hex_lib",
+        "//source/common/stats:heap_stat_data_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:logging_lib",

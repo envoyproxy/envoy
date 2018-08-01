@@ -54,6 +54,7 @@ envoy_cc_test(
     srcs = ["access_log_manager_impl_test.cc"],
     deps = [
         "//source/common/access_log:access_log_manager_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/api:api_mocks",
