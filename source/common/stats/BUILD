@@ -18,6 +18,7 @@ envoy_cc_library(
     ],
     deps = [
         ":stats_options_lib",
+        ":tag_extractor_lib",
         ":utility_lib",
         "//include/envoy/common:time_interface",
         "//include/envoy/server:options_interface",
@@ -40,6 +41,16 @@ envoy_cc_library(
     hdrs = ["stats_options_impl.h"],
     deps = [
         "//include/envoy/stats:stats_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "tag_extractor_lib",
+    srcs = ["tag_extractor_impl.cc"],
+    hdrs = ["tag_extractor_impl.h"],
+    deps = [
+        "//include/envoy/stats:stats_interface",
+        "//source/common/common:perf_annotation_lib",
     ],
 )
 
