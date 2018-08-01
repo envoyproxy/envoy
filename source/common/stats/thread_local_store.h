@@ -11,7 +11,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/stats/heap_stat_data.h"
-#include "common/stats/histogram.h"
+#include "common/stats/histogram_impl.h"
 #include "common/stats/stats_impl.h"
 #include "common/stats/utility.h"
 

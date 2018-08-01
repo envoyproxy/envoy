@@ -38,7 +38,7 @@
 #include "common/network/utility.h"
 #include "common/profiler/profiler.h"
 #include "common/router/config_impl.h"
-#include "common/stats/histogram.h"
+#include "common/stats/histogram_impl.h"
 #include "common/stats/stats_impl.h"
 #include "common/upstream/host_utility.h"
 

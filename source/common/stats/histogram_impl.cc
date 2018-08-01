@@ -1,4 +1,4 @@
-#include "common/stats/histogram.h"
+#include "common/stats/histogram_impl.h"
 
 #include <algorithm>
 #include <string>

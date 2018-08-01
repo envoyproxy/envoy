@@ -23,8 +23,8 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "histogram_lib",
-    srcs = ["histogram.cc"],
-    hdrs = ["histogram.h"],
+    srcs = ["histogram_impl.cc"],
+    hdrs = ["histogram_impl.h"],
     external_deps = [
         "abseil_optional",
         "libcircllhist",
