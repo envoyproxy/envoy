@@ -18,7 +18,7 @@ class TestStoredTypeTracking : public DynamicMetadata::DynamicMetadataObject {
     }
   }
 
-  int Access() const {
+  int access() const {
     if (access_count_) {
       ++*access_count_;
     }
@@ -35,7 +35,7 @@ class SimpleType : public DynamicMetadata::DynamicMetadataObject {
  public:
   SimpleType(int value) : value_(value) {}
 
-  int Access() const { return value_; }
+  int access() const { return value_; }
 
  private:
   int value_;
@@ -43,9 +43,9 @@ class SimpleType : public DynamicMetadata::DynamicMetadataObject {
 
 class DynamicMetadataImplTest : public testing::Test {
 public:
-  DynamicMetadataImplTest() { ResetDynamicMetadata(); }
+  DynamicMetadataImplTest() { resetDynamicMetadata(); }
 
-  void ResetDynamicMetadata() { dynamic_metadata_ = std::make_unique<DynamicMetadataImpl>(); }
+  void resetDynamicMetadata() { dynamic_metadata_ = std::make_unique<DynamicMetadataImpl>(); }
   DynamicMetadata& dynamic_metadata() { return *dynamic_metadata_; }
 
 private:
@@ -62,11 +62,11 @@ TEST_F(DynamicMetadataImplTest, Simple) {
   EXPECT_EQ(0u, access_count);
   EXPECT_EQ(0u, destruction_count);
 
-  EXPECT_EQ(5, dynamic_metadata().getData<TestStoredTypeTracking>("test_name").Access());
+  EXPECT_EQ(5, dynamic_metadata().getData<TestStoredTypeTracking>("test_name").access());
   EXPECT_EQ(1u, access_count);
   EXPECT_EQ(0u, destruction_count);
 
-  ResetDynamicMetadata();
+  resetDynamicMetadata();
   EXPECT_EQ(1u, access_count);
   EXPECT_EQ(1u, destruction_count);
 }
@@ -86,13 +86,13 @@ TEST_F(DynamicMetadataImplTest, SameTypes) {
   EXPECT_EQ(0u, access_count_2);
   EXPECT_EQ(0u, destruction_count);
 
-  EXPECT_EQ(ValueOne, dynamic_metadata().getData<TestStoredTypeTracking>("test_1").Access());
+  EXPECT_EQ(ValueOne, dynamic_metadata().getData<TestStoredTypeTracking>("test_1").access());
   EXPECT_EQ(1u, access_count_1);
   EXPECT_EQ(0u, access_count_2);
-  EXPECT_EQ(ValueTwo, dynamic_metadata().getData<TestStoredTypeTracking>("test_2").Access());
+  EXPECT_EQ(ValueTwo, dynamic_metadata().getData<TestStoredTypeTracking>("test_2").access());
   EXPECT_EQ(1u, access_count_1);
   EXPECT_EQ(1u, access_count_2);
-  ResetDynamicMetadata();
+  resetDynamicMetadata();
   EXPECT_EQ(2u, destruction_count);
 }
 
@@ -100,14 +100,14 @@ TEST_F(DynamicMetadataImplTest, SimpleType) {
   dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(1));
   dynamic_metadata().setData("test_2", std::make_unique<SimpleType>(2));
 
-  EXPECT_EQ(1, dynamic_metadata().getData<SimpleType>("test_1").Access());
-  EXPECT_EQ(2, dynamic_metadata().getData<SimpleType>("test_2").Access());
+  EXPECT_EQ(1, dynamic_metadata().getData<SimpleType>("test_1").access());
+  EXPECT_EQ(2, dynamic_metadata().getData<SimpleType>("test_2").access());
 }
 
 TEST_F(DynamicMetadataImplTest, NameConflict) {
   dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(1));
   EXPECT_THROW(dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(2)), EnvoyException);
-  EXPECT_EQ(1, dynamic_metadata().getData<SimpleType>("test_1").Access());
+  EXPECT_EQ(1, dynamic_metadata().getData<SimpleType>("test_1").access());
 }
 
 TEST_F(DynamicMetadataImplTest, NameConflictDifferentTypes) {
@@ -123,7 +123,7 @@ TEST_F(DynamicMetadataImplTest, UnknownName) {
 
 TEST_F(DynamicMetadataImplTest, WrongTypeGet) {
   dynamic_metadata().setData("test_name", std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr));
-  EXPECT_EQ(5, dynamic_metadata().getData<TestStoredTypeTracking>("test_name").Access());
+  EXPECT_EQ(5, dynamic_metadata().getData<TestStoredTypeTracking>("test_name").access());
   EXPECT_THROW(dynamic_metadata().getData<SimpleType>("test_name"), EnvoyException);
 }
 
