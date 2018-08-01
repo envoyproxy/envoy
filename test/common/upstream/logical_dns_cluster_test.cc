@@ -24,7 +24,6 @@
 
 using testing::Invoke;
 using testing::NiceMock;
-using testing::ReturnRef;
 using testing::_;
 
 namespace Envoy {
