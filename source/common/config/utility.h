@@ -91,7 +91,7 @@ public:
    * populate.
    */
   static void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
-                                       uint32_t request_timeout_ms, const std::string& api_type,
+                                       const std::string& api_type,
                                        envoy::api::v2::core::ApiConfigSource& api_config_source);
 
   /**

@@ -21,7 +21,7 @@ namespace Envoy {
 namespace Config {
 
 void Utility::translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
-                                       uint32_t request_timeout_ms, const std::string& api_type,
+                                       const std::string& api_type,
                                        envoy::api::v2::core::ApiConfigSource& api_config_source) {
   // TODO(junr03): document the option to chose an api type once we have created
   // stronger constraints around v2.
@@ -41,7 +41,7 @@ void Utility::translateApiConfigSource(const std::string& cluster, uint32_t refr
   api_config_source.mutable_refresh_delay()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
   api_config_source.mutable_request_timeout()->CopyFrom(
-      Protobuf::util::TimeUtil::MillisecondsToDuration(request_timeout_ms));
+      Protobuf::util::TimeUtil::MillisecondsToDuration(1000));
 }
 
 void Utility::checkCluster(const std::string& error_prefix, const std::string& cluster_name,
@@ -175,7 +175,6 @@ void Utility::translateEdsConfig(const Json::Object& json_config,
                                  envoy::api::v2::core::ConfigSource& eds_config) {
   translateApiConfigSource(json_config.getObject("cluster")->getString("name"),
                            json_config.getInteger("refresh_delay_ms", 30000),
-                           json_config.getInteger("request_timeout_ms", 1000),
                            json_config.getString("api_type", ApiType::get().RestLegacy),
                            *eds_config.mutable_api_config_source());
 }
@@ -184,7 +183,6 @@ void Utility::translateCdsConfig(const Json::Object& json_config,
                                  envoy::api::v2::core::ConfigSource& cds_config) {
   translateApiConfigSource(json_config.getObject("cluster")->getString("name"),
                            json_config.getInteger("refresh_delay_ms", 30000),
-                           json_config.getInteger("request_timeout_ms", 1000),
                            json_config.getString("api_type", ApiType::get().RestLegacy),
                            *cds_config.mutable_api_config_source());
 }
@@ -201,7 +199,6 @@ void Utility::translateRdsConfig(
 
   translateApiConfigSource(json_rds.getString("cluster"),
                            json_rds.getInteger("refresh_delay_ms", 30000),
-                           json_rds.getInteger("request_timeout_ms", 1000),
                            json_rds.getString("api_type", ApiType::get().RestLegacy),
                            *rds.mutable_config_source()->mutable_api_config_source());
 }
@@ -211,7 +208,6 @@ void Utility::translateLdsConfig(const Json::Object& json_lds,
   json_lds.validateSchema(Json::Schema::LDS_CONFIG_SCHEMA);
   translateApiConfigSource(json_lds.getString("cluster"),
                            json_lds.getInteger("refresh_delay_ms", 30000),
-                           json_lds.getInteger("request_timeout_ms", 1000),
                            json_lds.getString("api_type", ApiType::get().RestLegacy),
                            *lds_config.mutable_api_config_source());
 }

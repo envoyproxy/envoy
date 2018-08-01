@@ -30,9 +30,6 @@ message ClientSSLAuth {
   // 0-refresh_delay_ms milliseconds.
   google.protobuf.Duration refresh_delay = 3 [(gogoproto.stdduration) = true];
 
-  // Time in milliseconds for an authentication service request to timeout. Default is 1000 (1s).
-  google.protobuf.Duration request_timeout = 5 [(gogoproto.stdduration) = true];
-
   // An optional list of IP address and subnet masks that should be white
   // listed for access by the filter. If no list is provided, there is no
   // IP white list.

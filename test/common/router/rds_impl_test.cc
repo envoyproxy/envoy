@@ -86,8 +86,7 @@ public:
       "rds": {
         "cluster": "foo_cluster",
         "route_config_name": "foo_route_config",
-        "refresh_delay_ms": 1000,
-        "request_timeout_ms": 1000
+        "refresh_delay_ms": 1000
       },
       "codec_type": "auto",
       "stat_prefix": "foo",
@@ -359,8 +358,7 @@ public:
       {
         "cluster": "foo_cluster",
         "route_config_name": "foo_route_config",
-        "refresh_delay_ms": 1000,
-        "request_timeout_ms": 1000
+        "refresh_delay_ms": 1000
       }
       )EOF";
 
@@ -543,8 +541,7 @@ virtual_hosts:
     {
       "cluster": "bar_cluster",
       "route_config_name": "foo_route_config",
-      "refresh_delay_ms": 1000,
-      "request_timeout_ms": 1000
+      "refresh_delay_ms": 1000
     }
     )EOF";
 

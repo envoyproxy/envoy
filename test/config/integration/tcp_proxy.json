@@ -69,7 +69,6 @@
                 "auth_api_cluster": "ssl_auth",
                 "stat_prefix": "ssl_stats",
                 "refresh_delay_ms": 600000,
-                "request_timeout_ms": 1000,
                 "ip_white_list": [ "127.0.0.1/32", "::1/64"]
         }
       }

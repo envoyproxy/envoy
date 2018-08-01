@@ -29,8 +29,7 @@ public:
     const std::string config_json = R"EOF(
     {
       "cluster": "foo_cluster",
-      "refresh_delay_ms": 1000,
-      "request_timeout_ms": 1000
+      "refresh_delay_ms": 1000
     }
     )EOF";
 
@@ -139,8 +138,7 @@ TEST_F(LdsApiTest, UnknownCluster) {
   const std::string config_json = R"EOF(
   {
     "cluster": "foo_cluster",
-    "refresh_delay_ms": 1000,
-    "request_timeout_ms": 1000
+    "refresh_delay_ms": 1000
   }
   )EOF";
 
@@ -189,8 +187,7 @@ TEST_F(LdsApiTest, BadLocalInfo) {
   const std::string config_json = R"EOF(
   {
     "cluster": "foo_cluster",
-    "refresh_delay_ms": 1000,
-    "request_timeout_ms": 1000
+    "refresh_delay_ms": 1000
   }
   )EOF";
 
