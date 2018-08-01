@@ -116,7 +116,7 @@ public:
   NiceMock<Stats::MockStore> scope_;
   NiceMock<Server::MockInstance> server_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  RouteConfigProviderSharedPtr rds_;
+  RouteConfigProviderPtr rds_;
 };
 
 TEST_F(RdsImplTest, RdsAndStatic) {
@@ -375,8 +375,8 @@ public:
     EXPECT_CALL(*cluster.info_, addedViaApi());
     EXPECT_CALL(*cluster.info_, type());
     interval_timer_ = new Event::MockTimer(&factory_context_.dispatcher_);
-    provider_ = route_config_provider_manager_->getRdsRouteConfigProvider(rds_, factory_context_,
-                                                                          "foo_prefix.");
+    provider_ = route_config_provider_manager_->createRdsRouteConfigProvider(rds_, factory_context_,
+                                                                             "foo_prefix.");
   }
 
   RouteConfigProviderManagerImplTest() {
@@ -390,7 +390,7 @@ public:
   Stats::StatsOptionsImpl stats_options_;
   envoy::config::filter::network::http_connection_manager::v2::Rds rds_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  RouteConfigProviderSharedPtr provider_;
+  RouteConfigProviderPtr provider_;
 };
 
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
@@ -429,8 +429,8 @@ virtual_hosts:
   EXPECT_CALL(factory_context_, systemTimeSource()).WillRepeatedly(ReturnRef(system_time_source_));
 
   // Only static route.
-  RouteConfigProviderSharedPtr static_config =
-      route_config_provider_manager_->getStaticRouteConfigProvider(
+  RouteConfigProviderPtr static_config =
+      route_config_provider_manager_->createStaticRouteConfigProvider(
           parseRouteConfigurationFromV2Yaml(config_yaml), factory_context_);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump2 =
@@ -508,15 +508,34 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
   setup();
 
-  // Because this get has the same cluster and route_config_name, the provider returned is just a
-  // shared_ptr to the same provider as the one above.
-  RouteConfigProviderSharedPtr provider2 =
-      route_config_provider_manager_->getRdsRouteConfigProvider(rds_, factory_context_,
-                                                                "foo_prefix");
+  EXPECT_FALSE(provider_->configInfo().has_value());
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::RouteConfiguration> route_configs;
+  route_configs.Add()->MergeFrom(parseRouteConfigurationFromV2Yaml(R"EOF(
+name: foo_route_config
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+)EOF"));
+
+  RdsRouteConfigSubscription& subscription =
+      dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_).subscription();
+
+  subscription.onConfigUpdate(route_configs, "1");
+
+  RouteConfigProviderPtr provider2 = route_config_provider_manager_->createRdsRouteConfigProvider(
+      rds_, factory_context_, "foo_prefix");
+
+  // provider2 should have route config immediately after create
+  EXPECT_TRUE(provider2->configInfo().has_value());
+
   // So this means that both provider have same subscription.
-  EXPECT_NE(provider_, provider2);
   EXPECT_EQ(&dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_).subscription(),
             &dynamic_cast<RdsRouteConfigProviderImpl&>(*provider2).subscription());
+  EXPECT_EQ(&provider_->configInfo().value().config_, &provider2->configInfo().value().config_);
 
   std::string config_json2 = R"EOF(
     {
@@ -538,32 +557,32 @@ TEST_F(RouteConfigProviderManagerImplTest, Basic) {
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type());
   new Event::MockTimer(&factory_context_.dispatcher_);
-  RouteConfigProviderSharedPtr provider3 =
-      route_config_provider_manager_->getRdsRouteConfigProvider(rds2, factory_context_,
-                                                                "foo_prefix");
+  RouteConfigProviderPtr provider3 = route_config_provider_manager_->createRdsRouteConfigProvider(
+      rds2, factory_context_, "foo_prefix");
   EXPECT_NE(provider3, provider_);
-  EXPECT_EQ(1UL, provider3.use_count());
+  dynamic_cast<RdsRouteConfigProviderImpl&>(*provider3)
+      .subscription()
+      .onConfigUpdate(route_configs, "provider3");
 
-  std::vector<RouteConfigProviderSharedPtr> configured_providers =
-      route_config_provider_manager_->getRdsRouteConfigProviders();
-  EXPECT_EQ(2UL, configured_providers.size());
-  EXPECT_EQ(2UL, provider3.use_count());
+  EXPECT_EQ(2UL,
+            route_config_provider_manager_->dumpRouteConfigs()->dynamic_route_configs().size());
 
   provider_.reset();
   provider2.reset();
-  configured_providers.clear();
 
   // All shared_ptrs to the provider pointed at by provider1, and provider2 have been deleted, so
   // now we should only have the provider pointed at by provider3.
-  configured_providers = route_config_provider_manager_->getRdsRouteConfigProviders();
-  EXPECT_EQ(1UL, configured_providers.size());
-  EXPECT_EQ(provider3, configured_providers.front());
+  auto dynamic_route_configs =
+      route_config_provider_manager_->dumpRouteConfigs()->dynamic_route_configs();
+  EXPECT_EQ(1UL, dynamic_route_configs.size());
+
+  // Make sure the left one is provider3
+  EXPECT_EQ("provider3", dynamic_route_configs[0].version_info());
 
   provider3.reset();
-  configured_providers.clear();
 
-  configured_providers = route_config_provider_manager_->getRdsRouteConfigProviders();
-  EXPECT_EQ(0UL, configured_providers.size());
+  EXPECT_EQ(0UL,
+            route_config_provider_manager_->dumpRouteConfigs()->dynamic_route_configs().size());
 }
 
 // Negative test for protoc-gen-validate constraints.
