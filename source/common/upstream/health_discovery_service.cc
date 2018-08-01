@@ -13,23 +13,23 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
                          ClusterInfoFactory& info_factory,
                          AccessLog::AccessLogManager& access_log_manager)
     : stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_delegate."))},
-      async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")),
-      runtime_(runtime), store_stats(stats), ssl_context_manager_(ssl_context_manager),
-      secret_manager_(secret_manager), random_(random), dispatcher_(dispatcher),
-      info_factory_(info_factory), access_log_manager_(access_log_manager) {
+      async_client_(std::move(async_client)), dispatcher_(dispatcher), runtime_(runtime),
+      store_stats(stats), ssl_context_manager_(ssl_context_manager),
+      secret_manager_(secret_manager), random_(random), info_factory_(info_factory),
+      access_log_manager_(access_log_manager) {
   health_check_request_.mutable_node()->MergeFrom(node);
   hds_retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
   establishNewStream();
 }
 
-void HdsDelegate::setRetryTimer() {
+void HdsDelegate::setHdsRetryTimer() {
   hds_retry_timer_->enableTimer(std::chrono::milliseconds(RetryDelayMilliseconds));
 }
 
-void HdsDelegate::setServerResponseTimer() {
+void HdsDelegate::setHdsStreamResponseTimer() {
   hds_stream_response_timer_->enableTimer(std::chrono::milliseconds(server_response_ms_));
 }
 
@@ -55,7 +55,7 @@ void HdsDelegate::handleFailure() {
   ENVOY_LOG(warn, "HdsDelegate stream/connection failure, will retry in {} ms.",
             RetryDelayMilliseconds);
   stats_.errors_.inc();
-  setRetryTimer();
+  setHdsRetryTimer();
 }
 
 // TODO(lilika): Add support for the same endpoint in different clusters/ports
@@ -80,7 +80,7 @@ HdsDelegate::sendResponse() {
   ENVOY_LOG(debug, "Sending EndpointHealthResponse to server {}", response.DebugString());
   stream_->sendMessage(response, false);
   stats_.responses_.inc();
-  setServerResponseTimer();
+  setHdsStreamResponseTimer();
   return response;
 }
 
@@ -144,7 +144,7 @@ void HdsDelegate::onReceiveMessage(
 
   // Set response
   server_response_ms_ = PROTOBUF_GET_MS_REQUIRED(*message, interval);
-  setServerResponseTimer();
+  setHdsStreamResponseTimer();
 }
 
 void HdsDelegate::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
@@ -230,6 +230,12 @@ void HdsCluster::initialize(std::function<void()> callback) {
 
 void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
+
+void HdsDelegateFriend::processPrivateMessage(
+    std::shared_ptr<HdsDelegate> hd,
+    std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
+  hd->processMessage(std::move(message));
 }
 
 } // namespace Upstream
