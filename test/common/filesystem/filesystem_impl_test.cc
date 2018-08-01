@@ -1,13 +1,14 @@
 #include <chrono>
 #include <string>
 
+#include "envoy/stats/stats.h"
+
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/filesystem/filesystem_impl.h"
 #include "common/stats/isolated_store_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"

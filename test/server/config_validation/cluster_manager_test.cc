@@ -1,8 +1,8 @@
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/ssl/context_manager_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "server/config_validation/cluster_manager.h"
 

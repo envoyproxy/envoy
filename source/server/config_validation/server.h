@@ -13,7 +13,6 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
-#include "common/stats/stats_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "server/config_validation/admin.h"

@@ -39,7 +39,6 @@
 #include "common/profiler/profiler.h"
 #include "common/router/config_impl.h"
 #include "common/stats/histogram_impl.h"
-#include "common/stats/stats_impl.h"
 #include "common/upstream/host_utility.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
