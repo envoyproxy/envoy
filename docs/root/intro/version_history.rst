@@ -55,6 +55,9 @@ Version history
 * thrift_proxy: introduced thrift routing, moved configuration to correct location
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
   selecting a host from a subset.
+* upstream: require opt-in to use the :ref:`x-envoy-orignal-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` header
+  for overriding destination address when using the :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
+  load balancing policy.
 
 1.7.0
 ===============
