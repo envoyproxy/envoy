@@ -82,7 +82,9 @@ public:
     grpc_stream_->sendMessage(request_msg, end_stream);
 
     helloworld::HelloRequest received_msg;
-    fake_stream_->waitForGrpcMessage(dispatcher_helper_.dispatcher_, received_msg);
+    AssertionResult result =
+        fake_stream_->waitForGrpcMessage(dispatcher_helper_.dispatcher_, received_msg);
+    RELEASE_ASSERT(result, result.message());
     EXPECT_THAT(request_msg, ProtoEq(received_msg));
   }
 
@@ -162,7 +164,8 @@ public:
 
   void closeStream() {
     grpc_stream_->closeStream();
-    fake_stream_->waitForEndStream(dispatcher_helper_.dispatcher_);
+    AssertionResult result = fake_stream_->waitForEndStream(dispatcher_helper_.dispatcher_);
+    RELEASE_ASSERT(result, result.message());
   }
 
   DispatcherHelper& dispatcher_helper_;
@@ -224,8 +227,10 @@ public:
 
   void TearDown() override {
     if (fake_connection_) {
-      fake_connection_->close();
-      fake_connection_->waitForDisconnect();
+      AssertionResult result = fake_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
       fake_connection_.reset();
     }
   }
@@ -291,7 +296,8 @@ public:
   }
 
   void expectInitialHeaders(FakeStream& fake_stream, const TestMetadata& initial_metadata) {
-    fake_stream.waitForHeadersComplete();
+    AssertionResult result = fake_stream.waitForHeadersComplete();
+    RELEASE_ASSERT(result, result.message());
     Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
     EXPECT_EQ("POST", stream_headers.get_(":method"));
     EXPECT_EQ("/helloworld.Greeter/SayHello", stream_headers.get_(":path"));
@@ -333,9 +339,12 @@ public:
     EXPECT_NE(request->grpc_request_, nullptr);
 
     if (!fake_connection_) {
-      fake_connection_ = fake_upstream_->waitForHttpConnection(dispatcher_);
+      AssertionResult result = fake_upstream_->waitForHttpConnection(dispatcher_, fake_connection_);
+      RELEASE_ASSERT(result, result.message());
     }
-    fake_streams_.push_back(fake_connection_->waitForNewStream(dispatcher_));
+    fake_streams_.emplace_back();
+    AssertionResult result = fake_connection_->waitForNewStream(dispatcher_, fake_streams_.back());
+    RELEASE_ASSERT(result, result.message());
     auto& fake_stream = *fake_streams_.back();
     request->fake_stream_ = &fake_stream;
 
@@ -343,7 +352,8 @@ public:
     expectExtraHeaders(fake_stream);
 
     helloworld::HelloRequest received_msg;
-    fake_stream.waitForGrpcMessage(dispatcher_, received_msg);
+    result = fake_stream.waitForGrpcMessage(dispatcher_, received_msg);
+    RELEASE_ASSERT(result, result.message());
     EXPECT_THAT(request_msg, ProtoEq(received_msg));
 
     return request;
@@ -362,9 +372,12 @@ public:
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
     if (!fake_connection_) {
-      fake_connection_ = fake_upstream_->waitForHttpConnection(dispatcher_);
+      AssertionResult result = fake_upstream_->waitForHttpConnection(dispatcher_, fake_connection_);
+      RELEASE_ASSERT(result, result.message());
     }
-    fake_streams_.push_back(fake_connection_->waitForNewStream(dispatcher_));
+    fake_streams_.emplace_back();
+    AssertionResult result = fake_connection_->waitForNewStream(dispatcher_, fake_streams_.back());
+    RELEASE_ASSERT(result, result.message());
     auto& fake_stream = *fake_streams_.back();
     stream->fake_stream_ = &fake_stream;
 

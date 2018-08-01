@@ -1,7 +1,7 @@
 # Security Release Process
 
 Envoy is a large growing community of volunteers, users, and vendors. The Envoy community has
-adopted this security disclosures and response policy to ensure we responsibly handle critical
+adopted this security disclosure and response policy to ensure we responsibly handle critical
 issues.
 
 ## Product Security Team (PST)
@@ -73,7 +73,7 @@ These steps should be completed within the 1-7 days of Disclosure.
 - The Fix Lead and the Fix Team will create a
   [CVSS](https://www.first.org/cvss/specification-document) using the [CVSS
   Calculator](https://www.first.org/cvss/calculator/3.0). The Fix Lead makes the final call on the
-  calculated CVSS; it is better to move quickly than make the CVSS perfect.
+  calculated CVSS; it is better to move quickly than making the CVSS perfect.
 - The Fix Team will notify the Fix Lead that work on the fix branch is complete once there are LGTMs
   on all commits in the private repo from one or more maintainers.
 
@@ -160,7 +160,7 @@ said issue, they must agree to the same terms and only find out information on a
 
 In the unfortunate event you share the information beyond what is allowed by this policy, you _must_
 urgently inform the envoy-security@googlegroups.com mailing list of exactly what information leaked
-and to whom. A retrospective will take place after the leak so we can assess how to not make the
+and to whom. A retrospective will take place after the leak so we can assess how to prevent making the
 same mistake in the future.
 
 If you continue to leak information and break the policy outlined here, you will be removed from the

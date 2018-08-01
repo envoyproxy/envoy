@@ -467,7 +467,7 @@ public:
    * @return CounterSharedPtr a counter, or nullptr if allocation failed, in which case
    *     tag_extracted_name and tags are not moved.
    */
-  virtual CounterSharedPtr makeCounter(const std::string& name, std::string&& tag_extracted_name,
+  virtual CounterSharedPtr makeCounter(absl::string_view name, std::string&& tag_extracted_name,
                                        std::vector<Tag>&& tags) PURE;
 
   /**
@@ -477,8 +477,13 @@ public:
    * @return GaugeSharedPtr a gauge, or nullptr if allocation failed, in which case
    *     tag_extracted_name and tags are not moved.
    */
-  virtual GaugeSharedPtr makeGauge(const std::string& name, std::string&& tag_extracted_name,
+  virtual GaugeSharedPtr makeGauge(absl::string_view name, std::string&& tag_extracted_name,
                                    std::vector<Tag>&& tags) PURE;
+
+  /**
+   * Determines whether this stats allocator requires bounded stat-name size.
+   */
+  virtual bool requiresBoundedStatNameSize() const PURE;
 
   // TODO(jmarantz): create a parallel mechanism to instantiate histograms. At
   // the moment, histograms don't fit the same pattern of counters and gaugaes

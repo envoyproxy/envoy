@@ -1,10 +1,12 @@
 #include "common/api/os_sys_calls_impl.h"
+#include "common/common/hex.h"
 #include "common/stats/stats_impl.h"
 
 #include "server/hot_restart_impl.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/strings/match.h"
@@ -88,6 +90,44 @@ TEST_F(HotRestartImplTest, versionString) {
   }
 }
 
+// Check consistency of internal raw stat representation by comparing hash of
+// memory contents against a previously recorded value.
+TEST_F(HotRestartImplTest, Consistency) {
+  setup();
+
+  // Generate a stat, encode it to hex, and take the hash of that hex string. We
+  // expect the hash to vary only when the internal representation of a stat has
+  // been intentionally changed, in which case SharedMemory::VERSION should be
+  // incremented as well.
+  const uint64_t expected_hash = 1874506077228772558;
+  const uint64_t max_name_length = stats_options_.maxNameLength();
+
+  const std::string name_1(max_name_length, 'A');
+  Stats::RawStatData* stat_1 = hot_restart_->alloc(name_1);
+  const uint64_t stat_size = sizeof(Stats::RawStatData) + max_name_length;
+  const std::string stat_hex_dump_1 = Hex::encode(reinterpret_cast<uint8_t*>(stat_1), stat_size);
+  EXPECT_EQ(HashUtil::xxHash64(stat_hex_dump_1), expected_hash);
+  EXPECT_EQ(name_1, stat_1->key());
+  hot_restart_->free(*stat_1);
+}
+
+TEST_F(HotRestartImplTest, RawAlloc) {
+  setup();
+
+  Stats::RawStatData* stat_1 = hot_restart_->alloc("ref_name");
+  ASSERT_NE(stat_1, nullptr);
+  Stats::RawStatData* stat_2 = hot_restart_->alloc("ref_name");
+  ASSERT_NE(stat_2, nullptr);
+  Stats::RawStatData* stat_3 = hot_restart_->alloc("not_ref_name");
+  ASSERT_NE(stat_3, nullptr);
+  EXPECT_EQ(stat_1, stat_2);
+  EXPECT_NE(stat_1, stat_3);
+  EXPECT_NE(stat_2, stat_3);
+  hot_restart_->free(*stat_1);
+  hot_restart_->free(*stat_2);
+  hot_restart_->free(*stat_3);
+}
+
 TEST_F(HotRestartImplTest, crossAlloc) {
   setup();
 
@@ -112,16 +152,6 @@ TEST_F(HotRestartImplTest, crossAlloc) {
   EXPECT_EQ(stat1, stat1_prime);
   EXPECT_EQ(stat3, stat3_prime);
   EXPECT_EQ(stat5, stat5_prime);
-}
-
-TEST_F(HotRestartImplTest, truncateKey) {
-  setup();
-
-  std::string key1(options_.statsOptions().maxNameLength(), 'a');
-  Stats::RawStatData* stat1 = hot_restart_->alloc(key1);
-  std::string key2 = key1 + "a";
-  Stats::RawStatData* stat2 = hot_restart_->alloc(key2);
-  EXPECT_EQ(stat1, stat2);
 }
 
 TEST_F(HotRestartImplTest, allocFail) {

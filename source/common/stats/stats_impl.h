@@ -204,8 +204,7 @@ struct RawStatData {
 
   /**
    * Returns the size of this struct, accounting for the length of name_
-   * and padding for alignment. Required for the HeapRawStatDataAllocator, which does not truncate
-   * at a maximum stat name length.
+   * and padding for alignment.
    */
   static uint64_t structSize(uint64_t name_size);
 
@@ -221,14 +220,7 @@ struct RawStatData {
    * does not expect stat name truncation. We pass in the number of bytes allocated in order to
    * assert the copy is safe inline.
    */
-  void checkAndInit(absl::string_view key, uint64_t num_bytes_allocated);
-
-  /**
-   * Initializes this object to have the specified key,
-   * a refcount of 1, and all other values zero. Required by the BlockMemoryHashSet. StatsOptions is
-   * used to truncate key inline, if necessary.
-   */
-  void truncateAndInit(absl::string_view key, const StatsOptions& stats_options);
+  void initialize(absl::string_view key, const StatsOptions& stats_options);
 
   /**
    * Returns a hash of the key. This is required by BlockMemoryHashSet.
@@ -251,9 +243,6 @@ struct RawStatData {
   std::atomic<uint16_t> ref_count_;
   std::atomic<uint32_t> unused_;
   char name_[];
-
-private:
-  void initialize(absl::string_view key, uint64_t num_bytes_allocated);
 };
 
 /**
@@ -283,33 +272,48 @@ private:
   const std::vector<Tag> tags_;
 };
 
-/**
- * Implements a StatDataAllocator that uses RawStatData -- capable of deploying
- * in a shared memory block without internal pointers.
- */
-class RawStatDataAllocator : public StatDataAllocator {
+// Partially implements a StatDataAllocator, leaving alloc & free for subclasses.
+// We templatize on StatData rather than defining a virtual base StatData class
+// for performance reasons; stat increment is on the hot path.
+//
+// The two production derivations cover using a fixed block of shared-memory for
+// hot restart stat continuity, and heap allocation for more efficient RAM usage
+// for when hot-restart is not required.
+//
+// Also note that RawStatData needs to live in a shared memory block, and it's
+// possible, but not obvious, that a vptr would be usable across processes. In
+// any case, RawStatData is allocated from a shared-memory block rather than via
+// new, so the usual C++ compiler assistance for setting up vptrs will not be
+// available. This could be resolved with placed new, or another nesting level.
+template <class StatData> class StatDataAllocatorImpl : public StatDataAllocator {
 public:
   // StatDataAllocator
-  CounterSharedPtr makeCounter(const std::string& name, std::string&& tag_extracted_name,
+  CounterSharedPtr makeCounter(absl::string_view name, std::string&& tag_extracted_name,
                                std::vector<Tag>&& tags) override;
-  GaugeSharedPtr makeGauge(const std::string& name, std::string&& tag_extracted_name,
+  GaugeSharedPtr makeGauge(absl::string_view name, std::string&& tag_extracted_name,
                            std::vector<Tag>&& tags) override;
 
   /**
    * @param name the full name of the stat.
-   * @return RawStatData* a raw stat data block for a given stat name or nullptr if there is no
-   *         more memory available for stats. The allocator should return a reference counted
-   *         data location by name if one already exists with the same name. This is used for
-   *         intra-process scope swapping as well as inter-process hot restart.
+   * @return StatData* a data block for a given stat name or nullptr if there is no more memory
+   *         available for stats. The allocator should return a reference counted data location
+   *         by name if one already exists with the same name. This is used for intra-process
+   *         scope swapping as well as inter-process hot restart.
    */
-  virtual RawStatData* alloc(const std::string& name) PURE;
+  virtual StatData* alloc(absl::string_view name) PURE;
 
   /**
    * Free a raw stat data block. The allocator should handle reference counting and only truly
    * free the block if it is no longer needed.
    * @param data the data returned by alloc().
    */
-  virtual void free(RawStatData& data) PURE;
+  virtual void free(StatData& data) PURE;
+};
+
+class RawStatDataAllocator : public StatDataAllocatorImpl<RawStatData> {
+public:
+  // StatDataAllocator
+  bool requiresBoundedStatNameSize() const override { return true; }
 };
 
 /**
@@ -373,30 +377,58 @@ private:
 };
 
 /**
- * Implementation of RawStatDataAllocator that uses an unordered set to store
- * RawStatData pointers.
+ * This structure is an alternate backing store for both CounterImpl and GaugeImpl. It is designed
+ * so that it can be allocated efficiently from the heap on demand.
  */
-class HeapRawStatDataAllocator : public RawStatDataAllocator {
+struct HeapStatData {
+  explicit HeapStatData(absl::string_view key);
+
+  /**
+   * @returns absl::string_view the name as a string_view.
+   */
+  absl::string_view key() const { return name_; }
+
+  std::atomic<uint64_t> value_{0};
+  std::atomic<uint64_t> pending_increment_{0};
+  std::atomic<uint16_t> flags_{0};
+  std::atomic<uint16_t> ref_count_{1};
+  std::string name_;
+};
+
+/**
+ * Implementation of StatDataAllocator using a pure heap-based strategy, so that
+ * Envoy implementations that do not require hot-restart can use less memory.
+ */
+class HeapStatDataAllocator : public StatDataAllocatorImpl<HeapStatData> {
 public:
-  // RawStatDataAllocator
-  ~HeapRawStatDataAllocator() { ASSERT(stats_.empty()); }
-  RawStatData* alloc(const std::string& name) override;
-  void free(RawStatData& data) override;
+  HeapStatDataAllocator() {}
+  ~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
+
+  // StatDataAllocatorImpl
+  HeapStatData* alloc(absl::string_view name) override;
+  void free(HeapStatData& data) override;
+
+  // StatDataAllocator
+  bool requiresBoundedStatNameSize() const override { return false; }
 
 private:
-  struct RawStatDataHash_ {
-    size_t operator()(const RawStatData* a) const { return HashUtil::xxHash64(a->key()); }
+  struct HeapStatHash_ {
+    size_t operator()(const HeapStatData* a) const { return HashUtil::xxHash64(a->key()); }
   };
-  struct RawStatDataCompare_ {
-    bool operator()(const RawStatData* a, const RawStatData* b) const {
+  struct HeapStatCompare_ {
+    bool operator()(const HeapStatData* a, const HeapStatData* b) const {
       return (a->key() == b->key());
     }
   };
-  typedef std::unordered_set<RawStatData*, RawStatDataHash_, RawStatDataCompare_> StringRawDataSet;
 
-  // An unordered set of RawStatData pointers which keys off the key()
+  // TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/3927 and
+  //  https://github.com/envoyproxy/envoy/issues/3585, which can help reorganize
+  // the heap stats using a ref-counted symbol table to compress the stat strings.
+  typedef std::unordered_set<HeapStatData*, HeapStatHash_, HeapStatCompare_> StatSet;
+
+  // An unordered set of HeapStatData pointers which keys off the key()
   // field in each object. This necessitates a custom comparator and hasher.
-  StringRawDataSet stats_ GUARDED_BY(mutex_);
+  StatSet stats_ GUARDED_BY(mutex_);
   // A mutex is needed here to protect the stats_ object from both alloc() and free() operations.
   // Although alloc() operations are called under existing locking, free() operations are made from
   // the destructors of the individual stat objects, which are not protected by locks.
@@ -500,11 +532,11 @@ private:
     const std::string prefix_;
   };
 
-  HeapRawStatDataAllocator alloc_;
+  HeapStatDataAllocator alloc_;
   IsolatedStatsCache<Counter> counters_;
   IsolatedStatsCache<Gauge> gauges_;
   IsolatedStatsCache<Histogram> histograms_;
-  const Stats::StatsOptionsImpl stats_options_;
+  const StatsOptionsImpl stats_options_;
 };
 
 } // namespace Stats

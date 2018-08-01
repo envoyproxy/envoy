@@ -230,7 +230,7 @@ private:
 
     template <class StatType>
     using MakeStatFn =
-        std::function<std::shared_ptr<StatType>(StatDataAllocator&, const std::string& name,
+        std::function<std::shared_ptr<StatType>(StatDataAllocator&, absl::string_view name,
                                                 std::string&& tag_extracted_name,
                                                 std::vector<Tag>&& tags)>;
 
@@ -274,6 +274,7 @@ private:
   void clearScopeFromCaches(uint64_t scope_id);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb mergeCb);
+  absl::string_view truncateStatNameIfNeeded(absl::string_view name);
 
   const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;
@@ -287,7 +288,7 @@ private:
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
-  HeapRawStatDataAllocator heap_allocator_;
+  HeapStatDataAllocator heap_allocator_;
   SourceImpl source_;
 };
 

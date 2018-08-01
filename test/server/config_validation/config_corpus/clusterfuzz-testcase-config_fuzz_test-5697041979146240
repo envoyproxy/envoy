@@ -1,0 +1,231 @@
+static_resources {
+  clusters {
+    name: "ineasrh_stsB"
+    eds_cluster_config {
+      service_name: "\177"
+    }
+    connect_timeout {
+      nanos: 249999905
+    }
+    dns_refresh_rate {
+      nanos: 249999905
+    }
+    dns_lookup_family: V4_ONLY
+    load_assignment {
+      cluster_name: "GGG"
+      endpoints {
+        priority: 538970624
+      }
+      endpoints {
+        lb_endpoints {
+          load_balancing_weight {
+            value: 2
+          }
+        }
+        priority: 11264
+      }
+      endpoints {
+        priority: 246
+      }
+      endpoints {
+        priority: 538970624
+      }
+      endpoints {
+        priority: 2
+      }
+      endpoints {
+        priority: 538970624
+      }
+      endpoints {
+        priority: 2105354
+      }
+      endpoints {
+        lb_endpoints {
+          load_balancing_weight {
+            value: 2
+          }
+        }
+        priority: 11264
+      }
+      endpoints {
+        priority: 671091188
+      }
+      endpoints {
+        priority: 2105354
+      }
+      endpoints {
+        priority: 11264
+      }
+      endpoints {
+        lb_endpoints {
+        }
+        load_balancing_weight {
+          value: 2
+        }
+        priority: 11264
+      }
+      endpoints {
+        priority: 538970624
+      }
+      endpoints {
+        priority: 538970624
+      }
+      endpoints {
+        priority: 538970624
+      }
+      endpoints {
+        priority: 11264
+      }
+      endpoints {
+        priority: 2105354
+      }
+      endpoints {
+        priority: 671091190
+      }
+      endpoints {
+        priority: 671151625
+      }
+      endpoints {
+        priority: 671151625
+      }
+      endpoints {
+        lb_endpoints {
+          load_balancing_weight {
+            value: 2
+          }
+        }
+        priority: 11264
+      }
+      endpoints {
+        lb_endpoints {
+          load_balancing_weight {
+            value: 2
+          }
+        }
+        priority: 11264
+      }
+      endpoints {
+        priority: 671091190
+      }
+      endpoints {
+        priority: 538976256
+      }
+      endpoints {
+        priority: 671091188
+      }
+      endpoints {
+        priority: 671091188
+      }
+      endpoints {
+        priority: 11264
+      }
+      endpoints {
+        lb_endpoints {
+          health_status: DRAINING
+          load_balancing_weight {
+            value: 2
+          }
+        }
+        priority: 11264
+      }
+      endpoints {
+        lb_endpoints {
+          load_balancing_weight {
+            value: 2
+          }
+        }
+        priority: 11264
+      }
+      endpoints {
+        priority: 11264
+      }
+      endpoints {
+        priority: 538970624
+      }
+      endpoints {
+        lb_endpoints {
+          load_balancing_weight {
+            value: 2
+          }
+        }
+        priority: 11264
+      }
+      endpoints {
+        priority: 11264
+      }
+      endpoints {
+        lb_endpoints {
+          load_balancing_weight {
+            value: 2
+          }
+        }
+        priority: 738208768
+      }
+      endpoints {
+        priority: 671151625
+      }
+      endpoints {
+        priority: 671091188
+      }
+      endpoints {
+        priority: 30
+      }
+      endpoints {
+        priority: 671151625
+      }
+      endpoints {
+        lb_endpoints {
+        }
+        load_balancing_weight {
+          value: 64
+        }
+        priority: 2
+      }
+      endpoints {
+        lb_endpoints {
+          health_status: DRAINING
+        }
+        priority: 11264
+      }
+      endpoints {
+        lb_endpoints {
+        }
+        priority: 11264
+      }
+      endpoints {
+        locality {
+          zone: "\177\r"
+        }
+        priority: 538970624
+      }
+      endpoints {
+        priority: 671091190
+      }
+      endpoints {
+        priority: 244
+      }
+      endpoints {
+        priority: 538970624
+      }
+      endpoints {
+        locality {
+          region: "~"
+        }
+        lb_endpoints {
+        }
+        priority: 11264
+      }
+      endpoints {
+        priority: 2
+      }
+    }
+  }
+}
+admin {
+  access_log_path: "/tmp/admin_access.log"
+  address {
+    pipe {
+      path: "*"
+    }
+  }
+}

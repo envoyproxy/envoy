@@ -97,12 +97,12 @@ void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
                                                           {":authority", "host"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
-  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send part of the request body and ensure it is received upstream.
   codec_client_->sendData(*request_encoder_, bytes, false);
-  upstream_request_->waitForData(*dispatcher_, bytes);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, bytes));
 
   // Start sending the response and ensure it is received downstream.
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
@@ -111,7 +111,7 @@ void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
 
   // Finish the request.
   codec_client_->sendTrailers(*request_encoder_, Http::TestHeaderMapImpl{{"trailer", "foo"}});
-  upstream_request_->waitForEndStream(*dispatcher_);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Finish the response.
   upstream_request_->encodeTrailers(Http::TestHeaderMapImpl{{"trailer", "bar"}});
@@ -138,12 +138,12 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
                                                           {":authority", "host"}});
   auto response = std::move(encoder_decoder.second);
   request_encoder_ = &encoder_decoder.first;
-  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
 
   // Send some request data.
   codec_client_->sendData(*request_encoder_, 1024, false);
-  upstream_request_->waitForData(*dispatcher_, 1024);
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, 1024));
 
   // Start sending the response.
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
@@ -152,7 +152,7 @@ TEST_P(Http2UpstreamIntegrationTest, BidirectionalStreamingReset) {
 
   // Finish sending therequest.
   codec_client_->sendTrailers(*request_encoder_, Http::TestHeaderMapImpl{{"trailer", "foo"}});
-  upstream_request_->waitForEndStream(*dispatcher_);
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   // Reset the stream.
   upstream_request_->encodeResetStream();
@@ -177,8 +177,8 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
                                                           {":authority", "host"}});
   Http::StreamEncoder* encoder1 = &encoder_decoder1.first;
   auto response1 = std::move(encoder_decoder1.second);
-  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request1 = fake_upstream_connection_->waitForNewStream(*dispatcher_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request1));
 
   // Start request 2
   auto encoder_decoder2 =
@@ -188,15 +188,17 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
                                                           {":authority", "host"}});
   Http::StreamEncoder* encoder2 = &encoder_decoder2.first;
   auto response2 = std::move(encoder_decoder2.second);
-  upstream_request2 = fake_upstream_connection_->waitForNewStream(*dispatcher_);
+  // DO NOT SUBMIT replace other ASSERT_TRUE with ASSERT (?)
+  // (in places like this, ASSERT_TRUE is probably fine)
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));
 
   // Finish request 1
   codec_client_->sendData(*encoder1, request1_bytes, true);
-  upstream_request1->waitForEndStream(*dispatcher_);
+  ASSERT_TRUE(upstream_request1->waitForEndStream(*dispatcher_));
 
   // Finish request 2
   codec_client_->sendData(*encoder2, request2_bytes, true);
-  upstream_request2->waitForEndStream(*dispatcher_);
+  ASSERT_TRUE(upstream_request2->waitForEndStream(*dispatcher_));
 
   // Respond to request 2
   upstream_request2->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
@@ -302,20 +304,23 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
       codec_client_->sendData(*encoders[i], 0, true);
     }
   }
-  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   for (uint32_t i = 0; i < num_requests; ++i) {
-    upstream_requests.push_back(fake_upstream_connection_->waitForNewStream(*dispatcher_));
+    FakeStreamPtr stream;
+    upstream_requests.emplace_back();
+    ASSERT_TRUE(
+        fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_requests.back()));
   }
   for (uint32_t i = 0; i < num_requests; ++i) {
     if (i % 15 != 0) {
-      upstream_requests[i]->waitForEndStream(*dispatcher_);
+      ASSERT_TRUE(upstream_requests[i]->waitForEndStream(*dispatcher_));
       upstream_requests[i]->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
       upstream_requests[i]->encodeData(100, false);
     }
   }
   // Close the connection.
-  fake_upstream_connection_->close();
-  fake_upstream_connection_->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   // Ensure the streams are all reset successfully.
   for (uint32_t i = 0; i < num_requests; ++i) {
     if (i % 15 != 0) {

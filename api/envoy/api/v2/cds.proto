@@ -437,6 +437,17 @@ message Cluster {
       ZoneAwareLbConfig zone_aware_lb_config = 2;
       LocalityWeightedLbConfig locality_weighted_lb_config = 3;
     }
+    // If set, all health check/weight/metadata updates that happen within this duration will be
+    // merged and delivered in one shot when the duration expires. The start of the duration is when
+    // the first update happens. This is useful for big clusters, with potentially noisy deploys
+    // that might trigger excessive CPU usage due to a constant stream of healthcheck state changes
+    // or metadata updates. By default, this is not configured and updates apply immediately. Also,
+    // the first set of updates to be seen apply immediately as well (e.g.: a new cluster).
+    //
+    // Note: merging does not apply to cluster membership changes (e.g.: adds/removes); this is
+    // because merging those updates isn't currently safe. See
+    // https://github.com/envoyproxy/envoy/pull/3941.
+    google.protobuf.Duration update_merge_window = 4;
   }
 
   // Common configuration for all load balancer implementations.

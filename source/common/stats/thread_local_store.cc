@@ -156,6 +156,26 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id) {
   }
 }
 
+absl::string_view ThreadLocalStoreImpl::truncateStatNameIfNeeded(absl::string_view name) {
+  // If the main allocator requires stat name truncation, warn and truncate, before
+  // attempting to allocate.
+  if (alloc_.requiresBoundedStatNameSize()) {
+    const uint64_t max_length = stats_options_.maxNameLength();
+
+    // Note that the heap-allocator does not truncate itself; we have to
+    // truncate here if we are using heap-allocation as a fallback due to an
+    // exahusted shared-memory block
+    if (name.size() > max_length) {
+      ENVOY_LOG_MISC(
+          warn,
+          "Statistic '{}' is too long with {} characters, it will be truncated to {} characters",
+          name, name.size(), max_length);
+      name = absl::string_view(name.data(), max_length);
+    }
+  }
+  return name;
+}
+
 std::atomic<uint64_t> ThreadLocalStoreImpl::ScopeImpl::next_scope_id_;
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() { parent_.releaseScopeCrossThread(this); }
@@ -177,19 +197,17 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   std::shared_ptr<StatType>& central_ref = central_cache_map[name];
   if (!central_ref) {
     std::vector<Tag> tags;
+
+    // Tag extraction occurs on the original, untruncated name so the extraction
+    // can complete properly, even if the tag values are partially truncated.
     std::string tag_extracted_name = parent_.getTagsForName(name, tags);
+    absl::string_view truncated_name = parent_.truncateStatNameIfNeeded(name);
     std::shared_ptr<StatType> stat =
-        make_stat(parent_.alloc_, name, std::move(tag_extracted_name), std::move(tags));
+        make_stat(parent_.alloc_, truncated_name, std::move(tag_extracted_name), std::move(tags));
     if (stat == nullptr) {
       parent_.num_last_resort_stats_.inc();
-      // TODO(jbuckland) Performing the fallback from non-heap allocator to heap allocator should be
-      // the responsibility of the non-heap allocator, not the client of the non-heap allocator.
-      // This branch will never be used in the non-hot-restart case, since the parent_.alloc_ object
-      // will throw instead of returning a nullptr; we should remove the assumption that this
-      // branching case is always available.
-      stat =
-          make_stat(parent_.heap_allocator_, name.substr(0, parent_.statsOptions().maxNameLength()),
-                    std::move(tag_extracted_name), std::move(tags));
+      stat = make_stat(parent_.heap_allocator_, truncated_name, std::move(tag_extracted_name),
+                       std::move(tags));
       ASSERT(stat != nullptr);
     }
     central_ref = stat;
@@ -219,7 +237,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
 
   return safeMakeStat<Counter>(
       final_name, central_cache_.counters_,
-      [](StatDataAllocator& allocator, const std::string& name, std::string&& tag_extracted_name,
+      [](StatDataAllocator& allocator, absl::string_view name, std::string&& tag_extracted_name,
          std::vector<Tag>&& tags) -> CounterSharedPtr {
         return allocator.makeCounter(name, std::move(tag_extracted_name), std::move(tags));
       },
@@ -253,7 +271,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
 
   return safeMakeStat<Gauge>(
       final_name, central_cache_.gauges_,
-      [](StatDataAllocator& allocator, const std::string& name, std::string&& tag_extracted_name,
+      [](StatDataAllocator& allocator, absl::string_view name, std::string&& tag_extracted_name,
          std::vector<Tag>&& tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, std::move(tag_extracted_name), std::move(tags));
       },
