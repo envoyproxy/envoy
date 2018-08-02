@@ -182,6 +182,24 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
   EXPECT_CALL(request_, cancel());
 }
 
+// Validate onConfigUpadte throws EnvoyException with duplicate listeners.
+TEST_F(LdsApiTest, ValidateDuplicateListeners) {
+  InSequence s;
+
+  setup(true);
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
+  auto* listener_1 = listeners.Add();
+  listener_1->set_name("duplicate_listener");
+
+  auto* listener_2 = listeners.Add();
+  listener_2->set_name("duplicate_listener");
+
+  EXPECT_THROW_WITH_MESSAGE(lds_->onConfigUpdate(listeners, ""), EnvoyException,
+                            "duplicate listener duplicate_listener found");
+  EXPECT_CALL(request_, cancel());
+}
+
 TEST_F(LdsApiTest, BadLocalInfo) {
   interval_timer_ = new Event::MockTimer(&dispatcher_);
   const std::string config_json = R"EOF(

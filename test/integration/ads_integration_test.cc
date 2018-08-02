@@ -476,6 +476,32 @@ TEST_P(AdsIntegrationTest, Failure) {
   makeSingleRequest();
 }
 
+// Validate that the request with duplicate listeners is rejected.
+TEST_P(AdsIntegrationTest, DuplicateWarmingClusters) {
+  initialize();
+
+  // Send initial configuration, validate we can process a request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
+
+  // Send duplicate listeners and validate that the update is rejected.
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener,
+      {buildListener("duplicae_listener", "route_config_0"),
+       buildListener("duplicae_listener", "route_config_0")},
+      "1");
+  test_server_->waitForCounterGe("listener_manager.lds.update_rejected", 1);
+}
+
 // Regression test for the use-after-free crash when processing RDS update (#3953).
 TEST_P(AdsIntegrationTest, RdsAfterLdsWithNoRdsChanges) {
   initialize();
