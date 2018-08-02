@@ -42,7 +42,7 @@ LightStepDriver::LightStepTransporter::LightStepTransporter(LightStepDriver& dri
 // somewhat arbitrary.
 //
 // See https://github.com/lightstep/lightstep-tracer-cpp/issues/106
-const size_t LightStepDriver::default_min_flush_spans = 200U;
+const size_t LightStepDriver::DEFAULT_MIN_FLUSH_SPANS = 200U;
 
 LightStepDriver::LightStepTransporter::~LightStepTransporter() {
   if (active_request_ != nullptr) {
@@ -161,7 +161,7 @@ LightStepDriver::LightStepDriver(const Json::Object& config,
 
     tls_options.max_buffered_spans = std::function<size_t()>{[this] {
       return runtime_.snapshot().getInteger("tracing.lightstep.min_flush_spans",
-                                            default_min_flush_spans);
+                                            DEFAULT_MIN_FLUSH_SPANS);
     }};
     tls_options.metrics_observer.reset(new LightStepMetricsObserver{*this});
     tls_options.transporter.reset(new LightStepTransporter{*this});
