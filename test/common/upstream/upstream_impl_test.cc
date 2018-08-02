@@ -1280,7 +1280,7 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
   }
   )EOF";
 
-  EXPECT_THROW(
+  EXPECT_THROW_WITH_MESSAGE(
       {
         envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
         Envoy::Stats::ScopePtr scope = stats.createScope(
@@ -1291,7 +1291,11 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
             ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
         StaticClusterImpl(cluster_config, runtime, factory_context, std::move(scope), false);
       },
-      EnvoyException);
+      EnvoyException,
+      "JSON at lines 2-9 does not conform to schema.\n"
+      " Invalid schema: #/properties/lb_type\n"
+      " Schema violation: enum\n"
+      " Offending document key: #/lb_type");
 }
 
 TEST(StaticClusterImplTest, MalformedHostIP) {
