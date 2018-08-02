@@ -50,16 +50,23 @@ if [[ "$1" == "bazel.release" ]]; then
     echo 'Ignoring build for git tag event'
     exit 0
   fi
-
+  
   setup_gcc_toolchain
   echo "bazel release build with tests..."
   bazel_release_binary_build
-  echo "Testing..."
-  # We have various test binaries in the test directory such as tools, benchmarks, etc. We
-  # run a build pass to make sure they compile.
-  bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
-  # Now run all of the tests which should already be compiled.
-  bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt //test/...
+  
+  if [[ $# == 2 ]]; then
+ 	echo "Testing $2 ..."
+	# Run only specified tests.
+	bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt $2
+  else
+    echo "Testing..."
+	# We have various test binaries in the test directory such as tools, benchmarks, etc. We
+	# run a build pass to make sure they compile.
+	bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
+	# Now run all of the tests which should already be compiled.
+	bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt //test/...
+  fi
   exit 0
 elif [[ "$1" == "bazel.release.server_only" ]]; then
   setup_gcc_toolchain
