@@ -2283,18 +2283,34 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
     Buffer::OwnedImpl fake_data("hello");
     decoder->decodeData(fake_data, false);
 
-    HeaderMapPtr trailers{new TestHeaderMapImpl{{"foo", "bar"}}};
+    HeaderMapPtr trailers{new TestHeaderMapImpl{{"bazzz", "bar"}}};
     decoder->decodeTrailers(std::move(trailers));
   }));
 
-  setupFilterChain(1, 2);
+  setupFilterChain(2, 2);
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, false))
       .WillOnce(Return(FilterHeadersStatus::StopIteration));
   EXPECT_CALL(*decoder_filters_[0], decodeData(_, false))
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  std::string trailers_data("trailers");
   EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_))
-      .WillOnce(Return(FilterTrailersStatus::StopIteration));
+      .WillOnce(Invoke([&](Http::HeaderMap&) -> FilterTrailersStatus {
+        decoder_filters_[0]->callbacks_->addDecodedTrailers(
+            HeaderMapPtr{new TestHeaderMapImpl{{"foo", trailers_data}}});
+        return FilterTrailersStatus::Continue;
+      }));
+  EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
+      .WillOnce(Return(FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
+  EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
+      .WillOnce(Invoke([&](Http::HeaderMap& trailers) -> FilterTrailersStatus {
+        // assert that the trailers set in the previous filter was ignored
+        Http::LowerCaseString key("foo");
+        EXPECT_EQ(trailers.get(key), nullptr);
+        return FilterTrailersStatus::Continue;
+      }));
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -2323,7 +2339,6 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
   decoder_filters_[0]->callbacks_->encodeData(response_body, false);
   Http::LowerCaseString trailer_key("foo");
   // set up encodeTrailer expectations
-  std::string trailers_data("trailers");
   EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
       .WillOnce(Invoke([&](Http::HeaderMap&) -> FilterTrailersStatus {
         encoder_filters_[0]->callbacks_->addEncodedTrailers(
@@ -2333,8 +2348,9 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
 
   EXPECT_CALL(*encoder_filters_[1], encodeTrailers(_))
       .WillOnce(Invoke([&](Http::HeaderMap& trailers) -> FilterTrailersStatus {
-        auto v = trailers.get(trailer_key);
-        EXPECT_EQ(v->value().getStringView(), trailers_data);
+        // assert that the trailers set in the previous filter was ignored
+        Http::LowerCaseString key("foo");
+        EXPECT_EQ(trailers.get(key), nullptr);
         return FilterTrailersStatus::Continue;
       }));
   EXPECT_CALL(response_encoder_, encodeTrailers(_));
@@ -2376,8 +2392,12 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackWithTrailer
       }));
   EXPECT_CALL(*decoder_filters_[1], decodeData(_, false))
       .WillOnce(Return(FilterDataStatus::Continue));
-  EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_))
-      .WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_)).WillOnce(Invoke([](HeaderMap& trailers) {
+    // assert that the trailers added in decodeData were ignored
+    Http::LowerCaseString key("foo");
+    EXPECT_EQ(trailers.get(key), nullptr);
+    return FilterTrailersStatus::Continue;
+  }));
   EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
       .WillOnce(Return(FilterTrailersStatus::Continue));
 
@@ -2413,8 +2433,11 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackWithTrailer
   decoder_filters_[0]->callbacks_->encodeData(response_body, false);
 
   // set up encodeTrailers expectations
-  EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
-      .WillOnce(Return(FilterTrailersStatus::Continue));
+  EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_)).WillOnce(Invoke([](HeaderMap& trailers) {
+    Http::LowerCaseString key("foo");
+    EXPECT_EQ(trailers.get(key), nullptr);
+    return FilterTrailersStatus::Continue;
+  }));
   EXPECT_CALL(*encoder_filters_[1], encodeTrailers(_))
       .WillOnce(Return(FilterTrailersStatus::Continue));
   EXPECT_CALL(response_encoder_, encodeTrailers(_));
@@ -2452,8 +2475,28 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackNoTrailers)
             HeaderMapPtr{new TestHeaderMapImpl{{"foo", trailers_data}}});
         return FilterDataStatus::Continue;
       }));
-  EXPECT_CALL(*decoder_filters_[1], decodeData(_, true))
+
+  // ensure that the second decodeData call sees end_stream = false
+  EXPECT_CALL(*decoder_filters_[1], decodeData(_, false))
       .WillOnce(Return(FilterDataStatus::Continue));
+
+  // since we added trailers, we should see decodeTrailers
+  EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_)).WillOnce(Invoke([&](HeaderMap& trailers) {
+    // ensure that we see the trailers set in decodeData
+    Http::LowerCaseString key("foo");
+    trailers.iterate(
+        [](const HeaderEntry& e, void*) -> Http::HeaderMap::Iterate {
+          std::cout << e.key().getStringView() << std::endl;
+          return Http::HeaderMap::Iterate::Continue;
+        },
+        nullptr);
+    auto t = trailers.get(key);
+    ASSERT(t);
+    EXPECT_EQ(t->value(), trailers_data.c_str());
+    return FilterTrailersStatus::Continue;
+  }));
+  EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::Continue));
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -2472,16 +2515,29 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackNoTrailers)
 
   // set up encodeData expectations
   EXPECT_CALL(*encoder_filters_[0], encodeData(_, true))
-      .WillOnce(Return(FilterDataStatus::Continue));
-  EXPECT_CALL(*encoder_filters_[1], encodeData(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterDataStatus {
-        encoder_filters_[1]->callbacks_->addEncodedTrailers(
+        encoder_filters_[0]->callbacks_->addEncodedTrailers(
             HeaderMapPtr{new TestHeaderMapImpl{{"foo", trailers_data}}});
         return FilterDataStatus::Continue;
       }));
+  // ensure encodeData calls after setting header sees end_stream = false
+  EXPECT_CALL(*encoder_filters_[1], encodeData(_, false))
+      .WillOnce(Return(FilterDataStatus::Continue));
+
+  EXPECT_CALL(response_encoder_, encodeData(_, false));
+
+  // since we added trailers, we should see encodeTrailer callbacks
+  EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_)).WillOnce(Invoke([&](HeaderMap& trailers) {
+    // ensure that we see the trailers set in decodeData
+    Http::LowerCaseString key("foo");
+    auto t = trailers.get(key);
+    EXPECT_EQ(t->value(), trailers_data.c_str());
+    return FilterTrailersStatus::Continue;
+  }));
+  EXPECT_CALL(*encoder_filters_[1], encodeTrailers(_))
+      .WillOnce(Return(FilterTrailersStatus::Continue));
 
   // Ensure that we call encodeTrailers
-  EXPECT_CALL(response_encoder_, encodeData(_, false));
   EXPECT_CALL(response_encoder_, encodeTrailers(_));
 
   expectOnDestroy();

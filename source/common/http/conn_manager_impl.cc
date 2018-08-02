@@ -775,19 +775,36 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
 
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeData));
+
+    bool end_stream_no_trailers = end_stream && !request_trailers_;
+    if (end_stream_no_trailers) {
+      state_.filter_call_state_ |= FilterCallState::LastDataFrame;
+    }
     state_.filter_call_state_ |= FilterCallState::DecodeData;
-    FilterDataStatus status = (*entry)->handle_->decodeData(data, end_stream);
+    FilterDataStatus status = (*entry)->handle_->decodeData(data, end_stream_no_trailers);
     state_.filter_call_state_ &= ~FilterCallState::DecodeData;
+    if (end_stream_no_trailers) {
+      state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
+    }
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_)) {
       return;
     }
   }
+
+  if (end_stream && request_trailers_) {
+    decodeTrailers(filter, *request_trailers_);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::addDecodedTrailers(HeaderMapPtr&& trailers) {
-  request_trailers_ = std::move(trailers);
+  if (state_.filter_call_state_ & FilterCallState::LastDataFrame) {
+    request_trailers_ = std::move(trailers);
+  } else {
+    // do nothing
+    // todo: should this throw/assert?
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilter& filter,
@@ -815,10 +832,11 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(HeaderMapPtr&& trailers
   resetIdleTimer();
   maybeEndDecode(true);
   request_trailers_ = std::move(trailers);
-  decodeTrailers(nullptr);
+  decodeTrailers(nullptr, *request_trailers_);
 }
 
-void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilter* filter) {
+void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilter* filter,
+                                                         HeaderMap& trailers) {
   // See decodeData() above for why we check local_complete_ here.
   if (state_.local_complete_) {
     return;
@@ -834,10 +852,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeTrailers));
     state_.filter_call_state_ |= FilterCallState::DecodeTrailers;
-
-    // dereference the HeaderMapPtr on every iteration in order to allow filters
-    // to override the ptr
-    FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(*request_trailers_);
+    FilterTrailersStatus status = (*entry)->handle_->decodeTrailers(trailers);
     state_.filter_call_state_ &= ~FilterCallState::DecodeTrailers;
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -1065,7 +1080,13 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 }
 
 void ConnectionManagerImpl::ActiveStream::addEncodedTrailers(HeaderMapPtr&& trailers) {
-  response_trailers_ = std::move(trailers);
+  if (state_.filter_call_state_ & FilterCallState::LastDataFrame) {
+    response_trailers_ = std::move(trailers);
+    state_.local_complete_ = false;
+  } else {
+    // do nothing
+    // todo: should this throw/assert?
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilter& filter,
@@ -1095,9 +1116,17 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeData));
+
+    bool end_stream_no_trailers = end_stream && !response_trailers_;
     state_.filter_call_state_ |= FilterCallState::EncodeData;
-    FilterDataStatus status = (*entry)->handle_->encodeData(data, end_stream);
+    if (end_stream_no_trailers) {
+      state_.filter_call_state_ |= FilterCallState::LastDataFrame;
+    }
+    FilterDataStatus status = (*entry)->handle_->encodeData(data, end_stream_no_trailers);
     state_.filter_call_state_ &= ~FilterCallState::EncodeData;
+    if (end_stream_no_trailers) {
+      state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
+    }
     ENVOY_STREAM_LOG(trace, "encode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.encoder_filters_streaming_)) {
@@ -1111,23 +1140,21 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
   request_info_.addBytesSent(data.length());
   if (end_stream && response_trailers_) {
     response_encoder_->encodeData(data, false);
-    response_encoder_->encodeTrailers(*response_trailers_);
-    maybeEndEncode(true);
+    encodeTrailers(filter, *response_trailers_);
   } else {
-    response_encoder_->encodeData(data, end_stream);
+    response_encoder_->encodeData(data, end_stream && !response_trailers_);
     maybeEndEncode(end_stream);
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilter* filter) {
+void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilter* filter,
+                                                         HeaderMap& trailers) {
   resetIdleTimer();
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, true);
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeTrailers));
     state_.filter_call_state_ |= FilterCallState::EncodeTrailers;
-    ASSERT(response_trailers_);
-    // dereference HeaderMapPtr on each iteration to allow overriding the ptr
-    FilterTrailersStatus status = (*entry)->handle_->encodeTrailers(*response_trailers_);
+    FilterTrailersStatus status = (*entry)->handle_->encodeTrailers(trailers);
     state_.filter_call_state_ &= ~FilterCallState::EncodeTrailers;
     ENVOY_STREAM_LOG(trace, "encode trailers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
@@ -1135,8 +1162,6 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
       return;
     }
   }
-
-  auto& trailers = *response_trailers_;
 
   ENVOY_STREAM_LOG(debug, "encoding trailers via codec:\n{}", *this, trailers);
 
@@ -1434,7 +1459,7 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeData(Buffer::Instan
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::encodeTrailers(HeaderMapPtr&& trailers) {
   parent_.response_trailers_ = std::move(trailers);
-  parent_.encodeTrailers(nullptr);
+  parent_.encodeTrailers(nullptr, *parent_.response_trailers_);
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::

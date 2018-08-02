@@ -157,7 +157,7 @@ private:
     void doData(bool end_stream) override {
       parent_.decodeData(this, *parent_.buffered_request_data_, end_stream);
     }
-    void doTrailers() override { parent_.decodeTrailers(this); }
+    void doTrailers() override { parent_.decodeTrailers(this, *parent_.request_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.request_trailers_; }
 
     // Http::StreamDecoderFilterCallbacks
@@ -225,7 +225,7 @@ private:
     void doData(bool end_stream) override {
       parent_.encodeData(this, *parent_.buffered_response_data_, end_stream);
     }
-    void doTrailers() override { parent_.encodeTrailers(this); }
+    void doTrailers() override { parent_.encodeTrailers(this, *parent_.response_trailers_); }
     const HeaderMapPtr& trailers() override { return parent_.response_trailers_; }
 
     // Http::StreamEncoderFilterCallbacks
@@ -272,7 +272,7 @@ private:
     void addDecodedTrailers(HeaderMapPtr&& trailers);
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream);
-    void decodeTrailers(ActiveStreamDecoderFilter* filter);
+    void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     void addEncodedTrailers(HeaderMapPtr&& trailers);
@@ -281,7 +281,7 @@ private:
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
-    void encodeTrailers(ActiveStreamEncoderFilter* filter);
+    void encodeTrailers(ActiveStreamEncoderFilter* filter, HeaderMap& trailers);
     void maybeEndEncode(bool end_stream);
     uint64_t streamId() { return stream_id_; }
 
@@ -343,6 +343,9 @@ private:
       // to verify we do not encode100Continue headers more than once per
       // filter.
       static constexpr uint32_t Encode100ContinueHeaders  = 0x40;
+      // Used to indicate that we're processing the final [en|de]Code frame,
+      // i.e. end_stream = true
+      static constexpr uint32_t LastDataFrame = 0x80;
     };
     // clang-format on
 
