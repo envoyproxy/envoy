@@ -56,16 +56,17 @@ if [[ "$1" == "bazel.release" ]]; then
   bazel_release_binary_build
   
   if [[ $# == 2 ]]; then
- 	echo "Testing $2 ..."
-	# Run only specified tests.
-	bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt $2
+    echo "Testing $2 ..."
+    # Run only specified tests. Argument can be a single test 
+    # (e.g. '//test/common/common:assert_test') or a test group (e.g. '//test/common/...')
+    bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt $2
   else
     echo "Testing..."
-	# We have various test binaries in the test directory such as tools, benchmarks, etc. We
-	# run a build pass to make sure they compile.
-	bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
-	# Now run all of the tests which should already be compiled.
-	bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt //test/...
+    # We have various test binaries in the test directory such as tools, benchmarks, etc. We
+    # run a build pass to make sure they compile.
+    bazel --batch build ${BAZEL_BUILD_OPTIONS} -c opt //include/... //source/... //test/...
+    # Now run all of the tests which should already be compiled.
+    bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt //test/...
   fi
   exit 0
 elif [[ "$1" == "bazel.release.server_only" ]]; then
