@@ -394,10 +394,6 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() cons
 
 bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
-void ClientSslSocketFactory::onConfigUpdate() {
-  ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
-}
-
 ServerSslSocketFactory::ServerSslSocketFactory(ServerContextConfigPtr config,
                                                Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope,
@@ -411,10 +407,6 @@ Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() cons
 }
 
 bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
-
-void ServerSslSocketFactory::onConfigUpdate() {
-  ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
-}
 
 } // namespace Ssl
 } // namespace Envoy

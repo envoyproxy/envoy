@@ -76,9 +76,6 @@ public:
   bool implementsSecureTransport() const override;
 
 private:
-  // Will be called when config_ is changed
-  void onConfigUpdate();
-
   Ssl::ContextManager& manager_;
   Stats::Scope& stats_scope_;
   ClientContextConfigPtr config_;
@@ -94,9 +91,6 @@ public:
   bool implementsSecureTransport() const override;
 
 private:
-  // Will be called when config_ is changed
-  void onConfigUpdate();
-
   Ssl::ContextManager& manager_;
   Stats::Scope& stats_scope_;
   ServerContextConfigPtr config_;
