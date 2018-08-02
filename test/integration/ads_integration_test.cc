@@ -510,6 +510,63 @@ TEST_P(AdsIntegrationTest, RdsAfterLdsWithNoRdsChanges) {
   makeSingleRequest();
 }
 
+// Validate that the request with duplicate clusters in the initial request during server init is
+// rejected.
+TEST_P(AdsIntegrationTest, DuplicateInitialClusters) {
+  initialize();
+
+  // Send initial configuration, failing each xDS once (via a type mismatch), validate we can
+  // process a request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(
+      Config::TypeUrl::get().Cluster,
+      {buildCluster("duplicate_cluster"), buildCluster("duplicate_cluster")}, "1");
+
+  test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+}
+
+// Validate that the request with duplicate clusters in the subsequent requests (warming clusters)
+// is rejected.
+TEST_P(AdsIntegrationTest, DuplicateWarmingClusters) {
+  initialize();
+
+  // Send initial configuration, validate we can process a request.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}));
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(Config::TypeUrl::get().Cluster,
+                                                 {buildCluster("cluster_0")}, "1");
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "", {"cluster_0"}));
+  sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
+      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("cluster_0")}, "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}));
+  sendDiscoveryResponse<envoy::api::v2::Listener>(
+      Config::TypeUrl::get().Listener, {buildListener("listener_0", "route_config_0")}, "1");
+
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1", {"cluster_0"}));
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "", {"route_config_0"}));
+  sendDiscoveryResponse<envoy::api::v2::RouteConfiguration>(
+      Config::TypeUrl::get().RouteConfiguration, {buildRouteConfig("route_config_0", "cluster_0")},
+      "1");
+
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}));
+  EXPECT_TRUE(
+      compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "1", {"route_config_0"}));
+
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  makeSingleRequest();
+
+  // Send duplicate warming clusters and validate that the update is rejected.
+  sendDiscoveryResponse<envoy::api::v2::Cluster>(
+      Config::TypeUrl::get().Cluster,
+      {buildCluster("duplicate_cluster"), buildCluster("duplicate_cluster")}, "2");
+  test_server_->waitForCounterGe("cluster_manager.cds.update_rejected", 1);
+}
+
 // Regression test for the use-after-free crash when processing RDS update (#3953).
 TEST_P(AdsIntegrationTest, RdsAfterLdsWithRdsChange) {
   initialize();
