@@ -548,9 +548,9 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
 
   const std::string h1_expected_summary =
       "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
-      "P99: 1.099, P99.9: 1.0999, P100: 1.1";
-  const std::string h2_expected_summary =
-      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, P99.9: 99.9, P100: 100";
+      "P99: 1.099, P99.5: 1.0995, P99.9: 1.0999, P100: 1.1";
+  const std::string h2_expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, "
+                                          "P99: 99, P99.5: 99.5, P99.9: 99.9, P100: 100";
 
   for (size_t i = 0; i < 100; ++i) {
     expectCallAndAccumulate(h2, i);
@@ -577,8 +577,8 @@ TEST_F(HistogramTest, BasicHistogramMergeSummary) {
   }
   EXPECT_EQ(1, validateMerge());
 
-  const std::string expected_summary =
-      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, P99.9: 99.9, P100: 100";
+  const std::string expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: "
+                                       "99, P99.5: 99.5, P99.9: 99.9, P100: 100";
 
   NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
   EXPECT_EQ(expected_summary, name_histogram_map["h1"]->cumulativeStatistics().summary());
