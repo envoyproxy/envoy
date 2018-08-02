@@ -70,7 +70,7 @@ public:
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
     cluster_.reset(
-        new OriginalDstCluster(cluster_config, runtime_, false, factory_context, std::move(scope)));
+        new OriginalDstCluster(cluster_config, runtime_, factory_context, std::move(scope), false));
     cluster_->prioritySet().addMemberUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();

@@ -400,11 +400,11 @@ private:
   const std::chrono::milliseconds connect_timeout_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   const uint32_t per_connection_buffer_limit_bytes_;
-  Stats::IsolatedStoreImpl load_report_stats_store_;
-  mutable ClusterLoadReportStats load_report_stats_;
   Network::TransportSocketFactoryPtr transport_socket_factory_;
   Stats::ScopePtr stats_scope_;
   mutable ClusterStats stats_;
+  Stats::IsolatedStoreImpl load_report_stats_store_;
+  mutable ClusterLoadReportStats load_report_stats_;
   const uint64_t features_;
   const Http::Http2Settings http2_settings_;
   mutable ResourceManagers resource_managers_;
@@ -471,9 +471,8 @@ public:
 
 protected:
   ClusterImplBase(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                  bool added_via_api,
                   Server::Configuration::TransportSocketFactoryContext& factory_context,
-                  Stats::ScopePtr stats_scope);
+                  Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
@@ -568,9 +567,8 @@ typedef std::unique_ptr<PriorityStateManager> PriorityStateManagerPtr;
 class StaticClusterImpl : public ClusterImplBase {
 public:
   StaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                    bool added_via_api,
                     Server::Configuration::TransportSocketFactoryContext& factory_context,
-                    Stats::ScopePtr stats_scope);
+                    Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -600,9 +598,9 @@ protected:
 class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
   StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                       Network::DnsResolverSharedPtr dns_resolver, bool added_via_api,
+                       Network::DnsResolverSharedPtr dns_resolver,
                        Server::Configuration::TransportSocketFactoryContext& factory_context,
-                       Stats::ScopePtr stats_scope);
+                       Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }

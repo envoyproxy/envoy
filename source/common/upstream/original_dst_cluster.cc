@@ -123,10 +123,10 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
 }
 
 OriginalDstCluster::OriginalDstCluster(
-    const envoy::api::v2::Cluster& config, Runtime::Loader& runtime, bool added_via_api,
+    const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr stats_scope)
-    : ClusterImplBase(config, runtime, added_via_api, factory_context, std::move(stats_scope)),
+    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api),
       dispatcher_(factory_context.dispatcher()),
       cleanup_interval_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),

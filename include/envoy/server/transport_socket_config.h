@@ -47,7 +47,7 @@ public:
   /**
    * @return information about the local environment the server is running in.
    */
-  virtual const LocalInfo::LocalInfo& local_info() PURE;
+  virtual const LocalInfo::LocalInfo& localInfo() PURE;
 
   /**
    * @return Event::Dispatcher& the main thread's dispatcher.

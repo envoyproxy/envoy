@@ -18,12 +18,12 @@ namespace Envoy {
 namespace Upstream {
 
 EdsClusterImpl::EdsClusterImpl(
-    const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime, bool added_via_api,
+    const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr stats_scope)
-    : BaseDynamicClusterImpl(cluster, runtime, added_via_api, factory_context,
-                             std::move(stats_scope)),
-      cm_(factory_context.clusterManager()), local_info_(factory_context.local_info()),
+    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
+                             added_via_api),
+      cm_(factory_context.clusterManager()), local_info_(factory_context.localInfo()),
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()) {

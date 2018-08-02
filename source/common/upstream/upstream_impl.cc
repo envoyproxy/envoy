@@ -277,9 +277,10 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
           std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(config, connect_timeout))),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
-      load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       transport_socket_factory_(std::move(socket_factory)), stats_scope_(std::move(stats_scope)),
-      stats_(generateStats(*stats_scope_)), features_(parseFeatures(config)),
+      stats_(generateStats(*stats_scope_)),
+      load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
+      features_(parseFeatures(config)),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
@@ -398,18 +399,18 @@ ClusterSharedPtr ClusterImplBase::create(
 
   switch (cluster.type()) {
   case envoy::api::v2::Cluster::STATIC:
-    new_cluster.reset(new StaticClusterImpl(cluster, runtime, added_via_api, factory_context,
-                                            std::move(stats_scope)));
+    new_cluster.reset(new StaticClusterImpl(cluster, runtime, factory_context,
+                                            std::move(stats_scope), added_via_api));
     break;
   case envoy::api::v2::Cluster::STRICT_DNS:
     new_cluster.reset(new StrictDnsClusterImpl(cluster, runtime, selected_dns_resolver,
-                                               added_via_api, factory_context,
-                                               std::move(stats_scope)));
+                                               factory_context, std::move(stats_scope),
+                                               added_via_api));
     break;
   case envoy::api::v2::Cluster::LOGICAL_DNS:
     new_cluster.reset(new LogicalDnsCluster(cluster, runtime, selected_dns_resolver, tls,
-                                            added_via_api, factory_context,
-                                            std::move(stats_scope)));
+                                            factory_context, std::move(stats_scope),
+                                            added_via_api));
     break;
   case envoy::api::v2::Cluster::ORIGINAL_DST:
     if (cluster.lb_policy() != envoy::api::v2::Cluster::ORIGINAL_DST_LB) {
@@ -420,8 +421,8 @@ ClusterSharedPtr ClusterImplBase::create(
       throw EnvoyException(fmt::format(
           "cluster: cluster type 'original_dst' may not be used with lb_subset_config"));
     }
-    new_cluster.reset(new OriginalDstCluster(cluster, runtime, added_via_api, factory_context,
-                                             std::move(stats_scope)));
+    new_cluster.reset(new OriginalDstCluster(cluster, runtime, factory_context,
+                                             std::move(stats_scope), added_via_api));
     break;
   case envoy::api::v2::Cluster::EDS:
     if (!cluster.has_eds_cluster_config()) {
@@ -429,8 +430,8 @@ ClusterSharedPtr ClusterImplBase::create(
     }
 
     // We map SDS to EDS, since EDS provides backwards compatibility with SDS.
-    new_cluster.reset(new EdsClusterImpl(cluster, runtime, added_via_api, factory_context,
-                                         std::move(stats_scope)));
+    new_cluster.reset(new EdsClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
+                                         added_via_api));
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -452,9 +453,9 @@ ClusterSharedPtr ClusterImplBase::create(
 }
 
 ClusterImplBase::ClusterImplBase(
-    const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime, bool added_via_api,
+    const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr stats_scope)
+    Stats::ScopePtr&& stats_scope, bool added_via_api)
     : runtime_(runtime) {
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
@@ -786,11 +787,11 @@ void PriorityStateManager::updateClusterPrioritySet(
 }
 
 StaticClusterImpl::StaticClusterImpl(
-    const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime, bool added_via_api,
+    const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr stats_scope)
-    : ClusterImplBase(cluster, runtime, added_via_api, factory_context, std::move(stats_scope)),
-      priority_state_manager_(new PriorityStateManager(*this, factory_context.local_info())) {
+    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
+      priority_state_manager_(new PriorityStateManager(*this, factory_context.localInfo())) {
   // TODO(dio): Use by-reference when cluster.hosts() is removed.
   const envoy::api::v2::ClusterLoadAssignment cluster_load_assignment(
       cluster.has_load_assignment() ? cluster.load_assignment()
@@ -969,12 +970,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
 StrictDnsClusterImpl::StrictDnsClusterImpl(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-    Network::DnsResolverSharedPtr dns_resolver, bool added_via_api,
+    Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr stats_scope)
-    : BaseDynamicClusterImpl(cluster, runtime, added_via_api, factory_context,
-                             std::move(stats_scope)),
-      local_info_(factory_context.local_info()), dns_resolver_(dns_resolver),
+    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
+                             added_via_api),
+      local_info_(factory_context.localInfo()), dns_resolver_(dns_resolver),
       dns_refresh_rate_ms_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(cluster, dns_refresh_rate, 5000))) {
   switch (cluster.dns_lookup_family()) {

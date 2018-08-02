@@ -19,9 +19,8 @@ class EdsClusterImpl : public BaseDynamicClusterImpl,
                        Config::SubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> {
 public:
   EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                 bool added_via_api,
                  Server::Configuration::TransportSocketFactoryContext& factory_context,
-                 Stats::ScopePtr stats_scope);
+                 Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Secondary; }

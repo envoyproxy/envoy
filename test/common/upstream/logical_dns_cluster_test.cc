@@ -43,8 +43,8 @@ public:
                                        : std::string(cluster_config.alt_stat_name())));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
-    cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_, false,
-                                         factory_context, std::move(scope)));
+    cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
+                                         factory_context, std::move(scope), false));
     cluster_->prioritySet().addMemberUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
@@ -62,8 +62,8 @@ public:
                                        : std::string(cluster_config.alt_stat_name())));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
-    cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_, false,
-                                         factory_context, std::move(scope)));
+    cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
+                                         factory_context, std::move(scope), false));
     cluster_->prioritySet().addMemberUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();

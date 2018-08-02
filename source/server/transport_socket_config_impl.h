@@ -29,7 +29,7 @@ public:
     return cluster_manager_.clusterManagerFactory().secretManager();
   }
 
-  const LocalInfo::LocalInfo& local_info() override { return local_info_; }
+  const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
 

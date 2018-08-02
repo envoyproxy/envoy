@@ -30,9 +30,8 @@ class LogicalDnsCluster : public ClusterImplBase {
 public:
   LogicalDnsCluster(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                     Network::DnsResolverSharedPtr dns_resolver, ThreadLocal::SlotAllocator& tls,
-                    bool added_via_api,
                     Server::Configuration::TransportSocketFactoryContext& factory_context,
-                    Stats::ScopePtr stats_scope);
+                    Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   ~LogicalDnsCluster();
 
