@@ -38,11 +38,12 @@
 #include "common/network/utility.h"
 #include "common/profiler/profiler.h"
 #include "common/router/config_impl.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/histogram_impl.h"
 #include "common/upstream/host_utility.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
 
+#include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 
@@ -953,16 +954,19 @@ Http::Code AdminImpl::runCallback(absl::string_view path_and_query,
 
   for (const UrlHandler& handler : handlers_) {
     if (path_and_query.compare(0, query_index, handler.prefix_) == 0) {
+      found_handler = true;
       if (handler.mutates_server_state_) {
         const absl::string_view method =
             admin_stream.getRequestHeaders().Method()->value().getStringView();
         if (method != Http::Headers::get().MethodValues.Post) {
-          ENVOY_LOG(warn, "admin path \"{}\" mutates state, method={} rather than POST",
+          ENVOY_LOG(error, "admin path \"{}\" mutates state, method={} rather than POST",
                     handler.prefix_, method);
+          code = Http::Code::BadRequest;
+          response.add("Invalid request; POST required");
+          break;
         }
       }
       code = handler.handler_(path_and_query, response_headers, response, admin_stream);
-      found_handler = true;
       break;
     }
   }

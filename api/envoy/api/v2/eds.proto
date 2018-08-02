@@ -58,7 +58,7 @@ message ClusterLoadAssignment {
       string category = 1 [(validate.rules).string.min_bytes = 1];
 
       // Percentage of traffic that should be dropped for the category.
-      envoy.type.Percent drop_percentage = 2;
+      envoy.type.FractionalPercent drop_percentage = 2;
     }
     // Action to trim the overall incoming traffic to protect the upstream
     // hosts. This action allows protection in case the hosts are unable to

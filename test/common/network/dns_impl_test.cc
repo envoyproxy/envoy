@@ -11,6 +11,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/address.h"
 #include "envoy/network/dns.h"
+#include "envoy/stats/stats.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/utility.h"
@@ -20,7 +21,6 @@
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/environment.h"

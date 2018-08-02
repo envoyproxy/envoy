@@ -224,7 +224,7 @@ void Router::UpstreamRequest::start() {
 void Router::UpstreamRequest::resetStream() {
   if (conn_data_ != nullptr) {
     conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
-    conn_data_ = nullptr;
+    conn_data_.reset();
   }
 }
 
@@ -235,10 +235,10 @@ void Router::UpstreamRequest::onPoolFailure(Tcp::ConnectionPool::PoolFailureReas
   onResetStream(reason);
 }
 
-void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionData& conn_data,
+void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                                           Upstream::HostDescriptionConstSharedPtr host) {
   onUpstreamHostSelected(host);
-  conn_data_ = &conn_data;
+  conn_data_ = std::move(conn_data);
   conn_data_->addUpstreamCallbacks(parent_);
 
   conn_pool_handle_ = nullptr;
@@ -263,10 +263,7 @@ void Router::UpstreamRequest::onRequestComplete() { request_complete_ = true; }
 
 void Router::UpstreamRequest::onResponseComplete() {
   response_complete_ = true;
-  if (conn_data_ != nullptr) {
-    conn_data_->release();
-  }
-  conn_data_ = nullptr;
+  conn_data_.reset();
 }
 
 void Router::UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {

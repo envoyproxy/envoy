@@ -2,13 +2,14 @@
 #include <memory>
 #include <string>
 
+#include "envoy/stats/stats.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/listener_impl.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_impl.h"
 
 #include "server/connection_handler_impl.h"
 

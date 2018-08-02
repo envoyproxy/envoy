@@ -44,6 +44,12 @@ void LdsApiImpl::initialize(std::function<void()> callback) {
 void LdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::string& version_info) {
   cm_.adsMux().pause(Config::TypeUrl::get().RouteConfiguration);
   Cleanup rds_resume([this] { cm_.adsMux().resume(Config::TypeUrl::get().RouteConfiguration); });
+  std::unordered_set<std::string> listener_names;
+  for (const auto& listener : resources) {
+    if (!listener_names.insert(listener.name()).second) {
+      throw EnvoyException(fmt::format("duplicate listener {} found", listener.name()));
+    }
+  }
   for (const auto& listener : resources) {
     MessageUtil::validate(listener);
   }

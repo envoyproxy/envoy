@@ -7,7 +7,7 @@
 #include "common/common/perf_annotation.h"
 #include "common/event/libevent.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/thread_local_store.h"
 
 #include "server/config_validation/server.h"
 #include "server/drain_manager_impl.h"

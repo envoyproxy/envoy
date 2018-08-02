@@ -7,6 +7,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/stats/stats.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/access_log/access_log_formatter.h"
@@ -22,7 +23,6 @@
 #include "common/http/websocket/ws_handler_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
@@ -312,6 +312,8 @@ public:
   ConnectionManagerListenerStats listener_stats_;
   bool proxy_100_continue_ = false;
   Http::Http1Settings http1_settings_;
+  NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
+  NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
   MockStreamEncoder response_encoder_;
@@ -1120,30 +1122,36 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNotConfigured) {
 }
 
 // When the global timeout is configured, the timer is enabled before we receive
-// headers.
+// headers, if it fires we don't face plant.
 TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutGlobal) {
   stream_idle_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_))
-      .Times(1)
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
-        Event::MockTimer* idle_timer =
-            new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-        EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10)));
-        StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
+    Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+    EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10)));
+    conn_manager_->newStream(response_encoder_);
 
-        HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}}};
-        EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10)));
-        decoder->decodeHeaders(std::move(headers), false);
+    // Expect resetIdleTimer() to be called for the response
+    // encodeHeaders()/encodeData().
+    EXPECT_CALL(*idle_timer, enableTimer(_)).Times(2);
+    EXPECT_CALL(*idle_timer, disableTimer());
+    idle_timer->callback_();
+  }));
 
-        data.drain(4);
+  // 408 direct response after timeout.
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
+        EXPECT_STREQ("408", headers.Status()->value().c_str());
       }));
+  std::string response_body;
+  EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
-  EXPECT_EQ(0U, stats_.named_.downstream_rq_idle_timeout_.value());
+  EXPECT_EQ("stream timeout", response_body);
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_idle_timeout_.value());
 }
 
 // Per-route timeouts override the global stream idle timeout.
@@ -1498,8 +1506,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketNoThreadLocalCluster) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketNoConnInPool) {
   setup(false, "");
 
-  Upstream::MockHost::MockCreateConnectionData conn_info;
-  EXPECT_CALL(cluster_manager_, tcpConnForCluster_(_, _)).WillOnce(Return(conn_info));
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster(_, _, _)).WillOnce(Return(nullptr));
 
   expectOnUpstreamInitFailure();
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
@@ -1514,14 +1521,37 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketNoConnInPool) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketDataAfterConnectFail) {
   setup(false, "");
 
-  Upstream::MockHost::MockCreateConnectionData conn_info;
-  EXPECT_CALL(cluster_manager_, tcpConnForCluster_(_, _)).WillOnce(Return(conn_info));
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster(_, _, _)).WillOnce(Return(&conn_pool_));
 
-  expectOnUpstreamInitFailure();
+  StreamDecoder* decoder = nullptr;
+  NiceMock<MockStreamEncoder> encoder;
+
+  configureRouteForWebsocket(route_config_provider_.route_config_->route_->route_entry_);
+
+  EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
+                                               {":method", "GET"},
+                                               {":path", "/"},
+                                               {"connection", "Upgrade"},
+                                               {"upgrade", "websocket"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+    data.drain(4);
+  }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_active_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http1_active_.value());
 
+  EXPECT_CALL(encoder, encodeHeaders(_, true))
+      .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
+        EXPECT_STREQ("504", headers.Status()->value().c_str());
+      }));
+
+  conn_pool_.poolFailure(Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
   // This should get dropped, with no ASSERT or crash.
@@ -1541,13 +1571,14 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketMetadataMatch) {
       .WillByDefault(Return(
           &route_config_provider_.route_config_->route_->route_entry_.metadata_matches_criteria_));
 
-  EXPECT_CALL(cluster_manager_, tcpConnForCluster_(_, _))
-      .WillOnce(Invoke([&](const std::string&, Upstream::LoadBalancerContext* context)
-                           -> Upstream::MockHost::MockCreateConnectionData {
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster(_, _, _))
+      .WillOnce(Invoke([&](const std::string&, Upstream::ResourcePriority,
+                           Upstream::LoadBalancerContext* context)
+                           -> Tcp::ConnectionPool::MockInstance* {
         EXPECT_EQ(
             context->metadataMatchCriteria(),
             &route_config_provider_.route_config_->route_->route_entry_.metadata_matches_criteria_);
-        return {};
+        return nullptr;
       }));
   expectOnUpstreamInitFailure();
 
@@ -1558,21 +1589,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketMetadataMatch) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketConnectTimeoutError) {
   setup(false, "");
 
-  Event::MockTimer* connect_timer =
-      new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
-  NiceMock<Network::MockClientConnection>* upstream_connection =
-      new NiceMock<Network::MockClientConnection>();
-  Upstream::MockHost::MockCreateConnectionData conn_info;
-
-  conn_info.connection_ = upstream_connection;
-  conn_info.host_description_.reset(new Upstream::HostImpl(
-      cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
-      Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-      envoy::api::v2::core::Metadata::default_instance(), 1,
-      envoy::api::v2::core::Locality().default_instance(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
-  EXPECT_CALL(*connect_timer, enableTimer(_));
-  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      .WillOnce(Return(&conn_pool_));
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
@@ -1590,15 +1608,15 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectTimeoutError) {
     data.drain(4);
   }));
 
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
   EXPECT_CALL(encoder, encodeHeaders(_, true))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
         EXPECT_STREQ("504", headers.Status()->value().c_str());
       }));
+  conn_pool_.poolFailure(Tcp::ConnectionPool::PoolFailureReason::Timeout);
 
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
-
-  connect_timer->callback_();
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
 }
@@ -1606,21 +1624,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectTimeoutError) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketConnectionFailure) {
   setup(false, "");
 
-  Event::MockTimer* connect_timer =
-      new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
-  NiceMock<Network::MockClientConnection>* upstream_connection =
-      new NiceMock<Network::MockClientConnection>();
-  Upstream::MockHost::MockCreateConnectionData conn_info;
-
-  conn_info.connection_ = upstream_connection;
-  conn_info.host_description_.reset(new Upstream::HostImpl(
-      cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
-      Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-      envoy::api::v2::core::Metadata::default_instance(), 1,
-      envoy::api::v2::core::Locality().default_instance(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
-  EXPECT_CALL(*connect_timer, enableTimer(_));
-  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      .WillOnce(Return(&conn_pool_));
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
@@ -1638,16 +1643,16 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketConnectionFailure) {
     data.drain(4);
   }));
 
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
   EXPECT_CALL(encoder, encodeHeaders(_, true))
       .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
         EXPECT_STREQ("504", headers.Status()->value().c_str());
       }));
 
-  Buffer::OwnedImpl fake_input("1234");
-  conn_manager_->onData(fake_input, false);
+  conn_pool_.poolFailure(Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 
-  // expectOnUpstreamInitFailure("504");
-  upstream_connection->raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
 }
@@ -1657,9 +1662,6 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
-  NiceMock<Network::MockClientConnection>* upstream_connection =
-      new NiceMock<Network::MockClientConnection>();
-  Upstream::MockHost::MockCreateConnectionData conn_info;
   HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
                                              {":method", "GET"},
                                              {":path", "/"},
@@ -1667,14 +1669,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
                                              {"upgrade", "websocket"}}};
   auto raw_header_ptr = headers.get();
 
-  conn_info.connection_ = upstream_connection;
-  conn_info.host_description_.reset(new Upstream::HostImpl(
-      cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
-      Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-      envoy::api::v2::core::Metadata::default_instance(), 1,
-      envoy::api::v2::core::Locality().default_instance(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
-  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      .WillOnce(Return(&conn_pool_));
 
   configureRouteForWebsocket(route_config_provider_.route_config_->route_->route_entry_);
 
@@ -1691,7 +1687,9 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
-  upstream_connection->raiseEvent(Network::ConnectionEvent::Connected);
+
+  conn_pool_.host_->hostname_ = "newhost";
+  conn_pool_.poolReady(upstream_conn_);
 
   // rewritten authority header when auto_host_rewrite is true
   EXPECT_STREQ("newhost", raw_header_ptr->Host()->value().c_str());
@@ -1707,21 +1705,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyData) {
   setup(false, "");
 
-  Event::MockTimer* connect_timer =
-      new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
-  NiceMock<Network::MockClientConnection>* upstream_connection =
-      new NiceMock<Network::MockClientConnection>();
-  Upstream::MockHost::MockCreateConnectionData conn_info;
-
-  conn_info.connection_ = upstream_connection;
-  conn_info.host_description_.reset(new Upstream::HostImpl(
-      cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
-      Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-      envoy::api::v2::core::Metadata::default_instance(), 1,
-      envoy::api::v2::core::Locality().default_instance(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
-  EXPECT_CALL(*connect_timer, enableTimer(_));
-  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      .WillOnce(Return(&conn_pool_));
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
@@ -1748,10 +1733,11 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyData) {
 
   conn_manager_->onData(fake_input, false);
 
-  EXPECT_CALL(*upstream_connection, write(_, false));
-  EXPECT_CALL(*upstream_connection, write(BufferEqual(&early_data), false));
+  EXPECT_CALL(upstream_conn_, write(_, false));
+  EXPECT_CALL(upstream_conn_, write(BufferEqual(&early_data), false));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
-  upstream_connection->raiseEvent(Network::ConnectionEvent::Connected);
+  conn_pool_.poolReady(upstream_conn_);
+
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
 }
@@ -1759,21 +1745,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyData) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyDataConnectionFail) {
   setup(false, "");
 
-  Event::MockTimer* connect_timer =
-      new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
-  NiceMock<Network::MockClientConnection>* upstream_connection =
-      new NiceMock<Network::MockClientConnection>();
-  Upstream::MockHost::MockCreateConnectionData conn_info;
-
-  conn_info.connection_ = upstream_connection;
-  conn_info.host_description_.reset(new Upstream::HostImpl(
-      cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
-      Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-      envoy::api::v2::core::Metadata::default_instance(), 1,
-      envoy::api::v2::core::Locality().default_instance(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
-  EXPECT_CALL(*connect_timer, enableTimer(_));
-  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      .WillOnce(Return(&conn_pool_));
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
@@ -1800,7 +1773,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyDataConnectionFail) {
 
   conn_manager_->onData(fake_input, false);
 
-  upstream_connection->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  conn_pool_.poolFailure(Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
 
   // This should get dropped, with no crash or ASSERT.
@@ -1813,21 +1786,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyDataConnectionFail) {
 TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyEndStream) {
   setup(false, "");
 
-  Event::MockTimer* connect_timer =
-      new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
-  NiceMock<Network::MockClientConnection>* upstream_connection =
-      new NiceMock<Network::MockClientConnection>();
-  Upstream::MockHost::MockCreateConnectionData conn_info;
-
-  conn_info.connection_ = upstream_connection;
-  conn_info.host_description_.reset(new Upstream::HostImpl(
-      cluster_manager_.thread_local_cluster_.cluster_.info_, "newhost",
-      Network::Utility::resolveUrl("tcp://127.0.0.1:80"),
-      envoy::api::v2::core::Metadata::default_instance(), 1,
-      envoy::api::v2::core::Locality().default_instance(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance()));
-  EXPECT_CALL(*connect_timer, enableTimer(_));
-  EXPECT_CALL(cluster_manager_, tcpConnForCluster_("fake_cluster", _)).WillOnce(Return(conn_info));
+  EXPECT_CALL(cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      .WillOnce(Return(&conn_pool_));
 
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
@@ -1849,9 +1809,9 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyEndStream) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, true);
 
-  EXPECT_CALL(*upstream_connection, write(_, false));
-  EXPECT_CALL(*upstream_connection, write(_, true)).Times(0);
-  upstream_connection->raiseEvent(Network::ConnectionEvent::Connected);
+  EXPECT_CALL(upstream_conn_, write(_, false));
+  EXPECT_CALL(upstream_conn_, write(_, true)).Times(0);
+  conn_pool_.poolReady(upstream_conn_);
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
 }
