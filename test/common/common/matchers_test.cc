@@ -162,6 +162,11 @@ TEST(MetadataTest, MatchPresentValue) {
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 }
 
+// Helper function to retrieve the reference of an entry in a ListMatcher from a MetadataMatcher.
+ValueMatcherConstSharedPtr listMatchEntry(const envoy::type::matcher::MetadataMatcher& matcher) {
+  return matcher.mutable_value()->mutable_list_match()->mutable_one_of();
+}
+
 TEST(MetadataTest, MatchStringListValue) {
   envoy::api::v2::core::Metadata metadata;
   ProtobufWkt::Value& metadataValue =
@@ -175,35 +180,15 @@ TEST(MetadataTest, MatchStringListValue) {
   matcher.set_filter("envoy.filter.a");
   matcher.add_path()->set_key("groups");
 
-  matcher.mutable_value()
-      ->mutable_list_match()
-      ->mutable_one_of()
-      ->mutable_string_match()
-      ->set_exact("second");
+  listMatchEntry(matcher)->mutable_string_match()->set_exact("second");
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.mutable_value()
-      ->mutable_list_match()
-      ->mutable_one_of()
-      ->mutable_string_match()
-      ->set_prefix("fi");
+  listMatchEntry(matcher)->mutable_string_match()->set_prefix("fi");
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.mutable_value()
-      ->mutable_list_match()
-      ->mutable_one_of()
-      ->mutable_string_match()
-      ->set_suffix("rd");
+  listMatchEntry(matcher)->mutable_string_match()->set_suffix("rd");
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.mutable_value()
-      ->mutable_list_match()
-      ->mutable_one_of()
-      ->mutable_string_match()
-      ->set_exact("fourth");
+  listMatchEntry(matcher)->mutable_string_match()->set_exact("fourth");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.mutable_value()
-      ->mutable_list_match()
-      ->mutable_one_of()
-      ->mutable_string_match()
-      ->set_prefix("none");
+  listMatchEntry(matcher)->mutable_string_match()->set_prefix("none");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 
   values->clear_values();
@@ -222,15 +207,11 @@ TEST(MetadataTest, MatchBoolListValue) {
   matcher.set_filter("envoy.filter.a");
   matcher.add_path()->set_key("groups");
 
-  matcher.mutable_value()
-      ->mutable_list_match()
-      ->mutable_one_of()
-      ->mutable_string_match()
-      ->set_exact("test");
+  listMatchEntry(matcher)->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.mutable_value()->mutable_list_match()->mutable_one_of()->set_bool_match(true);
+  listMatchEntry(matcher)->set_bool_match(true);
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.mutable_value()->mutable_list_match()->mutable_one_of()->set_bool_match(false);
+  listMatchEntry(matcher)->set_bool_match(false);
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 
   values->clear_values();
@@ -249,50 +230,26 @@ TEST(MetadataTest, MatchDoubleListValue) {
   matcher.set_filter("envoy.filter.a");
   matcher.add_path()->set_key("groups");
 
-  matcher.mutable_value()
-      ->mutable_list_match()
-      ->mutable_one_of()
-      ->mutable_string_match()
-      ->set_exact("test");
+  listMatchEntry(matcher)->mutable_string_match()->set_exact("test");
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.mutable_value()->mutable_list_match()->mutable_one_of()->set_bool_match(true);
+  listMatchEntry(matcher)->set_bool_match(true);
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.mutable_value()
-      ->mutable_list_match()
-      ->mutable_one_of()
-      ->mutable_double_match()
-      ->set_exact(9);
+  listMatchEntry(matcher)->mutable_double_match()->set_exact(9);
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
-  matcher.mutable_value()
-      ->mutable_list_match()
-      ->mutable_one_of()
-      ->mutable_double_match()
-      ->set_exact(10);
+  listMatchEntry(matcher)->mutable_double_match()->set_exact(10);
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 
-  auto r = matcher.mutable_value()
-               ->mutable_list_match()
-               ->mutable_one_of()
-               ->mutable_double_match()
-               ->mutable_range();
+  auto r = listMatchEntry(matcher)->mutable_double_match()->mutable_range();
   r->set_start(10);
   r->set_end(15);
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 
-  r = matcher.mutable_value()
-          ->mutable_list_match()
-          ->mutable_one_of()
-          ->mutable_double_match()
-          ->mutable_range();
+  r = listMatchEntry(matcher)->mutable_double_match()->mutable_range();
   r->set_start(20);
   r->set_end(24);
   EXPECT_TRUE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));
 
-  r = matcher.mutable_value()
-          ->mutable_list_match()
-          ->mutable_one_of()
-          ->mutable_double_match()
-          ->mutable_range();
+  r = listMatchEntry(matcher)->mutable_double_match()->mutable_range();
   r->set_start(24);
   r->set_end(26);
   EXPECT_FALSE(Envoy::Matchers::MetadataMatcher(matcher).match(metadata));

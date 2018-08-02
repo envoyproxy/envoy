@@ -15,7 +15,7 @@ namespace Envoy {
 namespace Matchers {
 
 class ValueMatcher;
-typedef std::shared_ptr<const ValueMatcher> MatcherPtr;
+typedef std::shared_ptr<const ValueMatcher> ValueMatcherConstSharedPtr;
 
 class ValueMatcher {
 public:
@@ -29,7 +29,7 @@ public:
   /**
    * Create the matcher object.
    */
-  static MatcherPtr create(const envoy::type::matcher::ValueMatcher& value);
+  static ValueMatcherConstSharedPtr create(const envoy::type::matcher::ValueMatcher& value);
 };
 
 class NullMatcher : public ValueMatcher {
@@ -96,7 +96,7 @@ public:
 private:
   const envoy::type::matcher::ListMatcher matcher_;
 
-  MatcherPtr oneof_value_matcher_;
+  ValueMatcherConstSharedPtr oneof_value_matcher_;
 };
 
 class MetadataMatcher {
@@ -114,7 +114,7 @@ private:
   const envoy::type::matcher::MetadataMatcher matcher_;
   std::vector<std::string> path_;
 
-  MatcherPtr value_matcher_;
+  ValueMatcherConstSharedPtr value_matcher_;
 };
 
 } // namespace Matchers

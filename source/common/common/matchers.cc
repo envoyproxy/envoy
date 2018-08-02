@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace Matchers {
 
-MatcherPtr ValueMatcher::create(const envoy::type::matcher::ValueMatcher& v) {
+ValueMatcherConstSharedPtr ValueMatcher::create(const envoy::type::matcher::ValueMatcher& v) {
   switch (v.match_pattern_case()) {
   case envoy::type::matcher::ValueMatcher::kNullMatch:
     return std::make_shared<const NullMatcher>();
