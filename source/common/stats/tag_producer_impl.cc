@@ -1,9 +1,5 @@
 #include "common/stats/tag_producer_impl.h"
 
-//#include <string.h>
-
-//#include <algorithm>
-//#include <chrono>
 #include <string>
 
 #include "envoy/common/exception.h"
