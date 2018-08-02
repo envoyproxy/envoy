@@ -4,6 +4,7 @@
 #include "common/common/version.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
+#include "common/stats/histogram_impl.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"

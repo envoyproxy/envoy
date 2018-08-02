@@ -122,7 +122,8 @@ envoy_cc_library(
         "//source/common/common:block_memory_hash_set_lib",
         "//source/common/common:utility_lib",
         "//source/common/network:utility_lib",
-        "//source/common/stats:stats_lib",
+        "//source/common/stats:raw_stat_data_lib",
+        "//source/common/stats:stats_options_lib",
     ],
 )
 
@@ -165,6 +166,7 @@ envoy_cc_library(
     hdrs = ["overload_manager_impl.h"],
     deps = [
         "//include/envoy/server:overload_manager_interface",
+        "//include/envoy/stats:stats_interface",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
         "//source/server:resource_monitor_config_lib",

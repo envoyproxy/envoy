@@ -8,7 +8,6 @@
 #include "common/config/filter_json.h"
 #include "common/network/address_impl.h"
 #include "common/router/metadatamatchcriteria_impl.h"
-#include "common/stats/stats_impl.h"
 #include "common/tcp_proxy/tcp_proxy.h"
 #include "common/upstream/upstream_impl.h"
 

@@ -21,6 +21,7 @@
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
+#include "common/stats/stats_options_impl.h"
 
 #include "test/test_common/printers.h"
 
