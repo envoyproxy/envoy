@@ -139,6 +139,7 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                     90.0,
                     95.0,
                     99.0,
+                    99.5,
                     99.9,
                     100.0
                 ],
@@ -173,6 +174,10 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                             {
                                 "interval": null,
                                 "cumulative": 109.9
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.95
                             },
                             {
                                 "interval": null,
@@ -214,6 +219,10 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                             {
                                 "interval": 109.9,
                                 "cumulative": 209.8
+                            },
+                            {
+                                "interval": 109.95,
+                                "cumulative": 209.9
                             },
                             {
                                 "interval": 109.99,
@@ -276,6 +285,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
                     90.0,
                     95.0,
                     99.0,
+                    99.5,
                     99.9,
                     100.0
                 ],
@@ -310,6 +320,10 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
                             {
                                 "interval": 109.9,
                                 "cumulative": 209.8
+                            },
+                            {
+                                "interval": 109.95,
+                                "cumulative": 209.9
                             },
                             {
                                 "interval": 109.99,
