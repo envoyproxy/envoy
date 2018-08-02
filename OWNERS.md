@@ -14,6 +14,11 @@ routing PRs, questions, etc. to the right place.
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
   * HTTP, flow control, cluster manager, load balancing, and core networking (listeners,
     connections, etc.).
+* Stephan Zuercher ([zuercher](https://github.com/zuercher)) (stephan@turbinelabs.io)
+  * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
+    (metadata, etc.), and OSX build.
+* Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
+  * TCP proxy, TLS, logging, and core networking (listeners, connections, etc.).
 
 # Maintainers
 
@@ -25,11 +30,6 @@ routing PRs, questions, etc. to the right place.
   * Base server (watchdog, workers, startup, stack trace handling, etc.).
 * Daniel Hochman ([danielhochman](https://github.com/danielhochman)) (dhochman@lyft.com)
   * Redis, Python, configuration/operational questions.
-* Stephan Zuercher ([zuercher](https://github.com/zuercher)) (stephan@turbinelabs.io)
-  * Load balancing, upstream clusters and cluster manager, logging, complex HTTP routing
-    (metadata, etc.), and OSX build.
-* Greg Greenway ([ggreenway](https://github.com/ggreenway)) (ggreenway@apple.com)
-  * TCP proxy, TLS, logging, and core networking (listeners, connections, etc.).
 * Lizan Zhou ([lizan](https://github.com/lizan)) (zlizan@google.com)
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions).
 
