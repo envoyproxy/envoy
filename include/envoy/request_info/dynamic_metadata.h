@@ -27,8 +27,7 @@ public:
    * Note that it is an error to call setData() twice with the same data_name; this is to
    * enforce a single authoritative source for each piece of data stored in DynamicMetadata.
    */
-  virtual void setData(absl::string_view data_name,
-                       std::unique_ptr<Object>&& data) PURE;
+  virtual void setData(absl::string_view data_name, std::unique_ptr<Object>&& data) PURE;
 
   /**
    * @param data_name the name of the data being set.
