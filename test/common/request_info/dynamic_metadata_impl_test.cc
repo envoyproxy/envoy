@@ -75,8 +75,8 @@ TEST_F(DynamicMetadataImplTest, SameTypes) {
   size_t access_count_1 = 0u;
   size_t access_count_2 = 0u;
   size_t destruction_count = 0u;
-  const int ValueOne = 5;
-  const int ValueTwo = 6;
+  static const int ValueOne = 5;
+  static const int ValueTwo = 6;
 
   dynamic_metadata().setData("test_1", std::make_unique<TestStoredTypeTracking>(
                                            ValueOne, &access_count_1, &destruction_count));
