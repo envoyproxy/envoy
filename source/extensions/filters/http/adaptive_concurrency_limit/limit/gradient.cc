@@ -55,17 +55,15 @@ void Gradient::update(const Common::SampleWindow& sample) {
 
   // Reduce the limit to reduce traffic and probe for a new min_rtt_.
   if (probe_interval_.has_value() && probe_countdown_.has_value()) {
-    probe_countdown_ = absl::optional<uint32_t>{probe_countdown_.value() - 1};
-
     if (probe_countdown_.value() <= 0) {
       probe_countdown_ = nextProbeCountdown();
       estimated_limit_ = std::max(min_limit_, static_cast<uint32_t>(queue_size));
       min_rtt_.clear();
-      std::cerr << "Probe min rtt, estimated limit: " << estimated_limit_ << std::endl;
       ENVOY_LOG(debug, "Probe min rtt for '{}', estimated limit: {}", cluster_name_,
                 estimated_limit_);
       return;
     }
+    probe_countdown_ = absl::optional<uint32_t>{probe_countdown_.value() - 1};
   }
 
   uint32_t new_limit;

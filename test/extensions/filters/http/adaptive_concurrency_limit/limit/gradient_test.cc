@@ -54,7 +54,6 @@ common_config:
 limit_specific_config:
   smoothing: 0.5
   rtt_tolerance: 2.0
-  probe_interval: 2
 )EOF";
 
   setLimit(yaml);
@@ -71,7 +70,6 @@ common_config:
 limit_specific_config:
   smoothing: 0.5
   rtt_tolerance: 2.0
-  probe_interval: 10
 )EOF";
 
   setLimit(yaml);
@@ -95,7 +93,6 @@ common_config:
 limit_specific_config:
   smoothing: 0.5
   rtt_tolerance: 2.0
-  probe_interval: 20
 )EOF";
 
   setLimit(yaml);
@@ -124,7 +121,6 @@ common_config:
 limit_specific_config:
   smoothing: 0.5
   rtt_tolerance: 2.0
-  probe_interval: 20
 )EOF";
 
   setLimit(yaml);
@@ -153,7 +149,6 @@ common_config:
 limit_specific_config:
   smoothing: 1.0
   rtt_tolerance: 2.0
-  probe_interval: 20
 )EOF";
 
   setLimit(yaml);
@@ -174,7 +169,6 @@ common_config:
 limit_specific_config:
   smoothing: 0.5
   rtt_tolerance: 2.0
-  probe_interval: 20
 )EOF";
 
   setLimit(yaml_smoothing);
@@ -193,7 +187,6 @@ common_config:
 limit_specific_config:
   smoothing: 1.0
   rtt_tolerance: 2.0
-  probe_interval: 20
 )EOF";
 
   setLimit(yaml);
@@ -202,6 +195,85 @@ limit_specific_config:
   sample2.addDroppedSample(100);
   limit_->update(sample2);
   EXPECT_EQ(50, limit_->getLimit());
+}
+
+TEST_F(GradientLimitTest, DecreaseLimitOnProbe) {
+  std::string yaml = R"EOF(
+name: envoy.filters.http.adaptive_concurrency_limit.limit.gradient
+common_config:
+  initial_limit: 100
+  min_limit: 50
+  max_limit: 1000
+limit_specific_config:
+  smoothing: 0.5
+  rtt_tolerance: 2.0
+  probe_interval: 4
+)EOF";
+
+  setLimit(yaml);
+  Common::SampleWindow sample;
+  sample.addSample(millisecondsToNanoseconds(10), 100);
+  EXPECT_FALSE(sample.didDrop());
+  limit_->update(sample);
+  EXPECT_EQ(110, limit_->getLimit());
+  limit_->update(sample);
+  EXPECT_EQ(120, limit_->getLimit());
+  limit_->update(sample);
+  EXPECT_EQ(130, limit_->getLimit());
+  limit_->update(sample);
+  EXPECT_EQ(141, limit_->getLimit());
+  // After 4 updates the probing interval is up.
+  limit_->update(sample);
+  EXPECT_EQ(50, limit_->getLimit());
+  limit_->update(sample);
+  EXPECT_EQ(57, limit_->getLimit());
+}
+
+TEST_F(GradientLimitTest, NoLimitChangeWithEmptySample) {
+  std::string yaml = R"EOF(
+name: envoy.filters.http.adaptive_concurrency_limit.limit.gradient
+common_config:
+  initial_limit: 100
+  min_limit: 1
+  max_limit: 1000
+limit_specific_config:
+  smoothing: 0.5
+  rtt_tolerance: 2.0
+)EOF";
+
+  setLimit(yaml);
+  Common::SampleWindow sample;
+  sample.addSample(millisecondsToNanoseconds(10), 100);
+  EXPECT_FALSE(sample.didDrop());
+  limit_->update(sample);
+  EXPECT_EQ(110, limit_->getLimit());
+  Common::SampleWindow sample2;
+  limit_->update(sample2);
+  EXPECT_EQ(110, limit_->getLimit());
+}
+
+TEST_F(GradientLimitTest, NoLimitChangeWithUndersaturatedSample) {
+  std::string yaml = R"EOF(
+name: envoy.filters.http.adaptive_concurrency_limit.limit.gradient
+common_config:
+  initial_limit: 100
+  min_limit: 1
+  max_limit: 1000
+limit_specific_config:
+  smoothing: 0.5
+  rtt_tolerance: 2.0
+)EOF";
+
+  setLimit(yaml);
+  Common::SampleWindow sample;
+  sample.addSample(millisecondsToNanoseconds(10), 100);
+  EXPECT_FALSE(sample.didDrop());
+  limit_->update(sample);
+  EXPECT_EQ(110, limit_->getLimit());
+  Common::SampleWindow sample2;
+  sample.addSample(millisecondsToNanoseconds(10), 50);
+  limit_->update(sample2);
+  EXPECT_EQ(110, limit_->getLimit());
 }
 
 TEST(GradientLimitFactoryTest, CreateLimit) {
