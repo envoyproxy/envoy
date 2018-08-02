@@ -90,11 +90,13 @@ bool ListMatcher::match(const ProtobufWkt::Value& value) const {
     return false;
   }
 
-  for (int i = 0; i < value.list_value().values_size(); ++i) {
-    const auto& lv = value.list_value().values(i);
+  if (oneof_value_matcher_) {
+    for (int i = 0; i < value.list_value().values_size(); ++i) {
+      const auto &lv = value.list_value().values(i);
 
-    if (oneof_value_matcher_ && oneof_value_matcher_->match(lv)) {
-      return true;
+      if (oneof_value_matcher_->match(lv)) {
+        return true;
+      }
     }
   }
   return false;
