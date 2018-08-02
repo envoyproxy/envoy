@@ -7,7 +7,6 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
-#include "envoy/server/transport_socket_config.h"
 #include "envoy/server/worker.h"
 
 #include "common/common/logger.h"
@@ -16,6 +15,7 @@
 
 #include "server/init_manager_impl.h"
 #include "server/lds_api.h"
+#include "server/transport_socket_config_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -190,7 +190,6 @@ class ListenerImpl : public Network::ListenerConfig,
                      public Network::DrainDecision,
                      public Network::FilterChainManager,
                      public Network::FilterChainFactory,
-                     public Configuration::TransportSocketFactoryContext,
                      Logger::Loggable<Logger::Id::config> {
 public:
   /**
@@ -300,11 +299,6 @@ public:
   bool createNetworkFilterChain(Network::Connection& connection,
                                 const std::vector<Network::FilterFactoryCb>& factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& manager) override;
-
-  // Configuration::TransportSocketFactoryContext
-  Ssl::ContextManager& sslContextManager() override { return parent_.server_.sslContextManager(); }
-  Stats::Scope& statsScope() const override { return *listener_scope_; }
-  Secret::SecretManager& secretManager() override { return parent_.server_.secretManager(); }
 
   SystemTime last_updated_;
 

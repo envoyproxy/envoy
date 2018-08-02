@@ -310,6 +310,7 @@ public:
   COUNTER  (upstream_cx_http1_total)                                                               \
   COUNTER  (upstream_cx_http2_total)                                                               \
   COUNTER  (upstream_cx_connect_fail)                                                              \
+  COUNTER  (upstream_cx_connect_fail_by_sds)                                                       \
   COUNTER  (upstream_cx_connect_timeout)                                                           \
   COUNTER  (upstream_cx_idle_timeout)                                                              \
   COUNTER  (upstream_cx_connect_attempts_exceeded)                                                 \

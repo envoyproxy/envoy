@@ -13,9 +13,38 @@ envoy_cc_library(
     srcs = ["secret_manager_impl.cc"],
     hdrs = ["secret_manager_impl.h"],
     deps = [
+        ":sds_api_lib",
         "//include/envoy/secret:secret_manager_interface",
+        "//include/envoy/server:instance_interface",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/ssl:tls_certificate_config_impl_lib",
         "@envoy_api//envoy/api/v2/auth:cert_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "sds_api_lib",
+    srcs = ["sds_api.cc"],
+    hdrs = ["sds_api.h"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/init:init_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/config:resources_lib",
+        "//source/common/config:subscription_factory_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/ssl:tls_certificate_config_impl_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "dynamic_secret_provider_factory_impl_lib",
+    hdrs = ["dynamic_secret_provider_factory_impl.h"],
+    deps = [
+        ":sds_api_lib",
+        "//include/envoy/init:init_interface",
+        "//include/envoy/secret:dynamic_secret_provider_factory_interface",
     ],
 )

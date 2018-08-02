@@ -15,11 +15,12 @@
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/init/init.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/secret/dynamic_secret_provider_factory.h"
 #include "envoy/secret/secret_manager.h"
-#include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -38,6 +39,8 @@
 #include "common/upstream/locality.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
+
+#include "server/init_manager_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -328,13 +331,12 @@ private:
 /**
  * Implementation of ClusterInfo that reads from JSON.
  */
-class ClusterInfoImpl : public ClusterInfo,
-                        public Server::Configuration::TransportSocketFactoryContext {
+class ClusterInfoImpl : public ClusterInfo {
 public:
   ClusterInfoImpl(const envoy::api::v2::Cluster& config,
                   const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
-                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                  Secret::SecretManager& secret_manager, bool added_via_api);
+                  Network::TransportSocketFactoryPtr&& socket_factory,
+                  Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   static ClusterStats generateStats(Stats::Scope& scope);
   static ClusterLoadReportStats generateLoadReportStats(Stats::Scope& scope);
@@ -375,16 +377,11 @@ public:
   const LoadBalancerSubsetInfo& lbSubsetInfo() const override { return lb_subset_; }
   const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
 
-  // Server::Configuration::TransportSocketFactoryContext
-  Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
-
   const Network::ConnectionSocket::OptionsSharedPtr& clusterSocketOptions() const override {
     return cluster_socket_options_;
   };
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
-
-  Secret::SecretManager& secretManager() override { return secret_manager_; }
 
 private:
   struct ResourceManagers {
@@ -406,11 +403,11 @@ private:
   const std::chrono::milliseconds connect_timeout_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   const uint32_t per_connection_buffer_limit_bytes_;
-  Stats::ScopePtr stats_scope_;
-  mutable ClusterStats stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
   mutable ClusterLoadReportStats load_report_stats_;
   Network::TransportSocketFactoryPtr transport_socket_factory_;
+  Stats::ScopePtr stats_scope_;
+  mutable ClusterStats stats_;
   const uint64_t features_;
   const Http::Http2Settings http2_settings_;
   mutable ResourceManagers resource_managers_;
@@ -418,14 +415,12 @@ private:
   const Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_;
   absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
-  Ssl::ContextManager& ssl_context_manager_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;
   const envoy::api::v2::core::Metadata metadata_;
   const envoy::api::v2::Cluster::CommonLbConfig common_lb_config_;
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
-  Secret::SecretManager& secret_manager_;
 };
 
 /**
@@ -478,10 +473,10 @@ public:
   void initialize(std::function<void()> callback) override;
 
 protected:
-  ClusterImplBase(const envoy::api::v2::Cluster& cluster,
-                  const envoy::api::v2::core::BindConfig& bind_config, Runtime::Loader& runtime,
-                  Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                  Secret::SecretManager& secret_manager, bool added_via_api);
+  ClusterImplBase(
+      const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime, Stats::Store& stats,
+      Ssl::ContextManager& ssl_context_manager, ClusterManager& cm, bool added_via_api,
+      Secret::DynamicTlsCertificateSecretProviderFactoryContext& secret_provider_context);
 
   /**
    * Overridden by every concrete cluster. The cluster should do whatever pre-init is needed. E.g.,
@@ -490,14 +485,26 @@ protected:
   virtual void startPreInit() PURE;
 
   /**
-   * Called by every concrete cluster when pre-init is complete. At this point, shared init takes
-   * over and determines if there is an initial health check pass needed, etc.
+   * Called by every concrete cluster when pre-init is complete. At this point,
+   * shared init starts init_manager_ initialization and determines if there
+   * is an initial health check pass needed, etc.
    */
   void onPreInitComplete();
 
+  /**
+   * Called by every concrete cluster after all Sds api targets registered at SDS init manager are
+   * initialized. At this point, shared init takes over and determines if there is an initial health
+   * check pass needed, etc.
+   */
+  void onInitDone();
+
   Runtime::Loader& runtime_;
-  ClusterInfoConstSharedPtr info_; // This cluster info stores the stats scope so it must be
-                                   // initialized first and destroyed last.
+
+  Server::InitManagerImpl init_manager_;
+  ClusterInfoConstSharedPtr
+      info_; // This cluster info stores the stats scope so it must be initialized first
+             // and destroyed last.
+
   HealthCheckerSharedPtr health_checker_;
   Outlier::DetectorSharedPtr outlier_detector_;
 
@@ -575,9 +582,10 @@ typedef std::unique_ptr<PriorityStateManager> PriorityStateManagerPtr;
  */
 class StaticClusterImpl : public ClusterImplBase {
 public:
-  StaticClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                    Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                    const LocalInfo::LocalInfo& local_info, ClusterManager& cm, bool added_via_api);
+  StaticClusterImpl(
+      const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime, Stats::Store& stats,
+      Ssl::ContextManager& ssl_context_manager, ClusterManager& cm, bool added_via_api,
+      Secret::DynamicTlsCertificateSecretProviderFactoryContext& secret_provider_context);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -606,11 +614,11 @@ protected:
  */
 class StrictDnsClusterImpl : public BaseDynamicClusterImpl {
 public:
-  StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                       Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                       const LocalInfo::LocalInfo& local_info,
-                       Network::DnsResolverSharedPtr dns_resolver, ClusterManager& cm,
-                       Event::Dispatcher& dispatcher, bool added_via_api);
+  StrictDnsClusterImpl(
+      const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime, Stats::Store& stats,
+      Ssl::ContextManager& ssl_context_manager, Network::DnsResolverSharedPtr dns_resolver,
+      ClusterManager& cm, Event::Dispatcher& dispatcher, bool added_via_api,
+      Secret::DynamicTlsCertificateSecretProviderFactoryContext& secret_provider_context);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }

@@ -217,9 +217,9 @@ envoy_cc_library(
         ":drain_manager_lib",
         ":init_manager_lib",
         ":lds_api_lib",
+        ":transport_socket_config_lib",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
-        "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/server:worker_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:empty_string",
@@ -231,6 +231,7 @@ envoy_cc_library(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/secret:dynamic_secret_provider_factory_impl_lib",
         "//source/common/ssl:context_config_lib",
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/filters/network:well_known_names",
@@ -347,5 +348,14 @@ envoy_cc_library(
         "//include/envoy/server:worker_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:thread_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "transport_socket_config_lib",
+    hdrs = ["transport_socket_config_impl.h"],
+    deps = [
+        "//include/envoy/server:transport_socket_config_interface",
+        "//source/common/secret:dynamic_secret_provider_factory_impl_lib",
     ],
 )

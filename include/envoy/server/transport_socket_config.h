@@ -2,9 +2,12 @@
 
 #include <string>
 
+#include "envoy/init/init.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/secret/dynamic_secret_provider_factory.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -30,9 +33,25 @@ public:
   virtual Stats::Scope& statsScope() const PURE;
 
   /**
+   * @return the instance of init manager.
+   */
+  virtual Init::Manager& initManager() PURE;
+
+  /**
    * Return the instance of secret manager.
    */
   virtual Secret::SecretManager& secretManager() PURE;
+
+  /**
+   * @return the instance of ClusterManager.
+   */
+  virtual Upstream::ClusterManager& clusterManager() PURE;
+
+  /**
+   * @return the factory of dynamic tls certificate secret provider.
+   */
+  virtual Secret::DynamicTlsCertificateSecretProviderFactory&
+  dynamicTlsCertificateSecretProviderFactory() PURE;
 };
 
 class TransportSocketConfigFactory {

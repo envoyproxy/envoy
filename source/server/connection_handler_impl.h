@@ -27,6 +27,7 @@ namespace Server {
 #define ALL_LISTENER_STATS(COUNTER, GAUGE, HISTOGRAM)                                              \
   COUNTER  (downstream_cx_total)                                                                   \
   COUNTER  (downstream_cx_destroy)                                                                 \
+  COUNTER  (downstream_cx_destroy_by_sds)                                                          \
   GAUGE    (downstream_cx_active)                                                                  \
   HISTOGRAM(downstream_cx_length_ms)                                                               \
   COUNTER  (no_filter_chain_match)

@@ -411,6 +411,7 @@ public:
 
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
+  MOCK_METHOD0(initManager, Init::Manager&());
 };
 
 class MockListenerFactoryContext : public virtual MockFactoryContext,

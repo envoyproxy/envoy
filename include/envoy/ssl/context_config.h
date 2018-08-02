@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/secret/dynamic_secret_provider.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -111,6 +112,17 @@ public:
    * @return The maximum TLS protocol version to negotiate.
    */
   virtual unsigned maxProtocolVersion() const PURE;
+
+  /**
+   * @return true if the config is valid. Only when SDS dynamic secret is needed, but has not been
+   * downloaded yet, the config is invalid.
+   */
+  virtual bool isValid() const PURE;
+
+  /**
+   * @return the DynamicSecretProvider object.
+   */
+  virtual Secret::DynamicTlsCertificateSecretProvider* getDynamicSecretProvider() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {
@@ -126,6 +138,8 @@ public:
    */
   virtual bool allowRenegotiation() const PURE;
 };
+
+typedef std::unique_ptr<ClientContextConfig> ClientContextConfigPtr;
 
 class ServerContextConfig : public virtual ContextConfig {
 public:
@@ -147,6 +161,8 @@ public:
    */
   virtual const std::vector<SessionTicketKey>& sessionTicketKeys() const PURE;
 };
+
+typedef std::unique_ptr<ServerContextConfig> ServerContextConfigPtr;
 
 } // namespace Ssl
 } // namespace Envoy
