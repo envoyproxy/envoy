@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <thread>
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/base64.h"
