@@ -173,14 +173,5 @@ private:
 };
 
 typedef std::unique_ptr<HdsDelegate> HdsDelegatePtr;
-
-// Friend class of HdsDelegate, making it easier to access private fields
-class HdsDelegateFriend {
-public:
-  void processPrivateMessage(
-      std::shared_ptr<HdsDelegate> hd,
-      std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message);
-};
-
 } // namespace Upstream
 } // namespace Envoy

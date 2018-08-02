@@ -25,6 +25,17 @@ using ::testing::AtLeast;
 namespace Envoy {
 namespace Upstream {
 
+// Friend class of HdsDelegate, making it easier to access private fields
+class HdsDelegateFriend {
+public:
+  // Allows access to private function processMessage
+  void processPrivateMessage(
+      std::shared_ptr<HdsDelegate> hd,
+      std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
+    hd->processMessage(std::move(message));
+  };
+};
+
 class HdsTest : public testing::Test {
 public:
   HdsTest()

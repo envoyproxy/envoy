@@ -65,7 +65,7 @@ public:
   }
 
   // Envoy sends healthcheck messages to the endpoints
-  void healthcheckEndpoints(std::string cluster2 = "None") {
+  void healthcheckEndpoints(std::string cluster2 = "") {
     ASSERT_TRUE(host_upstream_->waitForHttpConnection(*dispatcher_, host_fake_connection_));
     ASSERT_TRUE(host_fake_connection_->waitForNewStream(*dispatcher_, host_stream_));
     ASSERT_TRUE(host_stream_->waitForEndStream(*dispatcher_));
@@ -74,7 +74,7 @@ public:
     EXPECT_STREQ(host_stream_->headers().Method()->value().c_str(), "GET");
     EXPECT_STREQ(host_stream_->headers().Host()->value().c_str(), "anna");
 
-    if (cluster2 != "None") {
+    if (cluster2 != "") {
       ASSERT_TRUE(host2_upstream_->waitForHttpConnection(*dispatcher_, host2_fake_connection_));
       ASSERT_TRUE(host2_fake_connection_->waitForNewStream(*dispatcher_, host2_stream_));
       ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
