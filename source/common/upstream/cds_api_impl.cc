@@ -52,7 +52,7 @@ void CdsApiImpl::onConfigUpdate(const ResourceVector& resources, const std::stri
   std::unordered_set<std::string> cluster_names;
   for (const auto& cluster : resources) {
     if (!cluster_names.insert(cluster.name()).second) {
-      throw EnvoyException("duplicate clusters found");
+      throw EnvoyException(fmt::format("duplicate cluster {} found", cluster.name()));
     }
   }
   for (const auto& cluster : resources) {

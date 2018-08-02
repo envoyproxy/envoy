@@ -137,7 +137,8 @@ TEST_F(CdsApiImplTest, ValidateDuplicateClusters) {
   auto* cluster_2 = clusters.Add();
   cluster_2->set_name("duplicate_cluster");
 
-  EXPECT_THROW(dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, ""), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, ""),
+                            EnvoyException, "duplicate cluster duplicate_cluster found");
   EXPECT_CALL(request_, cancel());
 }
 
