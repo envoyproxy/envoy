@@ -392,6 +392,7 @@ static_resources:
     circuit_breakers:
       thresholds:
         max_requests: 200
+    dns_lookup_family: V4_ONLY
   - name: rds
     connect_timeout: 0.25s
     type: STRICT_DNS
@@ -401,6 +402,7 @@ static_resources:
         protocol: TCP
         address: rds.yourcompany.net
         port_value: 80
+    dns_lookup_family: V4_ONLY
   - name: statsd
     connect_timeout: 0.25s
     type: STATIC
@@ -410,6 +412,7 @@ static_resources:
         protocol: TCP
         address: 127.0.0.1
         port_value: 8125
+    dns_lookup_family: V4_ONLY
   - name: lightstep_saas
     connect_timeout: 1s
     type: LOGICAL_DNS
@@ -450,23 +453,29 @@ dynamic_resources:
   cds_config:
     api_config_source:
       cluster_names:
-      - cds_cluster
+      - sds
       refresh_delay: 30s
-flags_path: /etc/envoy/flags
+cluster_manager: {}
+flags_path: "/etc/envoy/flags"
 stats_sinks:
   - name: envoy.statsd
     config:
       tcp_cluster_name: statsd
+watchdog: {}
 tracing:
   http:
     name: envoy.lightstep
     config:
-      access_token_file: /etc/envoy/lightstep_access_token
+      access_token_file: "/etc/envoy/lightstep_access_token"
       collector_cluster: lightstep_saas
 rate_limit_service:
   grpc_service:
     envoy_grpc:
       cluster_name: ratelimit
+runtime:
+  symlink_root: "/srv/runtime_data/current"
+  subdirectory: envoy
+  override_subdirectory: envoy_override
 admin:
   access_log_path: /var/log/envoy/admin_access.log
   address:

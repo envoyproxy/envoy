@@ -10,12 +10,17 @@
     {% if tls %}
     tls_context:
       common_tls_context:
-        alpn_protocols: h2,http/1.1
         tls_certificates:
         - certificate_chain:
             filename: certs/servercert.pem
           private_key:
             filename: certs/serverkey.pem
+        validation_context: {}
+        alpn_protocols:
+        - h2
+        - http/1.1
+        deprecated_v1:
+          alt_alpn_protocols: http/1.1
     {% endif %}
     {% if proxy_proto %}
     use_proxy_proto: true
@@ -119,7 +124,7 @@ static_resources:
           trusted_ca:
             filename: certs/cacert.pem
           verify_subject_alt_name:
-            - front-proxy.yourcompany.net
+          - front-proxy.yourcompany.net
     http2_protocol_options: {}
   - name: lightstep_saas
     type: LOGICAL_DNS
@@ -138,19 +143,19 @@ static_resources:
             filename: certs/cacert.pem
           verify_subject_alt_name:
           - collector-grpc.lightstep.com
-flags_path: /etc/envoy/flags
+flags_path: "/etc/envoy/flags"
 stats_sinks:
-  name: envoy.statsd
+- name: envoy.statsd
   config: 
     tcp_cluster_name: statsd
 tracing:
   http:
     name: envoy.lightstep
     config:
-      access_token_file: etc/envoy/lightstep_access_token
+      access_token_file: "/etc/envoy/lightstep_access_token"
       collector_cluster: lightstep_saas
 runtime:
-  symlink_root: /srv/runtime_data/current
+  symlink_root: "/srv/runtime_data/current"
   subdirectory: envoy
   override_subdirectory: envoy_override
 admin:

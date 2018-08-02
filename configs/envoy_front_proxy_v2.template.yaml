@@ -78,7 +78,7 @@
                         runtime_key: access_log.access_error.duration
                 - traceable_filter: {}
           config:
-            path: /var/log/envoy/access_error.log
+            path: "/var/log/envoy/access_error.log"
             format: "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" %RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% %RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% \"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" \"%REQ(:AUTHORITY)%\" \"%REQ(X-LYFT-USER-ID)%\" \"%RESP(GRPC-STATUS)%\"\n"
 {% endmacro -%}
 static_resources:
@@ -119,18 +119,16 @@ static_resources:
         address: collector-grpc.lightstep.com
         port_value: 443
     http2_protocol_options: {}
-  - name: main_website
-    connect_timeout: 0.25s
-    type: LOGICAL_DNS
-    lb_policy: ROUND_ROBIN
-    hosts:
-    - socket_address:
-        address: main_website.com
-        protocol: TCP
-        port_value: 443
   {% for service, options in clusters.iteritems() -%}
   - {{ helper.internal_cluster_definition(service, options)|indent(2) }}
   {% endfor %}
+dynamic_resources:
+  deprecated_v1:
+    sds_config:
+      api_config_source:
+        cluster_names:
+        - sds
+        refresh_delay: 30s
 cluster_manager:
   outlier_detection:
     event_log_path: /var/log/envoy/outlier_events.log
