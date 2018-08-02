@@ -6,8 +6,6 @@
 
 #include "envoy/stats/stats.h"
 
-//#include "common/common/utility.h"
-
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
