@@ -112,6 +112,11 @@ public:
    * @see man 2 getsockopt
    */
   virtual int getsockopt(int sockfd, int level, int optname, void* optval, socklen_t* optlen) PURE;
+
+  /**
+   * @see man 2 socket
+   */
+  virtual int socket(int domain, int type, int protocol) PURE;
 };
 
 typedef std::unique_ptr<OsSysCalls> OsSysCallsPtr;

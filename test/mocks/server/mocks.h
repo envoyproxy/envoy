@@ -19,7 +19,6 @@
 
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
@@ -173,12 +172,12 @@ public:
   MOCK_METHOD0(version, std::string());
   MOCK_METHOD0(logLock, Thread::BasicLockable&());
   MOCK_METHOD0(accessLogLock, Thread::BasicLockable&());
-  MOCK_METHOD0(statsAllocator, Stats::RawStatDataAllocator&());
+  MOCK_METHOD0(statsAllocator, Stats::StatDataAllocator&());
 
 private:
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
-  Stats::HeapRawStatDataAllocator stats_allocator_;
+  Stats::HeapStatDataAllocator stats_allocator_;
 };
 
 class MockListenerComponentFactory : public ListenerComponentFactory {

@@ -131,12 +131,11 @@ TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
 
   int bytes_written_total = 0;
   while (bytes_written_total < 20) {
-    std::tuple<int, int> result = buffer_.write(pipe_fds[1]);
-    int bytes_written = std::get<0>(result);
-    if (bytes_written < 0) {
-      ASSERT_EQ(EAGAIN, errno);
+    Api::SysCallResult result = buffer_.write(pipe_fds[1]);
+    if (result.rc_ < 0) {
+      ASSERT_EQ(EAGAIN, result.errno_);
     } else {
-      bytes_written_total += bytes_written;
+      bytes_written_total += result.rc_;
     }
   }
   EXPECT_EQ(1, times_high_watermark_called_);
@@ -145,8 +144,8 @@ TEST_F(WatermarkBufferTest, WatermarkFdFunctions) {
 
   int bytes_read_total = 0;
   while (bytes_read_total < 20) {
-    std::tuple<int, int> result = buffer_.read(pipe_fds[0], 20);
-    bytes_read_total += std::get<0>(result);
+    Api::SysCallResult result = buffer_.read(pipe_fds[0], 20);
+    bytes_read_total += result.rc_;
   }
   EXPECT_EQ(2, times_high_watermark_called_);
   EXPECT_EQ(20, buffer_.length());

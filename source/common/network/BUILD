@@ -15,6 +15,7 @@ envoy_cc_library(
     hdrs = ["address_impl.h"],
     deps = [
         "//include/envoy/network:address_interface",
+        "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
     ],

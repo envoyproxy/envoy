@@ -2,6 +2,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/stats/stats.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/event/dispatcher_impl.h"
@@ -12,7 +14,6 @@
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_impl.h"
 #include "common/ssl/ssl_socket.h"
-#include "common/stats/stats_impl.h"
 
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 

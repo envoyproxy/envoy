@@ -13,7 +13,7 @@ namespace ResourceMonitors {
 class ResourceMonitorNameValues {
 public:
   // Heap monitor with statically configured max.
-  const std::string FIXED_HEAP_RESOURCE_MONITOR = "envoy.resource_monitors.fixed_heap";
+  const std::string FixedHeap = "envoy.resource_monitors.fixed_heap";
 };
 
 typedef ConstSingleton<ResourceMonitorNameValues> ResourceMonitorNames;

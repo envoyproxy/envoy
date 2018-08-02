@@ -27,12 +27,12 @@ public:
   std::string version() override { return "disabled"; }
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
-  Stats::RawStatDataAllocator& statsAllocator() override { return stats_allocator_; }
+  Stats::StatDataAllocator& statsAllocator() override { return stats_allocator_; }
 
 private:
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
-  Stats::HeapRawStatDataAllocator stats_allocator_;
+  Stats::HeapStatDataAllocator stats_allocator_;
 };
 
 } // namespace Server

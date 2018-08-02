@@ -11,6 +11,7 @@
 
 #include "envoy/common/exception.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -45,9 +46,10 @@ void validateIpv6Supported(const std::string& address) {
 
 // Check if an IP family is supported on this machine.
 bool ipFamilySupported(int domain) {
-  const int fd = ::socket(domain, SOCK_STREAM, 0);
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  const int fd = os_sys_calls.socket(domain, SOCK_STREAM, 0);
   if (fd >= 0) {
-    RELEASE_ASSERT(::close(fd) == 0, "");
+    RELEASE_ASSERT(os_sys_calls.close(fd) == 0, "");
   }
   return fd != -1;
 }

@@ -9,7 +9,7 @@
 #include "common/common/block_memory_hash_set.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/stats_options_impl.h"
 
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
@@ -22,10 +22,10 @@ protected:
   // TestValue that doesn't define a hash.
   struct TestValueBase {
     absl::string_view key() const { return name; }
-    void truncateAndInit(absl::string_view key, const Stats::StatsOptions& stats_options) {
-      uint64_t xfer = std::min(stats_options.maxNameLength(), key.size());
-      memcpy(name, key.data(), xfer);
-      name[xfer] = '\0';
+    void initialize(absl::string_view key, const Stats::StatsOptions& stats_options) {
+      ASSERT(key.size() <= stats_options.maxNameLength());
+      memcpy(name, key.data(), key.size());
+      name[key.size()] = '\0';
     }
     static uint64_t structSizeWithOptions(const Stats::StatsOptions& stats_options) {
       UNREFERENCED_PARAMETER(stats_options);
