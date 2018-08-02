@@ -40,8 +40,6 @@ void Utility::translateApiConfigSource(const std::string& cluster, uint32_t refr
 
   api_config_source.mutable_refresh_delay()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
-  api_config_source.mutable_request_timeout()->CopyFrom(
-      Protobuf::util::TimeUtil::MillisecondsToDuration(1000));
 }
 
 void Utility::checkCluster(const std::string& error_prefix, const std::string& cluster_name,
