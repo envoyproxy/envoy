@@ -17,7 +17,6 @@ public:
 
   /**
    * getLimit returns the currently estimated limit.
-   * @param cluster_name is the name of the cluster to get the limit for.
    * @return the current estimated concurrency limit for the cluster.
    */
   virtual uint32_t getLimit() PURE;
@@ -26,7 +25,6 @@ public:
    * update is called when new data for a cluster is gathered. Updates the concurrency limit for
    * cluster based on the data provided.
    * @param data is the data to estimate to use to update the concurrency limit.
-   * @param cluster_name is the name of the cluster to add the data to.
    */
   virtual void update(const T& data) PURE;
 };

@@ -19,11 +19,9 @@ namespace AdaptiveConcurrencyLimit {
 namespace Limit {
 
 /**
- * Concurrency limit algorithm that adjust the limits based on the gradient of change in the
- * samples minimum RTT and absolute minimum RTT allowing for a queue of square root of the
- * current limit. Why square root?  Because it's better than a fixed queue size that becomes too
- * small for large limits but still prevents the limit from growing too much by slowing down
- * growth as the limit grows.
+ * Concurrency limit algorithm that adjust the limit based on the gradient of change in the
+ * samples minimum Round Trip Time (RTT) and absolute minimum RTT allowing for a queue of
+ * square root of the current limit.
  */
 class Gradient : public Upstream::Limit<Common::SampleWindow>,
                  Logger::Loggable<Logger::Id::upstream> {
