@@ -45,7 +45,7 @@ void ClusterStatsCache::printRollingWindow(absl::string_view name, RollingWindow
 
 void ClusterStatsCache::addHistogramToStream(std::stringstream& ss) {
   bool is_first = true;
-  for (std::pair<std::string, double> element : timing_) {
+  for (const std::pair<std::string, double> element : timing_) {
     HystrixSink::addDoubleToStream(element.first, element.second, ss, is_first);
     is_first = false;
   }
@@ -76,7 +76,7 @@ uint64_t HystrixSink::getRollingValue(RollingWindow rolling_window) {
 
 void HystrixSink::updateRollingWindowMap(const Upstream::ClusterInfo& cluster_info,
                                          ClusterStatsCache& cluster_stats_cache,
-                                         std::unordered_map<std::string, double>& histogram) {
+                                         QuantileLatencyMap& histogram) {
   const std::string cluster_name = cluster_info.name();
   Upstream::ClusterStats& cluster_stats = cluster_info.stats();
   Stats::Scope& cluster_stats_scope = cluster_info.statsScope();
@@ -193,7 +193,6 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
   ss << ", \"latencyExecute\": {";
   cluster_stats_cache.addHistogramToStream(ss);
   ss << "}";
-  // addInfoToStream("latencyExecute", "{" + cluster_stats_cache.printTimingHistogram() + "}", ss);
   addIntToStream("propertyValue_circuitBreakerRequestVolumeThreshold", 0, ss);
   addIntToStream("propertyValue_circuitBreakerSleepWindowInMilliseconds", 0, ss);
   addIntToStream("propertyValue_circuitBreakerErrorThresholdPercentage", 0, ss);
@@ -330,16 +329,17 @@ void HystrixSink::flush(Stats::Source&) {
     // i.e. "cluster.service1.upstream_rq_time".
     const std::vector<absl::string_view> split_name = absl::StrSplit(histogram->name(), '.');
     if (split_name[0] == "cluster" && split_name[2] == "upstream_rq_time") {
-      std::unordered_map<std::string, double>& hist_map = time_histograms[split_name[1]];
-      for (size_t i = 0; i < histogram->cumulativeStatistics().supportedQuantiles().size(); ++i) {
-        if (std::find(hystrix_quantiles.begin(), hystrix_quantiles.end(),
-                      histogram->cumulativeStatistics().supportedQuantiles()[i]) !=
+      QuantileLatencyMap& hist_map = time_histograms[split_name[1]];
+      const std::vector<double>& supported_quantiles =
+          histogram->cumulativeStatistics().supportedQuantiles();
+      for (size_t i = 0; i < supported_quantiles.size(); ++i) {
+        if (std::find(hystrix_quantiles.begin(), hystrix_quantiles.end(), supported_quantiles[i]) !=
             hystrix_quantiles.end()) {
-          if (histogram->cumulativeStatistics().supportedQuantiles()[i] == 0.995) {
+          if (supported_quantiles[i] == 0.995) {
+            // The only non int quantile value
             hist_map["99.5"] = histogram->cumulativeStatistics().computedQuantiles()[i];
           } else {
-            hist_map[std::to_string(
-                int(100 * histogram->cumulativeStatistics().supportedQuantiles()[i]))] =
+            hist_map[std::to_string(int(100 * supported_quantiles[i]))] =
                 histogram->cumulativeStatistics().computedQuantiles()[i];
           }
         }

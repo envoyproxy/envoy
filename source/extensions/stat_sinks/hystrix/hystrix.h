@@ -16,6 +16,8 @@ namespace Hystrix {
 typedef std::vector<uint64_t> RollingWindow;
 typedef std::map<const std::string, RollingWindow> RollingStatsMap;
 
+using QuantileLatencyMap = std::unordered_map<std::string, double>;
+
 struct {
   const std::string AllowHeadersHystrix{"Accept, Cache-Control, X-Requested-With, Last-Event-ID"};
 } AccessControlAllowHeadersValue;
@@ -37,7 +39,8 @@ struct ClusterStatsCache {
   RollingWindow timeouts_;
   RollingWindow rejected_;
 
-  std::unordered_map<std::string, double> timing_;
+  // Map string representation of the quantile to its recently read value from the histogram
+  QuantileLatencyMap timing_;
 };
 
 typedef std::unique_ptr<ClusterStatsCache> ClusterStatsCachePtr;
@@ -83,7 +86,7 @@ public:
    */
   void updateRollingWindowMap(const Upstream::ClusterInfo& cluster_info,
                               ClusterStatsCache& cluster_stats_cache,
-                              std::unordered_map<std::string, double>& histogram);
+                              QuantileLatencyMap& histogram);
   /**
    * Clear map.
    */
