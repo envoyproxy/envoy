@@ -37,13 +37,12 @@ void LightStepLogger::operator()(lightstep::LogLevel level,
 LightStepDriver::LightStepTransporter::LightStepTransporter(LightStepDriver& driver)
     : driver_(driver) {}
 
-// If the default min_flush_spans value is too small, spans can be dropped between reports.
-// Hence, we choose a number that's large enough, but divide by the number of CPUs since Envoy
-// creates separate tracers for each thread.
+// If the default min_flush_spans value is too small, the larger number of reports can overwhelm
+// LightStep's sattelites. Hence, we need to choose a number that's large enough; though, it's
+// somewhat arbitrary.
 //
 // See https://github.com/lightstep/lightstep-tracer-cpp/issues/106
-const size_t LightStepDriver::default_min_flush_spans =
-    2'000U / std::thread::hardware_concurrency();
+const size_t LightStepDriver::default_min_flush_spans = 200U;
 
 LightStepDriver::LightStepTransporter::~LightStepTransporter() {
   if (active_request_ != nullptr) {
