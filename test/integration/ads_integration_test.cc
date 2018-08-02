@@ -477,7 +477,7 @@ TEST_P(AdsIntegrationTest, Failure) {
 }
 
 // Validate that the request with duplicate listeners is rejected.
-TEST_P(AdsIntegrationTest, DuplicateWarmingClusters) {
+TEST_P(AdsIntegrationTest, DuplicateWarmingListeners) {
   initialize();
 
   // Send initial configuration, validate we can process a request.
