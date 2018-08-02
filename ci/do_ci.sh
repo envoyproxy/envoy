@@ -55,7 +55,10 @@ if [[ "$1" == "bazel.release" ]]; then
   echo "bazel release build with tests..."
   bazel_release_binary_build
   
-  if [[ $# == 2 ]]; then
+  if [[ $# > 2 ]]; then
+  	echo "Multiple tests are not supported, only $2 will run"
+  fi
+  if [[ $# > 1 ]]; then
     echo "Testing $2 ..."
     # Run only specified tests. Argument can be a single test 
     # (e.g. '//test/common/common:assert_test') or a test group (e.g. '//test/common/...')
