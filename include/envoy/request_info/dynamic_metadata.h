@@ -14,9 +14,9 @@ namespace RequestInfo {
 
 class DynamicMetadata {
 public:
-  class DynamicMetadataObject {
+  class Object {
   public:
-    virtual ~DynamicMetadataObject(){};
+    virtual ~Object(){};
   };
 
   virtual ~DynamicMetadata(){};
@@ -28,7 +28,7 @@ public:
    * enforce a single authoritative source for each piece of data stored in DynamicMetadata.
    */
   virtual void setData(absl::string_view data_name,
-                       std::unique_ptr<DynamicMetadataObject>&& data) PURE;
+                       std::unique_ptr<Object>&& data) PURE;
 
   /**
    * @param data_name the name of the data being set.
@@ -64,7 +64,7 @@ public:
   virtual bool hasDataWithName(absl::string_view data_name) const PURE;
 
 protected:
-  virtual const DynamicMetadataObject* getDataGeneric(absl::string_view data_name) const PURE;
+  virtual const Object* getDataGeneric(absl::string_view data_name) const PURE;
 };
 
 } // namespace RequestInfo

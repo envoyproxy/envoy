@@ -6,7 +6,7 @@ namespace Envoy {
 namespace RequestInfo {
 
 void DynamicMetadataImpl::setData(absl::string_view data_name,
-                                  std::unique_ptr<DynamicMetadataObject>&& data) {
+                                  std::unique_ptr<Object>&& data) {
   if (data_storage_.find(data_name) != data_storage_.end()) {
     throw EnvoyException("DynamicMetadata::setData<T> called twice with same name.");
   }
@@ -17,7 +17,7 @@ bool DynamicMetadataImpl::hasDataWithName(absl::string_view data_name) const {
   return data_storage_.count(data_name) > 0;
 }
 
-const DynamicMetadata::DynamicMetadataObject*
+const DynamicMetadata::Object*
 DynamicMetadataImpl::getDataGeneric(absl::string_view data_name) const {
   const auto& it = data_storage_.find(data_name);
 

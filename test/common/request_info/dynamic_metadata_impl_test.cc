@@ -8,7 +8,7 @@ namespace Envoy {
 namespace RequestInfo {
 namespace {
 
-class TestStoredTypeTracking : public DynamicMetadata::DynamicMetadataObject {
+class TestStoredTypeTracking : public DynamicMetadata::Object {
 public:
   TestStoredTypeTracking(int value, size_t* access_count, size_t* destruction_count)
       : value_(value), access_count_(access_count), destruction_count_(destruction_count) {}
@@ -31,7 +31,7 @@ private:
   size_t* destruction_count_;
 };
 
-class SimpleType : public DynamicMetadata::DynamicMetadataObject {
+class SimpleType : public DynamicMetadata::Object {
 public:
   SimpleType(int value) : value_(value) {}
 
@@ -131,7 +131,7 @@ TEST_F(DynamicMetadataImplTest, WrongTypeGet) {
 
 namespace {
 
-class A : public DynamicMetadata::DynamicMetadataObject {};
+class A : public DynamicMetadata::Object {};
 
 class B : public A {};
 

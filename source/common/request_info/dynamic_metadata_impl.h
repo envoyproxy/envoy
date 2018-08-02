@@ -15,12 +15,12 @@ public:
   ~DynamicMetadataImpl() override{};
 
   // DynamicMetadata
-  void setData(absl::string_view data_name, std::unique_ptr<DynamicMetadataObject>&& data) override;
+  void setData(absl::string_view data_name, std::unique_ptr<Object>&& data) override;
   bool hasDataWithName(absl::string_view) const override;
-  const DynamicMetadataObject* getDataGeneric(absl::string_view data_name) const override;
+  const Object* getDataGeneric(absl::string_view data_name) const override;
 
 private:
-  std::map<std::string, std::unique_ptr<DynamicMetadataObject>, std::less<>> data_storage_;
+  std::map<std::string, std::unique_ptr<Object>, std::less<>> data_storage_;
 };
 
 } // namespace RequestInfo
