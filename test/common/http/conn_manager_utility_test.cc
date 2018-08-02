@@ -1035,6 +1035,8 @@ TEST_F(ConnectionManagerUtilityTest, AppendXForwardedPort) {
   EXPECT_EQ(fmt::FormatInt(port).str(), headers.get_(Headers::get().ForwardedPort));
 }
 
+// Verify when appending x-forwarded-port is turned off, the mutated header should skip
+// appending x-forwarded-port.
 TEST_F(ConnectionManagerUtilityTest, DoNotAppendXForwardedPort) {
   EXPECT_CALL(config_, appendXForwardedPort()).WillOnce(Return(false));
   const uint32_t port = 8000;
@@ -1048,6 +1050,8 @@ TEST_F(ConnectionManagerUtilityTest, DoNotAppendXForwardedPort) {
   EXPECT_FALSE(headers.has(Headers::get().ForwardedPort));
 }
 
+// Verify when x-forwarded-port is already specified, the mutated header should skip appending
+// x-forwarded-port.
 TEST_F(ConnectionManagerUtilityTest, IgnoreAppendXForwardedPortWhenAlreadySet) {
   EXPECT_CALL(config_, appendXForwardedPort()).WillOnce(Return(true));
   const uint32_t port = 8000;
