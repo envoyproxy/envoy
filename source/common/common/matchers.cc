@@ -11,20 +11,20 @@ namespace Matchers {
 
 MatcherPtr ValueMatcher::create(const envoy::type::matcher::ValueMatcher& v) {
   switch (v.match_pattern_case()) {
-    case envoy::type::matcher::ValueMatcher::kNullMatch:
-      return std::make_shared<const NullMatcher>();
-    case envoy::type::matcher::ValueMatcher::kDoubleMatch:
-      return std::make_shared<const DoubleMatcher>(v.double_match());
-    case envoy::type::matcher::ValueMatcher::kStringMatch:
-      return std::make_shared<const StringMatcher>(v.string_match());
-    case envoy::type::matcher::ValueMatcher::kBoolMatch:
-      return std::make_shared<const BoolMatcher>(v.bool_match());
-    case envoy::type::matcher::ValueMatcher::kPresentMatch:
-      return std::make_shared<const PresentMatcher>(v.present_match());
-    case envoy::type::matcher::ValueMatcher::kListMatch:
-      return std::make_shared<const ListMatcher>(v.list_match());
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::type::matcher::ValueMatcher::kNullMatch:
+    return std::make_shared<const NullMatcher>();
+  case envoy::type::matcher::ValueMatcher::kDoubleMatch:
+    return std::make_shared<const DoubleMatcher>(v.double_match());
+  case envoy::type::matcher::ValueMatcher::kStringMatch:
+    return std::make_shared<const StringMatcher>(v.string_match());
+  case envoy::type::matcher::ValueMatcher::kBoolMatch:
+    return std::make_shared<const BoolMatcher>(v.bool_match());
+  case envoy::type::matcher::ValueMatcher::kPresentMatch:
+    return std::make_shared<const PresentMatcher>(v.present_match());
+  case envoy::type::matcher::ValueMatcher::kListMatch:
+    return std::make_shared<const ListMatcher>(v.list_match());
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -33,8 +33,7 @@ bool NullMatcher::match(const ProtobufWkt::Value& value) const {
 }
 
 bool BoolMatcher::match(const ProtobufWkt::Value& value) const {
-  return value.kind_case() == ProtobufWkt::Value::kBoolValue &&
-      matcher_ == value.bool_value();
+  return value.kind_case() == ProtobufWkt::Value::kBoolValue && matcher_ == value.bool_value();
 }
 
 bool PresentMatcher::match(const ProtobufWkt::Value& value) const {
@@ -77,8 +76,7 @@ bool StringMatcher::match(const ProtobufWkt::Value& value) const {
   }
 }
 
-ListMatcher::ListMatcher(const envoy::type::matcher::ListMatcher& matcher)
-    : matcher_(matcher) {
+ListMatcher::ListMatcher(const envoy::type::matcher::ListMatcher& matcher) : matcher_(matcher) {
   if (matcher_.match_pattern_case() != envoy::type::matcher::ListMatcher::kOneOf) {
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -112,7 +110,7 @@ MetadataMatcher::MetadataMatcher(const envoy::type::matcher::MetadataMatcher& ma
 }
 
 bool MetadataMatcher::match(const envoy::api::v2::core::Metadata& metadata) const {
-  const auto &value = Envoy::Config::Metadata::metadataValue(metadata, matcher_.filter(), path_);
+  const auto& value = Envoy::Config::Metadata::metadataValue(metadata, matcher_.filter(), path_);
   return value_matcher_ && value_matcher_->match(value);
 }
 

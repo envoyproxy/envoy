@@ -43,22 +43,22 @@ public:
 };
 
 class BoolMatcher : public ValueMatcher {
- public:
+public:
   BoolMatcher(bool matcher) : matcher_(matcher) {}
 
   bool match(const ProtobufWkt::Value& value) const override;
 
- private:
+private:
   bool matcher_;
 };
 
 class PresentMatcher : public ValueMatcher {
- public:
+public:
   PresentMatcher(bool matcher) : matcher_(matcher) {}
 
   bool match(const ProtobufWkt::Value& value) const override;
 
- private:
+private:
   bool matcher_;
 };
 
@@ -88,31 +88,31 @@ private:
 };
 
 class ListMatcher : public ValueMatcher {
- public:
+public:
   ListMatcher(const envoy::type::matcher::ListMatcher& matcher);
 
   bool match(const ProtobufWkt::Value& value) const;
 
- private:
+private:
   const envoy::type::matcher::ListMatcher matcher_;
 
   MatcherPtr oneof_value_matcher_;
 };
 
 class MetadataMatcher {
- public:
-  MetadataMatcher(const envoy::type::matcher::MetadataMatcher &matcher);
+public:
+  MetadataMatcher(const envoy::type::matcher::MetadataMatcher& matcher);
 
   /**
    * Check whether the metadata is matched to the matcher.
    * @param metadata the metadata to check.
    * @return true if it's matched otherwise false.
    */
-  bool match(const envoy::api::v2::core::Metadata &metadata) const;
+  bool match(const envoy::api::v2::core::Metadata& metadata) const;
 
- private:
+private:
   const envoy::type::matcher::MetadataMatcher matcher_;
-  std::vector <std::string> path_;
+  std::vector<std::string> path_;
 
   MatcherPtr value_matcher_;
 };

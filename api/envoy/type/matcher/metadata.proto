@@ -87,5 +87,3 @@ message MetadataMatcher {
   // The MetadataMatcher is matched if the value retrieved by path is matched to this value.
   ValueMatcher value = 3 [(validate.rules).message.required = true];
 }
-
-

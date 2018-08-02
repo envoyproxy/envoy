@@ -56,4 +56,3 @@ message ListMatcher {
     ValueMatcher one_of = 1;
   }
 }
-
