@@ -34,7 +34,6 @@ namespace MongoProxy {
 class MongoRuntimeConfigKeys {
 public:
   const std::string FixedDelayPercent{"mongo.fault.fixed_delay.percent"};
-  const std::string FixedDelayPercentage{"mongo.fault.fixed_delay.percentage"};
   const std::string FixedDelayDurationMs{"mongo.fault.fixed_delay.duration_ms"};
   const std::string LoggingEnabled{"mongo.logging_enabled"};
   const std::string ProxyEnabled{"mongo.proxy_enabled"};

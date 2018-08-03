@@ -60,18 +60,3 @@
           Protobuf::util::TimeUtil::MillisecondsToDuration((json).getInteger(#src_field "_ms")));  \
     }                                                                                              \
   } while (0)
-
-// Set a envoy.type.FractionalPercent compatible field in a protobuf message with the corresponding
-// numerator and denominator values from a JSON object if the fields are set in the JSON object.
-#define JSON_UTIL_SET_FRACTIONALPERCENT(json, message, field_name)                                 \
-  do {                                                                                             \
-    if ((json).hasObject("numerator")) {                                                           \
-      (message).mutable_##field_name()->set_numerator(                                             \
-          static_cast<uint32_t>((json).getInteger("numerator")));                                  \
-    }                                                                                              \
-    if ((json).hasObject("denominator")) {                                                         \
-      (message).mutable_##field_name()->set_denominator(                                           \
-          ProtobufPercentHelper::stringToFractionalPercentDenominatorType(                         \
-              (json).getString("denominator")));                                                   \
-    }                                                                                              \
-  } while (0)

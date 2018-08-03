@@ -27,7 +27,6 @@ namespace HttpFilters {
 namespace Fault {
 
 const std::string FaultFilter::DELAY_PERCENT_KEY = "fault.http.delay.fixed_delay_percent";
-const std::string FaultFilter::DELAY_PERCENTAGE_KEY = "fault.http.delay.fixed_delay_percentage";
 const std::string FaultFilter::ABORT_PERCENT_KEY = "fault.http.abort.abort_percent";
 const std::string FaultFilter::DELAY_DURATION_KEY = "fault.http.delay.fixed_duration_ms";
 const std::string FaultFilter::ABORT_HTTP_STATUS_KEY = "fault.http.abort.http_status";
@@ -41,6 +40,7 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
 
   if (fault.has_delay()) {
     fixed_delay_percent_ = fault.delay().percent();
+    fixed_delay_percentage_ = fault.delay().percentage();
     const auto& delay = fault.delay();
     fixed_duration_ms_ = PROTOBUF_GET_MS_OR_DEFAULT(delay, fixed_delay, 0);
   }
@@ -130,25 +130,20 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
 }
 
 bool FaultFilter::isDelayEnabled() {
-  bool enabled = false;
-  if (fault_settings_->delayPercent() != 0) {
-    enabled |= config_->runtime().snapshot().featureEnabled(DELAY_PERCENT_KEY,
-                                                            fault_settings_->delayPercent());
-    if (!downstream_cluster_delay_percent_key_.empty()) {
-      enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_delay_percent_key_,
-                                                              fault_settings_->delayPercent());
-    }
-  } else if (fault_settings_->delayPercentage().numerator() != 0) {
-    enabled |= config_->runtime().snapshot().sampleFeatureEnabled(
-        DELAY_PERCENTAGE_KEY, fault_settings_->delayPercentage().numerator(),
-        ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-            fault_settings_->delayPercentage()));
-    if (!downstream_cluster_delay_percent_key_.empty()) {
-      enabled |= config_->runtime().snapshot().sampleFeatureEnabled(
-          downstream_cluster_delay_percent_key_, fault_settings_->delayPercentage().numerator(),
-          ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-              fault_settings_->delayPercentage()));
-    }
+  bool enabled = (config_->runtime().snapshot().sampleFeatureEnabled(
+                      DELAY_PERCENT_KEY, fault_settings_->delayPercentage().numerator(),
+                      ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+                          fault_settings_->delayPercentage())) ||
+                  config_->runtime().snapshot().featureEnabled(DELAY_PERCENT_KEY,
+                                                               fault_settings_->delayPercent()));
+  if (!downstream_cluster_delay_percent_key_.empty()) {
+    enabled |=
+        (config_->runtime().snapshot().sampleFeatureEnabled(
+             downstream_cluster_delay_percent_key_, fault_settings_->delayPercentage().numerator(),
+             ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+                 fault_settings_->delayPercentage())) ||
+         config_->runtime().snapshot().featureEnabled(downstream_cluster_delay_percent_key_,
+                                                      fault_settings_->delayPercent()));
   }
   return enabled;
 }

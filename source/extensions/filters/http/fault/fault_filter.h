@@ -133,7 +133,6 @@ private:
   std::string downstream_cluster_abort_http_status_key_{};
 
   const static std::string DELAY_PERCENT_KEY;
-  const static std::string DELAY_PERCENTAGE_KEY;
   const static std::string ABORT_PERCENT_KEY;
   const static std::string DELAY_DURATION_KEY;
   const static std::string ABORT_HTTP_STATUS_KEY;

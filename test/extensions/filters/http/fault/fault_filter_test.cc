@@ -260,7 +260,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
 
   // Delay related calls
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 0))
-      .Times(0);
+      .WillOnce(Return(false));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);

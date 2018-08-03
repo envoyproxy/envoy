@@ -57,14 +57,6 @@ uint64_t checkAndReturnDefault(uint64_t default_value, uint64_t max_value);
 uint64_t convertPercent(double percent, uint64_t max_value);
 
 /**
- * Convert a string to a fractional percent DenominatorType enum value.
- * @param denominator supplies the denominator string to convert.
- * @return the converted DenominatorType.
- */
-envoy::type::FractionalPercent::DenominatorType
-stringToFractionalPercentDenominatorType(const std::string denominator);
-
-/**
  * Convert a fractional percent denominator enum into an integer.
  * @param percent supplies percent to convert.
  * @return the converted denominator.
