@@ -58,8 +58,7 @@ public:
 };
 
 /*
- * ConnectionData wraps a ClientConnection allocated to a caller. Open ClientConnections are
- * released back to the pool for re-use when their containing ConnectionData is destroyed.
+ * ConnectionData wraps a ClientConnection allocated to a caller.
  */
 class ConnectionData {
 public:
@@ -77,9 +76,13 @@ public:
    * @param callback the UpstreamCallbacks to invoke for upstream data
    */
   virtual void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callback) PURE;
-};
 
-typedef std::unique_ptr<ConnectionData> ConnectionDataPtr;
+  /**
+   * Release the connection after use. The connection should be closed first only if it is
+   * not viable for future use.
+   */
+  virtual void release() PURE;
+};
 
 /**
  * Pool callbacks invoked in the context of a newConnection() call, either synchronously or
@@ -99,17 +102,14 @@ public:
                              Upstream::HostDescriptionConstSharedPtr host) PURE;
 
   /**
-   * Called when a connection is available to process a request/response. Connections may be
-   * released back to the pool for re-use by resetting the ConnectionDataPtr. If the connection is
-   * no longer viable for reuse (e.g. due to some kind of protocol error), the underlying
-   * ClientConnection should be closed to prevent its reuse.
-   *
+   * Called when a connection is available to process a request/response. Recipients of connections
+   * must release the connection after use. They should only close the underlying ClientConnection
+   * if it is no longer viable for future requests.
    * @param conn supplies the connection data to use.
    * @param host supplies the description of the host that will carry the request. For logical
    *             connection pools the description may be different each time this is called.
    */
-  virtual void onPoolReady(ConnectionDataPtr&& conn,
-                           Upstream::HostDescriptionConstSharedPtr host) PURE;
+  virtual void onPoolReady(ConnectionData& conn, Upstream::HostDescriptionConstSharedPtr host) PURE;
 };
 
 /**
