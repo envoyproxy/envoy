@@ -103,6 +103,7 @@ private:
                                     std::vector<RateLimit::Descriptor>& descriptors,
                                     const Router::RouteEntry* route_entry,
                                     const Http::HeaderMap& headers) const;
+  void addHeaders(Http::HeaderMap& headers);
 
   enum class State { NotStarted, Calling, Complete, Responded };
 

@@ -92,21 +92,7 @@ Http::FilterHeadersStatus Filter::encode100ContinueHeaders(Http::HeaderMap&) {
 }
 
 Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) {
-  if (headers_to_add_) {
-    headers_to_add_->iterate(
-        [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-          Http::HeaderString k;
-          k.setCopy(header.key().c_str(), header.key().size());
-          Http::HeaderString v;
-          v.setCopy(header.value().c_str(), header.value().size());
-
-          static_cast<Http::HeaderMapImpl*>(context)->addViaMove(std::move(k), std::move(v));
-          return Http::HeaderMap::Iterate::Continue;
-        },
-        &headers);
-    headers_to_add_ = nullptr;
-  }
-
+  addHeaders(headers);
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -157,21 +143,8 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& header
   if (status == RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.http_filter_enforcing", 100)) {
     state_ = State::Responded;
-    callbacks_->sendLocalReply(Http::Code::TooManyRequests, "", [this](Http::HeaderMap& headers) {
-      if (headers_to_add_) {
-        headers_to_add_->iterate(
-            [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-              Http::HeaderString k;
-              k.setCopy(header.key().c_str(), header.key().size());
-              Http::HeaderString v;
-              v.setCopy(header.value().c_str(), header.value().size());
-
-              static_cast<Http::HeaderMapImpl*>(context)->addViaMove(std::move(k), std::move(v));
-              return Http::HeaderMap::Iterate::Continue;
-            },
-            &headers);
-      }
-    });
+    callbacks_->sendLocalReply(Http::Code::TooManyRequests, "",
+                               [this](Http::HeaderMap& headers) { addHeaders(headers); });
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::RateLimited);
   } else if (!initiating_call_) {
     callbacks_->continueDecoding();
@@ -193,6 +166,25 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
     rate_limit.populateDescriptors(*route_entry, descriptors, config_->localInfo().clusterName(),
                                    headers, *callbacks_->requestInfo().downstreamRemoteAddress());
   }
+}
+
+void Filter::addHeaders(Http::HeaderMap& headers) {
+  if (!headers_to_add_) {
+    return;
+  }
+
+  headers_to_add_->iterate(
+      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+        Http::HeaderString k;
+        k.setCopy(header.key().c_str(), header.key().size());
+        Http::HeaderString v;
+        v.setCopy(header.value().c_str(), header.value().size());
+        static_cast<Http::HeaderMapImpl*>(context)->addViaMove(std::move(k), std::move(v));
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      &headers);
+
+  headers_to_add_ = nullptr;
 }
 
 } // namespace RateLimitFilter
