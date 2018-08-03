@@ -213,6 +213,27 @@ TEST_F(SubscriptionFactoryTest, LegacySubscription) {
   subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_);
 }
 
+TEST_F(SubscriptionFactoryTest, HttpSubscriptionCustomRequestTimeout) {
+  envoy::api::v2::core::ConfigSource config;
+  auto* api_config_source = config.mutable_api_config_source();
+  api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
+  api_config_source->add_cluster_names("static_cluster");
+  api_config_source->mutable_refresh_delay()->set_seconds(1);
+  api_config_source->mutable_request_timeout()->set_seconds(5);
+  Upstream::ClusterManager::ClusterInfoMap cluster_map;
+  Upstream::MockCluster cluster;
+  cluster_map.emplace("static_cluster", cluster);
+  EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
+  EXPECT_CALL(cluster, info()).Times(2);
+  EXPECT_CALL(*cluster.info_, addedViaApi());
+  EXPECT_CALL(dispatcher_, createTimer_(_));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("static_cluster"));
+  EXPECT_CALL(
+      cm_.async_client_,
+      send_(_, _, absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(5000))));
+  subscriptionFromConfigSource(config)->start({"static_cluster"}, callbacks_);
+}
+
 TEST_F(SubscriptionFactoryTest, HttpSubscription) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
