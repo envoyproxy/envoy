@@ -776,6 +776,9 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeData));
 
+    // We check the request_trailers_ pointer here in case addDecodedTrailers
+    // is called in decodeData - at which point we communicate to the filter
+    // that the stream has not yet ended.
     bool end_stream_no_trailers = end_stream && !request_trailers_;
     if (end_stream_no_trailers) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
@@ -793,6 +796,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     }
   }
 
+  // If trailers were adding during decodeData we need to trigger decodeTrailers in order
+  // to allow filters to process the trailers.
   if (end_stream && request_trailers_) {
     decodeTrailers(filter, *request_trailers_);
   }
@@ -800,10 +805,13 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
 
 void ConnectionManagerImpl::ActiveStream::addDecodedTrailers(HeaderMapPtr&& trailers) {
   if (state_.filter_call_state_ & FilterCallState::LastDataFrame) {
+    if (request_trailers_) {
+      throw std::logic_error("decodedTrailers added more than once");
+    }
+
     request_trailers_ = std::move(trailers);
-  } else {
-    // do nothing
-    // todo: should this throw/assert?
+  } else if (!request_trailers_) {
+    throw std::logic_error("addDecodedTrailers called in invalid context");
   }
 }
 
@@ -1081,11 +1089,18 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
 void ConnectionManagerImpl::ActiveStream::addEncodedTrailers(HeaderMapPtr&& trailers) {
   if (state_.filter_call_state_ & FilterCallState::LastDataFrame) {
+    if (response_trailers_) {
+      throw std::logic_error("encodedTrailers added more than once");
+    }
+
     response_trailers_ = std::move(trailers);
+
+    // local_complete_ is set to true at the start of encodeData(..., true), but since
+    // we've now added trailers we have to undo this to prevent encodeTrailers from
+    // blowing up when it assert on local_complete_
     state_.local_complete_ = false;
-  } else {
-    // do nothing
-    // todo: should this throw/assert?
+  } else if (!response_trailers_) {
+    throw std::logic_error("encodedTrailers called in invalid context");
   }
 }
 
@@ -1117,6 +1132,9 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeData));
 
+    // We check the request_trailers_ pointer here in case addEncodedTrailers
+    // is called in encodeData - at which point we communicate to the filter
+    // that the stream has not yet ended.
     bool end_stream_no_trailers = end_stream && !response_trailers_;
     state_.filter_call_state_ |= FilterCallState::EncodeData;
     if (end_stream_no_trailers) {
@@ -1138,11 +1156,14 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
                    end_stream);
 
   request_info_.addBytesSent(data.length());
+  
+  // If trailers were adding during encodeData we need to trigger decodeTrailers in order
+  // to allow filters to process the trailers.
   if (end_stream && response_trailers_) {
     response_encoder_->encodeData(data, false);
     encodeTrailers(filter, *response_trailers_);
   } else {
-    response_encoder_->encodeData(data, end_stream && !response_trailers_);
+    response_encoder_->encodeData(data, end_stream);
     maybeEndEncode(end_stream);
   }
 }
