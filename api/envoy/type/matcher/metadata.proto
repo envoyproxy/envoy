@@ -69,6 +69,8 @@ import "validate/validate.proto";
 // <envoy_api_msg_config.rbac.v2alpha.Principal>`.
 message MetadataMatcher {
   // Specifies the segment in a path to retrieve value from Metadata.
+  // Note: Currently it's not supported to retrieve a value from a list in Metadata. This means that
+  // if the segment key refers to a list, it has to be the last segment in a path.
   message PathSegment {
     oneof segment {
       option (validate.required) = true;
