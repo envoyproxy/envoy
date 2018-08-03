@@ -2,6 +2,8 @@
 
 #include "common/request_info/dynamic_metadata_impl.h"
 
+#include "test/test_common/utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -106,27 +108,31 @@ TEST_F(DynamicMetadataImplTest, SimpleType) {
 
 TEST_F(DynamicMetadataImplTest, NameConflict) {
   dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(1));
-  EXPECT_THROW(dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(2)),
-               EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(2)),
+                            EnvoyException,
+                            "DynamicMetadata::setData<T> called twice with same name.");
   EXPECT_EQ(1, dynamic_metadata().getData<SimpleType>("test_1").access());
 }
 
 TEST_F(DynamicMetadataImplTest, NameConflictDifferentTypes) {
   dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(1));
-  EXPECT_THROW(dynamic_metadata().setData(
-                   "test_1", std::make_unique<TestStoredTypeTracking>(2, nullptr, nullptr)),
-               EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(
+      dynamic_metadata().setData("test_1",
+                                 std::make_unique<TestStoredTypeTracking>(2, nullptr, nullptr)),
+      EnvoyException, "DynamicMetadata::setData<T> called twice with same name.");
 }
 
 TEST_F(DynamicMetadataImplTest, UnknownName) {
-  EXPECT_THROW(dynamic_metadata().getData<SimpleType>("test_1"), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(dynamic_metadata().getData<SimpleType>("test_1"), EnvoyException,
+                            "DynamicMetadata::getData<T> called for unknown data name.");
 }
 
 TEST_F(DynamicMetadataImplTest, WrongTypeGet) {
   dynamic_metadata().setData("test_name",
                              std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr));
   EXPECT_EQ(5, dynamic_metadata().getData<TestStoredTypeTracking>("test_name").access());
-  EXPECT_THROW(dynamic_metadata().getData<SimpleType>("test_name"), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(dynamic_metadata().getData<SimpleType>("test_name"), EnvoyException,
+                            "Data stored under test_name cannot be coerced to specified type");
 }
 
 namespace {

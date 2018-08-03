@@ -13,6 +13,7 @@ envoy_cc_test(
     srcs = ["dynamic_metadata_impl_test.cc"],
     deps = [
         "//source/common/request_info:dynamic_metadata_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
