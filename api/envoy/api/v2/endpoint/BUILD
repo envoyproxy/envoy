@@ -35,6 +35,7 @@ api_proto_library_internal(
     visibility = ["//envoy/api/v2:friends"],
     deps = [
         "//envoy/api/v2/core:base",
+        "//envoy/api/v2/endpoint:endpoint",
     ],
 )
 
@@ -43,5 +44,6 @@ api_go_proto_library(
     proto = ":load_report",
     deps = [
         "//envoy/api/v2/core:base_go_proto",
+        "//envoy/api/v2/endpoint:endpoint_go_proto",
     ],
 )
