@@ -806,14 +806,11 @@ void StaticClusterImpl::startPreInit() {
   onPreInitComplete();
 }
 
-bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
-                                                   HostVector& current_hosts,
-                                                   HostVector& hosts_added,
-                                                   HostVector& hosts_removed,
-                                                   std::unordered_map<std::string, HostSharedPtr>& updated_hosts,
-                                                   const std::unordered_map<std::string, HostSharedPtr>& existing_hosts) {
+bool BaseDynamicClusterImpl::updateDynamicHostList(
+    const HostVector& new_hosts, HostVector& current_hosts, HostVector& hosts_added,
+    HostVector& hosts_removed, std::unordered_map<std::string, HostSharedPtr>& updated_hosts,
+    const std::unordered_map<std::string, HostSharedPtr>& existing_hosts) {
   uint64_t max_host_weight = 1;
-
 
   // Did hosts change?
   //
@@ -838,6 +835,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // possible for DNS to return the same address multiple times, and a bad SDS implementation could
   // do the same thing.
 
+  // Keep track of hosts we've seen during this pass so we can remove it from the
+  // list of current (i.e. existing hosts from this priority)
+  std::unordered_set<std::string> seen_hosts(current_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
     if (updated_hosts.count(host->address()->asString())) {
@@ -845,12 +845,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     }
 
     auto existing_host = existing_hosts.find(host->address()->asString());
-    // todo(snowp): should we check updated_hosts here? rn we pick latest seen host
-    
+
     if (existing_host != existing_hosts.end()) {
-      std::cout << "found: " << std::endl;
-      std::cout << existing_host->first << std::endl;
-      std::cout << existing_host->second->address()->asString() << std::endl;
+      seen_hosts.emplace(existing_host->first);
       // If we find a host matched based on address, we keep it. However we do change weight inline
       // so do that here.
       if (host->weight() > max_host_weight) {
@@ -874,8 +871,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       }
 
       // Did metadata change?
-      const bool metadata_changed =
-        !Protobuf::util::MessageDifferencer::Equivalent(*host->metadata(), *existing_host->second->metadata());
+      const bool metadata_changed = !Protobuf::util::MessageDifferencer::Equivalent(
+          *host->metadata(), *existing_host->second->metadata());
       if (metadata_changed) {
         // First, update the entire metadata for the endpoint.
         existing_host->second->metadata(*host->metadata());
@@ -909,16 +906,17 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     }
   }
 
-
   // Do a single pass over the current_hosts and remove any that were added to the map in the
   // previous loop
-  current_hosts.erase(std::remove_if(current_hosts.begin(), current_hosts.end(), [&updated_hosts](auto host) { 
-      return updated_hosts.count(host->address()->asString()); 
-      }), current_hosts.end());
+  current_hosts.erase(std::remove_if(current_hosts.begin(), current_hosts.end(),
+                                     [&seen_hosts](auto host) {
+                                       return seen_hosts.count(host->address()->asString());
+                                     }),
+                      current_hosts.end());
 
   // Do a single pass over the current_hosts and remove any that were added to the map in the
   const bool dont_remove_healthy_hosts =
-    health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
+      health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   // If there are removed hosts, check to see if we should only delete if unhealthy.
   if (!current_hosts.empty() && dont_remove_healthy_hosts) {
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
@@ -936,6 +934,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     }
   }
 
+  // Add the remaining hosts into the updated list of all hosts
+  for (auto& host : final_hosts) {
+    updated_hosts[host->address()->asString()] = host;
+  }
+
   // TODO(mattklein123): This stat is used by both the RR and LR load balancer to decide at
   // runtime whether to use either the weighted or unweighted mode. If we extend weights to
   // static clusters or DNS SRV clusters we need to make sure this gets set. Better, we should
@@ -945,18 +948,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   if (!hosts_added.empty() || !current_hosts.empty()) {
     hosts_removed = std::move(current_hosts);
     current_hosts = std::move(final_hosts);
-    for (auto& host : current_hosts) {
-      updated_hosts[host->address()->asString()] = host;
-    }
     return true;
   } else {
     // During the search we moved all of the hosts from hosts_ into final_hosts so just
     // move them back.
     current_hosts = std::move(final_hosts);
-
-    for (auto& host : current_hosts) {
-      updated_hosts[host->address()->asString()] = host;
-    }
     // We return false here in the absence of EDS health status or metadata changes, because we
     // have no changes to host vector status (modulo weights). When we have EDS
     // health status or metadata changed, we return true, causing updateHosts() to fire in the
@@ -1076,7 +1072,8 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
         HostVector hosts_added;
         HostVector hosts_removed;
-        if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, updated_all_hosts, all_hosts_)) {
+        if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
+                                          updated_all_hosts, all_hosts_)) {
           ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
           parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
         }
