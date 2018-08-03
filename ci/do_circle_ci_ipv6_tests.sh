@@ -12,6 +12,8 @@ export TEST_TYPE="bazel.ipv6_tests"
 
 export BAZEL_EXTRA_TEST_OPTIONS="--test_env=ENVOY_IP_TEST_VERSIONS=v6only"
 
+export BAZEL_REMOTE_CACHE="${BAZEL_REMOTE_CACHE:-https://storage.googleapis.com/envoy-circleci-bazel-cache/}"
+
 function finish {
   echo "disk space at end of build:"
   df -h
@@ -22,5 +24,6 @@ echo "disk space at beginning of build:"
 df -h
 
 docker run -t -i -v "$ENVOY_BUILD_DIR":/build -v "$ENVOY_SRCDIR":/source \
+  --env GCP_SERVICE_ACCOUNT_KEY --env BAZEL_REMOTE_CACHE \
   envoyproxy/envoy-build:"$ENVOY_BUILD_SHA" /bin/bash -c "cd /source && ci/do_ci.sh $TEST_TYPE"
 
