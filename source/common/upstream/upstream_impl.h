@@ -503,6 +503,7 @@ protected:
 
 protected:
   PrioritySetImpl priority_set_;
+  std::unordered_map<std::string, Upstream::HostSharedPtr> all_hosts_;
 
 private:
   void finishInitialization();
@@ -598,7 +599,8 @@ protected:
 
   bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_hosts,
                              HostVector& hosts_added, HostVector& hosts_removed,
-                             const HostVector& all_current_hosts);
+                             std::unordered_map<std::string, HostSharedPtr>& updated_hosts,
+                             const std::unordered_map<std::string, HostSharedPtr>& existing_hosts);
 };
 
 /**
@@ -631,6 +633,7 @@ private:
     uint32_t port_;
     Event::TimerPtr resolve_timer_;
     HostVector hosts_;
+    std::unordered_map<std::string, HostSharedPtr> all_hosts_;
     const envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;
     const envoy::api::v2::endpoint::LbEndpoint lb_endpoint_;
   };

@@ -439,7 +439,16 @@ TEST_F(EdsTest, EndpointMoved) {
     EXPECT_EQ(hosts.size(), 1);
 
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
-    // Mark the hosts as healthy
+    // Mark the host as healthy
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    // Mark the host as healthy
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   }
 
@@ -450,12 +459,35 @@ TEST_F(EdsTest, EndpointMoved) {
 
   VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
 
+  int p = 0;
+  for (auto& hs : cluster_->prioritySet().hostSetsPerPriority()) {
+    std::cout << p++ << std::endl;
+    for (auto& h : hs->hosts()) {
+      std::cout << h->address()->asString() << std::endl; 
+    }
+  }
+
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 1);
+    //
+    // assert that it moved
+    EXPECT_EQ(hosts[0]->address()->asString(), "1.2.3.4:81");
 
-    // Since the endpoint was healthy in the other priority, it should remain
-    // healthy after having moved.
+    // The endpoint was healthy in the original priority, so moving it
+    // around should preserve that.
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    // assert that it moved
+    EXPECT_EQ(hosts[0]->address()->asString(), "1.2.3.4:80");
+
+    // The endpoint was healthy in the original priority, so moving it
+    // around should preserve that.
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   }
 }

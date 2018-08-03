@@ -810,8 +810,10 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
                                                    HostVector& current_hosts,
                                                    HostVector& hosts_added,
                                                    HostVector& hosts_removed,
-                                                   const HostVector& all_hosts) {
+                                                   std::unordered_map<std::string, HostSharedPtr>& updated_hosts,
+                                                   const std::unordered_map<std::string, HostSharedPtr>& existing_hosts) {
   uint64_t max_host_weight = 1;
+
 
   // Did hosts change?
   //
@@ -835,100 +837,88 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // https://github.com/envoyproxy/envoy/issues/2874). We also check for duplicates here. It's
   // possible for DNS to return the same address multiple times, and a bad SDS implementation could
   // do the same thing.
-  std::unordered_set<std::string> host_addresses;
+
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
-    if (host_addresses.count(host->address()->asString())) {
+    if (updated_hosts.count(host->address()->asString())) {
       continue;
     }
-    host_addresses.emplace(host->address()->asString());
 
-    bool found = false;
-    for (auto i = current_hosts.begin(); i != current_hosts.end();) {
+    auto existing_host = existing_hosts.find(host->address()->asString());
+    // todo(snowp): should we check updated_hosts here? rn we pick latest seen host
+    
+    if (existing_host != existing_hosts.end()) {
+      std::cout << "found: " << std::endl;
+      std::cout << existing_host->first << std::endl;
+      std::cout << existing_host->second->address()->asString() << std::endl;
       // If we find a host matched based on address, we keep it. However we do change weight inline
       // so do that here.
-      if (*(*i)->address() == *host->address()) {
-        if (host->weight() > max_host_weight) {
-          max_host_weight = host->weight();
-        }
-
-        if ((*i)->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH) !=
-            host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
-          const bool previously_healthy = (*i)->healthy();
-          if (host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
-            (*i)->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
-            // If the host was previously healthy and we're now unhealthy, we need to
-            // rebuild.
-            hosts_changed |= previously_healthy;
-          } else {
-            (*i)->healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
-            // If the host was previously unhealthy and now healthy, we need to
-            // rebuild.
-            hosts_changed |= !previously_healthy && (*i)->healthy();
-          }
-        }
-
-        // Did metadata change?
-        const bool metadata_changed =
-            !Protobuf::util::MessageDifferencer::Equivalent(*host->metadata(), *(*i)->metadata());
-        if (metadata_changed) {
-          // First, update the entire metadata for the endpoint.
-          (*i)->metadata(*host->metadata());
-
-          // Also, given that the canary attribute of an endpoint is derived from its metadata
-          // (e.g.: from envoy.lb/canary), we do a blind update here since it's cheaper than testing
-          // to see if it actually changed. We must update this besides just updating the metadata,
-          // because it'll be used by the router filter to compute upstream stats.
-          (*i)->canary(host->canary());
-
-          // If metadata changed, we need to rebuild. See github issue #3810.
-          hosts_changed = true;
-        }
-
-        (*i)->weight(host->weight());
-        final_hosts.push_back(*i);
-        i = current_hosts.erase(i);
-        found = true;
-      } else {
-        i++;
+      if (host->weight() > max_host_weight) {
+        max_host_weight = host->weight();
       }
-    }
 
-    if (!found) {
+      if (existing_host->second->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH) !=
+          host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
+        const bool previously_healthy = existing_host->second->healthy();
+        if (host->healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
+          existing_host->second->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
+          // If the host was previously healthy and we're now unhealthy, we need to
+          // rebuild.
+          hosts_changed |= previously_healthy;
+        } else {
+          existing_host->second->healthFlagClear(Host::HealthFlag::FAILED_EDS_HEALTH);
+          // If the host was previously unhealthy and now healthy, we need to
+          // rebuild.
+          hosts_changed |= !previously_healthy && existing_host->second->healthy();
+        }
+      }
+
+      // Did metadata change?
+      const bool metadata_changed =
+        !Protobuf::util::MessageDifferencer::Equivalent(*host->metadata(), *existing_host->second->metadata());
+      if (metadata_changed) {
+        // First, update the entire metadata for the endpoint.
+        existing_host->second->metadata(*host->metadata());
+
+        // Also, given that the canary attribute of an endpoint is derived from its metadata
+        // (e.g.: from envoy.lb/canary), we do a blind update here since it's cheaper than testing
+        // to see if it actually changed. We must update this besides just updating the metadata,
+        // because it'll be used by the router filter to compute upstream stats.
+        existing_host->second->canary(host->canary());
+
+        // If metadata changed, we need to rebuild. See github issue #3810.
+        hosts_changed = true;
+      }
+
+      existing_host->second->weight(host->weight());
+      final_hosts.push_back(existing_host->second);
+      updated_hosts[existing_host->second->address()->asString()] = existing_host->second;
+    } else {
       if (host->weight() > max_host_weight) {
         max_host_weight = host->weight();
       }
 
       // If we are depending on a health checker, determine what to initialize the new host
       if (health_checker_ != nullptr) {
-
-        // This host might have been added from another priority, in which case it might
-        // have already passed health checks. To avoid reseting this host to unhealthy
-        // and potentially fail traffic, search through all hosts for the clusters to
-        // see if we already know about this host.
-        bool failed_active_health_check = true;
-        for (auto i = all_hosts.begin(); i != all_hosts.end(); ++i) {
-          if (*(*i)->address() == *host->address()) {
-            // We've found a match, so stop the loop and copy the health check flag from the other
-            // host. todo(snowp): should we OR all the hc values in case the host exists in multiple
-            // priorities?
-            failed_active_health_check = !(*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC);
-            break;
-          }
-        }
-
-        if (failed_active_health_check) {
-          host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
-        }
+        host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
       }
 
+      updated_hosts[host->address()->asString()] = host;
       final_hosts.push_back(host);
       hosts_added.push_back(host);
     }
   }
 
+
+  // Do a single pass over the current_hosts and remove any that were added to the map in the
+  // previous loop
+  current_hosts.erase(std::remove_if(current_hosts.begin(), current_hosts.end(), [&updated_hosts](auto host) { 
+      return updated_hosts.count(host->address()->asString()); 
+      }), current_hosts.end());
+
+  // Do a single pass over the current_hosts and remove any that were added to the map in the
   const bool dont_remove_healthy_hosts =
-      health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
+    health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   // If there are removed hosts, check to see if we should only delete if unhealthy.
   if (!current_hosts.empty() && dont_remove_healthy_hosts) {
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
@@ -938,6 +928,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         }
 
         final_hosts.push_back(*i);
+        updated_hosts[(*i)->address()->asString()] = *i;
         i = current_hosts.erase(i);
       } else {
         i++;
@@ -951,15 +942,21 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // avoid pivoting on this entirely and probably just force a host set refresh if any weights
   // change.
   info_->stats().max_host_weight_.set(max_host_weight);
-
   if (!hosts_added.empty() || !current_hosts.empty()) {
     hosts_removed = std::move(current_hosts);
     current_hosts = std::move(final_hosts);
+    for (auto& host : current_hosts) {
+      updated_hosts[host->address()->asString()] = host;
+    }
     return true;
   } else {
     // During the search we moved all of the hosts from hosts_ into final_hosts so just
     // move them back.
     current_hosts = std::move(final_hosts);
+
+    for (auto& host : current_hosts) {
+      updated_hosts[host->address()->asString()] = host;
+    }
     // We return false here in the absence of EDS health status or metadata changes, because we
     // have no changes to host vector status (modulo weights). When we have EDS
     // health status or metadata changed, we return true, causing updateHosts() to fire in the
@@ -1062,6 +1059,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();
 
+        std::unordered_map<std::string, HostSharedPtr> updated_all_hosts;
         HostVector new_hosts;
         for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
           // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
@@ -1073,14 +1071,17 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
               parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
               lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
               locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config()));
+          updated_all_hosts[address->asString()] = new_hosts.back();
         }
 
         HostVector hosts_added;
         HostVector hosts_removed;
-        if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, {})) {
+        if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed, updated_all_hosts, all_hosts_)) {
           ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
           parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
         }
+
+        all_hosts_ = std::move(updated_all_hosts);
 
         // If there is an initialize callback, fire it now. Note that if the cluster refers to
         // multiple DNS names, this will return initialized after a single DNS resolution

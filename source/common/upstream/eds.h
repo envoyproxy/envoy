@@ -41,7 +41,7 @@ private:
                               LocalityWeightsMap& locality_weights_map,
                               LocalityWeightsMap& new_locality_weights_map,
                               PriorityStateManager& priority_state_manager,
-                              const HostVector& all_hosts);
+                              std::unordered_map<std::string, HostSharedPtr>& updated_hosts);
 
   // ClusterImplBase
   void startPreInit() override;
