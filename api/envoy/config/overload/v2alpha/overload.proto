@@ -19,7 +19,9 @@ message ResourceMonitor {
   // The name of the resource monitor to instantiate. Must match a registered
   // resource monitor type. The built-in resource monitors are:
   //
+  // clang-format off
   // * :ref:`envoy.resource_monitors.fixed_heap <envoy_api_msg_config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig>`
+  // clang-format on
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // Configuration for the resource monitor being instantiated.
