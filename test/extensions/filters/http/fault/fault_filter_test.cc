@@ -129,12 +129,13 @@ public:
     return fault;
   }
 
-  void SetUpTest(const std::string json) {
-    envoy::config::filter::http::fault::v2::HTTPFault fault = convertJsonStrToProtoConfig(json);
+  void SetUpTest(const envoy::config::filter::http::fault::v2::HTTPFault& fault) {
     config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_));
     filter_.reset(new FaultFilter(config_));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
+
+  void SetUpTest(const std::string json) { SetUpTest(convertJsonStrToProtoConfig(json)); }
 
   void expectDelayTimer(uint64_t duration_ms) {
     timer_ = new Event::MockTimer(&filter_callbacks_.dispatcher_);
@@ -318,6 +319,52 @@ TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
 
   EXPECT_EQ(0UL, config_->stats().delays_injected_.value());
+  EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
+}
+
+TEST_F(FaultFilterTest, V2FixedDelayNonZeroDuration) {
+  envoy::config::filter::http::fault::v2::HTTPFault fault;
+  fault.mutable_abort()->set_percent(0);
+  fault.mutable_delay()->set_type(envoy::config::filter::fault::v2::FaultDelay::FIXED);
+  fault.mutable_delay()->mutable_percentage()->set_numerator(50);
+  fault.mutable_delay()->mutable_percentage()->set_denominator(
+      envoy::type::FractionalPercent::HUNDRED);
+  fault.mutable_delay()->mutable_fixed_delay()->set_seconds(5);
+  SetUpTest(fault);
+
+  // Delay related calls
+  EXPECT_CALL(runtime_.snapshot_,
+              sampleFeatureEnabled("fault.http.delay.fixed_delay_percent", 50, 100))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
+      .WillOnce(Return(5000UL));
+
+  SCOPED_TRACE("V2FixedDelayNonZeroDuration");
+  expectDelayTimer(5000UL);
+
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(RequestInfo::ResponseFlag::DelayInjected));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  // Abort related calls
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0))
+      .WillOnce(Return(false));
+
+  // Delay only case
+  EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
+  EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(RequestInfo::ResponseFlag::FaultInjected))
+      .Times(0);
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(request_headers_));
+  timer_->callback_();
+
+  EXPECT_EQ(1UL, config_->stats().delays_injected_.value());
   EXPECT_EQ(0UL, config_->stats().aborts_injected_.value());
 }
 

@@ -102,6 +102,79 @@ public:
     }
   }
 
+  void setupV2DelayFault(bool enable_fault) {
+    envoy::config::filter::fault::v2::FaultDelay fault{};
+    fault.mutable_percentage()->set_numerator(50);
+    fault.mutable_percentage()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
+    fault.mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
+
+    fault_config_.reset(new FaultConfig(fault));
+
+    EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled(_, _, _)).Times(AnyNumber());
+    EXPECT_CALL(runtime_.snapshot_,
+                sampleFeatureEnabled("mongo.fault.fixed_delay.percent", 50, 100))
+        .WillOnce(Return(enable_fault));
+
+    if (enable_fault) {
+      EXPECT_CALL(runtime_.snapshot_, getInteger("mongo.fault.fixed_delay.duration_ms", 10))
+          .WillOnce(Return(10));
+    }
+  }
+
+  void testDelayFaults() {
+    initializeFilter();
+
+    Event::MockTimer* delay_timer =
+        new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
+    EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10)));
+    EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
+
+    EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+      QueryMessagePtr message(new QueryMessageImpl(0, 0));
+      message->fullCollectionName("db.test");
+      message->flags(0b1110010);
+      message->query(Bson::DocumentImpl::create());
+      filter_->callbacks_->decodeQuery(std::move(message));
+    }));
+
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
+    EXPECT_EQ(1U, store_.counter("test.op_query").value());
+
+    // Requests during active delay.
+    EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+      QueryMessagePtr message(new QueryMessageImpl(0, 0));
+      message->fullCollectionName("db.test");
+      message->flags(0b1110010);
+      message->query(Bson::DocumentImpl::create());
+      filter_->callbacks_->decodeQuery(std::move(message));
+    }));
+
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
+    EXPECT_EQ(2U, store_.counter("test.op_query").value());
+
+    EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+      GetMoreMessagePtr message(new GetMoreMessageImpl(0, 0));
+      message->fullCollectionName("db.test");
+      message->cursorId(1);
+      filter_->callbacks_->decodeGetMore(std::move(message));
+    }));
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
+    EXPECT_EQ(1U, store_.counter("test.op_get_more").value());
+
+    EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+      KillCursorsMessagePtr message(new KillCursorsMessageImpl(0, 0));
+      message->numberOfCursorIds(1);
+      message->cursorIds({1});
+      filter_->callbacks_->decodeKillCursors(std::move(message));
+    }));
+    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
+    EXPECT_EQ(1U, store_.counter("test.op_kill_cursors").value());
+
+    EXPECT_CALL(read_filter_callbacks_, continueReading());
+    delay_timer->callback_();
+    EXPECT_EQ(1U, store_.counter("test.delays_injected").value());
+  }
+
   Buffer::OwnedImpl fake_data_;
   NiceMock<TestStatStore> store_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -115,59 +188,14 @@ public:
   NiceMock<Network::MockDrainDecision> drain_decision_;
 };
 
+TEST_F(MongoProxyFilterTest, V2DelayFaults) {
+  setupV2DelayFault(true);
+  testDelayFaults();
+}
+
 TEST_F(MongoProxyFilterTest, DelayFaults) {
   setupDelayFault(true);
-  initializeFilter();
-
-  Event::MockTimer* delay_timer =
-      new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10)));
-  EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
-
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    QueryMessagePtr message(new QueryMessageImpl(0, 0));
-    message->fullCollectionName("db.test");
-    message->flags(0b1110010);
-    message->query(Bson::DocumentImpl::create());
-    filter_->callbacks_->decodeQuery(std::move(message));
-  }));
-
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
-  EXPECT_EQ(1U, store_.counter("test.op_query").value());
-
-  // Requests during active delay.
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    QueryMessagePtr message(new QueryMessageImpl(0, 0));
-    message->fullCollectionName("db.test");
-    message->flags(0b1110010);
-    message->query(Bson::DocumentImpl::create());
-    filter_->callbacks_->decodeQuery(std::move(message));
-  }));
-
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
-  EXPECT_EQ(2U, store_.counter("test.op_query").value());
-
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    GetMoreMessagePtr message(new GetMoreMessageImpl(0, 0));
-    message->fullCollectionName("db.test");
-    message->cursorId(1);
-    filter_->callbacks_->decodeGetMore(std::move(message));
-  }));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
-  EXPECT_EQ(1U, store_.counter("test.op_get_more").value());
-
-  EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
-    KillCursorsMessagePtr message(new KillCursorsMessageImpl(0, 0));
-    message->numberOfCursorIds(1);
-    message->cursorIds({1});
-    filter_->callbacks_->decodeKillCursors(std::move(message));
-  }));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(fake_data_, false));
-  EXPECT_EQ(1U, store_.counter("test.op_kill_cursors").value());
-
-  EXPECT_CALL(read_filter_callbacks_, continueReading());
-  delay_timer->callback_();
-  EXPECT_EQ(1U, store_.counter("test.delays_injected").value());
+  testDelayFaults();
 }
 
 TEST_F(MongoProxyFilterTest, DelayFaultsRuntimeDisabled) {
