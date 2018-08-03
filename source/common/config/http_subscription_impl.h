@@ -33,8 +33,10 @@ public:
   HttpSubscriptionImpl(const envoy::api::v2::core::Node& node, Upstream::ClusterManager& cm,
                        const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
+                       std::chrono::milliseconds request_timeout,
                        const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats)
-      : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval),
+      : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval,
+                             request_timeout),
         stats_(stats) {
     request_.mutable_node()->CopyFrom(node);
     ASSERT(service_method.options().HasExtension(google::api::http));

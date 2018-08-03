@@ -9,8 +9,11 @@
 #include "common/upstream/original_dst_cluster.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "server/transport_socket_config_impl.h"
+
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -59,8 +62,15 @@ public:
 
   void setup(const std::string& json) {
     NiceMock<MockClusterManager> cm;
-    cluster_.reset(new OriginalDstCluster(parseClusterFromJson(json), runtime_, stats_store_,
-                                          ssl_context_manager_, cm, dispatcher_, false));
+    envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+    Envoy::Stats::ScopePtr scope = stats_store_.createScope(
+        fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
+                                       ? cluster_config.name()
+                                       : std::string(cluster_config.alt_stat_name())));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
+    cluster_.reset(
+        new OriginalDstCluster(cluster_config, runtime_, factory_context, std::move(scope), false));
     cluster_->prioritySet().addMemberUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
@@ -76,6 +86,8 @@ public:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Event::MockTimer* cleanup_timer_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 TEST(OriginalDstClusterConfigTest, BadConfig) {

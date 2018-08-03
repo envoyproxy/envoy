@@ -7,6 +7,8 @@
 #include "common/network/utility.h"
 #include "common/upstream/logical_dns_cluster.h"
 
+#include "server/transport_socket_config_impl.h"
+
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/local_info/mocks.h"
@@ -34,9 +36,15 @@ public:
   void setupFromV1Json(const std::string& json) {
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
     NiceMock<MockClusterManager> cm;
-    cluster_.reset(new LogicalDnsCluster(parseClusterFromJson(json), runtime_, stats_store_,
-                                         ssl_context_manager_, local_info_, dns_resolver_, tls_, cm,
-                                         dispatcher_, false));
+    envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
+    Envoy::Stats::ScopePtr scope = stats_store_.createScope(
+        fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
+                                       ? cluster_config.name()
+                                       : std::string(cluster_config.alt_stat_name())));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
+    cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
+                                         factory_context, std::move(scope), false));
     cluster_->prioritySet().addMemberUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
@@ -47,9 +55,15 @@ public:
   void setupFromV2Yaml(const std::string& yaml) {
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
     NiceMock<MockClusterManager> cm;
-    cluster_.reset(new LogicalDnsCluster(parseClusterFromV2Yaml(yaml), runtime_, stats_store_,
-                                         ssl_context_manager_, local_info_, dns_resolver_, tls_, cm,
-                                         dispatcher_, false));
+    envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+    Envoy::Stats::ScopePtr scope = stats_store_.createScope(
+        fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
+                                       ? cluster_config.name()
+                                       : std::string(cluster_config.alt_stat_name())));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
+    cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
+                                         factory_context, std::move(scope), false));
     cluster_->prioritySet().addMemberUpdateCb(
         [&](uint32_t, const HostVector&, const HostVector&) -> void {
           membership_updated_.ready();
@@ -168,6 +182,7 @@ public:
   std::shared_ptr<NiceMock<Network::MockDnsResolver>> dns_resolver_{
       new NiceMock<Network::MockDnsResolver>};
   Network::MockActiveDnsQuery active_dns_query_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
   Network::DnsResolver::ResolveCb dns_callback_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Event::MockTimer* resolve_timer_;

@@ -60,6 +60,7 @@ public:
         result.reset(new HttpSubscriptionImpl<ResourceType>(
             node, cm, api_config_source.cluster_names()[0], dispatcher, random,
             Utility::apiConfigSourceRefreshDelay(api_config_source),
+            Utility::apiConfigSourceRequestTimeout(api_config_source),
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method), stats));
         break;
       case envoy::api::v2::core::ApiConfigSource::GRPC: {

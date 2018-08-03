@@ -2,9 +2,14 @@
 
 #include <string>
 
+#include "envoy/event/dispatcher.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/stats/stats.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -33,6 +38,31 @@ public:
    * Return the instance of secret manager.
    */
   virtual Secret::SecretManager& secretManager() PURE;
+
+  /**
+   * @return the instance of ClusterManager.
+   */
+  virtual Upstream::ClusterManager& clusterManager() PURE;
+
+  /**
+   * @return information about the local environment the server is running in.
+   */
+  virtual const LocalInfo::LocalInfo& localInfo() PURE;
+
+  /**
+   * @return Event::Dispatcher& the main thread's dispatcher.
+   */
+  virtual Event::Dispatcher& dispatcher() PURE;
+
+  /**
+   * @return RandomGenerator& the random generator for the server.
+   */
+  virtual Envoy::Runtime::RandomGenerator& random() PURE;
+
+  /**
+   * @return the server-wide stats store.
+   */
+  virtual Stats::Store& stats() PURE;
 };
 
 class TransportSocketConfigFactory {
