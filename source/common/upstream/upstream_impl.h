@@ -338,6 +338,10 @@ public:
   lbRingHashConfig() const override {
     return lb_ring_hash_config_;
   }
+  const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>&
+  lbOriginalDstConfig() const override {
+    return lb_original_dst_config_;
+  }
   bool maintenanceMode() const override;
   uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const std::string& name() const override { return name_; }
@@ -397,6 +401,7 @@ private:
   const Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_;
   absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
   Ssl::ContextManager& ssl_context_manager_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;

@@ -20,9 +20,11 @@ namespace Upstream {
 // OriginalDstCluster::LoadBalancer is never configured with any other type of cluster,
 // and throws an exception otherwise.
 
-OriginalDstCluster::LoadBalancer::LoadBalancer(PrioritySet& priority_set, ClusterSharedPtr& parent)
+OriginalDstCluster::LoadBalancer::LoadBalancer(
+    PrioritySet& priority_set, ClusterSharedPtr& parent,
+    const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>& config)
     : priority_set_(priority_set), parent_(std::static_pointer_cast<OriginalDstCluster>(parent)),
-      info_(parent->info()) {
+      info_(parent->info()), use_http_header_(config ? config.value().use_http_header() : false) {
   // priority_set_ is initially empty.
   priority_set_.addMemberUpdateCb(
       [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
@@ -44,7 +46,10 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
   if (context) {
 
     // Check if override host header is present, if yes use it otherwise check local address.
-    Network::Address::InstanceConstSharedPtr dst_host = requestOverrideHost(context);
+    Network::Address::InstanceConstSharedPtr dst_host = nullptr;
+    if (use_http_header_) {
+      dst_host = requestOverrideHost(context);
+    }
     if (dst_host == nullptr) {
       const Network::Connection* connection = context->downstreamConnection();
       // The local address of the downstream connection is the original destination address,
