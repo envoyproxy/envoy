@@ -488,8 +488,8 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderEnabled) {
   std::string yaml = R"EOF(
     name: "name"
     connect_timeout: 1.250s
-    type: original_dst
-    lb_type: original_dst_lb
+    type: ORIGINAL_DST
+    lb_policy: ORIGINAL_DST_LB
     original_dst_lb_config:
       use_http_header: true
   )EOF";
@@ -562,8 +562,8 @@ TEST_F(OriginalDstClusterTest, UseHttpHeaderDisabled) {
   std::string yaml = R"EOF(
     name: "name"
     connect_timeout: 1.250s
-    type: original_dst
-    lb_type: original_dst_lb
+    type: ORIGINAL_DST
+    lb_policy: ORIGINAL_DST_LB
   )EOF";
 
   EXPECT_CALL(initialized_, ready());
