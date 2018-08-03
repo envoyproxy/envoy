@@ -113,6 +113,7 @@ PROTO_RST="
   /envoy/type/percent/envoy/type/percent.proto.rst
   /envoy/type/range/envoy/type/range.proto.rst
   /envoy/type/matcher/metadata/envoy/type/matcher/metadata.proto.rst
+  /envoy/type/matcher/value/envoy/type/matcher/value.proto.rst
   /envoy/type/matcher/number/envoy/type/matcher/number.proto.rst
   /envoy/type/matcher/string/envoy/type/matcher/string.proto.rst
 "
