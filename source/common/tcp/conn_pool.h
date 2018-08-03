@@ -34,32 +34,21 @@ public:
 protected:
   struct ActiveConn;
 
-  struct ConnectionWrapper {
+  struct ConnectionWrapper : public ConnectionPool::ConnectionData {
     ConnectionWrapper(ActiveConn& parent);
+    ~ConnectionWrapper();
 
-    Network::ClientConnection& connection();
-    void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callbacks);
-    void release(bool closed);
+    // ConnectionPool::ConnectionData
+    Network::ClientConnection& connection() override;
+    void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callbacks) override;
+    void release() override;
 
     ActiveConn& parent_;
     ConnectionPool::UpstreamCallbacks* callbacks_{};
     bool released_{false};
   };
 
-  typedef std::shared_ptr<ConnectionWrapper> ConnectionWrapperSharedPtr;
-
-  struct ConnectionDataImpl : public ConnectionPool::ConnectionData {
-    ConnectionDataImpl(ConnectionWrapperSharedPtr wrapper) : wrapper_(wrapper) {}
-    ~ConnectionDataImpl() { wrapper_->release(false); }
-
-    // ConnectionPool::ConnectionData
-    Network::ClientConnection& connection() override { return wrapper_->connection(); }
-    void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callbacks) override {
-      wrapper_->addUpstreamCallbacks(callbacks);
-    };
-
-    ConnectionWrapperSharedPtr wrapper_;
-  };
+  typedef std::unique_ptr<ConnectionWrapper> ConnectionWrapperPtr;
 
   struct ConnReadFilter : public Network::ReadFilterBaseImpl {
     ConnReadFilter(ActiveConn& parent) : parent_(parent) {}
@@ -89,7 +78,7 @@ protected:
 
     ConnPoolImpl& parent_;
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
-    ConnectionWrapperSharedPtr wrapper_;
+    ConnectionWrapperPtr wrapper_;
     Network::ClientConnectionPtr conn_;
     Event::TimerPtr connect_timer_;
     Stats::TimespanPtr conn_length_;
