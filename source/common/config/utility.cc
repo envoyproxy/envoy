@@ -161,12 +161,8 @@ std::chrono::milliseconds Utility::apiConfigSourceRefreshDelay(
 
 std::chrono::milliseconds Utility::apiConfigSourceRequestTimeout(
     const envoy::api::v2::core::ApiConfigSource& api_config_source) {
-  if (!api_config_source.has_request_timeout()) {
-    return std::chrono::milliseconds(1000);
-  }
-
   return std::chrono::milliseconds(
-      DurationUtil::durationToMilliseconds(api_config_source.request_timeout()));
+      PROTOBUF_GET_MS_OR_DEFAULT(api_config_source, request_timeout, 1000));
 }
 
 void Utility::translateEdsConfig(const Json::Object& json_config,

@@ -39,7 +39,6 @@ protected:
             cluster_names:
             - eds
             refresh_delay: 1s
-            request_timeout: 1s
     )EOF");
   }
 
@@ -135,7 +134,6 @@ TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
             cluster_names:
             - eds
             refresh_delay: 1s
-            request_timeout: 1s
     )EOF");
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
@@ -342,7 +340,6 @@ TEST_F(EdsTest, EndpointRemoval) {
             cluster_names:
             - eds
             refresh_delay: 1s
-            request_timeout: 1s
   )EOF");
 
   auto health_checker = std::make_shared<MockHealthChecker>();
@@ -485,7 +482,6 @@ TEST_F(EdsTest, EndpointLocalityWeights) {
             cluster_names:
             - eds
             refresh_delay: 1s
-            request_timeout: 1s
     )EOF");
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
   auto* cluster_load_assignment = resources.Add();
@@ -974,7 +970,6 @@ TEST_F(EdsTest, PriorityAndLocalityWeighted) {
             cluster_names:
             - eds
             refresh_delay: 1s
-            request_timeout: 1s
     )EOF");
 
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;

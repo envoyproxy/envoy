@@ -429,13 +429,11 @@ dynamic_resources:
       cluster_names:
       - lds
       refresh_delay: 30s
-      request_timeout: 1s
   cds_config:
     api_config_source:
       cluster_names:
       - cds
       refresh_delay: 30s
-      request_timeout: 1s
 cluster_manager: {}
 flags_path: "/invalid_flags"
 stats_sinks:
