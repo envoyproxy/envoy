@@ -32,6 +32,8 @@ routing PRs, questions, etc. to the right place.
   * Redis, Python, configuration/operational questions.
 * Lizan Zhou ([lizan](https://github.com/lizan)) (zlizan@google.com)
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions).
+* Dhi Aurrahman ([dio](https://github.com/dio)) (dio@tetrate.io)
+  * Lua, access logging, and general miscellany.
 
 # Emeritus maintainers
 
