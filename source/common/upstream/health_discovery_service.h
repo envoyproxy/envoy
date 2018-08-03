@@ -24,6 +24,8 @@ public:
                     bool added_via_api) override;
 };
 
+// TODO(lilika): Add HdsClusters to the /clusters endpoint to get detailed stats about each HC host.
+
 /**
  * Implementation of Upstream::Cluster for hds clusters, clusters that are used
  * by HdsDelegates
@@ -97,6 +99,8 @@ struct HdsDelegateStats {
   ALL_HDS_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+// TODO(lilika): Add /config_dump support for HdsDelegate
+
 /**
  * The HdsDelegate class is responsible for receiving requests from a management
  * server with a set of hosts to healthcheck, healthchecking them, and reporting
@@ -121,8 +125,7 @@ public:
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse sendResponse();
-  // TODO(htuch): Make this configurable or some static.
-  // Processes the management server requests
+
   std::vector<HdsClusterPtr> hdsClusters() { return hds_clusters_; };
 
 private:
@@ -159,12 +162,16 @@ private:
   Event::TimerPtr hds_stream_response_timer_;
   Event::TimerPtr hds_retry_timer_;
 
+  // TODO(lilika): Add API knob for RetryDelayMilliseconds, instead of
+  // hardcoding it.
   // How often we retry to establish a stream to the management server
   const uint32_t RetryDelayMilliseconds = 5000;
 
   // Soft limit on size of the cluster’s connections read and write buffers.
   static constexpr uint32_t ClusterConnectionBufferLimitBytes = 32768;
 
+  // TODO(lilika): Add API knob for ClusterTimeoutSeconds, instead of
+  // hardcoding it.
   // The timeout for new network connections to hosts in the cluster.
   static constexpr uint32_t ClusterTimeoutSeconds = 1;
 
@@ -173,5 +180,6 @@ private:
 };
 
 typedef std::unique_ptr<HdsDelegate> HdsDelegatePtr;
+
 } // namespace Upstream
 } // namespace Envoy

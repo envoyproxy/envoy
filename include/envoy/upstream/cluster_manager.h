@@ -297,7 +297,6 @@ public:
 /**
  * Factory for creating ClusterInfo
  */
-
 class ClusterInfoFactory {
 public:
   virtual ~ClusterInfoFactory() {}
@@ -314,7 +313,6 @@ public:
    * @param added_via_api denotes whether this was added via API.
    * @return Upstream::ClusterInfoConstSharedPtr
    */
-
   virtual Upstream::ClusterInfoConstSharedPtr
   createClusterInfo(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
                     const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,

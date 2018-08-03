@@ -231,5 +231,6 @@ void HdsCluster::initialize(std::function<void()> callback) {
 void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
+
 } // namespace Upstream
 } // namespace Envoy
