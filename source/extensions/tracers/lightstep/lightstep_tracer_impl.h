@@ -60,7 +60,7 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
 
-  static const size_t DEFAULT_MIN_FLUSH_SPANS;
+  static const size_t DefaultMinFlushSpans;
 
   // Tracer::OpenTracingDriver
   opentracing::Tracer& tracer() override;
