@@ -33,6 +33,7 @@ api_go_proto_library(
         "//envoy/api/v2/core:config_source_go_proto",
         "//envoy/config/metrics/v2:metrics_service_go_proto",
         "//envoy/config/metrics/v2:stats_go_proto",
+        "//envoy/config/overload/v2alpha:overload_go_proto",
         "//envoy/config/ratelimit/v2:rls_go_grpc",
         "//envoy/config/trace/v2:trace_go_proto",
     ],
