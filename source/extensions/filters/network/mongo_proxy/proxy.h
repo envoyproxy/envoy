@@ -102,15 +102,19 @@ typedef std::shared_ptr<AccessLog> AccessLogSharedPtr;
 class FaultConfig {
 public:
   FaultConfig(const envoy::config::filter::fault::v2::FaultDelay& fault_config)
-      : delay_percent_(fault_config.percent()), delay_percentage_(fault_config.percentage()),
-        duration_ms_(PROTOBUF_GET_MS_REQUIRED(fault_config, fixed_delay)) {}
-  uint32_t delayPercent() const { return delay_percent_; }
+      : duration_ms_(PROTOBUF_GET_MS_REQUIRED(fault_config, fixed_delay)) {
+    if (fault_config.has_percentage()) {
+      delay_percentage_ = fault_config.percentage();
+    } else {
+      delay_percentage_.set_numerator(static_cast<uint32_t>(fault_config.percent()));
+      delay_percentage_.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+    }
+  }
   envoy::type::FractionalPercent delayPercentage() const { return delay_percentage_; }
   uint64_t delayDuration() const { return duration_ms_; }
 
 private:
-  const uint32_t delay_percent_;
-  const envoy::type::FractionalPercent delay_percentage_;
+  envoy::type::FractionalPercent delay_percentage_;
   const uint64_t duration_ms_;
 };
 

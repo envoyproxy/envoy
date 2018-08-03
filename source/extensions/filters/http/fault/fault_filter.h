@@ -46,7 +46,6 @@ public:
     return fault_filter_headers_;
   }
   uint64_t abortPercent() const { return abort_percent_; }
-  uint64_t delayPercent() const { return fixed_delay_percent_; }
   envoy::type::FractionalPercent delayPercentage() const { return fixed_delay_percentage_; }
   uint64_t delayDuration() const { return fixed_duration_ms_; }
   uint64_t abortCode() const { return http_status_; }
@@ -56,7 +55,6 @@ public:
 private:
   uint64_t abort_percent_{};                                // 0-100
   uint64_t http_status_{};                                  // HTTP or gRPC return codes
-  uint64_t fixed_delay_percent_{};                          // 0-100
   envoy::type::FractionalPercent fixed_delay_percentage_{}; // 0-100
   uint64_t fixed_duration_ms_{};                            // in milliseconds
   std::string upstream_cluster_; // restrict faults to specific upstream cluster

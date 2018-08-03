@@ -322,9 +322,7 @@ absl::optional<uint64_t> ProxyFilter::delayDuration() {
   if (!runtime_.snapshot().sampleFeatureEnabled(
           MongoRuntimeConfig::get().FixedDelayPercent, fault_config_->delayPercentage().numerator(),
           ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-              fault_config_->delayPercentage())) &&
-      !runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().FixedDelayPercent,
-                                          fault_config_->delayPercent())) {
+              fault_config_->delayPercentage()))) {
     return result;
   }
 
