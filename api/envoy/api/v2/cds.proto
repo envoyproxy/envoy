@@ -398,13 +398,15 @@ message Cluster {
   // :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   // load balancing policy.
   message OriginalDstLbConfig {
-    // When true, :ref:`x-envoy-orignal-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>`
-    // can be used to override destination address.
+    // When true, :ref:`x-envoy-orignal-dst-host
+    // <config_http_conn_man_headers_x-envoy-original-dst-host>` can be used to override destination
+    // address.
     //
     // .. attention::
     //
     //   This header isn't sanitized by default, so enabling this feature allows HTTP clients to
-    //   route traffic to arbitrary hosts and/or ports, which may have serious security consequences.
+    //   route traffic to arbitrary hosts and/or ports, which may have serious security
+    //   consequences.
     bool use_http_header = 1;
   }
 
