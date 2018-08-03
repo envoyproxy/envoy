@@ -459,14 +459,6 @@ TEST_F(EdsTest, EndpointMoved) {
 
   VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
 
-  int p = 0;
-  for (auto& hs : cluster_->prioritySet().hostSetsPerPriority()) {
-    std::cout << p++ << std::endl;
-    for (auto& h : hs->hosts()) {
-      std::cout << h->address()->asString() << std::endl; 
-    }
-  }
-
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 1);
