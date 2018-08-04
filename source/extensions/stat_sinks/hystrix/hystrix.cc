@@ -43,12 +43,14 @@ void ClusterStatsCache::printRollingWindow(absl::string_view name, RollingWindow
   out_str << std::endl;
 }
 
-void ClusterStatsCache::addHistogramToStream(std::stringstream& ss) {
+void ClusterStatsCache::addHistogramToStream(absl::string_view key, std::stringstream& ss) {
+  ss << ", \"" << key << "\": {";
   bool is_first = true;
   for (const std::pair<std::string, double> element : timing_) {
     HystrixSink::addDoubleToStream(element.first, element.second, ss, is_first);
     is_first = false;
   }
+  ss << "}";
 }
 
 // Add new value to rolling window, in place of oldest one.
@@ -189,10 +191,8 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
   addIntToStream("rollingCountTimeout", timeouts, ss);
   addIntToStream("rollingCountBadRequests", 0, ss);
   addIntToStream("currentConcurrentExecutionCount", 0, ss);
-  addIntToStream("latencyExecute_mean", 0, ss);
-  ss << ", \"latencyExecute\": {";
-  cluster_stats_cache.addHistogramToStream(ss);
-  ss << "}";
+  addStringToStream("latencyExecute_mean", "null", ss);
+  cluster_stats_cache.addHistogramToStream("latencyExecute", ss);
   addIntToStream("propertyValue_circuitBreakerRequestVolumeThreshold", 0, ss);
   addIntToStream("propertyValue_circuitBreakerSleepWindowInMilliseconds", 0, ss);
   addIntToStream("propertyValue_circuitBreakerErrorThresholdPercentage", 0, ss);
@@ -313,7 +313,7 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
   return Http::Code::OK;
 }
 
-void HystrixSink::flush(Stats::Source&) {
+void HystrixSink::flush(Stats::Source& source) {
   if (callbacks_list_.empty()) {
     return;
   }
@@ -322,13 +322,13 @@ void HystrixSink::flush(Stats::Source&) {
   Upstream::ClusterManager::ClusterInfoMap clusters = server_.clusterManager().clusters();
 
   // Save a map of the relevant histograms per cluster in a convenient format.
-  std::unordered_map<absl::string_view, std::unordered_map<std::string, double>, StringViewHash>
-      time_histograms;
-  for (const Stats::ParentHistogramSharedPtr histogram : server_.stats().histograms()) {
+  std::unordered_map<std::string, QuantileLatencyMap, StringViewHash> time_histograms;
+  for (const Stats::ParentHistogramSharedPtr histogram : source.cachedHistograms()) {
     // histogram->name() on clusters of the format "cluster.cluster_name.histogram_name"
     // i.e. "cluster.service1.upstream_rq_time".
-    const std::vector<absl::string_view> split_name = absl::StrSplit(histogram->name(), '.');
-    if (split_name[0] == "cluster" && split_name[2] == "upstream_rq_time") {
+    const std::vector<std::string> split_name = absl::StrSplit(histogram->name(), '.');
+    if (split_name.size() >= 2 && split_name[0] == "cluster" &&
+        split_name[2] == "upstream_rq_time") {
       QuantileLatencyMap& hist_map = time_histograms[split_name[1]];
       const std::vector<double>& supported_quantiles =
           histogram->cumulativeStatistics().supportedQuantiles();
@@ -337,10 +337,10 @@ void HystrixSink::flush(Stats::Source&) {
             hystrix_quantiles.end()) {
           if (supported_quantiles[i] == 0.995) {
             // The only non int quantile value
-            hist_map["99.5"] = histogram->cumulativeStatistics().computedQuantiles()[i];
+            hist_map["99.5"] = histogram->intervalStatistics().computedQuantiles()[i];
           } else {
             hist_map[std::to_string(int(100 * supported_quantiles[i]))] =
-                histogram->cumulativeStatistics().computedQuantiles()[i];
+                histogram->intervalStatistics().computedQuantiles()[i];
           }
         }
       }
