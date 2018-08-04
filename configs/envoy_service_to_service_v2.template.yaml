@@ -141,7 +141,7 @@ static_resources:
                           runtime_key: access_log.access_error.duration
                   - traceable_filter: {}
             config:
-              path: /var/log/envoy/access_error.log
+              path: "/var/log/envoy/egress_http_error.log"
               {{ access_log_helper.egress_error_log()|indent(10)}}
           use_remote_address: true
           http_filters:
@@ -194,7 +194,7 @@ static_resources:
                           runtime_key: access_log.access_error.duration
                   - traceable_filter: {}
             config:
-              path: /var/log/envoy/access_error.log
+              path: "/var/log/envoy/egress_http_error.log"
               {{ access_log_helper.egress_error_log()|indent(10) }}
           use_remote_address: true
           http_filters:
@@ -237,7 +237,6 @@ static_resources:
                   {% if host.get('host_rewrite', False) %}
                   host_rewrite: "{{host['host_rewrite']}}"
                   {% endif %}
-            {% if not loop.last %}{% endif %}
             {% endfor %}
           http_filters:
           {% if mapping['name'] in ['dynamodb_iad', 'dynamodb_legacy'] -%}
@@ -272,7 +271,7 @@ static_resources:
                           runtime_key: access_log.access_error.duration
                   {% endif %}
             config:
-              path: /var/log/envoy/access_error.log
+              path: "/var/log/envoy/egress_{{ mapping['name'] }}_http_error.log"
               {% if mapping.get('is_amzn_service', False) -%}
               {{ access_log_helper.egress_error_amazon_service()|indent(10) }}
               {% else -%}
@@ -307,7 +306,6 @@ static_resources:
             - key: database
               value: "{{ key }}"
       {% endif %}
-  {% if not loop.last %}{% endif -%}
   {% endfor -%}
   clusters:
   {% for service, options in internal_virtual_hosts.iteritems() -%}
@@ -352,7 +350,6 @@ static_resources:
         protocol: {{ server['protocol'] }}
         port_value: {{ server['port_value'] }}
         address: {{ server['address'] }}
-    {% if not loop.last -%}{% endif -%}
     {% endfor -%}
   {% endfor %}
   - name: main_website
@@ -453,7 +450,7 @@ dynamic_resources:
   cds_config:
     api_config_source:
       cluster_names:
-      - sds
+      - cds_cluster
       refresh_delay: 30s
 cluster_manager: {}
 flags_path: "/etc/envoy/flags"

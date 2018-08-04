@@ -141,14 +141,6 @@ def _python_deps():
         name = "jinja2",
         actual = "@com_github_pallets_jinja//:jinja2",
     )
-    _repository_impl(
-        name = "com_github_yaml_pyyaml",
-        build_file = "@envoy//bazel/external:pyyaml.BUILD",
-    )
-    native.bind(
-        name = "yaml",
-        actual = "@com_github_yaml_pyyaml//:yaml",
-    )
 
 
 # Bazel native C++ dependencies. For the depedencies that doesn't provide autoconf/automake builds.

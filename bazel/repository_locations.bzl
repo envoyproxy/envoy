@@ -80,10 +80,6 @@ REPOSITORY_LOCATIONS = dict(
         commit = "f54b0e47a08782a6131cc3d60f94d038fa6e0a51",  # v1.1.0
         remote = "https://github.com/tencent/rapidjson",
     ),
-    com_github_yaml_pyyaml = dict(
-        commit = "b6cbfeec35e019734263a8f4e6a3340e94fe0a4f",
-        remote = "https://github.com/yaml/pyyaml",
-    ),
     com_google_googletest = dict(
         commit = "43863938377a9ea1399c0596269e0890b5c5515a",
         remote = "https://github.com/google/googletest",
