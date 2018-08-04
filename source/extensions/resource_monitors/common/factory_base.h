@@ -19,6 +19,10 @@ public:
         MessageUtil::downcastAndValidate<const ConfigProto&>(config), context);
   }
 
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ConfigProto>();
+  }
+
   std::string name() override { return name_; }
 
 protected:

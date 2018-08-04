@@ -1,5 +1,6 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/fmt.h"
 #include "common/config/cds_json.h"
@@ -8,7 +9,6 @@
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -57,6 +57,18 @@ TEST(UtilityTest, ApiConfigSourceRefreshDelay) {
   api_config_source.mutable_refresh_delay()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
   EXPECT_EQ(1234, Utility::apiConfigSourceRefreshDelay(api_config_source).count());
+}
+
+TEST(UtilityTest, ApiConfigSourceDefaultRequestTimeout) {
+  envoy::api::v2::core::ApiConfigSource api_config_source;
+  EXPECT_EQ(1000, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
+}
+
+TEST(UtilityTest, ApiConfigSourceRequestTimeout) {
+  envoy::api::v2::core::ApiConfigSource api_config_source;
+  api_config_source.mutable_request_timeout()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
+  EXPECT_EQ(1234, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
 }
 
 TEST(UtilityTest, TranslateApiConfigSource) {

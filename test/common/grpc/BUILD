@@ -61,6 +61,7 @@ envoy_cc_test(
     srcs = envoy_select_google_grpc(["google_async_client_impl_test.cc"]),
     deps = [
         "//source/common/event:dispatcher_lib",
+        "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/tracing:http_tracer_lib",
         "//test/mocks/grpc:grpc_mocks",

@@ -60,10 +60,10 @@ Network::TransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(b
     target = json_tls;
   }
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(target);
-  Ssl::ClientContextConfigImpl cfg(*loader, secret_manager_);
+  auto cfg = std::make_unique<Ssl::ClientContextConfigImpl>(*loader, secret_manager_);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::TransportSocketFactoryPtr{
-      new Ssl::ClientSslSocketFactory(cfg, *context_manager_, *client_stats_store)};
+      new Ssl::ClientSslSocketFactory(std::move(cfg), *context_manager_, *client_stats_store)};
 }
 
 Network::TransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext() {
@@ -75,10 +75,10 @@ Network::TransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext
 )EOF";
 
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  Ssl::ServerContextConfigImpl cfg(*loader, secret_manager_);
+  auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(*loader, secret_manager_);
   static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
   return std::make_unique<Ssl::ServerSslSocketFactory>(
-      cfg, *context_manager_, *upstream_stats_store, std::vector<std::string>{});
+      std::move(cfg), *context_manager_, *upstream_stats_store, std::vector<std::string>{});
 }
 
 Network::ClientConnectionPtr XfccIntegrationTest::makeClientConnection() {
@@ -149,9 +149,9 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previ
 
   codec_client_ = makeHttpConnection(std::move(conn));
   auto response = codec_client_->makeHeaderOnlyRequest(header_map);
-  fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-  upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
-  upstream_request_->waitForEndStream(*dispatcher_);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
   if (expected_xfcc.empty()) {
     EXPECT_EQ(nullptr, upstream_request_->headers().ForwardedClientCert());
   } else {

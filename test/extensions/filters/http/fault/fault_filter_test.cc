@@ -4,13 +4,13 @@
 #include <string>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/stats/stats.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/config/filter_json.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/stats/stats_impl.h"
 
 #include "extensions/filters/http/fault/fault_filter.h"
 #include "extensions/filters/http/well_known_names.h"

@@ -175,9 +175,14 @@ envoy_cc_library(
     name = "transport_socket_config_interface",
     hdrs = ["transport_socket_config.h"],
     deps = [
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/runtime:runtime_interface",
         "//include/envoy/secret:secret_manager_interface",
         "//include/envoy/ssl:context_manager_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/protobuf",
     ],
 )
@@ -196,5 +201,12 @@ envoy_cc_library(
     deps = [
         ":resource_monitor_interface",
         "//include/envoy/event:dispatcher_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "overload_manager_interface",
+    hdrs = ["overload_manager.h"],
+    deps = [
     ],
 )

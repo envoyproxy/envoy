@@ -53,8 +53,11 @@ public:
   }
 
   void waitForHdsStream() {
-    fake_hds_connection_ = hds_upstream_->waitForHttpConnection(*dispatcher_);
-    hds_stream_ = fake_hds_connection_->waitForNewStream(*dispatcher_);
+    AssertionResult result =
+        hds_upstream_->waitForHttpConnection(*dispatcher_, fake_hds_connection_);
+    RELEASE_ASSERT(result, result.message());
+    result = fake_hds_connection_->waitForNewStream(*dispatcher_, hds_stream_);
+    RELEASE_ASSERT(result, result.message());
   }
 
   void requestHealthCheckSpecifier() {
@@ -68,8 +71,10 @@ public:
 
   void cleanupHdsConnection() {
     if (fake_hds_connection_ != nullptr) {
-      fake_hds_connection_->close();
-      fake_hds_connection_->waitForDisconnect();
+      AssertionResult result = fake_hds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_hds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
   }
 
@@ -98,9 +103,9 @@ TEST_P(HdsIntegrationTest, Simple) {
   server_health_check_specifier.mutable_interval()->set_nanos(500000000); // 500ms
 
   // Server <--> Envoy
-  fake_hds_connection_ = hds_upstream_->waitForHttpConnection(*dispatcher_);
-  hds_stream_ = fake_hds_connection_->waitForNewStream(*dispatcher_);
-  hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg);
+  ASSERT_TRUE(hds_upstream_->waitForHttpConnection(*dispatcher_, fake_hds_connection_));
+  ASSERT_TRUE(fake_hds_connection_->waitForNewStream(*dispatcher_, hds_stream_));
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg));
 
   EXPECT_EQ(0, test_server_->counter("hds_delegate.requests")->value());
   EXPECT_EQ(1, test_server_->counter("hds_delegate.responses")->value());
@@ -111,7 +116,7 @@ TEST_P(HdsIntegrationTest, Simple) {
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
   // Wait for Envoy to reply
-  hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_2);
+  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_2));
 
   EXPECT_EQ(1, test_server_->counter("hds_delegate.requests")->value());
   EXPECT_EQ(2, test_server_->counter("hds_delegate.responses")->value());

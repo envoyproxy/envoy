@@ -90,7 +90,7 @@ maximize the chances of your PR being merged.
 * We expect that once a PR is opened, it will be actively worked on until it is merged or closed.
   We reserve the right to close PRs that are not making progress. This is generally defined as no
   changes for 7 days. Obviously PRs that are closed due to lack of activity can be reopened later.
-  Closing stale PRs helps us keep on top of all of the work currently in flight.
+  Closing stale PRs helps us to keep on top of all of the work currently in flight.
 * If a commit deprecates a feature, the commit message must mention what has been deprecated.
   Additionally, [DEPRECATED.md](DEPRECATED.md) must be updated as part of the commit.
 * Please consider joining the [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev)

@@ -12,6 +12,7 @@
 #include "common/common/base64.h"
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
+#include "common/common/utility.h"
 #include "common/ssl/utility.h"
 
 #include "openssl/hmac.h"
@@ -43,8 +44,18 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
   RELEASE_ASSERT(rc == 1, "");
 
   if (!SSL_CTX_set_strict_cipher_list(ctx_.get(), config.cipherSuites().c_str())) {
-    throw EnvoyException(
-        fmt::format("Failed to initialize cipher suites {}", config.cipherSuites()));
+    std::vector<absl::string_view> ciphers =
+        StringUtil::splitToken(config.cipherSuites(), ":+-![|]", false);
+    std::vector<std::string> bad_ciphers;
+    for (const auto& cipher : ciphers) {
+      std::string cipher_str(cipher);
+      if (!SSL_CTX_set_strict_cipher_list(ctx_.get(), cipher_str.c_str())) {
+        bad_ciphers.push_back(cipher_str);
+      }
+    }
+    throw EnvoyException(fmt::format("Failed to initialize cipher suites {}. The following "
+                                     "ciphers were rejected when tried individually: {}",
+                                     config.cipherSuites(), StringUtil::join(bad_ciphers, ", ")));
   }
 
   if (!SSL_CTX_set1_curves_list(ctx_.get(), config.ecdhCurves().c_str())) {

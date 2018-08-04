@@ -17,20 +17,10 @@ RdsSubscription::RdsSubscription(
     const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
     Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, const Stats::Scope& scope)
-    : RestApiFetcher(cm, rds.config_source().api_config_source().cluster_names()[0], dispatcher,
-                     random,
-                     Envoy::Config::Utility::apiConfigSourceRefreshDelay(
-                         rds.config_source().api_config_source())),
+    : RestApiFetcher(cm, rds.config_source().api_config_source(), dispatcher, random),
       local_info_(local_info), stats_(stats), scope_(scope) {
-  const auto& api_config_source = rds.config_source().api_config_source();
-  UNREFERENCED_PARAMETER(api_config_source);
-  // If we are building an RdsSubscription, the ConfigSource should be REST_LEGACY.
-  ASSERT(api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
-  // TODO(htuch): Add support for multiple clusters, #1170.
-  ASSERT(api_config_source.cluster_names().size() == 1);
-  ASSERT(api_config_source.has_refresh_delay());
-  Envoy::Config::Utility::checkClusterAndLocalInfo("rds", api_config_source.cluster_names()[0], cm,
-                                                   local_info);
+  Envoy::Config::Utility::checkClusterAndLocalInfo(
+      "rds", rds.config_source().api_config_source().cluster_names()[0], cm, local_info);
 }
 
 void RdsSubscription::createRequest(Http::Message& request) {

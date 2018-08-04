@@ -2,6 +2,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/stats/stats.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
@@ -11,7 +13,6 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"
@@ -678,7 +679,7 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   EXPECT_CALL(*client_write_buffer_, move(_))
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
-  EXPECT_CALL(*client_write_buffer_, write(_)).WillOnce(Invoke([&](int fd) -> std::tuple<int, int> {
+  EXPECT_CALL(*client_write_buffer_, write(_)).WillOnce(Invoke([&](int fd) -> Api::SysCallResult {
     dispatcher_->exit();
     return client_write_buffer_->failWrite(fd);
   }));
@@ -764,7 +765,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
         .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
     EXPECT_CALL(*client_write_buffer_, write(_))
         .WillOnce(DoAll(Invoke([&](int) -> void { client_write_buffer_->drain(bytes_to_flush); }),
-                        Return(std::make_tuple(bytes_to_flush, 0))))
+                        Return(Api::SysCallResult{bytes_to_flush, 0})))
         .WillRepeatedly(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::failWrite));
     client_connection_->write(buffer_to_write, false);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
