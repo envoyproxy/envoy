@@ -145,6 +145,11 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       // The only time this happens is if we actually saw a connect failure.
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
+
+      // Increment the total requests also.
+      host_->cluster().stats().upstream_rq_total_.inc();
+      host_->stats().rq_total_.inc();
+
       removed = client.removeFromList(busy_clients_);
 
       // Raw connect failures should never happen under normal circumstances. If we have an upstream

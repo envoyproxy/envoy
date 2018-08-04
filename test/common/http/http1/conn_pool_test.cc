@@ -363,6 +363,7 @@ TEST_F(Http1ConnPoolImplTest, ConnectTimeout) {
   EXPECT_CALL(conn_pool_, onClientDestroy()).Times(2);
   dispatcher_.clearDeferredDeleteList();
 
+  EXPECT_EQ(2U, cluster_->stats_.upstream_rq_total_.value());
   EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_timeout_.value());
 }
