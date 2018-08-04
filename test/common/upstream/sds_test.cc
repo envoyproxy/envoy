@@ -42,7 +42,9 @@ namespace Upstream {
 
 class SdsTest : public testing::Test {
 protected:
-  SdsTest() : request_(&cm_.async_client_) {
+  SdsTest() : request_(&cm_.async_client_) { resetCluster(false); }
+
+  void resetCluster(bool set_request_timeout) {
     std::string raw_config = R"EOF(
     {
       "name": "name",
@@ -58,6 +60,10 @@ protected:
     envoy::api::v2::core::ConfigSource eds_config;
     eds_config.mutable_api_config_source()->add_cluster_names("sds");
     eds_config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
+    if (set_request_timeout) {
+      eds_config.mutable_api_config_source()->mutable_request_timeout()->CopyFrom(
+          Protobuf::util::TimeUtil::MillisecondsToDuration(5000));
+    }
     sds_cluster_ = parseSdsClusterFromJson(raw_config, eds_config);
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
     Upstream::MockCluster cluster;
@@ -145,6 +151,20 @@ TEST_F(SdsTest, PoolFailure) {
   setupPoolFailure();
   EXPECT_CALL(*timer_, enableTimer(_));
   cluster_->initialize([] {});
+}
+
+TEST_F(SdsTest, RequestTimeout) {
+  resetCluster(true);
+
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("sds")).WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(
+      cm_.async_client_,
+      send_(_, _, absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(5000))))
+      .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callbacks_)), Return(&request_)));
+
+  cluster_->initialize([] {});
+  EXPECT_CALL(request_, cancel());
+  cluster_.reset();
 }
 
 TEST_F(SdsTest, NoHealthChecker) {

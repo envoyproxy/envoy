@@ -52,6 +52,8 @@ public:
   MOCK_CONST_METHOD0(type, envoy::api::v2::Cluster::DiscoveryType());
   MOCK_CONST_METHOD0(lbRingHashConfig,
                      const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&());
+  MOCK_CONST_METHOD0(lbOriginalDstConfig,
+                     const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>&());
   MOCK_CONST_METHOD0(maintenanceMode, bool());
   MOCK_CONST_METHOD0(maxRequestsPerConnection, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
@@ -81,6 +83,7 @@ public:
   envoy::api::v2::Cluster::DiscoveryType type_{envoy::api::v2::Cluster::STRICT_DNS};
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   envoy::api::v2::Cluster::CommonLbConfig lb_config_;
 };

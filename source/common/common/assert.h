@@ -29,11 +29,19 @@ namespace Envoy {
   } while (false)
 
 #ifndef NDEBUG
-#define ASSERT(X) RELEASE_ASSERT(X, "")
+#define _ASSERT_ORIGINAL(X) RELEASE_ASSERT(X, "")
+#define _ASSERT_VERBOSE(X, Y) RELEASE_ASSERT(X, Y)
+#define _ASSERT_SELECTOR(_1, _2, ASSERT_MACRO, ...) ASSERT_MACRO
+
+// If ASSERT is called with one argument, the ASSERT_SELECTOR will return
+// _ASSERT_ORIGINAL and this will call _ASSERT_ORIGINAL(__VA_ARGS__).
+// If ASSERT is called with two arguments, ASSERT_SELECTOR will return
+// _ASSERT_VERBOSE, and this will call _ASSERT_VERBOSE,(__VA_ARGS__)
+#define ASSERT(...) _ASSERT_SELECTOR(__VA_ARGS__, _ASSERT_VERBOSE, _ASSERT_ORIGINAL)(__VA_ARGS__)
 #else
 // This non-implementation ensures that its argument is a valid expression that can be statically
 // casted to a bool, but the expression is never evaluated and will be compiled away.
-#define ASSERT(X)                                                                                  \
+#define ASSERT(X, ...)                                                                             \
   do {                                                                                             \
     constexpr bool __assert_dummy_variable = false && static_cast<bool>(X);                        \
     (void)__assert_dummy_variable;                                                                 \
