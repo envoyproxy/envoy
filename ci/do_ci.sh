@@ -55,14 +55,12 @@ if [[ "$1" == "bazel.release" ]]; then
   echo "bazel release build with tests..."
   bazel_release_binary_build
   
-  if [[ $# > 2 ]]; then
-  	echo "Multiple tests are not supported, only $2 will run"
-  fi
   if [[ $# > 1 ]]; then
-    echo "Testing $2 ..."
+    shift
+    echo "Testing $* ..."
     # Run only specified tests. Argument can be a single test 
     # (e.g. '//test/common/common:assert_test') or a test group (e.g. '//test/common/...')
-    bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt $2
+    bazel --batch test ${BAZEL_TEST_OPTIONS} -c opt $*
   else
     echo "Testing..."
     # We have various test binaries in the test directory such as tools, benchmarks, etc. We
