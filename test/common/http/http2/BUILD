@@ -24,7 +24,6 @@ envoy_cc_fuzz_test(
         ":codec_impl_fuzz_proto",
         "//source/common/http:header_map_lib",
         "//source/common/http/http2:codec_lib",
-        "//source/common/stats:stats_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
     ],

@@ -11,7 +11,6 @@
 #include "common/common/logger.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/http2/codec_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/common/http/http2/codec_impl_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
