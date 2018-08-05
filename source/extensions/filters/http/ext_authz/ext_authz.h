@@ -38,8 +38,8 @@ public:
                Runtime::Loader& runtime, Upstream::ClusterManager& cm)
       : local_info_(local_info), scope_(scope), runtime_(runtime), cm_(cm),
         cluster_name_(config.grpc_service().envoy_grpc().cluster_name()),
-        response_headers_to_remove_(
-            toResponseHeaders(config.http_service().response_headers_to_remove())),
+        allowed_authorization_headers_(
+            toAuthorizationHeaders(config.http_service().allowed_authorization_headers())),
         allowed_request_headers_(toRequestHeaders(config.http_service().allowed_request_headers())),
         failure_mode_allow_(config.failure_mode_allow()) {}
 
@@ -48,8 +48,8 @@ public:
   Stats::Scope& scope() { return scope_; }
   std::string cluster() { return cluster_name_; }
   Upstream::ClusterManager& cm() { return cm_; }
-  const Http::LowerCaseStrUnorderedSet& responseHeadersToRemove() {
-    return response_headers_to_remove_;
+  const Http::LowerCaseStrUnorderedSet& allowedAuthorizationHeaders() {
+    return allowed_authorization_headers_;
   }
   const Http::LowerCaseStrUnorderedSet& allowedRequestHeaders() { return allowed_request_headers_; }
 
@@ -69,7 +69,7 @@ private:
     return headers;
   }
 
-  static Http::LowerCaseStrUnorderedSet toResponseHeaders(
+  static Http::LowerCaseStrUnorderedSet toAuthorizationHeaders(
       const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& response_headers) {
     Http::LowerCaseStrUnorderedSet headers;
     headers.reserve(response_headers.size());
@@ -84,7 +84,7 @@ private:
   Runtime::Loader& runtime_;
   Upstream::ClusterManager& cm_;
   std::string cluster_name_;
-  Http::LowerCaseStrUnorderedSet response_headers_to_remove_;
+  Http::LowerCaseStrUnorderedSet allowed_authorization_headers_;
   Http::LowerCaseStrUnorderedSet allowed_request_headers_;
   bool failure_mode_allow_;
 };

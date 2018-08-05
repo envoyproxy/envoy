@@ -38,18 +38,16 @@ private:
 
   std::string string_;
 };
+
 /**
  * Lower case string hasher.
  */
 struct LowerCaseStringHash {
-  size_t operator()(const LowerCaseString& value) const {
-    return HashUtil::xxHash64(value.get());
-    ;
-  }
+  size_t operator()(const LowerCaseString& value) const { return HashUtil::xxHash64(value.get()); }
 };
 
 /**
- * Convinient type for unordered set of lower case string.
+ * Convenient type for unordered set of lower case string.
  */
 typedef std::unordered_set<LowerCaseString, LowerCaseStringHash> LowerCaseStrUnorderedSet;
 

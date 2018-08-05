@@ -125,8 +125,10 @@ TEST_F(HttpExtAuthzFilterTest, TestAllowedRequestHeaders) {
       uri: "ext_authz:9000"
       cluster: "ext_authz"
       timeout: 0.25s
-    allowed_request_headers:
+    allowed_authorization_headers:
       - foo_header_key
+    allowed_request_headers:
+      - bar_header_key
   )EOF";
 
   initialize(config);
@@ -134,7 +136,10 @@ TEST_F(HttpExtAuthzFilterTest, TestAllowedRequestHeaders) {
   EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Path), 1);
   EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Method), 1);
   EXPECT_EQ(config_->allowedRequestHeaders().count(Http::Headers::get().Host), 1);
-  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::LowerCaseString{"foo_header_key"}), 1);
+  EXPECT_EQ(config_->allowedRequestHeaders().count(Http::LowerCaseString{"bar_header_key"}), 1);
+  EXPECT_EQ(config_->allowedAuthorizationHeaders().size(), 1);
+  EXPECT_EQ(config_->allowedAuthorizationHeaders().count(Http::LowerCaseString{"foo_header_key"}),
+            1);
 }
 
 // Test that the request continues when the filter_callbacks has no route.
