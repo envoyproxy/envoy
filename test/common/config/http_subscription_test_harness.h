@@ -37,9 +37,9 @@ public:
       timer_cb_ = timer_cb;
       return timer_;
     }));
-    subscription_.reset(new HttpEdsSubscriptionImpl(node_, cm_, "eds_cluster", dispatcher_,
-                                                    random_gen_, std::chrono::milliseconds(1),
-                                                    *method_descriptor_, stats_));
+    subscription_.reset(new HttpEdsSubscriptionImpl(
+        node_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
+        std::chrono::milliseconds(1000), *method_descriptor_, stats_));
   }
 
   ~HttpSubscriptionTestHarness() {

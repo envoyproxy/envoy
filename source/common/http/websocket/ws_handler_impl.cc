@@ -131,8 +131,7 @@ void WsHandlerImpl::onConnectionSuccess() {
   // the connection pool. The current approach is a stop gap solution, where
   // we put the onus on the user to tell us if a route (and corresponding upstream)
   // is supposed to allow websocket upgrades or not.
-  Http1::ClientConnectionImpl upstream_http(upstream_conn_data_->connection(),
-                                            http_conn_callbacks_);
+  Http1::ClientConnectionImpl upstream_http(*upstream_connection_, http_conn_callbacks_);
   Http1::RequestStreamEncoderImpl upstream_request = Http1::RequestStreamEncoderImpl(upstream_http);
   upstream_request.encodeHeaders(request_headers_, false);
   ASSERT(state_ == ConnectState::PreConnect);

@@ -190,7 +190,6 @@ class ListenerImpl : public Network::ListenerConfig,
                      public Network::DrainDecision,
                      public Network::FilterChainManager,
                      public Network::FilterChainFactory,
-                     public Configuration::TransportSocketFactoryContext,
                      Logger::Loggable<Logger::Id::config> {
 public:
   /**
@@ -300,11 +299,6 @@ public:
   bool createNetworkFilterChain(Network::Connection& connection,
                                 const std::vector<Network::FilterFactoryCb>& factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& manager) override;
-
-  // Configuration::TransportSocketFactoryContext
-  Ssl::ContextManager& sslContextManager() override { return parent_.server_.sslContextManager(); }
-  Stats::Scope& statsScope() const override { return *listener_scope_; }
-  Secret::SecretManager& secretManager() override { return parent_.server_.secretManager(); }
 
   SystemTime last_updated_;
 

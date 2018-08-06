@@ -159,6 +159,12 @@ std::chrono::milliseconds Utility::apiConfigSourceRefreshDelay(
       DurationUtil::durationToMilliseconds(api_config_source.refresh_delay()));
 }
 
+std::chrono::milliseconds Utility::apiConfigSourceRequestTimeout(
+    const envoy::api::v2::core::ApiConfigSource& api_config_source) {
+  return std::chrono::milliseconds(
+      PROTOBUF_GET_MS_OR_DEFAULT(api_config_source, request_timeout, 1000));
+}
+
 void Utility::translateEdsConfig(const Json::Object& json_config,
                                  envoy::api::v2::core::ConfigSource& eds_config) {
   translateApiConfigSource(json_config.getObject("cluster")->getString("name"),

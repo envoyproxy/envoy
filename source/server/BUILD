@@ -217,6 +217,7 @@ envoy_cc_library(
         ":drain_manager_lib",
         ":init_manager_lib",
         ":lds_api_lib",
+        ":transport_socket_config_lib",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
@@ -347,5 +348,13 @@ envoy_cc_library(
         "//include/envoy/server:worker_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:thread_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "transport_socket_config_lib",
+    hdrs = ["transport_socket_config_impl.h"],
+    deps = [
+        "//include/envoy/server:transport_socket_config_interface",
     ],
 )

@@ -25,7 +25,8 @@ ClientSslAuthConfig::ClientSslAuthConfig(
     Stats::Scope& scope, Runtime::RandomGenerator& random)
     : RestApiFetcher(
           cm, config.auth_api_cluster(), dispatcher, random,
-          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_delay, 60000))),
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_delay, 60000)),
+          std::chrono::milliseconds(1000)),
       tls_(tls.allocateSlot()), ip_white_list_(config.ip_white_list()),
       stats_(generateStats(scope, config.stat_prefix())) {
 

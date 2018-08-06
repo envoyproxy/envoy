@@ -5,6 +5,8 @@
 #include "common/config/utility.h"
 #include "common/upstream/eds.h"
 
+#include "server/transport_socket_config_impl.h"
+
 #include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -51,8 +53,14 @@ protected:
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
-    cluster_.reset(new EdsClusterImpl(eds_cluster_, runtime_, stats_, ssl_context_manager_,
-                                      local_info_, cm_, dispatcher_, random_, false));
+    Envoy::Stats::ScopePtr scope = stats_.createScope(
+        fmt::format("cluster.{}.", eds_cluster_.alt_stat_name().empty()
+                                       ? eds_cluster_.name()
+                                       : std::string(eds_cluster_.alt_stat_name())));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_);
+    cluster_.reset(
+        new EdsClusterImpl(eds_cluster_, runtime_, factory_context, std::move(scope), false));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
   }
 
