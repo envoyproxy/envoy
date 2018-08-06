@@ -45,7 +45,7 @@ public:
   const std::vector<Http::HeaderUtility::HeaderData>& filterHeaders() const {
     return fault_filter_headers_;
   }
-  uint64_t abortPercent() const { return abort_percent_; }
+  envoy::type::FractionalPercent abortPercentage() const { return abort_percentage_; }
   envoy::type::FractionalPercent delayPercentage() const { return fixed_delay_percentage_; }
   uint64_t delayDuration() const { return fixed_duration_ms_; }
   uint64_t abortCode() const { return http_status_; }
@@ -53,7 +53,7 @@ public:
   const std::unordered_set<std::string>& downstreamNodes() const { return downstream_nodes_; }
 
 private:
-  uint64_t abort_percent_{};                                // 0-100
+  envoy::type::FractionalPercent abort_percentage_{};       // 0.0-100.0
   uint64_t http_status_{};                                  // HTTP or gRPC return codes
   envoy::type::FractionalPercent fixed_delay_percentage_{}; // 0.0-100.0
   uint64_t fixed_duration_ms_{};                            // in milliseconds

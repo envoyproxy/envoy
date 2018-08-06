@@ -34,7 +34,12 @@ const std::string FaultFilter::ABORT_HTTP_STATUS_KEY = "fault.http.abort.http_st
 FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault) {
 
   if (fault.has_abort()) {
-    abort_percent_ = fault.abort().percent();
+    if (fault.abort().has_percentage()) {
+      abort_percentage_ = fault.abort().percentage();
+    } else {
+      abort_percentage_.set_numerator(fault.abort().percent());
+      abort_percentage_.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+    }
     http_status_ = fault.abort().http_status();
   }
 
@@ -147,14 +152,15 @@ bool FaultFilter::isDelayEnabled() {
 }
 
 bool FaultFilter::isAbortEnabled() {
-  bool enabled = config_->runtime().snapshot().featureEnabled(ABORT_PERCENT_KEY,
-                                                              fault_settings_->abortPercent());
-
+  bool enabled = config_->runtime().snapshot().sampleFeatureEnabled(
+      ABORT_PERCENT_KEY, fault_settings_->abortPercentage().numerator(),
+      ProtobufPercentHelper::fractionalPercentDenominatorToInt(fault_settings_->abortPercentage()));
   if (!downstream_cluster_abort_percent_key_.empty()) {
-    enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
-                                                            fault_settings_->abortPercent());
+    enabled |= config_->runtime().snapshot().sampleFeatureEnabled(
+        downstream_cluster_abort_percent_key_, fault_settings_->abortPercentage().numerator(),
+        ProtobufPercentHelper::fractionalPercentDenominatorToInt(
+            fault_settings_->abortPercentage()));
   }
-
   return enabled;
 }
 
