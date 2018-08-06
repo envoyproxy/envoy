@@ -731,6 +731,29 @@ TEST_F(TcpConnPoolImplTest, DrainWhileConnecting) {
   dispatcher_.clearDeferredDeleteList();
 }
 
+TEST_F(TcpConnPoolImplTest, DrainOnClose) {
+  ReadyWatcher drained;
+  EXPECT_CALL(drained, ready());
+  conn_pool_.addDrainedCallback([&]() -> void { drained.ready(); });
+
+  InSequence s;
+  ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
+
+  ConnectionPool::MockUpstreamCallbacks callbacks;
+  c1.callbacks_.conn_data_->addUpstreamCallbacks(callbacks);
+
+  EXPECT_CALL(drained, ready());
+  EXPECT_CALL(callbacks, onEvent(Network::ConnectionEvent::RemoteClose))
+      .WillOnce(Invoke([&](Network::ConnectionEvent event) -> void {
+        EXPECT_EQ(Network::ConnectionEvent::RemoteClose, event);
+        c1.releaseConn();
+      }));
+  conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
+  dispatcher_.clearDeferredDeleteList();
+}
+
 TEST_F(TcpConnPoolImplDestructorTest, TestBusyConnectionsAreClosed) {
   prepareConn();
 

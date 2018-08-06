@@ -234,7 +234,11 @@ void ConnPoolImpl::onUpstreamReady() {
 }
 
 void ConnPoolImpl::processIdleConnection(ActiveConn& conn, bool delay) {
-  conn.wrapper_.reset();
+  if (conn.wrapper_) {
+    conn.wrapper_->invalidate();
+    conn.wrapper_.reset();
+  }
+
   if (pending_requests_.empty() || delay) {
     // There is nothing to service or delayed processing is requested, so just move the connection
     // into the ready list.
@@ -264,7 +268,7 @@ ConnPoolImpl::ConnectionWrapper::ConnectionWrapper(ActiveConn& parent) : parent_
 }
 
 Network::ClientConnection& ConnPoolImpl::ConnectionWrapper::connection() {
-  ASSERT(!released_);
+  ASSERT(conn_valid_);
   return *parent_.conn_;
 }
 
@@ -342,6 +346,10 @@ ConnPoolImpl::ActiveConn::ActiveConn(ConnPoolImpl& parent)
 }
 
 ConnPoolImpl::ActiveConn::~ActiveConn() {
+  if (wrapper_) {
+    wrapper_->invalidate();
+  }
+
   parent_.host_->cluster().stats().upstream_cx_active_.dec();
   parent_.host_->stats().cx_active_.dec();
   conn_length_->complete();
@@ -371,11 +379,18 @@ void ConnPoolImpl::ActiveConn::onUpstreamData(Buffer::Instance& data, bool end_s
 }
 
 void ConnPoolImpl::ActiveConn::onEvent(Network::ConnectionEvent event) {
+  ConnectionPool::UpstreamCallbacks* cb = nullptr;
   if (wrapper_ != nullptr && wrapper_->callbacks_ != nullptr) {
-    wrapper_->callbacks_->onEvent(event);
+    cb = wrapper_->callbacks_;
   }
 
+  // In the event of a close event, we want to update the pool's state before triggering callbacks,
+  // preventing the case where we attempt to return a closed connection to the ready pool.
   parent_.onConnectionEvent(*this, event);
+
+  if (cb) {
+    cb->onEvent(event);
+  }
 }
 
 void ConnPoolImpl::ActiveConn::onAboveWriteBufferHighWatermark() {
