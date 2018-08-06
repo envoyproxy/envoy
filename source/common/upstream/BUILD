@@ -166,10 +166,17 @@ envoy_cc_library(
     srcs = ["health_discovery_service.cc"],
     hdrs = ["health_discovery_service.h"],
     deps = [
+        ":health_checker_lib",
+        ":upstream_includes",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/stats:stats_macros",
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//include/envoy/upstream:upstream_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/grpc:async_client_lib",
+        "//source/common/network:resolver_lib",
         "@envoy_api//envoy/service/discovery/v2:hds_cc",
     ],
 )
