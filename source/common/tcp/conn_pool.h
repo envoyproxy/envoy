@@ -41,9 +41,12 @@ protected:
     void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callbacks);
     void release(bool closed);
 
+    void invalidate() { conn_valid_ = false; }
+
     ActiveConn& parent_;
     ConnectionPool::UpstreamCallbacks* callbacks_{};
     bool released_{false};
+    bool conn_valid_{true};
   };
 
   typedef std::shared_ptr<ConnectionWrapper> ConnectionWrapperSharedPtr;
