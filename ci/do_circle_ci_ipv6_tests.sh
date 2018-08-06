@@ -12,8 +12,6 @@ export TEST_TYPE="bazel.ipv6_tests"
 
 export BAZEL_EXTRA_TEST_OPTIONS="--test_env=ENVOY_IP_TEST_VERSIONS=v6only"
 
-export BAZEL_REMOTE_CACHE="${BAZEL_REMOTE_CACHE:-https://storage.googleapis.com/envoy-circleci-bazel-cache/}"
-
 function finish {
   echo "disk space at end of build:"
   df -h

@@ -2,8 +2,6 @@
 
 set -e
 
-export BAZEL_REMOTE_CACHE="${BAZEL_REMOTE_CACHE:-https://storage.googleapis.com/envoy-circleci-bazel-cache/}"
-
 . "$(dirname "$0")"/setup_gcs_cache.sh
 
 BAZEL_BUILD_OPTIONS="--curses=no --show_task_finish --verbose_failures ${BAZEL_BUILD_EXTRA_OPTIONS}"

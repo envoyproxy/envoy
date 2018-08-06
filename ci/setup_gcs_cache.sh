@@ -2,19 +2,26 @@
 
 set -e
 
-gcp_service_account_cleanup() {
-  echo "Deleting service account key file..."
-  rm -rf /tmp/gcp_service_account.json
-}
-
 if [[ ! -z "${BAZEL_REMOTE_CACHE}" ]]; then
 
   if [[ ! -z "${GCP_SERVICE_ACCOUNT_KEY}" ]]; then
-    echo "${GCP_SERVICE_ACCOUNT_KEY}" | base64 --decode > /tmp/gcp_service_account.json
+
+    # mktemp will create a tempfile with u+rw permission minus umask, it will not be readable by all
+    # users by default.
+    GCP_SERVICE_ACCOUNT_KEY_FILE=$(mktemp -t gcp_service_account.XXXXXX.json)
+
+    gcp_service_account_cleanup() {
+      echo "Deleting service account key file..."
+      rm -rf "${GCP_SERVICE_ACCOUNT_KEY_FILE}"
+    }
+
     trap gcp_service_account_cleanup EXIT
 
+    echo "${GCP_SERVICE_ACCOUNT_KEY}" | base64 --decode > "${GCP_SERVICE_ACCOUNT_KEY_FILE}"
+
     export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} \
-      --remote_http_cache=${BAZEL_REMOTE_CACHE} --google_credentials=/tmp/gcp_service_account.json"
+      --remote_http_cache=${BAZEL_REMOTE_CACHE} \
+      --google_credentials=${GCP_SERVICE_ACCOUNT_KEY_FILE}"
     echo "Set up bazel read/write HTTP cache at ${BAZEL_REMOTE_CACHE}."
   else
     export BAZEL_BUILD_EXTRA_OPTIONS="${BAZEL_BUILD_EXTRA_OPTIONS} \
