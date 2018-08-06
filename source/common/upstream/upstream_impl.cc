@@ -208,6 +208,9 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
         locality_scheduler_->add(effective_weight, locality_entries_.back());
       }
     }
+    if (locality_scheduler_->empty()) {
+      locality_scheduler_ = nullptr;
+    }
   } else {
     locality_scheduler_ = nullptr;
   }
@@ -215,7 +218,7 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
 }
 
 absl::optional<uint32_t> HostSetImpl::chooseLocality() {
-  if (locality_scheduler_ == nullptr || locality_scheduler_->empty()) {
+  if (locality_scheduler_ == nullptr) {
     return {};
   }
   const std::shared_ptr<LocalityEntry> locality = locality_scheduler_->pick();
