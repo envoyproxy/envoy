@@ -9,7 +9,9 @@
 
 namespace Envoy {
 
-namespace Event { class Dispatcher; }
+namespace Event {
+class Dispatcher;
+}
 
 namespace Network {
 

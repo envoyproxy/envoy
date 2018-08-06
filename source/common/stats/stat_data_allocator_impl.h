@@ -3,8 +3,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/stats/stats.h"
 #include "envoy/stats/stat_data_allocator.h"
+#include "envoy/stats/stats.h"
 
 #include "common/common/assert.h"
 #include "common/stats/metric_impl.h"

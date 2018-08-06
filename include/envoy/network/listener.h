@@ -8,8 +8,8 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/transport_socket.h"
-#include "envoy/stats/scope.h"
 #include "envoy/ssl/context.h"
+#include "envoy/stats/scope.h"
 
 namespace Envoy {
 namespace Network {
