@@ -215,7 +215,7 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
 }
 
 absl::optional<uint32_t> HostSetImpl::chooseLocality() {
-  if (locality_scheduler_ == nullptr) {
+  if (locality_scheduler_ == nullptr || locality_scheduler_->empty()) {
     return {};
   }
   const std::shared_ptr<LocalityEntry> locality = locality_scheduler_->pick();
