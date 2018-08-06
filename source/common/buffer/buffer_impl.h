@@ -72,6 +72,9 @@ public:
   void addBufferFragment(BufferFragment& fragment) override;
   void add(const std::string& data) override;
   void add(const Instance& data) override;
+  void prepend(const void* data, uint64_t size) override;
+  void prepend(const std::string& data) override;
+  void prepend(Instance& data) override;
   void commit(RawSlice* iovecs, uint64_t num_iovecs) override;
   void copyOut(size_t start, uint64_t size, void* data) const override;
   void drain(uint64_t size) override;

@@ -78,6 +78,26 @@ public:
   virtual void add(const Instance& data) PURE;
 
   /**
+   * Prepend data to the buffer.
+   * @param data supplies the data address.
+   * @param size supplies the data size.
+   */
+  virtual void prepend(const void* data, uint64_t size) PURE;
+
+  /**
+   * Prepend a string to the buffer.
+   * @param data supplies the string to copy.
+   */
+  virtual void prepend(const std::string& data) PURE;
+
+  /**
+   * Prepend data from another buffer to this buffer.
+   * The supplied buffer is drained after this operation.
+   * @param data supplies the buffer to copy.
+   */
+  virtual void prepend(Instance& data) PURE;
+
+  /**
    * Commit a set of slices originally obtained from reserve(). The number of slices can be
    * different from the number obtained from reserve(). The size of each slice can also be altered.
    * @param iovecs supplies the array of slices to commit.
