@@ -1010,7 +1010,12 @@ Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::HeaderMap& respo
   // Prefix order is used during searching, but for printing do them in alpha order.
   for (const UrlHandler* handler : sortedHandlers()) {
     absl::string_view path = handler->prefix_;
-    // Removing the leading slash from the link, so that the admin page can be
+
+    if (path == "/") {
+      continue; // No need to print self-link to index page.
+    }
+
+    // Remove the leading slash from the link, so that the admin page can be
     // rendered as part of another console, on a sub-path.
     ASSERT(!path.empty());
     ASSERT(path[0] == '/');
