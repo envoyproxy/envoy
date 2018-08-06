@@ -28,8 +28,8 @@ void H1FuzzIntegrationTest::initialize() {
         virtual_host->mutable_routes(0)->mutable_direct_response()->set_status(
             static_cast<uint32_t>(status));
         virtual_host->mutable_routes(0)->mutable_direct_response()->mutable_body()->set_filename(
-            file_path); 
-	  });
+            file_path);
+      });
   HttpIntegrationTest::initialize();
 }
 
