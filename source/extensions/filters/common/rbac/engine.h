@@ -27,7 +27,8 @@ public:
    * @param metadata   the metadata with additional information about the action/principal.
    */
   virtual bool allowed(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
-                       const envoy::api::v2::core::Metadata& metadata) const PURE;
+                       const envoy::api::v2::core::Metadata& metadata,
+                       std::string& effectivePolicyID) const PURE;
 };
 
 } // namespace RBAC

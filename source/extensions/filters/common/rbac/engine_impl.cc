@@ -11,17 +11,20 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     : allowed_if_matched_(rules.action() ==
                           envoy::config::rbac::v2alpha::RBAC_Action::RBAC_Action_ALLOW) {
   for (const auto& policy : rules.policies()) {
-    policies_.emplace_back(policy.second);
+    policies_.insert(std::pair<std::string, PolicyMatcher>(policy.first, policy.second));
   }
 }
 
-bool RoleBasedAccessControlEngineImpl::allowed(
-    const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
-    const envoy::api::v2::core::Metadata& metadata) const {
+bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection,
+                                               const Envoy::Http::HeaderMap& headers,
+                                               const envoy::api::v2::core::Metadata& metadata,
+                                               std::string& effectivePolicyID) const {
   bool matched = false;
-  for (const auto& policy : policies_) {
-    if (policy.matches(connection, headers, metadata)) {
+
+  for (auto it = policies_.begin(); it != policies_.end(); it++) {
+    if (it->second.matches(connection, headers, metadata)) {
       matched = true;
+      effectivePolicyID = it->first;
       break;
     }
   }
