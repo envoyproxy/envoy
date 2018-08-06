@@ -1,16 +1,22 @@
 #pragma once
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/logger.h"
+#include "common/config/utility.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/network/resolver_impl.h"
 #include "common/upstream/health_checker_impl.h"
 #include "common/upstream/upstream_impl.h"
+
+#include "server/transport_socket_config_impl.h"
+
+#include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -20,8 +26,9 @@ public:
   ClusterInfoConstSharedPtr
   createClusterInfo(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
                     const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
-                    Ssl::ContextManager& ssl_context_manager, Secret::SecretManager& secret_manager,
-                    bool added_via_api) override;
+                    Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+                    ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
+                    Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random) override;
 };
 
 // TODO(lilika): Add HdsClusters to the /clusters endpoint to get detailed stats about each HC host.
@@ -36,8 +43,10 @@ public:
   static ClusterSharedPtr create();
   HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
              const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
-             Ssl::ContextManager& ssl_context_manager, Secret::SecretManager& secret_manager,
-             bool added_via_api, ClusterInfoFactory& info_factory);
+             Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+             ClusterInfoFactory& info_factory, ClusterManager& cm,
+             const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+             Runtime::RandomGenerator& random);
 
   // From Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
@@ -72,7 +81,6 @@ private:
   const envoy::api::v2::core::BindConfig& bind_config_;
   Stats::Store& stats_;
   Ssl::ContextManager& ssl_context_manager_;
-  Secret::SecretManager& secret_manager_;
   bool added_via_api_;
 
   HostVectorSharedPtr initial_hosts_;
@@ -113,9 +121,9 @@ public:
   HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& scope,
               Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
               Runtime::Loader& runtime, Envoy::Stats::Store& stats,
-              Ssl::ContextManager& ssl_context_manager, Secret::SecretManager& secret_manager,
-              Runtime::RandomGenerator& random, ClusterInfoFactory& info_factory,
-              AccessLog::AccessLogManager& access_log_manager);
+              Ssl::ContextManager& ssl_context_manager, Runtime::RandomGenerator& random,
+              ClusterInfoFactory& info_factory, AccessLog::AccessLogManager& access_log_manager,
+              ClusterManager& cm, const LocalInfo::LocalInfo& local_info);
 
   // Grpc::TypedAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
@@ -148,10 +156,11 @@ private:
   Runtime::Loader& runtime_;
   Envoy::Stats::Store& store_stats;
   Ssl::ContextManager& ssl_context_manager_;
-  Secret::SecretManager& secret_manager_;
   Runtime::RandomGenerator& random_;
   ClusterInfoFactory& info_factory_;
   AccessLog::AccessLogManager& access_log_manager_;
+  ClusterManager& cm_;
+  const LocalInfo::LocalInfo& local_info_;
 
   envoy::service::discovery::v2::HealthCheckRequest health_check_request_;
   std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier> health_check_message_;

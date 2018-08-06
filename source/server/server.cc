@@ -289,8 +289,8 @@ void InstanceImpl::initialize(Options& options,
         bootstrap_.node(), stats(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
             ->create(),
-        dispatcher(), runtime(), stats(), sslContextManager(), secretManager(), random(),
-        info_factory_, access_log_manager_));
+        dispatcher(), runtime(), stats(), sslContextManager(), random(), info_factory_,
+        access_log_manager_, clusterManager(), localInfo()));
   }
 
   for (Stats::SinkPtr& sink : main_config->statsSinks()) {

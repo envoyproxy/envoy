@@ -167,11 +167,11 @@ envoy_cc_test(
     srcs = ["hds_test.cc"],
     deps = [
         "//source/common/ssl:context_lib",
-        "//source/common/stats:stats_lib",
         "//source/common/upstream:health_discovery_service_lib",
         "//test/mocks/access_log:access_log_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",

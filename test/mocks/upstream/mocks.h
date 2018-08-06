@@ -276,12 +276,13 @@ public:
 
 class MockClusterInfoFactory : public ClusterInfoFactory, Logger::Loggable<Logger::Id::upstream> {
 public:
-  MOCK_METHOD7(
-      createClusterInfo,
-      ClusterInfoConstSharedPtr(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
-                                const envoy::api::v2::core::BindConfig& bind_config,
-                                Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                                Secret::SecretManager& secret_manager, bool added_via_api));
+  MOCK_METHOD10(createClusterInfo,
+                ClusterInfoConstSharedPtr(
+                    Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
+                    const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
+                    Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+                    ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
+                    Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random));
 };
 
 } // namespace Upstream
