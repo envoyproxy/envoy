@@ -59,6 +59,7 @@ public:
   Stats::IsolatedStoreImpl store_;
   RoleBasedAccessControlFilterConfigSharedPtr config_;
 
+  envoy::api::v2::core::Metadata metadata_;
   RoleBasedAccessControlFilter filter_;
   Network::Address::InstanceConstSharedPtr address_;
   Http::TestHeaderMapImpl headers_;

@@ -92,12 +92,24 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
       shadow_resp_code = "403";
     }
 
-    auto filter_meta = callbacks_->requestInfo().dynamicMetadata().filter_metadata();
-    if (effective_policyID != "") {
-      filter_meta["shadow"].MergeFrom(
-          MessageUtil::keyValueStruct("effective_policyID", effective_policyID));
+    const auto& filter_metadata = callbacks_->requestInfo().dynamicMetadata().filter_metadata();
+    const auto filter_it = filter_metadata.find(HttpFilterNames::get().Rbac);
+    if (filter_it != filter_metadata.end()) {
+      ProtobufWkt::Struct metrics;
+
+      if (effective_policyID != "") {
+        ProtobufWkt::Value policy_id;
+        policy_id.set_string_value(effective_policyID);
+        (*metrics.mutable_fields())["shadow_effective_policyID"] = policy_id;
+      }
+
+      ProtobufWkt::Value resp_code;
+      resp_code.set_string_value(shadow_resp_code);
+      (*metrics.mutable_fields())["shadow_response_code"] = resp_code;
+
+      auto filter_meta = filter_metadata.at(HttpFilterNames::get().Rbac);
+      filter_meta.MergeFrom(metrics);
     }
-    filter_meta["shadow"].MergeFrom(MessageUtil::keyValueStruct("response_code", shadow_resp_code));
   }
 
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>& engine =
