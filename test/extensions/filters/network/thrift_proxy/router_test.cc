@@ -79,9 +79,6 @@ public:
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
-    host_ = new NiceMock<Upstream::MockHostDescription>();
-    host_ptr_.reset(host_);
-
     router_.reset(new Router(context_.clusterManager()));
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
@@ -98,16 +95,8 @@ public:
     EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
     EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
 
-    EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, newConnection(_))
-        .WillOnce(
-            Invoke([&](Tcp::ConnectionPool::Callbacks& cb) -> Tcp::ConnectionPool::Cancellable* {
-              conn_pool_callbacks_ = &cb;
-              return &handle_;
-            }));
-
     EXPECT_EQ(ThriftFilters::FilterStatus::StopIteration,
               router_->messageBegin(method_name_, msg_type_, seq_id_));
-    EXPECT_NE(nullptr, conn_pool_callbacks_);
 
     NiceMock<Network::MockClientConnection> connection;
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection));
@@ -120,7 +109,7 @@ public:
   }
 
   void connectUpstream() {
-    EXPECT_CALL(conn_data_, addUpstreamCallbacks(_))
+    EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
         .WillOnce(Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
           upstream_callbacks_ = &cb;
         }));
@@ -135,7 +124,8 @@ public:
     EXPECT_CALL(*protocol_, writeMessageBegin(_, method_name_, msg_type_, seq_id_));
 
     EXPECT_CALL(callbacks_, continueDecoding());
-    conn_pool_callbacks_->onPoolReady(conn_data_, host_ptr_);
+
+    context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
     EXPECT_NE(nullptr, upstream_callbacks_);
   }
 
@@ -194,10 +184,10 @@ public:
   void completeRequest() {
     EXPECT_CALL(*protocol_, writeMessageEnd(_));
     EXPECT_CALL(*transport_, encodeFrame(_, _));
-    EXPECT_CALL(conn_data_.connection_, write(_, false));
+    EXPECT_CALL(upstream_connection_, write(_, false));
 
     if (msg_type_ == MessageType::Oneway) {
-      EXPECT_CALL(conn_data_, release());
+      EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, released(Ref(upstream_connection_)));
     }
 
     EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->messageEnd());
@@ -213,7 +203,7 @@ public:
     upstream_callbacks_->onUpstreamData(buffer, false);
 
     EXPECT_CALL(callbacks_, upstreamData(Ref(buffer))).WillOnce(Return(true));
-    EXPECT_CALL(conn_data_, release());
+    EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, released(Ref(upstream_connection_)));
     upstream_callbacks_->onUpstreamData(buffer, false);
   }
 
@@ -236,8 +226,6 @@ public:
   NiceMock<Upstream::MockHostDescription>* host_{};
 
   RouteConstSharedPtr route_ptr_;
-  Upstream::HostDescriptionConstSharedPtr host_ptr_;
-
   std::unique_ptr<Router> router_;
 
   std::string cluster_name_{"cluster"};
@@ -246,10 +234,8 @@ public:
   MessageType msg_type_{MessageType::Call};
   int32_t seq_id_{1};
 
-  NiceMock<Tcp::ConnectionPool::MockCancellable> handle_;
-  NiceMock<Tcp::ConnectionPool::MockConnectionData> conn_data_;
-  Tcp::ConnectionPool::Callbacks* conn_pool_callbacks_{};
   Tcp::ConnectionPool::UpstreamCallbacks* upstream_callbacks_{};
+  NiceMock<Network::MockClientConnection> upstream_connection_;
 };
 
 class ThriftRouterTest : public ThriftRouterTestBase, public Test {
@@ -290,8 +276,8 @@ TEST_F(ThriftRouterTest, PoolRemoteConnectionFailure) {
         EXPECT_EQ(AppExceptionType::InternalError, app_ex->type_);
         EXPECT_THAT(app_ex->error_message_, ContainsRegex(".*connection failure.*"));
       }));
-  conn_pool_callbacks_->onPoolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure, host_ptr_);
+  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
+      Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
 }
 
 TEST_F(ThriftRouterTest, PoolLocalConnectionFailure) {
@@ -308,8 +294,8 @@ TEST_F(ThriftRouterTest, PoolLocalConnectionFailure) {
         EXPECT_EQ(AppExceptionType::InternalError, app_ex->type_);
         EXPECT_THAT(app_ex->error_message_, ContainsRegex(".*connection failure.*"));
       }));
-  conn_pool_callbacks_->onPoolFailure(
-      Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure, host_ptr_);
+  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
+      Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
 }
 
 TEST_F(ThriftRouterTest, PoolTimeout) {
@@ -326,7 +312,8 @@ TEST_F(ThriftRouterTest, PoolTimeout) {
         EXPECT_EQ(AppExceptionType::InternalError, app_ex->type_);
         EXPECT_THAT(app_ex->error_message_, ContainsRegex(".*connection failure.*"));
       }));
-  conn_pool_callbacks_->onPoolFailure(Tcp::ConnectionPool::PoolFailureReason::Timeout, host_ptr_);
+  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
+      Tcp::ConnectionPool::PoolFailureReason::Timeout);
 }
 
 TEST_F(ThriftRouterTest, PoolOverflowFailure) {
@@ -343,7 +330,8 @@ TEST_F(ThriftRouterTest, PoolOverflowFailure) {
         EXPECT_EQ(AppExceptionType::InternalError, app_ex->type_);
         EXPECT_THAT(app_ex->error_message_, ContainsRegex(".*too many connections.*"));
       }));
-  conn_pool_callbacks_->onPoolFailure(Tcp::ConnectionPool::PoolFailureReason::Overflow, host_ptr_);
+  context_.cluster_manager_.tcp_conn_pool_.poolFailure(
+      Tcp::ConnectionPool::PoolFailureReason::Overflow);
 }
 
 TEST_F(ThriftRouterTest, NoRoute) {
@@ -440,7 +428,7 @@ TEST_F(ThriftRouterTest, TruncatedResponse) {
 
   EXPECT_CALL(callbacks_, startUpstreamResponse(TransportType::Framed, ProtocolType::Binary));
   EXPECT_CALL(callbacks_, upstreamData(Ref(buffer))).WillOnce(Return(false));
-  EXPECT_CALL(conn_data_, release());
+  EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, released(Ref(upstream_connection_)));
   EXPECT_CALL(callbacks_, resetDownstreamConnection());
 
   upstream_callbacks_->onUpstreamData(buffer, true);
@@ -462,7 +450,7 @@ TEST_F(ThriftRouterTest, UpstreamDataTriggersReset) {
         router_->resetUpstreamConnection();
         return true;
       }));
-  EXPECT_CALL(conn_data_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
 
   upstream_callbacks_->onUpstreamData(buffer, true);
   destroyRouter();
@@ -478,7 +466,7 @@ TEST_F(ThriftRouterTest, UnexpectedRouterDestroy) {
   initializeRouter();
   startRequest(MessageType::Call);
   connectUpstream();
-  EXPECT_CALL(conn_data_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
   destroyRouter();
 }
 

@@ -34,9 +34,9 @@ namespace Tcp {
  * Mock callbacks used for conn pool testing.
  */
 struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
-  void onPoolReady(ConnectionPool::ConnectionData& conn,
+  void onPoolReady(ConnectionPool::ConnectionDataPtr&& conn,
                    Upstream::HostDescriptionConstSharedPtr host) override {
-    conn_data_ = &conn;
+    conn_data_ = std::move(conn);
     host_ = host;
     pool_ready_.ready();
   }
@@ -50,7 +50,7 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
 
   ReadyWatcher pool_failure_;
   ReadyWatcher pool_ready_;
-  ConnectionPool::ConnectionData* conn_data_{};
+  ConnectionPool::ConnectionDataPtr conn_data_{};
   absl::optional<ConnectionPool::PoolFailureReason> reason_;
   Upstream::HostDescriptionConstSharedPtr host_;
 };
@@ -232,7 +232,7 @@ struct ActiveTestConn {
 
   void expectNewConn() { EXPECT_CALL(callbacks_.pool_ready_, ready()); }
 
-  void releaseConn() { callbacks_.conn_data_->release(); }
+  void releaseConn() { callbacks_.conn_data_.reset(); }
 
   void verifyConn() {
     EXPECT_EQ(&callbacks_.conn_data_->connection(),
@@ -589,7 +589,7 @@ TEST_F(TcpConnPoolImplTest, DisconnectWhilePending) {
   conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   EXPECT_CALL(conn_pool_, onConnReleasedForTest());
-  callbacks2.conn_data_->release();
+  callbacks2.conn_data_.reset();
 
   // Disconnect
   EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
@@ -625,11 +625,11 @@ TEST_F(TcpConnPoolImplTest, MaxConnections) {
   EXPECT_CALL(conn_pool_, onConnReleasedForTest());
   conn_pool_.expectEnableUpstreamReady();
   EXPECT_CALL(callbacks2.pool_ready_, ready());
-  callbacks.conn_data_->release();
+  callbacks.conn_data_.reset();
 
   conn_pool_.expectAndRunUpstreamReady();
   EXPECT_CALL(conn_pool_, onConnReleasedForTest());
-  callbacks2.conn_data_->release();
+  callbacks2.conn_data_.reset();
 
   // Cause the connection to go away.
   EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
@@ -657,7 +657,7 @@ TEST_F(TcpConnPoolImplTest, MaxRequestsPerConnection) {
 
   EXPECT_CALL(conn_pool_, onConnReleasedForTest());
   EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
-  callbacks.conn_data_->release();
+  callbacks.conn_data_.reset();
   dispatcher_.clearDeferredDeleteList();
 
   EXPECT_EQ(0U, cluster_->stats_.upstream_cx_destroy_with_active_rq_.value());
@@ -743,7 +743,7 @@ TEST_F(TcpConnPoolImplDestructorTest, TestReadyConnectionsAreClosed) {
   prepareConn();
 
   // Transition connection to ready list
-  callbacks_->conn_data_->release();
+  callbacks_->conn_data_.reset();
 
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(dispatcher_, clearDeferredDeleteList());
