@@ -76,6 +76,43 @@ TEST_F(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
   EXPECT_TRUE(release_callback_called_);
 }
 
+TEST_F(OwnedImplTest, Prepend) {
+
+  std::string suffix = "World!", prefix = "Hello, ";
+  Buffer::OwnedImpl buffer;
+  buffer.add(suffix.data(), suffix.size());
+  buffer.prepend(prefix.data(), prefix.size());
+
+  EXPECT_EQ(suffix.size() + prefix.size(), buffer.length());
+  EXPECT_EQ(prefix + suffix, buffer.toString());
+}
+
+TEST_F(OwnedImplTest, PrependString) {
+
+  std::string suffix = "World!", prefix = "Hello, ";
+  Buffer::OwnedImpl buffer;
+  buffer.add(suffix);
+  buffer.prepend(prefix);
+
+  EXPECT_EQ(suffix.size() + prefix.size(), buffer.length());
+  EXPECT_EQ(prefix + suffix, buffer.toString());
+}
+
+TEST_F(OwnedImplTest, PrependBuffer) {
+
+  std::string suffix = "World!", prefix = "Hello, ";
+  Buffer::OwnedImpl buffer;
+  buffer.add(suffix);
+  Buffer::OwnedImpl prefixBuffer;
+  prefixBuffer.add(prefix);
+
+  buffer.prepend(prefixBuffer);
+
+  EXPECT_EQ(suffix.size() + prefix.size(), buffer.length());
+  EXPECT_EQ(prefix + suffix, buffer.toString());
+  EXPECT_EQ(0, prefixBuffer.length());
+}
+
 TEST_F(OwnedImplTest, Write) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
