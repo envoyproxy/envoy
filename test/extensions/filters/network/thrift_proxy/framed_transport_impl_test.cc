@@ -44,7 +44,7 @@ TEST(FramedTransportTest, InvalidFrameSize) {
 
   {
     Buffer::OwnedImpl buffer;
-    addInt32(buffer, -1);
+    buffer.writeBEInt<int32_t>(-1);
 
     absl::optional<uint32_t> size = 1;
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, size), EnvoyException,
@@ -54,7 +54,7 @@ TEST(FramedTransportTest, InvalidFrameSize) {
 
   {
     Buffer::OwnedImpl buffer;
-    addInt32(buffer, 0x7fffffff);
+    buffer.writeBEInt<int32_t>(0x7fffffff);
 
     absl::optional<uint32_t> size = 1;
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, size), EnvoyException,
@@ -67,7 +67,8 @@ TEST(FramedTransportTest, DecodeFrameStart) {
   FramedTransportImpl transport;
 
   Buffer::OwnedImpl buffer;
-  addInt32(buffer, 100);
+  buffer.writeBEInt<int32_t>(100);
+
   EXPECT_EQ(buffer.length(), 4);
 
   absl::optional<uint32_t> size;

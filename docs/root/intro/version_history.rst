@@ -107,6 +107,7 @@ Version history
   <envoy_api_field_core.HealthCheck.unhealthy_edge_interval>`, :ref:`unhealthy to healthy
   <envoy_api_field_core.HealthCheck.healthy_edge_interval>` and for subsequent checks on
   :ref:`unhealthy hosts <envoy_api_field_core.HealthCheck.unhealthy_interval>`.
+* health check: added basic support for :ref:`MySQL health checks <config_health_checkers_mysql>`.
 * health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
 * health check: health check connections can now be configured to use http/2.
 * health check http filter: added

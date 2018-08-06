@@ -363,7 +363,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
                             0x00, 0x00, 0x00, 0x01,                     // sequence id
                             0x0b, 0x00, 0x01,                           // begin string field
                         });
-  addInt32(write_buffer_, err.length());
+  write_buffer_.writeBEInt<uint32_t>(err.length());
   addString(write_buffer_, err);
   addSeq(write_buffer_, {
                             0x08, 0x00, 0x02,       // begin i32 field

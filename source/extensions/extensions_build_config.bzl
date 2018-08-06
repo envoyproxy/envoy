@@ -18,6 +18,7 @@ EXTENSIONS = {
     #
 
     "envoy.health_checkers.redis":                      "//source/extensions/health_checkers/redis:config",
+    "envoy.health_checkers.mysql":                      "//source/extensions/health_checkers/mysql:config",
 
     #
     # HTTP filters

@@ -38,7 +38,7 @@ TEST(AutoProtocolTest, NotEnoughData) {
   MessageType msg_type = MessageType::Oneway;
   int32_t seq_id = -1;
 
-  addInt8(buffer, 0);
+  buffer.writeByte(0);
   EXPECT_FALSE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
   EXPECT_EQ(name, "-");
   EXPECT_EQ(msg_type, MessageType::Oneway);
@@ -52,7 +52,7 @@ TEST(AutoProtocolTest, UnknownProtocol) {
   MessageType msg_type = MessageType::Oneway;
   int32_t seq_id = -1;
 
-  addInt16(buffer, 0x0102);
+  buffer.writeBEInt<int16_t>(0x0102);
 
   EXPECT_THROW_WITH_MESSAGE(proto.readMessageBegin(buffer, name, msg_type, seq_id), EnvoyException,
                             "unknown thrift auto protocol message start 0102");
@@ -70,12 +70,12 @@ TEST(AutoProtocolTest, ReadMessageBegin) {
     int32_t seq_id = -1;
 
     Buffer::OwnedImpl buffer;
-    addInt16(buffer, 0x8001);
-    addInt8(buffer, 0);
-    addInt8(buffer, MessageType::Call);
-    addInt32(buffer, 8);
+    buffer.writeBEInt<int16_t>(0x8001);
+    buffer.writeByte(0);
+    buffer.writeByte(MessageType::Call);
+    buffer.writeBEInt<int32_t>(8);
     addString(buffer, "the_name");
-    addInt32(buffer, 1);
+    buffer.writeBEInt<int32_t>(1);
 
     EXPECT_TRUE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
     EXPECT_EQ(name, "the_name");
@@ -94,9 +94,9 @@ TEST(AutoProtocolTest, ReadMessageBegin) {
     int32_t seq_id = 1;
 
     Buffer::OwnedImpl buffer;
-    addInt16(buffer, 0x8221);
-    addInt16(buffer, 0x8202); // 0x0102
-    addInt8(buffer, 8);
+    buffer.writeBEInt<int16_t>(0x8221);
+    buffer.writeBEInt<int16_t>(0x8202); // 0x0102
+    buffer.writeByte(8);
     addString(buffer, "the_name");
 
     EXPECT_TRUE(proto.readMessageBegin(buffer, name, msg_type, seq_id));

@@ -47,8 +47,8 @@ TEST(AutoTransportTest, UnknownTransport) {
   // Looks like unframed, but fails protocol check.
   {
     Buffer::OwnedImpl buffer;
-    addInt32(buffer, 0);
-    addInt32(buffer, 0);
+    buffer.writeBEInt<int32_t>(0);
+    buffer.writeBEInt<int32_t>(0);
 
     absl::optional<uint32_t> size = 100;
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, size), EnvoyException,
@@ -59,8 +59,8 @@ TEST(AutoTransportTest, UnknownTransport) {
   // Looks like framed, but fails protocol check.
   {
     Buffer::OwnedImpl buffer;
-    addInt32(buffer, 0xFF);
-    addInt32(buffer, 0);
+    buffer.writeBEInt<int32_t>(0xFF);
+    buffer.writeBEInt<int32_t>(0);
 
     absl::optional<uint32_t> size = 100;
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, size), EnvoyException,
@@ -74,9 +74,9 @@ TEST(AutoTransportTest, DecodeFrameStart) {
   {
     AutoTransportImpl transport;
     Buffer::OwnedImpl buffer;
-    addInt32(buffer, 0xFF);
-    addInt16(buffer, 0x8001);
-    addInt16(buffer, 0);
+    buffer.writeBEInt<int32_t>(0xFF);
+    buffer.writeBEInt<int16_t>(0x8001);
+    buffer.writeBEInt<int16_t>(0);
 
     absl::optional<uint32_t> size;
     EXPECT_TRUE(transport.decodeFrameStart(buffer, size));
@@ -90,9 +90,9 @@ TEST(AutoTransportTest, DecodeFrameStart) {
   {
     AutoTransportImpl transport;
     Buffer::OwnedImpl buffer;
-    addInt32(buffer, 0xFFF);
-    addInt16(buffer, 0x8201);
-    addInt16(buffer, 0);
+    buffer.writeBEInt<int32_t>(0xFFF);
+    buffer.writeBEInt<int16_t>(0x8201);
+    buffer.writeBEInt<int16_t>(0);
 
     absl::optional<uint32_t> size;
     EXPECT_TRUE(transport.decodeFrameStart(buffer, size));
@@ -106,7 +106,7 @@ TEST(AutoTransportTest, DecodeFrameStart) {
   {
     AutoTransportImpl transport;
     Buffer::OwnedImpl buffer;
-    addInt16(buffer, 0x8001);
+    buffer.writeBEInt<int16_t>(0x8001);
     addRepeated(buffer, 6, 0);
 
     absl::optional<uint32_t> size = 1;
@@ -121,7 +121,7 @@ TEST(AutoTransportTest, DecodeFrameStart) {
   {
     AutoTransportImpl transport;
     Buffer::OwnedImpl buffer;
-    addInt16(buffer, 0x8201);
+    buffer.writeBEInt<int16_t>(0x8201);
     addRepeated(buffer, 6, 0);
 
     absl::optional<uint32_t> size = 1;
@@ -136,9 +136,9 @@ TEST(AutoTransportTest, DecodeFrameStart) {
 TEST(AutoTransportTest, DecodeFrameEnd) {
   AutoTransportImpl transport;
   Buffer::OwnedImpl buffer;
-  addInt32(buffer, 0xFF);
-  addInt16(buffer, 0x8001);
-  addInt16(buffer, 0);
+  buffer.writeBEInt<int32_t>(0xFF);
+  buffer.writeBEInt<int16_t>(0x8001);
+  buffer.writeBEInt<int16_t>(0);
 
   absl::optional<uint32_t> size;
   EXPECT_TRUE(transport.decodeFrameStart(buffer, size));

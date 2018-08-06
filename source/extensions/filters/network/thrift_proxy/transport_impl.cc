@@ -22,8 +22,8 @@ bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer, absl::optiona
       return false;
     }
 
-    int32_t size = BufferHelper::peekI32(buffer);
-    uint16_t proto_start = BufferHelper::peekU16(buffer, 4);
+    int32_t size = buffer.peekBEInt<int32_t>();
+    uint16_t proto_start = buffer.peekBEInt<uint16_t>(4);
 
     if (size > 0 && size <= FramedTransportImpl::MaxFrameSize) {
       // TODO(zuercher): Spec says max size is 16,384,000 (0xFA0000). Apache C++ TFramedTransport

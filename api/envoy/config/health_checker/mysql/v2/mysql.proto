@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package envoy.config.health_checker.mysql.v2;
+option go_package = "v2";
+
+// [#protodoc-title: MySQL]
+// MySQL health checker :ref:`configuration overview <config_health_checkers_mysql>`.
+
+// Configuration for MySQL health check. The health check involves authenticating against the MySQL
+// server with a passwordless user and closing the session immediatelly after, while validating the
+// server response. It's recommended to create a user with no privileges, exclusively for the
+// health check operation.
+message MySQL {
+  // Username to authenticate with for health checking.
+  string user = 1;
+}
