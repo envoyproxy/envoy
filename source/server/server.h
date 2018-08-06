@@ -114,7 +114,7 @@ class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
   RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, HotRestart& hot_restart,
             AccessLog::AccessLogManager& access_log_manager, InitManagerImpl& init_manager,
-            std::function<void()> workers_start_cb);
+            OverloadManager& overload_manager, std::function<void()> workers_start_cb);
 
 private:
   Event::SignalEventPtr sigterm_;

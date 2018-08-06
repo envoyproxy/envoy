@@ -52,13 +52,13 @@ private:
   Event::Dispatcher& dispatcher_;
 };
 
-class FakeResourceMonitorFactory : public Extensions::ResourceMonitors::Common::FactoryBase<
-                                       envoy::config::overload::v2alpha::EmptyConfig> {
+class FakeResourceMonitorFactory
+    : public Extensions::ResourceMonitors::Common::EmptyConfigFactoryBase {
 public:
-  FakeResourceMonitorFactory(const std::string& name) : FactoryBase(name), monitor_(nullptr) {}
+  FakeResourceMonitorFactory(const std::string& name)
+      : EmptyConfigFactoryBase(name), monitor_(nullptr) {}
 
-  ResourceMonitorPtr createResourceMonitorFromProtoTyped(
-      const envoy::config::overload::v2alpha::EmptyConfig&,
+  ResourceMonitorPtr createEmptyConfigResourceMonitor(
       Server::Configuration::ResourceMonitorFactoryContext& context) override {
     auto monitor = std::make_unique<FakeResourceMonitor>(context.dispatcher());
     monitor_ = monitor.get();

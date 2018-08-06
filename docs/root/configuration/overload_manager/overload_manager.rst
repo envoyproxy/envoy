@@ -3,7 +3,7 @@
 Overload manager
 ================
 
-The overload manager is configured in the Boostrap
+The :ref:`overload manager <arch_overview_overload_manager>` is configured in the Boostrap
 :ref:`overload_manager <envoy_api_field_config.bootstrap.v2.Bootstrap.overload_manager>`
 field.
 

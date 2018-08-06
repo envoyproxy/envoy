@@ -248,10 +248,8 @@ void InstanceImpl::initialize(Options& options,
   loadServerFlags(initial_config.flagsPath());
 
   // Initialize the overload manager early so other modules can register for actions.
-  overload_manager_.reset(new OverloadManagerImpl(
-      dispatcher(), stats(),
-      bootstrap_.has_overload_manager() ? bootstrap_.overload_manager()
-                                        : envoy::config::overload::v2alpha::OverloadManager()));
+  overload_manager_.reset(
+      new OverloadManagerImpl(dispatcher(), stats(), bootstrap_.overload_manager()));
 
   // Workers get created first so they register for thread local updates.
   listener_manager_.reset(new ListenerManagerImpl(
@@ -359,7 +357,8 @@ uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnectio
 
 RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
                      HotRestart& hot_restart, AccessLog::AccessLogManager& access_log_manager,
-                     InitManagerImpl& init_manager, std::function<void()> workers_start_cb) {
+                     InitManagerImpl& init_manager, OverloadManager& overload_manager,
+                     std::function<void()> workers_start_cb) {
 
   // Setup signals.
   sigterm_ = dispatcher.listenForSignal(SIGTERM, [this, &hot_restart, &dispatcher]() {
@@ -406,13 +405,13 @@ RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm
     // as we've subscribed to all the statically defined RDS resources.
     cm.adsMux().resume(Config::TypeUrl::get().RouteConfiguration);
   });
+
+  overload_manager.start();
 }
 
 void InstanceImpl::run() {
-  overload_manager_->start();
-
   RunHelper helper(*dispatcher_, clusterManager(), restarter_, access_log_manager_, init_manager_,
-                   [this]() -> void { startWorkers(); });
+                   overloadManager(), [this]() -> void { startWorkers(); });
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
