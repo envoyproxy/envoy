@@ -10,7 +10,19 @@ envoy_package()
 
 envoy_cc_library(
     name = "stats_interface",
-    hdrs = ["stats.h"],
+    hdrs = [
+        "histogram.h",
+        "scope.h",
+        "sink.h",
+        "source.h",
+        "stat_data_allocator.h",
+        "stats.h",
+        "stats_options.h",
+        "store.h",
+        "tag.h",
+        "tag_extractor.h",
+        "tag_producer.h",
+    ],
     deps = ["//include/envoy/common:interval_set_interface"],
 )
 
