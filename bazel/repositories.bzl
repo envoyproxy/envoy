@@ -484,7 +484,20 @@ def _com_google_protobuf():
 def _com_github_grpc_grpc():
     _repository_impl("com_github_grpc_grpc")
 
+    if "com_github_nanopb_nanopb" not in native.existing_rules():
+        native.new_http_archive(
+            name = "com_github_nanopb_nanopb",
+            build_file = "@com_github_grpc_grpc//third_party:nanopb.BUILD",
+            strip_prefix = "nanopb-f8ac463766281625ad710900479130c7fcb4d63b",
+            url = "https://github.com/nanopb/nanopb/archive/f8ac463766281625ad710900479130c7fcb4d63b.tar.gz",
+        )
+
     # Rebind some stuff to match what the gRPC Bazel is expecting.
+    native.bind(
+        name = "nanopb",
+        actual = "@com_github_nanopb_nanopb//:nanopb",
+    )
+
     native.bind(
         name = "protobuf_headers",
         actual = "@com_google_protobuf//:protobuf_headers",
