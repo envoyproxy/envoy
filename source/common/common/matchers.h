@@ -34,8 +34,6 @@ public:
 
 class NullMatcher : public ValueMatcher {
 public:
-  NullMatcher() {}
-
   /**
    * Check whether the value is NULL.
    */
@@ -49,7 +47,7 @@ public:
   bool match(const ProtobufWkt::Value& value) const override;
 
 private:
-  bool matcher_;
+  const bool matcher_;
 };
 
 class PresentMatcher : public ValueMatcher {
@@ -59,7 +57,7 @@ public:
   bool match(const ProtobufWkt::Value& value) const override;
 
 private:
-  bool matcher_;
+  const bool matcher_;
 };
 
 class DoubleMatcher : public ValueMatcher {

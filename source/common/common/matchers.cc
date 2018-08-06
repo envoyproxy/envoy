@@ -45,7 +45,7 @@ bool DoubleMatcher::match(const ProtobufWkt::Value& value) const {
     return false;
   }
 
-  double v = value.number_value();
+  const double v = value.number_value();
   switch (matcher_.match_pattern_case()) {
   case envoy::type::matcher::DoubleMatcher::kRange:
     return matcher_.range().start() <= v && v < matcher_.range().end();
@@ -77,12 +77,9 @@ bool StringMatcher::match(const ProtobufWkt::Value& value) const {
 }
 
 ListMatcher::ListMatcher(const envoy::type::matcher::ListMatcher& matcher) : matcher_(matcher) {
-  if (matcher_.match_pattern_case() != envoy::type::matcher::ListMatcher::kOneOf) {
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+  ASSERT(matcher_.match_pattern_case() == envoy::type::matcher::ListMatcher::kOneOf);
 
-  const auto& oneof = matcher_.one_of();
-  oneof_value_matcher_ = ValueMatcher::create(oneof);
+  oneof_value_matcher_ = ValueMatcher::create(matcher_.one_of());
 }
 
 bool ListMatcher::match(const ProtobufWkt::Value& value) const {
