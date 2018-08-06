@@ -77,13 +77,13 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
                 callbacks_->connection()->ssl()->subjectPeerCertificate()
           : "none",
       headers, callbacks_->requestInfo().dynamicMetadata().DebugString());
-  std::string effective_policyID;
+  std::string effective_policy_id;
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>& shadow_engine =
       config_->engine(callbacks_->route(), EnforcementMode::Shadow);
   if (shadow_engine.has_value()) {
     std::string shadow_resp_code = "200";
     if (shadow_engine->allowed(*callbacks_->connection(), headers,
-                               callbacks_->requestInfo().dynamicMetadata(), effective_policyID)) {
+                               callbacks_->requestInfo().dynamicMetadata(), effective_policy_id)) {
       ENVOY_LOG(debug, "shadow allowed");
       config_->stats().shadow_allowed_.inc();
     } else {
@@ -97,9 +97,9 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
     if (filter_it != filter_metadata.end()) {
       ProtobufWkt::Struct metrics;
 
-      if (effective_policyID != "") {
+      if (effective_policy_id != "") {
         ProtobufWkt::Value policy_id;
-        policy_id.set_string_value(effective_policyID);
+        policy_id.set_string_value(effective_policy_id);
         (*metrics.mutable_fields())["shadow_effective_policyID"] = policy_id;
       }
 
@@ -116,7 +116,7 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
       config_->engine(callbacks_->route(), EnforcementMode::Enforced);
   if (engine.has_value()) {
     if (engine->allowed(*callbacks_->connection(), headers,
-                        callbacks_->requestInfo().dynamicMetadata(), effective_policyID)) {
+                        callbacks_->requestInfo().dynamicMetadata(), effective_policy_id)) {
       ENVOY_LOG(debug, "enforced allowed");
       config_->stats().allowed_.inc();
       return Http::FilterHeadersStatus::Continue;

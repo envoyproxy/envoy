@@ -17,7 +17,7 @@ public:
 
   bool allowed(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const envoy::api::v2::core::Metadata& metadata,
-               std::string& effective_policyID) const override;
+               std::string& effective_policy_id) const override;
 
 private:
   const bool allowed_if_matched_;

@@ -18,13 +18,13 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
 bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection,
                                                const Envoy::Http::HeaderMap& headers,
                                                const envoy::api::v2::core::Metadata& metadata,
-                                               std::string& effective_policyID) const {
+                                               std::string& effective_policy_id) const {
   bool matched = false;
 
   for (auto it = policies_.begin(); it != policies_.end(); it++) {
     if (it->second.matches(connection, headers, metadata)) {
       matched = true;
-      effective_policyID = it->first;
+      effective_policy_id = it->first;
       break;
     }
   }

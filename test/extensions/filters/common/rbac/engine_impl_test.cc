@@ -24,8 +24,8 @@ void checkEngine(const RBAC::RoleBasedAccessControlEngineImpl& engine, bool expe
                  const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
                  const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl(),
                  const envoy::api::v2::core::Metadata& metadata = envoy::api::v2::core::Metadata(),
-                 std::string policyID = "") {
-  EXPECT_EQ(expected, engine.allowed(connection, headers, metadata, policyID));
+                 std::string policy_id = "") {
+  EXPECT_EQ(expected, engine.allowed(connection, headers, metadata, policy_id));
 }
 
 TEST(RoleBasedAccessControlEngineImpl, Disabled) {
