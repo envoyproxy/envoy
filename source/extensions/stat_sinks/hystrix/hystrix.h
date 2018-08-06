@@ -16,7 +16,7 @@ namespace Hystrix {
 typedef std::vector<uint64_t> RollingWindow;
 typedef std::map<const std::string, RollingWindow> RollingStatsMap;
 
-using QuantileLatencyMap = std::unordered_map<std::string, double>;
+using QuantileLatencyMap = std::unordered_map<double, double>;
 
 struct {
   const std::string AllowHeadersHystrix{"Accept, Cache-Control, X-Requested-With, Last-Event-ID"};
@@ -28,7 +28,6 @@ struct ClusterStatsCache {
   void printToStream(std::stringstream& out_str);
   void printRollingWindow(absl::string_view name, RollingWindow rolling_window,
                           std::stringstream& out_str);
-  void addHistogramToStream(absl::string_view key, std::stringstream& ss);
 
   std::string cluster_name_;
 
@@ -38,9 +37,6 @@ struct ClusterStatsCache {
   RollingWindow total_;
   RollingWindow timeouts_;
   RollingWindow rejected_;
-
-  // Map string representation of the quantile to its recently read value from the histogram
-  QuantileLatencyMap timing_;
 };
 
 typedef std::unique_ptr<ClusterStatsCache> ClusterStatsCachePtr;
@@ -79,14 +75,14 @@ public:
   void addClusterStatsToStream(ClusterStatsCache& cluster_stats_cache,
                                absl::string_view cluster_name, uint64_t max_concurrent_requests,
                                uint64_t reporting_hosts,
-                               std::chrono::milliseconds rolling_window_ms, std::stringstream& ss);
+                               std::chrono::milliseconds rolling_window_ms,
+                               QuantileLatencyMap& histogram, std::stringstream& ss);
 
   /**
    * Calculate values needed to create the stream and write into the map.
    */
   void updateRollingWindowMap(const Upstream::ClusterInfo& cluster_info,
-                              ClusterStatsCache& cluster_stats_cache,
-                              QuantileLatencyMap& histogram);
+                              ClusterStatsCache& cluster_stats_cache);
   /**
    * Clear map.
    */
@@ -129,13 +125,17 @@ public:
   static void addIntToStream(absl::string_view key, uint64_t value, std::stringstream& info,
                              bool is_first = false);
 
+  static void addHistogramToStream(QuantileLatencyMap latency_map, absl::string_view key,
+                                   std::stringstream& ss);
+
 private:
   /**
    * Generate HystrixCommand event stream.
    */
   void addHystrixCommand(ClusterStatsCache& cluster_stats_cache, absl::string_view cluster_name,
                          uint64_t max_concurrent_requests, uint64_t reporting_hosts,
-                         std::chrono::milliseconds rolling_window_ms, std::stringstream& ss);
+                         std::chrono::milliseconds rolling_window_ms, QuantileLatencyMap& histogram,
+                         std::stringstream& ss);
 
   /**
    * Generate HystrixThreadPool event stream.

@@ -11,6 +11,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
+#include "fmt/printf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,11 +44,13 @@ void ClusterStatsCache::printRollingWindow(absl::string_view name, RollingWindow
   out_str << std::endl;
 }
 
-void ClusterStatsCache::addHistogramToStream(absl::string_view key, std::stringstream& ss) {
+void HystrixSink::addHistogramToStream(QuantileLatencyMap latency_map, absl::string_view key,
+                                       std::stringstream& ss) {
   ss << ", \"" << key << "\": {";
   bool is_first = true;
-  for (const std::pair<std::string, double> element : timing_) {
-    HystrixSink::addDoubleToStream(element.first, element.second, ss, is_first);
+  for (const std::pair<double, double> element : latency_map) {
+    std::string quantile = fmt::sprintf("%g", element.first * 100);
+    HystrixSink::addDoubleToStream(quantile, element.second, ss, is_first);
     is_first = false;
   }
   ss << "}";
@@ -77,8 +80,7 @@ uint64_t HystrixSink::getRollingValue(RollingWindow rolling_window) {
 }
 
 void HystrixSink::updateRollingWindowMap(const Upstream::ClusterInfo& cluster_info,
-                                         ClusterStatsCache& cluster_stats_cache,
-                                         QuantileLatencyMap& histogram) {
+                                         ClusterStatsCache& cluster_stats_cache) {
   const std::string cluster_name = cluster_info.name();
   Upstream::ClusterStats& cluster_stats = cluster_info.stats();
   Stats::Scope& cluster_stats_scope = cluster_info.statsScope();
@@ -112,8 +114,6 @@ void HystrixSink::updateRollingWindowMap(const Upstream::ClusterInfo& cluster_in
   // leading to wrong results such as error percentage higher than 100%
   uint64_t total = errors + timeouts + success + rejected;
   pushNewValue(cluster_stats_cache.total_, total);
-
-  cluster_stats_cache.timing_ = histogram;
 
   ENVOY_LOG(trace, "{}", printRollingWindows());
 }
@@ -149,7 +149,7 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
                                     absl::string_view cluster_name,
                                     uint64_t max_concurrent_requests, uint64_t reporting_hosts,
                                     std::chrono::milliseconds rolling_window_ms,
-                                    std::stringstream& ss) {
+                                    QuantileLatencyMap& histogram, std::stringstream& ss) {
 
   std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
@@ -192,7 +192,7 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
   addIntToStream("rollingCountBadRequests", 0, ss);
   addIntToStream("currentConcurrentExecutionCount", 0, ss);
   addStringToStream("latencyExecute_mean", "null", ss);
-  cluster_stats_cache.addHistogramToStream("latencyExecute", ss);
+  addHistogramToStream(histogram, "latencyExecute", ss);
   addIntToStream("propertyValue_circuitBreakerRequestVolumeThreshold", 0, ss);
   addIntToStream("propertyValue_circuitBreakerSleepWindowInMilliseconds", 0, ss);
   addIntToStream("propertyValue_circuitBreakerErrorThresholdPercentage", 0, ss);
@@ -244,10 +244,10 @@ void HystrixSink::addClusterStatsToStream(ClusterStatsCache& cluster_stats_cache
                                           uint64_t max_concurrent_requests,
                                           uint64_t reporting_hosts,
                                           std::chrono::milliseconds rolling_window_ms,
-                                          std::stringstream& ss) {
+                                          QuantileLatencyMap& histogram, std::stringstream& ss) {
 
   addHystrixCommand(cluster_stats_cache, cluster_name, max_concurrent_requests, reporting_hosts,
-                    rolling_window_ms, ss);
+                    rolling_window_ms, histogram, ss);
   addHystrixThreadPool(cluster_name, max_concurrent_requests, reporting_hosts, rolling_window_ms,
                        ss);
 }
@@ -322,7 +322,7 @@ void HystrixSink::flush(Stats::Source& source) {
   Upstream::ClusterManager::ClusterInfoMap clusters = server_.clusterManager().clusters();
 
   // Save a map of the relevant histograms per cluster in a convenient format.
-  std::unordered_map<std::string, QuantileLatencyMap, StringViewHash> time_histograms;
+  std::unordered_map<std::string, QuantileLatencyMap> time_histograms;
   for (const Stats::ParentHistogramSharedPtr histogram : source.cachedHistograms()) {
     // histogram->name() on clusters of the format "cluster.cluster_name.histogram_name"
     // i.e. "cluster.service1.upstream_rq_time".
@@ -335,13 +335,7 @@ void HystrixSink::flush(Stats::Source& source) {
       for (size_t i = 0; i < supported_quantiles.size(); ++i) {
         if (std::find(hystrix_quantiles.begin(), hystrix_quantiles.end(), supported_quantiles[i]) !=
             hystrix_quantiles.end()) {
-          if (supported_quantiles[i] == 0.995) {
-            // The only non int quantile value
-            hist_map["99.5"] = histogram->intervalStatistics().computedQuantiles()[i];
-          } else {
-            hist_map[std::to_string(int(100 * supported_quantiles[i]))] =
-                histogram->intervalStatistics().computedQuantiles()[i];
-          }
+          hist_map[supported_quantiles[i]] = histogram->intervalStatistics().computedQuantiles()[i];
         }
       }
     }
@@ -357,15 +351,14 @@ void HystrixSink::flush(Stats::Source& source) {
     }
 
     // update rolling window with cluster stats
-    updateRollingWindowMap(*cluster_info, *cluster_stats_cache_ptr,
-                           time_histograms[cluster_info->name()]);
+    updateRollingWindowMap(*cluster_info, *cluster_stats_cache_ptr);
 
     // append it to stream to be sent
     addClusterStatsToStream(
         *cluster_stats_cache_ptr, cluster_info->name(),
         cluster_info->resourceManager(Upstream::ResourcePriority::Default).pendingRequests().max(),
         cluster_info->statsScope().gauge("membership_total").value(), server_.statsFlushInterval(),
-        ss);
+        time_histograms[cluster_info->name()], ss);
   }
 
   Buffer::OwnedImpl data;
