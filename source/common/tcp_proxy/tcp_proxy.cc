@@ -388,6 +388,9 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   upstream_connection_->write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
+  getRequestInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
+  ENVOY_LOG(debug, "TCP:onData(), requestedServerName: {} ",
+            getRequestInfo().requestedServerName());
   return Network::FilterStatus::StopIteration;
 }
 

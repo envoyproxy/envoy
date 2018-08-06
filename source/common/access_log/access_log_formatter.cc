@@ -301,6 +301,16 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
       return RequestInfo::Utility::formatDownstreamAddressNoPort(
           *request_info.downstreamRemoteAddress());
     };
+  } else if (field_name == "REQUESTED_SERVER_NAME") {
+    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
+      absl::string_view requested_server_name;
+      if (nullptr != request_info.requestedServerName()) {
+        return request_info.requestedServerName().data();
+      } else {
+        requested_server_name = UnspecifiedValueString;
+        return requested_server_name.data();
+      }
+    };
   } else {
     throw EnvoyException(fmt::format("Not supported field in RequestInfo: {}", field_name));
   }

@@ -154,6 +154,12 @@ public:
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
+  void setRequestedServerName(const absl::string_view& requested_server_name) override {
+    requested_server_name_ = requested_server_name;
+  }
+
+  const absl::string_view& requestedServerName() const override { return requested_server_name_; }
+
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
@@ -176,6 +182,7 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
+  absl::string_view requested_server_name_;
 };
 
 } // namespace Envoy

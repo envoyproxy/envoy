@@ -123,6 +123,8 @@ void Filter::onServername(absl::string_view name) {
   if (!name.empty()) {
     config_->stats().sni_found_.inc();
     cb_->socket().setRequestedServerName(name);
+    ENVOY_LOG(debug, "tls:onServerName(), requestedServerName: {}",
+              cb_->socket().requestedServerName());
   } else {
     config_->stats().sni_not_found_.inc();
   }
