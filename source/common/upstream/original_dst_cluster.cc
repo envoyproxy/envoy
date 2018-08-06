@@ -20,9 +20,11 @@ namespace Upstream {
 // OriginalDstCluster::LoadBalancer is never configured with any other type of cluster,
 // and throws an exception otherwise.
 
-OriginalDstCluster::LoadBalancer::LoadBalancer(PrioritySet& priority_set, ClusterSharedPtr& parent)
+OriginalDstCluster::LoadBalancer::LoadBalancer(
+    PrioritySet& priority_set, ClusterSharedPtr& parent,
+    const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>& config)
     : priority_set_(priority_set), parent_(std::static_pointer_cast<OriginalDstCluster>(parent)),
-      info_(parent->info()) {
+      info_(parent->info()), use_http_header_(config ? config.value().use_http_header() : false) {
   // priority_set_ is initially empty.
   priority_set_.addMemberUpdateCb(
       [this](uint32_t, const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
@@ -44,7 +46,10 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
   if (context) {
 
     // Check if override host header is present, if yes use it otherwise check local address.
-    Network::Address::InstanceConstSharedPtr dst_host = requestOverrideHost(context);
+    Network::Address::InstanceConstSharedPtr dst_host = nullptr;
+    if (use_http_header_) {
+      dst_host = requestOverrideHost(context);
+    }
     if (dst_host == nullptr) {
       const Network::Connection* connection = context->downstreamConnection();
       // The local address of the downstream connection is the original destination address,
@@ -122,15 +127,15 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
   return request_host;
 }
 
-OriginalDstCluster::OriginalDstCluster(const envoy::api::v2::Cluster& config,
-                                       Runtime::Loader& runtime, Stats::Store& stats,
-                                       Ssl::ContextManager& ssl_context_manager, ClusterManager& cm,
-                                       Event::Dispatcher& dispatcher, bool added_via_api)
-    : ClusterImplBase(config, cm.bindConfig(), runtime, stats, ssl_context_manager,
-                      cm.clusterManagerFactory().secretManager(), added_via_api),
-      dispatcher_(dispatcher), cleanup_interval_ms_(std::chrono::milliseconds(
-                                   PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
-      cleanup_timer_(dispatcher.createTimer([this]() -> void { cleanup(); })) {
+OriginalDstCluster::OriginalDstCluster(
+    const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
+    Server::Configuration::TransportSocketFactoryContext& factory_context,
+    Stats::ScopePtr&& stats_scope, bool added_via_api)
+    : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api),
+      dispatcher_(factory_context.dispatcher()),
+      cleanup_interval_ms_(
+          std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, cleanup_interval, 5000))),
+      cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })) {
 
   cleanup_timer_->enableTimer(cleanup_interval_ms_);
 }

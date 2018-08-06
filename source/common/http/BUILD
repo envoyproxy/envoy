@@ -215,6 +215,7 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:enum_to_int",
+        "//source/common/config:utility_lib",
     ],
 )
 

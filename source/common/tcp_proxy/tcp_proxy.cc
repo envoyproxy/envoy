@@ -135,17 +135,28 @@ Filter::~Filter() {
     access_log->log(nullptr, nullptr, nullptr, getRequestInfo());
   }
 
-  if (upstream_handle_) {
-    upstream_handle_->cancel();
-  }
-
-  if (upstream_conn_data_) {
-    upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+  if (upstream_connection_) {
+    finalizeUpstreamConnectionStats();
   }
 }
 
 TcpProxyStats Config::SharedConfig::generateStats(Stats::Scope& scope) {
   return {ALL_TCP_PROXY_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
+}
+
+namespace {
+void finalizeConnectionStats(const Upstream::HostDescription& host,
+                             Stats::Timespan connected_timespan) {
+  host.cluster().stats().upstream_cx_destroy_.inc();
+  host.cluster().stats().upstream_cx_active_.dec();
+  host.stats().cx_active_.dec();
+  host.cluster().resourceManager(Upstream::ResourcePriority::Default).connections().dec();
+  connected_timespan.complete();
+}
+} // namespace
+
+void Filter::finalizeUpstreamConnectionStats() {
+  finalizeConnectionStats(*read_callbacks_->upstreamHost(), *connected_timespan_);
 }
 
 void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
@@ -177,15 +188,15 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
 }
 
 void Filter::readDisableUpstream(bool disable) {
-  if (upstream_conn_data_ == nullptr ||
-      upstream_conn_data_->connection().state() != Network::Connection::State::Open) {
+  if (upstream_connection_ == nullptr ||
+      upstream_connection_->state() != Network::Connection::State::Open) {
     // Because we flush write downstream, we can have a case where upstream has already disconnected
     // and we are waiting to flush. If we had a watermark event during this time we should no
     // longer touch the upstream connection.
     return;
   }
 
-  upstream_conn_data_->connection().readDisable(disable);
+  upstream_connection_->readDisable(disable);
   if (disable) {
     read_callbacks_->upstreamHost()
         ->cluster()
@@ -251,12 +262,13 @@ void Filter::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
   }
 }
 
-void Filter::UpstreamCallbacks::onUpstreamData(Buffer::Instance& data, bool end_stream) {
+Network::FilterStatus Filter::UpstreamCallbacks::onData(Buffer::Instance& data, bool end_stream) {
   if (parent_) {
     parent_->onUpstreamData(data, end_stream);
   } else {
     drainer_->onData(data, end_stream);
   }
+  return Network::FilterStatus::StopIteration;
 }
 
 void Filter::UpstreamCallbacks::onBytesSent() {
@@ -282,7 +294,7 @@ void Filter::UpstreamCallbacks::drain(Drainer& drainer) {
 }
 
 Network::FilterStatus Filter::initializeUpstreamConnection() {
-  ASSERT(upstream_conn_data_ == nullptr);
+  ASSERT(upstream_connection_ == nullptr);
 
   const std::string& cluster_name = getUpstreamCluster();
 
@@ -299,9 +311,6 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
   }
 
   Upstream::ClusterInfoConstSharedPtr cluster = thread_local_cluster->info();
-
-  // Check this here because the TCP conn pool will queue our request waiting for a connection that
-  // will never be released.
   if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
     getRequestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamOverflow);
     cluster->stats().upstream_cx_overflow_.inc();
@@ -316,105 +325,86 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
     return Network::FilterStatus::StopIteration;
   }
 
-  Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      cluster_name, Upstream::ResourcePriority::Default, this);
-  if (!conn_pool) {
-    // Either cluster is unknown or there are no healthy hosts. tcpConnPoolForCluster() increments
-    // cluster->stats().upstream_cx_none_healthy in the latter case.
+  Upstream::Host::CreateConnectionData conn_info =
+      cluster_manager_.tcpConnForCluster(cluster_name, this);
+
+  upstream_connection_ = std::move(conn_info.connection_);
+  read_callbacks_->upstreamHost(conn_info.host_description_);
+  if (!upstream_connection_) {
+    // tcpConnForCluster() increments cluster->stats().upstream_cx_none_healthy.
     getRequestInfo().setResponseFlag(RequestInfo::ResponseFlag::NoHealthyUpstream);
     onInitFailure(UpstreamFailureReason::NO_HEALTHY_UPSTREAM);
     return Network::FilterStatus::StopIteration;
   }
 
-  connecting_ = true;
   connect_attempts_++;
+  cluster->resourceManager(Upstream::ResourcePriority::Default).connections().inc();
+  upstream_connection_->addReadFilter(upstream_callbacks_);
+  upstream_connection_->addConnectionCallbacks(*upstream_callbacks_);
+  upstream_connection_->enableHalfClose(true);
+  upstream_connection_->setConnectionStats(
+      {read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_rx_bytes_total_,
+       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_rx_bytes_buffered_,
+       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_tx_bytes_total_,
+       read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_tx_bytes_buffered_,
+       &read_callbacks_->upstreamHost()->cluster().stats().bind_errors_});
+  upstream_connection_->connect();
+  upstream_connection_->noDelay(true);
+  getRequestInfo().onUpstreamHostSelected(conn_info.host_description_);
+  getRequestInfo().setUpstreamLocalAddress(upstream_connection_->localAddress());
 
-  // Because we never return open connections to the pool, this should either return a handle while
-  // a connection completes or it invokes onPoolFailure inline. Either way, stop iteration.
-  upstream_handle_ = conn_pool->newConnection(*this);
-  return Network::FilterStatus::StopIteration;
-}
+  ASSERT(connect_timeout_timer_ == nullptr);
+  connect_timeout_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+      [this]() -> void { onConnectTimeout(); });
+  connect_timeout_timer_->enableTimer(cluster->connectTimeout());
 
-void Filter::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
-                           Upstream::HostDescriptionConstSharedPtr host) {
-  upstream_handle_ = nullptr;
+  read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_total_.inc();
+  read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_active_.inc();
+  read_callbacks_->upstreamHost()->stats().cx_total_.inc();
+  read_callbacks_->upstreamHost()->stats().cx_active_.inc();
+  connect_timespan_.reset(new Stats::Timespan(
+      read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_ms_));
+  connected_timespan_.reset(new Stats::Timespan(
+      read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_length_ms_));
 
-  read_callbacks_->upstreamHost(host);
-  getRequestInfo().onUpstreamHostSelected(host);
-
-  switch (reason) {
-  case Tcp::ConnectionPool::PoolFailureReason::Overflow:
-  case Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure:
-    upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
-    break;
-
-  case Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
-    upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
-    break;
-
-  case Tcp::ConnectionPool::PoolFailureReason::Timeout:
-    onConnectTimeout();
-    break;
-
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-}
-
-void Filter::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
-                         Upstream::HostDescriptionConstSharedPtr host) {
-  upstream_handle_ = nullptr;
-  upstream_conn_data_ = std::move(conn_data);
-  read_callbacks_->upstreamHost(host);
-
-  upstream_conn_data_->addUpstreamCallbacks(*upstream_callbacks_);
-
-  Network::ClientConnection& connection = upstream_conn_data_->connection();
-
-  connection.enableHalfClose(true);
-
-  getRequestInfo().onUpstreamHostSelected(host);
-  getRequestInfo().setUpstreamLocalAddress(connection.localAddress());
-
-  // Simulate the event that onPoolReady represents.
-  upstream_callbacks_->onEvent(Network::ConnectionEvent::Connected);
-
-  read_callbacks_->continueReading();
+  return Network::FilterStatus::Continue;
 }
 
 void Filter::onConnectTimeout() {
   ENVOY_CONN_LOG(debug, "connect timeout", read_callbacks_->connection());
   read_callbacks_->upstreamHost()->outlierDetector().putResult(Upstream::Outlier::Result::TIMEOUT);
+  read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_timeout_.inc();
   getRequestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure);
 
-  // Raise LocalClose, which will trigger a reconnect if needed/configured.
-  upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
+  // This will cause a LocalClose event to be raised, which will trigger a reconnect if
+  // needed/configured.
+  upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
 }
 
 Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
   ENVOY_CONN_LOG(trace, "downstream connection received {} bytes, end_stream={}",
                  read_callbacks_->connection(), data.length(), end_stream);
   getRequestInfo().addBytesReceived(data.length());
-  upstream_conn_data_->connection().write(data, end_stream);
+  upstream_connection_->write(data, end_stream);
   ASSERT(0 == data.length());
   resetIdleTimer(); // TODO(ggreenway) PERF: do we need to reset timer on both send and receive?
   return Network::FilterStatus::StopIteration;
 }
 
 void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
-  if (upstream_conn_data_) {
+  if (upstream_connection_) {
     if (event == Network::ConnectionEvent::RemoteClose) {
-      upstream_conn_data_->connection().close(Network::ConnectionCloseType::FlushWrite);
+      upstream_connection_->close(Network::ConnectionCloseType::FlushWrite);
 
-      if (upstream_conn_data_ != nullptr &&
-          upstream_conn_data_->connection().state() != Network::Connection::State::Closed) {
-        config_->drainManager().add(config_->sharedConfig(), std::move(upstream_conn_data_),
+      if (upstream_connection_ != nullptr &&
+          upstream_connection_->state() != Network::Connection::State::Closed) {
+        config_->drainManager().add(config_->sharedConfig(), std::move(upstream_connection_),
                                     std::move(upstream_callbacks_), std::move(idle_timer_),
-                                    read_callbacks_->upstreamHost());
+                                    read_callbacks_->upstreamHost(),
+                                    std::move(connected_timespan_));
       }
     } else if (event == Network::ConnectionEvent::LocalClose) {
-      upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
-      upstream_conn_data_.reset();
+      upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
       disableIdleTimer();
     }
   }
@@ -430,21 +420,36 @@ void Filter::onUpstreamData(Buffer::Instance& data, bool end_stream) {
 }
 
 void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
-  // Update the connecting flag before processing the event because we may start a new connection
-  // attempt in initializeUpstreamConnection.
-  bool connecting = connecting_;
-  connecting_ = false;
+  bool connecting = false;
+
+  // The timer must be cleared before, not after, processing the event because
+  // if initializeUpstreamConnection() is called it will reset the timer, so
+  // clearing after that call will leave the timer unset.
+  if (connect_timeout_timer_) {
+    connecting = true;
+    connect_timeout_timer_->disableTimer();
+    connect_timeout_timer_.reset();
+  }
 
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
-    upstream_conn_data_.reset();
+    finalizeUpstreamConnectionStats();
+    read_callbacks_->connection().dispatcher().deferredDelete(std::move(upstream_connection_));
     disableIdleTimer();
+
+    auto& destroy_ctx_stat =
+        (event == Network::ConnectionEvent::RemoteClose)
+            ? read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_remote_
+            : read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_destroy_local_;
+    destroy_ctx_stat.inc();
 
     if (connecting) {
       if (event == Network::ConnectionEvent::RemoteClose) {
         getRequestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamConnectionFailure);
         read_callbacks_->upstreamHost()->outlierDetector().putResult(
             Upstream::Outlier::Result::CONNECT_FAILED);
+        read_callbacks_->upstreamHost()->cluster().stats().upstream_cx_connect_fail_.inc();
+        read_callbacks_->upstreamHost()->stats().cx_connect_fail_.inc();
       }
 
       initializeUpstreamConnection();
@@ -454,6 +459,8 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
       }
     }
   } else if (event == Network::ConnectionEvent::Connected) {
+    connect_timespan_->complete();
+
     // Re-enable downstream reads now that the upstream connection is established
     // so we have a place to send downstream data to.
     read_callbacks_->connection().readDisable(false);
@@ -473,10 +480,8 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
           });
       resetIdleTimer();
       read_callbacks_->connection().addBytesSentCallback([this](uint64_t) { resetIdleTimer(); });
-      upstream_conn_data_->connection().addBytesSentCallback([upstream_callbacks =
-                                                                  upstream_callbacks_](uint64_t) {
-        upstream_callbacks->onBytesSent();
-      });
+      upstream_connection_->addBytesSentCallback([upstream_callbacks = upstream_callbacks_](
+          uint64_t) { upstream_callbacks->onBytesSent(); });
     }
   }
 }
@@ -518,12 +523,14 @@ UpstreamDrainManager::~UpstreamDrainManager() {
 }
 
 void UpstreamDrainManager::add(const Config::SharedConfigSharedPtr& config,
-                               Tcp::ConnectionPool::ConnectionDataPtr&& upstream_conn_data,
+                               Network::ClientConnectionPtr&& upstream_connection,
                                const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
                                Event::TimerPtr&& idle_timer,
-                               const Upstream::HostDescriptionConstSharedPtr& upstream_host) {
-  DrainerPtr drainer(new Drainer(*this, config, callbacks, std::move(upstream_conn_data),
-                                 std::move(idle_timer), upstream_host));
+                               const Upstream::HostDescriptionConstSharedPtr& upstream_host,
+                               Stats::TimespanPtr&& connected_timespan) {
+  DrainerPtr drainer(new Drainer(*this, config, callbacks, std::move(upstream_connection),
+                                 std::move(idle_timer), upstream_host,
+                                 std::move(connected_timespan)));
   callbacks->drain(*drainer);
 
   // Use temporary to ensure we get the pointer before we move it out of drainer
@@ -540,10 +547,12 @@ void UpstreamDrainManager::remove(Drainer& drainer, Event::Dispatcher& dispatche
 
 Drainer::Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
                  const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
-                 Tcp::ConnectionPool::ConnectionDataPtr&& conn_data, Event::TimerPtr&& idle_timer,
-                 const Upstream::HostDescriptionConstSharedPtr& upstream_host)
-    : parent_(parent), callbacks_(callbacks), upstream_conn_data_(std::move(conn_data)),
-      timer_(std::move(idle_timer)), upstream_host_(upstream_host), config_(config) {
+                 Network::ClientConnectionPtr&& connection, Event::TimerPtr&& idle_timer,
+                 const Upstream::HostDescriptionConstSharedPtr& upstream_host,
+                 Stats::TimespanPtr&& connected_timespan)
+    : parent_(parent), callbacks_(callbacks), upstream_connection_(std::move(connection)),
+      timer_(std::move(idle_timer)), connected_timespan_(std::move(connected_timespan)),
+      upstream_host_(upstream_host), config_(config) {
   config_->stats().upstream_flush_total_.inc();
   config_->stats().upstream_flush_active_.inc();
 }
@@ -555,7 +564,8 @@ void Drainer::onEvent(Network::ConnectionEvent event) {
       timer_->disableTimer();
     }
     config_->stats().upstream_flush_active_.dec();
-    parent_.remove(*this, upstream_conn_data_->connection().dispatcher());
+    finalizeConnectionStats(*upstream_host_, *connected_timespan_);
+    parent_.remove(*this, upstream_connection_->dispatcher());
   }
 }
 
@@ -582,7 +592,7 @@ void Drainer::onBytesSent() {
 
 void Drainer::cancelDrain() {
   // This sends onEvent(LocalClose).
-  upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
+  upstream_connection_->close(Network::ConnectionCloseType::NoFlush);
 }
 
 } // namespace TcpProxy

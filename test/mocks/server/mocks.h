@@ -411,6 +411,12 @@ public:
 
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
+  MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
+  MOCK_METHOD0(secretManager, Secret::SecretManager&());
+  MOCK_METHOD0(local_info, const LocalInfo::LocalInfo&());
+  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
+  MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
+  MOCK_METHOD0(stats, Stats::Store&());
 };
 
 class MockListenerFactoryContext : public virtual MockFactoryContext,
