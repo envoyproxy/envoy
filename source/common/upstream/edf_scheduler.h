@@ -66,10 +66,31 @@ public:
   }
 
   /**
-   * Implements empty() on the internal queue. Does not check for expired elements.
+   * Implements empty() on the internal queue, discarding expired elements along the way.
    * @return bool whether or not the internal queue is empty.
    */
-  bool empty() { return queue_.empty(); }
+  bool empty() {
+    EDF_TRACE("Queue empty check: queue_.size()={}, current_time_={}.", queue_.size(),
+              current_time_);
+    while (true) {
+      if (queue_.empty()) {
+        EDF_TRACE("Queue is empty.");
+        return true;
+      }
+      const EdfEntry& edf_entry = queue_.top();
+      // Entry has been removed, let's see if there's another one.
+      if (edf_entry.entry_.expired()) {
+        EDF_TRACE("Entry has expired, continue seeking.");
+        queue_.pop();
+        continue;
+      }
+      std::shared_ptr<C> ret{edf_entry.entry_};
+      ASSERT(edf_entry.deadline_ >= current_time_);
+      current_time_ = edf_entry.deadline_;
+      EDF_TRACE("Found {}, current_time_={}.", static_cast<const void*>(ret.get()), current_time_);
+      return false;
+    }
+  }
 
 private:
   struct EdfEntry {
