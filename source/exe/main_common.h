@@ -28,6 +28,15 @@ public:
 
   bool run();
 
+  using AdminRequestFn =
+      std::function<void(const Http::HeaderMap& response_headers, absl::string_view body)>;
+
+  // Makes an admin-console request by path, calling handler() when complete.
+  // The caller can initiate this from any thread, but it posts the request
+  // onto the main thread, so the handler is called asynchronously.
+  void adminRequest(absl::string_view path_and_query, absl::string_view method,
+                    const AdminRequestFn& handler);
+
 protected:
   Envoy::OptionsImpl& options_;
   ProdComponentFactory component_factory_;

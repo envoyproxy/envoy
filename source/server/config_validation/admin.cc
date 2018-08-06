@@ -13,8 +13,8 @@ const Network::Socket& ValidationAdmin::socket() { NOT_IMPLEMENTED_GCOVR_EXCL_LI
 
 ConfigTracker& ValidationAdmin::getConfigTracker() { return config_tracker_; };
 
-Http::Code ValidationAdmin::request(absl::string_view, const Http::Utility::QueryParams&,
-                                    absl::string_view, Http::HeaderMap&, std::string&) {
+Http::Code ValidationAdmin::request(absl::string_view, absl::string_view, Http::HeaderMap&,
+                                    std::string&) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
