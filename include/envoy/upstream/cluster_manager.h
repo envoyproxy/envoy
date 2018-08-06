@@ -17,7 +17,6 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/admin.h"
-#include "envoy/ssl/context_manager.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
@@ -292,32 +291,6 @@ public:
    * Returns the secret manager.
    */
   virtual Secret::SecretManager& secretManager() PURE;
-};
-
-/**
- * Factory for creating ClusterInfo
- */
-class ClusterInfoFactory {
-public:
-  virtual ~ClusterInfoFactory() {}
-
-  /**
-   * This method returns a Upstream::ClusterInfoConstSharedPtr
-   *
-   * @param runtime supplies the runtime loader.
-   * @param cluster supplies the owning cluster.
-   * @param bind_config supplies information on binding newly established connections.
-   * @param stats supplies a store for all known counters, gauges, and timers.
-   * @param ssl_context_manager supplies a manager for all SSL contexts.
-   * @param secret_manager supplies a manager for static secrets.
-   * @param added_via_api denotes whether this was added via API.
-   * @return Upstream::ClusterInfoConstSharedPtr
-   */
-  virtual Upstream::ClusterInfoConstSharedPtr
-  createClusterInfo(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
-                    const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
-                    Ssl::ContextManager& ssl_context_manager, Secret::SecretManager& secret_manager,
-                    bool added_via_api) PURE;
 };
 
 } // namespace Upstream
