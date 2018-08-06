@@ -30,9 +30,9 @@ class HdsDelegateFriend {
 public:
   // Allows access to private function processMessage
   void processPrivateMessage(
-      std::shared_ptr<HdsDelegate> hd,
+      HdsDelegate& hd,
       std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
-    hd->processMessage(std::move(message));
+    hd.processMessage(std::move(message));
   };
 };
 
@@ -65,7 +65,6 @@ public:
   // Creates a HealthCheckSpecifier message that contains one endpoint and one
   // healthcheck
   envoy::service::discovery::v2::HealthCheckSpecifier* createSimpleMessage() {
-
     envoy::service::discovery::v2::HealthCheckSpecifier* msg =
         new envoy::service::discovery::v2::HealthCheckSpecifier;
     msg->mutable_interval()->set_seconds(1);
@@ -93,7 +92,7 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   MockClusterInfoFactory test_factory_;
 
-  std::shared_ptr<Upstream::HdsDelegate> hds_delegate_;
+  std::unique_ptr<Upstream::HdsDelegate> hds_delegate_;
   HdsDelegateFriend hds_delegate_friend_;
 
   Event::MockTimer* retry_timer_;
@@ -138,7 +137,7 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
 
   // Process message
   EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _)).Times(2);
-  hds_delegate_friend_.processPrivateMessage(hds_delegate_, std::move(message));
+  hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
 
   // Check Correctness
   for (int i = 0; i < 2; i++) {
@@ -151,8 +150,8 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
   }
 }
 
-// Test if processMessage processes healthchecks from a HealthCheckSpecifier
-// message  correctly
+// Test if processMessage processes health checks from a HealthCheckSpecifier
+// message correctly
 TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessage(_, _));
@@ -183,7 +182,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   EXPECT_CALL(test_factory_, createClusterInfo(_, _, _, _, _, _, _))
       .WillRepeatedly(Return(cluster_info_));
 
-  hds_delegate_friend_.processPrivateMessage(hds_delegate_, std::move(message));
+  hds_delegate_friend_.processPrivateMessage(*hds_delegate_, std::move(message));
 
   // Check Correctness
   EXPECT_EQ(hds_delegate_->hdsClusters()[0]->healthCheckers().size(), 2);
