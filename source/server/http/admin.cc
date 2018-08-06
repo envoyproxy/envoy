@@ -1017,6 +1017,14 @@ Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::HeaderMap& respo
 
     // Remove the leading slash from the link, so that the admin page can be
     // rendered as part of another console, on a sub-path.
+    //
+    // E.g. consider a downstream dashboard that embeds the Envoy admin console.
+    // In that case, the "/stats" endpoint would be at
+    // https://DASHBOARD/envoy_admin/stats. If the links we present on the home
+    // page are absolute (e.g. "/stats") they won't work in the context of the
+    // dashboard. Removing the leading slash, they will work properly in both
+    // the raw admin console and when embedded in another page and URL
+    // hierarchy.
     ASSERT(!path.empty());
     ASSERT(path[0] == '/');
     path = path.substr(1);
@@ -1046,6 +1054,9 @@ const Network::Address::Instance& AdminImpl::localAddress() {
 
 bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
                            HandlerCb callback, bool removable, bool mutates_state) {
+  ASSERT(prefix.size() > 1);
+  ASSERT(prefix[0] == '/');
+
   // Sanitize prefix and help_text to ensure no XSS can be injected, as
   // we are injecting these strings into HTML that runs in a domain that
   // can mutate Envoy server state. Also rule out some characters that

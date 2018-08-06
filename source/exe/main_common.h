@@ -40,6 +40,9 @@ public:
   //
   // This should only be called while run() is active; ensuring this is the
   // responsibility of the caller.
+  //
+  // TODO(jmarantz): consider std::future for encapsulating this delayed request
+  // semantics, rather than a handler callback.
   void adminRequest(absl::string_view path_and_query, absl::string_view method,
                     const AdminRequestFn& handler);
 
@@ -53,6 +56,8 @@ protected:
   std::unique_ptr<Server::InstanceImpl> server_;
 };
 
+// TODO(jmarantz): consider removing this class; I think it'd be more useful to
+// go through MainCommonBase directly.
 class MainCommon {
 public:
   MainCommon(int argc, const char* const* argv);
