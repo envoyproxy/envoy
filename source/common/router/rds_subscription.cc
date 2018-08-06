@@ -1,7 +1,5 @@
 #include "common/router/rds_subscription.h"
 
-#include "envoy/stats/stats.h"
-
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/rds_json.h"

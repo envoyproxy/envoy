@@ -5,7 +5,6 @@
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats.h"
 
 namespace Envoy {
 namespace Ssl {

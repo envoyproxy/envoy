@@ -6,7 +6,6 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
-#include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/ssl/context_impl.h"

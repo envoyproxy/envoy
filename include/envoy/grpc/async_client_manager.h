@@ -2,7 +2,6 @@
 
 #include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
-#include "envoy/stats/stats.h"
 
 namespace Envoy {
 namespace Grpc {

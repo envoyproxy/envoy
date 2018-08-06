@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/utility.h"

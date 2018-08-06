@@ -2,7 +2,6 @@
 
 #include <string>
 
-#include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
 
 namespace Envoy {

@@ -5,7 +5,6 @@
 
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.validate.h"
-#include "envoy/stats/stats.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"

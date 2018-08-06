@@ -8,7 +8,6 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
-#include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/protobuf/protobuf.h"

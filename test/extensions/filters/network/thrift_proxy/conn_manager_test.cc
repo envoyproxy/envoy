@@ -1,5 +1,4 @@
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
-#include "envoy/stats/stats.h"
 
 #include "common/buffer/buffer_impl.h"
 

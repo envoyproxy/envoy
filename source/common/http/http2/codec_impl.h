@@ -10,7 +10,6 @@
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats.h"
 
 //#include "envoy/stats/stats_macros.h"
 
