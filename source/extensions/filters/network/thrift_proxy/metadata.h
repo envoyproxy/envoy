@@ -33,6 +33,7 @@ private:
   std::string value_;
 };
 
+// TODO(zuercher): replace this with Http::HeaderMap[Impl]
 /*
  * HeaderMap contains Thrift transport and/or protocol-level headers.
  */
