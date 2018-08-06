@@ -585,4 +585,7 @@ private:
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
 };
+
+typedef std::unique_ptr<FakeUpstream> FakeUpstreamPtr;
+
 } // namespace Envoy
