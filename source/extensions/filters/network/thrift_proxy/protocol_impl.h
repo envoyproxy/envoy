@@ -31,8 +31,7 @@ public:
     return ProtocolType::Auto;
   }
 
-  bool readMessageBegin(Buffer::Instance& buffer, std::string& name, MessageType& msg_type,
-                        int32_t& seq_id) override;
+  bool readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) override;
   bool readMessageEnd(Buffer::Instance& buffer) override;
   bool readStructBegin(Buffer::Instance& buffer, std::string& name) override {
     return protocol_->readStructBegin(buffer, name);
@@ -80,9 +79,8 @@ public:
   bool readBinary(Buffer::Instance& buffer, std::string& value) override {
     return protocol_->readBinary(buffer, value);
   }
-  void writeMessageBegin(Buffer::Instance& buffer, const std::string& name, MessageType msg_type,
-                         int32_t seq_id) override {
-    protocol_->writeMessageBegin(buffer, name, msg_type, seq_id);
+  void writeMessageBegin(Buffer::Instance& buffer, const MessageMetadata& metadata) override {
+    protocol_->writeMessageBegin(buffer, metadata);
   }
   void writeMessageEnd(Buffer::Instance& buffer) override { protocol_->writeMessageEnd(buffer); }
   void writeStructBegin(Buffer::Instance& buffer, const std::string& name) override {

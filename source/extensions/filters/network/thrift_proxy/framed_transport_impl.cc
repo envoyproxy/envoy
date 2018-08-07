@@ -10,8 +10,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-bool FramedTransportImpl::decodeFrameStart(Buffer::Instance& buffer,
-                                           absl::optional<uint32_t>& size) {
+bool FramedTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMetadata& metadata) {
+  UNREFERENCED_PARAMETER(metadata);
+
   if (buffer.length() < 4) {
     return false;
   }
@@ -24,13 +25,16 @@ bool FramedTransportImpl::decodeFrameStart(Buffer::Instance& buffer,
 
   buffer.drain(4);
 
-  size = static_cast<uint32_t>(thrift_size);
+  metadata.setFrameSize(static_cast<uint32_t>(thrift_size));
   return true;
 }
 
 bool FramedTransportImpl::decodeFrameEnd(Buffer::Instance&) { return true; }
 
-void FramedTransportImpl::encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) {
+void FramedTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMetadata& metadata,
+                                      Buffer::Instance& message) {
+  UNREFERENCED_PARAMETER(metadata);
+
   uint64_t size = message.length();
   if (size == 0 || size > MaxFrameSize) {
     throw EnvoyException(fmt::format("invalid thrift framed transport frame size {}", size));

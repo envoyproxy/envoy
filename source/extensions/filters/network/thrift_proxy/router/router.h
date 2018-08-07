@@ -47,10 +47,10 @@ public:
   /**
    * Based on the incoming Thrift request transport and/or protocol data, determine the target
    * route for the request.
-   * @param method supplies the thrift method name
+   * @param metadata MessageMetadata for the message to route
    * @return the route or nullptr if there is no matching route for the request.
    */
-  virtual RouteConstSharedPtr route(const std::string& method) const PURE;
+  virtual RouteConstSharedPtr route(const MessageMetadata& metadata) const PURE;
 };
 
 typedef std::shared_ptr<const Config> ConfigConstSharedPtr;

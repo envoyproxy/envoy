@@ -44,8 +44,8 @@ public:
   void createFilterChain(ThriftFilters::FilterChainFactoryCallbacks& callbacks) override;
 
   // Router::Config
-  Router::RouteConstSharedPtr route(const std::string& method_name) const override {
-    return route_matcher_->route(method_name);
+  Router::RouteConstSharedPtr route(const MessageMetadata& metadata) const override {
+    return route_matcher_->route(metadata);
   }
 
   // Config
