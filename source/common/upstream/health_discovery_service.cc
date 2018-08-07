@@ -141,6 +141,9 @@ void HdsDelegate::onReceiveMessage(
   stats_.requests_.inc();
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
 
+  // Reset
+  hds_clusters_.clear();
+
   // Process the HealthCheckSpecifier message
   processMessage(std::move(message));
 
