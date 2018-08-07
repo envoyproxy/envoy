@@ -6,6 +6,7 @@ namespace Envoy {
 namespace RequestInfo {
 
 void DynamicMetadataImpl::setData(absl::string_view data_name, std::unique_ptr<Object>&& data) {
+  // TODO(Google): Remove string conversion when fixed internally.
   if (data_storage_.find(std::string(data_name)) != data_storage_.end()) {
     throw EnvoyException("DynamicMetadata::setData<T> called twice with same name.");
   }
@@ -15,11 +16,13 @@ void DynamicMetadataImpl::setData(absl::string_view data_name, std::unique_ptr<O
 }
 
 bool DynamicMetadataImpl::hasDataWithName(absl::string_view data_name) const {
+  // TODO(Google): Remove string conversion when fixed internally.
   return data_storage_.count(std::string(data_name)) > 0;
 }
 
 const DynamicMetadata::Object*
 DynamicMetadataImpl::getDataGeneric(absl::string_view data_name) const {
+  // TODO(Google): Remove string conversion when fixed internally.
   const auto& it = data_storage_.find(std::string(data_name));
 
   if (it == data_storage_.end()) {
