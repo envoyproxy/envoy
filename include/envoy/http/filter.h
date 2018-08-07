@@ -190,15 +190,13 @@ public:
    */
   virtual void addDecodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
-   /**
-    * Adds decoded trailers. May only be called in decodeData when end_stream is set to true.
-    * If called in any other context, std::logic_error will be thrown.
-    *
-    * When called in decodeData, the trailers map will be initialized to an empty map and returned by
-    * reference. Calling it more than once is invalid and will result in std::logic_error being thrown.
-    *
-    * @throws std::logic_error if called in the wrong context
-    */
+  /**
+   * Adds decoded trailers. May only be called in decodeData when end_stream is set to true.
+   * If called in any other context, an assertion will be triggered.
+   *
+   * When called in decodeData, the trailers map will be initialized to an empty map and returned by
+   * reference. Calling this function more than once is invalid.
+   */
   virtual HeaderMap& addDecodedTrailers() PURE;
 
   /**
@@ -407,13 +405,11 @@ public:
   virtual void addEncodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
-   * Adds encoded trailers. May only be called in encodeData when end_stream is set to true. If called 
-   * in any other context, std::logic_error will be thrown.
+   * Adds encoded trailers. May only be called in encodeData when end_stream is set to true.
+   * If called in any other context, an assertion will be triggered.
    *
    * When called in encodeData, the trailers map will be initialized to an empty map and returned by
-   * reference. Calling it more than once is invalid and will result in std::logic_error being thrown.
-   *
-   * @throws std::logic_error if called in the wrong context
+   * reference. Calling this function more than once is invalid.
    */
   virtual HeaderMap& addEncodedTrailers() PURE;
 
