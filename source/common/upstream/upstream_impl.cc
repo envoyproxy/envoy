@@ -913,9 +913,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
                                      }),
                       current_hosts.end());
 
-  // Do a single pass over the current_hosts and remove any that were added to the map in the
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
+  // If there are removed hosts, check to see if we should only delete if unhealthy.
   if (!current_hosts.empty() && dont_remove_healthy_hosts) {
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
       if (!(*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
@@ -932,11 +932,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     }
   }
 
-  // Add the remaining hosts into the updated list of all hosts
-  for (auto& host : final_hosts) {
-    updated_hosts[host->address()->asString()] = host;
-  }
-
   // TODO(mattklein123): This stat is used by both the RR and LR load balancer to decide at
   // runtime whether to use either the weighted or unweighted mode. If we extend weights to
   // static clusters or DNS SRV clusters we need to make sure this gets set. Better, we should
@@ -948,8 +943,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     current_hosts = std::move(final_hosts);
     return true;
   } else {
-    // During the search we moved all of the hosts from hosts_ into final_hosts so just
-    // move them back.
+    // During the search populated final_hosts with either from hosts_ or from all_hosts, so
+    // move them back into current_hosts to indicate that these are the current hosts for
+    // this priority after the update.
     current_hosts = std::move(final_hosts);
     // We return false here in the absence of EDS health status or metadata changes, because we
     // have no changes to host vector status (modulo weights). When we have EDS
@@ -1065,7 +1061,6 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
               parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
               lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
               locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config()));
-          updated_hosts[address->asString()] = new_hosts.back();
         }
 
         HostVector hosts_added;
