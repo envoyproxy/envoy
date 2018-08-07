@@ -26,6 +26,7 @@
 #include "server/http/admin.h"
 #include "server/init_manager_impl.h"
 #include "server/listener_manager_impl.h"
+#include "server/overload_manager_impl.h"
 #include "server/test_hooks.h"
 #include "server/worker_impl.h"
 
@@ -112,7 +113,7 @@ class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
   RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, HotRestart& hot_restart,
             AccessLog::AccessLogManager& access_log_manager, InitManagerImpl& init_manager,
-            std::function<void()> workers_start_cb);
+            OverloadManager& overload_manager, std::function<void()> workers_start_cb);
 
 private:
   Event::SignalEventPtr sigterm_;
@@ -154,6 +155,7 @@ public:
   Init::Manager& initManager() override { return init_manager_; }
   ListenerManager& listenerManager() override { return *listener_manager_; }
   Secret::SecretManager& secretManager() override { return *secret_manager_; }
+  OverloadManager& overloadManager() override { return *overload_manager_; }
   Runtime::RandomGenerator& random() override { return *random_generator_; }
   RateLimit::ClientPtr
   rateLimitClient(const absl::optional<std::chrono::milliseconds>& timeout) override {
@@ -221,6 +223,7 @@ private:
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Upstream::HdsDelegatePtr hds_delegate_;
+  std::unique_ptr<OverloadManagerImpl> overload_manager_;
 };
 
 } // namespace Server

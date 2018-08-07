@@ -31,6 +31,12 @@ public:
   virtual ~OverloadManager() {}
 
   /**
+   * Start a recurring timer to monitor resources and notify listeners when overload actions
+   * change state.
+   */
+  virtual void start() PURE;
+
+  /**
    * Register a callback to be invoked when the specified overload action changes state
    * (ie. becomes activated or inactivated). Must be called before the start method is called.
    * @param action const std::string& the name of the overload action to register for

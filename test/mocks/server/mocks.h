@@ -12,6 +12,7 @@
 #include "envoy/server/health_checker_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
+#include "envoy/server/overload_manager.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/server/worker.h"
 #include "envoy/ssl/context_manager.h"
@@ -272,6 +273,17 @@ public:
   std::function<void()> remove_listener_completion_;
 };
 
+class MockOverloadManager : public OverloadManager {
+public:
+  MockOverloadManager() {}
+  ~MockOverloadManager() {}
+
+  // OverloadManager
+  MOCK_METHOD0(start, void());
+  MOCK_METHOD3(registerForAction, void(const std::string& action, Event::Dispatcher& dispatcher,
+                                       OverloadActionCb callback));
+};
+
 class MockInstance : public Instance {
 public:
   MockInstance();
@@ -300,6 +312,7 @@ public:
   MOCK_METHOD0(initManager, Init::Manager&());
   MOCK_METHOD0(listenerManager, ListenerManager&());
   MOCK_METHOD0(options, Options&());
+  MOCK_METHOD0(overloadManager, OverloadManager&());
   MOCK_METHOD0(random, Runtime::RandomGenerator&());
   MOCK_METHOD0(rateLimitClient_, RateLimit::Client*());
   MOCK_METHOD0(runtime, Runtime::Loader&());
@@ -335,6 +348,7 @@ public:
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockListenerManager> listener_manager_;
+  testing::NiceMock<MockOverloadManager> overload_manager_;
   Singleton::ManagerPtr singleton_manager_;
 };
 

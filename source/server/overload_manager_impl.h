@@ -52,9 +52,8 @@ public:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
                       const envoy::config::overload::v2alpha::OverloadManager& config);
 
-  void start();
-
   // Server::OverloadManager
+  void start() override;
   void registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                          OverloadActionCb callback) override;
 
