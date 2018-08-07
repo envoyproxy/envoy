@@ -208,23 +208,8 @@ ClusterInfoConstSharedPtr ProdClusterInfoFactory::createClusterInfo(
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
 
-  auto transport_socket = cluster.transport_socket();
-  if (!cluster.has_transport_socket()) {
-    if (cluster.has_tls_context()) {
-      transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
-      MessageUtil::jsonConvert(cluster.tls_context(), *transport_socket.mutable_config());
-    } else {
-      transport_socket.set_name(
-          Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
-    }
-  }
-
-  auto& config_factory = Config::Utility::getAndCheckFactory<
-      Server::Configuration::UpstreamTransportSocketConfigFactory>(transport_socket.name());
-  ProtobufTypes::MessagePtr message =
-      Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
   Network::TransportSocketFactoryPtr socket_factory =
-      config_factory.createTransportSocketFactory(*message, factory_context);
+      Upstream::createTransportSocketFactory(cluster, factory_context);
 
   return std::make_unique<ClusterInfoImpl>(cluster, bind_config, runtime, std::move(socket_factory),
                                            std::move(scope), added_via_api);
