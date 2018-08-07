@@ -211,7 +211,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthy) {
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
-  // Check that the response_ is correct
+  // Check that the response is correct
   checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
                               envoy::api::v2::core::HealthStatus::HEALTHY,
                               host_upstream_->localAddress());
@@ -245,7 +245,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeout) {
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
-  // Check that the response_ is correct
+  // Check that the response is correct
   // TODO(lilika): Ideally this would be envoy::api::v2::core::HealthStatus::TIMEOUT
   checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
                               envoy::api::v2::core::HealthStatus::UNHEALTHY,
@@ -282,7 +282,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthy) {
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
-  // Check that the response_ is correct
+  // Check that the response is correct
   checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
                               envoy::api::v2::core::HealthStatus::UNHEALTHY,
                               host_upstream_->localAddress());
@@ -325,7 +325,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
-  // Check that the response_ is correct
+  // Check that the response is correct
   checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
                               envoy::api::v2::core::HealthStatus::UNHEALTHY,
                               host_upstream_->localAddress());
@@ -383,7 +383,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
-  // Check that the response_ is correct
+  // Check that the response is correct
   checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
                               envoy::api::v2::core::HealthStatus::UNHEALTHY,
                               host_upstream_->localAddress());
@@ -450,7 +450,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
-  // Check that the response_ is correct
+  // Check that the response is correct
   checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
                               envoy::api::v2::core::HealthStatus::UNHEALTHY,
                               host_upstream_->localAddress());
@@ -466,8 +466,8 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   cleanupHdsConnection();
 }
 
-// Tests Envoy healthchecking a single endpoint and receiving an update
-// message from the management and healthchecking a new endpoint
+// Tests Envoy healthchecking a single endpoint, receiving an update
+// message from the management server and healthchecking a new endpoint
 TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   initialize();
 
@@ -491,13 +491,15 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
-  // Check that the response_ is correct
+  // Check that the response is correct
   checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
                               envoy::api::v2::core::HealthStatus::HEALTHY,
                               host_upstream_->localAddress());
   checkCounters(1, 2, 1, 0);
 
   cleanupHostConnections();
+
+  // New HealthCheckSpecifier message
   envoy::service::discovery::v2::HealthCheckSpecifier new_message;
   new_message.mutable_interval()->set_seconds(1);
 
@@ -526,7 +528,7 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   health_check->mutable_health_checks(0)->mutable_http_health_check()->set_use_http2(false);
   health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
 
-  // Server asks for healthchecking
+  // Server asks for healthchecking with the new message
   hds_stream_->sendGrpcMessage(new_message);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
@@ -542,7 +544,7 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
-  // Check that the response_ is correct
+  // Check that the response is correct
   checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
                               envoy::api::v2::core::HealthStatus::UNHEALTHY,
                               host2_upstream_->localAddress());
