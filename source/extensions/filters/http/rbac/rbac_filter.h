@@ -4,6 +4,7 @@
 
 #include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"

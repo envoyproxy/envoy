@@ -44,6 +44,7 @@ envoy_cc_library(
         ":histogram_lib",
         ":stats_lib",
         ":stats_options_lib",
+        "//include/envoy/stats:stats_macros",
         "//source/common/stats:heap_stat_data_lib",
     ],
 )
@@ -69,7 +70,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "source_lib",
+    name = "source_impl_lib",
     srcs = ["source_impl.cc"],
     hdrs = ["source_impl.h"],
     external_deps = [
@@ -82,7 +83,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "stat_data_allocator_lib",
-    hdrs = ["stat_data_allocator.h"],
+    hdrs = ["stat_data_allocator_impl.h"],
     deps = [
         ":metric_impl_lib",
         "//include/envoy/stats:stats_interface",
@@ -96,7 +97,7 @@ envoy_cc_library(
         ":histogram_lib",
         ":metric_impl_lib",
         ":raw_stat_data_lib",
-        ":source_lib",
+        ":source_impl_lib",
         ":stats_options_lib",
         ":symbol_table_lib",
         ":tag_extractor_lib",

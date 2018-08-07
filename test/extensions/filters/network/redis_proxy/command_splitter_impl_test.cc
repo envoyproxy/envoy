@@ -3,8 +3,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/stats/stats.h"
-
 #include "common/common/fmt.h"
 #include "common/stats/isolated_store_impl.h"
 

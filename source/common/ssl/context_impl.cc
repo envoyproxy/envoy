@@ -7,6 +7,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/base64.h"

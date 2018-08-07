@@ -4,7 +4,6 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/stats/stats.h"
 #include "envoy/stats/timespan.h"
 
 #include "common/buffer/buffer_impl.h"

@@ -46,7 +46,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 34]
+// [#comment:next free field: 35]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -394,6 +394,22 @@ message Cluster {
     DeprecatedV1 deprecated_v1 = 2 [deprecated = true];
   }
 
+  // Specific configuration for the
+  // :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
+  // load balancing policy.
+  message OriginalDstLbConfig {
+    // When true, :ref:`x-envoy-orignal-dst-host
+    // <config_http_conn_man_headers_x-envoy-original-dst-host>` can be used to override destination
+    // address.
+    //
+    // .. attention::
+    //
+    //   This header isn't sanitized by default, so enabling this feature allows HTTP clients to
+    //   route traffic to arbitrary hosts and/or ports, which may have serious security
+    //   consequences.
+    bool use_http_header = 1;
+  }
+
   // Optional configuration for the load balancing algorithm selected by
   // LbPolicy. Currently only
   // :ref:`RING_HASH<envoy_api_enum_value_Cluster.LbPolicy.RING_HASH>`
@@ -404,6 +420,8 @@ message Cluster {
   oneof lb_config {
     // Optional configuration for the Ring Hash load balancing policy.
     RingHashLbConfig ring_hash_lb_config = 23;
+    // Optional configuration for the Original Destination load balancing policy.
+    OriginalDstLbConfig original_dst_lb_config = 34;
   }
 
   // Common configuration for all load balancer implementations.

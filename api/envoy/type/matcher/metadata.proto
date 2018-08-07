@@ -3,8 +3,7 @@ syntax = "proto3";
 package envoy.type.matcher;
 option go_package = "matcher";
 
-import "envoy/type/matcher/string.proto";
-import "envoy/type/matcher/number.proto";
+import "envoy/type/matcher/value.proto";
 
 import "validate/validate.proto";
 
@@ -49,8 +48,8 @@ import "validate/validate.proto";
 //      string_match:
 //        prefix: pr
 //
-// The following MetadataMatcher is not matched as the path [a, t] is pointing to a list value in
-// the Metadata which is not supported for now.
+// The following MetadataMatcher is matched as the code will match one of the string values in the
+// list at the path [a, t].
 //
 // .. code-block:: yaml
 //
@@ -59,8 +58,10 @@ import "validate/validate.proto";
 //    - key: a
 //    - key: t
 //    value:
-//      string_match:
-//        exact: m
+//      list_match:
+//        one_of:
+//          string_match:
+//            exact: m
 //
 // An example use of MetadataMatcher is specifying additional metadata in envoy.filters.http.rbac to
 // enforce access control based on dynamic metadata in a request. See :ref:`Permission
@@ -68,47 +69,14 @@ import "validate/validate.proto";
 // <envoy_api_msg_config.rbac.v2alpha.Principal>`.
 message MetadataMatcher {
   // Specifies the segment in a path to retrieve value from Metadata.
-  // Note: Currently it's not supported to retrieve a value from a list in Metadata. This means it
-  // will always be not matched if the associated value of the key is a list.
+  // Note: Currently it's not supported to retrieve a value from a list in Metadata. This means that
+  // if the segment key refers to a list, it has to be the last segment in a path.
   message PathSegment {
     oneof segment {
       option (validate.required) = true;
 
       // If specified, use the key to retrieve the value in a Struct.
       string key = 1 [(validate.rules).string.min_bytes = 1];
-    }
-  }
-
-  // Specifies the value to match. Only primitive value are supported. For non-primitive values, the
-  // result is always not matched.
-  message Value {
-    // NullMatch is an empty message to specify a null value.
-    message NullMatch {
-    }
-
-    // Specifies how to match a value.
-    oneof match_pattern {
-      option (validate.required) = true;
-
-      // If specified, a match occurs if and only if the target value is a NullValue.
-      NullMatch null_match = 1;
-
-      // If specified, a match occurs if and only if the target value is a double value and is
-      // matched to this field.
-      DoubleMatcher double_match = 2;
-
-      // If specified, a match occurs if and only if the target value is a string value and is
-      // matched to this field.
-      StringMatcher string_match = 3;
-
-      // If specified, a match occurs if and only if the target value is a bool value and is equal
-      // to this field.
-      bool bool_match = 4;
-
-      // If specified, value match will be performed based on whether the path is referring to a
-      // valid primitive value in the metadata. If the path is referring to a non-primitive value,
-      // the result is always not matched.
-      bool present_match = 5;
     }
   }
 
@@ -119,5 +87,5 @@ message MetadataMatcher {
   repeated PathSegment path = 2 [(validate.rules).repeated .min_items = 1];
 
   // The MetadataMatcher is matched if the value retrieved by path is matched to this value.
-  Value value = 3 [(validate.rules).message.required = true];
+  ValueMatcher value = 3 [(validate.rules).message.required = true];
 }

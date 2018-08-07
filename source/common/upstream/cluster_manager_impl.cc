@@ -11,6 +11,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -1062,7 +1063,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     case LoadBalancerType::OriginalDst: {
       ASSERT(lb_factory_ == nullptr);
       lb_.reset(new OriginalDstCluster::LoadBalancer(
-          priority_set_, parent.parent_.active_clusters_.at(cluster->name())->cluster_));
+          priority_set_, parent.parent_.active_clusters_.at(cluster->name())->cluster_,
+          cluster->lbOriginalDstConfig()));
       break;
     }
     }

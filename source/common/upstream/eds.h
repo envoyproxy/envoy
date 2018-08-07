@@ -5,6 +5,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/stats/scope.h"
 
 #include "common/upstream/locality.h"
 #include "common/upstream/upstream_impl.h"
@@ -19,10 +20,8 @@ class EdsClusterImpl : public BaseDynamicClusterImpl,
                        Config::SubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> {
 public:
   EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                 Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                 const LocalInfo::LocalInfo& local_info, ClusterManager& cm,
-                 Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                 bool added_via_api);
+                 Server::Configuration::TransportSocketFactoryContext& factory_context,
+                 Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Secondary; }

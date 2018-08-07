@@ -9,7 +9,6 @@
 #include <unordered_map>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/assert.h"

@@ -1,5 +1,3 @@
-#include "envoy/stats/stats.h"
-
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/hex.h"
 

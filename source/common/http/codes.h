@@ -6,7 +6,7 @@
 
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 namespace Envoy {
 namespace Http {

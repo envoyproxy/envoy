@@ -7,6 +7,12 @@
 #include <string>
 #include <unordered_set>
 
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/sink.h"
+#include "envoy/stats/stat_data_allocator.h"
+#include "envoy/stats/stats.h"
+#include "envoy/stats/stats_options.h"
+
 #include "common/common/lock_guard.h"
 #include "common/stats/tag_producer_impl.h"
 
@@ -15,7 +21,7 @@
 namespace Envoy {
 namespace Stats {
 
-ThreadLocalStoreImpl::ThreadLocalStoreImpl(const Stats::StatsOptions& stats_options,
+ThreadLocalStoreImpl::ThreadLocalStoreImpl(const StatsOptions& stats_options,
                                            StatDataAllocator& alloc)
     : stats_options_(stats_options), alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),

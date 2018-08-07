@@ -5,6 +5,7 @@
 
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
 #include "common/ssl/context_impl.h"
@@ -69,25 +70,32 @@ private:
 
 class ClientSslSocketFactory : public Network::TransportSocketFactory {
 public:
-  ClientSslSocketFactory(const ClientContextConfig& config, Ssl::ContextManager& manager,
+  ClientSslSocketFactory(ClientContextConfigPtr config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope);
 
   Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
 
 private:
+  Ssl::ContextManager& manager_;
+  Stats::Scope& stats_scope_;
+  ClientContextConfigPtr config_;
   ClientContextSharedPtr ssl_ctx_;
 };
 
 class ServerSslSocketFactory : public Network::TransportSocketFactory {
 public:
-  ServerSslSocketFactory(const ServerContextConfig& config, Ssl::ContextManager& manager,
+  ServerSslSocketFactory(ServerContextConfigPtr config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope, const std::vector<std::string>& server_names);
 
   Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
 
 private:
+  Ssl::ContextManager& manager_;
+  Stats::Scope& stats_scope_;
+  ServerContextConfigPtr config_;
+  const std::vector<std::string> server_names_;
   ServerContextSharedPtr ssl_ctx_;
 };
 
