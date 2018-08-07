@@ -62,6 +62,58 @@ TEST_F(WatermarkBufferTest, AddBuffer) {
   EXPECT_EQ(11, buffer_.length());
 }
 
+TEST_F(WatermarkBufferTest, Prepend) {
+  std::string suffix = "World!", prefix = "Hello, ";
+
+  buffer_.add(suffix.data(), suffix.size());
+  EXPECT_EQ(0, times_high_watermark_called_);
+  buffer_.prepend(prefix.data(), prefix.size());
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(suffix.size() + prefix.size(), buffer_.length());
+}
+
+TEST_F(WatermarkBufferTest, PrependToEmptyBuffer) {
+  std::string suffix = "World!", prefix = "Hello, ";
+
+  buffer_.prepend(suffix);
+  EXPECT_EQ(0, times_high_watermark_called_);
+  EXPECT_EQ(suffix.size(), buffer_.length());
+
+  buffer_.prepend(prefix.data(), prefix.size());
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(suffix.size() + prefix.size(), buffer_.length());
+
+  buffer_.prepend("");
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(suffix.size() + prefix.size(), buffer_.length());
+}
+
+TEST_F(WatermarkBufferTest, PrependString) {
+  std::string suffix = "World!", prefix = "Hello, ";
+
+  buffer_.add(suffix);
+  EXPECT_EQ(0, times_high_watermark_called_);
+  buffer_.prepend(prefix);
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(suffix.size() + prefix.size(), buffer_.length());
+}
+
+TEST_F(WatermarkBufferTest, PrependBuffer) {
+  std::string suffix = "World!", prefix = "Hello, ";
+  buffer_.add(suffix);
+  EXPECT_EQ(0, times_high_watermark_called_);
+  EXPECT_EQ(suffix.size(), buffer_.length());
+
+  OwnedImpl prefixBuffer;
+  prefixBuffer.add(prefix);
+  buffer_.prepend(prefixBuffer);
+
+  EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(suffix.size() + prefix.size(), buffer_.length());
+  EXPECT_EQ(prefix + suffix, buffer_.toString());
+  EXPECT_EQ(0, prefixBuffer.length());
+}
+
 TEST_F(WatermarkBufferTest, Commit) {
   buffer_.add(TEN_BYTES, 10);
   EXPECT_EQ(0, times_high_watermark_called_);
