@@ -26,6 +26,8 @@
 #include "exe/signal_action.h"
 #endif
 
+using testing::HasSubstr;
+
 namespace Envoy {
 
 /**
@@ -44,7 +46,8 @@ public:
                      "/test/config/integration/google_com_proxy_port_0.v2.yaml"),
         random_string_(fmt::format("{}", computeBaseId())),
         argv_({"envoy-static", "--base-id", random_string_.c_str(), "-c", config_file_.c_str(),
-               nullptr}) {}
+               nullptr}),
+        envoy_return_(false), envoy_started_(false), envoy_finished_(false) {}
 
   /**
    * Computes a numeric ID to incorporate into the names of
@@ -117,10 +120,15 @@ public:
       // triggered with an adminRequest POST to /quitquitquit, which
       // is done in the testing thread.
       main_common_ = std::make_unique<MainCommon>(argc(), argv());
+      {
+        Thread::LockGuard lock(mutex_);
+        envoy_started_ = true;
+        started_condvar_.notifyOne();
+      }
       bool status = main_common_->run();
       main_common_.reset();
       {
-        Thread::LockGuard lock(finished_mutex_);
+        Thread::LockGuard lock(mutex_);
         envoy_finished_ = true;
         envoy_return_ = status;
         finished_condvar_.notifyOne();
@@ -131,22 +139,18 @@ public:
   // Having started Envoy in its own thread, this waits for Envoy to be
   // responsive by sending it a simple stats request.
   void waitForEnvoyToStart() {
-    // We don't get a notification when Envoy starts running, so we
-    // keep making admin requests till they pass. In practice this
-    // appears to just need one pass with the 0.1 second delay.
-    std::string out;
-    do {
-      usleep(100000 /* 100k microsections == 0.1 seconds */);
-      out = adminRequest("/stats", "GET");
-    } while (out.find("filesystem.reopen_failed") == std::string::npos);
+    Thread::LockGuard lock(mutex_);
+    while (!envoy_started_) {
+      started_condvar_.wait(mutex_);
+    }
   }
 
   // Having sent a /quitquitquit to Envoy, this blocks until Envoy exits.
   bool waitForEnvoyToExit() {
     {
-      Thread::LockGuard lock(finished_mutex_);
+      Thread::LockGuard lock(mutex_);
       while (!envoy_finished_) {
-        finished_condvar_.wait(finished_mutex_);
+        finished_condvar_.wait(mutex_);
       }
     }
     envoy_thread_->join();
@@ -158,10 +162,12 @@ public:
   std::vector<const char*> argv_;
   std::unique_ptr<Thread::Thread> envoy_thread_;
   std::unique_ptr<MainCommon> main_common_;
+  Thread::CondVar started_condvar_;
   Thread::CondVar finished_condvar_;
-  Thread::MutexBasicLockable finished_mutex_;
-  bool envoy_return_ = false;
-  bool envoy_finished_ = false;
+  Thread::MutexBasicLockable mutex_;
+  bool envoy_return_;
+  bool envoy_started_ GUARDED_BY(mutex_);
+  bool envoy_finished_ GUARDED_BY(mutex_);
 };
 
 // Exercise the codepath to instantiate MainCommon and destruct it, with hot restart.
@@ -224,6 +230,7 @@ TEST_F(MainCommonTest, AdminRequestGetStatsAndQuit) {
   addArg("--disable-hot-restart");
   startEnvoy();
   waitForEnvoyToStart();
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
   adminRequest("/quitquitquit", "POST");
   EXPECT_TRUE(waitForEnvoyToExit());
 }
