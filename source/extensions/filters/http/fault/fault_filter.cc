@@ -34,22 +34,14 @@ const std::string FaultFilter::ABORT_HTTP_STATUS_KEY = "fault.http.abort.http_st
 FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault) {
 
   if (fault.has_abort()) {
-    if (fault.abort().has_percentage()) {
-      abort_percentage_ = fault.abort().percentage();
-    } else {
-      abort_percentage_.set_numerator(fault.abort().percent());
-      abort_percentage_.set_denominator(envoy::type::FractionalPercent::HUNDRED);
-    }
+    PROTOBUF_SET_FRACTIONAL_PERCENT_OR_DEFAULT(abort_percentage_, fault.abort(), percentage,
+                                               percent);
     http_status_ = fault.abort().http_status();
   }
 
   if (fault.has_delay()) {
-    if (fault.delay().has_percentage()) {
-      fixed_delay_percentage_ = fault.delay().percentage();
-    } else {
-      fixed_delay_percentage_.set_numerator(fault.delay().percent());
-      fixed_delay_percentage_.set_denominator(envoy::type::FractionalPercent::HUNDRED);
-    }
+    PROTOBUF_SET_FRACTIONAL_PERCENT_OR_DEFAULT(fixed_delay_percentage_, fault.delay(), percentage,
+                                               percent);
     const auto& delay = fault.delay();
     fixed_duration_ms_ = PROTOBUF_GET_MS_OR_DEFAULT(delay, fixed_delay, 0);
   }

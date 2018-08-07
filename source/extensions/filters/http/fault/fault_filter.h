@@ -53,10 +53,10 @@ public:
   const std::unordered_set<std::string>& downstreamNodes() const { return downstream_nodes_; }
 
 private:
-  envoy::type::FractionalPercent abort_percentage_{};       // 0.0-100.0
-  uint64_t http_status_{};                                  // HTTP or gRPC return codes
-  envoy::type::FractionalPercent fixed_delay_percentage_{}; // 0.0-100.0
-  uint64_t fixed_duration_ms_{};                            // in milliseconds
+  envoy::type::FractionalPercent abort_percentage_;
+  uint64_t http_status_{}; // HTTP or gRPC return codes
+  envoy::type::FractionalPercent fixed_delay_percentage_;
+  uint64_t fixed_duration_ms_{}; // in milliseconds
   std::string upstream_cluster_; // restrict faults to specific upstream cluster
   std::vector<Http::HeaderUtility::HeaderData> fault_filter_headers_;
   std::unordered_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream

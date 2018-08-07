@@ -103,12 +103,8 @@ class FaultConfig {
 public:
   FaultConfig(const envoy::config::filter::fault::v2::FaultDelay& fault_config)
       : duration_ms_(PROTOBUF_GET_MS_REQUIRED(fault_config, fixed_delay)) {
-    if (fault_config.has_percentage()) {
-      delay_percentage_ = fault_config.percentage();
-    } else {
-      delay_percentage_.set_numerator(static_cast<uint32_t>(fault_config.percent()));
-      delay_percentage_.set_denominator(envoy::type::FractionalPercent::HUNDRED);
-    }
+    PROTOBUF_SET_FRACTIONAL_PERCENT_OR_DEFAULT(delay_percentage_, fault_config, percentage,
+                                               percent);
   }
   envoy::type::FractionalPercent delayPercentage() const { return delay_percentage_; }
   uint64_t delayDuration() const { return duration_ms_; }
