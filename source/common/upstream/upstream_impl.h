@@ -427,6 +427,15 @@ private:
 };
 
 /**
+ * Function that creates a Network::TransportSocketFactoryPtr
+ * given a cluster configuration and transport socket factory
+ * context.
+ */
+Network::TransportSocketFactoryPtr
+createTransportSocketFactory(const envoy::api::v2::Cluster& config,
+                             Server::Configuration::TransportSocketFactoryContext& factory_context);
+
+/**
  * Base class all primary clusters.
  */
 class ClusterImplBase : public Cluster, protected Logger::Loggable<Logger::Id::upstream> {

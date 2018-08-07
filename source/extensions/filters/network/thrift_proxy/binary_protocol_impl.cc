@@ -17,8 +17,7 @@ namespace ThriftProxy {
 
 const uint16_t BinaryProtocolImpl::Magic = 0x8001;
 
-bool BinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string& name,
-                                          MessageType& msg_type, int32_t& seq_id) {
+bool BinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) {
   // Minimum message length:
   //   version: 2 bytes +
   //   unused: 1 byte +
@@ -52,13 +51,14 @@ bool BinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string&
   buffer.drain(8);
 
   if (name_len > 0) {
-    name.assign(std::string(static_cast<char*>(buffer.linearize(name_len)), name_len));
+    metadata.setMethodName(
+        std::string(static_cast<const char*>(buffer.linearize(name_len)), name_len));
     buffer.drain(name_len);
   } else {
-    name.clear();
+    metadata.setMethodName("");
   }
-  msg_type = type;
-  seq_id = BufferHelper::drainI32(buffer);
+  metadata.setMessageType(type);
+  metadata.setSequenceId(BufferHelper::drainI32(buffer));
 
   return true;
 }
@@ -253,7 +253,7 @@ bool BinaryProtocolImpl::readString(Buffer::Instance& buffer, std::string& value
   }
 
   buffer.drain(4);
-  value.assign(static_cast<char*>(buffer.linearize(str_len)), str_len);
+  value.assign(static_cast<const char*>(buffer.linearize(str_len)), str_len);
   buffer.drain(str_len);
   return true;
 }
@@ -262,12 +262,12 @@ bool BinaryProtocolImpl::readBinary(Buffer::Instance& buffer, std::string& value
   return readString(buffer, value);
 }
 
-void BinaryProtocolImpl::writeMessageBegin(Buffer::Instance& buffer, const std::string& name,
-                                           MessageType msg_type, int32_t seq_id) {
+void BinaryProtocolImpl::writeMessageBegin(Buffer::Instance& buffer,
+                                           const MessageMetadata& metadata) {
   BufferHelper::writeU16(buffer, Magic);
-  BufferHelper::writeU16(buffer, static_cast<uint16_t>(msg_type));
-  writeString(buffer, name);
-  BufferHelper::writeI32(buffer, seq_id);
+  BufferHelper::writeU16(buffer, static_cast<uint16_t>(metadata.messageType()));
+  writeString(buffer, metadata.methodName());
+  BufferHelper::writeI32(buffer, metadata.sequenceId());
 }
 
 void BinaryProtocolImpl::writeMessageEnd(Buffer::Instance& buffer) {
@@ -362,8 +362,7 @@ void BinaryProtocolImpl::writeBinary(Buffer::Instance& buffer, const std::string
   writeString(buffer, value);
 }
 
-bool LaxBinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string& name,
-                                             MessageType& msg_type, int32_t& seq_id) {
+bool LaxBinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) {
   // Minimum message length:
   //   name len: 4 bytes +
   //   name: 0 bytes +
@@ -387,24 +386,25 @@ bool LaxBinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::stri
 
   buffer.drain(4);
   if (name_len > 0) {
-    name.assign(std::string(static_cast<char*>(buffer.linearize(name_len)), name_len));
+    metadata.setMethodName(
+        std::string(static_cast<const char*>(buffer.linearize(name_len)), name_len));
     buffer.drain(name_len);
   } else {
-    name.clear();
+    metadata.setMethodName("");
   }
 
-  msg_type = type;
-  seq_id = BufferHelper::peekI32(buffer, 1);
+  metadata.setMessageType(type);
+  metadata.setSequenceId(BufferHelper::peekI32(buffer, 1));
   buffer.drain(5);
 
   return true;
 }
 
-void LaxBinaryProtocolImpl::writeMessageBegin(Buffer::Instance& buffer, const std::string& name,
-                                              MessageType msg_type, int32_t seq_id) {
-  writeString(buffer, name);
-  BufferHelper::writeI8(buffer, static_cast<int8_t>(msg_type));
-  BufferHelper::writeI32(buffer, seq_id);
+void LaxBinaryProtocolImpl::writeMessageBegin(Buffer::Instance& buffer,
+                                              const MessageMetadata& metadata) {
+  writeString(buffer, metadata.methodName());
+  BufferHelper::writeI8(buffer, static_cast<int8_t>(metadata.messageType()));
+  BufferHelper::writeI32(buffer, metadata.sequenceId());
 }
 
 class BinaryProtocolConfigFactory : public ProtocolFactoryBase<BinaryProtocolImpl> {

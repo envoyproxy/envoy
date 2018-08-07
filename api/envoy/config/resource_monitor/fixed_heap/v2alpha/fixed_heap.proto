@@ -3,8 +3,11 @@ syntax = "proto3";
 package envoy.config.resource_monitor.fixed_heap.v2alpha;
 option go_package = "v2alpha";
 
+// [#protodoc-title: Fixed heap]
+
+// The fixed heap resource monitor reports the Envoy process memory pressure, computed as a
+// fraction of currently reserved heap memory divided by a statically configured maximum
+// specified in the FixedHeapConfig.
 message FixedHeapConfig {
-  // Limit of the Envoy process heap size. This is used to calculate heap memory pressure which
-  // is defined as (current heap size)/max_heap_size_bytes.
   uint64 max_heap_size_bytes = 1;
 }

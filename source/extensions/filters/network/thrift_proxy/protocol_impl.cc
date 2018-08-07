@@ -17,8 +17,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string& name,
-                                        MessageType& msg_type, int32_t& seq_id) {
+bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) {
   if (protocol_ == nullptr) {
     if (buffer.length() < 2) {
       return false;
@@ -29,15 +28,15 @@ bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string& n
       setProtocol(std::make_unique<BinaryProtocolImpl>());
     } else if (CompactProtocolImpl::isMagic(version)) {
       setProtocol(std::make_unique<CompactProtocolImpl>());
-    } else {
+    }
+
+    if (!protocol_) {
       throw EnvoyException(
           fmt::format("unknown thrift auto protocol message start {:04x}", version));
     }
-
-    ASSERT(protocol_ != nullptr);
   }
 
-  return protocol_->readMessageBegin(buffer, name, msg_type, seq_id);
+  return protocol_->readMessageBegin(buffer, metadata);
 }
 
 bool AutoProtocolImpl::readMessageEnd(Buffer::Instance& buffer) {
