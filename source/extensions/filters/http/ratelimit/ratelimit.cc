@@ -125,6 +125,16 @@ void Filter::complete(RateLimit::LimitStatus status) {
     state_ = State::Responded;
     callbacks_->sendLocalReply(Http::Code::TooManyRequests, "", nullptr);
     callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::RateLimited);
+  } else if (status == RateLimit::LimitStatus::Error) {
+    if (config_->failureModeAllow()) {
+      cluster_->statsScope().counter("ratelimit.failure_mode_allowed").inc();
+      callbacks_->continueDecoding();
+    } else {
+      state_ = State::Responded;
+      callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr);
+      callbacks_->requestInfo().setResponseFlag(
+          RequestInfo::ResponseFlag::RateLimitingServiceError);
+    }
   } else if (!initiating_call_) {
     callbacks_->continueDecoding();
   }

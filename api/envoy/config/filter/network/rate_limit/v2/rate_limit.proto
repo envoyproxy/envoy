@@ -5,6 +5,7 @@ option go_package = "v2";
 
 import "envoy/api/v2/ratelimit/ratelimit.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
@@ -26,4 +27,10 @@ message RateLimit {
   // The timeout in milliseconds for the rate limit service RPC. If not
   // set, this defaults to 20ms.
   google.protobuf.Duration timeout = 4 [(gogoproto.stdduration) = true];
+
+  // The filter's behaviour in case the rate limiting service does
+  // not respond back. When it is set to true, Envoy will also allow traffic in case of
+  // communication failure between rate limiting service and the proxy.
+  // Defaults to true.
+  google.protobuf.BoolValue failure_mode_allow = 5;
 }

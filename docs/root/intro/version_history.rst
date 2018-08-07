@@ -54,6 +54,7 @@ Version history
 * thrift_proxy: introduced thrift routing, moved configuration to correct location
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
   selecting a host from a subset.
+* ratelimit: added :ref:`failure_mode_allow <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in case of rate limit error.
 
 1.7.0
 ===============

@@ -33,7 +33,9 @@ namespace RateLimitFilter {
 
 class RateLimitFilterTest : public testing::Test {
 public:
-  RateLimitFilterTest() {
+  RateLimitFilterTest() {}
+
+  void SetUp() override {
     std::string json = R"EOF(
     {
       "domain": "foo",
@@ -53,6 +55,8 @@ public:
     Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
     envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
     Envoy::Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config);
+    // TODO(ramaraochavali): move the config to yaml and use a different config for failure_mode.
+    proto_config.mutable_failure_mode_allow()->set_value(failure_mode_);
     config_.reset(new Config(proto_config, stats_store_, runtime_));
     client_ = new RateLimit::MockClient();
     filter_.reset(new Filter(config_, RateLimit::ClientPtr{client_}));
@@ -76,6 +80,16 @@ public:
   std::unique_ptr<Filter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   RateLimit::RequestCallbacks* request_callbacks_{};
+  bool failure_mode_{true};
+};
+
+class RateLimitFilterFailureModeTest : public RateLimitFilterTest {
+public:
+  RateLimitFilterFailureModeTest() {
+    failure_mode_ = false;
+    std::cout << "setting failure mode to false..."
+              << "\n";
+  }
 };
 
 TEST_F(RateLimitFilterTest, BadRatelimitConfig) {
@@ -194,6 +208,7 @@ TEST_F(RateLimitFilterTest, Error) {
 
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.total").value());
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.error").value());
+  EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.failure_mode_allowed").value());
 }
 
 TEST_F(RateLimitFilterTest, Disconnect) {
@@ -245,6 +260,29 @@ TEST_F(RateLimitFilterTest, RuntimeDisable) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+}
+
+TEST_F(RateLimitFilterFailureModeTest, ErrorResponseWithFailureAllowModeOff) {
+  InSequence s;
+
+  EXPECT_CALL(*client_, limit(_, "foo", _, _))
+      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
+        request_callbacks_ = &callbacks;
+      })));
+
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
+  request_callbacks_->complete(RateLimit::LimitStatus::Error);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  EXPECT_CALL(*client_, cancel()).Times(0);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+
+  EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.total").value());
+  EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.error").value());
+  EXPECT_EQ(0U, stats_store_.counter("ratelimit.name.failure_mode_allowed").value());
 }
 
 } // namespace RateLimitFilter

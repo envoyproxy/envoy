@@ -46,10 +46,13 @@ public:
         .WillByDefault(Return(true));
   }
 
-  void SetUpTest(const std::string json) {
+  void SetUpTest(const std::string json, const bool failure_mode = true) {
     Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
     envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
     Config::FilterJson::translateHttpRateLimitFilter(*json_config, proto_config);
+    // TODO(ramaraochavali): move filter_config_ to yaml and use a different config for
+    // failure_mode.
+    proto_config.mutable_failure_mode_allow()->set_value(failure_mode);
     config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_, cm_));
 
     client_ = new RateLimit::MockClient();
@@ -239,6 +242,37 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponse) {
   EXPECT_EQ(
       1U,
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.error").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("ratelimit.failure_mode_allowed")
+                    .value());
+}
+
+TEST_F(HttpRateLimitFilterTest, ErrorResponseWithFailureAllowModeOff) {
+  SetUpTest(filter_config_, false);
+  InSequence s;
+
+  EXPECT_CALL(route_rate_limit_, populateDescriptors(_, _, _, _, _))
+      .WillOnce(SetArgReferee<1>(descriptor_));
+  EXPECT_CALL(*client_, limit(_, _, _, _))
+      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
+        request_callbacks_ = &callbacks;
+      })));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  request_callbacks_->complete(RateLimit::LimitStatus::Error);
+
+  EXPECT_CALL(filter_callbacks_.request_info_,
+              setResponseFlag(RequestInfo::ResponseFlag::RateLimitingServiceError))
+      .Times(0);
+
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.error").value());
+  EXPECT_EQ(0U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("ratelimit.failure_mode_allowed")
+                    .value());
 }
 
 TEST_F(HttpRateLimitFilterTest, LimitResponse) {

@@ -85,7 +85,7 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
     const RequestInfo::RequestInfo& request_info) {
 
-  static_assert(RequestInfo::ResponseFlag::LastFlag == 0x1000,
+  static_assert(RequestInfo::ResponseFlag::LastFlag == 0x1200,
                 "A flag has been added. Fix this code.");
 
   if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::FailedLocalHealthCheck)) {
