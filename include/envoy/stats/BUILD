@@ -8,6 +8,7 @@ load(
 
 envoy_package()
 
+# TODO(jmarantz): atomize the build rules to match the include files.
 envoy_cc_library(
     name = "stats_interface",
     hdrs = [

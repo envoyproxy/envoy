@@ -6,13 +6,17 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/histogram.h"
-#include "envoy/stats/stats.h"
 #include "envoy/stats/stats_options.h"
 
 namespace Envoy {
 namespace Stats {
 
+class Counter;
+class Gauge;
+class Histogram;
 class Scope;
+class StatsOptions;
+
 typedef std::unique_ptr<Scope> ScopePtr;
 typedef std::shared_ptr<Scope> ScopeSharedPtr;
 
