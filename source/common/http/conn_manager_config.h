@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/router/rds.h"
+#include "envoy/stats/scope.h"
 
 #include "common/http/date_provider.h"
 
@@ -192,7 +193,13 @@ public:
   /**
    * @return optional idle timeout for incoming connection manager connections.
    */
-  virtual const absl::optional<std::chrono::milliseconds>& idleTimeout() PURE;
+  virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+
+  /**
+   * @return per-stream idle timeout for incoming connection manager connections. Zero indicates a
+   *         disabled idle timeout.
+   */
+  virtual std::chrono::milliseconds streamIdleTimeout() const PURE;
 
   /**
    * @return Router::RouteConfigProvider& the configuration provider used to acquire a route

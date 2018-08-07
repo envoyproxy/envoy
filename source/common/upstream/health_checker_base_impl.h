@@ -4,6 +4,7 @@
 #include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/health_checker.h"
 
 #include "common/common/logger.h"

@@ -71,8 +71,10 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   config.mutable_pass_through_mode()->set_value(false);
-  config.set_endpoint("foo");
   config.mutable_cache_time()->set_seconds(10);
+  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
+  header.set_name(":path");
+  header.set_exact_match("foo");
 
   EXPECT_THROW(
       healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context),
@@ -85,7 +87,9 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto)
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   config.mutable_pass_through_mode()->set_value(false);
-  config.set_endpoint("foo");
+  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
+  header.set_name(":path");
+  header.set_exact_match("foo");
   healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
 }
 
@@ -97,7 +101,9 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
           healthCheckFilterConfig.createEmptyConfigProto().get());
 
   config.mutable_pass_through_mode()->set_value(false);
-  config.set_endpoint("foo");
+  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
+  header.set_name(":path");
+  header.set_exact_match("foo");
   healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
 }
 
@@ -191,42 +197,6 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchMissingHeader) {
   yheader.set_exact_match("foo");
 
   Http::TestHeaderMapImpl headers{{"y-healthcheck", "foo"}};
-
-  testHealthCheckHeaderMatch(config, headers, false);
-}
-
-// If an endpoint is specified and the path matches, it should match regardless of any :path
-// conditions given in the headers field.
-TEST(HealthCheckFilterConfig, HealthCheckFilterEndpoint) {
-  envoy::config::filter::http::health_check::v2::HealthCheck config;
-
-  config.mutable_pass_through_mode()->set_value(false);
-
-  config.set_endpoint("foo");
-
-  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
-  header.set_name(Http::Headers::get().Path.get());
-  header.set_exact_match("bar");
-
-  Http::TestHeaderMapImpl headers{{Http::Headers::get().Path.get(), "foo"}};
-
-  testHealthCheckHeaderMatch(config, headers, true);
-}
-
-// If an endpoint is specified and the path does not match, the filter should not match regardless
-// of any :path conditions given in the headers field.
-TEST(HealthCheckFilterConfig, HealthCheckFilterEndpointOverride) {
-  envoy::config::filter::http::health_check::v2::HealthCheck config;
-
-  config.mutable_pass_through_mode()->set_value(false);
-
-  config.set_endpoint("foo");
-
-  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
-  header.set_name(Http::Headers::get().Path.get());
-  header.set_exact_match("bar");
-
-  Http::TestHeaderMapImpl headers{{Http::Headers::get().Path.get(), "bar"}};
 
   testHealthCheckHeaderMatch(config, headers, false);
 }

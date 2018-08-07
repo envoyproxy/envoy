@@ -4,8 +4,8 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include <tuple>
 
+#include "envoy/api/os_sys_calls.h"
 #include "envoy/common/pure.h"
 
 namespace Envoy {
@@ -143,11 +143,10 @@ public:
    * Read from a file descriptor directly into the buffer.
    * @param fd supplies the descriptor to read from.
    * @param max_length supplies the maximum length to read.
-   * @return a tuple with the number of bytes read and the errno. If an error occurred, the
-   *   number of bytes read would indicate -1 and the errno would be non-zero. Otherwise, if
-   *   bytes were read, errno shouldn't be used.
+   * @return a Api::SysCallResult with rc_ = the number of bytes read if successful, or rc_ = -1
+   *   for failure. If the call is successful, errno_ shouldn't be used.
    */
-  virtual std::tuple<int, int> read(int fd, uint64_t max_length) PURE;
+  virtual Api::SysCallResult read(int fd, uint64_t max_length) PURE;
 
   /**
    * Reserve space in the buffer.
@@ -176,11 +175,10 @@ public:
   /**
    * Write the buffer out to a file descriptor.
    * @param fd supplies the descriptor to write to.
-   * @return a tuple with the number of bytes written and the errno. If an error occurred, the
-   *   number of bytes written would indicate -1 and the errno would be non-zero. Otherwise, if
-   *   bytes were written, errno shouldn't be used.
+   * @return a Api::SysCallResult with rc_ = the number of bytes written if successful, or rc_ = -1
+   *   for failure. If the call is successful, errno_ shouldn't be used.
    */
-  virtual std::tuple<int, int> write(int fd) PURE;
+  virtual Api::SysCallResult write(int fd) PURE;
 };
 
 typedef std::unique_ptr<Instance> InstancePtr;

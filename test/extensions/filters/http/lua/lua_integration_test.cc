@@ -72,12 +72,16 @@ public:
   void cleanup() {
     codec_client_->close();
     if (fake_lua_connection_ != nullptr) {
-      fake_lua_connection_->close();
-      fake_lua_connection_->waitForDisconnect();
+      AssertionResult result = fake_lua_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_lua_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
     if (fake_upstream_connection_ != nullptr) {
-      fake_upstream_connection_->close();
-      fake_upstream_connection_->waitForDisconnect();
+      AssertionResult result = fake_upstream_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = fake_upstream_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
     }
   }
 
@@ -106,6 +110,10 @@ config:
 
       local metadata = request_handle:metadata():get("foo.bar")
       local body_length = request_handle:body():length()
+
+      request_handle:requestInfo():dynamicMetadata():set("envoy.lb", "foo", "bar")
+      local dynamic_metadata_value = request_handle:requestInfo():dynamicMetadata():get("envoy.lb")["foo"]
+
       request_handle:headers():add("request_body_size", body_length)
       request_handle:headers():add("request_metadata_foo", metadata["foo"])
       request_handle:headers():add("request_metadata_baz", metadata["baz"])
@@ -115,6 +123,7 @@ config:
         request_handle:headers():add("request_secure", "true")
       end
       request_handle:headers():add("request_protocol", request_handle:requestInfo():protocol())
+      request_handle:headers():add("request_dynamic_metadata_value", dynamic_metadata_value)
     end
 
     function envoy_on_response(response_handle)
@@ -166,6 +175,11 @@ config:
   EXPECT_STREQ(
       "HTTP/1.1",
       upstream_request_->headers().get(Http::LowerCaseString("request_protocol"))->value().c_str());
+
+  EXPECT_STREQ("bar", upstream_request_->headers()
+                          .get(Http::LowerCaseString("request_dynamic_metadata_value"))
+                          ->value()
+                          .c_str());
 
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   upstream_request_->encodeHeaders(response_headers, false);
@@ -224,9 +238,9 @@ config:
                                           {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  fake_lua_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-  lua_request_ = fake_lua_connection_->waitForNewStream(*dispatcher_);
-  lua_request_->waitForEndStream(*dispatcher_);
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_lua_connection_));
+  ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, lua_request_));
+  ASSERT_TRUE(lua_request_->waitForEndStream(*dispatcher_));
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, false);
   Buffer::OwnedImpl response_data1("good");
@@ -282,9 +296,9 @@ config:
                                           {"x-forwarded-for", "10.0.0.1"}};
   auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
-  fake_lua_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-  lua_request_ = fake_lua_connection_->waitForNewStream(*dispatcher_);
-  lua_request_->waitForEndStream(*dispatcher_);
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_lua_connection_));
+  ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, lua_request_));
+  ASSERT_TRUE(lua_request_->waitForEndStream(*dispatcher_));
   Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
   lua_request_->encodeHeaders(response_headers, true);
 

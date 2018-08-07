@@ -36,6 +36,35 @@ genrule(
 )
 
 config_setting(
+    name = "windows_x86_64",
+    values = {"cpu": "x64_windows"},
+)
+
+config_setting(
+    name = "windows_opt_build",
+    values = {
+        "cpu": "x64_windows",
+        "compilation_mode": "opt",
+    },
+)
+
+config_setting(
+    name = "windows_dbg_build",
+    values = {
+        "cpu": "x64_windows",
+        "compilation_mode": "dbg",
+    },
+)
+
+config_setting(
+    name = "windows_fastbuild_build",
+    values = {
+        "cpu": "x64_windows",
+        "compilation_mode": "fastbuild",
+    },
+)
+
+config_setting(
     name = "opt_build",
     values = {"compilation_mode": "opt"},
 )

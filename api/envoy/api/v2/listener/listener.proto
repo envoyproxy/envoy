@@ -148,20 +148,8 @@ message FilterChainMatch {
   //   unless all connecting clients are known to use ALPN.
   repeated string application_protocols = 10;
 
-  // If non-empty, a list of server names (e.g. SNI for TLS protocol) to consider when determining
-  // a filter chain match. Those values will be compared against the server names of a new
-  // connection, when detected by one of the listener filters.
-  //
-  // The server name will be matched against all wildcard domains, i.e. ``www.example.com``
-  // will be first matched against ``www.example.com``, then ``*.example.com``, then ``*.com``.
-  //
-  // Note that partial wildcards are not supported, and values like ``*w.example.com`` are invalid.
-  //
-  // .. attention::
-  //
-  //   Deprecated. Use :ref:`server_names <envoy_api_field_listener.FilterChainMatch.server_names>`
-  //   instead.
-  repeated string sni_domains = 1 [deprecated = true];
+  reserved 1;
+  reserved "sni_domains";
 }
 
 // A filter chain wraps a set of match criteria, an option TLS context, a set of filters, and

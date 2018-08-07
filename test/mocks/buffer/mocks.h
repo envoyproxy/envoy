@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"
 
@@ -16,7 +18,7 @@ public:
   MockBufferBase();
   MockBufferBase(std::function<void()> below_low, std::function<void()> above_high);
 
-  MOCK_METHOD1(write, std::tuple<int, int>(int fd));
+  MOCK_METHOD1(write, Api::SysCallResult(int fd));
   MOCK_METHOD1(move, void(Buffer::Instance& rhs));
   MOCK_METHOD2(move, void(Buffer::Instance& rhs, uint64_t length));
   MOCK_METHOD1(drain, void(uint64_t size));
@@ -24,11 +26,10 @@ public:
   void baseMove(Buffer::Instance& rhs) { BaseClass::move(rhs); }
   void baseDrain(uint64_t size) { BaseClass::drain(size); }
 
-  std::tuple<int, int> trackWrites(int fd) {
-    std::tuple<int, int> result = BaseClass::write(fd);
-    int bytes_written = std::get<0>(result);
-    if (bytes_written > 0) {
-      bytes_written_ += bytes_written;
+  Api::SysCallResult trackWrites(int fd) {
+    Api::SysCallResult result = BaseClass::write(fd);
+    if (result.rc_ > 0) {
+      bytes_written_ += result.rc_;
     }
     return result;
   }
@@ -39,7 +40,7 @@ public:
   }
 
   // A convenience function to invoke on write() which fails the write with EAGAIN.
-  std::tuple<int, int> failWrite(int) { return std::make_tuple(-1, EAGAIN); }
+  Api::SysCallResult failWrite(int) { return {-1, EAGAIN}; }
 
   int bytes_written() const { return bytes_written_; }
   uint64_t bytes_drained() const { return bytes_drained_; }
@@ -101,6 +102,12 @@ MATCHER_P(BufferStringEqual, rhs, rhs) {
 
   Buffer::OwnedImpl buffer(rhs);
   return TestUtility::buffersEqual(arg, buffer);
+}
+
+MATCHER_P(BufferStringContains, rhs,
+          std::string(negation ? "doesn't contain" : "contains") + " \"" + rhs + "\"") {
+  *result_listener << "\"" << arg.toString() << "\"";
+  return arg.toString().find(rhs) != std::string::npos;
 }
 
 ACTION_P(AddBufferToString, target_string) {

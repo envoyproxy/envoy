@@ -26,7 +26,7 @@ int BufferWrapper::luaGetBytes(lua_State* state) {
   return 1;
 }
 
-void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value& value) {
+void MetadataMapHelper::setValue(lua_State* state, const ProtobufWkt::Value& value) {
   ProtobufWkt::Value::KindCase kind = value.kind_case();
 
   switch (kind) {
@@ -76,7 +76,7 @@ void MetadataMapWrapper::setValue(lua_State* state, const ProtobufWkt::Value& va
   }
 }
 
-void MetadataMapWrapper::createTable(
+void MetadataMapHelper::createTable(
     lua_State* state,
     const Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Value>& fields) {
   lua_createtable(state, 0, fields.size());
@@ -98,7 +98,7 @@ int MetadataMapIterator::luaPairsIterator(lua_State* state) {
   }
 
   lua_pushstring(state, current_->first.c_str());
-  parent_.setValue(state, current_->second);
+  MetadataMapHelper::setValue(state, current_->second);
 
   current_++;
   return 2;
@@ -111,7 +111,7 @@ int MetadataMapWrapper::luaGet(lua_State* state) {
     return 0;
   }
 
-  setValue(state, filter_it->second);
+  MetadataMapHelper::setValue(state, filter_it->second);
   return 1;
 }
 

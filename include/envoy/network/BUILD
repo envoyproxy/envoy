@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_library(
     name = "address_interface",
     hdrs = ["address.h"],
+    deps = ["//include/envoy/api:os_sys_calls_interface"],
 )
 
 envoy_cc_library(

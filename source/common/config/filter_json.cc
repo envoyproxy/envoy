@@ -1,6 +1,7 @@
 #include "common/config/filter_json.h"
 
 #include "envoy/config/accesslog/v2/file.pb.h"
+#include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
@@ -302,7 +303,10 @@ void FilterJson::translateHealthCheckFilter(
 
   JSON_UTIL_SET_BOOL(json_config, proto_config, pass_through_mode);
   JSON_UTIL_SET_DURATION(json_config, proto_config, cache_time);
-  JSON_UTIL_SET_STRING(json_config, proto_config, endpoint);
+  std::string endpoint = json_config.getString("endpoint");
+  auto& header = *proto_config.add_headers();
+  header.set_name(":path");
+  header.set_exact_match(endpoint);
 }
 
 void FilterJson::translateGrpcJsonTranscoder(

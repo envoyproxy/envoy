@@ -32,8 +32,8 @@ modify different aspects of the server:
   In the future additional security options will be added to the administration interface. This
   work is tracked in `this <https://github.com/envoyproxy/envoy/issues/2763>`_ issue.
 
-  All mutations should be sent as HTTP POST operations. For a limited time, they will continue
-  to work with HTTP GET, with a warning logged.
+  All mutations must be sent as HTTP POST operations. When a mutation is requested via GET,
+  the request has no effect, and an HTTP 400 (Invalid Request) response is returned.
 
 .. http:get:: /
 

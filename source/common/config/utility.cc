@@ -3,6 +3,7 @@
 #include <unordered_set>
 
 #include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -15,7 +16,7 @@
 #include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/tag_producer_impl.h"
 
 namespace Envoy {
 namespace Config {
@@ -159,6 +160,12 @@ std::chrono::milliseconds Utility::apiConfigSourceRefreshDelay(
       DurationUtil::durationToMilliseconds(api_config_source.refresh_delay()));
 }
 
+std::chrono::milliseconds Utility::apiConfigSourceRequestTimeout(
+    const envoy::api::v2::core::ApiConfigSource& api_config_source) {
+  return std::chrono::milliseconds(
+      PROTOBUF_GET_MS_OR_DEFAULT(api_config_source, request_timeout, 1000));
+}
+
 void Utility::translateEdsConfig(const Json::Object& json_config,
                                  envoy::api::v2::core::ConfigSource& eds_config) {
   translateApiConfigSource(json_config.getObject("cluster")->getString("name"),
@@ -223,6 +230,21 @@ Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
   grpc_service.MergeFrom(api_config_source.grpc_services(0));
 
   return async_client_manager.factoryForGrpcService(grpc_service, scope, false);
+}
+
+envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
+    const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts) {
+  envoy::api::v2::ClusterLoadAssignment load_assignment;
+  envoy::api::v2::endpoint::LocalityLbEndpoints* locality_lb_endpoints =
+      load_assignment.add_endpoints();
+  // Since this LocalityLbEndpoints is built from hosts list, set the default weight to 1.
+  locality_lb_endpoints->mutable_load_balancing_weight()->set_value(1);
+  for (const envoy::api::v2::core::Address& host : hosts) {
+    envoy::api::v2::endpoint::LbEndpoint* lb_endpoint = locality_lb_endpoints->add_lb_endpoints();
+    lb_endpoint->mutable_endpoint()->mutable_address()->MergeFrom(host);
+    lb_endpoint->mutable_load_balancing_weight()->set_value(1);
+  }
+  return load_assignment;
 }
 
 } // namespace Config

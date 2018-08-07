@@ -2,8 +2,6 @@
 #include <memory>
 #include <sstream>
 
-#include "common/stats/stats_impl.h"
-
 #include "extensions/stat_sinks/hystrix/hystrix.h"
 
 #include "test/mocks/server/mocks.h"

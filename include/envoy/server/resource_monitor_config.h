@@ -42,6 +42,13 @@ public:
                                                    ResourceMonitorFactoryContext& context) PURE;
 
   /**
+   * @return ProtobufTypes::MessagePtr create empty config proto message. The resource monitor
+   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted
+   *         to JSON and then parsed into this empty proto.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+
+  /**
    * @return std::string the identifying name for a particular implementation of a resource
    * monitor produced by the factory.
    */

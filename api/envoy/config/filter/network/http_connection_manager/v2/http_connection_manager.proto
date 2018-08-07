@@ -19,7 +19,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 24]
+// [#comment:next free field: 25]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -136,6 +136,33 @@ message HttpConnectionManager {
   // :ref:`drain_timeout
   // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.drain_timeout>`.
   google.protobuf.Duration idle_timeout = 11 [(gogoproto.stdduration) = true];
+
+  // The stream idle timeout for connections managed by the connection manager.
+  // If not specified, this defaults to 5 minutes. The default value was selected
+  // so as not to interfere with any smaller configured timeouts that may have
+  // existed in configurations prior to the introduction of this feature, while
+  // introducing robustness to TCP connections that terminate without a FIN.
+  //
+  // This idle timeout applies to new streams and is overridable by the
+  // :ref:`route-level idle_timeout
+  // <envoy_api_field_route.RouteAction.idle_timeout>`. Even on a stream in
+  // which the override applies, prior to receipt of the initial request
+  // headers, the :ref:`stream_idle_timeout
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
+  // applies. Each time an encode/decode event for headers or data is processed
+  // for the stream, the timer will be reset. If the timeout fires, the stream
+  // is terminated with a 408 Request Timeout error code if no upstream response
+  // header has been received, otherwise a stream reset occurs.
+  //
+  // Note that it is possible to idle timeout even if the wire traffic for a stream is non-idle, due
+  // to the granularity of events presented to the connection manager. For example, while receiving
+  // very large request headers, it may be the case that there is traffic regularly arriving on the
+  // wire while the connection manage is only able to observe the end-of-headers event, hence the
+  // stream may still idle timeout.
+  //
+  // A value of 0 will completely disable the connection manager stream idle
+  // timeout, although per-route idle timeout overrides will continue to apply.
+  google.protobuf.Duration stream_idle_timeout = 24 [(gogoproto.stdduration) = true];
 
   // The time that Envoy will wait between sending an HTTP/2 “shutdown
   // notification” (GOAWAY frame with max stream ID) and a final GOAWAY frame.

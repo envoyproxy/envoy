@@ -133,7 +133,7 @@ enum RequestMethod {
 // Header name/value pair.
 message HeaderValue {
   // Header name.
-  string key = 1;
+  string key = 1 [(validate.rules).string.min_bytes = 1];
 
   // Header value.
   //

@@ -10,10 +10,11 @@
 
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/options.h"
+#include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
 #include "common/common/block_memory_hash_set.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/raw_stat_data.h"
 
 namespace Envoy {
 namespace Server {
@@ -139,7 +140,7 @@ public:
   static std::string hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len);
 
   // RawStatDataAllocator
-  Stats::RawStatData* alloc(const std::string& name) override;
+  Stats::RawStatData* alloc(absl::string_view name) override;
   void free(Stats::RawStatData& data) override;
 
 private:

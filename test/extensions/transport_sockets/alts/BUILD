@@ -12,6 +12,16 @@ load(
 envoy_package()
 
 envoy_extension_cc_test(
+    name = "tsi_frame_protector_test",
+    srcs = ["tsi_frame_protector_test.cc"],
+    extension_name = "envoy.transport_sockets.alts",
+    deps = [
+        "//source/extensions/transport_sockets/alts:tsi_frame_protector",
+        "//test/mocks/buffer:buffer_mocks",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "tsi_handshaker_test",
     srcs = ["tsi_handshaker_test.cc"],
     extension_name = "envoy.transport_sockets.alts",

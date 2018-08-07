@@ -15,6 +15,7 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/tcp:conn_pool_interface",
+        "//test/mocks/network:network_mocks",
         "//test/mocks/upstream:host_mocks",
     ],
 )

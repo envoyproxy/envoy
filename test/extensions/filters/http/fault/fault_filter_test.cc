@@ -10,7 +10,6 @@
 #include "common/config/filter_json.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/stats/stats_impl.h"
 
 #include "extensions/filters/http/fault/fault_filter.h"
 #include "extensions/filters/http/well_known_names.h"

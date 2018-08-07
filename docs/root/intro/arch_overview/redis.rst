@@ -43,8 +43,10 @@ For filter configuration details, see the Redis proxy filter
 The corresponding cluster definition should be configured with
 :ref:`ring hash load balancing <config_cluster_manager_cluster_lb_type>`.
 
-If active healthchecking is desired, the cluster should be configured with a
-:ref:`Redis healthcheck <config_cluster_manager_cluster_hc>`.
+If :ref:`active health checking <arch_overview_health_checking>` is desired, the
+cluster should be configured with a :ref:`custom health check
+<envoy_api_field_core.HealthCheck.custom_health_check>` which configured as a
+:ref:`Redis health checker <config_health_checkers_redis>`.
 
 If passive healthchecking is desired, also configure
 :ref:`outlier detection <config_cluster_manager_cluster_outlier_detection_summary>`.

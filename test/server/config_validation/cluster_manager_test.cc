@@ -2,7 +2,6 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/ssl/context_manager_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "server/config_validation/cluster_manager.h"
 

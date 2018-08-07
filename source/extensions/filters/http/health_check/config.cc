@@ -20,25 +20,12 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
 
   const bool pass_through_mode = proto_config.pass_through_mode().value();
   const int64_t cache_time_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, cache_time, 0);
-  const std::string hc_endpoint = proto_config.endpoint();
 
   auto header_match_data = std::make_shared<std::vector<Http::HeaderUtility::HeaderData>>();
 
-  // TODO(mrice32): remove endpoint field at the end of the 1.7.0 deprecation cycle.
-  const bool endpoint_set = !proto_config.endpoint().empty();
-  if (endpoint_set) {
-    envoy::api::v2::route::HeaderMatcher matcher;
-    matcher.set_name(Http::Headers::get().Path.get());
-    matcher.set_exact_match(proto_config.endpoint());
-    header_match_data->emplace_back(matcher);
-  }
-
   for (const envoy::api::v2::route::HeaderMatcher& matcher : proto_config.headers()) {
     Http::HeaderUtility::HeaderData single_header_match(matcher);
-    // Ignore any path header matchers if the endpoint field has been set.
-    if (!(endpoint_set && single_header_match.name_ == Http::Headers::get().Path)) {
-      header_match_data->push_back(std::move(single_header_match));
-    }
+    header_match_data->push_back(std::move(single_header_match));
   }
 
   if (!pass_through_mode && cache_time_ms) {

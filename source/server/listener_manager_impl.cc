@@ -3,6 +3,7 @@
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/stats/scope.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -17,6 +18,7 @@
 
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
+#include "server/transport_socket_config_impl.h"
 
 #include "extensions/filters/listener/well_known_names.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -209,29 +211,15 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       destination_ips.push_back(cidr_range.asString());
     }
 
-    std::vector<std::string> server_names;
-    if (!filter_chain_match.server_names().empty()) {
-      if (!filter_chain_match.sni_domains().empty()) {
-        throw EnvoyException(
-            fmt::format("error adding listener '{}': both \"server_names\" and the deprecated "
-                        "\"sni_domains\" are used, please merge the list of expected server names "
-                        "into \"server_names\" and remove \"sni_domains\"",
-                        address_->asString()));
-      }
-
-      server_names.assign(filter_chain_match.server_names().begin(),
-                          filter_chain_match.server_names().end());
-    } else if (!filter_chain_match.sni_domains().empty()) {
-      server_names.assign(filter_chain_match.sni_domains().begin(),
-                          filter_chain_match.sni_domains().end());
-    }
+    std::vector<std::string> server_names(filter_chain_match.server_names().begin(),
+                                          filter_chain_match.server_names().end());
 
     // Reject partial wildcards, we don't match on them.
     for (const auto& server_name : server_names) {
       if (server_name.find('*') != std::string::npos && !isWildcardServerName(server_name)) {
         throw EnvoyException(
             fmt::format("error adding listener '{}': partial wildcards are not supported in "
-                        "\"server_names\" (or the deprecated \"sni_domains\")",
+                        "\"server_names\"",
                         address_->asString()));
       }
     }
@@ -239,12 +227,15 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     std::vector<std::string> application_protocols(
         filter_chain_match.application_protocols().begin(),
         filter_chain_match.application_protocols().end());
-
-    addFilterChain(PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0),
-                   destination_ips, server_names, filter_chain_match.transport_protocol(),
-                   application_protocols,
-                   config_factory.createTransportSocketFactory(*message, *this, server_names),
-                   parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), *this));
+    Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        parent_.server_.sslContextManager(), *listener_scope_, parent_.server_.clusterManager(),
+        parent_.server_.localInfo(), parent_.server_.dispatcher(), parent_.server_.random(),
+        parent_.server_.stats());
+    addFilterChain(
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
+        server_names, filter_chain_match.transport_protocol(), application_protocols,
+        config_factory.createTransportSocketFactory(*message, factory_context, server_names),
+        parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), *this));
 
     need_tls_inspector |= filter_chain_match.transport_protocol() == "tls" ||
                           (filter_chain_match.transport_protocol().empty() &&
@@ -380,17 +371,19 @@ void ListenerImpl::convertDestinationIPsMapToTrie() {
     for (const auto& entry : destination_ips_map) {
       std::vector<Network::Address::CidrRange> subnets;
       if (entry.first == EMPTY_STRING) {
-        list.push_back(
-            std::make_pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>(
-                std::make_shared<ServerNamesMap>(entry.second),
-                {Network::Address::CidrRange::create("0.0.0.0/0"),
-                 Network::Address::CidrRange::create("::/0")}));
+        if (Network::Address::ipFamilySupported(AF_INET)) {
+          subnets.push_back(Network::Address::CidrRange::create("0.0.0.0/0"));
+        }
+        if (Network::Address::ipFamilySupported(AF_INET6)) {
+          subnets.push_back(Network::Address::CidrRange::create("::/0"));
+        }
       } else {
-        list.push_back(
-            std::make_pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>(
-                std::make_shared<ServerNamesMap>(entry.second),
-                {Network::Address::CidrRange::create(entry.first)}));
+        subnets.push_back(Network::Address::CidrRange::create(entry.first));
       }
+      list.push_back(
+          std::make_pair<ServerNamesMapSharedPtr, std::vector<Network::Address::CidrRange>>(
+              std::make_shared<ServerNamesMap>(entry.second),
+              std::vector<Network::Address::CidrRange>(subnets)));
     }
     destination_ips_pair.second = std::make_unique<DestinationIPsTrie>(list, true);
   }

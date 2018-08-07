@@ -10,29 +10,31 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-bool FramedTransportImpl::decodeFrameStart(Buffer::Instance& buffer) {
+bool FramedTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMetadata& metadata) {
+  UNREFERENCED_PARAMETER(metadata);
+
   if (buffer.length() < 4) {
     return false;
   }
 
-  int32_t size = BufferHelper::peekI32(buffer);
+  int32_t thrift_size = BufferHelper::peekI32(buffer);
 
-  if (size <= 0 || size > MaxFrameSize) {
-    throw EnvoyException(fmt::format("invalid thrift framed transport frame size {}", size));
+  if (thrift_size <= 0 || thrift_size > MaxFrameSize) {
+    throw EnvoyException(fmt::format("invalid thrift framed transport frame size {}", thrift_size));
   }
 
-  onFrameStart(absl::optional<uint32_t>(static_cast<uint32_t>(size)));
-
   buffer.drain(4);
+
+  metadata.setFrameSize(static_cast<uint32_t>(thrift_size));
   return true;
 }
 
-bool FramedTransportImpl::decodeFrameEnd(Buffer::Instance&) {
-  onFrameComplete();
-  return true;
-}
+bool FramedTransportImpl::decodeFrameEnd(Buffer::Instance&) { return true; }
 
-void FramedTransportImpl::encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) {
+void FramedTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMetadata& metadata,
+                                      Buffer::Instance& message) {
+  UNREFERENCED_PARAMETER(metadata);
+
   uint64_t size = message.length();
   if (size == 0 || size > MaxFrameSize) {
     throw EnvoyException(fmt::format("invalid thrift framed transport frame size {}", size));
@@ -43,6 +45,17 @@ void FramedTransportImpl::encodeFrame(Buffer::Instance& buffer, Buffer::Instance
   BufferHelper::writeI32(buffer, thrift_size);
   buffer.move(message);
 }
+
+class FramedTransportConfigFactory : public TransportFactoryBase<FramedTransportImpl> {
+public:
+  FramedTransportConfigFactory() : TransportFactoryBase(TransportNames::get().FRAMED) {}
+};
+
+/**
+ * Static registration for the framed transport. @see RegisterFactory.
+ */
+static Registry::RegisterFactory<FramedTransportConfigFactory, NamedTransportConfigFactory>
+    register_;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

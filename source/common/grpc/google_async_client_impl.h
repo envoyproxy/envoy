@@ -3,6 +3,7 @@
 #include <queue>
 
 #include "envoy/grpc/async_client.h"
+#include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 

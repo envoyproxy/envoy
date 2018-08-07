@@ -124,6 +124,24 @@ TEST_F(CdsApiImplTest, ValidateFail) {
   EXPECT_CALL(request_, cancel());
 }
 
+// Validate onConfigUpadte throws EnvoyException with duplicate clusters.
+TEST_F(CdsApiImplTest, ValidateDuplicateClusters) {
+  InSequence s;
+
+  setup(true);
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
+  auto* cluster_1 = clusters.Add();
+  cluster_1->set_name("duplicate_cluster");
+
+  auto* cluster_2 = clusters.Add();
+  cluster_2->set_name("duplicate_cluster");
+
+  EXPECT_THROW_WITH_MESSAGE(dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, ""),
+                            EnvoyException, "duplicate cluster duplicate_cluster found");
+  EXPECT_CALL(request_, cancel());
+}
+
 TEST_F(CdsApiImplTest, InvalidOptions) {
   const std::string config_json = R"EOF(
   {

@@ -7,6 +7,7 @@
 
 #include "extensions/filters/network/thrift_proxy/protocol.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::TestParamInfo;
@@ -91,6 +92,76 @@ inline std::string fieldTypeToString(const FieldType& field_type) {
 
 inline std::string fieldTypeParamToString(const TestParamInfo<FieldType>& params) {
   return fieldTypeToString(params.param);
+}
+
+MATCHER(IsEmptyMetadata, "") {
+  if (arg.hasFrameSize()) {
+    *result_listener << "has a frame size of " << arg.frameSize();
+    return false;
+  }
+  if (arg.hasProtocol()) {
+    *result_listener << "has a protocol of " << ProtocolNames::get().fromType(arg.protocol());
+    return false;
+  }
+  if (arg.hasMethodName()) {
+    *result_listener << "has a method name of " << arg.methodName();
+    return false;
+  }
+  if (arg.hasSequenceId()) {
+    *result_listener << "has a sequence id " << arg.sequenceId();
+    return false;
+  }
+  if (arg.hasMessageType()) {
+    *result_listener << "has a message type of " << static_cast<int>(arg.messageType());
+    return false;
+  }
+  if (!arg.headers().empty()) {
+    *result_listener << "has " << arg.headers().size() << " headers";
+    return false;
+  }
+  if (arg.hasAppException()) {
+    *result_listener << "has an app exception";
+    return false;
+  }
+  return true;
+}
+
+MATCHER_P(HasOnlyFrameSize, n, "") {
+  return arg.hasFrameSize() && arg.frameSize() == n && !arg.hasProtocol() && !arg.hasMethodName() &&
+         !arg.hasSequenceId() && !arg.hasMessageType() && arg.headers().empty() &&
+         !arg.hasAppException();
+}
+
+MATCHER_P(HasFrameSize, n, "") {
+  if (!arg.hasFrameSize()) {
+    *result_listener << "has no frame size";
+    return false;
+  }
+  *result_listener << "has frame size = " << arg.frameSize();
+  return arg.frameSize() == n;
+}
+
+MATCHER_P(HasProtocol, p, "") { return arg.hasProtocol() && arg.protocol() == p; }
+MATCHER_P(HasSequenceId, id, "") { return arg.hasSequenceId() && arg.sequenceId() == id; }
+MATCHER(HasNoHeaders, "") { return arg.headers().empty(); }
+
+MATCHER_P2(HasAppException, t, m, "") {
+  if (!arg.hasAppException()) {
+    *result_listener << "has no exception";
+    return false;
+  }
+
+  if (arg.appExceptionType() != t) {
+    *result_listener << "has exception with type " << static_cast<int>(arg.appExceptionType());
+    return false;
+  }
+
+  if (std::string(m) != arg.appExceptionMessage()) {
+    *result_listener << "has exception with message " << arg.appExceptionMessage();
+    return false;
+  }
+
+  return true;
 }
 
 } // namespace

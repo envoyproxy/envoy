@@ -41,15 +41,17 @@ struct ConnPoolCallbacks : public Tcp::ConnectionPool::Callbacks {
     pool_ready_.ready();
   }
 
-  void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason,
+  void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
                      Upstream::HostDescriptionConstSharedPtr host) override {
+    reason_ = reason;
     host_ = host;
     pool_failure_.ready();
   }
 
   ReadyWatcher pool_failure_;
   ReadyWatcher pool_ready_;
-  ConnectionPool::ConnectionData* conn_data_;
+  ConnectionPool::ConnectionData* conn_data_{};
+  absl::optional<ConnectionPool::PoolFailureReason> reason_;
   Upstream::HostDescriptionConstSharedPtr host_;
 };
 
@@ -322,9 +324,36 @@ TEST_F(TcpConnPoolImplTest, UpstreamCallbacks) {
   EXPECT_EQ(Network::FilterStatus::StopIteration,
             conn_pool_.test_conns_[0].filter_->onData(buffer, false));
 
+  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
+  for (auto* cb : conn_pool_.test_conns_[0].connection_->callbacks_) {
+    cb->onAboveWriteBufferHighWatermark();
+  }
+
+  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
+  for (auto* cb : conn_pool_.test_conns_[0].connection_->callbacks_) {
+    cb->onBelowWriteBufferLowWatermark();
+  }
+
   // Shutdown normally.
   EXPECT_CALL(conn_pool_, onConnReleasedForTest());
   c1.releaseConn();
+
+  EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
+  conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+TEST_F(TcpConnPoolImplTest, UpstreamCallbacksCloseEvent) {
+  Buffer::OwnedImpl buffer;
+
+  InSequence s;
+  ConnectionPool::MockUpstreamCallbacks callbacks;
+
+  // Create connection, set UpstreamCallbacks
+  ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
+  c1.callbacks_.conn_data_->addUpstreamCallbacks(callbacks);
+
+  EXPECT_CALL(callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
 
   EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
   conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -394,6 +423,8 @@ TEST_F(TcpConnPoolImplTest, MaxPendingRequests) {
   conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
 
+  EXPECT_EQ(ConnectionPool::PoolFailureReason::Overflow, callbacks2.reason_);
+
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_overflow_.value());
 }
 
@@ -401,7 +432,7 @@ TEST_F(TcpConnPoolImplTest, MaxPendingRequests) {
  * Tests a connection failure before a request is bound which should result in the pending request
  * getting purged.
  */
-TEST_F(TcpConnPoolImplTest, ConnectFailure) {
+TEST_F(TcpConnPoolImplTest, RemoteConnectFailure) {
   InSequence s;
 
   // Request 1 should kick off a new connection.
@@ -416,6 +447,34 @@ TEST_F(TcpConnPoolImplTest, ConnectFailure) {
   EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
   conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(ConnectionPool::PoolFailureReason::RemoteConnectionFailure, callbacks.reason_);
+
+  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_failure_eject_.value());
+}
+
+/**
+ * Tests a connection failure before a request is bound which should result in the pending request
+ * getting purged.
+ */
+TEST_F(TcpConnPoolImplTest, LocalConnectFailure) {
+  InSequence s;
+
+  // Request 1 should kick off a new connection.
+  ConnPoolCallbacks callbacks;
+  conn_pool_.expectConnCreate();
+  Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(callbacks);
+  EXPECT_NE(nullptr, handle);
+
+  EXPECT_CALL(callbacks.pool_failure_, ready());
+  EXPECT_CALL(*conn_pool_.test_conns_[0].connect_timer_, disableTimer());
+
+  EXPECT_CALL(conn_pool_, onConnDestroyedForTest());
+  conn_pool_.test_conns_[0].connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
+  dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(ConnectionPool::PoolFailureReason::LocalConnectionFailure, callbacks.reason_);
 
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_failure_eject_.value());
@@ -445,6 +504,9 @@ TEST_F(TcpConnPoolImplTest, ConnectTimeout) {
 
   EXPECT_CALL(conn_pool_, onConnDestroyedForTest()).Times(2);
   dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(ConnectionPool::PoolFailureReason::Timeout, callbacks1.reason_);
+  EXPECT_EQ(ConnectionPool::PoolFailureReason::Timeout, callbacks2.reason_);
 
   EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_timeout_.value());

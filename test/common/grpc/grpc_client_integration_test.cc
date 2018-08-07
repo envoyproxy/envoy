@@ -308,10 +308,10 @@ TEST_P(GrpcClientIntegrationTest, ResetAfterCloseLocal) {
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->grpc_stream_->closeStream();
-  stream->fake_stream_->waitForEndStream(dispatcher_helper_.dispatcher_);
+  ASSERT_TRUE(stream->fake_stream_->waitForEndStream(dispatcher_helper_.dispatcher_));
   stream->grpc_stream_->resetStream();
   dispatcher_helper_.dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-  stream->fake_stream_->waitForReset();
+  ASSERT_TRUE(stream->fake_stream_->waitForReset());
 }
 
 // Validate that request cancel() works.
@@ -323,7 +323,7 @@ TEST_P(GrpcClientIntegrationTest, CancelRequest) {
   EXPECT_CALL(*request->child_span_, finishSpan());
   request->grpc_request_->cancel();
   dispatcher_helper_.dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
-  request->fake_stream_->waitForReset();
+  ASSERT_TRUE(request->fake_stream_->waitForReset());
 }
 
 // Parameterize the loopback test server socket address and gRPC client type.
@@ -352,7 +352,8 @@ TEST_P(GrpcSslClientIntegrationTest, BasicSslRequestWithClientCert) {
 class GrpcAccessTokenClientIntegrationTest : public GrpcSslClientIntegrationTest {
 public:
   void expectExtraHeaders(FakeStream& fake_stream) override {
-    fake_stream.waitForHeadersComplete();
+    AssertionResult result = fake_stream.waitForHeadersComplete();
+    RELEASE_ASSERT(result, result.message());
     Http::TestHeaderMapImpl stream_headers(fake_stream.headers());
     if (access_token_value_ != "") {
       if (access_token_value_2_ == "") {

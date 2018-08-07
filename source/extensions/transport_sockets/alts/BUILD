@@ -25,6 +25,21 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "tsi_frame_protector",
+    srcs = [
+        "tsi_frame_protector.cc",
+    ],
+    hdrs = [
+        "tsi_frame_protector.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":grpc_tsi_wrapper",
+        "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "tsi_handshaker",
     srcs = [
         "tsi_handshaker.cc",

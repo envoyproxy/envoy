@@ -99,13 +99,85 @@ private:
   friend class HeaderMapIterator;
 };
 
+class DynamicMetadataMapWrapper;
+class RequestInfoWrapper;
+
+/**
+ * Iterator over a dynamic metadata map.
+ */
+class DynamicMetadataMapIterator
+    : public Filters::Common::Lua::BaseLuaObject<DynamicMetadataMapIterator> {
+public:
+  DynamicMetadataMapIterator(DynamicMetadataMapWrapper& parent);
+
+  static ExportedFunctions exportedFunctions() { return {}; }
+
+  DECLARE_LUA_CLOSURE(DynamicMetadataMapIterator, luaPairsIterator);
+
+private:
+  DynamicMetadataMapWrapper& parent_;
+  Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>::const_iterator current_;
+};
+
+/**
+ * Lua wrapper for a dynamic metadata.
+ */
+class DynamicMetadataMapWrapper
+    : public Filters::Common::Lua::BaseLuaObject<DynamicMetadataMapWrapper> {
+public:
+  DynamicMetadataMapWrapper(RequestInfoWrapper& parent) : parent_{parent} {}
+
+  static ExportedFunctions exportedFunctions() {
+    return {{"get", static_luaGet}, {"set", static_luaSet}, {"__pairs", static_luaPairs}};
+  }
+
+private:
+  /**
+   * Get a metadata value from the map.
+   * @param 1 (string): filter name.
+   * @return value if found or nil.
+   */
+  DECLARE_LUA_FUNCTION(DynamicMetadataMapWrapper, luaGet);
+
+  /**
+   * Get a metadata value from the map.
+   * @param 1 (string): filter name.
+   * @param 2 (string or table): key.
+   * @param 3 (string or table): value.
+   * @return nil.
+   */
+  DECLARE_LUA_FUNCTION(DynamicMetadataMapWrapper, luaSet);
+
+  /**
+   * Implementation of the __pairs metamethod so a dynamic metadata wrapper can be iterated over
+   * using pairs().
+   */
+  DECLARE_LUA_FUNCTION(DynamicMetadataMapWrapper, luaPairs);
+
+  // Envoy::Lua::BaseLuaObject
+  void onMarkDead() override {
+    // Iterators do not survive yields.
+    iterator_.reset();
+  }
+
+  // To get reference to parent's (RequestInfoWrapper) request info member.
+  RequestInfo::RequestInfo& requestInfo();
+
+  RequestInfoWrapper& parent_;
+  Filters::Common::Lua::LuaDeathRef<DynamicMetadataMapIterator> iterator_;
+
+  friend class DynamicMetadataMapIterator;
+};
+
 /**
  * Lua wrapper for a request info.
  */
 class RequestInfoWrapper : public Filters::Common::Lua::BaseLuaObject<RequestInfoWrapper> {
 public:
   RequestInfoWrapper(RequestInfo::RequestInfo& request_info) : request_info_{request_info} {}
-  static ExportedFunctions exportedFunctions() { return {{"protocol", static_luaProtocol}}; }
+  static ExportedFunctions exportedFunctions() {
+    return {{"protocol", static_luaProtocol}, {"dynamicMetadata", static_luaDynamicMetadata}};
+  }
 
 private:
   /**
@@ -113,7 +185,17 @@ private:
    * @return string representation of Http::Protocol.
    */
   DECLARE_LUA_FUNCTION(RequestInfoWrapper, luaProtocol);
+
+  /**
+   * Get reference to request info dynamic metadata object.
+   * @return DynamicMetadataMapWrapper representation of RequestInfo dynamic metadata.
+   */
+  DECLARE_LUA_FUNCTION(RequestInfoWrapper, luaDynamicMetadata);
+
   RequestInfo::RequestInfo& request_info_;
+  Filters::Common::Lua::LuaDeathRef<DynamicMetadataMapWrapper> dynamic_metadata_wrapper_;
+
+  friend class DynamicMetadataMapWrapper;
 };
 
 } // namespace Lua

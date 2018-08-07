@@ -12,7 +12,7 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -164,6 +164,10 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream) {
 }
 
 void ConnectionManagerImpl::doDeferredStreamDestroy(ActiveStream& stream) {
+  if (stream.idle_timer_ != nullptr) {
+    stream.idle_timer_->disableTimer();
+    stream.idle_timer_ = nullptr;
+  }
   stream.state_.destroyed_ = true;
   for (auto& filter : stream.decoder_filters_) {
     filter->handle_->onDestroy();
@@ -369,6 +373,13 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   // prevents surprises for logging code in edge cases.
   request_info_.setDownstreamRemoteAddress(
       connection_manager_.read_callbacks_->connection().remoteAddress());
+
+  if (connection_manager_.config_.streamIdleTimeout().count()) {
+    idle_timeout_ms_ = connection_manager_.config_.streamIdleTimeout();
+    idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onIdleTimeout(); });
+    resetIdleTimer();
+  }
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
@@ -413,8 +424,9 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
     // or gRPC status code, and/or set H2 RST_STREAM error.
     connection_manager_.doEndStream(*this);
   } else {
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Http::Code::RequestTimeout,
-                   "stream timeout", nullptr);
+    sendLocalReply(request_headers_ != nullptr &&
+                       Grpc::Common::hasGrpcContentType(*request_headers_),
+                   Http::Code::RequestTimeout, "stream timeout", nullptr);
   }
 }
 
@@ -605,9 +617,18 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
     if (route_entry != nullptr && route_entry->idleTimeout()) {
       idle_timeout_ms_ = route_entry->idleTimeout().value();
-      idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
-          [this]() -> void { onIdleTimeout(); });
-      resetIdleTimer();
+      if (idle_timeout_ms_.count()) {
+        // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
+        if (idle_timer_ == nullptr) {
+          idle_timer_ = connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
+              [this]() -> void { onIdleTimeout(); });
+        }
+      } else if (idle_timer_ != nullptr) {
+        // If we had a global stream idle timeout but the route-level idle timeout is set to zero
+        // (to override), we disable the idle timer.
+        idle_timer_->disableTimer();
+        idle_timer_ = nullptr;
+      }
     }
   }
 
@@ -617,6 +638,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   decodeHeaders(nullptr, *request_headers_, end_stream);
+
+  // Reset it here for both global and overriden cases.
+  resetIdleTimer();
 }
 
 void ConnectionManagerImpl::ActiveStream::traceRequest() {
@@ -905,7 +929,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
 
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
-  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_, EMPTY_STRING);
+  ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(), EMPTY_STRING);
 
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(headers);
@@ -946,7 +970,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   connection_manager_.config_.dateProvider().setDateHeader(headers);
   // Following setReference() is safe because serverName() is constant for the life of the listener.
   headers.insertServer().value().setReference(connection_manager_.config_.serverName());
-  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_,
+  ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
                                                   connection_manager_.config_.via());
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
@@ -983,7 +1007,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
     // Do not do this for H2 (which drains via GOAWA) or Upgrade (as the upgrade
     // payload is no longer HTTP/1.1)
-    if (headers.Connection() == nullptr || headers.Connection()->value() != "Upgrade") {
+    if (!Utility::isUpgrade(headers)) {
       headers.insertConnection().value().setReference(Headers::get().ConnectionValues.Close);
     }
   }

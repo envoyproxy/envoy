@@ -5,7 +5,7 @@
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_impl.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/common/ssl/ssl_certs_test.h"
 #include "test/mocks/runtime/mocks.h"
@@ -74,7 +74,7 @@ TEST_F(SslContextImplTest, TestVerifySubjectAltNameNotMatched) {
 TEST_F(SslContextImplTest, TestCipherSuites) {
   std::string json = R"EOF(
   {
-    "cipher_suites": "AES128-SHA:BOGUS:AES256-SHA"
+    "cipher_suites": "-ALL:+[AES128-SHA|BOGUS1]:BOGUS2:AES256-SHA"
   }
   )EOF";
 
@@ -83,7 +83,10 @@ TEST_F(SslContextImplTest, TestCipherSuites) {
   Runtime::MockLoader runtime;
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
-  EXPECT_THROW(manager.createSslClientContext(store, cfg), EnvoyException);
+  EXPECT_THROW_WITH_MESSAGE(manager.createSslClientContext(store, cfg), EnvoyException,
+                            "Failed to initialize cipher suites "
+                            "-ALL:+[AES128-SHA|BOGUS1]:BOGUS2:AES256-SHA. The following "
+                            "ciphers were rejected when tried individually: BOGUS1, BOGUS2");
 }
 
 TEST_F(SslContextImplTest, TestExpiringCert) {

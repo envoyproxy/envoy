@@ -18,6 +18,8 @@
 #include "common/common/lock_guard.h"
 #include "common/common/utility.h"
 #include "common/network/utility.h"
+#include "common/stats/raw_stat_data.h"
+#include "common/stats/stats_options_impl.h"
 
 #include "absl/strings/string_view.h"
 
@@ -55,7 +57,8 @@ SharedMemory& SharedMemory::initialize(uint64_t stats_set_size, Options& options
 
   int shmem_fd = os_sys_calls.shmOpen(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
   if (shmem_fd == -1) {
-    PANIC(fmt::format("cannot open shared memory region {} check user permissions", shmem_name));
+    PANIC(fmt::format("cannot open shared memory region {} check user permissions. Error: {}",
+                      shmem_name, strerror(errno)));
   }
 
   if (options.restartEpoch() == 0) {
@@ -141,14 +144,14 @@ HotRestartImpl::HotRestartImpl(Options& options)
   RELEASE_ASSERT(rc != -1, "");
 }
 
-Stats::RawStatData* HotRestartImpl::alloc(const std::string& name) {
+Stats::RawStatData* HotRestartImpl::alloc(absl::string_view name) {
   // Try to find the existing slot in shared memory, otherwise allocate a new one.
   Thread::LockGuard lock(stat_lock_);
-  absl::string_view key = name;
-  if (key.size() > options_.statsOptions().maxNameLength()) {
-    key.remove_suffix(key.size() - options_.statsOptions().maxNameLength());
-  }
-  auto value_created = stats_set_->insert(key);
+  // In production, the name is truncated in ThreadLocalStore before this
+  // is called. This is just a sanity check to make sure that actually happens;
+  // it is coded as an if/return-null to facilitate testing.
+  ASSERT(name.length() <= options_.statsOptions().maxNameLength());
+  auto value_created = stats_set_->insert(name);
   Stats::RawStatData* data = value_created.first;
   if (data == nullptr) {
     return nullptr;

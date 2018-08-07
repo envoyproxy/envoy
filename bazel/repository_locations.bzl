@@ -1,11 +1,11 @@
 REPOSITORY_LOCATIONS = dict(
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        commit = "2a52ce799382c87cd3119f3b44fbbebf97061ab6",  # chromium-67.0.3396.62
+        commit = "372daf7042ffe3da1335743e7c93d78f1399aba7",  # chromium-68.0.3440.75
         remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
-        commit = "92020a042c0cd46979db9f6f0cb32783dc07765e",  # 2018-06-08
+        commit = "92e07e5590752d6b8e67f7f2f86c6286561e8cea",  # 2018-08-01
         remote = "https://github.com/abseil/abseil-cpp",
     ),
     com_github_apache_thrift = dict(
@@ -18,7 +18,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/bombela/backward-cpp",
     ),
     com_github_circonus_labs_libcircllhist = dict(
-        commit = "476687ac9cc636fc92ac3070246d757ae6854547",  # 2018-05-08
+        commit = "050da53a44dede7bda136b93a9aeef47bd91fa12",  # 2018-07-02
         remote = "https://github.com/circonus-labs/libcircllhist",
     ),
     com_github_cyan4973_xxhash = dict(
@@ -68,9 +68,11 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/jwt_verify_lib",
     ),
     com_github_nodejs_http_parser = dict(
-        # 2018-05-30 snapshot to pick up a performance fix, nodejs/http-parser PR 422
+        # 2018-07-20 snapshot to pick up:
+        # A performance fix, nodejs/http-parser PR 422.
+        # A bug fix, nodejs/http-parser PR 432.
         # TODO(brian-pane): Upgrade to the next http-parser release once it's available
-        commit = "cf69c8eda9fe79e4682598a7b3d39338dea319a3",
+        commit = "77310eeb839c4251c07184a5db8885a572a08352",
         remote = "https://github.com/nodejs/http-parser",
     ),
     com_github_pallets_jinja = dict(

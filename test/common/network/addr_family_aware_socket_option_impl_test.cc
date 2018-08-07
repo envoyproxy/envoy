@@ -49,6 +49,8 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V4EmptyOptionNames) {
 
 // If a platform doesn't support IPv4 and IPv6 socket option variants for an IPv4 address, we fail
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6EmptyOptionNames) {
+  EXPECT_CALL(os_sys_calls_, socket(_, _, _));
+  EXPECT_CALL(os_sys_calls_, close(_));
   Address::Ipv6Instance address("::1:2:3:4", 5678);
   const int fd = address.socket(Address::SocketType::Stream);
   EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
