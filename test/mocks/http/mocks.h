@@ -220,11 +220,9 @@ public:
   }
   void encodeTrailers(HeaderMapPtr&& trailers) override { encodeTrailers_(*trailers); }
 
-  void addDecodedTrailers(HeaderMapPtr&& trailers) override { addDecodedTrailers_(*trailers); }
-
   MOCK_METHOD0(continueDecoding, void());
   MOCK_METHOD2(addDecodedData, void(Buffer::Instance& data, bool streaming));
-  MOCK_METHOD1(addDecodedTrailers_, void(const HeaderMap& trailers));
+  MOCK_METHOD0(addDecodedTrailers, HeaderMap&());
   MOCK_METHOD0(decodingBuffer, const Buffer::Instance*());
   MOCK_METHOD1(encode100ContinueHeaders_, void(HeaderMap& headers));
   MOCK_METHOD2(encodeHeaders_, void(HeaderMap& headers, bool end_stream));
@@ -262,11 +260,9 @@ public:
 
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD2(addEncodedData, void(Buffer::Instance& data, bool streaming));
-  MOCK_METHOD1(addEncodedTrailers_, void(const HeaderMap& trailers));
+  MOCK_METHOD0(addEncodedTrailers, HeaderMap&());
   MOCK_METHOD0(continueEncoding, void());
   MOCK_METHOD0(encodingBuffer, const Buffer::Instance*());
-
-  void addEncodedTrailers(HeaderMapPtr&& trailers) override { addEncodedTrailers_(*trailers); }
 
   Buffer::InstancePtr buffer_;
   testing::NiceMock<Tracing::MockSpan> active_span_;

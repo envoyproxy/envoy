@@ -190,10 +190,17 @@ public:
    */
   virtual void addDecodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
-  /**
-   * Adds decoded trailers. This will overwrite any existing trailers should any already exist.
-   */
-  virtual void addDecodedTrailers(HeaderMapPtr&& trailers) PURE;
+   /**
+    * Adds decoded trailers. May only be called in decodeData when end_stream is set to true or in
+    * decodeTrailers. If called in any other context, std::logic_error will be thrown.
+    *
+    * When called in decodeData, the trailers map will be initialized to an empty map and returned by
+    * reference. Calling it more than once is invalid and will result in std::logic_error being thrown.
+    * 
+    * When called in decodeTrailers it will simply return the trailers (same data as passed in the 
+    * parameter).
+    */
+  virtual HeaderMap& addDecodedTrailers() PURE;
 
   /**
    * Create a locally generated response using the provided response_code and body_text parameters.
@@ -401,9 +408,16 @@ public:
   virtual void addEncodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
-   * Adds encoded trailers. This will overwrite any existing trailers should any already exist.
+   * Adds encoded trailers. May only be called in encodeData when end_stream is set to true or in
+   * encodeTrailers. If called in any other context, std::logic_error will be thrown.
+   *
+   * When called in encodeData, the trailers map will be initialized to an empty map and returned by
+   * reference. Calling it more than once is invalid and will result in std::logic_error being thrown.
+   * 
+   * When called in encodeTrailers it will simply return the trailers (same data as passed in the 
+   * parameter).
    */
-  virtual void addEncodedTrailers(HeaderMapPtr&& trailers) PURE;
+  virtual HeaderMap& addEncodedTrailers() PURE;
 
   /**
    * Called when an encoder filter goes over its high watermark.

@@ -803,14 +803,15 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::addDecodedTrailers(HeaderMapPtr&& trailers) {
+HeaderMap& ConnectionManagerImpl::ActiveStream::addDecodedTrailers() {
   if (state_.filter_call_state_ & FilterCallState::LastDataFrame) {
     if (request_trailers_) {
       throw std::logic_error("decodedTrailers added more than once");
     }
 
-    request_trailers_ = std::move(trailers);
-  } else if (!request_trailers_) {
+    request_trailers_ = std::make_unique<HeaderMapImpl>();
+    return *request_trailers_;
+  } else {
     throw std::logic_error("addDecodedTrailers called in invalid context");
   }
 }
@@ -1087,19 +1088,20 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   }
 }
 
-void ConnectionManagerImpl::ActiveStream::addEncodedTrailers(HeaderMapPtr&& trailers) {
+HeaderMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
   if (state_.filter_call_state_ & FilterCallState::LastDataFrame) {
     if (response_trailers_) {
       throw std::logic_error("encodedTrailers added more than once");
     }
 
-    response_trailers_ = std::move(trailers);
-
     // local_complete_ is set to true at the start of encodeData(..., true), but since
     // we've now added trailers we have to undo this to prevent encodeTrailers from
     // blowing up when it assert on local_complete_
     state_.local_complete_ = false;
-  } else if (!response_trailers_) {
+
+    response_trailers_ = std::make_unique<HeaderMapImpl>();
+    return *response_trailers_;
+  } else {
     throw std::logic_error("encodedTrailers called in invalid context");
   }
 }
@@ -1445,8 +1447,8 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::cre
   return buffer;
 }
 
-void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedTrailers(HeaderMapPtr&& trailers) {
-  parent_.addDecodedTrailers(std::move(trailers));
+HeaderMap& ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedTrailers() {
+  return parent_.addDecodedTrailers();
 }
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedData(Buffer::Instance& data,
@@ -1542,8 +1544,8 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::In
   return parent_.addEncodedData(*this, data, streaming);
 }
 
-void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers(HeaderMapPtr&& trailers) {
-  parent_.addEncodedTrailers(std::move(trailers));
+HeaderMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {
+  return parent_.addEncodedTrailers();
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::
