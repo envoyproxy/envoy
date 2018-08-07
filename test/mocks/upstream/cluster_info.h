@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 

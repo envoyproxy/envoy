@@ -9,7 +9,8 @@
 #include <vector>
 
 #include "envoy/config/metrics/v2/stats.pb.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/tag_extractor.h"
+#include "envoy/stats/tag_producer.h"
 
 #include "common/common/hash.h"
 #include "common/common/utility.h"

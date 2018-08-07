@@ -12,7 +12,6 @@
 #include "envoy/server/guarddog.h"
 #include "envoy/server/instance.h"
 #include "envoy/ssl/context_manager.h"
-#include "envoy/stats/stats.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/tracing/http_tracer.h"
 

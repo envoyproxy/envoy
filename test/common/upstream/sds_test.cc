@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/stats/scope.h"
 
 #include "common/config/utility.h"
 #include "common/filesystem/filesystem_impl.h"

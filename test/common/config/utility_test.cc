@@ -1,6 +1,5 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/common/exception.h"
-#include "envoy/stats/stats.h"
 
 #include "common/common/fmt.h"
 #include "common/config/cds_json.h"

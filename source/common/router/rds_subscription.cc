@@ -1,6 +1,6 @@
 #include "common/router/rds_subscription.h"
 
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

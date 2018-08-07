@@ -2,6 +2,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/load_stats/v2/lrs.pb.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 

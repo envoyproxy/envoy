@@ -1,6 +1,7 @@
 #include "common/upstream/health_checker_base_impl.h"
 
 #include "envoy/data/core/v2alpha/health_check_event.pb.h"
+#include "envoy/stats/scope.h"
 
 #include "common/router/router.h"
 

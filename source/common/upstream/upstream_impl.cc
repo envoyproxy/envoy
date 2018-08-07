@@ -14,6 +14,7 @@
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/health_checker.h"
 
 #include "common/common/enum_to_int.h"

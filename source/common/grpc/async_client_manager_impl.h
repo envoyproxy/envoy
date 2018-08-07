@@ -2,6 +2,7 @@
 
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/singleton/manager.h"
+#include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 

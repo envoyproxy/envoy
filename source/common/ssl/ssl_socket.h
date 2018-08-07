@@ -5,6 +5,7 @@
 
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
 #include "common/ssl/context_impl.h"

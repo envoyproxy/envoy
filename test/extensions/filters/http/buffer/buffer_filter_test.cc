@@ -3,7 +3,6 @@
 
 #include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/stats/stats.h"
 
 #include "common/http/header_map_impl.h"
 

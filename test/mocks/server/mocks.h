@@ -15,6 +15,8 @@
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/server/worker.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_options.h"
 #include "envoy/thread/thread.h"
 
 #include "common/secret/secret_manager_impl.h"

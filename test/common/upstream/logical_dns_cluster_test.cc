@@ -4,6 +4,8 @@
 #include <tuple>
 #include <vector>
 
+#include "envoy/stats/scope.h"
+
 #include "common/network/utility.h"
 #include "common/upstream/logical_dns_cluster.h"
 
