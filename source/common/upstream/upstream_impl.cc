@@ -864,9 +864,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
     bool found = false;
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
+      const bool health_check_changed =
+          health_checker_ != nullptr && *(*i)->healthCheckAddress() != *host->healthCheckAddress();
       // If we find a host matched based on address, we keep it. However we do change weight inline
       // so do that here.
-      if (*(*i)->address() == *host->address()) {
+      if (*(*i)->address() == *host->address() && !health_check_changed) {
         if (host->weight() > max_host_weight) {
           max_host_weight = host->weight();
         }
@@ -904,18 +906,14 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
           hosts_changed = true;
         }
 
-        // Did the health check address change?
-        if (*(*i)->healthCheckAddress() != *host->healthCheckAddress()) {
-          // If the health check address is updated, set the current host's health check address
-          // using the updated one.
-          (*i)->setHealthCheckAddress(host->healthCheckAddress());
-        }
-
         (*i)->weight(host->weight());
         final_hosts.push_back(*i);
         i = current_hosts.erase(i);
         found = true;
       } else {
+        if (health_check_changed) {
+          hosts_changed = true;
+        }
         i++;
       }
     }
@@ -938,7 +936,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   // If there are removed hosts, check to see if we should only delete if unhealthy.
-  if (!current_hosts.empty() && dont_remove_healthy_hosts) {
+  if (!current_hosts.empty() && dont_remove_healthy_hosts && !hosts_changed) {
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
       if (!(*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
         if ((*i)->weight() > max_host_weight) {
