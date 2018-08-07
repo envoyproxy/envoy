@@ -25,6 +25,10 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
   hds_retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
   establishNewStream();
+
+  // TODO(lilika): Add support for other types of healthchecks
+  health_check_request_.mutable_capability()->add_health_check_protocol(
+      envoy::service::discovery::v2::Capability::HTTP);
 }
 
 void HdsDelegate::setHdsRetryTimer() {
@@ -44,9 +48,6 @@ void HdsDelegate::establishNewStream() {
     return;
   }
 
-  // TODO(lilika): Add support for other types of healthchecks
-  health_check_request_.mutable_capability()->add_health_check_protocol(
-      envoy::service::discovery::v2::Capability::HTTP);
   ENVOY_LOG(debug, "Sending HealthCheckRequest {} ", health_check_request_.DebugString());
   stream_->sendMessage(health_check_request_, false);
   stats_.responses_.inc();
