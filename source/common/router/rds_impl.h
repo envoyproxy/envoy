@@ -19,6 +19,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/singleton/instance.h"
+#include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"

@@ -11,6 +11,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"

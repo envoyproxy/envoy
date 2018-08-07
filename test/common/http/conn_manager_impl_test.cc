@@ -7,7 +7,6 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/stats/stats.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/access_log/access_log_formatter.h"

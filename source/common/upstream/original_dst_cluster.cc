@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/stats/scope.h"
+
 #include "common/http/headers.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"

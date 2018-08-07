@@ -24,12 +24,14 @@ public:
   // Transport
   const std::string& name() const override { return TransportNames::get().UNFRAMED; }
   TransportType type() const override { return TransportType::Unframed; }
-  bool decodeFrameStart(Buffer::Instance&, absl::optional<uint32_t>& size) override {
-    size.reset();
+  bool decodeFrameStart(Buffer::Instance&, MessageMetadata& metadata) override {
+    UNREFERENCED_PARAMETER(metadata);
     return true;
   }
   bool decodeFrameEnd(Buffer::Instance&) override { return true; }
-  void encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) override {
+  void encodeFrame(Buffer::Instance& buffer, const MessageMetadata& metadata,
+                   Buffer::Instance& message) override {
+    UNREFERENCED_PARAMETER(metadata);
     buffer.move(message);
   }
 };

@@ -2,6 +2,8 @@
 
 #include <chrono>
 
+#include "envoy/stats/scope.h"
+
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/lock_guard.h"

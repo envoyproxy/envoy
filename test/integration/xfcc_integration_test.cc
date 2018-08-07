@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/stats/scope.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/http/header_map_impl.h"

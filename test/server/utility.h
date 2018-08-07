@@ -2,6 +2,7 @@
 
 #include "common/config/lds_json.h"
 #include "common/json/json_loader.h"
+#include "common/stats/stats_options_impl.h"
 
 namespace Envoy {
 namespace Server {

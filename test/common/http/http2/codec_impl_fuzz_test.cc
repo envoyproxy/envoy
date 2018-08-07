@@ -1,3 +1,5 @@
+#include "envoy/stats/scope.h"
+
 // Fuzzer for the H2 codec. This is similar in structure to
 // //test/common/http/http2:codec_impl_test, where a client H2 codec is wired
 // via shared memory to a server H2 codec and stream actions are applied. We

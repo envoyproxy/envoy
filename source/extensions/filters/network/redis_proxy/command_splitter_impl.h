@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "envoy/stats/scope.h"
+
 #include "common/common/logger.h"
 #include "common/common/to_lower_table.h"
 

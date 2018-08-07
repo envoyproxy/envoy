@@ -5,7 +5,7 @@
 
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/subscription.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/http/rest_api_fetcher.h"

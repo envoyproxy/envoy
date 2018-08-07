@@ -2,6 +2,7 @@
 
 #include "envoy/api/v2/eds.pb.validate.h"
 #include "envoy/common/exception.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
 #include "common/config/metadata.h"

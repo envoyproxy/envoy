@@ -9,6 +9,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/server/resource_monitor.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
 #include "common/common/logger.h"
@@ -51,9 +52,8 @@ public:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
                       const envoy::config::overload::v2alpha::OverloadManager& config);
 
-  void start();
-
   // Server::OverloadManager
+  void start() override;
   void registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                          OverloadActionCb callback) override;
 
