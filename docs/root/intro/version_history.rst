@@ -48,6 +48,7 @@ Version history
   :ref:`use_data_plane_proto<envoy_api_field_config.ratelimit.v2.RateLimitServiceConfig.use_data_plane_proto>`
   boolean flag in the ratelimit configuration.
   Support for the legacy proto :repo:`source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
+* rest-api: added ability to set the :ref:`request timeout <envoy_api_field_core.ApiConfigSource.request_timeout>` for REST API requests.
 * router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
 * tracing: added support for configuration of :ref:`tracing sampling
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
@@ -55,6 +56,9 @@ Version history
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
   selecting a host from a subset.
 * ratelimit: added :ref:`failure_mode_allow <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in case of rate limit error.
+* upstream: require opt-in to use the :ref:`x-envoy-orignal-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` header
+  for overriding destination address when using the :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
+  load balancing policy.
 
 1.7.0
 ===============

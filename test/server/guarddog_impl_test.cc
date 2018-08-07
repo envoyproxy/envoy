@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/common/time.h"
-#include "envoy/stats/stats.h"
 
 #include "common/common/utility.h"
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/router/rds.h"
+#include "envoy/stats/scope.h"
 
 #include "common/http/date_provider.h"
 

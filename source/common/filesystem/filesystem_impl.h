@@ -10,6 +10,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/stats/store.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/thread.h"

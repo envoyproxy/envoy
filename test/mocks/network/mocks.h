@@ -11,6 +11,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/resolver.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/stats/scope.h"
 
 #include "common/stats/isolated_store_impl.h"
 

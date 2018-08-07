@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/stats/stats.h"
+#include "envoy/stats/stats_options.h"
 
 #include "common/common/fmt.h"
 

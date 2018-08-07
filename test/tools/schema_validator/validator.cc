@@ -1,7 +1,5 @@
 #include "test/tools/schema_validator/validator.h"
 
-#include "envoy/stats/stats.h"
-
 #include "common/router/config_impl.h"
 
 #include "test/test_common/printers.h"

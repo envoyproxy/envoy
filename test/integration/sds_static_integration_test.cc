@@ -1,6 +1,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/stats/scope.h"
+
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"

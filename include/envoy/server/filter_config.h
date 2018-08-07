@@ -13,6 +13,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/singleton/manager.h"
+#include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"

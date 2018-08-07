@@ -15,7 +15,7 @@
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/json/json_object.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/stats_options.h"
 
 namespace Envoy {
 namespace Config {

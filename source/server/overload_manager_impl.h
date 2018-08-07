@@ -9,6 +9,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/overload_manager.h"
 #include "envoy/server/resource_monitor.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
 #include "common/common/logger.h"
