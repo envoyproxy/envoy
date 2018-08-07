@@ -114,10 +114,8 @@ public:
   MOCK_METHOD1(removeHandler, bool(const std::string& prefix));
   MOCK_METHOD0(socket, Network::Socket&());
   MOCK_METHOD0(getConfigTracker, ConfigTracker&());
-  MOCK_METHOD5(request,
-               Http::Code(absl::string_view path, const Http::Utility::QueryParams& query_params,
-                          absl::string_view method, Http::HeaderMap& response_headers,
-                          std::string& body));
+  MOCK_METHOD4(request, Http::Code(absl::string_view path_and_query, absl::string_view method,
+                                   Http::HeaderMap& response_headers, std::string& body));
 
   NiceMock<MockConfigTracker> config_tracker_;
 };
