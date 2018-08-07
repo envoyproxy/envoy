@@ -13,22 +13,15 @@ void H1FuzzIntegrationTest::initialize() {
           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
           -> void {
         auto* route_config = hcm.mutable_route_config();
+        // adding an additional route to the default route
+        auto* additional_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
+        additional_route->mutable_match()->set_prefix(prefix);
+        additional_route->mutable_direct_response()->set_status(static_cast<uint32_t>(status));
+        additional_route->mutable_direct_response()->mutable_body()->set_filename(file_path);
+        // adding headers to the default route
         auto* header_value_option = route_config->mutable_response_headers_to_add()->Add();
-        header_value_option->mutable_header()->set_key("x-direct-response-header");
         header_value_option->mutable_header()->set_value("direct-response-enabled");
-        header_value_option->mutable_append()->set_value(false);
-        header_value_option = route_config->mutable_response_headers_to_add()->Add();
-        header_value_option->mutable_header()->set_key("content-type");
-        header_value_option->mutable_header()->set_value("text/html");
-        header_value_option->mutable_append()->set_value(false);
-        auto* virtual_host = route_config->add_virtual_hosts();
-        virtual_host->set_name(domain);
-        virtual_host->add_domains(domain);
-        virtual_host->add_routes()->mutable_match()->set_prefix(prefix);
-        virtual_host->mutable_routes(0)->mutable_direct_response()->set_status(
-            static_cast<uint32_t>(status));
-        virtual_host->mutable_routes(0)->mutable_direct_response()->mutable_body()->set_filename(
-            file_path);
+        header_value_option->mutable_header()->set_key("x-direct-response-header");
       });
   HttpIntegrationTest::initialize();
 }
