@@ -2297,7 +2297,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
       .WillOnce(Return(FilterDataStatus::StopIterationAndBuffer));
   EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_))
       .WillOnce(Invoke([&](Http::HeaderMap&) -> FilterTrailersStatus {
-        decoder_filters_[0]->callbacks_->addDecodedTrailers().addCopy(trailer_key, trailers_data);
+        EXPECT_THROW(decoder_filters_[0]->callbacks_->addDecodedTrailers().addCopy(trailer_key, trailers_data), std::logic_error);
         return FilterTrailersStatus::Continue;
       }));
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, false))
@@ -2339,7 +2339,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInTrailersCallback) {
   // set up encodeTrailer expectations
   EXPECT_CALL(*encoder_filters_[0], encodeTrailers(_))
       .WillOnce(Invoke([&](Http::HeaderMap&) -> FilterTrailersStatus {
-        encoder_filters_[0]->callbacks_->addEncodedTrailers().addCopy(trailer_key, trailers_data);
+        EXPECT_THROW(encoder_filters_[0]->callbacks_->addEncodedTrailers().addCopy(trailer_key, trailers_data), std::logic_error);
         return FilterTrailersStatus::Continue;
       }));
 
