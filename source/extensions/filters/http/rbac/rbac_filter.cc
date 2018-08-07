@@ -9,6 +9,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
+static const std::string resp_code_200 = "200";
+static const std::string resp_code_403 = "403";
+static const std::string shadow_policy_id_field = "shadow_effective_policyID";
+static const std::string shadow_resp_code_field = "shadow_response_code";
+
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope)
@@ -81,7 +86,7 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>& shadow_engine =
       config_->engine(callbacks_->route(), EnforcementMode::Shadow);
   if (shadow_engine.has_value()) {
-    std::string shadow_resp_code = "200";
+    std::string shadow_resp_code = resp_code_200;
     if (shadow_engine->allowed(*callbacks_->connection(), headers,
                                callbacks_->requestInfo().dynamicMetadata(), effective_policy_id)) {
       ENVOY_LOG(debug, "shadow allowed");
@@ -89,7 +94,7 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
     } else {
       ENVOY_LOG(debug, "shadow denied");
       config_->stats().shadow_denied_.inc();
-      shadow_resp_code = "403";
+      shadow_resp_code = resp_code_403;
     }
 
     const auto& filter_metadata = callbacks_->requestInfo().dynamicMetadata().filter_metadata();
@@ -97,15 +102,15 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
     if (filter_it != filter_metadata.end()) {
       ProtobufWkt::Struct metrics;
 
-      if (effective_policy_id != "") {
+      if (!effective_policy_id.empty()) {
         ProtobufWkt::Value policy_id;
         policy_id.set_string_value(effective_policy_id);
-        (*metrics.mutable_fields())["shadow_effective_policyID"] = policy_id;
+        (*metrics.mutable_fields())[shadow_policy_id_field] = policy_id;
       }
 
       ProtobufWkt::Value resp_code;
       resp_code.set_string_value(shadow_resp_code);
-      (*metrics.mutable_fields())["shadow_response_code"] = resp_code;
+      (*metrics.mutable_fields())[shadow_resp_code_field] = resp_code;
 
       auto filter_meta = filter_metadata.at(HttpFilterNames::get().Rbac);
       filter_meta.MergeFrom(metrics);

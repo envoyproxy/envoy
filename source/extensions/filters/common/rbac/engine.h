@@ -25,6 +25,7 @@ public:
    * @param headers    the headers of the incoming request used to identify the action/principal. An
    *                   empty map should be used if there are no headers available.
    * @param metadata   the metadata with additional information about the action/principal.
+   * @param effective_policy_id  the matching policy's ID to identity the source of the allow/deny.
    */
   virtual bool allowed(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                        const envoy::api::v2::core::Metadata& metadata,
