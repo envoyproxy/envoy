@@ -5,7 +5,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/stat_data_allocator.h"
 #include "envoy/thread/thread.h"
 
 namespace Envoy {

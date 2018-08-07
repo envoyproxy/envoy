@@ -16,7 +16,6 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 #include "envoy/network/transport_socket.h"
-#include "envoy/stats/stats.h"
 
 namespace Envoy {
 namespace Event {

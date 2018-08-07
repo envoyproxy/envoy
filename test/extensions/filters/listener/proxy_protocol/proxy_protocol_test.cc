@@ -2,7 +2,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"

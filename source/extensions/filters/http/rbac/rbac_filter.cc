@@ -1,5 +1,7 @@
 #include "extensions/filters/http/rbac/rbac_filter.h"
 
+#include "envoy/stats/scope.h"
+
 #include "common/http/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"

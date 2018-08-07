@@ -19,6 +19,7 @@
 #include "envoy/router/rds.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/ssl/connection.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/upstream.h"
