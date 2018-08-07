@@ -817,7 +817,7 @@ config:
   path: /dev/null
   )EOF";
 
-  static_assert(RequestInfo::ResponseFlag::LastFlag == 0x1000,
+  static_assert(RequestInfo::ResponseFlag::LastFlag == 0x1200,
                 "A flag has been added. Fix this code.");
 
   std::vector<RequestInfo::ResponseFlag> all_response_flags = {
