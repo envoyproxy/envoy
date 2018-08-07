@@ -7,7 +7,7 @@
 #include "common/common/hash.h"
 #include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
-#include "common/stats/stat_data_allocator.h"
+#include "common/stats/stat_data_allocator_impl.h"
 
 namespace Envoy {
 namespace Stats {

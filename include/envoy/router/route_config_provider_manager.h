@@ -10,7 +10,6 @@
 #include "envoy/router/rds.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
-#include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 

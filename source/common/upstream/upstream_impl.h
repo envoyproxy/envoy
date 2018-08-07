@@ -21,6 +21,7 @@
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/health_checker.h"
@@ -428,6 +429,15 @@ private:
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
 };
+
+/**
+ * Function that creates a Network::TransportSocketFactoryPtr
+ * given a cluster configuration and transport socket factory
+ * context.
+ */
+Network::TransportSocketFactoryPtr
+createTransportSocketFactory(const envoy::api::v2::Cluster& config,
+                             Server::Configuration::TransportSocketFactoryContext& factory_context);
 
 /**
  * Base class all primary clusters.

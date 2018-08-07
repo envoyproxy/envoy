@@ -236,10 +236,10 @@ xDS updates can be pushed independently if no new clusters/routes/listeners
 are added or if it's acceptable to temporarily drop traffic during
 updates. Note that in case of LDS updates, the listeners will be warmed
 before they receive traffic, i.e. the dependent routes are fetched through
-RDS if configured. On the other hand, clusters are not warmed when
-adding/removing/updating clusters. Similarly, routes are not warmed --
-i.e., the management plane must ensure that clusters referenced by a route
-are in place, before pushing the updates for a rotue.
+RDS if configured. Clusters are warmed when adding/removing/updating
+clusters. On the other hand, routes are not warmed, i.e., the management
+plane must ensure that clusters referenced by a route are in place, before
+pushing the updates for a route.
 
 ### Aggregated Discovery Services (ADS)
 

@@ -8,7 +8,9 @@
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_options.h"
+#include "envoy/stats/tag_producer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"

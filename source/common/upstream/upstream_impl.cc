@@ -14,6 +14,7 @@
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/health_checker.h"
 
 #include "common/common/enum_to_int.h"
@@ -341,6 +342,8 @@ Stats::ScopePtr generateStatsScope(const envoy::api::v2::Cluster& config, Stats:
                                                           : std::string(config.alt_stat_name())));
 }
 
+} // namespace
+
 Network::TransportSocketFactoryPtr createTransportSocketFactory(
     const envoy::api::v2::Cluster& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
@@ -364,8 +367,6 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
       Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
   return config_factory.createTransportSocketFactory(*message, factory_context);
 }
-
-} // namespace
 
 ClusterSharedPtr ClusterImplBase::create(
     const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,

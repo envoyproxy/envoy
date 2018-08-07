@@ -101,7 +101,9 @@ PROTO_RST="
   /envoy/config/filter/network/redis_proxy/v2/redis_proxy/envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto.rst
   /envoy/config/filter/network/tcp_proxy/v2/tcp_proxy/envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.proto.rst
   /envoy/config/health_checker/redis/v2/redis/envoy/config/health_checker/redis/v2/redis.proto.rst
+  /envoy/config/overload/v2alpha/overload/envoy/config/overload/v2alpha/overload.proto.rst
   /envoy/config/rbac/v2alpha/rbac/envoy/config/rbac/v2alpha/rbac.proto.rst
+  /envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap/envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.proto.rst
   /envoy/config/transport_socket/capture/v2alpha/capture/envoy/config/transport_socket/capture/v2alpha/capture.proto.rst
   /envoy/data/accesslog/v2/accesslog/envoy/data/accesslog/v2/accesslog.proto.rst
   /envoy/data/core/v2alpha/health_check_event/envoy/data/core/v2alpha/health_check_event.proto.rst
@@ -113,6 +115,7 @@ PROTO_RST="
   /envoy/type/percent/envoy/type/percent.proto.rst
   /envoy/type/range/envoy/type/range.proto.rst
   /envoy/type/matcher/metadata/envoy/type/matcher/metadata.proto.rst
+  /envoy/type/matcher/value/envoy/type/matcher/value.proto.rst
   /envoy/type/matcher/number/envoy/type/matcher/number.proto.rst
   /envoy/type/matcher/string/envoy/type/matcher/string.proto.rst
 "

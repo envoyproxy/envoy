@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "envoy/runtime/runtime.h"
-#include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"

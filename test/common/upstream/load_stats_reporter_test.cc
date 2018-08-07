@@ -1,6 +1,5 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/endpoint/load_report.pb.h"
-#include "envoy/stats/stats.h"
 
 #include "common/upstream/load_stats_reporter.h"
 

@@ -9,6 +9,7 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/server/worker.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
 #include "common/network/cidr_range.h"

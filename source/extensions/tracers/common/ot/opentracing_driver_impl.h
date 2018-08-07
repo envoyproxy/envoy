@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/stats/store.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/common/logger.h"

@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/stats/stats.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"

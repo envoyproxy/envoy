@@ -24,9 +24,10 @@ public:
   // Transport
   const std::string& name() const override { return TransportNames::get().FRAMED; }
   TransportType type() const override { return TransportType::Framed; }
-  bool decodeFrameStart(Buffer::Instance& buffer, absl::optional<uint32_t>& size) override;
+  bool decodeFrameStart(Buffer::Instance& buffer, MessageMetadata& metadata) override;
   bool decodeFrameEnd(Buffer::Instance& buffer) override;
-  void encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) override;
+  void encodeFrame(Buffer::Instance& buffer, const MessageMetadata& metadata,
+                   Buffer::Instance& message) override;
 
   static const int32_t MaxFrameSize = 0xFA0000;
 };

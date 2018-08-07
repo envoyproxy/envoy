@@ -3,6 +3,8 @@
 #include <functional>
 #include <shared_mutex>
 
+#include "envoy/stats/scope.h"
+
 #include "common/common/assert.h"
 #include "common/ssl/context_impl.h"
 

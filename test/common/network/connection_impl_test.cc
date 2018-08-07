@@ -2,8 +2,6 @@
 #include <memory>
 #include <string>
 
-#include "envoy/stats/stats.h"
-
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
