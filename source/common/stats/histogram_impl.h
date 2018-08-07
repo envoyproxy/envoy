@@ -3,7 +3,9 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/store.h"
 
 #include "common/common/non_copyable.h"
 #include "common/stats/metric_impl.h"

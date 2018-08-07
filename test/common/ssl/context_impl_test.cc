@@ -1,8 +1,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/stats/stats.h"
-
 #include "common/json/json_loader.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_config_impl.h"

@@ -1,4 +1,3 @@
-#include "envoy/stats/stats.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 

@@ -1,7 +1,5 @@
 #include <string>
 
-#include "envoy/stats/stats.h"
-
 #include "extensions/filters/http/dynamo/dynamo_utility.h"
 
 #include "test/mocks/stats/mocks.h"

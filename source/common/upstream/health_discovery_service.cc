@@ -1,5 +1,7 @@
 #include "common/upstream/health_discovery_service.h"
 
+#include "envoy/stats/scope.h"
+
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {

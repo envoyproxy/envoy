@@ -3,6 +3,7 @@
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.validate.h"
+#include "envoy/stats/scope.h"
 
 #include "common/config/filter_json.h"
 #include "common/config/utility.h"

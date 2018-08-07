@@ -1,5 +1,6 @@
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/stats/scope.h"
 
 #include "common/config/subscription_factory.h"
 

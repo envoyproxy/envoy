@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "envoy/common/exception.h"
-#include "envoy/stats/stats.h"
 
 #include "common/common/utility.h"
 

@@ -4,6 +4,7 @@
 
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/subscription.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/filesystem_subscription_impl.h"
