@@ -3,6 +3,7 @@
 #include <unordered_set>
 
 #include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

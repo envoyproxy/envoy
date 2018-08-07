@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/stats/scope.h"
 
 namespace Envoy {
 namespace Server {

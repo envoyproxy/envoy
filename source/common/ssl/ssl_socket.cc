@@ -1,5 +1,7 @@
 #include "common/ssl/ssl_socket.h"
 
+#include "envoy/stats/scope.h"
+
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/hex.h"

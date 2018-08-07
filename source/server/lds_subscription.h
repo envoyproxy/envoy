@@ -3,6 +3,7 @@
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/config/subscription.h"
+#include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"

@@ -4,6 +4,7 @@
 
 #include "envoy/api/v2/cds.pb.validate.h"
 #include "envoy/api/v2/cluster/outlier_detection.pb.validate.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/cleanup.h"
 #include "common/config/resources.h"

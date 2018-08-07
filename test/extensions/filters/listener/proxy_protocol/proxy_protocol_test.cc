@@ -2,6 +2,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/stats/scope.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/listen_socket_impl.h"

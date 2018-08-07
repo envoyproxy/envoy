@@ -1,5 +1,7 @@
 #include "server/overload_manager_impl.h"
 
+#include "envoy/stats/scope.h"
+
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"

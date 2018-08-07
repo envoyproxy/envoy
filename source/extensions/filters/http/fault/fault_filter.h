@@ -10,6 +10,7 @@
 #include "envoy/config/filter/http/fault/v2/fault.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/http/header_utility.h"

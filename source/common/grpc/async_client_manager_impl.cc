@@ -1,5 +1,7 @@
 #include "common/grpc/async_client_manager_impl.h"
 
+#include "envoy/stats/scope.h"
+
 #include "common/grpc/async_client_impl.h"
 
 #ifdef ENVOY_GOOGLE_GRPC

@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/stats/scope.h"
+
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/ratelimit/ratelimit_impl.h"

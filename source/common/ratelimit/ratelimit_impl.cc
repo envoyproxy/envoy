@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/api/v2/ratelimit/ratelimit.pb.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/http/headers.h"

@@ -1,3 +1,5 @@
+#include "envoy/stats/scope.h"
+
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/http/async_client_impl.h"

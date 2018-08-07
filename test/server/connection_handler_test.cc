@@ -1,3 +1,5 @@
+#include "envoy/stats/scope.h"
+
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/raw_buffer_socket.h"
