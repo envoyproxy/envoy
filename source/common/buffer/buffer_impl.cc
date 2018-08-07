@@ -50,8 +50,11 @@ void OwnedImpl::prepend(const std::string& data) {
 }
 
 void OwnedImpl::prepend(Instance& data) {
-  evbuffer_prepend_buffer(buffer_.get(), static_cast<LibEventInstance&>(data).buffer().get());
+  int rc =
+      evbuffer_prepend_buffer(buffer_.get(), static_cast<LibEventInstance&>(data).buffer().get());
+  ASSERT(rc == 0);
   data.drain(data.length());
+  static_cast<LibEventInstance&>(data).postProcess();
 }
 
 void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {

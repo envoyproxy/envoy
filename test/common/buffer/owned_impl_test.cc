@@ -8,8 +8,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Return;
 using testing::_;
+using testing::Return;
 
 namespace Envoy {
 namespace Buffer {
@@ -77,7 +77,6 @@ TEST_F(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
 }
 
 TEST_F(OwnedImplTest, Prepend) {
-
   std::string suffix = "World!", prefix = "Hello, ";
   Buffer::OwnedImpl buffer;
   buffer.add(suffix.data(), suffix.size());
@@ -87,8 +86,21 @@ TEST_F(OwnedImplTest, Prepend) {
   EXPECT_EQ(prefix + suffix, buffer.toString());
 }
 
-TEST_F(OwnedImplTest, PrependString) {
+TEST_F(OwnedImplTest, PrependToEmptyBuffer) {
+  std::string prefix = "Hello, ";
+  Buffer::OwnedImpl buffer;
+  buffer.prepend(prefix);
 
+  EXPECT_EQ(prefix.size(), buffer.length());
+  EXPECT_EQ(prefix, buffer.toString());
+
+  buffer.prepend("");
+
+  EXPECT_EQ(prefix.size(), buffer.length());
+  EXPECT_EQ(prefix, buffer.toString());
+}
+
+TEST_F(OwnedImplTest, PrependString) {
   std::string suffix = "World!", prefix = "Hello, ";
   Buffer::OwnedImpl buffer;
   buffer.add(suffix);
@@ -99,7 +111,6 @@ TEST_F(OwnedImplTest, PrependString) {
 }
 
 TEST_F(OwnedImplTest, PrependBuffer) {
-
   std::string suffix = "World!", prefix = "Hello, ";
   Buffer::OwnedImpl buffer;
   buffer.add(suffix);
