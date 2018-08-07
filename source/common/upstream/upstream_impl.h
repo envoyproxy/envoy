@@ -599,8 +599,7 @@ protected:
 
   bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_hosts,
                              HostVector& hosts_added, HostVector& hosts_removed,
-                             std::unordered_map<std::string, HostSharedPtr>& updated_hosts,
-                             const std::unordered_map<std::string, HostSharedPtr>& existing_hosts);
+                             std::unordered_map<std::string, HostSharedPtr>& updated_hosts);
 };
 
 /**

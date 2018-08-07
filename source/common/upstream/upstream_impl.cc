@@ -808,8 +808,7 @@ void StaticClusterImpl::startPreInit() {
 
 bool BaseDynamicClusterImpl::updateDynamicHostList(
     const HostVector& new_hosts, HostVector& current_hosts, HostVector& hosts_added,
-    HostVector& hosts_removed, std::unordered_map<std::string, HostSharedPtr>& updated_hosts,
-    const std::unordered_map<std::string, HostSharedPtr>& existing_hosts) {
+    HostVector& hosts_removed, std::unordered_map<std::string, HostSharedPtr>& updated_hosts) {
   uint64_t max_host_weight = 1;
 
   // Did hosts change?
@@ -836,7 +835,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   // do the same thing.
 
   // Keep track of hosts we've seen during this pass so we can remove it from the
-  // list of current (i.e. existing hosts from this priority)
+  // list of current (i.e. existing hosts from this priority) hosts.
   std::unordered_set<std::string> seen_hosts(current_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
@@ -844,9 +843,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       continue;
     }
 
-    auto existing_host = existing_hosts.find(host->address()->asString());
+    auto existing_host = all_hosts_.find(host->address()->asString());
 
-    if (existing_host != existing_hosts.end()) {
+    if (existing_host != all_hosts_.end()) {
       seen_hosts.emplace(existing_host->first);
       // If we find a host matched based on address, we keep it. However we do change weight inline
       // so do that here.
@@ -917,7 +916,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   // Do a single pass over the current_hosts and remove any that were added to the map in the
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
-  // If there are removed hosts, check to see if we should only delete if unhealthy.
   if (!current_hosts.empty() && dont_remove_healthy_hosts) {
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
       if (!(*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
@@ -1055,7 +1053,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();
 
-        std::unordered_map<std::string, HostSharedPtr> updated_all_hosts;
+        std::unordered_map<std::string, HostSharedPtr> updated_hosts;
         HostVector new_hosts;
         for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
           // TODO(mattklein123): Currently the DNS interface does not consider port. We need to
@@ -1067,18 +1065,18 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
               parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
               lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
               locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config()));
-          updated_all_hosts[address->asString()] = new_hosts.back();
+          updated_hosts[address->asString()] = new_hosts.back();
         }
 
         HostVector hosts_added;
         HostVector hosts_removed;
         if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
-                                          updated_all_hosts, all_hosts_)) {
+                                          updated_hosts)) {
           ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
           parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
         }
 
-        all_hosts_ = std::move(updated_all_hosts);
+        parent_.all_hosts_ = std::move(updated_hosts);
 
         // If there is an initialize callback, fire it now. Note that if the cluster refers to
         // multiple DNS names, this will return initialized after a single DNS resolution
