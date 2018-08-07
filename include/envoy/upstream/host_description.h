@@ -108,9 +108,14 @@ public:
    * @return the address used to health check the host.
    */
   virtual Network::Address::InstanceConstSharedPtr healthCheckAddress() const PURE;
+
+  /**
+   * Sets the address used to health check the host. This noop by default.
+   */
+  virtual void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr){};
 };
 
 typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;
 
-} // Upstream
+} // namespace Upstream
 } // namespace Envoy

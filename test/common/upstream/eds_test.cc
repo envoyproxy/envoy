@@ -1018,6 +1018,7 @@ TEST_F(EdsTest, PriorityAndLocalityWeighted) {
   EXPECT_TRUE(initialized);
   EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
 
+  uint32_t host_index = 0;
   {
     auto& first_hosts_per_locality =
         cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
@@ -1044,12 +1045,43 @@ TEST_F(EdsTest, PriorityAndLocalityWeighted) {
     EXPECT_EQ(60, second_locality_weights[0]);
     EXPECT_EQ(2, second_hosts_per_locality.get()[1].size());
     EXPECT_EQ(40, second_locality_weights[1]);
+
+    // Find the index of host that has health check port value equals to 1000 (i.e. the first
+    // endpoint).
+    const auto& hosts = first_hosts_per_locality.get()[1];
+    for (uint32_t i = 0; i < hosts.size(); ++i) {
+      if (hosts[i]->healthCheckAddress()->ip()->port() == 1000) {
+        host_index = i;
+        break;
+      }
+    }
   }
+
+  // Update the health check port value of the first endpoint.
+  const uint32_t updated_health_check_port = 8000;
+  cluster_load_assignment->mutable_endpoints(0)
+      ->mutable_lb_endpoints(0)
+      ->mutable_endpoint()
+      ->mutable_health_check_config()
+      ->set_port_value(updated_health_check_port);
 
   // This should noop (regression test for earlier bug where we would still
   // rebuild).
   VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
   EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
+
+  {
+    auto& first_hosts_per_locality =
+        cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality();
+    EXPECT_EQ(2, first_hosts_per_locality.get().size());
+    EXPECT_EQ(1, first_hosts_per_locality.get()[0].size());
+
+    // Check if the health check port value is updated.
+    const auto& hosts = first_hosts_per_locality.get()[1];
+    const auto& current_health_check_port = hosts[host_index]->healthCheckAddress()->ip()->port();
+    EXPECT_NE(port, current_health_check_port);
+    EXPECT_EQ(updated_health_check_port, current_health_check_port);
+  }
 
   // Adjust locality weights, validate that we observe an update.
   cluster_load_assignment->mutable_endpoints(0)->mutable_load_balancing_weight()->set_value(60);

@@ -903,6 +903,13 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
           hosts_changed = true;
         }
 
+        // Did the health check address change?
+        if (*(*i)->healthCheckAddress() != *host->healthCheckAddress()) {
+          // If the health check address is updated, set the current host's health check address
+          // using the updated one.
+          (*i)->setHealthCheckAddress(host->healthCheckAddress());
+        }
+
         (*i)->weight(host->weight());
         final_hosts.push_back(*i);
         i = current_hosts.erase(i);

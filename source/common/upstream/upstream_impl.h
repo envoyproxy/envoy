@@ -121,6 +121,10 @@ public:
   Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
     return health_check_address_;
   }
+  void
+  setHealthCheckAddress(Network::Address::InstanceConstSharedPtr health_check_address) override {
+    health_check_address_ = health_check_address;
+  }
   const envoy::api::v2::core::Locality& locality() const override { return locality_; }
 
 protected:
