@@ -121,7 +121,7 @@ public:
   Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Secret::MockSecretManager secret_manager_;
+  NiceMock<Secret::MockSecretManager> secret_manager_;
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.

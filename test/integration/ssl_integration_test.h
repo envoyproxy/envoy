@@ -32,7 +32,7 @@ public:
 private:
   std::unique_ptr<Runtime::Loader> runtime_;
   std::unique_ptr<ContextManager> context_manager_;
-  Secret::MockSecretManager secret_manager_;
+  NiceMock<Secret::MockSecretManager> secret_manager_;
 
   Network::TransportSocketFactoryPtr client_ssl_ctx_plain_;
   Network::TransportSocketFactoryPtr client_ssl_ctx_alpn_;
