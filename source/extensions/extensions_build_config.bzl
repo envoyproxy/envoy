@@ -69,6 +69,7 @@ EXTENSIONS = {
     "envoy.filters.network.ratelimit":                  "//source/extensions/filters/network/ratelimit:config",
     "envoy.filters.network.tcp_proxy":                  "//source/extensions/filters/network/tcp_proxy:config",
     "envoy.filters.network.thrift_proxy":               "//source/extensions/filters/network/thrift_proxy:config",
+    "envoy.filters.network.source_ip_access":           "//source/extensions/filters/network/source_ip_access:config",  
 
     #
     # Resource monitors

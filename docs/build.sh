@@ -95,6 +95,7 @@ PROTO_RST="
   /envoy/config/filter/http/transcoder/v2/transcoder/envoy/config/filter/http/transcoder/v2/transcoder.proto.rst
   /envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth/envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.proto.rst
   /envoy/config/filter/network/ext_authz/v2/ext_authz/envoy/config/filter/network/ext_authz/v2/ext_authz.proto.rst
+  /envoy/config/filter/network/source_ip_access/v2/source_ip_access/envoy/config/filter/network/source_ip_access/v2/source_ip_access.proto.rst
   /envoy/config/filter/network/http_connection_manager/v2/http_connection_manager/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto.rst
   /envoy/config/filter/network/mongo_proxy/v2/mongo_proxy/envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.proto.rst
   /envoy/config/filter/network/rate_limit/v2/rate_limit/envoy/config/filter/network/rate_limit/v2/rate_limit.proto.rst

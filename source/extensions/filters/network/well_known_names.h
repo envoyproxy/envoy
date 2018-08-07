@@ -30,6 +30,8 @@ public:
   const std::string ExtAuthorization = "envoy.ext_authz";
   // Thrift proxy filter
   const std::string ThriftProxy = "envoy.filters.network.thrift_proxy";
+  // Source Ip Access filter
+  const std::string SourceIpAccess = "envoy.source_ip_access";
 
   // Converts names from v1 to v2
   const Config::V1Converter v1_converter_;
@@ -37,7 +39,7 @@ public:
   // NOTE: Do not add any new filters to this list. All future filters are v2 only.
   NetworkFilterNameValues()
       : v1_converter_({ClientSslAuth, Echo, HttpConnectionManager, MongoProxy, RateLimit,
-                       RedisProxy, TcpProxy, ExtAuthorization}) {}
+                       RedisProxy, TcpProxy, ExtAuthorization, SourceIpAccess}) {}
 };
 
 typedef ConstSingleton<NetworkFilterNameValues> NetworkFilterNames;
