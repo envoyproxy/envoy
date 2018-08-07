@@ -194,6 +194,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthy) {
   // Server <--> Envoy
   waitForHdsStream();
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
+  EXPECT_EQ(envoy_msg_.capability().health_check_protocol(0),
+            envoy::service::discovery::v2::Capability::HTTP);
 
   // Server asks for healthchecking
   server_health_check_specifier_ = makeHealthCheckSpecifier();
