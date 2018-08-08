@@ -5,6 +5,7 @@
 
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/secret/secret_callbacks.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
@@ -68,13 +69,19 @@ private:
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
 };
 
-class ClientSslSocketFactory : public Network::TransportSocketFactory {
+class ClientSslSocketFactory : public Network::TransportSocketFactory,
+                               public Secret::SecretCallbacks,
+                               Logger::Loggable<Logger::Id::config> {
 public:
   ClientSslSocketFactory(ClientContextConfigPtr config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope);
+  virtual ~ClientSslSocketFactory();
 
   Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
+
+  // Secret::SecretCallbacks
+  void onAddOrUpdateSecret() override;
 
 private:
   Ssl::ContextManager& manager_;
@@ -83,13 +90,19 @@ private:
   ClientContextSharedPtr ssl_ctx_;
 };
 
-class ServerSslSocketFactory : public Network::TransportSocketFactory {
+class ServerSslSocketFactory : public Network::TransportSocketFactory,
+                               public Secret::SecretCallbacks,
+                               Logger::Loggable<Logger::Id::config> {
 public:
   ServerSslSocketFactory(ServerContextConfigPtr config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope, const std::vector<std::string>& server_names);
+  virtual ~ServerSslSocketFactory();
 
   Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
+
+  // Secret::SecretCallbacks
+  void onAddOrUpdateSecret() override;
 
 private:
   Ssl::ContextManager& manager_;

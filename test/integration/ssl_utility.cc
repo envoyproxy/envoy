@@ -7,6 +7,7 @@
 #include "common/ssl/ssl_socket.h"
 
 #include "test/integration/server.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
@@ -14,8 +15,7 @@ namespace Envoy {
 namespace Ssl {
 
 Network::TransportSocketFactoryPtr
-createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& context_manager,
-                                      Secret::SecretManager& secret_manager) {
+createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& context_manager) {
   const std::string json_plain = R"EOF(
 {
   "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
@@ -59,7 +59,8 @@ createClientSslTransportSocketFactory(bool alpn, bool san, ContextManager& conte
     target = san ? json_san : json_plain;
   }
   Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(target);
-  auto cfg = std::make_unique<ClientContextConfigImpl>(*loader, secret_manager);
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
+  auto cfg = std::make_unique<ClientContextConfigImpl>(*loader, mock_factory_ctx);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::TransportSocketFactoryPtr{
       new Ssl::ClientSslSocketFactory(std::move(cfg), context_manager, *client_stats_store)};

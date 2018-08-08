@@ -34,7 +34,8 @@ envoy_cc_library(
         "ssl",
     ],
     deps = [
-        "//include/envoy/secret:secret_manager_interface",
+        "//include/envoy/secret:dynamic_secret_provider_interface",
+        "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",

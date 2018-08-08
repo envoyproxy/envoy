@@ -14,6 +14,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//include/envoy/secret:secret_manager_interface",
+        "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/ssl:tls_certificate_config_interface",
     ],
 )

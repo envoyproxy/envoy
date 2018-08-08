@@ -101,8 +101,11 @@ CaptureSocketFactory::CaptureSocketFactory(
       transport_socket_factory_(std::move(transport_socket_factory)) {}
 
 Network::TransportSocketPtr CaptureSocketFactory::createTransportSocket() const {
-  return std::make_unique<CaptureSocket>(path_prefix_, format_,
-                                         transport_socket_factory_->createTransportSocket());
+  auto transport_socket = transport_socket_factory_->createTransportSocket();
+  if (!transport_socket) {
+    return std::make_unique<CaptureSocket>(path_prefix_, format_, std::move(transport_socket));
+  }
+  return nullptr;
 }
 
 bool CaptureSocketFactory::implementsSecureTransport() const {
