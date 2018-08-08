@@ -1,5 +1,7 @@
 #pragma once
 
+#include <future>
+
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
 
@@ -21,15 +23,17 @@ public:
                                    Server::Configuration::Initial& config) override;
 };
 
+struct AdminResponse {
+  std::unique_ptr<Http::HeaderMap> headers;
+  std::string body;
+};
+
 class MainCommonBase {
 public:
   MainCommonBase(OptionsImpl& options);
   ~MainCommonBase();
 
   bool run();
-
-  using AdminRequestFn =
-      std::function<void(const Http::HeaderMap& response_headers, absl::string_view body)>;
 
   // Makes an admin-console request by path, calling handler() when complete.
   // The caller can initiate this from any thread, but it posts the request
@@ -43,8 +47,8 @@ public:
   //
   // TODO(jmarantz): consider std::future for encapsulating this delayed request
   // semantics, rather than a handler callback.
-  void adminRequest(absl::string_view path_and_query, absl::string_view method,
-                    const AdminRequestFn& handler);
+  std::future<AdminResponse> adminRequest(absl::string_view path_and_query,
+                                          absl::string_view method);
 
 protected:
   Envoy::OptionsImpl& options_;
@@ -72,9 +76,9 @@ public:
   //
   // This should only be called while run() is active; ensuring this is the
   // responsibility of the caller.
-  void adminRequest(absl::string_view path_and_query, absl::string_view method,
-                    const MainCommonBase::AdminRequestFn& handler) {
-    base_.adminRequest(path_and_query, method, handler);
+  std::future<AdminResponse> adminRequest(absl::string_view path_and_query,
+                                          absl::string_view method) {
+    return base_.adminRequest(path_and_query, method);
   }
 
   static std::string hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,
