@@ -12,7 +12,7 @@ void H1FuzzIntegrationTest::initialize() {
           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
           -> void {
         auto* route_config = hcm.mutable_route_config();
-        // adding an additional route to the default route
+        // adding direct response mode to the default route
         auto* default_route =
             hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
         default_route->mutable_match()->set_prefix(prefix);
