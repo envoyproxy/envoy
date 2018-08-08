@@ -1059,6 +1059,99 @@ TEST_F(EdsTest, PriorityAndLocalityWeighted) {
   EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
 }
 
+TEST_F(EdsTest, EndpointUpdateHealthCheckConfig) {
+  resetCluster(R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      type: EDS
+      lb_policy: ROUND_ROBIN
+      drain_connections_on_host_removal: true
+      eds_cluster_config:
+        service_name: fare
+        eds_config:
+          api_config_source:
+            cluster_names:
+            - eds
+            refresh_delay: 1s
+  )EOF");
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  auto* cluster_load_assignment = resources.Add();
+  cluster_load_assignment->set_cluster_name("fare");
+
+  auto add_endpoint = [cluster_load_assignment](int port) {
+    auto* endpoints = cluster_load_assignment->add_endpoints();
+
+    auto* socket_address = endpoints->add_lb_endpoints()
+                               ->mutable_endpoint()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_address("1.2.3.4");
+    socket_address->set_port_value(port);
+  };
+
+  auto update_health_check_port = [cluster_load_assignment](const uint32_t index,
+                                                            const uint32_t port) {
+    cluster_load_assignment->mutable_endpoints(index)
+        ->mutable_lb_endpoints(0)
+        ->mutable_endpoint()
+        ->mutable_health_check_config()
+        ->set_port_value(port);
+  };
+
+  add_endpoint(80);
+  add_endpoint(81);
+
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
+  // Make sure the custer is rebuilt.
+  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    // Mark the hosts as healthy
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+
+  const uint32_t new_health_check_port = 8000;
+  update_health_check_port(0, new_health_check_port);
+
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
+  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+    // Make sure the first endpoint health check port is updated.
+    EXPECT_EQ(new_health_check_port, hosts[0]->healthCheckAddress()->ip()->port());
+
+    EXPECT_NE(new_health_check_port, hosts[1]->healthCheckAddress()->ip()->port());
+  }
+
+  update_health_check_port(1, new_health_check_port);
+
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
+  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+    EXPECT_EQ(new_health_check_port, hosts[0]->healthCheckAddress()->ip()->port());
+
+    // Make sure the second endpoint health check port is updated.
+    EXPECT_EQ(new_health_check_port, hosts[1]->healthCheckAddress()->ip()->port());
+  }
+}
+
 // Throw on adding a new resource with an invalid endpoint (since the given address is invalid).
 TEST_F(EdsTest, MalformedIP) {
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;

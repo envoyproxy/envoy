@@ -864,11 +864,12 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
     bool found = false;
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
+      const bool address_matched = *(*i)->address() == *host->address();
       const bool health_check_changed =
           health_checker_ != nullptr && *(*i)->healthCheckAddress() != *host->healthCheckAddress();
       // If we find a host matched based on address, we keep it. However we do change weight inline
       // so do that here.
-      if (*(*i)->address() == *host->address() && !health_check_changed) {
+      if (address_matched && !health_check_changed) {
         if (host->weight() > max_host_weight) {
           max_host_weight = host->weight();
         }
@@ -911,7 +912,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         i = current_hosts.erase(i);
         found = true;
       } else {
-        if (health_check_changed) {
+        if (address_matched && health_check_changed) {
           hosts_changed = true;
         }
         i++;
