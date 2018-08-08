@@ -91,7 +91,6 @@ public:
   // returning the response body.
   std::string adminRequest(absl::string_view path, absl::string_view method) {
     auto future = main_common_->adminRequest(path, method);
-    future.wait();
     return future.get().body;
   }
 
