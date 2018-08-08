@@ -291,6 +291,7 @@ go_proto_library(
 
     _com_github_grpc_grpc()
 
+# TODO(bplotnick): port repository_locations.bzl repository management logic to here
 def _com_github_grpc_grpc():
     git_repository(
         name = "com_github_grpc_grpc",

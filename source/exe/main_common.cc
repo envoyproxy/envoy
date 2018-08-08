@@ -21,7 +21,7 @@
 #include "server/hot_restart_impl.h"
 #endif
 
-#include "ares.h"
+#include <ares.h>
 
 namespace Envoy {
 
