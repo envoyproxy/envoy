@@ -28,7 +28,6 @@ struct ClusterStatsCache {
   void printToStream(std::stringstream& out_str);
   void printRollingWindow(absl::string_view name, RollingWindow rolling_window,
                           std::stringstream& out_str);
-
   std::string cluster_name_;
 
   // Rolling windows
@@ -125,7 +124,7 @@ public:
   static void addIntToStream(absl::string_view key, uint64_t value, std::stringstream& info,
                              bool is_first = false);
 
-  static void addHistogramToStream(QuantileLatencyMap latency_map, absl::string_view key,
+  static void addHistogramToStream(const QuantileLatencyMap& latency_map, absl::string_view key,
                                    std::stringstream& ss);
 
 private:

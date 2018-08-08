@@ -7,6 +7,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
+#include "common/config/well_known_names.h"
 #include "common/http/headers.h"
 
 #include "absl/strings/str_cat.h"
@@ -44,11 +45,11 @@ void ClusterStatsCache::printRollingWindow(absl::string_view name, RollingWindow
   out_str << std::endl;
 }
 
-void HystrixSink::addHistogramToStream(QuantileLatencyMap latency_map, absl::string_view key,
+void HystrixSink::addHistogramToStream(const QuantileLatencyMap& latency_map, absl::string_view key,
                                        std::stringstream& ss) {
   ss << ", \"" << key << "\": {";
   bool is_first = true;
-  for (const std::pair<double, double> element : latency_map) {
+  for (const std::pair<double, double>& element : latency_map) {
     std::string quantile = fmt::sprintf("%g", element.first * 100);
     HystrixSink::addDoubleToStream(quantile, element.second, ss, is_first);
     is_first = false;
@@ -324,15 +325,23 @@ void HystrixSink::flush(Stats::Source& source) {
   // Save a map of the relevant histograms per cluster in a convenient format.
   std::unordered_map<std::string, QuantileLatencyMap> time_histograms;
   for (const Stats::ParentHistogramSharedPtr histogram : source.cachedHistograms()) {
-    // histogram->name() on clusters of the format "cluster.cluster_name.histogram_name"
-    // i.e. "cluster.service1.upstream_rq_time".
-    const std::vector<std::string> split_name = absl::StrSplit(histogram->name(), '.');
-    if (split_name.size() >= 2 && split_name[0] == "cluster" &&
-        split_name[2] == "upstream_rq_time") {
-      QuantileLatencyMap& hist_map = time_histograms[split_name[1]];
+    if (histogram->tagExtractedName() == "cluster.upstream_rq_time") {
+      // TODO(mrice32): add an Envoy utility function to look up and return a tag for a metric.
+      auto it = std::find_if(histogram->tags().begin(), histogram->tags().end(),
+                             [](const Stats::Tag& tag) {
+                               return (tag.name_ == Config::TagNames::get().CLUSTER_NAME);
+                             });
+
+      // Make sure we found the cluster name tag
+      ASSERT(it != histogram->tags().end());
+      // Make sure histogram with this name was not already added
+      ASSERT(time_histograms.find(it->value_) == time_histograms.end());
+      QuantileLatencyMap& hist_map = time_histograms[it->value_];
+
       const std::vector<double>& supported_quantiles =
           histogram->cumulativeStatistics().supportedQuantiles();
       for (size_t i = 0; i < supported_quantiles.size(); ++i) {
+        // binary-search here is likely not worth it, as hystrix_quantiles has <10 elements.
         if (std::find(hystrix_quantiles.begin(), hystrix_quantiles.end(), supported_quantiles[i]) !=
             hystrix_quantiles.end()) {
           hist_map[supported_quantiles[i]] = histogram->intervalStatistics().computedQuantiles()[i];
