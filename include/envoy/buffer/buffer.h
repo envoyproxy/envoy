@@ -8,6 +8,8 @@
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/pure.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Buffer {
 
@@ -78,17 +80,10 @@ public:
   virtual void add(const Instance& data) PURE;
 
   /**
-   * Prepend data to the buffer.
-   * @param data supplies the data address.
-   * @param size supplies the data size.
-   */
-  virtual void prepend(const void* data, uint64_t size) PURE;
-
-  /**
    * Prepend a string to the buffer.
    * @param data supplies the string to copy.
    */
-  virtual void prepend(const std::string& data) PURE;
+  virtual void prepend(absl::string_view data) PURE;
 
   /**
    * Prepend data from another buffer to this buffer.

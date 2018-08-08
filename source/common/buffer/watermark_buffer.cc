@@ -20,16 +20,10 @@ void WatermarkBuffer::add(const Instance& data) {
   checkHighWatermark();
 }
 
-void WatermarkBuffer::prepend(const void* data, uint64_t size) {
-  OwnedImpl::prepend(data, size);
-  checkHighWatermark();
-}
-
-void WatermarkBuffer::prepend(const std::string& data) {
+void WatermarkBuffer::prepend(absl::string_view data) {
   OwnedImpl::prepend(data);
   checkHighWatermark();
 }
-
 void WatermarkBuffer::prepend(Instance& data) {
   OwnedImpl::prepend(data);
   checkHighWatermark();

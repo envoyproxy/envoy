@@ -41,11 +41,7 @@ void OwnedImpl::add(const Instance& data) {
   }
 }
 
-void OwnedImpl::prepend(const void* data, uint64_t size) {
-  evbuffer_prepend(buffer_.get(), data, size);
-}
-
-void OwnedImpl::prepend(const std::string& data) {
+void OwnedImpl::prepend(absl::string_view data) {
   evbuffer_prepend(buffer_.get(), data.data(), data.size());
 }
 

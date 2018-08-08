@@ -80,24 +80,24 @@ TEST_F(OwnedImplTest, Prepend) {
   std::string suffix = "World!", prefix = "Hello, ";
   Buffer::OwnedImpl buffer;
   buffer.add(suffix.data(), suffix.size());
-  buffer.prepend(prefix.data(), prefix.size());
+  buffer.prepend(prefix.data());
 
   EXPECT_EQ(suffix.size() + prefix.size(), buffer.length());
   EXPECT_EQ(prefix + suffix, buffer.toString());
 }
 
 TEST_F(OwnedImplTest, PrependToEmptyBuffer) {
-  std::string prefix = "Hello, ";
+  std::string data = "Hello, World!";
   Buffer::OwnedImpl buffer;
-  buffer.prepend(prefix);
+  buffer.prepend(data);
 
-  EXPECT_EQ(prefix.size(), buffer.length());
-  EXPECT_EQ(prefix, buffer.toString());
+  EXPECT_EQ(data.size(), buffer.length());
+  EXPECT_EQ(data, buffer.toString());
 
   buffer.prepend("");
 
-  EXPECT_EQ(prefix.size(), buffer.length());
-  EXPECT_EQ(prefix, buffer.toString());
+  EXPECT_EQ(data.size(), buffer.length());
+  EXPECT_EQ(data, buffer.toString());
 }
 
 TEST_F(OwnedImplTest, PrependString) {
