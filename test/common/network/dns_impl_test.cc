@@ -1,3 +1,5 @@
+#include <ares.h>
+#include <ares_dns.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
 #include <arpa/nameser_compat.h>
@@ -27,8 +29,6 @@
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
-#include "ares.h"
-#include "ares_dns.h"
 #include "gtest/gtest.h"
 
 using testing::InSequence;

@@ -1,9 +1,4 @@
 REPOSITORY_LOCATIONS = dict(
-    boringssl = dict(
-        # Use commits from branch "chromium-stable-with-bazel"
-        commit = "372daf7042ffe3da1335743e7c93d78f1399aba7",  # chromium-68.0.3440.75
-        remote = "https://github.com/google/boringssl",
-    ),
     com_google_absl = dict(
         commit = "92e07e5590752d6b8e67f7f2f86c6286561e8cea",  # 2018-08-01
         remote = "https://github.com/abseil/abseil-cpp",
@@ -46,10 +41,6 @@ REPOSITORY_LOCATIONS = dict(
     com_github_google_libprotobuf_mutator = dict(
         commit = "c3d2faf04a1070b0b852b0efdef81e1a81ba925e",
         remote = "https://github.com/google/libprotobuf-mutator",
-    ),
-    com_github_grpc_grpc = dict(
-        commit = "bec3b5ada2c5e5d782dff0b7b5018df646b65cb0",  # v1.12.0
-        remote = "https://github.com/grpc/grpc.git",
     ),
     io_opentracing_cpp = dict(
         commit = "3b36b084a4d7fffc196eac83203cf24dfb8696b3",  # v1.4.2

@@ -1,6 +1,8 @@
 # Envoy specific Bazel build/test options.
 
 build --workspace_status_command=bazel/get_workspace_status
+# workaround bazel thread-local bug https://github.com/grpc/grpc/pull/13929
+build --copt -DGRPC_BAZEL_BUILD
 
 # Basic ASAN/UBSAN that works for gcc
 build:asan --define ENVOY_CONFIG_ASAN=1

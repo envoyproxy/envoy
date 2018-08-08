@@ -8,16 +8,6 @@ config_setting(
 )
 
 cc_library(
-    name = "ares",
-    srcs = select({
-        ":windows_x86_64": ["thirdparty_build/lib/cares.lib"],
-        "//conditions:default": ["thirdparty_build/lib/libcares.a"],
-    }),
-    hdrs = glob(["thirdparty_build/include/ares*.h"]),
-    includes = ["thirdparty_build/include"],
-)
-
-cc_library(
     name = "benchmark",
     srcs = select({
         ":windows_x86_64": ["thirdparty_build/lib/benchmark.lib"],

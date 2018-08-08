@@ -1,5 +1,6 @@
 GOOGLEAPIS_SHA = "d642131a6e6582fc226caf9893cb7fe7885b3411"  # May 23, 2018
 GOGOPROTO_SHA = "1adfc126b41513cc696b209667c8656ea7aac67c"  # v1.0.0
+GRPC_SHA = "befc7220cadb963755de86763a04ab6f9dc14200"  # v1.13.1
 PROMETHEUS_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
 OPENCENSUS_SHA = "ab82e5fdec8267dc2a726544b10af97675970847"  # May 23, 2018
 
@@ -286,4 +287,83 @@ go_proto_library(
     visibility = ["//visibility:public"],
 )
         """,
+    )
+
+    _com_github_grpc_grpc()
+
+# TODO(bplotnick): port repository_locations.bzl repository management logic to here
+def _com_github_grpc_grpc():
+    git_repository(
+        name = "com_github_grpc_grpc",
+        remote = "https://github.com/grpc/grpc.git",
+        commit = GRPC_SHA,
+    )
+
+    # Rebind some stuff to match what the gRPC Bazel is expecting.
+    native.bind(
+        name = "protobuf_headers",
+        actual = "@com_google_protobuf//:protobuf_headers",
+    )
+
+    native.bind(
+        name = "libssl",
+        actual = "@boringssl//:ssl",
+    )
+
+    # Envoy requires this bind
+    native.bind(
+        name = "ssl",
+        actual = "@boringssl//:ssl",
+    )
+
+    if "boringssl" not in native.existing_rules():
+        native.http_archive(
+            name = "boringssl",
+            # chromium-68.0.3440.75
+            url = "https://boringssl.googlesource.com/boringssl/+archive/372daf7042ffe3da1335743e7c93d78f1399aba7.tar.gz",
+        )
+
+    native.bind(
+        name = "ares",
+        actual = "@com_github_cares_cares//:ares",
+    )
+
+    native.bind(
+        name = "cares",
+        actual = "@com_github_cares_cares//:ares",
+    )
+
+    if "com_github_cares_cares" not in native.existing_rules():
+        native.new_http_archive(
+            name = "com_github_cares_cares",
+            build_file = "@com_github_grpc_grpc//third_party:cares/cares.BUILD",
+            strip_prefix = "c-ares-cares-1_14_0",
+            url = "https://github.com/c-ares/c-ares/archive/cares-1_14_0.tar.gz",
+        )
+
+    native.bind(
+        name = "grpc",
+        actual = "@com_github_grpc_grpc//:grpc++",
+    )
+
+    native.bind(
+        name = "grpc_health_proto",
+        actual = "@envoy//bazel:grpc_health_proto",
+    )
+
+    # cc_proto_library via pgv_cc_proto_library requires these binds
+    # Once https://github.com/bazelbuild/bazel/issues/1943 is fixed, we can just call grpc_deps()
+    native.bind(
+        name = "grpc_lib",
+        actual = "@com_github_grpc_grpc//:grpc++",
+    )
+
+    native.bind(
+        name = "grpc_cpp_plugin",
+        actual = "@com_github_grpc_grpc//:grpc_cpp_plugin",
+    )
+
+    native.bind(
+        name = "protobuf_clib",
+        actual = "@com_google_protobuf//:protoc_lib",
     )

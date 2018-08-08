@@ -131,6 +131,7 @@ def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], de
             "@com_github_gogo_protobuf//:gogo_proto_cc",
         ],
         visibility = ["//visibility:public"],
+        use_grpc_plugin = True,
     )
     if (require_py == 1):
         api_py_proto_library(name, srcs, deps, has_services)

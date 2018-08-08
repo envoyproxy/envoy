@@ -2,7 +2,6 @@
 # target in //ci/prebuilt/BUILD to the underlying build recipe in
 # ci/build_container/build_recipes.
 TARGET_RECIPES = {
-    "ares": "cares",
     "benchmark": "benchmark",
     "event": "libevent",
     "tcmalloc_and_profiler": "gperftools",

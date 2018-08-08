@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ares.h>
 #include <netdb.h>
 
 #include <cstdint>
@@ -13,8 +14,6 @@
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
 #include "common/common/utility.h"
-
-#include "ares.h"
 
 namespace Envoy {
 namespace Network {
