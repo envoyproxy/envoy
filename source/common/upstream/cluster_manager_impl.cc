@@ -524,10 +524,12 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
 // isn't enough; the unique_ptrs won't go away because the armed timers hold
 // references to them. So we take care of those too.
 void ClusterManagerImpl::destroyUpdates(const std::string& name) {
-  auto& updates_by_prio = updates_map_[name];
-  if (!updates_by_prio) {
+  auto updates_by_prio_pair = updates_map_.find(name);
+  if (updates_by_prio_pair == updates_map_.end()) {
     return;
   }
+
+  auto& updates_by_prio = updates_by_prio_pair->second;
 
   for (auto& prio_updates : (*updates_by_prio)) {
     auto& updates = prio_updates.second;
