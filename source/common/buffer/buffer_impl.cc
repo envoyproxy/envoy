@@ -49,7 +49,7 @@ void OwnedImpl::prepend(Instance& data) {
   int rc =
       evbuffer_prepend_buffer(buffer_.get(), static_cast<LibEventInstance&>(data).buffer().get());
   ASSERT(rc == 0);
-  data.drain(data.length());
+  ASSERT(data.length() == 0);
   static_cast<LibEventInstance&>(data).postProcess();
 }
 
