@@ -1,9 +1,6 @@
-#include <typeinfo>
-
 #include "envoy/api/v2/eds.pb.h"
 
 #include "common/upstream/load_balancer_impl.h"
-
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/network_utility.h"
@@ -27,9 +24,7 @@ public:
     envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("cluster_0");
     if (overprovisioning_factor.has_value()) {
-      cluster_load_assignment.mutable_policy()->mutable_overprovisioning_factor()->set_value(
-          overprovisioning_factor
-          : value());
+      cluster_load_assignment.mutable_policy()->mutable_overprovisioning_factor()->set_value(overprovisioning_factor.value());
     }
     auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
 
