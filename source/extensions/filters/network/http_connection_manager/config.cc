@@ -290,8 +290,8 @@ void HttpConnectionManagerConfig::processFilter(
     callback = factory.createFilterFactory(*filter_config->getObject("value", true), stats_prefix_,
                                            context_);
   } else {
-    ProtobufTypes::MessagePtr message =
-        Config::Utility::translateToFactoryConfig(proto_config, factory);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        proto_config, factory, context_.allowUnknownFields());
     callback = factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
   }
   filter_factories.push_back(callback);

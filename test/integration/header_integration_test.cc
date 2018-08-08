@@ -227,7 +227,8 @@ public:
           MessageUtil::loadFromYaml(http_connection_mgr_config, hcm, false);
           envoy::config::filter::http::router::v2::Router router_config;
           router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
-          MessageUtil::jsonConvert(router_config, *hcm.mutable_http_filters(0)->mutable_config(), false);
+          MessageUtil::jsonConvert(router_config, *hcm.mutable_http_filters(0)->mutable_config(),
+                                   false);
 
           const bool append = mode == HeaderMode::Append;
 

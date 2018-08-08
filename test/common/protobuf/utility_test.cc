@@ -62,8 +62,8 @@ TEST(UtilityTest, LoadBinaryProtoUnknownFieldFromFile) {
       TestEnvironment::writeStringToFileForTest("proto.pb", source_duration.SerializeAsString());
 
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
-  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromFile(filename, proto_from_file, false), EnvoyException,
-                          "Unable to parse file .* due to unknown fields");
+  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromFile(filename, proto_from_file, false),
+                          EnvoyException, "Unable to parse file .* due to unknown fields");
 }
 
 TEST(UtilityTest, LoadTextProtoFromFile) {
@@ -88,7 +88,8 @@ TEST(UtilityTest, LoadTextProtoFromFile_Failure) {
       TestEnvironment::writeStringToFileForTest("proto.pb_text", "invalid {");
 
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
-  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromFile(filename, proto_from_file, false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromFile(filename, proto_from_file, false),
+                            EnvoyException,
                             "Unable to parse file \"" + filename +
                                 "\" as a text protobuf (type envoy.config.bootstrap.v2.Bootstrap)");
 }
@@ -237,15 +238,17 @@ TEST(UtilityTest, JsonConvertUnknownFieldSuccess) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   EXPECT_NO_THROW(MessageUtil::jsonConvert(obj, bootstrap, true));
   EXPECT_THROW_WITH_MESSAGE(MessageUtil::jsonConvert(obj, bootstrap, false), EnvoyException,
-                          "Unable to parse JSON as proto (INVALID_ARGUMENT:: invalid name test_key: Cannot find field.): "
-                          "{\"test_key\":\"test_value\"}");
+                            "Unable to parse JSON as proto (INVALID_ARGUMENT:: invalid name "
+                            "test_key: Cannot find field.): "
+                            "{\"test_key\":\"test_value\"}");
 }
 
 TEST(UtilityTest, JsonConvertFail) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(-281474976710656);
   ProtobufWkt::Duration dest_duration;
-  EXPECT_THROW_WITH_REGEX(MessageUtil::jsonConvert(source_duration, dest_duration, false), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(MessageUtil::jsonConvert(source_duration, dest_duration, false),
+                          EnvoyException,
                           "Unable to convert protobuf message to JSON string.*"
                           "seconds exceeds limit for field:  seconds: -281474976710656\n");
 }

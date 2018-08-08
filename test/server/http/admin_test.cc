@@ -744,7 +744,8 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters", header_map, response));
   std::string text_output = response.toString();
   envoy::admin::v2alpha::Clusters failed_conversion_proto;
-  EXPECT_THROW(MessageUtil::loadFromJson(text_output, failed_conversion_proto, false), EnvoyException);
+  EXPECT_THROW(MessageUtil::loadFromJson(text_output, failed_conversion_proto, false),
+               EnvoyException);
 }
 
 TEST_P(AdminInstanceTest, GetRequest) {

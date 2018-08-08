@@ -130,7 +130,7 @@ protected:
 TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   setDispatcherExpectation();
 
-  OverloadManagerImpl manager(dispatcher_, stats_, parseConfig(getConfig()));
+  OverloadManagerImpl manager(dispatcher_, stats_, parseConfig(getConfig()), false);
   bool is_active = false;
   int cb_count = 0;
   manager.registerForAction("envoy.overload_actions.dummy_action", dispatcher_,
@@ -188,7 +188,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
 
 TEST_F(OverloadManagerImplTest, FailedUpdates) {
   setDispatcherExpectation();
-  OverloadManagerImpl manager(dispatcher_, stats_, parseConfig(getConfig()));
+  OverloadManagerImpl manager(dispatcher_, stats_, parseConfig(getConfig()), false);
   manager.start();
   Stats::Counter& failed_updates =
       stats_.counter("overload.envoy.resource_monitors.fake_resource1.failed_updates");
@@ -207,7 +207,7 @@ TEST_F(OverloadManagerImplTest, SkippedUpdates) {
   Event::PostCb post_cb;
   ON_CALL(dispatcher_, post(_)).WillByDefault(Invoke([&](Event::PostCb cb) { post_cb = cb; }));
 
-  OverloadManagerImpl manager(dispatcher_, stats_, parseConfig(getConfig()));
+  OverloadManagerImpl manager(dispatcher_, stats_, parseConfig(getConfig()), false);
   manager.start();
   Stats::Counter& skipped_updates =
       stats_.counter("overload.envoy.resource_monitors.fake_resource1.skipped_updates");
@@ -233,7 +233,7 @@ TEST_F(OverloadManagerImplTest, DuplicateResourceMonitor) {
     }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, stats_, parseConfig(config)),
+  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, stats_, parseConfig(config), false),
                           EnvoyException, "Duplicate resource monitor .*");
 }
 
@@ -247,7 +247,7 @@ TEST_F(OverloadManagerImplTest, DuplicateOverloadAction) {
     }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, stats_, parseConfig(config)),
+  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, stats_, parseConfig(config), false),
                           EnvoyException, "Duplicate overload action .*");
 }
 
@@ -264,7 +264,7 @@ TEST_F(OverloadManagerImplTest, UnknownTrigger) {
     }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, stats_, parseConfig(config)),
+  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, stats_, parseConfig(config), false),
                           EnvoyException, "Unknown trigger resource .*");
 }
 
@@ -290,7 +290,7 @@ TEST_F(OverloadManagerImplTest, DuplicateTrigger) {
     }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, stats_, parseConfig(config)),
+  EXPECT_THROW_WITH_REGEX(OverloadManagerImpl(dispatcher_, stats_, parseConfig(config), false),
                           EnvoyException, "Duplicate trigger .*");
 }
 } // namespace

@@ -155,7 +155,8 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
     }
     if (!options.configYaml().empty()) {
       envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
-      MessageUtil::loadFromYaml(options.configYaml(), bootstrap_override, options.allowUnknownFields());
+      MessageUtil::loadFromYaml(options.configYaml(), bootstrap_override,
+                                options.allowUnknownFields());
       bootstrap.MergeFrom(bootstrap_override);
     }
     MessageUtil::validate(bootstrap);
@@ -248,8 +249,8 @@ void InstanceImpl::initialize(Options& options,
   loadServerFlags(initial_config.flagsPath());
 
   // Initialize the overload manager early so other modules can register for actions.
-  overload_manager_.reset(
-      new OverloadManagerImpl(dispatcher(), stats(), bootstrap_.overload_manager()));
+  overload_manager_.reset(new OverloadManagerImpl(
+      dispatcher(), stats(), bootstrap_.overload_manager(), options.allowUnknownFields()));
 
   // Workers get created first so they register for thread local updates.
   listener_manager_.reset(new ListenerManagerImpl(

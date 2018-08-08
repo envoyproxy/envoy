@@ -209,7 +209,8 @@ AccessLogFactory::fromProto(const envoy::config::filter::accesslog::v2::AccessLo
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
           config.name());
-  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(config, factory);
+  ProtobufTypes::MessagePtr message =
+      Config::Utility::translateToFactoryConfig(config, factory, context.allowUnknownFields());
 
   return factory.createAccessLogInstance(*message, std::move(filter), context);
 }

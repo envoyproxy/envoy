@@ -39,7 +39,9 @@ public:
   void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
   void setV2ConfigOnly(bool v2_config_only) { v2_config_only_ = v2_config_only; }
-  void setAllowUnknownFields(bool allow_unknown_fields) { allow_unknown_fields_ = allow_unknown_fields; }
+  void setAllowUnknownFields(bool allow_unknown_fields) {
+    allow_unknown_fields_ = allow_unknown_fields;
+  }
   void setAdminAddressPath(const std::string& admin_address_path) {
     admin_address_path_ = admin_address_path;
   }

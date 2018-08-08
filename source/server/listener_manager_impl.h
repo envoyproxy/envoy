@@ -253,6 +253,7 @@ public:
   AccessLog::AccessLogManager& accessLogManager() override {
     return parent_.server_.accessLogManager();
   }
+  bool allowUnknownFields() override { return parent_.server_.options().allowUnknownFields(); }
   Upstream::ClusterManager& clusterManager() override { return parent_.server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return parent_.server_.dispatcher(); }
   Network::DrainDecision& drainDecision() override { return *this; }

@@ -48,7 +48,8 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
   ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
 }
 
-void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message, bool allow_unknown_fields) {
+void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
+                               bool allow_unknown_fields) {
   Protobuf::util::JsonParseOptions options;
   options.ignore_unknown_fields = allow_unknown_fields;
   const auto status = Protobuf::util::JsonStringToMessage(json, &message, options);
@@ -57,12 +58,14 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
   }
 }
 
-void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message, bool allow_unknown_fields) {
+void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message,
+                               bool allow_unknown_fields) {
   const std::string json = Json::Factory::loadFromYamlString(yaml)->asJsonString();
   loadFromJson(json, message, allow_unknown_fields);
 }
 
-void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message, bool allow_unknown_fields) {
+void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message,
+                               bool allow_unknown_fields) {
   const std::string contents = Filesystem::fileReadToEnd(path);
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (StringUtil::endsWith(path, ".pb")) {
@@ -71,7 +74,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
       // Check that no unknown fields are present if necessary.
       if (!allow_unknown_fields && !message.GetReflection()->GetUnknownFields(message).empty()) {
         throw EnvoyException("Unable to parse file \"" + path + "\" as a binary protobuf (type " +
-                              message.GetTypeName() + ") due to unknown fields");
+                             message.GetTypeName() + ") due to unknown fields");
       }
       return;
     }
@@ -117,7 +120,8 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   return json;
 }
 
-void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest, bool allow_unknown_fields) {
+void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest,
+                              bool allow_unknown_fields) {
   // TODO(htuch): Consolidate with the inflight cleanups here.
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;

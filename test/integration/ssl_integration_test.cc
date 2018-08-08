@@ -197,7 +197,8 @@ public:
       // Configure inner SSL transport socket based on existing config.
       envoy::api::v2::core::TransportSocket ssl_transport_socket;
       ssl_transport_socket.set_name("tls");
-      MessageUtil::jsonConvert(filter_chain->tls_context(), *ssl_transport_socket.mutable_config(), false);
+      MessageUtil::jsonConvert(filter_chain->tls_context(), *ssl_transport_socket.mutable_config(),
+                               false);
       // Configure outer capture transport socket.
       auto* transport_socket = filter_chain->mutable_transport_socket();
       transport_socket->set_name("envoy.transport_sockets.capture");
