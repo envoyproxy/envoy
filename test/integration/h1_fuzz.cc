@@ -11,7 +11,7 @@
 namespace Envoy {
 
 void H1FuzzIntegrationTest::replay(const test::integration::CaptureFuzzTestCase& input) {
-
+  initialize();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
   FakeRawConnectionPtr fake_upstream_connection;
@@ -65,4 +65,6 @@ void H1FuzzIntegrationTest::replay(const test::integration::CaptureFuzzTestCase&
     RELEASE_ASSERT(result, result.message());
   }
   tcp_client->close();
+}
+
 } // namespace Envoy

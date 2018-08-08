@@ -1,5 +1,8 @@
 #pragma once
 
+#include "common/common/assert.h"
+#include "common/common/logger.h"
+
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/capture_fuzz.pb.h"
 #include "test/integration/http_integration.h"
