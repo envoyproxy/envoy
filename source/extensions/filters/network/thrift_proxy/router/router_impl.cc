@@ -1,3 +1,5 @@
+#include "common/common/utility.h"
+
 #include "extensions/filters/network/thrift_proxy/router/router_impl.h"
 
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
@@ -24,24 +26,52 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry() const { return shared_fro
 
 MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
-    : RouteEntryImplBase(route), method_name_(route.match().method()) {}
+  : RouteEntryImplBase(route),
+    method_name_(route.match().method_name()),
+    invert_(route.match().invert()) {}
 
 RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
-  if (method_name_.empty()) {
-    return clusterEntry();
-  }
+  bool matches = method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
 
-  if (metadata.hasMethodName() && metadata.methodName() == method_name_) {
+  if (matches ^ invert_) {
     return clusterEntry();
+  } else {
+    return nullptr;
   }
+}
 
-  return nullptr;
+ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
+    const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
+  : RouteEntryImplBase(route),
+    service_name_(route.match().service_name()),
+    invert_(route.match().invert()) {}
+
+RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
+  bool matches = service_name_.empty() ||
+    (metadata.hasMethodName() && StringUtil::startsWith(metadata.methodName().c_str(), service_name_));
+
+  if (matches ^ invert_) {
+    return clusterEntry();
+  } else {
+    return nullptr;
+  }
 }
 
 RouteMatcher::RouteMatcher(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration& config) {
+  using envoy::config::filter::network::thrift_proxy::v2alpha1::RouteMatch;
+
   for (const auto& route : config.routes()) {
-    routes_.emplace_back(new MethodNameRouteEntryImpl(route));
+    switch (route.match().match_specifier_case()) {
+    case RouteMatch::MatchSpecifierCase::kMethodName:
+      routes_.emplace_back(new MethodNameRouteEntryImpl(route));
+      break;
+    case RouteMatch::MatchSpecifierCase::kServiceName:
+      routes_.emplace_back(new ServiceNameRouteEntryImpl(route));
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
   }
 }
 

@@ -693,11 +693,11 @@ TEST(RouteMatcherTest, Route) {
 name: config
 routes:
   - match:
-      method: "method1"
+      method_name: "method1"
     route:
       cluster: "cluster1"
   - match:
-      method: "method2"
+      method_name: "method2"
     route:
       cluster: "cluster2"
 )EOF";
@@ -729,10 +729,11 @@ TEST(RouteMatcherTest, RouteMatchAny) {
 name: config
 routes:
   - match:
-      method: "method1"
+      method_name: "method1"
     route:
       cluster: "cluster1"
-  - match: {}
+  - match:
+      method_name: ""
     route:
       cluster: "cluster2"
 )EOF";

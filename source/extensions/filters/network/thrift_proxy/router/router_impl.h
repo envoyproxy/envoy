@@ -57,6 +57,22 @@ public:
 
 private:
   const std::string method_name_;
+  bool invert_;
+};
+
+class ServiceNameRouteEntryImpl : public RouteEntryImplBase {
+public:
+  ServiceNameRouteEntryImpl(
+      const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route);
+
+  const std::string& serviceName() const { return service_name_; }
+
+  // RoutEntryImplBase
+  RouteConstSharedPtr matches(const MessageMetadata& metadata) const override;
+
+private:
+  const std::string service_name_;
+  bool invert_;
 };
 
 class RouteMatcher {
