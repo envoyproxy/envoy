@@ -269,6 +269,30 @@ public:
   }
 
   /**
+   * Translate a nested config into protocol specific options proto message provided by the
+   * implementation factory.
+   * @param source a message that contains the opaque config for the given factory's
+   *        protocol specific configuration.
+   * @param factory implementation factory with the method 'createEmptyProtocolOptionsProto' to
+   *        produce a proto to be filled with the translated configuration.
+   * @return ProtobufTypes::MessagePtr the converted message
+   * @throws EnvoyException if the factory does not support protocol options
+   */
+  template <class Factory>
+  static ProtobufTypes::MessagePtr
+  translateToFactoryProtocolOptionsConfig(const Protobuf::Message& source, Factory& factory) {
+    ProtobufTypes::MessagePtr config = factory.createEmptyProtocolOptionsProto();
+
+    if (config == nullptr) {
+      throw EnvoyException(
+          fmt::format("filter {} does not support protocol options", factory.name()));
+    }
+
+    MessageUtil::jsonConvert(source, *config);
+    return config;
+  }
+
+  /**
    * Create TagProducer instance. Check all tag names for conflicts to avoid
    * unexpected tag name overwriting.
    * @param bootstrap bootstrap proto.

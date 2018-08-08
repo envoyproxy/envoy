@@ -390,6 +390,17 @@ struct ClusterLoadReportStats {
 };
 
 /**
+ * All extension protocol specific options returned by the method at
+ *   NamedNetworkFilterConfigFactory::createProtocolOptions
+ * must be derived from this class.
+ */
+class ProtocolOptionsConfig {
+public:
+  virtual ~ProtocolOptionsConfig() {}
+};
+typedef std::shared_ptr<const ProtocolOptionsConfig> ProtocolOptionsConfigConstSharedPtr;
+
+/**
  * Information about a given upstream cluster.
  */
 class ClusterInfo {
@@ -437,6 +448,15 @@ public:
    *         @see Http::Http2Settings.
    */
   virtual const Http::Http2Settings& http2Settings() const PURE;
+
+  /**
+   * @param name std::string containing the well-known name of the extension for which protocol
+   *        options are desired
+   * @return ProtocolOptionsConfigConstSharedPtr for extension protocol connections
+   *         created on behalf of this cluster.
+   */
+  virtual ProtocolOptionsConfigConstSharedPtr
+  extensionProtocolOptions(const std::string& name) const PURE;
 
   /**
    * @return const envoy::api::v2::Cluster::CommonLbConfig& the common configuration for all

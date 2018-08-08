@@ -25,6 +25,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1478,18 +1479,33 @@ TEST(PrioritySet, Extend) {
   }
 }
 
-// Cluster metadata retrieval.
-TEST(ClusterMetadataTest, Metadata) {
-  Stats::IsolatedStoreImpl stats;
-  Ssl::MockContextManager ssl_context_manager;
-  auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
-  NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockLoader> runtime;
-  NiceMock<MockClusterManager> cm;
-  NiceMock<LocalInfo::MockLocalInfo> local_info;
-  NiceMock<Runtime::MockRandomGenerator> random;
-  ReadyWatcher initialized;
+class ClusterInfoImplTest : public testing::Test {
+public:
+  std::unique_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml) {
+    envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+    Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                              : cluster_config.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_);
 
+    return std::make_unique<StrictDnsClusterImpl>(cluster_config, runtime_, dns_resolver_,
+                                                  factory_context, std::move(scope), false);
+  }
+
+  Stats::IsolatedStoreImpl stats_;
+  Ssl::MockContextManager ssl_context_manager_;
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver_{new NiceMock<Network::MockDnsResolver>()};
+  NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<MockClusterManager> cm_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
+  ReadyWatcher initialized_;
+};
+
+// Cluster metadata retrieval.
+TEST_F(ClusterInfoImplTest, Metadata) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -1502,19 +1518,112 @@ TEST(ClusterMetadataTest, Metadata) {
         value: 0.3
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
-      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
-                                                            : cluster_config.alt_stat_name()));
-  Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-      ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
-  StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
-                               std::move(scope), false);
+  auto cluster = makeCluster(yaml);
+
   EXPECT_EQ("test_value",
-            Config::Metadata::metadataValue(cluster.info()->metadata(), "com.bar.foo", "baz")
+            Config::Metadata::metadataValue(cluster->info()->metadata(), "com.bar.foo", "baz")
                 .string_value());
-  EXPECT_EQ(0.3, cluster.info()->lbConfig().healthy_panic_threshold().value());
-  EXPECT_EQ(LoadBalancerType::Maglev, cluster.info()->lbType());
+  EXPECT_EQ(0.3, cluster->info()->lbConfig().healthy_panic_threshold().value());
+  EXPECT_EQ(LoadBalancerType::Maglev, cluster->info()->lbType());
+}
+
+TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    extension_protocol_options:
+      no_such_filter: { option: value }
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(makeCluster(yaml), EnvoyException,
+                          "Didn't find a registered implementation for name:.*");
+}
+
+class TestFilterConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
+public:
+  TestFilterConfigFactory(
+      std::function<ProtobufTypes::MessagePtr()> empty_proto,
+      std::function<Upstream::ProtocolOptionsConfigConstSharedPtr(const Protobuf::Message&)> config)
+      : empty_proto_(empty_proto), config_(config) {}
+
+  // NamedNetworkFilterConfigFactory
+  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
+                                               Server::Configuration::FactoryContext&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override { return empty_proto_(); }
+  Upstream::ProtocolOptionsConfigConstSharedPtr
+  createProtocolOptionsConfig(const Protobuf::Message& msg) {
+    return config_(msg);
+  }
+  std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+
+  std::function<ProtobufTypes::MessagePtr()> empty_proto_;
+  std::function<Upstream::ProtocolOptionsConfigConstSharedPtr(const Protobuf::Message&)> config_;
+};
+
+struct TestFilterProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig {};
+
+TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
+  TestFilterConfigFactory factory(
+      []() -> ProtobufTypes::MessagePtr { return nullptr; },
+      [](const Protobuf::Message&) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
+        return nullptr;
+      });
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(factory);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    extension_protocol_options:
+      envoy.test.filter: { option: value }
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "filter envoy.test.filter does not support protocol options");
+}
+
+TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
+  auto protocol_options = std::shared_ptr<TestFilterProtocolOptionsConfig>();
+
+  TestFilterConfigFactory factory(
+      []() -> ProtobufTypes::MessagePtr { return std::make_unique<ProtobufWkt::Struct>(); },
+      [&](const Protobuf::Message& msg) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
+        const auto& msg_struct = dynamic_cast<const ProtobufWkt::Struct&>(msg);
+        EXPECT_TRUE(msg_struct.fields().find("option") != msg_struct.fields().end());
+
+        return protocol_options;
+      });
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(factory);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
+    extension_protocol_options:
+      envoy.test.filter: { option: "value" }
+  )EOF";
+
+  auto cluster = makeCluster(yaml);
+
+  ProtocolOptionsConfigConstSharedPtr stored_options =
+      cluster->info()->extensionProtocolOptions("envoy.test.filter");
+  // Same pointer
+  EXPECT_EQ(stored_options.get(), protocol_options.get());
 }
 
 // Validate empty singleton for HostsPerLocalityImpl.
