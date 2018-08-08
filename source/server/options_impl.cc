@@ -64,8 +64,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::SwitchArg allow_v1_config("", "allow-deprecated-v1-api", "allow use of legacy v1 config",
                                    cmd, false);
 
-  TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields",
-                                 "allow unknown fields in the filter configuration", cmd, true);
+  TCLAP::SwitchArg allow_unknown_fields(
+      "", "allow-unknown-fields", "allow unknown fields in the filter configuration", cmd, false);
 
   TCLAP::ValueArg<std::string> admin_address_path("", "admin-address-path", "Admin address path",
                                                   false, "", "string", cmd);
