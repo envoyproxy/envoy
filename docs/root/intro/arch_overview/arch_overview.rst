@@ -38,3 +38,4 @@ Architecture overview
   scripting
   ext_authz_filter
   overload_manager
+  source_ip_access_filter

@@ -3,6 +3,7 @@ Version history
 
 1.8.0 (Pending)
 ===============
+* access filter: added :ref:`Source IP access filter <config_network_filters_source_ip_access>`.
 * access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>`
   to filter based on the presence of Envoy response flags.
 * access log: added RESPONSE_DURATION and RESPONSE_TX_DURATION.

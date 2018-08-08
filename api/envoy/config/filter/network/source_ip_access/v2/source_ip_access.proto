@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.config.filter.network.source_ip_access.v2;
+option go_package = "v2";
+
+import "envoy/api/v2/core/address.proto";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Source IP Access ]
+// Source IP Access
+// :ref:`configuration overview <config_network_filters_source_ip_access>`.
+
+// Source IP Access filter allows whitelisting or blacklisting IP addresses using CIDR notation.
+// TCP connections from IP addresses that are denied will be closed immediately.
+message SourceIpAccess {
+  // The prefix to use when emitting statistics.
+  string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
+
+  // Will accept all connections other than from addresses specified in exception_prefixes field if
+  // true. Will deny all connections other than from addresses specified in exception_prefixes field
+  // if false.
+  bool allow_by_default = 2;
+
+  // List of source IP addresses to be exceptions from the default behavior.
+  repeated envoy.api.v2.core.CidrRange exception_prefixes = 3;
+}

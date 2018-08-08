@@ -567,3 +567,18 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "source_ip_access_integration_test",
+    srcs = [
+        "source_ip_access_integration_test.cc",
+    ],
+    deps = [
+        ":integration_lib",
+        "//source/extensions/filters/network/source_ip_access:config",
+        "//source/extensions/filters/network/tcp_proxy:config",
+        "//test/server:utility_lib",
+        "//test/test_common:network_utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
