@@ -13,7 +13,8 @@ void H1FuzzIntegrationTest::initialize() {
           -> void {
         auto* route_config = hcm.mutable_route_config();
         // adding an additional route to the default route
-        auto* default_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+        auto* default_route =
+            hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
         default_route->mutable_match()->set_prefix(prefix);
         default_route->mutable_direct_response()->set_status(static_cast<uint32_t>(status));
         default_route->mutable_direct_response()->mutable_body()->set_filename(file_path);
