@@ -5,8 +5,6 @@
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
-#include "absl/types/optional.h"
-
 namespace Envoy {
 namespace Ssl {
 
