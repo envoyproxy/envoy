@@ -124,7 +124,7 @@ public:
     }
 
     envoy::service::accesslog::v2::StreamAccessLogsMessage expected_request_msg;
-    MessageUtil::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
+    MessageUtil::loadFromYaml(expected_request_msg_yaml, expected_request_msg, false);
     EXPECT_CALL(*streamer_, send(_, "hello_log"))
         .WillOnce(Invoke(
             [expected_request_msg](envoy::service::accesslog::v2::StreamAccessLogsMessage& message,

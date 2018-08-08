@@ -52,6 +52,7 @@ public:
     Protobuf::RepeatedPtrField<ResourceType> typed_resources;
     for (const auto& resource : response.resources()) {
       auto* typed_resource = typed_resources.Add();
+      // TODO(kuat)
       resource.UnpackTo(typed_resource);
     }
     return typed_resources;
@@ -241,7 +242,8 @@ public:
     RELEASE_ASSERT(config != nullptr, "");
 
     if (enclosing_message.has_config()) {
-      MessageUtil::jsonConvert(enclosing_message.config(), *config);
+      // TODO(kuat)
+      MessageUtil::jsonConvert(enclosing_message.config(), *config, true);
     }
 
     return config;
@@ -264,7 +266,8 @@ public:
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");
 
-    MessageUtil::jsonConvert(source, *config);
+    // TODO(kuat)
+    MessageUtil::jsonConvert(source, *config, true);
     return config;
   }
 

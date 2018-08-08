@@ -35,7 +35,7 @@ TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
 
   ExtAuthzConfigFactory factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  MessageUtil::loadFromYaml(yaml, *proto_config);
+  MessageUtil::loadFromYaml(yaml, *proto_config, false);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 

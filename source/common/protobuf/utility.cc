@@ -48,26 +48,31 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
   ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
 }
 
-void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message) {
+void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message, bool allow_unknown_fields) {
   Protobuf::util::JsonParseOptions options;
-  options.ignore_unknown_fields = true;
+  options.ignore_unknown_fields = allow_unknown_fields;
   const auto status = Protobuf::util::JsonStringToMessage(json, &message, options);
   if (!status.ok()) {
     throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
   }
 }
 
-void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
+void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message, bool allow_unknown_fields) {
   const std::string json = Json::Factory::loadFromYamlString(yaml)->asJsonString();
-  loadFromJson(json, message);
+  loadFromJson(json, message, allow_unknown_fields);
 }
 
-void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message) {
+void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message, bool allow_unknown_fields) {
   const std::string contents = Filesystem::fileReadToEnd(path);
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (StringUtil::endsWith(path, ".pb")) {
     // Attempt to parse the binary format.
     if (message.ParseFromString(contents)) {
+      // Check that no unknown fields are present if necessary.
+      if (!allow_unknown_fields && !message.GetReflection()->GetUnknownFields(message).empty()) {
+        throw EnvoyException("Unable to parse file \"" + path + "\" as a binary protobuf (type " +
+                              message.GetTypeName() + ") due to unknown fields");
+      }
       return;
     }
     throw EnvoyException("Unable to parse file \"" + path + "\" as a binary protobuf (type " +
@@ -75,6 +80,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
   if (StringUtil::endsWith(path, ".pb_text")) {
+    // Text protobuf unconditionally disallows unknown fields.
     if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
       return;
     }
@@ -82,9 +88,9 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                          message.GetTypeName() + ")");
   }
   if (StringUtil::endsWith(path, ".yaml")) {
-    loadFromYaml(contents, message);
+    loadFromYaml(contents, message, allow_unknown_fields);
   } else {
-    loadFromJson(contents, message);
+    loadFromJson(contents, message, allow_unknown_fields);
   }
 }
 
@@ -111,7 +117,7 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   return json;
 }
 
-void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
+void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest, bool allow_unknown_fields) {
   // TODO(htuch): Consolidate with the inflight cleanups here.
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;
@@ -121,7 +127,7 @@ void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message
     throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
                                      status.ToString(), source.DebugString()));
   }
-  MessageUtil::loadFromJson(json, dest);
+  MessageUtil::loadFromJson(json, dest, allow_unknown_fields);
 }
 
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {

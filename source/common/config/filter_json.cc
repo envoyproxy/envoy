@@ -113,7 +113,7 @@ void FilterJson::translateAccessLog(const Json::Object& json_config,
   JSON_UTIL_SET_STRING(json_config, file_access_log, format);
 
   ProtobufWkt::Struct& custom_config = *proto_config.mutable_config();
-  MessageUtil::jsonConvert(file_access_log, custom_config);
+  MessageUtil::jsonConvert(file_access_log, custom_config, false);
 
   // Statically registered access logs are a v2-only feature, so use the standard internal file
   // access log for json config conversion.
@@ -341,7 +341,7 @@ void FilterJson::translateSquashConfig(
   JSON_UTIL_SET_STRING(json_config, proto_config, cluster);
   // convert json object to google.protobuf.Struct
   std::string json_string = json_config.getObject("attachment_template")->asJsonString();
-  MessageUtil::loadFromJson(json_string, *proto_config.mutable_attachment_template());
+  MessageUtil::loadFromJson(json_string, *proto_config.mutable_attachment_template(), false);
 
   JSON_UTIL_SET_DURATION(json_config, proto_config, attachment_timeout);
   JSON_UTIL_SET_DURATION(json_config, proto_config, attachment_poll_period);

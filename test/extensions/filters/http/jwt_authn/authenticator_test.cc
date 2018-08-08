@@ -25,7 +25,7 @@ namespace JwtAuthn {
 class AuthenticatorTest : public ::testing::Test {
 public:
   void SetUp() {
-    MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
+    MessageUtil::loadFromYaml(ExampleConfig, proto_config_, false);
     CreateAuthenticator();
   }
 

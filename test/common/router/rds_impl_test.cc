@@ -396,7 +396,7 @@ public:
 
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::RouteConfiguration route_config;
-  MessageUtil::loadFromYaml(yaml, route_config);
+  MessageUtil::loadFromYaml(yaml, route_config, false);
   return route_config;
 }
 
@@ -412,7 +412,7 @@ TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
 static_route_configs:
 dynamic_route_configs:
 )EOF",
-                            expected_route_config_dump);
+                            expected_route_config_dump, false);
   EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump.DebugString());
 
   std::string config_yaml = R"EOF(
@@ -452,7 +452,7 @@ static_route_configs:
       nanos: 234000000
 dynamic_route_configs:
 )EOF",
-                            expected_route_config_dump);
+                            expected_route_config_dump, false);
   EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump2.DebugString());
 
   // Static + dynamic.
@@ -497,7 +497,7 @@ dynamic_route_configs:
       seconds: 1234567891
       nanos: 234000000
 )EOF",
-                            expected_route_config_dump);
+                            expected_route_config_dump, false);
   EXPECT_EQ(expected_route_config_dump.DebugString(), route_config_dump3.DebugString());
 }
 

@@ -317,7 +317,7 @@ TEST_P(WebsocketIntegrationTest, WebSocketLogging) {
 
     envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
         http_conn_manager_config;
-    MessageUtil::jsonConvert(*config_blob, http_conn_manager_config);
+    MessageUtil::jsonConvert(*config_blob, http_conn_manager_config, false);
 
     auto* access_log = http_conn_manager_config.add_access_log();
     access_log->set_name("envoy.file_access_log");
@@ -327,8 +327,8 @@ TEST_P(WebsocketIntegrationTest, WebSocketLogging) {
         expected_log_template, "%BYTES_SENT%", "%BYTES_RECEIVED%", "%DOWNSTREAM_LOCAL_ADDRESS%",
         "%DOWNSTREAM_REMOTE_ADDRESS%", "%UPSTREAM_LOCAL_ADDRESS%"));
 
-    MessageUtil::jsonConvert(access_log_config, *access_log->mutable_config());
-    MessageUtil::jsonConvert(http_conn_manager_config, *config_blob);
+    MessageUtil::jsonConvert(access_log_config, *access_log->mutable_config(), false);
+    MessageUtil::jsonConvert(http_conn_manager_config, *config_blob, false);
   });
 
   initialize();
@@ -472,7 +472,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
         auto* filter_list_back = foo_upgrade->add_filters();
         const std::string json =
             Json::Factory::loadFromYamlString("name: envoy.router")->asJsonString();
-        MessageUtil::loadFromJson(json, *filter_list_back);
+        MessageUtil::loadFromJson(json, *filter_list_back, false);
       });
   initialize();
 

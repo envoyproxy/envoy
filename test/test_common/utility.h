@@ -247,7 +247,7 @@ public:
    */
   template <class MessageType> static MessageType parseYaml(const std::string& yaml) {
     MessageType message;
-    MessageUtil::loadFromYaml(yaml, message);
+    MessageUtil::loadFromYaml(yaml, message, false);
     return message;
   }
 

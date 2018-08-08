@@ -56,7 +56,7 @@ inline envoy::api::v2::Cluster parseClusterFromJson(const std::string& json_stri
 
 inline envoy::api::v2::Cluster parseClusterFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::Cluster cluster;
-  MessageUtil::loadFromYaml(yaml, cluster);
+  MessageUtil::loadFromYaml(yaml, cluster, false);
   return cluster;
 }
 
@@ -118,7 +118,7 @@ inline HostsPerLocalitySharedPtr makeHostsPerLocality(std::vector<HostVector>&& 
 inline envoy::api::v2::core::HealthCheck
 parseHealthCheckFromV2Yaml(const std::string& yaml_string) {
   envoy::api::v2::core::HealthCheck health_check;
-  MessageUtil::loadFromYaml(yaml_string, health_check);
+  MessageUtil::loadFromYaml(yaml_string, health_check, false);
   return health_check;
 }
 

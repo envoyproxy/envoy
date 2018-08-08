@@ -38,7 +38,7 @@ TEST(StatsConfigTest, ValidTcpStatsd) {
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  MessageUtil::jsonConvert(sink_config, *message);
+  MessageUtil::jsonConvert(sink_config, *message, false);
 
   NiceMock<Server::MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
@@ -72,7 +72,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkDefaultPrefix) {
       Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
   ASSERT_NE(factory, nullptr);
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  MessageUtil::jsonConvert(sink_config, *message);
+  MessageUtil::jsonConvert(sink_config, *message, false);
 
   NiceMock<Server::MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
@@ -104,7 +104,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
       Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
   ASSERT_NE(factory, nullptr);
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  MessageUtil::jsonConvert(sink_config, *message);
+  MessageUtil::jsonConvert(sink_config, *message, false);
 
   NiceMock<Server::MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
@@ -127,7 +127,7 @@ TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
   ASSERT_NE(factory, nullptr);
   EXPECT_EQ(sink_config.prefix(), "");
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  MessageUtil::jsonConvert(sink_config, *message);
+  MessageUtil::jsonConvert(sink_config, *message, false);
 
   NiceMock<Server::MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
@@ -152,7 +152,7 @@ TEST(StatsConfigTest, TcpSinkCustomPrefix) {
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  MessageUtil::jsonConvert(sink_config, *message);
+  MessageUtil::jsonConvert(sink_config, *message, false);
 
   NiceMock<Server::MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
@@ -184,7 +184,7 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  MessageUtil::jsonConvert(sink_config, *message);
+  MessageUtil::jsonConvert(sink_config, *message, false);
 
   NiceMock<Server::MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);

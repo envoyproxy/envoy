@@ -55,7 +55,7 @@ envoy::api::v2::RouteConfiguration parseRouteConfigurationFromJson(const std::st
 
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::RouteConfiguration route_config;
-  MessageUtil::loadFromYaml(yaml, route_config);
+  MessageUtil::loadFromYaml(yaml, route_config, false);
   return route_config;
 }
 

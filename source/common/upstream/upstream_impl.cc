@@ -354,7 +354,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   if (!config.has_transport_socket()) {
     if (config.has_tls_context()) {
       transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
-      MessageUtil::jsonConvert(config.tls_context(), *transport_socket.mutable_config());
+      MessageUtil::jsonConvert(config.tls_context(), *transport_socket.mutable_config(), true);
     } else {
       transport_socket.set_name(
           Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);

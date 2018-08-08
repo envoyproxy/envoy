@@ -690,7 +690,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json", header_map, response));
   std::string output_json = response.toString();
   envoy::admin::v2alpha::Clusters output_proto;
-  MessageUtil::loadFromJson(output_json, output_proto);
+  MessageUtil::loadFromJson(output_json, output_proto, false);
 
   const std::string expected_json = R"EOF({
  "cluster_statuses": [
@@ -735,7 +735,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 )EOF";
 
   envoy::admin::v2alpha::Clusters expected_proto;
-  MessageUtil::loadFromJson(expected_json, expected_proto);
+  MessageUtil::loadFromJson(expected_json, expected_proto, false);
 
   // Ensure the protos created from each JSON are equivalent.
   EXPECT_THAT(output_proto, ProtoEq(expected_proto));
@@ -744,7 +744,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters", header_map, response));
   std::string text_output = response.toString();
   envoy::admin::v2alpha::Clusters failed_conversion_proto;
-  EXPECT_THROW(MessageUtil::loadFromJson(text_output, failed_conversion_proto), EnvoyException);
+  EXPECT_THROW(MessageUtil::loadFromJson(text_output, failed_conversion_proto, false), EnvoyException);
 }
 
 TEST_P(AdminInstanceTest, GetRequest) {

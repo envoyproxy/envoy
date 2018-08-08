@@ -50,8 +50,20 @@ TEST(UtilityTest, LoadBinaryProtoFromFile) {
       TestEnvironment::writeStringToFileForTest("proto.pb", bootstrap.SerializeAsString());
 
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
-  MessageUtil::loadFromFile(filename, proto_from_file);
+  MessageUtil::loadFromFile(filename, proto_from_file, false);
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
+}
+
+TEST(UtilityTest, LoadBinaryProtoUnknownFieldFromFile) {
+  ProtobufWkt::Duration source_duration;
+  source_duration.set_seconds(42);
+
+  const std::string filename =
+      TestEnvironment::writeStringToFileForTest("proto.pb", source_duration.SerializeAsString());
+
+  envoy::config::bootstrap::v2::Bootstrap proto_from_file;
+  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromFile(filename, proto_from_file, false), EnvoyException,
+                          "Unable to parse file .* due to unknown fields");
 }
 
 TEST(UtilityTest, LoadTextProtoFromFile) {
@@ -67,7 +79,7 @@ TEST(UtilityTest, LoadTextProtoFromFile) {
       TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);
 
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
-  MessageUtil::loadFromFile(filename, proto_from_file);
+  MessageUtil::loadFromFile(filename, proto_from_file, false);
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
@@ -76,7 +88,7 @@ TEST(UtilityTest, LoadTextProtoFromFile_Failure) {
       TestEnvironment::writeStringToFileForTest("proto.pb_text", "invalid {");
 
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
-  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromFile(filename, proto_from_file), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromFile(filename, proto_from_file, false), EnvoyException,
                             "Unable to parse file \"" + filename +
                                 "\" as a text protobuf (type envoy.config.bootstrap.v2.Bootstrap)");
 }
@@ -216,21 +228,24 @@ TEST(UtilityTest, JsonConvertSuccess) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Duration dest_duration;
-  MessageUtil::jsonConvert(source_duration, dest_duration);
+  MessageUtil::jsonConvert(source_duration, dest_duration, false);
   EXPECT_EQ(42, dest_duration.seconds());
 }
 
 TEST(UtilityTest, JsonConvertUnknownFieldSuccess) {
   const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  EXPECT_NO_THROW(MessageUtil::jsonConvert(obj, bootstrap));
+  EXPECT_NO_THROW(MessageUtil::jsonConvert(obj, bootstrap, true));
+  EXPECT_THROW_WITH_MESSAGE(MessageUtil::jsonConvert(obj, bootstrap, false), EnvoyException,
+                          "Unable to parse JSON as proto (INVALID_ARGUMENT:: invalid name test_key: Cannot find field.): "
+                          "{\"test_key\":\"test_value\"}");
 }
 
 TEST(UtilityTest, JsonConvertFail) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(-281474976710656);
   ProtobufWkt::Duration dest_duration;
-  EXPECT_THROW_WITH_REGEX(MessageUtil::jsonConvert(source_duration, dest_duration), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(MessageUtil::jsonConvert(source_duration, dest_duration, false), EnvoyException,
                           "Unable to convert protobuf message to JSON string.*"
                           "seconds exceeds limit for field:  seconds: -281474976710656\n");
 }
@@ -241,9 +256,9 @@ TEST(UtilityTest, JsonConvertCamelSnake) {
   // Make sure we use a field eligible for snake/camel case translation.
   bootstrap.mutable_cluster_manager()->set_local_cluster_name("foo");
   ProtobufWkt::Struct json;
-  MessageUtil::jsonConvert(bootstrap, json);
+  MessageUtil::jsonConvert(bootstrap, json, false);
   // Verify we can round-trip. This didn't cause the #3665 regression, but useful as a sanity check.
-  MessageUtil::loadFromJson(MessageUtil::getJsonStringFromMessage(json, false), bootstrap);
+  MessageUtil::loadFromJson(MessageUtil::getJsonStringFromMessage(json, false), bootstrap, false);
   // Verify we don't do a camel case conversion.
   EXPECT_EQ("foo", json.fields()
                        .at("cluster_manager")

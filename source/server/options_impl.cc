@@ -61,6 +61,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   // Deprecated and unused.
   TCLAP::SwitchArg v2_config_only("", "v2-config-only", "deprecated", cmd, true);
 
+  TCLAP::SwitchArg allow_unknown_fields("", "allow-unknown-fields", "allow unknown fields in the config", cmd, true);
+
   TCLAP::SwitchArg allow_v1_config("", "allow-deprecated-v1-api", "allow use of legacy v1 config",
                                    cmd, false);
 
@@ -184,6 +186,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
   v2_config_only_ = !allow_v1_config.getValue();
+  allow_unknown_fields_ = allow_unknown_fields.getValue();
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();
   restart_epoch_ = restart_epoch.getValue();

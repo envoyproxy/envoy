@@ -37,7 +37,7 @@ request_rules:
 
   void initializeFilter(const std::string& yaml) {
     envoy::config::filter::http::header_to_metadata::v2::Config config;
-    MessageUtil::loadFromYaml(yaml, config);
+    MessageUtil::loadFromYaml(yaml, config, false);
     config_.reset(new Config(config));
     filter_.reset(new HeaderToMetadataFilter(config_));
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);

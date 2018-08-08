@@ -59,7 +59,7 @@ private:
     bool config_update_available = false;
     try {
       envoy::api::v2::DiscoveryResponse message;
-      MessageUtil::loadFromFile(path_, message);
+      MessageUtil::loadFromFile(path_, message, true);
       const auto typed_resources = Config::Utility::getTypedResources<ResourceType>(message);
       config_update_available = true;
       callbacks_->onConfigUpdate(typed_resources, message.version_info());

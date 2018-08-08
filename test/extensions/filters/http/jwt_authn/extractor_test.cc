@@ -50,7 +50,7 @@ providers:
 class ExtractorTest : public ::testing::Test {
 public:
   void SetUp() {
-    MessageUtil::loadFromYaml(ExampleConfig, config_);
+    MessageUtil::loadFromYaml(ExampleConfig, config_, false);
     extractor_ = Extractor::create(config_);
   }
 

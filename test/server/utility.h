@@ -18,7 +18,7 @@ inline envoy::api::v2::Listener parseListenerFromJson(const std::string& json_st
 
 inline envoy::api::v2::Listener parseListenerFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::Listener listener;
-  MessageUtil::loadFromYaml(yaml, listener);
+  MessageUtil::loadFromYaml(yaml, listener, false);
   return listener;
 }
 

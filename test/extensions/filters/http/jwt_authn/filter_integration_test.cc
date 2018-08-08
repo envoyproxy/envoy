@@ -16,7 +16,7 @@ namespace {
 
 std::string getFilterConfig(bool use_local_jwks) {
   JwtAuthentication proto_config;
-  MessageUtil::loadFromYaml(ExampleConfig, proto_config);
+  MessageUtil::loadFromYaml(ExampleConfig, proto_config, false);
 
   if (use_local_jwks) {
     auto& provider0 = (*proto_config.mutable_providers())[std::string(ProviderName)];
@@ -27,7 +27,7 @@ std::string getFilterConfig(bool use_local_jwks) {
 
   HttpFilter filter;
   filter.set_name(HttpFilterNames::get().JwtAuthn);
-  MessageUtil::jsonConvert(proto_config, *filter.mutable_config());
+  MessageUtil::jsonConvert(proto_config, *filter.mutable_config(), false);
   return MessageUtil::getJsonStringFromMessage(filter);
 }
 

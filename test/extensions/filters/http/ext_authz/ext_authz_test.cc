@@ -68,7 +68,7 @@ public:
 
   void initialize(const std::string yaml) {
     envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
-    MessageUtil::loadFromYaml(yaml, proto_config);
+    MessageUtil::loadFromYaml(yaml, proto_config, false);
     config_.reset(new FilterConfig(proto_config, local_info_, stats_store_, runtime_, cm_));
 
     client_ = new Filters::Common::ExtAuthz::MockClient();
@@ -109,7 +109,7 @@ envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz GetFilterConfig() {
       cluster_name: "ext_authz_server"
   )EOF";
   envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
-  MessageUtil::loadFromYaml(yaml, proto_config);
+  MessageUtil::loadFromYaml(yaml, proto_config, false);
   proto_config.set_failure_mode_allow(failure_mode_allow_value);
   return proto_config;
 }
@@ -521,7 +521,7 @@ TEST_F(HttpExtAuthzFilterTest, BadConfig) {
   )EOF";
 
   envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz proto_config{};
-  MessageUtil::loadFromYaml(filter_config, proto_config);
+  MessageUtil::loadFromYaml(filter_config, proto_config, false);
 
   EXPECT_THROW(MessageUtil::downcastAndValidate<
                    const envoy::config::filter::http::ext_authz::v2alpha::ExtAuthz&>(proto_config),

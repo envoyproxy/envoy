@@ -158,9 +158,9 @@ public:
     return HashUtil::xxHash64(text);
   }
 
-  static void loadFromJson(const std::string& json, Protobuf::Message& message);
-  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message);
-  static void loadFromFile(const std::string& path, Protobuf::Message& message);
+  static void loadFromJson(const std::string& json, Protobuf::Message& message, bool allow_unknown_fields);
+  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message, bool allow_unknown_fields);
+  static void loadFromFile(const std::string& path, Protobuf::Message& message, bool allow_unknown_fields);
 
   /**
    * Validate protoc-gen-validate constraints on a given protobuf.
@@ -225,7 +225,7 @@ public:
    * @param source message.
    * @param dest message.
    */
-  static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest);
+  static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest, bool allow_unknown_fields);
 
   /**
    * Extract JSON as string from a google.protobuf.Message.

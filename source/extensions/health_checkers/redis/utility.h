@@ -14,7 +14,7 @@ static const envoy::config::health_checker::redis::v2::Redis
 getRedisHealthCheckConfig(const envoy::api::v2::core::HealthCheck& hc_config) {
   ProtobufTypes::MessagePtr config =
       ProtobufTypes::MessagePtr{new envoy::config::health_checker::redis::v2::Redis()};
-  MessageUtil::jsonConvert(hc_config.custom_health_check().config(), *config);
+  MessageUtil::jsonConvert(hc_config.custom_health_check().config(), *config, true);
   return MessageUtil::downcastAndValidate<const envoy::config::health_checker::redis::v2::Redis&>(
       *config);
 }

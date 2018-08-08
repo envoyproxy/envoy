@@ -39,10 +39,10 @@ SquashFilterConfig constructSquashFilterConfigFromJson(
 
 void EXPECT_JSON_EQ(const std::string& expected, const std::string& actual) {
   ProtobufWkt::Struct actualjson;
-  MessageUtil::loadFromJson(actual, actualjson);
+  MessageUtil::loadFromJson(actual, actualjson, false);
 
   ProtobufWkt::Struct expectedjson;
-  MessageUtil::loadFromJson(expected, expectedjson);
+  MessageUtil::loadFromJson(expected, expectedjson, false);
 
   EXPECT_TRUE(MessageDifferencer::Equals(expectedjson, actualjson));
 }

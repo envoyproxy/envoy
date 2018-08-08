@@ -151,11 +151,11 @@ InstanceUtil::loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& boots
                                   Options& options) {
   try {
     if (!options.configPath().empty()) {
-      MessageUtil::loadFromFile(options.configPath(), bootstrap);
+      MessageUtil::loadFromFile(options.configPath(), bootstrap, options.allowUnknownFields());
     }
     if (!options.configYaml().empty()) {
       envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
-      MessageUtil::loadFromYaml(options.configYaml(), bootstrap_override);
+      MessageUtil::loadFromYaml(options.configYaml(), bootstrap_override, options.allowUnknownFields());
       bootstrap.MergeFrom(bootstrap_override);
     }
     MessageUtil::validate(bootstrap);
