@@ -80,8 +80,8 @@ public:
   virtual void add(const Instance& data) PURE;
 
   /**
-   * Prepend a string to the buffer.
-   * @param data supplies the string to copy.
+   * Prepend a string_view to the buffer.
+   * @param data supplies the string_view to copy.
    */
   virtual void prepend(absl::string_view data) PURE;
 

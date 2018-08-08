@@ -24,6 +24,7 @@ void WatermarkBuffer::prepend(absl::string_view data) {
   OwnedImpl::prepend(data);
   checkHighWatermark();
 }
+
 void WatermarkBuffer::prepend(Instance& data) {
   OwnedImpl::prepend(data);
   checkHighWatermark();

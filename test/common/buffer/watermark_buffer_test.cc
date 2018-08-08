@@ -65,9 +65,9 @@ TEST_F(WatermarkBufferTest, AddBuffer) {
 TEST_F(WatermarkBufferTest, Prepend) {
   std::string suffix = "World!", prefix = "Hello, ";
 
-  buffer_.add(suffix.data(), suffix.size());
+  buffer_.add(suffix);
   EXPECT_EQ(0, times_high_watermark_called_);
-  buffer_.prepend(prefix.data());
+  buffer_.prepend(prefix);
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(suffix.size() + prefix.size(), buffer_.length());
 }
@@ -84,16 +84,6 @@ TEST_F(WatermarkBufferTest, PrependToEmptyBuffer) {
   EXPECT_EQ(suffix.size() + prefix.size(), buffer_.length());
 
   buffer_.prepend("");
-  EXPECT_EQ(1, times_high_watermark_called_);
-  EXPECT_EQ(suffix.size() + prefix.size(), buffer_.length());
-}
-
-TEST_F(WatermarkBufferTest, PrependString) {
-  std::string suffix = "World!", prefix = "Hello, ";
-
-  buffer_.add(suffix);
-  EXPECT_EQ(0, times_high_watermark_called_);
-  buffer_.prepend(prefix);
   EXPECT_EQ(1, times_high_watermark_called_);
   EXPECT_EQ(suffix.size() + prefix.size(), buffer_.length());
 }

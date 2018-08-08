@@ -79,8 +79,8 @@ TEST_F(OwnedImplTest, AddBufferFragmentDynamicAllocation) {
 TEST_F(OwnedImplTest, Prepend) {
   std::string suffix = "World!", prefix = "Hello, ";
   Buffer::OwnedImpl buffer;
-  buffer.add(suffix.data(), suffix.size());
-  buffer.prepend(prefix.data());
+  buffer.add(suffix);
+  buffer.prepend(prefix);
 
   EXPECT_EQ(suffix.size() + prefix.size(), buffer.length());
   EXPECT_EQ(prefix + suffix, buffer.toString());
@@ -98,16 +98,6 @@ TEST_F(OwnedImplTest, PrependToEmptyBuffer) {
 
   EXPECT_EQ(data.size(), buffer.length());
   EXPECT_EQ(data, buffer.toString());
-}
-
-TEST_F(OwnedImplTest, PrependString) {
-  std::string suffix = "World!", prefix = "Hello, ";
-  Buffer::OwnedImpl buffer;
-  buffer.add(suffix);
-  buffer.prepend(prefix);
-
-  EXPECT_EQ(suffix.size() + prefix.size(), buffer.length());
-  EXPECT_EQ(prefix + suffix, buffer.toString());
 }
 
 TEST_F(OwnedImplTest, PrependBuffer) {
