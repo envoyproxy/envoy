@@ -98,16 +98,16 @@ std::future<AdminResponse> MainCommonBase::adminRequest(absl::string_view path_a
   std::string path_and_query_buf = std::string(path_and_query);
   std::string method_buf = std::string(method);
   // Note: must be a shared_ptr to allow the std::function to be copyable.
-  auto promise = std::make_shared<std::promise<AdminResponse>>();
-  std::future<AdminResponse> future = promise->get_future();
+  auto response_promise = std::make_shared<std::promise<AdminResponse>>();
+  std::future<AdminResponse> response_future = response_promise->get_future();
   server_->dispatcher().post(
-      [ this, path_and_query_buf, method_buf, promise{std::move(promise)} ]() {
+      [ this, path_and_query_buf, method_buf, response_promise{std::move(response_promise)} ]() {
         AdminResponse response;
         response.headers = std::make_unique<Http::HeaderMapImpl>();
         server_->admin().request(path_and_query_buf, method_buf, *response.headers, response.body);
-        promise->set_value(std::move(response));
+        response_promise->set_value(std::move(response));
       });
-  return future;
+  return response_future;
 }
 
 MainCommon::MainCommon(int argc, const char* const* argv)

@@ -90,8 +90,8 @@ public:
   // Runs a an admin request specified in path, blocking until completion, and
   // returning the response body.
   std::string adminRequest(absl::string_view path, absl::string_view method) {
-    auto future = main_common_->adminRequest(path, method);
-    return future.get().body;
+    std::future<AdminResponse> response_future = main_common_->adminRequest(path, method);
+    return response_future.get().body;
   }
 
   // Initiates Envoy running in its own thread.
