@@ -372,6 +372,7 @@ private:
   typedef std::map<std::string, ClusterDataPtr> ClusterMap;
 
   struct PendingUpdates {
+    ~PendingUpdates() { disableTimer(); }
     void enableTimer(const uint64_t timeout) {
       ASSERT(!timer_enabled_);
       if (timer_ != nullptr) {
@@ -406,7 +407,6 @@ private:
 
   void applyUpdates(const Cluster& cluster, uint32_t priority, PendingUpdates& updates);
   bool scheduleUpdate(const Cluster& cluster, uint32_t priority, bool mergeable);
-  void destroyUpdates(const std::string& name);
   void createOrUpdateThreadLocalCluster(ClusterData& cluster);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
   static ClusterManagerStats generateStats(Stats::Scope& scope);

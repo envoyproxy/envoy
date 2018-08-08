@@ -504,7 +504,7 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
 
       // If the cluster is being updated, we need to destroy any pending merged updates.
       // Othewise, applyUpdates() will fire with a dangling cluster reference.
-      destroyUpdates(cluster_name);
+      updates_map_.erase(cluster_name);
 
       active_clusters_[cluster_name] = std::move(warming_it->second);
       warming_clusters_.erase(warming_it);
@@ -518,31 +518,6 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
 
   updateGauges();
   return true;
-}
-
-// Note: simply deleting the entry corresponding to this cluster from updates_map_
-// isn't enough; the unique_ptrs won't go away because the armed timers hold
-// references to them. So we take care of those too.
-void ClusterManagerImpl::destroyUpdates(const std::string& name) {
-  auto updates_by_prio_pair = updates_map_.find(name);
-  if (updates_by_prio_pair == updates_map_.end()) {
-    return;
-  }
-
-  auto& updates_by_prio = updates_by_prio_pair->second;
-
-  for (auto& prio_updates : (*updates_by_prio)) {
-    auto& updates = prio_updates.second;
-    if (!updates) {
-      continue;
-    }
-
-    updates->disableTimer();
-    // This is needed, because timer_ has a ref to updates.
-    updates->timer_ = nullptr;
-  }
-
-  updates_map_.erase(name);
 }
 
 void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) {
@@ -605,7 +580,7 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
     cm_stats_.cluster_removed_.inc();
     updateGauges();
     // Did we ever deliver merged updates for this cluster?
-    destroyUpdates(cluster_name);
+    updates_map_.erase(cluster_name);
   }
 
   return removed;
