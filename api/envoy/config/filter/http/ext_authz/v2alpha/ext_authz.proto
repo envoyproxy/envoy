@@ -57,6 +57,8 @@ message HttpService {
   // Sets an optional prefix to the value of authorization request header `path`.
   string path_prefix = 2;
 
+  reserved 3;
+
   // Sets a list of headers that can be sent from the authorization server to the upstream or to the
   // downstream when present in the authorization response. Note that a matched request header will
   // have its value overriden by the ones sent from the authorization server.
