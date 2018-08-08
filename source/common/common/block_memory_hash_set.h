@@ -5,12 +5,11 @@
 #include <utility>
 
 #include "envoy/common/exception.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
-#include "common/stats/stats_impl.h"
 
 #include "absl/strings/string_view.h"
 
@@ -165,7 +164,7 @@ public:
     cell.next_cell_index = slots_[slot];
     slots_[slot] = cell_index;
     value = &cell.value;
-    value->truncateAndInit(key, stats_options_);
+    value->initialize(key, stats_options_);
     ++control_->size;
     return ValueCreatedPair(value, true);
   }

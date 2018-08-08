@@ -13,6 +13,7 @@
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
 

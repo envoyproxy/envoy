@@ -33,19 +33,20 @@ void TcpProxyIntegrationTest::initialize() {
 TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
-  fake_upstream_connection->write("hello");
+  ASSERT_TRUE(fake_upstream_connection->write("hello"));
   tcp_client->waitForData("hello");
 
   tcp_client->write("hello");
-  fake_upstream_connection->waitForData(5);
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
 
-  fake_upstream_connection->write("", true);
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
   tcp_client->waitForHalfClose();
   tcp_client->write("", true);
-  fake_upstream_connection->waitForHalfClose();
-  fake_upstream_connection->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
 // Test proxying data in both directions, and that all data is flushed properly
@@ -54,11 +55,12 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamDisconnect) {
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->write("hello");
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  fake_upstream_connection->waitForData(5);
-  fake_upstream_connection->write("world");
-  fake_upstream_connection->close();
-  fake_upstream_connection->waitForDisconnect();
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForHalfClose();
   tcp_client->close();
 
@@ -71,15 +73,16 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamDisconnect) {
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->write("hello");
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  fake_upstream_connection->waitForData(5);
-  fake_upstream_connection->write("world");
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
   tcp_client->waitForData("world");
   tcp_client->write("hello", true);
-  fake_upstream_connection->waitForData(10);
-  fake_upstream_connection->waitForHalfClose();
-  fake_upstream_connection->write("", true);
-  fake_upstream_connection->waitForDisconnect(true);
+  ASSERT_TRUE(fake_upstream_connection->waitForData(10));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
   tcp_client->waitForDisconnect();
 }
 
@@ -90,14 +93,15 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyLargeWrite) {
   std::string data(1024 * 16, 'a');
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->write(data);
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  fake_upstream_connection->waitForData(data.size());
-  fake_upstream_connection->write(data);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size()));
+  ASSERT_TRUE(fake_upstream_connection->write(data));
   tcp_client->waitForData(data);
   tcp_client->close();
-  fake_upstream_connection->waitForHalfClose();
-  fake_upstream_connection->close();
-  fake_upstream_connection->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   uint32_t upstream_pauses =
       test_server_->counter("cluster.cluster_0.upstream_flow_control_paused_reading_total")
@@ -123,15 +127,16 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamFlush) {
 
   std::string data(size, 'a');
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
   tcp_client->readDisable(true);
   tcp_client->write("", true);
 
   // This ensures that readDisable(true) has been run on it's thread
   // before tcp_client starts writing.
-  fake_upstream_connection->waitForHalfClose();
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
 
-  fake_upstream_connection->write(data, true);
+  ASSERT_TRUE(fake_upstream_connection->write(data, true));
 
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_flow_control_paused_reading_total", 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_flow_control_resumed_reading_total")
@@ -140,7 +145,7 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyDownstreamFlush) {
   tcp_client->readDisable(false);
   tcp_client->waitForData(data);
   tcp_client->waitForHalfClose();
-  fake_upstream_connection->waitForHalfClose();
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
 
   uint32_t upstream_pauses =
       test_server_->counter("cluster.cluster_0.upstream_flow_control_paused_reading_total")
@@ -161,9 +166,10 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
 
   std::string data(size, 'a');
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  fake_upstream_connection->readDisable(true);
-  fake_upstream_connection->write("", true);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->readDisable(true));
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
 
   // This ensures that fake_upstream_connection->readDisable has been run on it's thread
   // before tcp_client starts writing.
@@ -172,9 +178,9 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlush) {
   tcp_client->write(data, true);
 
   test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
-  fake_upstream_connection->readDisable(false);
-  fake_upstream_connection->waitForData(data.size());
-  fake_upstream_connection->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->readDisable(false));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(data.size()));
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
   tcp_client->waitForHalfClose();
 
   EXPECT_EQ(test_server_->counter("tcp.tcp_stats.upstream_flush_total")->value(), 1);
@@ -190,9 +196,10 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
 
   std::string data(size, 'a');
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  fake_upstream_connection->readDisable(true);
-  fake_upstream_connection->write("", true);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->readDisable(true));
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
 
   // This ensures that fake_upstream_connection->readDisable has been run on it's thread
   // before tcp_client starts writing.
@@ -202,8 +209,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamFlushEnvoyExit) {
 
   test_server_->waitForGaugeEq("tcp.tcp_stats.upstream_flush_active", 1);
   test_server_.reset();
-  fake_upstream_connection->close();
-  fake_upstream_connection->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   // Success criteria is that no ASSERTs fire and there are no leaks.
 }
@@ -233,16 +240,17 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
-  fake_upstream_connection->write("hello");
+  ASSERT_TRUE(fake_upstream_connection->write("hello"));
   tcp_client->waitForData("hello");
 
-  fake_upstream_connection->write("", true);
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
   tcp_client->waitForHalfClose();
   tcp_client->write("", true);
-  fake_upstream_connection->waitForHalfClose();
-  fake_upstream_connection->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 
   std::string log_result;
   // Access logs only get flushed to disk periodically, so poll until the log is non-empty
@@ -277,16 +285,17 @@ TEST_P(TcpProxyIntegrationTest, ShutdownWithOpenConnections) {
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
   tcp_client->write("hello");
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
-  fake_upstream_connection->waitForData(5);
-  fake_upstream_connection->write("world");
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(5));
+  ASSERT_TRUE(fake_upstream_connection->write("world"));
   tcp_client->waitForData("world");
   tcp_client->write("hello", false);
-  fake_upstream_connection->waitForData(10);
+  ASSERT_TRUE(fake_upstream_connection->waitForData(10));
   test_server_.reset();
-  fake_upstream_connection->waitForHalfClose();
-  fake_upstream_connection->close();
-  fake_upstream_connection->waitForDisconnect(true);
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection->close());
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
   tcp_client->waitForHalfClose();
   tcp_client->close();
 
@@ -333,14 +342,15 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
 
   initialize();
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  FakeRawConnectionPtr fake_upstream_connection = fake_upstreams_[0]->waitForRawConnection();
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
 
   std::string data(1024 * 16, 'a');
   tcp_client->write(data);
-  fake_upstream_connection->write(data);
+  ASSERT_TRUE(fake_upstream_connection->write(data));
 
   tcp_client->waitForDisconnect(true);
-  fake_upstream_connection->waitForDisconnect(true);
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
 }
 
 void TcpProxySslIntegrationTest::initialize() {
@@ -387,7 +397,8 @@ void TcpProxySslIntegrationTest::setupConnections() {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
 
-  fake_upstream_connection_ = fake_upstreams_[0]->waitForRawConnection();
+  AssertionResult result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
 }
 
 // Test proxying data in both directions with envoy doing TCP and TLS
@@ -402,10 +413,10 @@ void TcpProxySslIntegrationTest::sendAndReceiveTlsData(const std::string& data_t
   }
 
   // Make sure the data makes it upstream.
-  fake_upstream_connection_->waitForData(data_to_send_upstream.size());
+  ASSERT_TRUE(fake_upstream_connection_->waitForData(data_to_send_upstream.size()));
 
   // Now send data downstream and make sure it arrives.
-  fake_upstream_connection_->write(data_to_send_downstream);
+  ASSERT_TRUE(fake_upstream_connection_->write(data_to_send_downstream));
   payload_reader_->set_data_to_wait_for(data_to_send_downstream);
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
 
@@ -413,9 +424,9 @@ void TcpProxySslIntegrationTest::sendAndReceiveTlsData(const std::string& data_t
   Buffer::OwnedImpl empty_buffer;
   ssl_client_->write(empty_buffer, true);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  fake_upstream_connection_->waitForHalfClose();
-  fake_upstream_connection_->write("", true);
-  fake_upstream_connection_->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection_->write("", true));
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(payload_reader_->readLastByte());
   EXPECT_TRUE(connect_callbacks_.closed());
@@ -438,15 +449,15 @@ TEST_P(TcpProxySslIntegrationTest, DownstreamHalfClose) {
 
   Buffer::OwnedImpl empty_buffer;
   ssl_client_->write(empty_buffer, true);
-  fake_upstream_connection_->waitForHalfClose();
+  ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
 
   const std::string data("data");
-  fake_upstream_connection_->write(data, false);
+  ASSERT_TRUE(fake_upstream_connection_->write(data, false));
   payload_reader_->set_data_to_wait_for(data);
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(payload_reader_->readLastByte());
 
-  fake_upstream_connection_->write("", true);
+  ASSERT_TRUE(fake_upstream_connection_->write("", true));
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(payload_reader_->readLastByte());
 }
@@ -455,7 +466,7 @@ TEST_P(TcpProxySslIntegrationTest, DownstreamHalfClose) {
 TEST_P(TcpProxySslIntegrationTest, UpstreamHalfClose) {
   setupConnections();
 
-  fake_upstream_connection_->write("", true);
+  ASSERT_TRUE(fake_upstream_connection_->write("", true));
   ssl_client_->dispatcher().run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(payload_reader_->readLastByte());
   EXPECT_FALSE(connect_callbacks_.closed());
@@ -466,14 +477,14 @@ TEST_P(TcpProxySslIntegrationTest, UpstreamHalfClose) {
   while (client_write_buffer_->bytes_drained() != val.size()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  fake_upstream_connection_->waitForData(val.size());
+  ASSERT_TRUE(fake_upstream_connection_->waitForData(val.size()));
 
   Buffer::OwnedImpl empty_buffer;
   ssl_client_->write(empty_buffer, true);
   while (!connect_callbacks_.closed()) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
-  fake_upstream_connection_->waitForHalfClose();
+  ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
 }
 
 } // namespace

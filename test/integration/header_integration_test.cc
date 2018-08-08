@@ -142,8 +142,10 @@ public:
     if (eds_connection_ != nullptr) {
       // Don't ASSERT fail if an EDS reconnect ends up unparented.
       fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
-      eds_connection_->close();
-      eds_connection_->waitForDisconnect();
+      AssertionResult result = eds_connection_->close();
+      RELEASE_ASSERT(result, result.message());
+      result = eds_connection_->waitForDisconnect();
+      RELEASE_ASSERT(result, result.message());
       eds_connection_.reset();
     }
     cleanupUpstreamAndDownstream();
@@ -309,12 +311,16 @@ public:
   void initialize() override {
     if (use_eds_) {
       pre_worker_start_test_steps_ = [this]() {
-        eds_connection_ = fake_upstreams_[1]->waitForHttpConnection(*dispatcher_);
-        eds_stream_ = eds_connection_->waitForNewStream(*dispatcher_);
+        AssertionResult result =
+            fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, eds_connection_);
+        RELEASE_ASSERT(result, result.message());
+        result = eds_connection_->waitForNewStream(*dispatcher_, eds_stream_);
+        RELEASE_ASSERT(result, result.message());
         eds_stream_->startGrpcStream();
 
         envoy::api::v2::DiscoveryRequest discovery_request;
-        eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+        result = eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+        RELEASE_ASSERT(result, result.message());
 
         envoy::api::v2::DiscoveryResponse discovery_response;
         discovery_response.set_version_info("1");
@@ -343,7 +349,8 @@ public:
         eds_stream_->sendGrpcMessage(discovery_response);
 
         // Wait for the next request to make sure the first response was consumed.
-        eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+        result = eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
+        RELEASE_ASSERT(result, result.message());
       };
     }
 

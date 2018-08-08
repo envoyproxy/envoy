@@ -297,9 +297,10 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(Http::HeaderMap& request_
 }
 
 void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_headers,
-                                                     const Http::HeaderMap& request_headers,
+                                                     const Http::HeaderMap* request_headers,
                                                      const std::string& via) {
-  if (Utility::isUpgrade(request_headers) && Utility::isUpgrade(response_headers)) {
+  if (request_headers != nullptr && Utility::isUpgrade(*request_headers) &&
+      Utility::isUpgrade(response_headers)) {
     // As in mutateRequestHeaders, Upgrade responses have special handling.
     //
     // Unlike mutateRequestHeaders there is no explicit protocol check. If Envoy is proxying an
@@ -314,8 +315,9 @@ void ConnectionManagerUtility::mutateResponseHeaders(Http::HeaderMap& response_h
   }
   response_headers.removeTransferEncoding();
 
-  if (request_headers.EnvoyForceTrace() && request_headers.RequestId()) {
-    response_headers.insertRequestId().value(*request_headers.RequestId());
+  if (request_headers != nullptr && request_headers->EnvoyForceTrace() &&
+      request_headers->RequestId()) {
+    response_headers.insertRequestId().value(*request_headers->RequestId());
   }
 
   response_headers.removeKeepAlive();

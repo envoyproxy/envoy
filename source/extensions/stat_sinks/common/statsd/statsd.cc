@@ -6,6 +6,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
@@ -23,8 +24,8 @@ Writer::Writer(Network::Address::InstanceConstSharedPtr address) {
   fd_ = address->socket(Network::Address::SocketType::Datagram);
   ASSERT(fd_ != -1);
 
-  int rc = address->connect(fd_);
-  ASSERT(rc != -1);
+  const Api::SysCallResult result = address->connect(fd_);
+  ASSERT(result.rc_ != -1);
 }
 
 Writer::~Writer() {

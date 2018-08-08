@@ -17,50 +17,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-TEST(BufferWrapperTest, ImplementedFunctions) {
-  Buffer::OwnedImpl buffer;
-  addString(buffer, "abcdefghij");
-
-  BufferWrapper wrapper(buffer);
-  {
-    char s[4] = {0};
-    wrapper.copyOut(0, 3, s);
-    EXPECT_EQ("abc", std::string(s));
-    EXPECT_EQ(10, wrapper.length());
-    EXPECT_EQ(0, wrapper.position());
-  }
-
-  {
-    char s[6] = {0};
-    wrapper.copyOut(5, 5, s);
-    EXPECT_EQ("fghij", std::string(s));
-    EXPECT_EQ(10, wrapper.length());
-    EXPECT_EQ(0, wrapper.position());
-  }
-
-  {
-    std::string s(static_cast<char*>(wrapper.linearize(5)), 5);
-    EXPECT_EQ("abcde", s);
-    EXPECT_EQ(0, wrapper.position());
-  }
-
-  wrapper.drain(2);
-
-  {
-    char s[4] = {0};
-    wrapper.copyOut(4, 3, s);
-    EXPECT_EQ("ghi", std::string(s));
-    EXPECT_EQ(8, wrapper.length());
-    EXPECT_EQ(2, wrapper.position());
-  }
-
-  {
-    std::string s(static_cast<char*>(wrapper.linearize(8)), 8);
-    EXPECT_EQ("cdefghij", s);
-    EXPECT_EQ(2, wrapper.position());
-  }
-}
-
 TEST(BufferHelperTest, PeekI8) {
   {
     Buffer::OwnedImpl buffer;

@@ -68,6 +68,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
+        "//source/common/common:utility_lib",
     ],
 )
 

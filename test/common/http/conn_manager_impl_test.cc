@@ -22,7 +22,6 @@
 #include "common/http/websocket/ws_handler_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
@@ -1120,30 +1119,36 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNotConfigured) {
 }
 
 // When the global timeout is configured, the timer is enabled before we receive
-// headers.
+// headers, if it fires we don't face plant.
 TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutGlobal) {
   stream_idle_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_))
-      .Times(1)
-      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
-        Event::MockTimer* idle_timer =
-            new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-        EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10)));
-        StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
+    Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+    EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10)));
+    conn_manager_->newStream(response_encoder_);
 
-        HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}}};
-        EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10)));
-        decoder->decodeHeaders(std::move(headers), false);
+    // Expect resetIdleTimer() to be called for the response
+    // encodeHeaders()/encodeData().
+    EXPECT_CALL(*idle_timer, enableTimer(_)).Times(2);
+    EXPECT_CALL(*idle_timer, disableTimer());
+    idle_timer->callback_();
+  }));
 
-        data.drain(4);
+  // 408 direct response after timeout.
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
+        EXPECT_STREQ("408", headers.Status()->value().c_str());
       }));
+  std::string response_body;
+  EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
-  EXPECT_EQ(0U, stats_.named_.downstream_rq_idle_timeout_.value());
+  EXPECT_EQ("stream timeout", response_body);
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_idle_timeout_.value());
 }
 
 // Per-route timeouts override the global stream idle timeout.
@@ -1854,6 +1859,65 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyEndStream) {
   upstream_connection->raiseEvent(Network::ConnectionEvent::Connected);
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
+}
+
+// Make sure for upgrades, we do not append Connection: Close when draining.
+TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
+  setup(false, "envoy-custom-server", false);
+
+  // Store the basic request encoder during filter chain setup.
+  MockStreamFilter* filter = new MockStreamFilter();
+  EXPECT_CALL(drain_close_, drainClose()).WillOnce(Return(true));
+
+  EXPECT_CALL(*filter, decodeHeaders(_, false))
+      .WillRepeatedly(Invoke([&](HeaderMap&, bool) -> FilterHeadersStatus {
+        return FilterHeadersStatus::StopIteration;
+      }));
+
+  EXPECT_CALL(*filter, encodeHeaders(_, false))
+      .WillRepeatedly(Invoke(
+          [&](HeaderMap&, bool) -> FilterHeadersStatus { return FilterHeadersStatus::Continue; }));
+
+  NiceMock<MockStreamEncoder> encoder;
+  EXPECT_CALL(encoder, encodeHeaders(_, false))
+      .WillOnce(Invoke([&](const HeaderMap& headers, bool) -> void {
+        EXPECT_NE(nullptr, headers.Connection());
+        EXPECT_STREQ("upgrade", headers.Connection()->value().c_str());
+      }));
+
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_)).Times(1);
+  EXPECT_CALL(*filter, setEncoderFilterCallbacks(_)).Times(1);
+
+  EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _))
+      .WillRepeatedly(
+          Invoke([&](absl::string_view, FilterChainFactoryCallbacks& callbacks) -> bool {
+            callbacks.addStreamFilter(StreamFilterSharedPtr{filter});
+            return true;
+          }));
+
+  // When dispatch is called on the codec, we pretend to get a new stream and then fire a headers
+  // only request into it. Then we respond into the filter.
+  StreamDecoder* decoder = nullptr;
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
+    decoder = &conn_manager_->newStream(encoder);
+
+    HeaderMapPtr headers{new TestHeaderMapImpl{{":authority", "host"},
+                                               {":method", "GET"},
+                                               {":path", "/"},
+                                               {"connection", "Upgrade"},
+                                               {"upgrade", "foo"}}};
+    decoder->decodeHeaders(std::move(headers), false);
+
+    HeaderMapPtr response_headers{
+        new TestHeaderMapImpl{{":status", "101"}, {"Connection", "upgrade"}, {"upgrade", "foo"}}};
+    filter->decoder_callbacks_->encodeHeaders(std::move(response_headers), false);
+
+    data.drain(4);
+  }));
+
+  // Kick off the incoming data. Use extra data which should cause a redispatch.
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
 }
 
 TEST_F(HttpConnectionManagerImplTest, DrainClose) {

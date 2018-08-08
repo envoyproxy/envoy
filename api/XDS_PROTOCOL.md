@@ -147,7 +147,7 @@ management server will provide the complete state of the LDS/CDS resources in
 each response. An absent `Listener` or `Cluster` will be deleted.
 
 For EDS/RDS, the management server does not need to supply every requested
-resource and may also supply additional, unrequested resources, `resource_names`
+resource and may also supply additional, unrequested resources. `resource_names`
 is only a hint. Envoy will silently ignore any superfluous resources. When a
 requested resource is missing in a RDS or EDS update, Envoy will retain the last
 known value for this resource. The management server may be able to infer all
@@ -166,7 +166,7 @@ For EDS/RDS, Envoy may either generate a distinct stream for each resource of a
 given type (e.g. if each `ConfigSource` has its own distinct upstream cluster
 for a management server), or may combine together multiple resource requests for
 a given resource type when they are destined for the same management server.
-This is left to implementation specifics, management servers should be capable
+While this is left to implementation specifics, management servers should be capable
 of handling one or more `resource_names` for a given resource type in each
 request. Both sequence diagrams below are valid for fetching two EDS resources
 `{foo, bar}`:
@@ -236,10 +236,10 @@ xDS updates can be pushed independently if no new clusters/routes/listeners
 are added or if it's acceptable to temporarily drop traffic during
 updates. Note that in case of LDS updates, the listeners will be warmed
 before they receive traffic, i.e. the dependent routes are fetched through
-RDS if configured. On the other hand, clusters are not warmed when
-adding/removing/updating clusters. Similarly, routes are not warmed --
-i.e., the management plane must ensure that clusters referenced by a route
-are in place, before pushing the updates for a rotue.
+RDS if configured. Clusters are warmed when adding/removing/updating
+clusters. On the other hand, routes are not warmed, i.e., the management
+plane must ensure that clusters referenced by a route are in place, before
+pushing the updates for a route.
 
 ### Aggregated Discovery Services (ADS)
 
@@ -287,7 +287,7 @@ admin:
 
 ### Incremental xDS
 
-Incremental xDS is separate xDS endpoint available for ADS, CDS and RDS that
+Incremental xDS is a separate xDS endpoint available for ADS, CDS and RDS that
 allows:
 
   * Incremental updates of the list of tracked resources by the xDS client.
@@ -295,7 +295,7 @@ allows:
     example, this may occur when a request corresponding to an unknown cluster
     arrives.
   * The xDS server can incremetally update the resources on the client.
-    This support the goal of scalability of xDS resources. Rather than deliver
+    This supports the goal of scalability of xDS resources. Rather than deliver
     all 100k clusters when a single cluster is modified, the management server
     only needs to deliver the single cluster that changed.
 
@@ -319,7 +319,7 @@ debugging purposes only.
      This can be done to dynamically add or remove elements from the tracked
      `resource_names` set. In this case `response_nonce` must be omitted.
 
-In this first example the client connects and receive a first update that it
+In this first example the client connects and receives a first update that it
 ACKs. The second update fails and the client NACKs the update. Later the xDS
 client spontaneously requests the "wc" resource.
 

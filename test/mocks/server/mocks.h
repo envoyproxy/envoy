@@ -12,14 +12,16 @@
 #include "envoy/server/health_checker_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
+#include "envoy/server/overload_manager.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/server/worker.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_options.h"
 #include "envoy/thread/thread.h"
 
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/context_manager_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
@@ -112,10 +114,8 @@ public:
   MOCK_METHOD1(removeHandler, bool(const std::string& prefix));
   MOCK_METHOD0(socket, Network::Socket&());
   MOCK_METHOD0(getConfigTracker, ConfigTracker&());
-  MOCK_METHOD5(request,
-               Http::Code(absl::string_view path, const Http::Utility::QueryParams& query_params,
-                          absl::string_view method, Http::HeaderMap& response_headers,
-                          std::string& body));
+  MOCK_METHOD4(request, Http::Code(absl::string_view path_and_query, absl::string_view method,
+                                   Http::HeaderMap& response_headers, std::string& body));
 
   NiceMock<MockConfigTracker> config_tracker_;
 };
@@ -173,12 +173,12 @@ public:
   MOCK_METHOD0(version, std::string());
   MOCK_METHOD0(logLock, Thread::BasicLockable&());
   MOCK_METHOD0(accessLogLock, Thread::BasicLockable&());
-  MOCK_METHOD0(statsAllocator, Stats::RawStatDataAllocator&());
+  MOCK_METHOD0(statsAllocator, Stats::StatDataAllocator&());
 
 private:
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
-  Stats::HeapRawStatDataAllocator stats_allocator_;
+  Stats::HeapStatDataAllocator stats_allocator_;
 };
 
 class MockListenerComponentFactory : public ListenerComponentFactory {
@@ -271,6 +271,17 @@ public:
   std::function<void()> remove_listener_completion_;
 };
 
+class MockOverloadManager : public OverloadManager {
+public:
+  MockOverloadManager() {}
+  ~MockOverloadManager() {}
+
+  // OverloadManager
+  MOCK_METHOD0(start, void());
+  MOCK_METHOD3(registerForAction, void(const std::string& action, Event::Dispatcher& dispatcher,
+                                       OverloadActionCb callback));
+};
+
 class MockInstance : public Instance {
 public:
   MockInstance();
@@ -299,6 +310,7 @@ public:
   MOCK_METHOD0(initManager, Init::Manager&());
   MOCK_METHOD0(listenerManager, ListenerManager&());
   MOCK_METHOD0(options, Options&());
+  MOCK_METHOD0(overloadManager, OverloadManager&());
   MOCK_METHOD0(random, Runtime::RandomGenerator&());
   MOCK_METHOD0(rateLimitClient_, RateLimit::Client*());
   MOCK_METHOD0(runtime, Runtime::Loader&());
@@ -334,6 +346,7 @@ public:
   testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockListenerManager> listener_manager_;
+  testing::NiceMock<MockOverloadManager> overload_manager_;
   Singleton::ManagerPtr singleton_manager_;
 };
 
@@ -412,6 +425,12 @@ public:
 
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
+  MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
+  MOCK_METHOD0(secretManager, Secret::SecretManager&());
+  MOCK_METHOD0(local_info, const LocalInfo::LocalInfo&());
+  MOCK_METHOD0(dispatcher, Event::Dispatcher&());
+  MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
+  MOCK_METHOD0(stats, Stats::Store&());
 };
 
 class MockListenerFactoryContext : public virtual MockFactoryContext,

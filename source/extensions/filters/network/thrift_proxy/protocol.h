@@ -5,8 +5,14 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/registry/registry.h"
 
+#include "common/common/assert.h"
+#include "common/config/utility.h"
 #include "common/singleton/const_singleton.h"
+
+#include "extensions/filters/network/thrift_proxy/metadata.h"
+#include "extensions/filters/network/thrift_proxy/thrift.h"
 
 #include "absl/strings/string_view.h"
 
@@ -16,108 +22,6 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 /**
- * Names of available Protocol implementations.
- */
-class ProtocolNameValues {
-public:
-  // Binary protocol
-  const std::string BINARY = "binary";
-
-  // Lax Binary protocol
-  const std::string LAX_BINARY = "binary/non-strict";
-
-  // Compact protocol
-  const std::string COMPACT = "compact";
-
-  // JSON protocol
-  const std::string JSON = "json";
-
-  // Auto-detection protocol
-  const std::string AUTO = "auto";
-};
-
-typedef ConstSingleton<ProtocolNameValues> ProtocolNames;
-
-/**
- * Thrift protocol message types.
- * See https://github.com/apache/thrift/blob/master/lib/cpp/src/thrift/protocol/TProtocol.h
- */
-enum class MessageType {
-  Call = 1,
-  Reply = 2,
-  Exception = 3,
-  Oneway = 4,
-
-  // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST MESSAGE TYPE
-  LastMessageType = Oneway,
-};
-
-/**
- * Thrift protocol struct field types.
- * See https://github.com/apache/thrift/blob/master/lib/cpp/src/thrift/protocol/TProtocol.h
- */
-enum class FieldType {
-  Stop = 0,
-  Void = 1,
-  Bool = 2,
-  Byte = 3,
-  Double = 4,
-  I16 = 6,
-  I32 = 8,
-  I64 = 10,
-  String = 11,
-  Struct = 12,
-  Map = 13,
-  Set = 14,
-  List = 15,
-
-  // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FIELD TYPE
-  LastFieldType = List,
-};
-
-/**
- * ProtocolCallbacks are Thrift protocol-level callbacks.
- */
-class ProtocolCallbacks {
-public:
-  virtual ~ProtocolCallbacks() {}
-
-  /**
-   * Indicates that the start of a Thrift protocol message was detected.
-   * @param name the name of the message, if available
-   * @param msg_type the type of the message
-   * @param seq_id the message sequence id
-   */
-  virtual void messageStart(const absl::string_view name, MessageType msg_type,
-                            int32_t seq_id) PURE;
-
-  /**
-   * Indicates that the start of a Thrift protocol struct was detected.
-   * @param name the name of the struct, if available
-   */
-  virtual void structBegin(const absl::string_view name) PURE;
-
-  /**
-   * Indicates that the start of Thrift protocol struct field was detected.
-   * @param name the name of the field, if available
-   * @param field_type the type of the field
-   * @param field_id the field id
-   */
-  virtual void structField(const absl::string_view name, FieldType field_type,
-                           int16_t field_id) PURE;
-
-  /**
-   * Indicates that the end of a Thrift protocol struct was detected.
-   */
-  virtual void structEnd() PURE;
-
-  /**
-   * Indicates that the end of a Thrift protocol message was detected.
-   */
-  virtual void messageComplete() PURE;
-};
-
-/**
  * Protocol represents the operations necessary to implement the a generic Thrift protocol.
  * See https://github.com/apache/thrift/blob/master/doc/specs/thrift-protocol-spec.md
  */
@@ -125,21 +29,26 @@ class Protocol {
 public:
   virtual ~Protocol() {}
 
+  /**
+   * @return const std::string& the human-readable name of the protocol
+   */
   virtual const std::string& name() const PURE;
 
   /**
-   * Reads the start of a Thrift protocol message from the buffer and updates the name, msg_type,
-   * and seq_id parameters with values from the message header. If successful, the message header
-   * is removed from the buffer.
+   * @return ProtocolType the protocol type
+   */
+  virtual ProtocolType type() const PURE;
+
+  /**
+   * Reads the start of a Thrift protocol message from the buffer and updates the metadata
+   * parameter with values from the message header. If successful, the message header is removed
+   * from the buffer.
    * @param buffer the buffer to read from
-   * @param name updated with the message name on success only
-   * @param msg_type updated with the MessageType on success only
-   * @param seq_id updated with the message sequence ID on success only
+   * @param metadata MessageMetadata to be updated with name, message type, and sequence id.
    * @return true if a message header was sucessfully read, false if more data is required
    * @throw EnvoyException if the data is not a valid message header
    */
-  virtual bool readMessageBegin(Buffer::Instance& buffer, std::string& name, MessageType& msg_type,
-                                int32_t& seq_id) PURE;
+  virtual bool readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) PURE;
 
   /**
    * Reads the end of a Thrift protocol message from the buffer. If successful, the message footer
@@ -340,12 +249,9 @@ public:
   /**
    * Writes the start of a Thrift protocol message to the buffer.
    * @param buffer Buffer::Instance to modify
-   * @param name the message name
-   * @param msg_type the message's MessageType
-   * @param seq_id the message sequende ID
+   * @param metadata MessageMetadata for the message to write.
    */
-  virtual void writeMessageBegin(Buffer::Instance& buffer, const std::string& name,
-                                 MessageType msg_type, int32_t seq_id) PURE;
+  virtual void writeMessageBegin(Buffer::Instance& buffer, const MessageMetadata& metadata) PURE;
 
   /**
    * Writes the end of a Thrift protocol message to the buffer.
@@ -484,6 +390,71 @@ public:
 };
 
 typedef std::unique_ptr<Protocol> ProtocolPtr;
+
+/**
+ * Implemented by each Thrift protocol and registered via Registry::registerFactory or the
+ * convenience class RegisterFactory.
+ */
+class NamedProtocolConfigFactory {
+public:
+  virtual ~NamedProtocolConfigFactory() {}
+
+  /**
+   * Create a particular Thrift protocol
+   * @return ProtocolFactoryCb the protocol
+   */
+  virtual ProtocolPtr createProtocol() PURE;
+
+  /**
+   * @return std::string the identifying name for a particular implementation of thrift protocol
+   * produced by the factory.
+   */
+  virtual std::string name() PURE;
+
+  /**
+   * Convenience method to lookup a factory by type.
+   * @param ProtocolType the protocol type
+   * @return NamedProtocolConfigFactory& for the ProtocolType
+   */
+  static NamedProtocolConfigFactory& getFactory(ProtocolType type) {
+    const std::string& name = ProtocolNames::get().fromType(type);
+    return Envoy::Config::Utility::getAndCheckFactory<NamedProtocolConfigFactory>(name);
+  }
+};
+
+/**
+ * ProtocolFactoryBase provides a template for a trivial NamedProtocolConfigFactory.
+ */
+template <class ProtocolImpl> class ProtocolFactoryBase : public NamedProtocolConfigFactory {
+  ProtocolPtr createProtocol() override { return std::move(std::make_unique<ProtocolImpl>()); }
+
+  std::string name() override { return name_; }
+
+protected:
+  ProtocolFactoryBase(const std::string& name) : name_(name) {}
+
+private:
+  const std::string name_;
+};
+
+/**
+ * A DirectResponse manipulates a Protocol to directly create a Thrift response message.
+ */
+class DirectResponse {
+public:
+  virtual ~DirectResponse() {}
+
+  /**
+   * Encodes the response via the given Protocol.
+   * @param metadata the MessageMetadata for the request that generated this response
+   * @param proto the Protocol to be used for message encoding
+   * @param buffer the Buffer into which the message should be encoded
+   */
+  virtual void encode(MessageMetadata& metadata, Protocol& proto,
+                      Buffer::Instance& buffer) const PURE;
+};
+
+typedef std::unique_ptr<DirectResponse> DirectResponsePtr;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

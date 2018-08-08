@@ -15,7 +15,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer) {
+bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMetadata& metadata) {
   if (transport_ == nullptr) {
     // Not enough data to select a transport.
     if (buffer.length() < 8) {
@@ -27,16 +27,15 @@ bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer) {
 
     if (size > 0 && size <= FramedTransportImpl::MaxFrameSize) {
       // TODO(zuercher): Spec says max size is 16,384,000 (0xFA0000). Apache C++ TFramedTransport
-      // is configurable, but defaults to 256 MB (0x1000000). THeaderTransport will take up to ~1GB
-      // (0x3FFFFFFF) when it falls back to framed mode.
+      // is configurable, but defaults to 256 MB (0x1000000).
       if (BinaryProtocolImpl::isMagic(proto_start) || CompactProtocolImpl::isMagic(proto_start)) {
-        setTransport(std::make_unique<FramedTransportImpl>(callbacks_));
+        setTransport(std::make_unique<FramedTransportImpl>());
       }
     } else {
       // Check for sane unframed protocol.
       proto_start = static_cast<uint16_t>((size >> 16) & 0xFFFF);
       if (BinaryProtocolImpl::isMagic(proto_start) || CompactProtocolImpl::isMagic(proto_start)) {
-        setTransport(std::make_unique<UnframedTransportImpl>(callbacks_));
+        setTransport(std::make_unique<UnframedTransportImpl>());
       }
     }
 
@@ -51,7 +50,7 @@ bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer) {
     }
   }
 
-  return transport_->decodeFrameStart(buffer);
+  return transport_->decodeFrameStart(buffer, metadata);
 }
 
 bool AutoTransportImpl::decodeFrameEnd(Buffer::Instance& buffer) {
@@ -59,10 +58,21 @@ bool AutoTransportImpl::decodeFrameEnd(Buffer::Instance& buffer) {
   return transport_->decodeFrameEnd(buffer);
 }
 
-void AutoTransportImpl::encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) {
-  RELEASE_ASSERT(transport_ != nullptr, "");
-  transport_->encodeFrame(buffer, message);
+void AutoTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMetadata& metadata,
+                                    Buffer::Instance& message) {
+  RELEASE_ASSERT(transport_ != nullptr, "auto transport cannot encode before transport detection");
+  transport_->encodeFrame(buffer, metadata, message);
 }
+
+class AutoTransportConfigFactory : public TransportFactoryBase<AutoTransportImpl> {
+public:
+  AutoTransportConfigFactory() : TransportFactoryBase(TransportNames::get().AUTO) {}
+};
+
+/**
+ * Static registration for the auto transport. @see RegisterFactory.
+ */
+static Registry::RegisterFactory<AutoTransportConfigFactory, NamedTransportConfigFactory> register_;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

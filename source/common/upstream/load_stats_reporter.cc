@@ -1,5 +1,7 @@
 #include "common/upstream/load_stats_reporter.h"
 
+#include "envoy/stats/scope.h"
+
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {

@@ -18,8 +18,7 @@ namespace ThriftProxy {
 const uint16_t CompactProtocolImpl::Magic = 0x8201;
 const uint16_t CompactProtocolImpl::MagicMask = 0xFF1F;
 
-bool CompactProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string& name,
-                                           MessageType& msg_type, int32_t& seq_id) {
+bool CompactProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) {
   // Minimum message length:
   //   protocol, message type, and version: 2 bytes +
   //   seq id (var int): 1 byte +
@@ -64,21 +63,20 @@ bool CompactProtocolImpl::readMessageBegin(Buffer::Instance& buffer, std::string
   buffer.drain(id_size + name_len_size + 2);
 
   if (name_len > 0) {
-    name.assign(std::string(static_cast<char*>(buffer.linearize(name_len)), name_len));
+    metadata.setMethodName(
+        std::string(static_cast<const char*>(buffer.linearize(name_len)), name_len));
     buffer.drain(name_len);
   } else {
-    name.clear();
+    metadata.setMethodName("");
   }
-  msg_type = type;
-  seq_id = id;
+  metadata.setMessageType(type);
+  metadata.setSequenceId(id);
 
-  onMessageStart(absl::string_view(name), msg_type, seq_id);
   return true;
 }
 
 bool CompactProtocolImpl::readMessageEnd(Buffer::Instance& buffer) {
   UNREFERENCED_PARAMETER(buffer);
-  onMessageComplete();
   return true;
 }
 
@@ -91,7 +89,6 @@ bool CompactProtocolImpl::readStructBegin(Buffer::Instance& buffer, std::string&
   last_field_id_stack_.push(last_field_id_);
   last_field_id_ = 0;
 
-  onStructBegin(absl::string_view(name));
   return true;
 }
 
@@ -105,7 +102,6 @@ bool CompactProtocolImpl::readStructEnd(Buffer::Instance& buffer) {
   last_field_id_ = last_field_id_stack_.top();
   last_field_id_stack_.pop();
 
-  onStructEnd();
   return true;
 }
 
@@ -124,7 +120,6 @@ bool CompactProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& 
     field_type = FieldType::Stop;
     buffer.drain(1);
 
-    onStructField(absl::string_view(name), field_type, field_id);
     return true;
   }
 
@@ -166,7 +161,6 @@ bool CompactProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& 
 
   buffer.drain(id_size + 1);
 
-  onStructField(absl::string_view(name), field_type, field_id);
   return true;
 }
 
@@ -379,7 +373,7 @@ bool CompactProtocolImpl::readString(Buffer::Instance& buffer, std::string& valu
   }
 
   buffer.drain(len_size);
-  value.assign(static_cast<char*>(buffer.linearize(str_len)), str_len);
+  value.assign(static_cast<const char*>(buffer.linearize(str_len)), str_len);
   buffer.drain(str_len);
   return true;
 }
@@ -388,17 +382,17 @@ bool CompactProtocolImpl::readBinary(Buffer::Instance& buffer, std::string& valu
   return readString(buffer, value);
 }
 
-void CompactProtocolImpl::writeMessageBegin(Buffer::Instance& buffer, const std::string& name,
-                                            MessageType msg_type, int32_t seq_id) {
-  UNREFERENCED_PARAMETER(name);
+void CompactProtocolImpl::writeMessageBegin(Buffer::Instance& buffer,
+                                            const MessageMetadata& metadata) {
+  MessageType msg_type = metadata.messageType();
 
   uint16_t ptv = (Magic & MagicMask) | (static_cast<uint16_t>(msg_type) << 5);
   ASSERT((ptv & MagicMask) == Magic);
   ASSERT((ptv & ~MagicMask) >> 5 == static_cast<uint16_t>(msg_type));
 
   BufferHelper::writeU16(buffer, ptv);
-  BufferHelper::writeVarIntI32(buffer, seq_id);
-  writeString(buffer, name);
+  BufferHelper::writeVarIntI32(buffer, metadata.sequenceId());
+  writeString(buffer, metadata.methodName());
 }
 
 void CompactProtocolImpl::writeMessageEnd(Buffer::Instance& buffer) {
@@ -459,7 +453,7 @@ void CompactProtocolImpl::writeFieldBeginInternal(
                                       static_cast<int8_t>(compact_field_type));
   } else {
     BufferHelper::writeI8(buffer, static_cast<int8_t>(compact_field_type));
-    BufferHelper::writeI16(buffer, field_id);
+    BufferHelper::writeZigZagI32(buffer, static_cast<int32_t>(field_id));
   }
 
   last_field_id_ = field_id;
@@ -622,6 +616,17 @@ CompactProtocolImpl::CompactFieldType CompactProtocolImpl::convertFieldType(Fiel
         fmt::format("unknown protocol field type {}", static_cast<int8_t>(field_type)));
   }
 }
+
+class CompactProtocolConfigFactory : public ProtocolFactoryBase<CompactProtocolImpl> {
+public:
+  CompactProtocolConfigFactory() : ProtocolFactoryBase(ProtocolNames::get().COMPACT) {}
+};
+
+/**
+ * Static registration for the binary protocol. @see RegisterFactory.
+ */
+static Registry::RegisterFactory<CompactProtocolConfigFactory, NamedProtocolConfigFactory>
+    register_;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

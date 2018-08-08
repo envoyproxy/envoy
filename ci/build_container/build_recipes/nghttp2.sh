@@ -36,6 +36,7 @@ mkdir build
 cd build
 
 cmake -G "Ninja" -DCMAKE_INSTALL_PREFIX="$THIRDPARTY_BUILD" \
+  -DCMAKE_INSTALL_LIBDIR="$THIRDPARTY_BUILD/lib" \
   -DENABLE_STATIC_LIB=on \
   -DENABLE_LIB_ONLY=on \
   ..

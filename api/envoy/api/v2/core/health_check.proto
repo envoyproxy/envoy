@@ -95,7 +95,9 @@ message HealthCheck {
     string service_name = 5;
 
     // Specifies a list of HTTP headers that should be added to each request that is sent to the
-    // health checked cluster.
+    // health checked cluster. For more information, including details on header value syntax, see
+    // the documentation on :ref:`custom request headers
+    // <config_http_conn_man_headers_custom_request_headers>`.
     repeated core.HeaderValueOption request_headers_to_add = 6;
 
     // If set, health checks will be made using http/2.

@@ -59,7 +59,7 @@ IntegrationTestServer::~IntegrationTestServer() {
   ENVOY_LOG(info, "stopping integration test server");
 
   BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(server_->admin().socket().localAddress(), "GET",
+      IntegrationUtil::makeSingleRequest(server_->admin().socket().localAddress(), "POST",
                                          "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
@@ -92,9 +92,9 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   Thread::MutexBasicLockable lock;
 
   ThreadLocal::InstanceImpl tls;
-  Stats::HeapRawStatDataAllocator stats_allocator;
-  Stats::StatsOptionsImpl options_;
-  Stats::ThreadLocalStoreImpl stats_store(options_, stats_allocator);
+  Stats::HeapStatDataAllocator stats_allocator;
+  Stats::StatsOptionsImpl stats_options;
+  Stats::ThreadLocalStoreImpl stats_store(stats_options, stats_allocator);
   stat_store_ = &stats_store;
   Runtime::RandomGeneratorPtr random_generator;
   if (deterministic) {

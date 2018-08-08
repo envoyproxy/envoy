@@ -12,7 +12,7 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -424,8 +424,9 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
     // or gRPC status code, and/or set H2 RST_STREAM error.
     connection_manager_.doEndStream(*this);
   } else {
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Http::Code::RequestTimeout,
-                   "stream timeout", nullptr);
+    sendLocalReply(request_headers_ != nullptr &&
+                       Grpc::Common::hasGrpcContentType(*request_headers_),
+                   Http::Code::RequestTimeout, "stream timeout", nullptr);
   }
 }
 
@@ -928,7 +929,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
 
   // Strip the T-E headers etc. Defer other header additions as well as drain-close logic to the
   // continuation headers.
-  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_, EMPTY_STRING);
+  ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(), EMPTY_STRING);
 
   // Count both the 1xx and follow-up response code in stats.
   chargeStats(headers);
@@ -969,7 +970,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   connection_manager_.config_.dateProvider().setDateHeader(headers);
   // Following setReference() is safe because serverName() is constant for the life of the listener.
   headers.insertServer().value().setReference(connection_manager_.config_.serverName());
-  ConnectionManagerUtility::mutateResponseHeaders(headers, *request_headers_,
+  ConnectionManagerUtility::mutateResponseHeaders(headers, request_headers_.get(),
                                                   connection_manager_.config_.via());
 
   // See if we want to drain/close the connection. Send the go away frame prior to encoding the
@@ -1006,7 +1007,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
     // Do not do this for H2 (which drains via GOAWA) or Upgrade (as the upgrade
     // payload is no longer HTTP/1.1)
-    if (headers.Connection() == nullptr || headers.Connection()->value() != "Upgrade") {
+    if (!Utility::isUpgrade(headers)) {
       headers.insertConnection().value().setReference(Headers::get().ConnectionValues.Close);
     }
   }
