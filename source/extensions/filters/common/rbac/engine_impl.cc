@@ -7,11 +7,12 @@ namespace Common {
 namespace RBAC {
 
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
-    const envoy::config::rbac::v2alpha::RBAC& rules)
+    const envoy::config::rbac::v2alpha::RBAC& rules, bool disable_http_rules)
     : allowed_if_matched_(rules.action() ==
                           envoy::config::rbac::v2alpha::RBAC_Action::RBAC_Action_ALLOW) {
   for (const auto& policy : rules.policies()) {
-    policies_.insert(std::make_pair(policy.first, policy.second));
+    policies_.insert(
+        std::make_pair(policy.first, PolicyMatcher(policy.second, disable_http_rules)));
   }
 }
 

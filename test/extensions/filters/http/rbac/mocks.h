@@ -1,6 +1,6 @@
 #pragma once
 
-#include "extensions/filters/http/rbac/rbac_filter.h"
+#include "extensions/filters/common/rbac/config.h"
 
 #include "gmock/gmock.h"
 
@@ -11,11 +11,11 @@ namespace RBACFilter {
 namespace {
 
 class MockRoleBasedAccessControlRouteSpecificFilterConfig
-    : public RoleBasedAccessControlRouteSpecificFilterConfig {
+    : public Filters::Common::RBAC::RoleBasedAccessControlRouteSpecificFilterConfig {
 public:
   MockRoleBasedAccessControlRouteSpecificFilterConfig(
       const envoy::config::filter::http::rbac::v2::RBACPerRoute& r)
-      : RoleBasedAccessControlRouteSpecificFilterConfig(r){};
+      : Filters::Common::RBAC::RoleBasedAccessControlRouteSpecificFilterConfig(r){};
 
   MOCK_CONST_METHOD0(engine, Filters::Common::RBAC::RoleBasedAccessControlEngineImpl&());
 };

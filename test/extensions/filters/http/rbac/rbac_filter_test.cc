@@ -1,6 +1,7 @@
 #include "common/config/metadata.h"
 #include "common/network/utility.h"
 
+#include "extensions/filters/common/rbac/config.h"
 #include "extensions/filters/http/rbac/rbac_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -22,7 +23,7 @@ namespace {
 
 class RoleBasedAccessControlFilterTest : public testing::Test {
 public:
-  RoleBasedAccessControlFilterConfigSharedPtr setupConfig() {
+  Filters::Common::RBAC::RoleBasedAccessControlFilterConfigSharedPtr setupConfig() {
     envoy::config::filter::http::rbac::v2::RBAC config;
 
     envoy::config::rbac::v2alpha::Policy policy;
@@ -37,7 +38,8 @@ public:
     config.mutable_shadow_rules()->set_action(envoy::config::rbac::v2alpha::RBAC::ALLOW);
     (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
 
-    return std::make_shared<RoleBasedAccessControlFilterConfig>(config, "test", store_);
+    return std::make_shared<Filters::Common::RBAC::RoleBasedAccessControlFilterConfig>(
+        config, "test", store_);
   }
 
   RoleBasedAccessControlFilterTest() : config_(setupConfig()), filter_(config_) {}
@@ -57,7 +59,7 @@ public:
   NiceMock<Network::MockConnection> connection_{};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> req_info_;
   Stats::IsolatedStoreImpl store_;
-  RoleBasedAccessControlFilterConfigSharedPtr config_;
+  Filters::Common::RBAC::RoleBasedAccessControlFilterConfigSharedPtr config_;
 
   envoy::api::v2::core::Metadata metadata_;
   RoleBasedAccessControlFilter filter_;

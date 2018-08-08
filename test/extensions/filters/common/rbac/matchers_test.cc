@@ -36,6 +36,7 @@ TEST(AndMatcher, Permission_Set) {
   perm->set_any(true);
 
   checkMatcher(RBAC::AndMatcher(set), true);
+  checkMatcher(RBAC::AndMatcher(set, true /* disable_http_rules */), true);
 
   perm = set.add_rules();
   perm->set_destination_port(123);
@@ -43,14 +44,16 @@ TEST(AndMatcher, Permission_Set) {
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(conn, localAddress()).WillOnce(ReturnRef(addr));
+  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
   checkMatcher(RBAC::AndMatcher(set), true, conn);
+  checkMatcher(RBAC::AndMatcher(set, true /* disable_http_rules */), true, conn);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 8080, false);
-  EXPECT_CALL(conn, localAddress()).WillOnce(ReturnRef(addr));
+  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
   checkMatcher(RBAC::AndMatcher(set), false, conn);
+  checkMatcher(RBAC::AndMatcher(set, true /* disable_http_rules */), false, conn);
 }
 
 TEST(AndMatcher, Principal_Set) {
@@ -59,6 +62,7 @@ TEST(AndMatcher, Principal_Set) {
   principal->set_any(true);
 
   checkMatcher(RBAC::AndMatcher(set), true);
+  checkMatcher(RBAC::AndMatcher(set, true /* disable_http_rules */), true);
 
   principal = set.add_ids();
   auto* cidr = principal->mutable_source_ip();
@@ -68,14 +72,35 @@ TEST(AndMatcher, Principal_Set) {
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(conn, remoteAddress()).WillOnce(ReturnRef(addr));
+  EXPECT_CALL(conn, remoteAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
   checkMatcher(RBAC::AndMatcher(set), true, conn);
+  checkMatcher(RBAC::AndMatcher(set, true /* disable_http_rules */), true, conn);
 
   addr = Envoy::Network::Utility::parseInternetAddress("1.2.4.6", 123, false);
-  EXPECT_CALL(conn, remoteAddress()).WillOnce(ReturnRef(addr));
+  EXPECT_CALL(conn, remoteAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
 
   checkMatcher(RBAC::AndMatcher(set), false, conn);
+  checkMatcher(RBAC::AndMatcher(set, true /* disable_http_rules */), false, conn);
+}
+
+TEST(AndMatcher, DisableHttpRules) {
+  envoy::config::rbac::v2alpha::Permission_Set set;
+  envoy::config::rbac::v2alpha::Permission* perm = set.add_rules();
+  perm->mutable_header()->set_name("name");
+  perm->mutable_header()->set_exact_match("value");
+
+  Envoy::Network::MockConnection conn;
+  checkMatcher(RBAC::AndMatcher(set), false, conn);
+  checkMatcher(RBAC::AndMatcher(set, true /* disable_http_rules */), true, conn);
+
+  envoy::config::rbac::v2alpha::Principal_Set set2;
+  envoy::config::rbac::v2alpha::Principal* principal = set2.add_ids();
+  principal->mutable_header()->set_name("name");
+  principal->mutable_header()->set_exact_match("value");
+
+  checkMatcher(RBAC::AndMatcher(set2), false, conn);
+  checkMatcher(RBAC::AndMatcher(set2, true /* disable_http_rules */), true, conn);
 }
 
 TEST(OrMatcher, Permission_Set) {
@@ -86,14 +111,16 @@ TEST(OrMatcher, Permission_Set) {
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 456, false);
-  EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(conn, localAddress()).Times(4).WillRepeatedly(ReturnRef(addr));
 
   checkMatcher(RBAC::OrMatcher(set), false, conn);
+  checkMatcher(RBAC::OrMatcher(set, true /* disable_http_rules */), false, conn);
 
   perm = set.add_rules();
   perm->set_any(true);
 
   checkMatcher(RBAC::OrMatcher(set), true, conn);
+  checkMatcher(RBAC::OrMatcher(set, true /* disable_http_rules */), true, conn);
 }
 
 TEST(OrMatcher, Principal_Set) {
@@ -106,14 +133,35 @@ TEST(OrMatcher, Principal_Set) {
   Envoy::Network::MockConnection conn;
   Envoy::Network::Address::InstanceConstSharedPtr addr =
       Envoy::Network::Utility::parseInternetAddress("1.2.4.6", 456, false);
-  EXPECT_CALL(conn, remoteAddress()).Times(2).WillRepeatedly(ReturnRef(addr));
+  EXPECT_CALL(conn, remoteAddress()).Times(4).WillRepeatedly(ReturnRef(addr));
 
   checkMatcher(RBAC::OrMatcher(set), false, conn);
+  checkMatcher(RBAC::OrMatcher(set, true /* disable_http_rules */), false, conn);
 
   id = set.add_ids();
   id->set_any(true);
 
   checkMatcher(RBAC::OrMatcher(set), true, conn);
+  checkMatcher(RBAC::OrMatcher(set, true /* disable_http_rules */), true, conn);
+}
+
+TEST(OrMatcher, DisableHttpRules) {
+  envoy::config::rbac::v2alpha::Permission_Set set;
+  envoy::config::rbac::v2alpha::Permission* perm = set.add_rules();
+  perm->mutable_header()->set_name("name");
+  perm->mutable_header()->set_exact_match("value");
+
+  Envoy::Network::MockConnection conn;
+  checkMatcher(RBAC::OrMatcher(set), false, conn);
+  checkMatcher(RBAC::OrMatcher(set, true /* disable_http_rules */), true, conn);
+
+  envoy::config::rbac::v2alpha::Principal_Set set2;
+  envoy::config::rbac::v2alpha::Principal* principal = set2.add_ids();
+  principal->mutable_header()->set_name("name");
+  principal->mutable_header()->set_exact_match("value");
+
+  checkMatcher(RBAC::OrMatcher(set2), false, conn);
+  checkMatcher(RBAC::OrMatcher(set2, true /* disable_http_rules */), true, conn);
 }
 
 TEST(NotMatcher, Permission) {
@@ -121,6 +169,8 @@ TEST(NotMatcher, Permission) {
   perm.set_any(true);
 
   checkMatcher(RBAC::NotMatcher(perm), false, Envoy::Network::MockConnection());
+  checkMatcher(RBAC::NotMatcher(perm, true /* disable_http_rules */), false,
+               Envoy::Network::MockConnection());
 }
 
 TEST(NotMatcher, Principal) {
@@ -128,6 +178,29 @@ TEST(NotMatcher, Principal) {
   principal.set_any(true);
 
   checkMatcher(RBAC::NotMatcher(principal), false, Envoy::Network::MockConnection());
+  checkMatcher(RBAC::NotMatcher(principal, true /* disable_http_rules */), false,
+               Envoy::Network::MockConnection());
+}
+
+TEST(NotMatcher, DisableHttpRules) {
+  envoy::config::rbac::v2alpha::Permission perm;
+  auto* perms = perm.mutable_and_rules();
+  perms->add_rules()->set_any(true);
+  perms->add_rules()->mutable_header()->set_name("name");
+  perms->add_rules()->mutable_header()->set_exact_match("value");
+
+  Envoy::Network::MockConnection conn;
+  checkMatcher(RBAC::NotMatcher(perm), true, conn);
+  checkMatcher(RBAC::NotMatcher(perm, true /* disable_http_rules */), false, conn);
+
+  envoy::config::rbac::v2alpha::Principal principal;
+  auto* ids = principal.mutable_and_ids();
+  ids->add_ids()->set_any(true);
+  ids->add_ids()->mutable_header()->set_name("name");
+  ids->add_ids()->mutable_header()->set_exact_match("value");
+
+  checkMatcher(RBAC::NotMatcher(principal), true, conn);
+  checkMatcher(RBAC::NotMatcher(principal, true /* disable_http_rules */), false, conn);
 }
 
 TEST(HeaderMatcher, HeaderMatcher) {

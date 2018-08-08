@@ -40,15 +40,19 @@ public:
 
   /**
    * Creates a shared instance of a matcher based off the rules defined in the Permission config
-   * proto message.
+   * proto message. If disable_http_rules is true, HeaderMatcher and MetadataMatcher will be
+   * replaced to AlwaysMatcher during the creation.
    */
-  static MatcherConstSharedPtr create(const envoy::config::rbac::v2alpha::Permission& permission);
+  static MatcherConstSharedPtr create(const envoy::config::rbac::v2alpha::Permission& permission,
+                                      bool disable_http_rules = false);
 
   /**
    * Creates a shared instance of a matcher based off the rules defined in the Principal config
-   * proto message.
+   * proto message. If disable_http_rules is true, HeaderMatcher and MetadataMatcher will be
+   * replaced to AlwaysMatcher during the creation.
    */
-  static MatcherConstSharedPtr create(const envoy::config::rbac::v2alpha::Principal& principal);
+  static MatcherConstSharedPtr create(const envoy::config::rbac::v2alpha::Principal& principal,
+                                      bool disable_http_rules = false);
 };
 
 /**
@@ -68,8 +72,10 @@ public:
  */
 class AndMatcher : public Matcher {
 public:
-  AndMatcher(const envoy::config::rbac::v2alpha::Permission_Set& rules);
-  AndMatcher(const envoy::config::rbac::v2alpha::Principal_Set& ids);
+  AndMatcher(const envoy::config::rbac::v2alpha::Permission_Set& rules,
+             bool disable_http_rules = false);
+  AndMatcher(const envoy::config::rbac::v2alpha::Principal_Set& ids,
+             bool disable_http_rules = false);
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const envoy::api::v2::core::Metadata&) const override;
@@ -84,10 +90,15 @@ private:
  */
 class OrMatcher : public Matcher {
 public:
-  OrMatcher(const envoy::config::rbac::v2alpha::Permission_Set& set) : OrMatcher(set.rules()) {}
-  OrMatcher(const envoy::config::rbac::v2alpha::Principal_Set& set) : OrMatcher(set.ids()) {}
-  OrMatcher(const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Permission>& rules);
-  OrMatcher(const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Principal>& ids);
+  OrMatcher(const envoy::config::rbac::v2alpha::Permission_Set& set,
+            bool disable_http_rules = false)
+      : OrMatcher(set.rules(), disable_http_rules) {}
+  OrMatcher(const envoy::config::rbac::v2alpha::Principal_Set& set, bool disable_http_rules = false)
+      : OrMatcher(set.ids(), disable_http_rules) {}
+  OrMatcher(const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Permission>& rules,
+            bool disable_http_rules = false);
+  OrMatcher(const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Principal>& ids,
+            bool disable_http_rules = false);
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const envoy::api::v2::core::Metadata&) const override;
@@ -98,10 +109,12 @@ private:
 
 class NotMatcher : public Matcher {
 public:
-  NotMatcher(const envoy::config::rbac::v2alpha::Permission& permission)
-      : matcher_(Matcher::create(permission)) {}
-  NotMatcher(const envoy::config::rbac::v2alpha::Principal& principal)
-      : matcher_(Matcher::create(principal)) {}
+  NotMatcher(const envoy::config::rbac::v2alpha::Permission& permission,
+             bool disable_http_rules = false)
+      : matcher_(Matcher::create(permission, disable_http_rules)) {}
+  NotMatcher(const envoy::config::rbac::v2alpha::Principal& principal,
+             bool disable_http_rules = false)
+      : matcher_(Matcher::create(principal, disable_http_rules)) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const envoy::api::v2::core::Metadata&) const override;
@@ -174,12 +187,14 @@ private:
 
 /**
  * Matches a Policy which is a collection of permission and principal matchers. If any action
- * matches a permission, the principals are then checked for a match.
+ * matches a permission, the principals are then checked for a match. If disable_http_rules is true,
+ * HeaderMatcher and MetadataMatcher will be replaced to AlwaysMatcher during the creation.
  */
 class PolicyMatcher : public Matcher {
 public:
-  PolicyMatcher(const envoy::config::rbac::v2alpha::Policy& policy)
-      : permissions_(policy.permissions()), principals_(policy.principals()) {}
+  PolicyMatcher(const envoy::config::rbac::v2alpha::Policy& policy, bool disable_http_rules = false)
+      : permissions_(policy.permissions(), disable_http_rules),
+        principals_(policy.principals(), disable_http_rules) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const envoy::api::v2::core::Metadata&) const override;
