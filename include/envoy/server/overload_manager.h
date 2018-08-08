@@ -1,6 +1,9 @@
 #pragma once
 
+#include <unordered_map>
+
 #include "envoy/common/pure.h"
+#include "envoy/thread_local/thread_local.h"
 
 namespace Envoy {
 namespace Server {
@@ -20,6 +23,22 @@ enum class OverloadActionState {
  * Callback invoked when an overload action changes state.
  */
 typedef std::function<void(OverloadActionState)> OverloadActionCb;
+
+/**
+ * Thread-local cache of the current state of each configured overload action.
+ */
+class OverloadActionStateCache : public ThreadLocal::ThreadLocalObject {
+public:
+  bool isActive(const std::string& action) const {
+    auto it = actions_.find(action);
+    return it != actions_.end() && it->second == OverloadActionState::Active;
+  }
+
+  void setState(const std::string& action, OverloadActionState state) { actions_[action] = state; }
+
+private:
+  std::unordered_map<std::string, OverloadActionState> actions_;
+};
 
 /**
  * The OverloadManager protects the Envoy instance from being overwhelmed by client
@@ -46,6 +65,12 @@ public:
    */
   virtual void registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                                  OverloadActionCb callback) PURE;
+
+  /**
+   * Get the thread-local overload action state cache. Lookups in this cache can be used as
+   * an alternative to registering a callback for overload action state changes.
+   */
+  virtual const OverloadActionStateCache& getOverloadActionStateCache() PURE;
 };
 
 } // namespace Server

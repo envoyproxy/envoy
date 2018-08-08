@@ -282,6 +282,7 @@ public:
   MOCK_METHOD0(start, void());
   MOCK_METHOD3(registerForAction, void(const std::string& action, Event::Dispatcher& dispatcher,
                                        OverloadActionCb callback));
+  MOCK_METHOD0(getOverloadActionStateCache, const OverloadActionStateCache&());
 };
 
 class MockInstance : public Instance {
