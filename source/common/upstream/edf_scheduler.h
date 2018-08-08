@@ -69,7 +69,7 @@ public:
    * Implements empty() on the internal queue. Does not attempt to discard expired elements.
    * @return bool whether or not the internal queue is empty.
    */
-  bool empty() { return queue_.empty(); }
+  bool empty() const { return queue_.empty(); }
 
 private:
   struct EdfEntry {
