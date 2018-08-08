@@ -1977,13 +1977,10 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   )EOF";
 
   // Assert timer was disabled and it won't be called on version1 of new_cluster.
-  bool called = false;
-  EXPECT_CALL(*timer, disableTimer()).WillOnce(Invoke([&called]() { called = true; }));
-
+  EXPECT_CALL(*timer, disableTimer());
   EXPECT_TRUE(
       cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml_updated), "version2"));
   updated->initialize_callback_();
-  EXPECT_TRUE(called);
 }
 
 class ClusterManagerInitHelperTest : public testing::Test {
