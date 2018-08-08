@@ -71,4 +71,8 @@ message LoadStatsResponse {
   //    of inobservability that might otherwise exists between the messages. New clusters are not
   //    subject to this consideration.
   google.protobuf.Duration load_reporting_interval = 2;
+
+  // Set to *true* if the management server supports endpoint granularity
+  // report.
+  bool report_endpoint_granularity = 3;
 }
