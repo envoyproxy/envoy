@@ -867,8 +867,8 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       const bool address_matched = *(*i)->address() == *host->address();
       const bool health_check_changed =
           health_checker_ != nullptr && *(*i)->healthCheckAddress() != *host->healthCheckAddress();
-      // If we find a host matched based on address, we keep it. However we do change weight inline
-      // so do that here.
+      // If we find a host matched based on address and the health check address is not changed, we
+      // keep it. However we do change weight inline so do that here.
       if (address_matched && !health_check_changed) {
         if (host->weight() > max_host_weight) {
           max_host_weight = host->weight();
@@ -912,9 +912,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
         i = current_hosts.erase(i);
         found = true;
       } else {
-        if (address_matched && health_check_changed) {
-          hosts_changed = true;
-        }
         i++;
       }
     }
@@ -937,7 +934,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
   // If there are removed hosts, check to see if we should only delete if unhealthy.
-  if (!current_hosts.empty() && dont_remove_healthy_hosts && !hosts_changed) {
+  if (!current_hosts.empty() && dont_remove_healthy_hosts) {
     for (auto i = current_hosts.begin(); i != current_hosts.end();) {
       if (!(*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
         if ((*i)->weight() > max_host_weight) {
