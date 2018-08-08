@@ -182,7 +182,6 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
   if (overprovisioning_factor.has_value()) {
     ASSERT(overprovisioning_factor.value() > 0);
     overprovisioning_factor_ = overprovisioning_factor.value();
-    std::cerr << "DDD reset opf to " << overprovisioning_factor_ << std::endl;
   }
   hosts_ = std::move(hosts);
   healthy_hosts_ = std::move(healthy_hosts);

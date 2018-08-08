@@ -88,8 +88,6 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt;
   if (cluster_load_assignment.policy().has_overprovisioning_factor()) {
     overprovisioning_factor = cluster_load_assignment.policy().overprovisioning_factor().value();
-
-    std::cerr << "DDD new vale is set to : " << overprovisioning_factor.value() << std::endl;
   }
 
   // Loop over existing priorities not present in the config. This will empty out any priorities
