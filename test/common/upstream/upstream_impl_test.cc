@@ -147,10 +147,9 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
       }));
   NiceMock<MockClusterManager> cm;
   envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
 
@@ -183,10 +182,9 @@ TEST(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
 
   ResolverData resolver(*dns_resolver, dispatcher);
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
@@ -249,10 +247,9 @@ TEST(StrictDnsClusterImplTest, Basic) {
 
   NiceMock<MockClusterManager> cm;
   envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
@@ -374,10 +371,9 @@ TEST(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
 
   ResolverData resolver(*dns_resolver, dispatcher);
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
@@ -473,10 +469,9 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
 
   NiceMock<MockClusterManager> cm;
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
@@ -631,10 +626,9 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
 
   NiceMock<MockClusterManager> cm;
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
@@ -786,10 +780,9 @@ TEST(StaticClusterImplTest, InitialHosts) {
 
   NiceMock<MockClusterManager> cm;
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
@@ -820,10 +813,9 @@ TEST(StaticClusterImplTest, EmptyHostname) {
 
   NiceMock<MockClusterManager> cm;
   envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
@@ -860,10 +852,9 @@ TEST(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
 
   NiceMock<MockClusterManager> cm;
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
@@ -919,10 +910,9 @@ TEST(StaticClusterImplTest, LoadAssignmentMultiplePriorities) {
 
   NiceMock<MockClusterManager> cm;
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
@@ -972,10 +962,9 @@ TEST(StaticClusterImplTest, LoadAssignmentLocality) {
 
   NiceMock<MockClusterManager> cm;
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
@@ -1012,10 +1001,9 @@ TEST(StaticClusterImplTest, AltStatName) {
 
   NiceMock<MockClusterManager> cm;
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
@@ -1045,10 +1033,9 @@ TEST(StaticClusterImplTest, RingHash) {
 
   NiceMock<MockClusterManager> cm;
   envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), true);
@@ -1080,10 +1067,9 @@ TEST(StaticClusterImplTest, OutlierDetector) {
 
   NiceMock<MockClusterManager> cm;
   envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
@@ -1137,10 +1123,9 @@ TEST(StaticClusterImplTest, HealthyStat) {
 
   NiceMock<MockClusterManager> cm;
   envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
@@ -1229,10 +1214,9 @@ TEST(StaticClusterImplTest, UrlConfig) {
 
   NiceMock<MockClusterManager> cm;
   envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
@@ -1284,10 +1268,10 @@ TEST(StaticClusterImplTest, UnsupportedLBType) {
   EXPECT_THROW_WITH_MESSAGE(
       {
         envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
-        Envoy::Stats::ScopePtr scope = stats.createScope(
-            fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                           ? cluster_config.name()
-                                           : std::string(cluster_config.alt_stat_name())));
+        Envoy::Stats::ScopePtr scope =
+            stats.createScope(fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
+                                                             ? cluster_config.name()
+                                                             : cluster_config.alt_stat_name()));
         Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
             ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
         StaticClusterImpl(cluster_config, runtime, factory_context, std::move(scope), false);
@@ -1317,10 +1301,9 @@ TEST(StaticClusterImplTest, MalformedHostIP) {
 
   NiceMock<MockClusterManager> cm;
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   EXPECT_THROW_WITH_MESSAGE(
@@ -1379,8 +1362,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
     NiceMock<MockClusterManager> cm;
     cm.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
-        "cluster.{}.",
-        config.alt_stat_name().empty() ? config.name() : std::string(config.alt_stat_name())));
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
     StaticClusterImpl cluster(config, runtime, factory_context, std::move(scope), false);
@@ -1393,8 +1375,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
     // Verify source address from cluster config is used when present.
     NiceMock<MockClusterManager> cm;
     Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
-        "cluster.{}.",
-        config.alt_stat_name().empty() ? config.name() : std::string(config.alt_stat_name())));
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
     StaticClusterImpl cluster(config, runtime, factory_context, std::move(scope), false);
@@ -1406,8 +1387,7 @@ TEST(StaticClusterImplTest, SourceAddressPriority) {
     NiceMock<MockClusterManager> cm;
     cm.bind_config_.mutable_source_address()->set_address("1.2.3.5");
     Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
-        "cluster.{}.",
-        config.alt_stat_name().empty() ? config.name() : std::string(config.alt_stat_name())));
+        "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
     StaticClusterImpl cluster(config, runtime, factory_context, std::move(scope), false);
@@ -1437,10 +1417,9 @@ TEST(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
     hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
   )EOF";
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
 
@@ -1524,10 +1503,9 @@ TEST(ClusterMetadataTest, Metadata) {
   )EOF";
 
   envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-  Envoy::Stats::ScopePtr scope = stats.createScope(
-      fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                     ? cluster_config.name()
-                                     : std::string(cluster_config.alt_stat_name())));
+  Envoy::Stats::ScopePtr scope = stats.createScope(fmt::format(
+      "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                            : cluster_config.alt_stat_name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
   StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
