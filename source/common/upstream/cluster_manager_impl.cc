@@ -501,6 +501,11 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
     cluster_entry->cluster_->initialize([this, cluster_name] {
       auto warming_it = warming_clusters_.find(cluster_name);
       auto& cluster_entry = *warming_it->second;
+
+      // If the cluster is being updated, we need to destroy any pending merged updates.
+      // Othewise, applyUpdates() will fire with a dangling cluster reference.
+      updates_map_.erase(cluster_name);
+
       active_clusters_[cluster_name] = std::move(warming_it->second);
       warming_clusters_.erase(warming_it);
 
