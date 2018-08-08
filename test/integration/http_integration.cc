@@ -437,6 +437,9 @@ config: {}
   upstream_request_->encodeData(128, true);
   response->waitForEndStream();
 
+  if (upstreamProtocol() == FakeHttpConnection::Type::HTTP2) {
+    EXPECT_STREQ("decode", upstream_request_->trailers()->GrpcMessage()->value().c_str());
+  }
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
   EXPECT_STREQ("encode", response->trailers()->GrpcMessage()->value().c_str());
