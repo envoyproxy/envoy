@@ -52,7 +52,6 @@ public:
     Protobuf::RepeatedPtrField<ResourceType> typed_resources;
     for (const auto& resource : response.resources()) {
       auto* typed_resource = typed_resources.Add();
-      // TODO(kuat)
       resource.UnpackTo(typed_resource);
     }
     return typed_resources;

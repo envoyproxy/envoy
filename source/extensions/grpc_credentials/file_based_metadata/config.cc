@@ -27,9 +27,10 @@ FileBasedMetadataGrpcCredentialsFactory::getChannelCredentials(
     case envoy::api::v2::core::GrpcService::GoogleGrpc::CallCredentials::kFromPlugin: {
       if (credential.from_plugin().name() == GrpcCredentialsNames::get().FileBasedMetadata) {
         FileBasedMetadataGrpcCredentialsFactory file_based_metadata_credentials_factory;
+        // downcast to file based config, ignore unknown fields (kuat)
         const Envoy::ProtobufTypes::MessagePtr file_based_metadata_config_message =
             Envoy::Config::Utility::translateToFactoryConfig(
-                credential.from_plugin(), file_based_metadata_credentials_factory, true /*kuat*/);
+                credential.from_plugin(), file_based_metadata_credentials_factory, true);
         const auto& file_based_metadata_config = Envoy::MessageUtil::downcastAndValidate<
             const envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig&>(
             *file_based_metadata_config_message);

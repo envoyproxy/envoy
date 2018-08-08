@@ -363,8 +363,9 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(transport_socket.name());
+  // always downcast and ignore unknown fields (kuat)
   ProtobufTypes::MessagePtr message =
-      Config::Utility::translateToFactoryConfig(transport_socket, config_factory, true /* kuat */);
+      Config::Utility::translateToFactoryConfig(transport_socket, config_factory, true);
   return config_factory.createTransportSocketFactory(*message, factory_context);
 }
 

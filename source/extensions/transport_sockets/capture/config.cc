@@ -22,8 +22,9 @@ Network::TransportSocketFactoryPtr UpstreamCaptureSocketConfigFactory::createTra
   auto& inner_config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(
       outer_config.transport_socket().name());
+  // always downcast and ignore unknown fields (kuat)
   ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
-      outer_config.transport_socket(), inner_config_factory, true /*kuat*/);
+      outer_config.transport_socket(), inner_config_factory, true);
   auto inner_transport_factory =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
   return std::make_unique<CaptureSocketFactory>(outer_config.file_sink().path_prefix(),
@@ -40,8 +41,9 @@ DownstreamCaptureSocketConfigFactory::createTransportSocketFactory(
   auto& inner_config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(
       outer_config.transport_socket().name());
+  // always downcast and ignore unknown fields in the message (kuat)
   ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
-      outer_config.transport_socket(), inner_config_factory, true /*kuat*/);
+      outer_config.transport_socket(), inner_config_factory, true);
   auto inner_transport_factory = inner_config_factory.createTransportSocketFactory(
       *inner_factory_config, context, server_names);
   return std::make_unique<CaptureSocketFactory>(outer_config.file_sink().path_prefix(),
