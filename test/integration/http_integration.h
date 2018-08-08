@@ -156,6 +156,7 @@ protected:
   void testInvalidContentLength();
   void testMultipleContentLengths();
   void testComputedHealthCheck();
+  void testAddEncodedTrailers();
   void testDrainClose();
   void testRetry();
   void testRetryHittingBufferLimit();

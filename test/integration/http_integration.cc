@@ -28,11 +28,11 @@
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::AnyNumber;
 using testing::HasSubstr;
 using testing::Invoke;
 using testing::Not;
-using testing::_;
 
 namespace Envoy {
 
@@ -416,6 +416,30 @@ config:
 
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+}
+
+void HttpIntegrationTest::testAddEncodedTrailers() {
+  config_helper_.addFilter(R"EOF(
+name: add-trailers-filter
+config: {}
+)EOF");
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "GET"},
+                                                                 {":path", "/test/long/url"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"}},
+                                         128);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
+  upstream_request_->encodeData(128, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_STREQ("encode", response->trailers()->GrpcMessage()->value().c_str());
 }
 
 // Add a health check filter and verify correct behavior when draining.
