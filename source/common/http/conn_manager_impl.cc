@@ -792,7 +792,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_)) {
-      return;
+      // break here to ensure that we call decodeTrailers below
+      break;
     }
   }
 

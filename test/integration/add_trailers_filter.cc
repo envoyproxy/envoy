@@ -5,7 +5,7 @@
 namespace Envoy {
 Http::FilterDataStatus AddTrailersStreamFilter::decodeData(Buffer::Instance&, bool end_stream) {
   if (end_stream) {
-    /* decoder_callbacks_->addDecodedTrailers().insertGrpcMessage().value(std::string("decode")); */
+    decoder_callbacks_->addDecodedTrailers().insertGrpcMessage().value(std::string("decode"));
   }
 
   return Http::FilterDataStatus::Continue;
