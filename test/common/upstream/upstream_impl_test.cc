@@ -1465,8 +1465,9 @@ TEST(PrioritySet, Extend) {
   HostVector hosts_added{hosts->front()};
   HostVector hosts_removed{};
 
-  priority_set.hostSetsPerPriority()[1]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  priority_set.hostSetsPerPriority()[1]->updateHosts(hosts, hosts, hosts_per_locality,
+                                                     hosts_per_locality, {}, hosts_added,
+                                                     hosts_removed, absl::nullopt);
   EXPECT_EQ(1, changes);
   EXPECT_EQ(last_priority, 1);
   EXPECT_EQ(1, priority_set.hostSetsPerPriority()[1]->hosts().size());
@@ -1583,7 +1584,7 @@ TEST(HostsPerLocalityImpl, Filter) {
 class HostSetImplLocalityTest : public ::testing::Test {
 public:
   LocalityWeightsConstSharedPtr locality_weights_;
-  HostSetImpl host_set_{0};
+  HostSetImpl host_set_{0, kDefaultOverProvisioningFactor};
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   HostVector hosts_{
       makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
@@ -1604,7 +1605,7 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1, 1}};
   auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
   host_set_.updateHosts(hosts, std::make_shared<const HostVector>(), hosts_per_locality,
-                        hosts_per_locality, locality_weights, {}, {});
+                        hosts_per_locality, locality_weights, {}, {}, absl::nullopt);
   EXPECT_FALSE(host_set_.chooseLocality().has_value());
 }
 
@@ -1625,7 +1626,7 @@ TEST_F(HostSetImplLocalityTest, Unweighted) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1, 1}};
   auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
   host_set_.updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, locality_weights, {},
-                        {});
+                        {}, absl::nullopt);
   EXPECT_EQ(0, host_set_.chooseLocality().value());
   EXPECT_EQ(1, host_set_.chooseLocality().value());
   EXPECT_EQ(2, host_set_.chooseLocality().value());
@@ -1640,7 +1641,7 @@ TEST_F(HostSetImplLocalityTest, Weighted) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 2}};
   auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
   host_set_.updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, locality_weights, {},
-                        {});
+                        {}, absl::nullopt);
   EXPECT_EQ(1, host_set_.chooseLocality().value());
   EXPECT_EQ(0, host_set_.chooseLocality().value());
   EXPECT_EQ(1, host_set_.chooseLocality().value());
@@ -1656,7 +1657,7 @@ TEST_F(HostSetImplLocalityTest, MissingWeight) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 0, 1}};
   auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
   host_set_.updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, locality_weights, {},
-                        {});
+                        {}, absl::nullopt);
   EXPECT_EQ(0, host_set_.chooseLocality().value());
   EXPECT_EQ(2, host_set_.chooseLocality().value());
   EXPECT_EQ(0, host_set_.chooseLocality().value());
@@ -1681,7 +1682,8 @@ TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
     auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
     host_set_.updateHosts(makeHostsFromHostsPerLocality(hosts_per_locality),
                           makeHostsFromHostsPerLocality(healthy_hosts_per_locality),
-                          hosts_per_locality, healthy_hosts_per_locality, locality_weights, {}, {});
+                          hosts_per_locality, healthy_hosts_per_locality, locality_weights, {}, {},
+                          absl::nullopt);
   };
 
   const auto expectPicks = [this](uint32_t locality_0_picks, uint32_t locality_1_picks) {
@@ -1709,6 +1711,47 @@ TEST_F(HostSetImplLocalityTest, UnhealthyFailover) {
   setHealthyHostCount(0);
   expectPicks(0, 100);
 }
+
+TEST(OverProvisioningFactorTest, LocalityPickChanges) {
+  auto setUpHostSetWithOPFAndTestPicks = [](const uint32_t overprovisioning_factor,
+                                            const uint32_t pick_0, const uint32_t pick_1) {
+    HostSetImpl host_set(0, overprovisioning_factor);
+    std::shared_ptr<MockClusterInfo> cluster_info{new NiceMock<MockClusterInfo>()};
+    HostVector hosts{makeTestHost(cluster_info, "tcp://127.0.0.1:80"),
+                     makeTestHost(cluster_info, "tcp://127.0.0.1:81"),
+                     makeTestHost(cluster_info, "tcp://127.0.0.1:82")};
+    LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};
+    HostsPerLocalitySharedPtr hosts_per_locality =
+        makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2]}});
+    // Healthy ratio: (1/2, 1).
+    HostsPerLocalitySharedPtr healthy_hosts_per_locality =
+        makeHostsPerLocality({{hosts[0]}, {hosts[2]}});
+    host_set.updateHosts(makeHostsFromHostsPerLocality(hosts_per_locality),
+                         makeHostsFromHostsPerLocality(healthy_hosts_per_locality),
+                         hosts_per_locality, healthy_hosts_per_locality, locality_weights, {}, {},
+                         absl::nullopt);
+    uint32_t cnts[] = {0, 0};
+    for (uint32_t i = 0; i < 100; ++i) {
+      absl::optional<uint32_t> locality_index = host_set.chooseLocality();
+      if (!locality_index.has_value()) {
+        // It's possible locality scheduler is nullptr (when factor is 0).
+        continue;
+      }
+      ASSERT_LT(locality_index.value(), 2);
+      ++cnts[locality_index.value()];
+    }
+    EXPECT_EQ(pick_0, cnts[0]);
+    EXPECT_EQ(pick_1, cnts[1]);
+  };
+
+  // NOTE: effective locality weight: weight * min(1, factor * healthy-ratio).
+
+  // Picks in localities match to weight(1) * healthy-ratio when
+  // overprovisioning factor is 1.
+  setUpHostSetWithOPFAndTestPicks(100, 33, 67);
+  // Picks in localities match to weights as factor * healthy-ratio > 1.
+  setUpHostSetWithOPFAndTestPicks(200, 50, 50);
+};
 
 } // namespace
 } // namespace Upstream

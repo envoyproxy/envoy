@@ -58,13 +58,13 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
 
   // Determine the health of the newly modified priority level.
   // Health ranges from 0-100, and is the ratio of healthy hosts to total hosts, modified by the
-  // somewhat arbitrary overprovision factor of kOverProvisioningFactor.
-  // Eventually the overprovision factor will likely be made configurable.
+  // overprovisioning factor.
   HostSet& host_set = *priority_set_.hostSetsPerPriority()[priority];
   per_priority_health_[priority] = 0;
   if (host_set.hosts().size() > 0) {
-    per_priority_health_[priority] = std::min<uint32_t>(
-        100, kOverProvisioningFactor * host_set.healthyHosts().size() / host_set.hosts().size());
+    per_priority_health_[priority] =
+        std::min<uint32_t>(100, (host_set.overprovisioning_factor() *
+                                 host_set.healthyHosts().size() / host_set.hosts().size()));
   }
 
   // Now that we've updated health for the changed priority level, we need to caculate percentage
