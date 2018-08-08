@@ -14,6 +14,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RBACFilter {
 
+enum EngineResult { UNKNOWN, NONE, ALLOW, DENY };
+
 /**
  * Implementation of a basic RBAC network filter.
  */
@@ -35,6 +37,10 @@ public:
 private:
   Filters::Common::RBAC::RoleBasedAccessControlFilterConfigSharedPtr config_;
   Network::ReadFilterCallbacks* callbacks_{};
+  EngineResult engine_result_{UNKNOWN};
+  EngineResult shadow_engine_result_{UNKNOWN};
+
+  EngineResult checkEngine(Filters::Common::RBAC::EnforcementMode mode);
 };
 
 } // namespace RBACFilter

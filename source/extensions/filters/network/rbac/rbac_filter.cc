@@ -3,8 +3,6 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 
-#include "common/http/header_map_impl.h"
-
 #include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
@@ -23,39 +21,53 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
                 callbacks_->connection().ssl()->subjectPeerCertificate()
           : "none");
 
-  const Envoy::Http::HeaderMapImpl empty_header;
-  const envoy::api::v2::core::Metadata empty_metadata;
-  const std::string& filter_name = NetworkFilterNames::get().Rbac;
-  const auto& shadow_engine =
-      config_->engine(nullptr, filter_name, Filters::Common::RBAC::EnforcementMode::Shadow);
-  if (shadow_engine.has_value()) {
+  if (shadow_engine_result_ == UNKNOWN) {
     // TODO(quanlin): Support metric collection for RBAC network filter.
-    if (shadow_engine->allowed(callbacks_->connection(), empty_header, empty_metadata, nullptr)) {
-      ENVOY_LOG(debug, "shadow allowed");
-      config_->stats().shadow_allowed_.inc();
-    } else {
-      ENVOY_LOG(debug, "shadow denied");
-      config_->stats().shadow_denied_.inc();
-    }
+    // Only check the engine and increase stats for the first time call to onData(), any following
+    // calls to onData() could just use the cached result and no need to increase the stats anymore.
+    shadow_engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow);
   }
 
-  const auto& engine =
-      config_->engine(nullptr, filter_name, Filters::Common::RBAC::EnforcementMode::Enforced);
-  if (engine.has_value()) {
-    if (engine->allowed(callbacks_->connection(), empty_header, empty_metadata, nullptr)) {
-      ENVOY_LOG(debug, "enforced allowed");
-      config_->stats().allowed_.inc();
-      return Network::FilterStatus::Continue;
-    } else {
-      ENVOY_LOG(debug, "enforced denied");
-      config_->stats().denied_.inc();
-      callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-      return Network::FilterStatus::StopIteration;
-    }
+  if (engine_result_ == UNKNOWN) {
+    engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
+  }
+
+  if (engine_result_ == ALLOW) {
+    return Network::FilterStatus::Continue;
+  } else if (engine_result_ == DENY) {
+    callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+    return Network::FilterStatus::StopIteration;
   }
 
   ENVOY_LOG(debug, "no engine, allowed by default");
   return Network::FilterStatus::Continue;
+}
+
+EngineResult
+RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode mode) {
+  const auto& engine = config_->engine(nullptr, NetworkFilterNames::get().Rbac, mode);
+  if (engine.has_value()) {
+    if (engine->allowed(callbacks_->connection())) {
+      if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
+        ENVOY_LOG(debug, "shadow allowed");
+        config_->stats().shadow_allowed_.inc();
+      } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
+        ENVOY_LOG(debug, "enforced allowed");
+        config_->stats().allowed_.inc();
+      }
+      return ALLOW;
+    } else {
+      if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
+        ENVOY_LOG(debug, "shadow denied");
+        config_->stats().shadow_denied_.inc();
+      } else if (mode == Filters::Common::RBAC::EnforcementMode::Enforced) {
+        ENVOY_LOG(debug, "enforced denied");
+        config_->stats().denied_.inc();
+      }
+      return DENY;
+    }
+  }
+  return NONE;
 }
 
 } // namespace RBACFilter

@@ -67,18 +67,28 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Allowed) {
   setDestinationPort(123);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  // Call onData() twice, should only increase stats once.
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
   EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
   setDestinationPort(456);
 
-  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush)).Times(2);
+
+  // Call onData() twice, should only increase stats once.
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
   EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(1U, config_->stats().shadow_allowed_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
 }
 
 } // namespace RBACFilter
