@@ -144,9 +144,14 @@ HostImpl::createConnection(Event::Dispatcher& dispatcher, const ClusterInfo& clu
     connection_options = options;
   }
 
+  auto transport_socket = cluster.transportSocketFactory().createTransportSocket();
+  if (!transport_socket) {
+    cluster.stats().upstream_cx_connect_fail_by_sds_.inc();
+    return nullptr;
+  }
+
   Network::ClientConnectionPtr connection = dispatcher.createClientConnection(
-      address, cluster.sourceAddress(), cluster.transportSocketFactory().createTransportSocket(),
-      connection_options);
+      address, cluster.sourceAddress(), std::move(transport_socket), connection_options);
   connection->setBufferLimits(cluster.perConnectionBufferLimitBytes());
   return connection;
 }
@@ -344,11 +349,12 @@ Stats::ScopePtr generateStatsScope(const envoy::api::v2::Cluster& config, Stats:
       "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
 }
 
-} // namespace
+Network::TransportSocketFactoryPtr
+createTransportSocketFactory(const envoy::api::v2::Cluster& config,
+                             Server::Configuration::TransportSocketFactoryContext& factory_context,
+                             Init::Manager& init_manager) {
+  factory_context.setInitManager(init_manager);
 
-Network::TransportSocketFactoryPtr createTransportSocketFactory(
-    const envoy::api::v2::Cluster& config,
-    Server::Configuration::TransportSocketFactoryContext& factory_context) {
   // If the cluster config doesn't have a transport socket configured, override with the default
   // transport socket implementation based on the tls_context. We copy by value first then override
   // if necessary.
@@ -369,6 +375,8 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
       Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
   return config_factory.createTransportSocketFactory(*message, factory_context);
 }
+
+} // namespace
 
 ClusterSharedPtr ClusterImplBase::create(
     const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
@@ -460,7 +468,7 @@ ClusterImplBase::ClusterImplBase(
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : runtime_(runtime) {
-  auto socket_factory = createTransportSocketFactory(cluster, factory_context);
+  auto socket_factory = createTransportSocketFactory(cluster, factory_context, init_manager_);
   info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
                                             runtime, std::move(socket_factory),
                                             std::move(stats_scope), added_via_api);
@@ -523,6 +531,10 @@ void ClusterImplBase::onPreInitComplete() {
   }
   initialization_started_ = true;
 
+  init_manager_.initialize([this]() { onInitDone(); });
+}
+
+void ClusterImplBase::onInitDone() {
   if (health_checker_ && pending_initialize_health_checks_ == 0) {
     for (auto& host_set : prioritySet().hostSetsPerPriority()) {
       pending_initialize_health_checks_ += host_set->hosts().size();

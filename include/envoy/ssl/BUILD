@@ -21,6 +21,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "context_config_interface",
     hdrs = ["context_config.h"],
+    deps = [
+        "//include/envoy/secret:dynamic_secret_provider_interface",
+    ],
 )
 
 envoy_cc_library(

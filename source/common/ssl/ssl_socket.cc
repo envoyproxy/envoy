@@ -388,13 +388,27 @@ ClientSslSocketFactory::ClientSslSocketFactory(ClientContextConfigPtr config,
                                                Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope)
     : manager_(manager), stats_scope_(stats_scope), config_(std::move(config)),
-      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {}
+      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {
+  if (config_->getDynamicSecretProvider()) {
+    config_->getDynamicSecretProvider()->addUpdateCallback(*this);
+  }
+}
+
+ClientSslSocketFactory::~ClientSslSocketFactory() {
+  if (config_->getDynamicSecretProvider()) {
+    config_->getDynamicSecretProvider()->removeUpdateCallback(*this);
+  }
+}
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() const {
-  return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Client);
+  return ssl_ctx_ ? std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Client) : nullptr;
 }
 
 bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
+
+void ClientSslSocketFactory::onAddOrUpdateSecret() {
+  ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
+}
 
 ServerSslSocketFactory::ServerSslSocketFactory(ServerContextConfigPtr config,
                                                Ssl::ContextManager& manager,
@@ -402,13 +416,27 @@ ServerSslSocketFactory::ServerSslSocketFactory(ServerContextConfigPtr config,
                                                const std::vector<std::string>& server_names)
     : manager_(manager), stats_scope_(stats_scope), config_(std::move(config)),
       server_names_(server_names),
-      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_)) {}
+      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_)) {
+  if (config_->getDynamicSecretProvider()) {
+    config_->getDynamicSecretProvider()->addUpdateCallback(*this);
+  }
+}
+
+ServerSslSocketFactory::~ServerSslSocketFactory() {
+  if (config_->getDynamicSecretProvider()) {
+    config_->getDynamicSecretProvider()->removeUpdateCallback(*this);
+  }
+}
 
 Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() const {
-  return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Server);
+  return ssl_ctx_ ? std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Server) : nullptr;
 }
 
 bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
+
+void ServerSslSocketFactory::onAddOrUpdateSecret() {
+  ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
+}
 
 } // namespace Ssl
 } // namespace Envoy
