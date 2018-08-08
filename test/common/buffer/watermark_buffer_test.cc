@@ -100,15 +100,20 @@ TEST_F(WatermarkBufferTest, PrependString) {
 
 TEST_F(WatermarkBufferTest, PrependBuffer) {
   std::string suffix = "World!", prefix = "Hello, ";
-  buffer_.add(suffix);
-  EXPECT_EQ(0, times_high_watermark_called_);
-  EXPECT_EQ(suffix.size(), buffer_.length());
 
-  OwnedImpl prefixBuffer;
+  uint32_t prefix_buffer_low_watermark_hits{0};
+  uint32_t prefix_buffer_high_watermark_hits{0};
+  WatermarkBuffer prefixBuffer{[&]() -> void { ++prefix_buffer_low_watermark_hits; },
+                               [&]() -> void { ++prefix_buffer_high_watermark_hits; }};
+  prefixBuffer.setWatermarks(5, 10);
   prefixBuffer.add(prefix);
+  prefixBuffer.add(suffix);
+
+  EXPECT_EQ(1, prefix_buffer_high_watermark_hits);
   buffer_.prepend(prefixBuffer);
 
   EXPECT_EQ(1, times_high_watermark_called_);
+  EXPECT_EQ(1, prefix_buffer_low_watermark_hits);
   EXPECT_EQ(suffix.size() + prefix.size(), buffer_.length());
   EXPECT_EQ(prefix + suffix, buffer_.toString());
   EXPECT_EQ(0, prefixBuffer.length());
