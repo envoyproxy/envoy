@@ -26,12 +26,12 @@ public:
     HttpProtocolIntegrationTest::initialize();
   }
 
-  IntegrationStreamDecoderPtr setupPerStreamIdleTimeoutTest() {
+  IntegrationStreamDecoderPtr setupPerStreamIdleTimeoutTest(const char* method = "GET") {
     initialize();
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
     auto encoder_decoder =
-        codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+        codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", method},
                                                             {":path", "/test/long/url"},
                                                             {":scheme", "http"},
                                                             {":authority", "host"}});
@@ -44,23 +44,6 @@ public:
     RELEASE_ASSERT(result, result.message());
     result = upstream_request_->waitForHeadersComplete();
     RELEASE_ASSERT(result, result.message());
-    return response;
-  }
-
-  IntegrationStreamDecoderPtr setupPerStreamIdleTimeoutHeadRequestTest() {
-    initialize();
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-    auto encoder_decoder =
-        codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "HEAD"},
-                                                            {":path", "/test/long/url"},
-                                                            {":scheme", "http"},
-                                                            {":authority", "host"}});
-    request_encoder_ = &encoder_decoder.first;
-    auto response = std::move(encoder_decoder.second);
-    fake_upstream_connection_ = fake_upstreams_[0]->waitForHttpConnection(*dispatcher_);
-    upstream_request_ = fake_upstream_connection_->waitForNewStream(*dispatcher_);
-    upstream_request_->waitForHeadersComplete();
     return response;
   }
 
@@ -101,7 +84,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
 
 // Per-stream idle timeout after having sent downstream head request.
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutHeadRequestAfterDownstreamHeadRequest) {
-  auto response = setupPerStreamIdleTimeoutHeadRequestTest();
+  auto response = setupPerStreamIdleTimeoutTest("HEAD");
 
   waitForTimeout(*response);
   EXPECT_FALSE(upstream_request_->complete());
