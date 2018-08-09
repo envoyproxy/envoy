@@ -28,7 +28,11 @@ MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
   : RouteEntryImplBase(route),
     method_name_(route.match().method_name()),
-    invert_(route.match().invert()) {}
+    invert_(route.match().invert()) {
+  if (method_name_.empty() && invert_) {
+    throw EnvoyException("Cannot have an empty method name with inversion enabled");
+  }
+}
 
 RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
   bool matches = method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
@@ -44,7 +48,11 @@ ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
   : RouteEntryImplBase(route),
     service_name_(route.match().service_name()),
-    invert_(route.match().invert()) {}
+    invert_(route.match().invert()) {
+  if (service_name_.empty() && invert_) {
+    throw EnvoyException("Cannot have an empty service name with inversion enabled");
+  }
+}
 
 RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
   bool matches = service_name_.empty() ||
