@@ -217,6 +217,11 @@ public:
     if (!message.UnpackTo(&typed_message)) {
       throw EnvoyException("Unable to unpack " + message.DebugString());
     }
+    if (!MessageUtil::allow_unknown_fields &&
+        !typed_message.GetReflection()->GetUnknownFields(typed_message).empty()) {
+      throw EnvoyException("Protobuf Any (type " + typed_message.GetTypeName() +
+                           ") has unknown fields");
+    }
     return typed_message;
   };
 

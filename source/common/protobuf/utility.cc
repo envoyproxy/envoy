@@ -78,6 +78,11 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   if (StringUtil::endsWith(path, ".pb")) {
     // Attempt to parse the binary format.
     if (message.ParseFromString(contents)) {
+      if (!MessageUtil::allow_unknown_fields &&
+          !message.GetReflection()->GetUnknownFields(message).empty()) {
+        throw EnvoyException("Protobuf Any (type " + message.GetTypeName() +
+                             ") has unknown fields");
+      }
       return;
     }
     throw EnvoyException("Unable to parse file \"" + path + "\" as a binary protobuf (type " +
