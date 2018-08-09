@@ -116,7 +116,7 @@ public:
             OverloadManager& overload_manager, std::function<void()> workers_start_cb);
 
   // Helper function to inititate a shutdown. This can be triggered either by catching SIGTERM
-  // or will be called directly from ServerImpl::shutdown() if --shutdown_without_signal is set.
+  // or be called from ServerImpl::shutdown().
   void shutdown(Event::Dispatcher& dispatcher, HotRestart& hot_restart);
 
 private:
