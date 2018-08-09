@@ -767,6 +767,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   }
 
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
+  auto trailers_added_entry = decoder_filters_.end();
+  bool trailers_exists = request_trailers_ != nullptr;
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
@@ -779,28 +781,33 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     // We check the request_trailers_ pointer here in case addDecodedTrailers
     // is called in decodeData - at which point we communicate to the filter
     // that the stream has not yet ended.
-    bool end_stream_no_trailers = end_stream && !request_trailers_;
-    if (end_stream_no_trailers) {
+    if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
     state_.filter_call_state_ |= FilterCallState::DecodeData;
-    FilterDataStatus status = (*entry)->handle_->decodeData(data, end_stream_no_trailers);
+    FilterDataStatus status = (*entry)->handle_->decodeData(data, end_stream && !request_trailers_);
     state_.filter_call_state_ &= ~FilterCallState::DecodeData;
-    if (end_stream_no_trailers) {
+    if (end_stream) {
       state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
     }
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
-    if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_)) {
+
+    if (!trailers_exists && request_trailers_ && trailers_added_entry == decoder_filters_.end()) {
+      trailers_added_entry = entry;
+    }
+
+    if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_) && std::next(entry) != decoder_filters_.end()) {
       // break here to ensure that we call decodeTrailers below
-      break;
+      return;
     }
   }
 
   // If trailers were adding during decodeData we need to trigger decodeTrailers in order
   // to allow filters to process the trailers.
-  if (end_stream && request_trailers_) {
-    decodeTrailers(filter, *request_trailers_);
+  if (trailers_added_entry != decoder_filters_.end()) {
+    (*trailers_added_entry)->stopped_ = true;
+    (*trailers_added_entry)->continueDecoding();
   }
 }
 

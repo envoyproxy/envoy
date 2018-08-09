@@ -2384,7 +2384,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackNoTrailers)
       .WillOnce(Return(FilterDataStatus::Continue));
 
   // since we added trailers, we should see decodeTrailers
-  EXPECT_CALL(*decoder_filters_[0], decodeTrailers(_)).WillOnce(Invoke([&](HeaderMap& trailers) {
+  EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_)).WillOnce(Invoke([&](HeaderMap& trailers) {
     // ensure that we see the trailers set in decodeData
     Http::LowerCaseString key("foo");
     auto t = trailers.get(key);
@@ -2392,8 +2392,6 @@ TEST_F(HttpConnectionManagerImplTest, FilterAddTrailersInDataCallbackNoTrailers)
     EXPECT_EQ(t->value(), trailers_data.c_str());
     return FilterTrailersStatus::Continue;
   }));
-  EXPECT_CALL(*decoder_filters_[1], decodeTrailers(_))
-      .WillOnce(Return(FilterTrailersStatus::Continue));
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
