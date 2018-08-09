@@ -55,11 +55,7 @@ public:
       if (!resource.UnpackTo(typed_resource)) {
         throw EnvoyException("Unable to unpack " + resource.DebugString());
       }
-      if (!MessageUtil::allow_unknown_fields &&
-          !typed_resource->GetReflection()->GetUnknownFields(*typed_resource).empty()) {
-        throw EnvoyException("Protobuf Any (type " + typed_resource->GetTypeName() +
-                             ") has unknown fields");
-      }
+      MessageUtil::checkUnknownFields(*typed_resource);
     }
     return typed_resources;
   }
