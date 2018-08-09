@@ -85,10 +85,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
   // Track whether we rebuilt any LB structures.
   bool cluster_rebuilt = false;
 
-  absl::optional<uint32_t> overprovisioning_factor = absl::nullopt;
-  if (cluster_load_assignment.policy().has_overprovisioning_factor()) {
-    overprovisioning_factor = cluster_load_assignment.policy().overprovisioning_factor().value();
-  }
+  const uint32_t overprovisioning_factor = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 
   // Loop over existing priorities not present in the config. This will empty out any priorities
   // the config update did not refer to
@@ -128,7 +126,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
 }
 
 bool EdsClusterImpl::updateHostsPerLocality(const uint32_t priority,
-                                            absl::optional<uint32_t> overprovisioning_factor,
+                                            const uint32_t overprovisioning_factor,
                                             const HostVector& new_hosts,
                                             LocalityWeightsMap& locality_weights_map,
                                             LocalityWeightsMap& new_locality_weights_map,
@@ -146,7 +144,7 @@ bool EdsClusterImpl::updateHostsPerLocality(const uint32_t priority,
   // out of the locality scheduler, we discover their new weights. We don't currently have a shared
   // object for locality weights that we can update here, we should add something like this to
   // improve performance and scalability of locality weight updates.
-  if (overprovisioning_factor.has_value() ||
+  if (host_set.overprovisioning_factor() != overprovisioning_factor ||
       updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed) ||
       locality_weights_map != new_locality_weights_map) {
     locality_weights_map = new_locality_weights_map;
