@@ -1,6 +1,8 @@
 #include "test/integration/add_trailers_filter_config.h"
-#include "test/integration/add_trailers_filter.h"
+
 #include "envoy/registry/registry.h"
+
+#include "test/integration/add_trailers_filter.h"
 
 namespace Envoy {
 Http::FilterFactoryCb

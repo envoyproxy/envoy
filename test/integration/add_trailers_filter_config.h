@@ -1,9 +1,11 @@
 #pragma once
 
-#include "envoy/server/filter_config.h"
-#include "test/integration/add_trailers_filter.h"
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
+
+#include "extensions/filters/http/common/empty_http_filter_config.h"
+
+#include "test/integration/add_trailers_filter.h"
 
 namespace Envoy {
 class AddTrailersStreamFilterConfig
