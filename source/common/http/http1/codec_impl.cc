@@ -119,11 +119,6 @@ void StreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_stream)
   if (end_stream) {
     endEncode();
   } else {
-    // Request is likely to be incomplete, in this case need to transfer the head request state into
-    // the pending response.
-    if (headers.Method() &&
-        headers.Method()->value().c_str() == Http::Headers::get().MethodValues.Head)
-      connection_.onEncodeComplete();
     connection_.flushOutput();
   }
 }
@@ -252,6 +247,11 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
 
   if (method->value() == Headers::get().MethodValues.Head.c_str()) {
     head_request_ = true;
+    // If this is an incomplete request (end_stream=false), then connection_.onEncodeComplete();
+    // will not be called in StreamEncoderImpl::encodeHeaders, head request state will not be passed
+    // to the corresponding response so here need to call this method
+    if (!end_stream)
+      connection_.onEncodeComplete();
   }
 
   connection_.reserveBuffer(std::max(4096U, path->value().size() + 4096));
@@ -692,9 +692,7 @@ StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) 
 
 void ClientConnectionImpl::onEncodeComplete() {
   // Transfer head request state into the pending response before we reuse the encoder.
-  if (!pending_responses_.empty()) {
-    pending_responses_.back().head_request_ = request_encoder_->headRequest();
-  }
+  pending_responses_.back().head_request_ = request_encoder_->headRequest();
 }
 
 int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
