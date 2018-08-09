@@ -1128,24 +1128,31 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
                                                      Buffer::Instance& data, bool end_stream) {
   resetIdleTimer();
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
+  auto trailers_added_entry = encoder_filters_.end();
+
+  bool trailers_exists = response_trailers_ != nullptr;
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeData));
 
     // We check the request_trailers_ pointer here in case addEncodedTrailers
     // is called in encodeData - at which point we communicate to the filter
     // that the stream has not yet ended.
-    bool end_stream_no_trailers = end_stream && !response_trailers_;
     state_.filter_call_state_ |= FilterCallState::EncodeData;
-    if (end_stream_no_trailers) {
+    if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
-    FilterDataStatus status = (*entry)->handle_->encodeData(data, end_stream_no_trailers);
+    FilterDataStatus status = (*entry)->handle_->encodeData(data, end_stream && !response_trailers_);
     state_.filter_call_state_ &= ~FilterCallState::EncodeData;
-    if (end_stream_no_trailers) {
+    if (end_stream) {
       state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
     }
     ENVOY_STREAM_LOG(trace, "encode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
+
+    if (!trailers_exists && response_trailers_ && trailers_added_entry == encoder_filters_.end()) {
+      trailers_added_entry = entry;
+    }
+
     if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.encoder_filters_streaming_)) {
       return;
     }
@@ -1158,9 +1165,10 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
 
   // If trailers were adding during encodeData we need to trigger decodeTrailers in order
   // to allow filters to process the trailers.
-  if (end_stream && response_trailers_) {
+  if (trailers_added_entry != encoder_filters_.end()) {
     response_encoder_->encodeData(data, false);
-    encodeTrailers(filter, *response_trailers_);
+    (*trailers_added_entry)->stopped_ = true;
+    (*trailers_added_entry)->continueEncoding();
   } else {
     response_encoder_->encodeData(data, end_stream);
     maybeEndEncode(end_stream);
