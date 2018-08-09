@@ -286,7 +286,7 @@ void Router::UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionCo
 }
 
 void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReason reason) {
-  if (msg_type_ == MessageType::Oneway) {
+  if (metadata_->messageType() == MessageType::Oneway) {
     // For oneway requests, we should not attempt a response. Reset the downstream to signal
     // an error.
     parent_.callbacks_->resetDownstreamConnection();

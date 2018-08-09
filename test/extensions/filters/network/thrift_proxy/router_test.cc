@@ -143,13 +143,13 @@ public:
   }
 
   void startRequestWithExistingConnection(MessageType msg_type) {
-    msg_type_ = msg_type;
-
     EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->transportBegin({}));
 
     EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
     EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
     EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
+
+    initializeMetadata(msg_type);
 
     EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
         .WillOnce(Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void {
@@ -172,7 +172,12 @@ public:
     EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Binary));
     protocol_ = new NiceMock<MockProtocol>();
     ON_CALL(*protocol_, type()).WillByDefault(Return(ProtocolType::Binary));
-    EXPECT_CALL(*protocol_, writeMessageBegin(_, method_name_, msg_type_, seq_id_));
+    EXPECT_CALL(*protocol_, writeMessageBegin(_, _))
+        .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
+          EXPECT_EQ(metadata_->methodName(), metadata.methodName());
+          EXPECT_EQ(metadata_->messageType(), metadata.messageType());
+          EXPECT_EQ(metadata_->sequenceId(), metadata.sequenceId());
+        }));
 
     EXPECT_CALL(callbacks_, continueDecoding()).Times(0);
     EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, newConnection(_))
@@ -183,8 +188,7 @@ public:
               return nullptr;
             }));
 
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue,
-              router_->messageBegin(method_name_, msg_type_, seq_id_));
+    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->messageBegin(metadata_));
     EXPECT_NE(nullptr, upstream_callbacks_);
   }
 
@@ -384,7 +388,7 @@ TEST_F(ThriftRouterTest, PoolConnectionFailureWithOnewayMessage) {
   initializeRouter();
   startRequest(MessageType::Oneway);
 
-  EXPECT_CALL(callbacks_, sendLocalReply_(_)).Times(0);
+  EXPECT_CALL(callbacks_, sendLocalReply(_)).Times(0);
   EXPECT_CALL(callbacks_, resetDownstreamConnection());
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
@@ -485,14 +489,11 @@ TEST_F(ThriftRouterTest, UpstreamRemoteCloseMidResponse) {
   startRequest(MessageType::Call);
   connectUpstream();
 
-  EXPECT_CALL(callbacks_, sendLocalReply_(_))
-      .WillOnce(Invoke([&](ThriftFilters::DirectResponsePtr& response) -> void {
-        auto* app_ex = dynamic_cast<AppException*>(response.get());
-        EXPECT_NE(nullptr, app_ex);
-        EXPECT_EQ(method_name_, app_ex->method_name_);
-        EXPECT_EQ(seq_id_, app_ex->seq_id_);
-        EXPECT_EQ(AppExceptionType::InternalError, app_ex->type_);
-        EXPECT_THAT(app_ex->error_message_, ContainsRegex(".*connection failure.*"));
+  EXPECT_CALL(callbacks_, sendLocalReply(_))
+      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
+        auto& app_ex = dynamic_cast<const AppException&>(response);
+        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
+        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
       }));
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
   destroyRouter();
@@ -503,14 +504,11 @@ TEST_F(ThriftRouterTest, UpstreamLocalCloseMidResponse) {
   startRequest(MessageType::Call);
   connectUpstream();
 
-  EXPECT_CALL(callbacks_, sendLocalReply_(_))
-      .WillOnce(Invoke([&](ThriftFilters::DirectResponsePtr& response) -> void {
-        auto* app_ex = dynamic_cast<AppException*>(response.get());
-        EXPECT_NE(nullptr, app_ex);
-        EXPECT_EQ(method_name_, app_ex->method_name_);
-        EXPECT_EQ(seq_id_, app_ex->seq_id_);
-        EXPECT_EQ(AppExceptionType::InternalError, app_ex->type_);
-        EXPECT_THAT(app_ex->error_message_, ContainsRegex(".*connection failure.*"));
+  EXPECT_CALL(callbacks_, sendLocalReply(_))
+      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
+        auto& app_ex = dynamic_cast<const AppException&>(response);
+        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
+        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
       }));
   upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
   destroyRouter();
