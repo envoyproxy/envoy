@@ -48,7 +48,17 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
   ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
 }
 
+bool MessageUtil::allow_unknown_fields = false;
+
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message) {
+  Protobuf::util::JsonParseOptions options;
+  const auto status = Protobuf::util::JsonStringToMessage(json, &message, options);
+  if (!status.ok()) {
+    throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
+  }
+}
+
+void MessageUtil::loadFromJsonLenient(const std::string& json, Protobuf::Message& message) {
   Protobuf::util::JsonParseOptions options;
   options.ignore_unknown_fields = true;
   const auto status = Protobuf::util::JsonStringToMessage(json, &message, options);
@@ -120,6 +130,10 @@ void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message
   if (!status.ok()) {
     throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
                                      status.ToString(), source.DebugString()));
+  }
+  if (MessageUtil::allow_unknown_fields) {
+    MessageUtil::loadFromJsonLenient(json, dest);
+    return;
   }
   MessageUtil::loadFromJson(json, dest);
 }

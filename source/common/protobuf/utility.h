@@ -158,7 +158,10 @@ public:
     return HashUtil::xxHash64(text);
   }
 
+  static bool allow_unknown_fields;
+
   static void loadFromJson(const std::string& json, Protobuf::Message& message);
+  static void loadFromJsonLenient(const std::string& json, Protobuf::Message& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
 

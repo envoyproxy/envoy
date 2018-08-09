@@ -409,7 +409,6 @@ void HttpIntegrationTest::testComputedHealthCheck() {
 name: envoy.health_check
 config:
     pass_through_mode: false
-    endpoint: /healthcheck
     cluster_min_healthy_percentages:
         example_cluster_name: { value: 75 }
 )EOF");
