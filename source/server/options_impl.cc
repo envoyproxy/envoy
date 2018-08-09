@@ -111,8 +111,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                                              cmd);
   TCLAP::SwitchArg disable_hot_restart("", "disable-hot-restart",
                                        "Disable hot restart functionality", cmd, false);
-  TCLAP::SwitchArg shutdown_without_signal(
-      "", "shutdown-without-signal", "Shutdown the server without sending a SIGTERM", cmd, false);
 
   cmd.setExceptionHandling(false);
   try {
@@ -147,7 +145,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   // TODO(jmarantz): should we also multiply these to bound the total amount of memory?
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
-  shutdown_without_signal_ = shutdown_without_signal.getValue();
 
   log_level_ = default_log_level;
   for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {

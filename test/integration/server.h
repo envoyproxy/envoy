@@ -65,7 +65,6 @@ public:
   uint64_t maxStats() const override { return 16384; }
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
   bool hotRestartDisabled() const override { return false; }
-  bool shutdownWithoutSignal() const override { return true; }
 
   // asConfigYaml returns a new config that empties the configPath() and populates configYaml()
   Server::TestOptionsImpl asConfigYaml();

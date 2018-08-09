@@ -75,8 +75,7 @@ TEST(OptionsImplTest, All) {
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
       "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
       "--service-zone zone --file-flush-interval-msec 9000 --drain-time-s 60 --log-format [%v] "
-      "--parent-shutdown-time-s 90 --log-path /foo/bar --v2-config-only --disable-hot-restart "
-      "--shutdown-without-signal");
+      "--parent-shutdown-time-s 90 --log-path /foo/bar --v2-config-only --disable-hot-restart");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
@@ -93,8 +92,7 @@ TEST(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::milliseconds(9000), options->fileFlushIntervalMsec());
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
-  EXPECT_TRUE(options->hotRestartDisabled());
-  EXPECT_TRUE(options->shutdownWithoutSignal());
+  EXPECT_EQ(true, options->hotRestartDisabled());
 
   options = createOptionsImpl("envoy --mode init_only");
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
@@ -104,7 +102,6 @@ TEST(OptionsImplTest, SetAll) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
   bool v2_config_only = options->v2ConfigOnly();
   bool hot_restart_disabled = options->hotRestartDisabled();
-  bool shutdown_without_signal = options->shutdownWithoutSignal();
   Stats::StatsOptionsImpl stats_options;
   stats_options.max_obj_name_length_ = 54321;
   stats_options.max_stat_suffix_length_ = 1234;
@@ -129,8 +126,7 @@ TEST(OptionsImplTest, SetAll) {
   options->setServiceZone("zone_foo");
   options->setMaxStats(12345);
   options->setStatsOptions(stats_options);
-  options->setHotRestartDisabled(!hot_restart_disabled);
-  options->setShutdownWithoutSignal(!shutdown_without_signal);
+  options->setHotRestartDisabled(!options->hotRestartDisabled());
 
   EXPECT_EQ(109876, options->baseId());
   EXPECT_EQ(42U, options->concurrency());
@@ -154,7 +150,6 @@ TEST(OptionsImplTest, SetAll) {
   EXPECT_EQ(stats_options.max_obj_name_length_, options->statsOptions().maxObjNameLength());
   EXPECT_EQ(stats_options.max_stat_suffix_length_, options->statsOptions().maxStatSuffixLength());
   EXPECT_EQ(!hot_restart_disabled, options->hotRestartDisabled());
-  EXPECT_EQ(!shutdown_without_signal, options->shutdownWithoutSignal());
 }
 
 TEST(OptionsImplTest, DefaultParams) {
@@ -164,8 +159,7 @@ TEST(OptionsImplTest, DefaultParams) {
   EXPECT_EQ("", options->adminAddressPath());
   EXPECT_EQ(Network::Address::IpVersion::v4, options->localAddressIpVersion());
   EXPECT_EQ(Server::Mode::Serve, options->mode());
-  EXPECT_FALSE(options->hotRestartDisabled());
-  EXPECT_FALSE(options->shutdownWithoutSignal());
+  EXPECT_EQ(false, options->hotRestartDisabled());
 }
 
 TEST(OptionsImplTest, BadCliOption) {

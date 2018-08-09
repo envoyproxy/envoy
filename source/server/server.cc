@@ -467,13 +467,8 @@ void InstanceImpl::terminate() {
 Runtime::Loader& InstanceImpl::runtime() { return *runtime_loader_; }
 
 void InstanceImpl::shutdown() {
-  if (options_.shutdownWithoutSignal()) {
-    ASSERT(run_helper_.get() != nullptr);
-    run_helper_->shutdown(*dispatcher_, restarter_);
-  } else {
-    ENVOY_LOG(info, "shutdown invoked. sending SIGTERM to self");
-    kill(getpid(), SIGTERM);
-  }
+  ASSERT(run_helper_.get() != nullptr);
+  run_helper_->shutdown(*dispatcher_, restarter_);
 }
 
 void InstanceImpl::shutdownAdmin() {

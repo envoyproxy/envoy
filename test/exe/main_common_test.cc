@@ -238,19 +238,6 @@ TEST_F(MainCommonTest, AdminRequestGetStatsAndQuit) {
   EXPECT_TRUE(waitForEnvoyToExit());
 }
 
-TEST_F(MainCommonTest, AdminRequestGetStatsAndQuitWithoutSignal) {
-  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
-    return;
-  }
-  addArg("--disable-hot-restart");
-  addArg("--shutdown-without-signal");
-  startEnvoy();
-  waitForEnvoyToStart();
-  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
-  adminRequest("/quitquitquit", "POST");
-  EXPECT_TRUE(waitForEnvoyToExit());
-}
-
 } // namespace Envoy
 
 #endif // ENVOY_CONFIG_COVERAGE

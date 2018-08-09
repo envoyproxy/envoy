@@ -143,9 +143,6 @@ public:
 
   void run();
 
-  // Behaves like shutdown(), but works directly, rather than sending ourselves a SIGTERM.
-  void shutdownWithoutSignal();
-
   // Server::Instance
   Admin& admin() override { return *admin_; }
   Api::Api& api() override { return *api_; }

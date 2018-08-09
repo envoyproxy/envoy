@@ -72,7 +72,6 @@ public:
   MOCK_CONST_METHOD0(maxStats, uint64_t());
   MOCK_CONST_METHOD0(statsOptions, const Stats::StatsOptions&());
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
-  MOCK_CONST_METHOD0(shutdownWithoutSignal, bool());
 
   std::string config_path_;
   std::string config_yaml_;
