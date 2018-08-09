@@ -125,10 +125,10 @@ HostSet& LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
       std::vector<uint32_t> per_priority_health;
 
       for (auto& host_set : priority_set_.hostSetsPerPriority()) {
-        recalculatePerPriorityState(host_set->priority(), per_priority_load_, per_priority_health_,
+        recalculatePerPriorityState(host_set->priority(), per_priority_load, per_priority_health,
                                     *pre_priority_filter);
       }
-      const uint32_t priority = choosePriority(random_.random(), per_priority_load_);
+      const uint32_t priority = choosePriority(random_.random(), per_priority_load);
       return *priority_set_.hostSetsPerPriority()[priority];
     }
   }
