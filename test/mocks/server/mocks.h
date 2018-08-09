@@ -56,6 +56,7 @@ public:
   MOCK_CONST_METHOD0(configPath, const std::string&());
   MOCK_CONST_METHOD0(configYaml, const std::string&());
   MOCK_CONST_METHOD0(v2ConfigOnly, bool());
+  MOCK_CONST_METHOD0(allowUnknownFields, bool());
   MOCK_CONST_METHOD0(adminAddressPath, const std::string&());
   MOCK_CONST_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
   MOCK_CONST_METHOD0(drainTime, std::chrono::seconds());
@@ -383,6 +384,7 @@ public:
   }
 
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
+  MOCK_METHOD0(allowUnknownFields, bool());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(drainDecision, const Network::DrainDecision&());

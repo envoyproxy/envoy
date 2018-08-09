@@ -20,7 +20,7 @@ namespace {
 class JwksCacheTest : public ::testing::Test {
 public:
   void SetUp() {
-    MessageUtil::loadFromYaml(ExampleConfig, config_);
+    MessageUtil::loadFromYaml(ExampleConfig, config_, false);
     cache_ = JwksCache::create(config_);
   }
 

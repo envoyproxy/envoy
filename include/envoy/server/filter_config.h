@@ -41,6 +41,11 @@ public:
   virtual AccessLog::AccessLogManager& accessLogManager() PURE;
 
   /**
+   * @return whether to allow unknown fields in the filter configs.
+   */
+  virtual bool allowUnknownFields() PURE;
+
+  /**
    * @return Upstream::ClusterManager& singleton for use by the entire server.
    */
   virtual Upstream::ClusterManager& clusterManager() PURE;

@@ -160,7 +160,7 @@ protected:
 
 envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  MessageUtil::loadFromYaml(yaml, bootstrap);
+  MessageUtil::loadFromYaml(yaml, bootstrap, false);
   return bootstrap;
 }
 
@@ -221,7 +221,7 @@ public:
         dynamic_cast<const envoy::admin::v2alpha::ClustersConfigDump&>(*message_ptr);
 
     envoy::admin::v2alpha::ClustersConfigDump expected_clusters_config_dump;
-    MessageUtil::loadFromYaml(expected_dump_yaml, expected_clusters_config_dump);
+    MessageUtil::loadFromYaml(expected_dump_yaml, expected_clusters_config_dump, false);
     EXPECT_EQ(expected_clusters_config_dump.DebugString(), clusters_config_dump.DebugString());
   }
 

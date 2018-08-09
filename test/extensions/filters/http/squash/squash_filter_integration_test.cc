@@ -135,12 +135,12 @@ TEST_P(SquashFilterIntegrationTest, TestHappyPath) {
   EXPECT_STREQ("/api/v2/debugattachment/", create_stream->headers().Path()->value().c_str());
   // Make sure the env var was replaced
   ProtobufWkt::Struct actualbody;
-  MessageUtil::loadFromJson(create_stream->body().toString(), actualbody);
+  MessageUtil::loadFromJson(create_stream->body().toString(), actualbody, false);
 
   ProtobufWkt::Struct expectedbody;
   MessageUtil::loadFromJson("{\"spec\": { \"attachment\" : { \"env\": \"" ENV_VAR_VALUE
                             "\" } , \"match_request\":true} }",
-                            expectedbody);
+                            expectedbody, false);
 
   EXPECT_TRUE(MessageDifferencer::Equals(expectedbody, actualbody));
   // The second request should be for the created object

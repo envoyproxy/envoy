@@ -84,7 +84,7 @@ void BootstrapJson::translateBootstrap(const Json::Object& json_config,
     envoy::config::metrics::v2::StatsdSink statsd_sink;
     AddressJson::translateAddress(json_config.getString("statsd_udp_ip_address"), false, true,
                                   *statsd_sink.mutable_address());
-    MessageUtil::jsonConvert(statsd_sink, *stats_sink->mutable_config());
+    MessageUtil::jsonConvert(statsd_sink, *stats_sink->mutable_config(), false);
   }
 
   if (json_config.hasObject("statsd_tcp_cluster_name")) {
@@ -92,7 +92,7 @@ void BootstrapJson::translateBootstrap(const Json::Object& json_config,
     stats_sink->set_name(Extensions::StatSinks::StatsSinkNames::get().Statsd);
     envoy::config::metrics::v2::StatsdSink statsd_sink;
     statsd_sink.set_tcp_cluster_name(json_config.getString("statsd_tcp_cluster_name"));
-    MessageUtil::jsonConvert(statsd_sink, *stats_sink->mutable_config());
+    MessageUtil::jsonConvert(statsd_sink, *stats_sink->mutable_config(), false);
   }
 
   JSON_UTIL_SET_DURATION(json_config, bootstrap, stats_flush_interval);
@@ -109,7 +109,7 @@ void BootstrapJson::translateBootstrap(const Json::Object& json_config,
     auto* http_tracing = bootstrap.mutable_tracing()->mutable_http();
     http_tracing->set_name("envoy." + driver->getString("type"));
     MessageUtil::loadFromJson(driver->getObject("config")->asJsonString(),
-                              *http_tracing->mutable_config());
+                              *http_tracing->mutable_config(), false);
   }
 
   if (json_config.hasObject("rate_limit_service")) {

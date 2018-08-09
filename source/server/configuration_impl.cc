@@ -118,8 +118,8 @@ void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstra
   for (const envoy::config::metrics::v2::StatsSink& sink_object : bootstrap.stats_sinks()) {
     // Generate factory and translate stats sink custom config
     auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object.name());
-    ProtobufTypes::MessagePtr message =
-        Config::Utility::translateToFactoryConfig(sink_object, factory);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        sink_object, factory, server.options().allowUnknownFields());
 
     stats_sinks_.emplace_back(factory.createStatsSink(*message, server));
   }

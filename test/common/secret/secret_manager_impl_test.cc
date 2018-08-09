@@ -30,7 +30,7 @@ tls_certificate:
     filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
 )EOF";
 
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config, false);
 
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
 
@@ -60,7 +60,7 @@ session_ticket_keys:
     - filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
 )EOF";
 
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config, false);
 
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
 

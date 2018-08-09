@@ -932,7 +932,8 @@ PerFilterConfigs::PerFilterConfigs(
         Server::Configuration::NamedHttpFilterConfigFactory>(name);
 
     auto object = factory.createRouteSpecificFilterConfig(
-        *Envoy::Config::Utility::translateToFactoryRouteConfig(struct_config, factory),
+        *Envoy::Config::Utility::translateToFactoryRouteConfig(
+            struct_config, factory, factory_context.allowUnknownFields()),
         factory_context);
     if (object) {
       configs_[name] = object;

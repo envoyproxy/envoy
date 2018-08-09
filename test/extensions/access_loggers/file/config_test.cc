@@ -31,7 +31,7 @@ TEST(FileAccessLogConfigTest, ConfigureFromProto) {
   envoy::config::accesslog::v2::FileAccessLog fal_config;
   fal_config.set_path("/dev/null");
 
-  MessageUtil::jsonConvert(fal_config, *config.mutable_config());
+  MessageUtil::jsonConvert(fal_config, *config.mutable_config(), false);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
@@ -62,7 +62,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogTest) {
   envoy::config::accesslog::v2::FileAccessLog file_access_log;
   file_access_log.set_path("/dev/null");
   file_access_log.set_format("%START_TIME%");
-  MessageUtil::jsonConvert(file_access_log, *message);
+  MessageUtil::jsonConvert(file_access_log, *message, false);
 
   AccessLog::FilterPtr filter;
   NiceMock<Server::Configuration::MockFactoryContext> context;

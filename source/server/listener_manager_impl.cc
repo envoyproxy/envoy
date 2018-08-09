@@ -51,7 +51,8 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     if (filter_config->getBoolean("deprecated_v1", false)) {
       callback = factory.createFilterFactory(*filter_config->getObject("value", true), context);
     } else {
-      auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
+      auto message = Config::Utility::translateToFactoryConfig(proto_config, factory,
+                                                               context.allowUnknownFields());
       callback = factory.createFilterFactoryFromProto(*message, context);
     }
     ret.push_back(callback);
@@ -77,7 +78,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
             string_name);
-    auto message = Config::Utility::translateToFactoryConfig(proto_config, factory);
+    auto message = Config::Utility::translateToFactoryConfig(proto_config, factory,
+                                                             context.allowUnknownFields());
     ret.push_back(factory.createFilterFactoryFromProto(*message, context));
   }
   return ret;
@@ -192,7 +194,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     if (!filter_chain.has_transport_socket()) {
       if (filter_chain.has_tls_context()) {
         transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
-        MessageUtil::jsonConvert(filter_chain.tls_context(), *transport_socket.mutable_config());
+        MessageUtil::jsonConvert(filter_chain.tls_context(), *transport_socket.mutable_config(),
+                                 true);
       } else {
         transport_socket.set_name(
             Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
@@ -201,8 +204,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
 
     auto& config_factory = Config::Utility::getAndCheckFactory<
         Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
-    ProtobufTypes::MessagePtr message =
-        Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        transport_socket, config_factory, parent_.server_.options().allowUnknownFields());
 
     // Validate IP addresses.
     std::vector<std::string> destination_ips;

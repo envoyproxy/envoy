@@ -54,7 +54,7 @@ public:
           )EOF";
 
           ProtobufWkt::Struct value;
-          MessageUtil::loadFromYaml(yaml, value);
+          MessageUtil::loadFromYaml(yaml, value, false);
 
           // Sets the route's metadata.
           hcm.mutable_route_config()

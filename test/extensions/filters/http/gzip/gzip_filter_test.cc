@@ -61,7 +61,7 @@ protected:
   void setUpFilter(std::string&& json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
     envoy::config::filter::http::gzip::v2::Gzip gzip;
-    MessageUtil::loadFromJson(json, gzip);
+    MessageUtil::loadFromJson(json, gzip, false);
     config_.reset(new GzipFilterConfig(gzip, "test.", stats_, runtime_));
     filter_.reset(new GzipFilter(config_));
   }

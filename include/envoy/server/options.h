@@ -83,6 +83,11 @@ public:
   virtual bool v2ConfigOnly() const PURE;
 
   /**
+   * @return bool whether to ignore unknown fields in the config (JSON, YAML, and protobuf).
+   */
+  virtual bool allowUnknownFields() const PURE;
+
+  /**
    * @return const std::string& the admin address output file.
    */
   virtual const std::string& adminAddressPath() const PURE;

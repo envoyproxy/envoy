@@ -32,7 +32,7 @@ static envoy::api::v2::route::Route parseRouteFromJson(const std::string& json_s
 
 static envoy::api::v2::route::Route parseRouteFromV2Yaml(const std::string& yaml) {
   envoy::api::v2::route::Route route;
-  MessageUtil::loadFromYaml(yaml, route);
+  MessageUtil::loadFromYaml(yaml, route, false);
   return route;
 }
 

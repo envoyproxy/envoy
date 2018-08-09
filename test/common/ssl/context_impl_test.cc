@@ -428,7 +428,7 @@ tls_certificate:
     filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
 )EOF";
 
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config, false);
 
   std::unique_ptr<Secret::SecretManager> secret_manager(new Secret::SecretManagerImpl());
   secret_manager->addOrUpdateSecret(secret_config);
@@ -461,7 +461,7 @@ tls_certificate:
     filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
 )EOF";
 
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config, false);
 
   std::unique_ptr<Secret::SecretManager> secret_manager(new Secret::SecretManagerImpl());
 

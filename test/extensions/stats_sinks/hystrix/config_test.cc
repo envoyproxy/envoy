@@ -35,7 +35,7 @@ TEST(StatsConfigTest, ValidHystrixSink) {
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  MessageUtil::jsonConvert(sink_config, *message);
+  MessageUtil::jsonConvert(sink_config, *message, false);
 
   NiceMock<Server::MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);

@@ -89,7 +89,6 @@ const std::string ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER =
 name: envoy.health_check
 config:
     pass_through_mode: false
-    endpoint: /healthcheck
 )EOF";
 
 const std::string ConfigHelper::DEFAULT_SQUASH_FILTER =
@@ -116,7 +115,7 @@ config:
 ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, const std::string& config) {
   RELEASE_ASSERT(!finalized_, "");
   std::string filename = TestEnvironment::writeStringToFileForTest("basic_config.yaml", config);
-  MessageUtil::loadFromFile(filename, bootstrap_);
+  MessageUtil::loadFromFile(filename, bootstrap_, false);
 
   // Fix up all the socket addresses with the correct version.
   auto* admin = bootstrap_.mutable_admin();
@@ -163,7 +162,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
         absl::optional<ProtobufWkt::Struct> tls_config;
         if (has_tls) {
           tls_config = ProtobufWkt::Struct();
-          MessageUtil::jsonConvert(filter_chain->tls_context(), tls_config.value());
+          MessageUtil::jsonConvert(filter_chain->tls_context(), tls_config.value(), false);
           filter_chain->clear_tls_context();
         }
         setCaptureTransportSocket(capture_path.value(), fmt::format("listener_{}_{}", i, j),
@@ -189,7 +188,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
       absl::optional<ProtobufWkt::Struct> tls_config;
       if (has_tls) {
         tls_config = ProtobufWkt::Struct();
-        MessageUtil::jsonConvert(cluster->tls_context(), tls_config.value());
+        MessageUtil::jsonConvert(cluster->tls_context(), tls_config.value(), false);
         cluster->clear_tls_context();
       }
       setCaptureTransportSocket(capture_path.value(), fmt::format("cluster_{}", i),
@@ -238,7 +237,7 @@ void ConfigHelper::setCaptureTransportSocket(
   file_sink->set_path_prefix(capture_path + "_" + absl::StrReplaceAll(test_id, {{"/", "_"}}));
   file_sink->set_format(envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_TEXT);
   capture_config.mutable_transport_socket()->MergeFrom(inner_transport_socket);
-  MessageUtil::jsonConvert(capture_config, *transport_socket.mutable_config());
+  MessageUtil::jsonConvert(capture_config, *transport_socket.mutable_config(), false);
 }
 
 void ConfigHelper::setSourceAddress(const std::string& address_string) {
@@ -337,7 +336,7 @@ void ConfigHelper::addFilter(const std::string& config) {
 
   auto* filter_list_back = hcm_config.add_http_filters();
   const std::string json = Json::Factory::loadFromYamlString(config)->asJsonString();
-  MessageUtil::loadFromJson(json, *filter_list_back);
+  MessageUtil::loadFromJson(json, *filter_list_back, false);
 
   // Now move it to the front.
   for (int i = hcm_config.http_filters_size() - 1; i > 0; --i) {
@@ -412,7 +411,7 @@ bool ConfigHelper::loadHttpConnectionManager(
   RELEASE_ASSERT(!finalized_, "");
   auto* hcm_filter = getFilterFromListener("envoy.http_connection_manager");
   if (hcm_filter) {
-    MessageUtil::jsonConvert(*hcm_filter->mutable_config(), hcm);
+    MessageUtil::jsonConvert(*hcm_filter->mutable_config(), hcm, false);
     return true;
   }
   return false;
@@ -424,7 +423,7 @@ void ConfigHelper::storeHttpConnectionManager(
   auto* hcm_config_struct =
       getFilterFromListener("envoy.http_connection_manager")->mutable_config();
 
-  MessageUtil::jsonConvert(hcm, *hcm_config_struct);
+  MessageUtil::jsonConvert(hcm, *hcm_config_struct, false);
 }
 
 void ConfigHelper::addConfigModifier(ConfigModifierFunction function) {

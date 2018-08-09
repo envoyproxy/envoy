@@ -356,7 +356,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   if (!config.has_transport_socket()) {
     if (config.has_tls_context()) {
       transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
-      MessageUtil::jsonConvert(config.tls_context(), *transport_socket.mutable_config());
+      MessageUtil::jsonConvert(config.tls_context(), *transport_socket.mutable_config(), true);
     } else {
       transport_socket.set_name(
           Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
@@ -365,8 +365,9 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::UpstreamTransportSocketConfigFactory>(transport_socket.name());
+  // always downcast and ignore unknown fields (kuat)
   ProtobufTypes::MessagePtr message =
-      Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
+      Config::Utility::translateToFactoryConfig(transport_socket, config_factory, true);
   return config_factory.createTransportSocketFactory(*message, factory_context);
 }
 

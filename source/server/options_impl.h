@@ -39,6 +39,9 @@ public:
   void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
   void setV2ConfigOnly(bool v2_config_only) { v2_config_only_ = v2_config_only; }
+  void setAllowUnknownFields(bool allow_unknown_fields) {
+    allow_unknown_fields_ = allow_unknown_fields;
+  }
   void setAdminAddressPath(const std::string& admin_address_path) {
     admin_address_path_ = admin_address_path;
   }
@@ -74,6 +77,7 @@ public:
   const std::string& configPath() const override { return config_path_; }
   const std::string& configYaml() const override { return config_yaml_; }
   bool v2ConfigOnly() const override { return v2_config_only_; }
+  bool allowUnknownFields() const override { return allow_unknown_fields_; }
   const std::string& adminAddressPath() const override { return admin_address_path_; }
   Network::Address::IpVersion localAddressIpVersion() const override {
     return local_address_ip_version_;
@@ -101,6 +105,7 @@ private:
   std::string config_path_;
   std::string config_yaml_;
   bool v2_config_only_;
+  bool allow_unknown_fields_;
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;

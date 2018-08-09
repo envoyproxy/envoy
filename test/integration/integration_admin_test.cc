@@ -289,7 +289,8 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_TRUE(json->getObject("configs")->hasObject("routes"));
   // Validate we can parse as proto.
   envoy::admin::v2alpha::ConfigDump config_dump;
-  MessageUtil::loadFromJson(response->body(), config_dump);
+  // TODO(kuat) make sure proto matches JSON
+  MessageUtil::loadFromJson(response->body(), config_dump, true);
   EXPECT_EQ(1, config_dump.configs().count("bootstrap"));
   EXPECT_EQ(1, config_dump.configs().count("clusters"));
   EXPECT_EQ(1, config_dump.configs().count("listeners"));

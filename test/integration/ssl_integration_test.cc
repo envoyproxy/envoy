@@ -197,7 +197,8 @@ public:
       // Configure inner SSL transport socket based on existing config.
       envoy::api::v2::core::TransportSocket ssl_transport_socket;
       ssl_transport_socket.set_name("tls");
-      MessageUtil::jsonConvert(filter_chain->tls_context(), *ssl_transport_socket.mutable_config());
+      MessageUtil::jsonConvert(filter_chain->tls_context(), *ssl_transport_socket.mutable_config(),
+                               false);
       // Configure outer capture transport socket.
       auto* transport_socket = filter_chain->mutable_transport_socket();
       transport_socket->set_name("envoy.transport_sockets.capture");
@@ -208,7 +209,7 @@ public:
           text_format_ ? envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_TEXT
                        : envoy::config::transport_socket::capture::v2alpha::FileSink::PROTO_BINARY);
       capture_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
-      MessageUtil::jsonConvert(capture_config, *transport_socket->mutable_config());
+      MessageUtil::jsonConvert(capture_config, *transport_socket->mutable_config(), false);
       // Nuke TLS context from legacy location.
       filter_chain->clear_tls_context();
       // Rest of TLS initialization.
@@ -254,7 +255,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::data::tap::v2alpha::Trace trace;
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace);
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace, false);
   // Validate general expected properties in the trace.
   EXPECT_EQ(first_id, trace.connection().id());
   EXPECT_THAT(expected_local_address, ProtoEq(trace.connection().local_address()));
@@ -279,7 +280,7 @@ TEST_P(SslCaptureIntegrationTest, TwoRequestsWithBinaryProto) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 2);
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace);
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, second_id), trace, false);
   // Validate second connection ID.
   EXPECT_EQ(second_id, trace.connection().id());
   ASSERT_GE(trace.events().size(), 2);
@@ -299,7 +300,7 @@ TEST_P(SslCaptureIntegrationTest, RequestWithTextProto) {
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
   envoy::data::tap::v2alpha::Trace trace;
-  MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace);
+  MessageUtil::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace, false);
   // Test some obvious properties.
   EXPECT_TRUE(absl::StartsWith(trace.events(0).read().data(), "POST /test/long/url HTTP/1.1"));
   EXPECT_TRUE(absl::StartsWith(trace.events(1).write().data(), "HTTP/1.1 200 OK"));

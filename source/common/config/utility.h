@@ -234,14 +234,15 @@ public:
    */
   template <class ProtoMessage, class Factory>
   static ProtobufTypes::MessagePtr translateToFactoryConfig(const ProtoMessage& enclosing_message,
-                                                            Factory& factory) {
+                                                            Factory& factory,
+                                                            bool allowUnknownFields) {
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
 
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");
 
     if (enclosing_message.has_config()) {
-      MessageUtil::jsonConvert(enclosing_message.config(), *config);
+      MessageUtil::jsonConvert(enclosing_message.config(), *config, allowUnknownFields);
     }
 
     return config;
@@ -258,13 +259,14 @@ public:
    */
   template <class Factory>
   static ProtobufTypes::MessagePtr translateToFactoryRouteConfig(const Protobuf::Message& source,
-                                                                 Factory& factory) {
+                                                                 Factory& factory,
+                                                                 bool allowUnknownFields) {
     ProtobufTypes::MessagePtr config = factory.createEmptyRouteConfigProto();
 
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");
 
-    MessageUtil::jsonConvert(source, *config);
+    MessageUtil::jsonConvert(source, *config, allowUnknownFields);
     return config;
   }
 

@@ -41,7 +41,7 @@ ip_tags:
 
   void initializeFilter(const std::string& yaml) {
     envoy::config::filter::http::ip_tagging::v2::IPTagging config;
-    MessageUtil::loadFromYaml(yaml, config);
+    MessageUtil::loadFromYaml(yaml, config, false);
     config_.reset(new IpTaggingFilterConfig(config, "prefix.", stats_, runtime_));
     filter_.reset(new IpTaggingFilter(config_));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);

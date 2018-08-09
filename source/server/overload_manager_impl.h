@@ -50,7 +50,8 @@ private:
 class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadManager {
 public:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
-                      const envoy::config::overload::v2alpha::OverloadManager& config);
+                      const envoy::config::overload::v2alpha::OverloadManager& config,
+                      bool allow_unknown_fields);
 
   // Server::OverloadManager
   void start() override;

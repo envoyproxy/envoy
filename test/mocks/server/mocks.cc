@@ -145,6 +145,7 @@ MockMain::MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill)
 
 MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::ManagerImpl()) {
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
+  ON_CALL(*this, allowUnknownFields()).WillByDefault(Return(false));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
   ON_CALL(*this, drainDecision()).WillByDefault(ReturnRef(drain_manager_));
