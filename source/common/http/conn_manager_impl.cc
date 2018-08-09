@@ -813,10 +813,10 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStream::addDecodedTrailers() {
-  // trailers can only be added during the last data frame (i.e. end_stream = true)
+  // Trailers can only be added during the last data frame (i.e. end_stream = true).
   ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
 
-  // traileres can only be added once
+  // Trailers can only be added once.
   ASSERT(!request_trailers_);
 
   request_trailers_ = std::make_unique<HeaderMapImpl>();
@@ -1096,10 +1096,10 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
-  // trailers can only be added during the last data frame (i.e. end_stream = true)
+  // Trailers can only be added during the last data frame (i.e. end_stream = true).
   ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
 
-  // traileres can only be added once
+  // Trailers can only be added once.
   ASSERT(!response_trailers_);
 
   response_trailers_ = std::make_unique<HeaderMapImpl>();
