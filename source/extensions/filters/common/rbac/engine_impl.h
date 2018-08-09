@@ -19,10 +19,9 @@ public:
   RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v2alpha::RBAC& rules,
                                    bool disable_http_rules = false);
 
-  bool allowed(const Network::Connection& connection,
-               const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl(),
-               const envoy::api::v2::core::Metadata& metadata = envoy::api::v2::core::Metadata(),
-               std::string* effective_policy_id = nullptr) const override;
+  bool allowed(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+               const envoy::api::v2::core::Metadata& metadata,
+               std::string* effective_policy_id) const override;
 
 private:
   const bool allowed_if_matched_;

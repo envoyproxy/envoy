@@ -5,8 +5,6 @@
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
 
-#include "common/http/header_map_impl.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -30,11 +28,9 @@ public:
    * @param effective_policy_id  it will be filled by the matching policy's ID,
    *                   which is used to identity the source of the allow/deny.
    */
-  virtual bool
-  allowed(const Network::Connection& connection,
-          const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl(),
-          const envoy::api::v2::core::Metadata& metadata = envoy::api::v2::core::Metadata(),
-          std::string* effective_policy_id = nullptr) const PURE;
+  virtual bool allowed(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
+                       const envoy::api::v2::core::Metadata& metadata,
+                       std::string* effective_policy_id) const PURE;
 };
 
 } // namespace RBAC
