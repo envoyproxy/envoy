@@ -23,7 +23,7 @@ static constexpr uint32_t kOverProvisioningFactor = 140;
 /**
  * Base class for all LB implementations.
  */
-class LoadBalancerBase {
+class LoadBalancerBase : public LoadBalancer {
 public:
   // A utility function to chose a priority level based on a precomputed hash and
   // a priority vector in the style of per_priority_load_
@@ -31,7 +31,11 @@ public:
   // Returns the priority, a number between 0 and per_priority_load.size()-1
   static uint32_t choosePriority(uint64_t hash, const std::vector<uint32_t>& per_priority_load);
 
+  HostConstSharedPtr chooseHost(LoadBalancerContext *context) override;
+
 protected:
+  virtual HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) PURE;
+
   /**
    * For the given host_set @return if we should be in a panic mode or not. For example, if the
    * majority of hosts are unhealthy we'll be likely in a panic mode. In this case we'll route
@@ -228,15 +232,15 @@ private:
  * This base class also supports unweighted selection which derived classes can use to customize
  * behavior. Derived classes can also override how host weight is determined when in weighted mode.
  */
-class EdfLoadBalancerBase : public LoadBalancer, public ZoneAwareLoadBalancerBase {
+class EdfLoadBalancerBase : public ZoneAwareLoadBalancerBase {
 public:
   EdfLoadBalancerBase(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                       ClusterStats& stats, Runtime::Loader& runtime,
                       Runtime::RandomGenerator& random,
                       const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
-  // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+  // Upstream::LoadBalancerBase
+  HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
 
 protected:
   struct Scheduler {
@@ -349,7 +353,7 @@ private:
 /**
  * Random load balancer that picks a random host out of all hosts.
  */
-class RandomLoadBalancer : public LoadBalancer, ZoneAwareLoadBalancerBase {
+class RandomLoadBalancer : public ZoneAwareLoadBalancerBase {
 public:
   RandomLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
                      ClusterStats& stats, Runtime::Loader& runtime,
@@ -358,8 +362,8 @@ public:
       : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                   common_config) {}
 
-  // Upstream::LoadBalancer
-  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
+  // Upstream::LoadBalancerBase
+  HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) override;
 };
 
 /**

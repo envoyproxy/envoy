@@ -48,6 +48,8 @@ public:
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config) {}
   using LoadBalancerBase::chooseHostSet;
   using LoadBalancerBase::percentageLoad;
+
+  HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override { return nullptr; }
 };
 
 class LoadBalancerBaseTest : public LoadBalancerTestBase {

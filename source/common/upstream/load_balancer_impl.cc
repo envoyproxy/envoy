@@ -297,6 +297,25 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
   return false;
 }
 
+HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
+  HostConstSharedPtr host;
+  size_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
+  for (size_t i = 0; i < max_attempts; ++i) {
+    host = chooseHostOnce(context);
+
+    // If host selection failed or the host is accepted by the filter, return.
+    // Otherwise, try again.
+    if (!host || !context || context->postHostSelectionFilter(*host)) {
+      return host;
+    } else {
+      continue;
+    }
+  }
+
+  // If we didnt find anything, return the last host.
+  return host;
+}
+
 bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set) {
   uint64_t global_panic_threshold = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger(RuntimePanicThreshold, default_healthy_panic_percent_));
@@ -502,10 +521,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
   }
 }
 
-HostConstSharedPtr EdfLoadBalancerBase::chooseHost(LoadBalancerContext* context) {
-  size_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
-  HostConstSharedPtr host;
-  for (size_t i = 0; i < max_attempts; ++i) {
+HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* context) {
     const HostsSource hosts_source = hostSourceToUse(context);
     auto scheduler_it = scheduler_.find(hosts_source);
     // We should always have a scheduler for any return value from
@@ -521,30 +537,19 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHost(LoadBalancerContext* context)
     // the same but not 1 (like 42), we will use the EDF schedule not the unweighted pick. This is
     // not optimal. If this is fixed, remove the note in the arch overview docs for the LR LB.
     if (stats_.max_host_weight_.value() != 1) {
-      host = scheduler.edf_.pick();
+      auto host = scheduler.edf_.pick();
       if (host != nullptr) {
         scheduler.edf_.add(hostWeight(*host), host);
       }
+      return host;
     } else {
       const HostVector& hosts_to_use = hostSourceToHosts(hosts_source);
       if (hosts_to_use.size() == 0) {
-        host = nullptr;
+        return nullptr;
       } else {
-        host = unweightedHostPick(hosts_to_use, hosts_source);
+        return unweightedHostPick(hosts_to_use, hosts_source);
       }
     }
-
-    // If host selection failed or the host is accepted by the filter, return.
-    // Otherwise, try again.
-    if (host == nullptr || !context || context->postHostSelectionFilter(*host)) {
-      return host;
-    } else {
-      continue;
-    }
-  }
-
-  // If we ran out of attempts, just return the last host.
-  return host;
 }
 
 HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector& hosts_to_use,
@@ -559,28 +564,13 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
   }
 }
 
-HostConstSharedPtr RandomLoadBalancer::chooseHost(LoadBalancerContext* context) {
-  HostConstSharedPtr host;
-  size_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
-  for (size_t i = 0; i < max_attempts; ++i) {
-    const HostVector& hosts_to_use = hostSourceToHosts(hostSourceToUse(context));
-    if (hosts_to_use.empty()) {
-      return nullptr;
-    }
-
-    host = hosts_to_use[random_.random() % hosts_to_use.size()];
-
-    // If host selection failed or the host is accepted by the filter, return.
-    // Otherwise, try again.
-    if (!host || !context || context->postHostSelectionFilter(*host)) {
-      return host;
-    } else {
-      continue;
-    }
+HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* context) {
+  const HostVector& hosts_to_use = hostSourceToHosts(hostSourceToUse(context));
+  if (hosts_to_use.empty()) {
+    return nullptr;
   }
 
-  // If we didnt find anything, return the last host.
-  return host;
+  return hosts_to_use[random_.random() % hosts_to_use.size()];
 }
 
 } // namespace Upstream
