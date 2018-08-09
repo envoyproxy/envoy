@@ -29,7 +29,7 @@ public:
   void initialize() override;
 
   // Upstream::LoadBalancerBase
-  HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override { return nullptr; }  // notused
+  HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override { return nullptr; } // notused
 
 protected:
   ThreadAwareLoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,

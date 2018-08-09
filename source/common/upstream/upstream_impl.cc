@@ -235,7 +235,7 @@ HostSetImpl::filter(std::function<bool(const HostConstSharedPtr&)> predicate) co
 
   std::copy_if(hosts_->begin(), hosts_->end(), std::back_inserter(filtered_hosts), predicate);
   std::copy_if(healthy_hosts_->begin(), healthy_hosts_->end(),
-      std::back_inserter(filtered_healthy_hosts), predicate);
+               std::back_inserter(filtered_healthy_hosts), predicate);
 
   return std::make_shared<const HostSetImpl>(priority(), std::move(filtered_hosts),
                                              std::move(filtered_healthy_hosts));

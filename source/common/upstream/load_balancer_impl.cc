@@ -55,25 +55,31 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
 void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                                    std::vector<uint32_t>& per_priority_load,
                                                    std::vector<uint32_t>& per_priority_health) {
-  recalculatePerPriorityState(priority, per_priority_load, per_priority_health,
-                              [](auto, const auto&) -> bool { return true; });
+  recalculatePerPriorityState(priority, per_priority_load, per_priority_health, {});
 }
 
 void LoadBalancerBase::recalculatePerPriorityState(
     uint32_t priority, std::vector<uint32_t>& per_priority_load,
     std::vector<uint32_t>& per_priority_health,
-    std::function<bool(uint32_t, const Host&)> host_predicate) {
+    absl::optional<std::function<bool(uint32_t, const Host&)>> host_predicate) {
   per_priority_load.resize(priority_set_.hostSetsPerPriority().size());
   per_priority_health.resize(priority_set_.hostSetsPerPriority().size());
+
+  // Keep this shared_pointer around so that in case we need to filter the host set, the temporary
+  // host set stays alive long enough for us to use it.
+  std::shared_ptr<const HostSet> filtered_host_set;
+  const HostSet* host_set = priority_set_.hostSetsPerPriority()[priority].get();
+  if (host_predicate) {
+    filtered_host_set = host_set->filter([priority, &host_predicate](const auto& host) {
+      return (*host_predicate)(priority, *host);
+    });
+    host_set = filtered_host_set.get();
+  }
 
   // Determine the health of the newly modified priority level.
   // Health ranges from 0-100, and is the ratio of healthy hosts to total hosts, modified by the
   // somewhat arbitrary overprovision factor of kOverProvisioningFactor.
   // Eventually the overprovision factor will likely be made configurable.
-  // todo(snowp): we should avoid filtering when possible
-  const auto& host_set = priority_set_.hostSetsPerPriority()[priority]->filter(
-      [priority, &host_predicate](const auto& host) { return host_predicate(priority, *host); });
-
   per_priority_health[priority] = 0;
   if (host_set->hosts().size() > 0) {
     per_priority_health[priority] = std::min<uint32_t>(
@@ -307,8 +313,6 @@ HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
     // Otherwise, try again.
     if (!host || !context || context->postHostSelectionFilter(*host)) {
       return host;
-    } else {
-      continue;
     }
   }
 
@@ -522,34 +526,34 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
 }
 
 HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* context) {
-    const HostsSource hosts_source = hostSourceToUse(context);
-    auto scheduler_it = scheduler_.find(hosts_source);
-    // We should always have a scheduler for any return value from
-    // hostSourceToUse() via the construction in refresh();
-    ASSERT(scheduler_it != scheduler_.end());
-    auto& scheduler = scheduler_it->second;
+  const HostsSource hosts_source = hostSourceToUse(context);
+  auto scheduler_it = scheduler_.find(hosts_source);
+  // We should always have a scheduler for any return value from
+  // hostSourceToUse() via the construction in refresh();
+  ASSERT(scheduler_it != scheduler_.end());
+  auto& scheduler = scheduler_it->second;
 
-    // As has been commented in both EdfLoadBalancerBase::refresh and
-    // BaseDynamicClusterImpl::updateDynamicHostList, we must do a runtime pivot here to determine
-    // whether to use EDF or do unweighted (fast) selection.
-    // TODO(mattklein123): As commented elsewhere, this is wasteful, and we should just refresh the
-    // host set if any weights change. Additionally, it has the property that if all weights are
-    // the same but not 1 (like 42), we will use the EDF schedule not the unweighted pick. This is
-    // not optimal. If this is fixed, remove the note in the arch overview docs for the LR LB.
-    if (stats_.max_host_weight_.value() != 1) {
-      auto host = scheduler.edf_.pick();
-      if (host != nullptr) {
-        scheduler.edf_.add(hostWeight(*host), host);
-      }
-      return host;
-    } else {
-      const HostVector& hosts_to_use = hostSourceToHosts(hosts_source);
-      if (hosts_to_use.size() == 0) {
-        return nullptr;
-      } else {
-        return unweightedHostPick(hosts_to_use, hosts_source);
-      }
+  // As has been commented in both EdfLoadBalancerBase::refresh and
+  // BaseDynamicClusterImpl::updateDynamicHostList, we must do a runtime pivot here to determine
+  // whether to use EDF or do unweighted (fast) selection.
+  // TODO(mattklein123): As commented elsewhere, this is wasteful, and we should just refresh the
+  // host set if any weights change. Additionally, it has the property that if all weights are
+  // the same but not 1 (like 42), we will use the EDF schedule not the unweighted pick. This is
+  // not optimal. If this is fixed, remove the note in the arch overview docs for the LR LB.
+  if (stats_.max_host_weight_.value() != 1) {
+    auto host = scheduler.edf_.pick();
+    if (host != nullptr) {
+      scheduler.edf_.add(hostWeight(*host), host);
     }
+    return host;
+  } else {
+    const HostVector& hosts_to_use = hostSourceToHosts(hosts_source);
+    if (hosts_to_use.size() == 0) {
+      return nullptr;
+    } else {
+      return unweightedHostPick(hosts_to_use, hosts_source);
+    }
+  }
 }
 
 HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector& hosts_to_use,

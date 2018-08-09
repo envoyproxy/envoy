@@ -31,7 +31,7 @@ public:
   // Returns the priority, a number between 0 and per_priority_load.size()-1
   static uint32_t choosePriority(uint64_t hash, const std::vector<uint32_t>& per_priority_load);
 
-  HostConstSharedPtr chooseHost(LoadBalancerContext *context) override;
+  HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
 protected:
   virtual HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) PURE;
@@ -68,9 +68,10 @@ protected:
   // Called when a host set at the given priority level is updated. This updates
   // per_priority_health for that priority level, and may update per_priority_load for all
   // priority levels.
-  void recalculatePerPriorityState(uint32_t priority, std::vector<uint32_t>& per_priority_load,
-                                   std::vector<uint32_t>& per_priority_health,
-                                   std::function<bool(uint32_t, const Host&)> host_predicate);
+  void recalculatePerPriorityState(
+      uint32_t priority, std::vector<uint32_t>& per_priority_load,
+      std::vector<uint32_t>& per_priority_health,
+      absl::optional<std::function<bool(uint32_t, const Host&)>> host_predicate);
 
   // The percentage load (0-100) for each priority level
   std::vector<uint32_t> per_priority_load_;
