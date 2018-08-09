@@ -1541,8 +1541,8 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
       no_such_filter: { option: value }
   )EOF";
 
-  EXPECT_THROW_WITH_REGEX(makeCluster(yaml), EnvoyException,
-                          "Didn't find a registered implementation for name:.*");
+  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                            "Didn't find a registered implementation for name: 'no_such_filter'");
 }
 
 class TestFilterConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
