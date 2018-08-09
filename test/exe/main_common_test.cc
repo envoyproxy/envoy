@@ -90,26 +90,8 @@ public:
   // Runs a an admin request specified in path, blocking until completion, and
   // returning the response body.
   std::string adminRequest(absl::string_view path, absl::string_view method) {
-    Thread::MutexBasicLockable mutex;
-    Thread::CondVar condvar;
-    bool done = false;
-    std::string out;
-    main_common_->adminRequest(
-        path, method,
-        [&mutex, &condvar, &done, &out](const Http::HeaderMap& /*response_headers*/,
-                                        absl::string_view body) {
-          Thread::LockGuard lock(mutex);
-          out = std::string(body);
-          done = true;
-          condvar.notifyOne();
-        });
-    {
-      Thread::LockGuard lock(mutex);
-      while (!done) {
-        condvar.wait(mutex);
-      }
-    }
-    return out;
+    std::future<AdminResponse> response_future = main_common_->adminRequest(path, method);
+    return response_future.get().body;
   }
 
   // Initiates Envoy running in its own thread.

@@ -93,16 +93,21 @@ bool MainCommonBase::run() {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string_view method,
-                                  const AdminRequestFn& handler) {
+std::future<AdminResponse> MainCommonBase::adminRequest(absl::string_view path_and_query,
+                                                        absl::string_view method) {
   std::string path_and_query_buf = std::string(path_and_query);
   std::string method_buf = std::string(method);
-  server_->dispatcher().post([this, path_and_query_buf, method_buf, handler]() {
-    Http::HeaderMapImpl response_headers;
-    std::string body;
-    server_->admin().request(path_and_query_buf, method_buf, response_headers, body);
-    handler(response_headers, body);
-  });
+  // Note: must be a shared_ptr to allow the std::function to be copyable.
+  auto response_promise = std::make_shared<std::promise<AdminResponse>>();
+  std::future<AdminResponse> response_future = response_promise->get_future();
+  server_->dispatcher().post(
+      [ this, path_and_query_buf, method_buf, response_promise{std::move(response_promise)} ]() {
+        AdminResponse response;
+        response.headers = std::make_unique<Http::HeaderMapImpl>();
+        server_->admin().request(path_and_query_buf, method_buf, *response.headers, response.body);
+        response_promise->set_value(std::move(response));
+      });
+  return response_future;
 }
 
 MainCommon::MainCommon(int argc, const char* const* argv)
