@@ -46,7 +46,16 @@ public:
             route_config:
               name: "routes"
               routes:
-                - match: {}
+                - match:
+                    service_name: "svcname"
+                  route:
+                    cluster: "cluster_0"
+                - match:
+                    method_name: "execute"
+                  route:
+                    cluster: "cluster_0"
+                - match:
+                    method_name: "poke"
                   route:
                     cluster: "cluster_0"
       )EOF";
