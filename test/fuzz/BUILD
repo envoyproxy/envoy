@@ -12,6 +12,7 @@ envoy_package()
 envoy_proto_library(
     name = "common_proto",
     srcs = ["common.proto"],
+    generate_python = 0,
     deps = ["@envoy_api//envoy/api/v2/core:base_cc_proto"],
 )
 
