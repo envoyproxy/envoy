@@ -15,6 +15,11 @@ public:
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
   const Network::Connection* downstreamConnection() const override { return nullptr; }
   const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
+  absl::optional<std::function<bool(uint32_t, const Host&)>> prePrioritySelectionFilter() override {
+    return {};
+  }
+  bool postHostSelectionFilter(const Host&) override { return true; }
+  uint32_t hostSelectionRetryCount() override { return 0; }
 
   absl::optional<uint64_t> hash_key_;
 };

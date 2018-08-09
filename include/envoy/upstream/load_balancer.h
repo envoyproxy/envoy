@@ -43,6 +43,27 @@ public:
    * balancing.
    */
   virtual const Http::HeaderMap* downstreamHeaders() const PURE;
+
+  /**
+   * Called to retrieve an optional pre priority selection host predicate. If present, this will be
+   * used to rebuild the per priority load data which only includes hosts that match the predicate.
+   *
+   */
+  virtual absl::optional<std::function<bool(uint32_t, const Host&)>>
+  prePrioritySelectionFilter() PURE;
+
+  /**
+   * Called to determine whether we should reperform host selection. The load balancer
+   * will retry host selection until either the postHostSelectionFilter returns true
+   * or hostSelectionRetryCount is reached.
+   */
+  virtual bool postHostSelectionFilter(const Host& host) PURE;
+
+  /**
+   * Called to determine how many times host selection should be retried until the filter is
+   * ignored.
+   */
+  virtual uint32_t hostSelectionRetryCount() PURE;
 };
 
 /**

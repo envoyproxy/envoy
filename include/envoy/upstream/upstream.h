@@ -248,6 +248,12 @@ public:
    * @return uint32_t the priority of this host set.
    */
   virtual uint32_t priority() const PURE;
+
+  /**
+   * A clone of this HostSet with only hosts matching the predicate.
+   */
+  virtual std::shared_ptr<const HostSet>
+  filter(std::function<bool(const Host&)> predicate) const PURE;
 };
 
 typedef std::unique_ptr<HostSet> HostSetPtr;

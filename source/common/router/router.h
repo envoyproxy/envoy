@@ -198,7 +198,12 @@ public:
     return callbacks_->connection();
   }
   const Http::HeaderMap* downstreamHeaders() const override { return downstream_headers_; }
-
+  absl::optional<std::function<bool(uint32_t, const Upstream::Host&)>>
+  prePrioritySelectionFilter() override {
+    return {};
+  }
+  bool postHostSelectionFilter(const Upstream::Host&) override { return true; }
+  uint32_t hostSelectionRetryCount() override { return 0; }
   /**
    * Set a computed cookie to be sent with the downstream headers.
    * @param key supplies the size of the cookie

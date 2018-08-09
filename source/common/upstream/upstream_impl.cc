@@ -228,6 +228,20 @@ absl::optional<uint32_t> HostSetImpl::chooseLocality() {
   return locality->index_;
 }
 
+std::shared_ptr<const HostSet>
+HostSetImpl::filter(std::function<bool(const Host&)> predicate) const {
+  HostVector filtered_hosts;
+  HostVector filtered_healthy_hosts;
+
+  auto deref_predicate = [&predicate](auto host) { return predicate(*host); };
+  std::copy_if(hosts_->begin(), hosts_->end(), std::back_inserter(filtered_hosts), deref_predicate);
+  std::copy_if(healthy_hosts_->begin(), healthy_hosts_->end(),
+               std::back_inserter(filtered_healthy_hosts), deref_predicate);
+
+  return std::make_shared<const HostSetImpl>(priority(), std::move(filtered_hosts),
+                                             std::move(filtered_healthy_hosts));
+}
+
 double HostSetImpl::effectiveLocalityWeight(uint32_t index) const {
   ASSERT(locality_weights_ != nullptr);
   ASSERT(hosts_per_locality_ != nullptr);

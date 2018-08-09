@@ -162,6 +162,15 @@ public:
 
   const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
+  absl::optional<std::function<bool(uint32_t, const Upstream::Host&)>>
+  prePrioritySelectionFilter() override {
+    return {};
+  }
+
+  bool postHostSelectionFilter(const Upstream::Host&) override { return true; }
+
+  uint32_t hostSelectionRetryCount() override { return 0; }
+
   // These two functions allow enabling/disabling reads on the upstream and downstream connections.
   // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.
   void readDisableUpstream(bool disable);

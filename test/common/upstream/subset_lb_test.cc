@@ -99,6 +99,11 @@ public:
   const Network::Connection* downstreamConnection() const override { return nullptr; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return matches_.get(); }
   const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
+  absl::optional<std::function<bool(uint32_t, const Host&)>> prePrioritySelectionFilter() override {
+    return {};
+  }
+  bool postHostSelectionFilter(const Host&) override { return true; }
+  uint32_t hostSelectionRetryCount() override { return 0; }
 
 private:
   const std::shared_ptr<Router::MetadataMatchCriteria> matches_;

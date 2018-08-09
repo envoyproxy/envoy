@@ -44,7 +44,7 @@ protected:
                    const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
   // Choose host set randomly, based on the per_priority_load_;
-  HostSet& chooseHostSet();
+  HostSet& chooseHostSet(LoadBalancerContext* context);
 
   uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_[priority]; }
 
@@ -56,9 +56,17 @@ protected:
   const PrioritySet& priority_set_;
 
   // Called when a host set at the given priority level is updated. This updates
-  // per_priority_health_ for that priority level, and may update per_priority_load_ for all
+  // per_priority_health for that priority level, and may update per_priority_load for all
   // priority levels.
-  void recalculatePerPriorityState(uint32_t priority);
+  void recalculatePerPriorityState(uint32_t priority, std::vector<uint32_t>& per_priority_load,
+                                   std::vector<uint32_t>& per_priority_health);
+
+  // Called when a host set at the given priority level is updated. This updates
+  // per_priority_health for that priority level, and may update per_priority_load for all
+  // priority levels.
+  void recalculatePerPriorityState(uint32_t priority, std::vector<uint32_t>& per_priority_load,
+                                   std::vector<uint32_t>& per_priority_health,
+                                   std::function<bool(uint32_t, const Host&)> host_predicate);
 
   // The percentage load (0-100) for each priority level
   std::vector<uint32_t> per_priority_load_;
@@ -132,7 +140,7 @@ protected:
   /**
    * Pick the host source to use, doing zone aware routing when the hosts are sufficiently healthy.
    */
-  HostsSource hostSourceToUse();
+  HostsSource hostSourceToUse(LoadBalancerContext* context);
 
   /**
    * Index into priority_set via hosts source descriptor.
