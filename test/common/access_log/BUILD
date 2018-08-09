@@ -21,6 +21,7 @@ envoy_cc_library(
 envoy_proto_library(
     name = "access_log_formatter_fuzz_proto",
     srcs = ["access_log_formatter_fuzz.proto"],
+    generate_python = 0,
     deps = ["//test/fuzz:common_proto"],
 )
 

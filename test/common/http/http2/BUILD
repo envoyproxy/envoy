@@ -14,6 +14,7 @@ envoy_proto_library(
     name = "codec_impl_fuzz_proto",
     srcs = ["codec_impl_fuzz.proto"],
     external_deps = ["well_known_protos"],
+    generate_python = 0,
     deps = ["//test/fuzz:common_proto"],
 )
 
