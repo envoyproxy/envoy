@@ -253,7 +253,7 @@ public:
    * A clone of this HostSet with only hosts matching the predicate.
    */
   virtual std::shared_ptr<const HostSet>
-  filter(std::function<bool(const Host&)> predicate) const PURE;
+  filter(std::function<bool(const HostConstSharedPtr&)> predicate) const PURE;
 };
 
 typedef std::unique_ptr<HostSet> HostSetPtr;

@@ -261,7 +261,7 @@ public:
   absl::optional<uint32_t> chooseLocality() override;
   uint32_t priority() const override { return priority_; }
   std::shared_ptr<const HostSet>
-  filter(std::function<bool(const Host&)> host_predicate) const override;
+  filter(std::function<bool(const HostConstSharedPtr&)> host_predicate) const override;
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {

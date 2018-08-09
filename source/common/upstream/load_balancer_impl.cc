@@ -72,7 +72,7 @@ void LoadBalancerBase::recalculatePerPriorityState(
   // Eventually the overprovision factor will likely be made configurable.
   // todo(snowp): we should avoid filtering when possible
   const auto& host_set = priority_set_.hostSetsPerPriority()[priority]->filter(
-      [priority, &host_predicate](auto& host) { return host_predicate(priority, host); });
+      [priority, &host_predicate](const auto& host) { return host_predicate(priority, *host); });
 
   per_priority_health[priority] = 0;
   if (host_set->hosts().size() > 0) {
