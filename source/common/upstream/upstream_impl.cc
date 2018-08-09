@@ -113,7 +113,7 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
   return cluster_options;
 }
 
-std::map<std::string, ProtocolOptionsConfigConstSharedPtr>&&
+std::map<std::string, ProtocolOptionsConfigConstSharedPtr>
 parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
   std::map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
   for (const auto& iter : config.extension_protocol_options()) {
@@ -129,7 +129,8 @@ parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
       options[name] = object;
     }
   }
-  return std::move(options);
+
+  return options;
 }
 
 } // namespace

@@ -1482,15 +1482,15 @@ TEST(PrioritySet, Extend) {
 class ClusterInfoImplTest : public testing::Test {
 public:
   std::unique_ptr<StrictDnsClusterImpl> makeCluster(const std::string& yaml) {
-    envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-    Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
-        "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
-                                                              : cluster_config.alt_stat_name()));
-    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
-        ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_);
+    cluster_config_ = parseClusterFromV2Yaml(yaml);
+    scope_ = stats_.createScope(fmt::format("cluster.{}.", cluster_config_.alt_stat_name().empty()
+                                                               ? cluster_config_.name()
+                                                               : cluster_config_.alt_stat_name()));
+    factory_context_ = std::make_unique<Server::Configuration::TransportSocketFactoryContextImpl>(
+        ssl_context_manager_, *scope_, cm_, local_info_, dispatcher_, random_, stats_);
 
-    return std::make_unique<StrictDnsClusterImpl>(cluster_config, runtime_, dns_resolver_,
-                                                  factory_context, std::move(scope), false);
+    return std::make_unique<StrictDnsClusterImpl>(cluster_config_, runtime_, dns_resolver_,
+                                                  *factory_context_, std::move(scope_), false);
   }
 
   Stats::IsolatedStoreImpl stats_;
@@ -1502,6 +1502,9 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Runtime::MockRandomGenerator> random_;
   ReadyWatcher initialized_;
+  envoy::api::v2::Cluster cluster_config_;
+  Envoy::Stats::ScopePtr scope_;
+  std::unique_ptr<Server::Configuration::TransportSocketFactoryContextImpl> factory_context_;
 };
 
 // Cluster metadata retrieval.
@@ -1562,7 +1565,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override { return empty_proto_(); }
   Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsConfig(const Protobuf::Message& msg) {
+  createProtocolOptionsConfig(const Protobuf::Message& msg) override {
     return config_(msg);
   }
   std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
@@ -1596,7 +1599,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
 }
 
 TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
-  auto protocol_options = std::shared_ptr<TestFilterProtocolOptionsConfig>();
+  auto protocol_options = std::make_shared<TestFilterProtocolOptionsConfig>();
 
   TestFilterConfigFactory factory(
       []() -> ProtobufTypes::MessagePtr { return std::make_unique<ProtobufWkt::Struct>(); },
@@ -1621,7 +1624,8 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
   auto cluster = makeCluster(yaml);
 
   ProtocolOptionsConfigConstSharedPtr stored_options =
-      cluster->info()->extensionProtocolOptions("envoy.test.filter");
+      cluster->info()->extensionProtocolOptions(factory.name());
+  EXPECT_NE(nullptr, protocol_options);
   // Same pointer
   EXPECT_EQ(stored_options.get(), protocol_options.get());
 }

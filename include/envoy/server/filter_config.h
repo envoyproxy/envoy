@@ -227,7 +227,7 @@ public:
    * @param config supplies the protobuf configuration for the filter
    * @return Upstream::ProtocoOptionsConfigConstSharedPtr the protocol options
    */
-  Upstream::ProtocolOptionsConfigConstSharedPtr
+  virtual Upstream::ProtocolOptionsConfigConstSharedPtr
   createProtocolOptionsConfig(const Protobuf::Message& config) {
     UNREFERENCED_PARAMETER(config);
     return nullptr;
