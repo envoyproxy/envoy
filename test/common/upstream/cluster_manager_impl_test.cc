@@ -1979,12 +1979,11 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
   // Add the updated cluster.
   EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_modified").value());
+  EXPECT_EQ(0, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
   EXPECT_TRUE(
       cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml_updated), "version2"));
   EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_modified").value());
-
-  EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
   EXPECT_EQ(1, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
 
   // Promote the updated cluster from warming to active & assert the old timer was disabled
