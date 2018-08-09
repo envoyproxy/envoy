@@ -8,7 +8,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"

@@ -13,7 +13,7 @@
 #include "common/config/bootstrap_json.h"
 #include "common/json/json_loader.h"
 #include "common/protobuf/utility.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/stats_options_impl.h"
 
 // NOLINT(namespace-envoy)
 int main(int argc, char** argv) {

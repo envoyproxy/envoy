@@ -239,7 +239,7 @@ py_proto_library(
     )
 
     native.new_http_archive(
-        name = "promotheus_metrics_model",
+        name = "prometheus_metrics_model",
         strip_prefix = "client_model-" + PROMETHEUS_SHA,
         url = "https://github.com/prometheus/client_model/archive/" + PROMETHEUS_SHA + ".tar.gz",
         build_file_content = """

@@ -60,6 +60,8 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   LightstepTracerStats& tracerStats() { return tracer_stats_; }
 
+  static const size_t DefaultMinFlushSpans;
+
   // Tracer::OpenTracingDriver
   opentracing::Tracer& tracer() override;
   PropagationMode propagationMode() const override { return propagation_mode_; }

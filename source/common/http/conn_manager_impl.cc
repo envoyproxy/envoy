@@ -12,7 +12,7 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/buffer/buffer_impl.h"

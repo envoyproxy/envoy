@@ -24,6 +24,35 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
+class AutoProtocolTest : public testing::Test {
+public:
+  void resetMetadata() {
+    metadata_.setMethodName("-");
+    metadata_.setMessageType(MessageType::Oneway);
+    metadata_.setSequenceId(-1);
+  }
+
+  void expectMetadata(const std::string& name, MessageType msg_type, int32_t seq_id) {
+    EXPECT_TRUE(metadata_.hasMethodName());
+    EXPECT_EQ(name, metadata_.methodName());
+
+    EXPECT_TRUE(metadata_.hasMessageType());
+    EXPECT_EQ(msg_type, metadata_.messageType());
+
+    EXPECT_TRUE(metadata_.hasSequenceId());
+    EXPECT_EQ(seq_id, metadata_.sequenceId());
+
+    EXPECT_FALSE(metadata_.hasFrameSize());
+    EXPECT_FALSE(metadata_.hasProtocol());
+    EXPECT_FALSE(metadata_.hasAppException());
+    EXPECT_TRUE(metadata_.headers().empty());
+  }
+
+  void expectDefaultMetadata() { expectMetadata("-", MessageType::Oneway, -1); }
+
+  MessageMetadata metadata_;
+};
+
 TEST(ProtocolNames, FromType) {
   for (int i = 0; i <= static_cast<int>(ProtocolType::LastProtocolType); i++) {
     ProtocolType type = static_cast<ProtocolType>(i);
@@ -31,43 +60,33 @@ TEST(ProtocolNames, FromType) {
   }
 }
 
-TEST(AutoProtocolTest, NotEnoughData) {
+TEST_F(AutoProtocolTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
   AutoProtocolImpl proto;
-  std::string name = "-";
-  MessageType msg_type = MessageType::Oneway;
-  int32_t seq_id = -1;
+  resetMetadata();
 
   addInt8(buffer, 0);
-  EXPECT_FALSE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
-  EXPECT_EQ(name, "-");
-  EXPECT_EQ(msg_type, MessageType::Oneway);
-  EXPECT_EQ(seq_id, -1);
+  EXPECT_FALSE(proto.readMessageBegin(buffer, metadata_));
+  expectDefaultMetadata();
 }
 
-TEST(AutoProtocolTest, UnknownProtocol) {
+TEST_F(AutoProtocolTest, UnknownProtocol) {
   Buffer::OwnedImpl buffer;
   AutoProtocolImpl proto;
-  std::string name = "-";
-  MessageType msg_type = MessageType::Oneway;
-  int32_t seq_id = -1;
+  resetMetadata();
 
   addInt16(buffer, 0x0102);
 
-  EXPECT_THROW_WITH_MESSAGE(proto.readMessageBegin(buffer, name, msg_type, seq_id), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(proto.readMessageBegin(buffer, metadata_), EnvoyException,
                             "unknown thrift auto protocol message start 0102");
-  EXPECT_EQ(name, "-");
-  EXPECT_EQ(msg_type, MessageType::Oneway);
-  EXPECT_EQ(seq_id, -1);
+  expectDefaultMetadata();
 }
 
-TEST(AutoProtocolTest, ReadMessageBegin) {
+TEST_F(AutoProtocolTest, ReadMessageBegin) {
   // Binary Protocol
   {
     AutoProtocolImpl proto;
-    std::string name = "-";
-    MessageType msg_type = MessageType::Oneway;
-    int32_t seq_id = -1;
+    resetMetadata();
 
     Buffer::OwnedImpl buffer;
     addInt16(buffer, 0x8001);
@@ -77,10 +96,8 @@ TEST(AutoProtocolTest, ReadMessageBegin) {
     addString(buffer, "the_name");
     addInt32(buffer, 1);
 
-    EXPECT_TRUE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
-    EXPECT_EQ(name, "the_name");
-    EXPECT_EQ(msg_type, MessageType::Call);
-    EXPECT_EQ(seq_id, 1);
+    EXPECT_TRUE(proto.readMessageBegin(buffer, metadata_));
+    expectMetadata("the_name", MessageType::Call, 1);
     EXPECT_EQ(buffer.length(), 0);
     EXPECT_EQ(proto.name(), "binary(auto)");
     EXPECT_EQ(proto.type(), ProtocolType::Binary);
@@ -89,9 +106,7 @@ TEST(AutoProtocolTest, ReadMessageBegin) {
   // Compact protocol
   {
     AutoProtocolImpl proto;
-    std::string name = "-";
-    MessageType msg_type = MessageType::Oneway;
-    int32_t seq_id = 1;
+    resetMetadata();
 
     Buffer::OwnedImpl buffer;
     addInt16(buffer, 0x8221);
@@ -99,36 +114,32 @@ TEST(AutoProtocolTest, ReadMessageBegin) {
     addInt8(buffer, 8);
     addString(buffer, "the_name");
 
-    EXPECT_TRUE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
-    EXPECT_EQ(name, "the_name");
-    EXPECT_EQ(msg_type, MessageType::Call);
-    EXPECT_EQ(seq_id, 0x0102);
+    EXPECT_TRUE(proto.readMessageBegin(buffer, metadata_));
+    expectMetadata("the_name", MessageType::Call, 0x0102);
     EXPECT_EQ(buffer.length(), 0);
     EXPECT_EQ(proto.name(), "compact(auto)");
     EXPECT_EQ(proto.type(), ProtocolType::Compact);
   }
 }
 
-TEST(AutoProtocolTest, ReadDelegation) {
+TEST_F(AutoProtocolTest, ReadDelegation) {
   NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
   AutoProtocolImpl auto_proto;
   auto_proto.setProtocol(ProtocolPtr{proto});
 
   // readMessageBegin
   Buffer::OwnedImpl buffer;
-  std::string name = "x";
-  MessageType msg_type = MessageType::Call;
-  int32_t seq_id = 1;
+  resetMetadata();
 
-  EXPECT_CALL(*proto, readMessageBegin(Ref(buffer), Ref(name), Ref(msg_type), Ref(seq_id)))
-      .WillOnce(Return(true));
-  EXPECT_TRUE(auto_proto.readMessageBegin(buffer, name, msg_type, seq_id));
+  EXPECT_CALL(*proto, readMessageBegin(Ref(buffer), Ref(metadata_))).WillOnce(Return(true));
+  EXPECT_TRUE(auto_proto.readMessageBegin(buffer, metadata_));
 
   // readMessageEnd
   EXPECT_CALL(*proto, readMessageEnd(Ref(buffer))).WillOnce(Return(true));
   EXPECT_TRUE(auto_proto.readMessageEnd(buffer));
 
   // readStructBegin
+  std::string name;
   EXPECT_CALL(*proto, readStructBegin(Ref(buffer), Ref(name))).WillOnce(Return(true));
   EXPECT_TRUE(auto_proto.readStructBegin(buffer, name));
 
@@ -234,15 +245,15 @@ TEST(AutoProtocolTest, ReadDelegation) {
   }
 }
 
-TEST(AutoProtocolTest, WriteDelegation) {
+TEST_F(AutoProtocolTest, WriteDelegation) {
   NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
   AutoProtocolImpl auto_proto;
   auto_proto.setProtocol(ProtocolPtr{proto});
 
   // writeMessageBegin
   Buffer::OwnedImpl buffer;
-  EXPECT_CALL(*proto, writeMessageBegin(Ref(buffer), "name", MessageType::Call, 100));
-  auto_proto.writeMessageBegin(buffer, "name", MessageType::Call, 100);
+  EXPECT_CALL(*proto, writeMessageBegin(Ref(buffer), Ref(metadata_)));
+  auto_proto.writeMessageBegin(buffer, metadata_);
 
   // writeMessageEnd
   EXPECT_CALL(*proto, writeMessageEnd(Ref(buffer)));
@@ -321,12 +332,12 @@ TEST(AutoProtocolTest, WriteDelegation) {
   auto_proto.writeBinary(buffer, "binary");
 }
 
-TEST(AutoProtocolTest, Name) {
+TEST_F(AutoProtocolTest, Name) {
   AutoProtocolImpl proto;
   EXPECT_EQ(proto.name(), "auto");
 }
 
-TEST(AutoProtocolTest, Type) {
+TEST_F(AutoProtocolTest, Type) {
   AutoProtocolImpl proto;
   EXPECT_EQ(proto.type(), ProtocolType::Auto);
 }

@@ -11,7 +11,6 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/event/mocks.h"

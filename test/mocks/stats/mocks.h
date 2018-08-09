@@ -5,12 +5,17 @@
 #include <list>
 #include <string>
 
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/sink.h"
+#include "envoy/stats/source.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/store.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/stats/stats_impl.h"
+#include "common/stats/histogram_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "gmock/gmock.h"
 
@@ -145,7 +150,7 @@ public:
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
   MOCK_METHOD1(histogram, Histogram&(const std::string& name));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
-  MOCK_CONST_METHOD0(statsOptions, const Stats::StatsOptions&());
+  MOCK_CONST_METHOD0(statsOptions, const StatsOptions&());
 
   testing::NiceMock<MockCounter> counter_;
   std::vector<std::unique_ptr<MockHistogram>> histograms_;

@@ -123,5 +123,5 @@ message LocalityLbEndpoints {
   // next highest priority group.
   //
   // Priorities should range from 0 (highest) to N (lowest) without skipping.
-  uint32 priority = 5;
+  uint32 priority = 5 [(validate.rules).uint32 = {lte: 128}];
 }

@@ -46,5 +46,6 @@ envoy_extension_cc_test(
         "//source/extensions/access_loggers/http_grpc:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
     ],
 )

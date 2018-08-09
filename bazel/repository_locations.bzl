@@ -5,7 +5,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
-        commit = "92020a042c0cd46979db9f6f0cb32783dc07765e",  # 2018-06-08
+        commit = "92e07e5590752d6b8e67f7f2f86c6286561e8cea",  # 2018-08-01
         remote = "https://github.com/abseil/abseil-cpp",
     ),
     com_github_apache_thrift = dict(
@@ -48,8 +48,14 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/libprotobuf-mutator",
     ),
     com_github_grpc_grpc = dict(
-        commit = "bec3b5ada2c5e5d782dff0b7b5018df646b65cb0",  # v1.12.0
+        commit = "3eedb606a07738e5446ba852085f676b134ecca4",  # v1.14.0
         remote = "https://github.com/grpc/grpc.git",
+    ),
+    com_github_nanopb_nanopb = dict(
+        # From: https://github.com/grpc/grpc/blob/v1.14.0/bazel/grpc_deps.bzl#L123
+        sha256 = "8bbbb1e78d4ddb0a1919276924ab10d11b631df48b657d960e0c795a25515735",
+        strip_prefix = "nanopb-f8ac463766281625ad710900479130c7fcb4d63b",
+        urls = ["https://github.com/nanopb/nanopb/archive/f8ac463766281625ad710900479130c7fcb4d63b.tar.gz"],
     ),
     io_opentracing_cpp = dict(
         commit = "3b36b084a4d7fffc196eac83203cf24dfb8696b3",  # v1.4.2

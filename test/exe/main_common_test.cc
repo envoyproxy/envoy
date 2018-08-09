@@ -9,6 +9,8 @@
 
 #include <unistd.h>
 
+#include "common/common/lock_guard.h"
+#include "common/common/thread.h"
 #include "common/runtime/runtime_impl.h"
 
 #include "exe/main_common.h"
@@ -23,6 +25,8 @@
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "exe/signal_action.h"
 #endif
+
+using testing::HasSubstr;
 
 namespace Envoy {
 
@@ -42,7 +46,8 @@ public:
                      "/test/config/integration/google_com_proxy_port_0.v2.yaml"),
         random_string_(fmt::format("{}", computeBaseId())),
         argv_({"envoy-static", "--base-id", random_string_.c_str(), "-c", config_file_.c_str(),
-               nullptr}) {}
+               nullptr}),
+        envoy_return_(false), envoy_started_(false), envoy_finished_(false) {}
 
   /**
    * Computes a numeric ID to incorporate into the names of
@@ -76,9 +81,93 @@ public:
     argv_.push_back(nullptr);
   }
 
+  // Adds options to make Envoy exit immediately after initializtion.
+  void initOnly() {
+    addArg("--mode");
+    addArg("init_only");
+  }
+
+  // Runs a an admin request specified in path, blocking until completion, and
+  // returning the response body.
+  std::string adminRequest(absl::string_view path, absl::string_view method) {
+    Thread::MutexBasicLockable mutex;
+    Thread::CondVar condvar;
+    bool done = false;
+    std::string out;
+    main_common_->adminRequest(
+        path, method,
+        [&mutex, &condvar, &done, &out](const Http::HeaderMap& /*response_headers*/,
+                                        absl::string_view body) {
+          Thread::LockGuard lock(mutex);
+          out = std::string(body);
+          done = true;
+          condvar.notifyOne();
+        });
+    {
+      Thread::LockGuard lock(mutex);
+      while (!done) {
+        condvar.wait(mutex);
+      }
+    }
+    return out;
+  }
+
+  // Initiates Envoy running in its own thread.
+  void startEnvoy() {
+    envoy_thread_ = std::make_unique<Thread::Thread>([this]() {
+      // Note: main_common_ is accesesed in the testing thread, but
+      // is race-free, as MainCommon::run() does not return until
+      // triggered with an adminRequest POST to /quitquitquit, which
+      // is done in the testing thread.
+      main_common_ = std::make_unique<MainCommon>(argc(), argv());
+      {
+        Thread::LockGuard lock(mutex_);
+        envoy_started_ = true;
+        started_condvar_.notifyOne();
+      }
+      bool status = main_common_->run();
+      main_common_.reset();
+      {
+        Thread::LockGuard lock(mutex_);
+        envoy_finished_ = true;
+        envoy_return_ = status;
+        finished_condvar_.notifyOne();
+      }
+    });
+  }
+
+  // Having started Envoy in its own thread, this waits for Envoy to be
+  // responsive by sending it a simple stats request.
+  void waitForEnvoyToStart() {
+    Thread::LockGuard lock(mutex_);
+    while (!envoy_started_) {
+      started_condvar_.wait(mutex_);
+    }
+  }
+
+  // Having sent a /quitquitquit to Envoy, this blocks until Envoy exits.
+  bool waitForEnvoyToExit() {
+    {
+      Thread::LockGuard lock(mutex_);
+      while (!envoy_finished_) {
+        finished_condvar_.wait(mutex_);
+      }
+    }
+    envoy_thread_->join();
+    return envoy_return_;
+  }
+
   std::string config_file_;
   std::string random_string_;
   std::vector<const char*> argv_;
+  std::unique_ptr<Thread::Thread> envoy_thread_;
+  std::unique_ptr<MainCommon> main_common_;
+  Thread::CondVar started_condvar_;
+  Thread::CondVar finished_condvar_;
+  Thread::MutexBasicLockable mutex_;
+  bool envoy_return_;
+  bool envoy_started_ GUARDED_BY(mutex_);
+  bool envoy_finished_ GUARDED_BY(mutex_);
 };
 
 // Exercise the codepath to instantiate MainCommon and destruct it, with hot restart.
@@ -104,8 +193,7 @@ TEST_F(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
     return;
   }
   addArg("--disable-hot-restart");
-  addArg("--mode");
-  addArg("init_only");
+  initOnly();
   MainCommon main_common(argc(), argv());
   EXPECT_TRUE(main_common.run());
 }
@@ -124,9 +212,7 @@ TEST_F(MainCommonTest, LegacyMain) {
   std::unique_ptr<Envoy::OptionsImpl> options;
   int return_code = -1;
   try {
-    // Set the mode to init-only so main_common doesn't initiate a server-loop.
-    addArg("--mode");
-    addArg("init_only");
+    initOnly();
     options = std::make_unique<Envoy::OptionsImpl>(argc(), argv(), &MainCommon::hotRestartVersion,
                                                    spdlog::level::info);
   } catch (const Envoy::NoServingException& e) {
@@ -138,6 +224,15 @@ TEST_F(MainCommonTest, LegacyMain) {
     return_code = Envoy::main_common(*options);
   }
   EXPECT_EQ(EXIT_SUCCESS, return_code);
+}
+
+TEST_F(MainCommonTest, AdminRequestGetStatsAndQuit) {
+  addArg("--disable-hot-restart");
+  startEnvoy();
+  waitForEnvoyToStart();
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  adminRequest("/quitquitquit", "POST");
+  EXPECT_TRUE(waitForEnvoyToExit());
 }
 
 } // namespace Envoy

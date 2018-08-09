@@ -2,6 +2,9 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/source.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"

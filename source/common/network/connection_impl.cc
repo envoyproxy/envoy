@@ -504,7 +504,9 @@ void ConnectionImpl::onWriteReady() {
 }
 
 void ConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
-  ASSERT(!connection_stats_);
+  ASSERT(!connection_stats_,
+         "Two network filters are attempting to set connection stats. This indicates an issue "
+         "with the configured filter chain.");
   connection_stats_.reset(new ConnectionStats(stats));
 }
 

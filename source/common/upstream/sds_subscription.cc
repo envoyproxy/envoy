@@ -22,17 +22,7 @@ SdsSubscription::SdsSubscription(ClusterStats& stats,
                                  const envoy::api::v2::core::ConfigSource& eds_config,
                                  ClusterManager& cm, Event::Dispatcher& dispatcher,
                                  Runtime::RandomGenerator& random)
-    : RestApiFetcher(cm, eds_config.api_config_source().cluster_names()[0], dispatcher, random,
-                     Config::Utility::apiConfigSourceRefreshDelay(eds_config.api_config_source())),
-      stats_(stats) {
-  const auto& api_config_source = eds_config.api_config_source();
-  UNREFERENCED_PARAMETER(api_config_source);
-  // If we are building an SdsSubscription, the ConfigSource should be REST_LEGACY.
-  ASSERT(api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
-  // TODO(htuch): Add support for multiple clusters, #1170.
-  ASSERT(api_config_source.cluster_names().size() == 1);
-  ASSERT(api_config_source.has_refresh_delay());
-}
+    : RestApiFetcher(cm, eds_config.api_config_source(), dispatcher, random), stats_(stats) {}
 
 void SdsSubscription::parseResponse(const Http::Message& response) {
   const std::string response_body = response.bodyAsString();

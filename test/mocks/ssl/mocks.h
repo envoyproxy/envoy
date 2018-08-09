@@ -7,7 +7,7 @@
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/context_manager.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "test/mocks/secret/mocks.h"
 
