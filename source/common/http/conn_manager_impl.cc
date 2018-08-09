@@ -797,7 +797,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
       trailers_added_entry = entry;
     }
 
-    if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_) && std::next(entry) != decoder_filters_.end()) {
+    if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_) &&
+        std::next(entry) != decoder_filters_.end()) {
       // break here to ensure that we call decodeTrailers below
       return;
     }
@@ -1101,11 +1102,6 @@ HeaderMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
   // traileres can only be added once
   ASSERT(!response_trailers_);
 
-  // local_complete_ is set to true at the start of encodeData(..., true), but since
-  // we've now added trailers we have to undo this to prevent encodeTrailers from
-  // blowing up when it assert on local_complete_
-  state_.local_complete_ = false;
-
   response_trailers_ = std::make_unique<HeaderMapImpl>();
   return *response_trailers_;
 }
@@ -1148,7 +1144,8 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
-    FilterDataStatus status = (*entry)->handle_->encodeData(data, end_stream && !response_trailers_);
+    FilterDataStatus status =
+        (*entry)->handle_->encodeData(data, end_stream && !response_trailers_);
     state_.filter_call_state_ &= ~FilterCallState::EncodeData;
     if (end_stream) {
       state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;

@@ -442,7 +442,9 @@ config: {}
   }
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("503", response->headers().Status()->value().c_str());
-  EXPECT_STREQ("encode", response->trailers()->GrpcMessage()->value().c_str());
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
+    EXPECT_STREQ("encode", response->trailers()->GrpcMessage()->value().c_str());
+  }
 }
 
 // Add a health check filter and verify correct behavior when draining.
