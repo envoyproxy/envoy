@@ -111,7 +111,8 @@ public:
     filter_callbacks_.connection_.remote_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
     conn_manager_.reset(new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_,
-                                                  local_info_, cluster_manager_));
+                                                  local_info_, cluster_manager_,
+                                                  &overload_manager_));
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
     if (tracing) {
@@ -309,6 +310,7 @@ public:
   MockStream stream_;
   Http::StreamCallbacks* stream_callbacks_{nullptr};
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   uint32_t initial_buffer_limit_{};
   bool streaming_filter_{false};
   Stats::IsolatedStoreImpl fake_listener_stats_;
@@ -3275,6 +3277,34 @@ TEST(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {
 
   ConnectionManagerImpl::chargeTracingStats(Tracing::Reason::NotTraceableRequestId, tracing_stats);
   EXPECT_EQ(1UL, tracing_stats.not_traceable_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
+  setup(false, "");
+
+  overload_manager_.overload_state_.setState("envoy.overload_actions.stop_accepting_requests",
+                                             Server::OverloadActionState::Active);
+
+  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+  }));
+
+  // 503 direct response when overloaded.
+  EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([](const HeaderMap& headers, bool) -> void {
+        EXPECT_STREQ("503", headers.Status()->value().c_str());
+      }));
+  std::string response_body;
+  EXPECT_CALL(response_encoder_, encodeData(_, true)).WillOnce(AddBufferToString(&response_body));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_EQ("envoy overloaded", response_body);
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_overload_close_.value());
 }
 
 } // namespace Http

@@ -12,6 +12,7 @@
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
+#include "envoy/server/overload_manager.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -134,6 +135,11 @@ public:
    * @return TimeSource& a reference to the time source.
    */
   virtual TimeSource& timeSource() PURE;
+
+  /**
+   * @return OverloadManager& the overload manager for the server.
+   */
+  virtual OverloadManager& overloadManager() PURE;
 };
 
 class ListenerFactoryContext : public FactoryContext {
@@ -247,6 +253,25 @@ public:
    *         is deprecated.
    */
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
+
+  /**
+   * Create a particular network filter's protocol specific options implementation. If the factory
+   * implementation is unable to produce a factory with the provided parameters, it should throw an
+   * EnvoyException.
+   * @param config supplies the protobuf configuration for the filter
+   * @return Upstream::ProtocoOptionsConfigConstSharedPtr the protocol options
+   */
+  virtual Upstream::ProtocolOptionsConfigConstSharedPtr
+  createProtocolOptionsConfig(const Protobuf::Message& config) {
+    UNREFERENCED_PARAMETER(config);
+    return nullptr;
+  }
+
+  /**
+   * @return ProtobufTypes::MessagePtr a newly created empty protocol specific options message or
+   *         nullptr if protocol specific options are not available.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() { return nullptr; }
 
   /**
    * @return std::string the identifying name for a particular implementation of a network filter
