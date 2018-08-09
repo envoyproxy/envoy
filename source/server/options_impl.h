@@ -67,6 +67,9 @@ public:
   void setHotRestartDisabled(bool hot_restart_disabled) {
     hot_restart_disabled_ = hot_restart_disabled;
   }
+  void setShutdownWithoutSignal(bool shutdown_without_signal) {
+    shutdown_without_signal_ = shutdown_without_signal;
+  }
 
   // Server::Options
   uint64_t baseId() const override { return base_id_; }
@@ -94,6 +97,7 @@ public:
   uint64_t maxStats() const override { return max_stats_; }
   const Stats::StatsOptions& statsOptions() const override { return stats_options_; }
   bool hotRestartDisabled() const override { return hot_restart_disabled_; }
+  bool shutdownWithoutSignal() const override { return shutdown_without_signal_; }
 
 private:
   uint64_t base_id_;
@@ -117,6 +121,7 @@ private:
   uint64_t max_stats_;
   Stats::StatsOptionsImpl stats_options_;
   bool hot_restart_disabled_;
+  bool shutdown_without_signal_;
 };
 
 /**

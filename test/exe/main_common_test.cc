@@ -227,7 +227,23 @@ TEST_F(MainCommonTest, LegacyMain) {
 }
 
 TEST_F(MainCommonTest, AdminRequestGetStatsAndQuit) {
+  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
+    return;
+  }
   addArg("--disable-hot-restart");
+  startEnvoy();
+  waitForEnvoyToStart();
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  adminRequest("/quitquitquit", "POST");
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_F(MainCommonTest, AdminRequestGetStatsAndQuitWithoutSignal) {
+  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
+    return;
+  }
+  addArg("--disable-hot-restart");
+  addArg("--shutdown-without-signal");
   startEnvoy();
   waitForEnvoyToStart();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));

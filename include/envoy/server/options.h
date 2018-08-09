@@ -159,6 +159,11 @@ public:
    * @return bool indicating whether the hot restart functionality has been disabled via cli flags.
    */
   virtual bool hotRestartDisabled() const PURE;
+
+  /**
+   * @return bool indicating whether the /quitquitquit should induce shutdown without a signal.
+   */
+  virtual bool shutdownWithoutSignal() const PURE;
 };
 
 } // namespace Server
