@@ -1976,9 +1976,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
     update_merge_window: 4s
   )EOF";
 
-  // Assert timer was disabled and it won't be called on version1 of new_cluster.
-  EXPECT_CALL(*timer, disableTimer());
-
+  // Add the updated cluster.
   EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_modified").value());
   EXPECT_TRUE(
@@ -1988,7 +1986,12 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
 
   EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
   EXPECT_EQ(1, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
+
+  // Promote the updated cluster from warming to active & assert the old timer was disabled
+  // and it won't be called on version1 of new_cluster.
+  EXPECT_CALL(*timer, disableTimer());
   updated->initialize_callback_();
+
   EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
   EXPECT_EQ(0, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
 }
