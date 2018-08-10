@@ -16,7 +16,6 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) override;
 
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
-    std::cout << "trailers cb" << std::endl;
     return Http::FilterTrailersStatus::Continue;
   }
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
