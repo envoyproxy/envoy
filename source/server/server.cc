@@ -247,6 +247,10 @@ void InstanceImpl::initialize(Options& options,
 
   loadServerFlags(initial_config.flagsPath());
 
+  // Initialize the overload manager early so other modules can register for actions.
+  overload_manager_.reset(
+      new OverloadManagerImpl(dispatcher(), stats(), bootstrap_.overload_manager()));
+
   // Workers get created first so they register for thread local updates.
   listener_manager_.reset(new ListenerManagerImpl(
       *this, listener_component_factory_, worker_factory_, ProdSystemTimeSource::instance_));
@@ -289,7 +293,8 @@ void InstanceImpl::initialize(Options& options,
         bootstrap_.node(), stats(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
             ->create(),
-        dispatcher()));
+        dispatcher(), runtime(), stats(), sslContextManager(), random(), info_factory_,
+        access_log_manager_, clusterManager(), localInfo()));
   }
 
   for (Stats::SinkPtr& sink : main_config->statsSinks()) {
@@ -353,14 +358,13 @@ uint64_t InstanceImpl::numConnections() { return listener_manager_->numConnectio
 
 RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm,
                      HotRestart& hot_restart, AccessLog::AccessLogManager& access_log_manager,
-                     InitManagerImpl& init_manager, std::function<void()> workers_start_cb) {
+                     InitManagerImpl& init_manager, OverloadManager& overload_manager,
+                     std::function<void()> workers_start_cb) {
 
   // Setup signals.
   sigterm_ = dispatcher.listenForSignal(SIGTERM, [this, &hot_restart, &dispatcher]() {
     ENVOY_LOG(warn, "caught SIGTERM");
-    shutdown_ = true;
-    hot_restart.terminateParent();
-    dispatcher.exit();
+    shutdown(dispatcher, hot_restart);
   });
 
   sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
@@ -400,11 +404,22 @@ RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm
     // as we've subscribed to all the statically defined RDS resources.
     cm.adsMux().resume(Config::TypeUrl::get().RouteConfiguration);
   });
+
+  overload_manager.start();
+}
+
+void RunHelper::shutdown(Event::Dispatcher& dispatcher, HotRestart& hot_restart) {
+  shutdown_ = true;
+  hot_restart.terminateParent();
+  dispatcher.exit();
 }
 
 void InstanceImpl::run() {
-  RunHelper helper(*dispatcher_, clusterManager(), restarter_, access_log_manager_, init_manager_,
-                   [this]() -> void { startWorkers(); });
+  // We need the RunHelper to be available to call from InstanceImpl::shutdown() below, so
+  // we save it as a member variable.
+  run_helper_ = std::make_unique<RunHelper>(*dispatcher_, clusterManager(), restarter_,
+                                            access_log_manager_, init_manager_, overloadManager(),
+                                            [this]() -> void { startWorkers(); });
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
@@ -416,6 +431,7 @@ void InstanceImpl::run() {
   watchdog.reset();
 
   terminate();
+  run_helper_.reset();
 }
 
 void InstanceImpl::terminate() {
@@ -453,8 +469,8 @@ void InstanceImpl::terminate() {
 Runtime::Loader& InstanceImpl::runtime() { return *runtime_loader_; }
 
 void InstanceImpl::shutdown() {
-  ENVOY_LOG(info, "shutdown invoked. sending SIGTERM to self");
-  kill(getpid(), SIGTERM);
+  ASSERT(run_helper_.get() != nullptr);
+  run_helper_->shutdown(*dispatcher_, restarter_);
 }
 
 void InstanceImpl::shutdownAdmin() {

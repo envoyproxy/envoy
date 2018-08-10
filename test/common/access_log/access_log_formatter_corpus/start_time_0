@@ -1,0 +1,4 @@
+format: "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|%START_TIME%|%START_TIME(%f.%1f.%2f.%3f)%"
+request_info {
+  start_time: 1522280158
+}

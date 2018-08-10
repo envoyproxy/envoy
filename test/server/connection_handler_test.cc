@@ -1,4 +1,4 @@
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"

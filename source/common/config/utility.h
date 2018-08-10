@@ -8,7 +8,9 @@
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_options.h"
+#include "envoy/stats/tag_producer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
@@ -73,6 +75,14 @@ public:
    */
   static std::chrono::milliseconds
   apiConfigSourceRefreshDelay(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+
+  /**
+   * Extract request_timeout as a std::chrono::milliseconds from
+   * envoy::api::v2::core::ApiConfigSource. If request_timeout isn't set in the config source, a
+   * default value of 1s will be returned.
+   */
+  static std::chrono::milliseconds
+  apiConfigSourceRequestTimeout(const envoy::api::v2::core::ApiConfigSource& api_config_source);
 
   /**
    * Populate an envoy::api::v2::core::ApiConfigSource.

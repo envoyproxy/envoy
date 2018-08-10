@@ -1,7 +1,5 @@
 #include <memory>
 
-#include "envoy/stats/stats.h"
-
 #include "common/access_log/access_log_manager_impl.h"
 #include "common/stats/isolated_store_impl.h"
 

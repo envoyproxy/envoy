@@ -14,6 +14,8 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/ssl/context.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/load_balancer_type.h"
 #include "envoy/upstream/outlier_detection.h"
@@ -332,6 +334,7 @@ public:
   COUNTER  (upstream_cx_none_healthy)                                                              \
   COUNTER  (upstream_rq_total)                                                                     \
   GAUGE    (upstream_rq_active)                                                                    \
+  COUNTER  (upstream_rq_completed)                                                                 \
   COUNTER  (upstream_rq_pending_total)                                                             \
   COUNTER  (upstream_rq_pending_overflow)                                                          \
   COUNTER  (upstream_rq_pending_failure_eject)                                                     \
@@ -457,6 +460,14 @@ public:
    */
   virtual const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&
   lbRingHashConfig() const PURE;
+
+  /**
+   * @return const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>& the configuration
+   *         for the Original Destination load balancing policy, only used if type is set to
+   *         ORIGINAL_DST_LB.
+   */
+  virtual const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>&
+  lbOriginalDstConfig() const PURE;
 
   /**
    * @return Whether the cluster is currently in maintenance mode and should not be routed to.

@@ -1,6 +1,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/stats/scope.h"
+
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
@@ -166,11 +168,11 @@ public:
     tls_certificate->mutable_private_key()->set_filename(
         TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
 
-    Ssl::ServerContextConfigImpl cfg(tls_context, secret_manager_);
+    auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, secret_manager_);
 
     static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
     return std::make_unique<Ssl::ServerSslSocketFactory>(
-        cfg, context_manager_, *upstream_stats_store, std::vector<std::string>{});
+        std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
   }
 
 private:

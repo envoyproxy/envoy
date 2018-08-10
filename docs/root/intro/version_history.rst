@@ -25,6 +25,8 @@ Version history
   defaults to 5 minutes; if you have other timeouts (e.g. connection idle timeout, upstream
   response per-retry) that are longer than this in duration, you may want to consider setting a
   non-default per-stream idle timeout.
+* http: added upstream_rq_completed counter for :ref:`total requests completed <config_cluster_manager_cluster_stats_dynamic_http>` to dynamic HTTP counters.
+* http: added downstream_rq_completed counter for :ref:`total requests completed <config_http_conn_man_stats>`, including on a :ref:`per-listener basis <config_http_conn_man_stats_per_listener>`.
 * http: added support for a :ref:`per-stream idle timeout
   <envoy_api_field_route.RouteAction.idle_timeout>`. This defaults to 5 minutes; if you have
   other timeouts (e.g. connection idle timeout, upstream response per-retry) that are longer than
@@ -48,12 +50,16 @@ Version history
   :ref:`use_data_plane_proto<envoy_api_field_config.ratelimit.v2.RateLimitServiceConfig.use_data_plane_proto>`
   boolean flag in the ratelimit configuration.
   Support for the legacy proto :repo:`source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
+* rest-api: added ability to set the :ref:`request timeout <envoy_api_field_core.ApiConfigSource.request_timeout>` for REST API requests.
 * router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
 * tracing: added support for configuration of :ref:`tracing sampling
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
 * thrift_proxy: introduced thrift routing, moved configuration to correct location
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
   selecting a host from a subset.
+* upstream: require opt-in to use the :ref:`x-envoy-orignal-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` header
+  for overriding destination address when using the :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
+  load balancing policy.
 
 1.7.0
 ===============

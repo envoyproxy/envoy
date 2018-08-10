@@ -12,7 +12,7 @@
 #include "envoy/network/drain_decision.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -457,6 +457,8 @@ void ConnectionManagerImpl::ActiveStream::chargeStats(const HeaderMap& headers) 
     return;
   }
 
+  connection_manager_.stats_.named_.downstream_rq_completed_.inc();
+  connection_manager_.listener_stats_.downstream_rq_completed_.inc();
   if (CodeUtility::is1xx(response_code)) {
     connection_manager_.stats_.named_.downstream_rq_1xx_.inc();
     connection_manager_.listener_stats_.downstream_rq_1xx_.inc();

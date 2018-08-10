@@ -392,6 +392,7 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
+  EXPECT_EQ(2U, cluster_->stats_.upstream_rq_total_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_timeout_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_failure_eject_.value());

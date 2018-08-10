@@ -3,9 +3,11 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
+    "envoy_cc_fuzz_test",
     "envoy_cc_library",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
@@ -14,6 +16,24 @@ envoy_cc_library(
     name = "test_util",
     hdrs = ["test_util.h"],
     deps = [],
+)
+
+envoy_proto_library(
+    name = "access_log_formatter_fuzz_proto",
+    srcs = ["access_log_formatter_fuzz.proto"],
+    generate_python = 0,
+    deps = ["//test/fuzz:common_proto"],
+)
+
+envoy_cc_fuzz_test(
+    name = "access_log_formatter_fuzz_test",
+    srcs = ["access_log_formatter_fuzz_test.cc"],
+    corpus = "access_log_formatter_corpus",
+    deps = [
+        ":access_log_formatter_fuzz_proto",
+        "//source/common/access_log:access_log_formatter_lib",
+        "//test/fuzz:utility_lib",
+    ],
 )
 
 envoy_cc_test(

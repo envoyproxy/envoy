@@ -15,76 +15,92 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-TEST(BinaryProtocolTest, Name) {
+class BinaryProtocolTest : public testing::Test {
+public:
+  void resetMetadata() {
+    metadata_.setMethodName("-");
+    metadata_.setMessageType(MessageType::Oneway);
+    metadata_.setSequenceId(1);
+  }
+
+  void expectMetadata(const std::string& name, MessageType msg_type, int32_t seq_id) {
+    EXPECT_TRUE(metadata_.hasMethodName());
+    EXPECT_EQ(name, metadata_.methodName());
+
+    EXPECT_TRUE(metadata_.hasMessageType());
+    EXPECT_EQ(msg_type, metadata_.messageType());
+
+    EXPECT_TRUE(metadata_.hasSequenceId());
+    EXPECT_EQ(seq_id, metadata_.sequenceId());
+
+    EXPECT_FALSE(metadata_.hasFrameSize());
+    EXPECT_FALSE(metadata_.hasProtocol());
+    EXPECT_FALSE(metadata_.hasAppException());
+    EXPECT_TRUE(metadata_.headers().empty());
+  }
+
+  void expectDefaultMetadata() { expectMetadata("-", MessageType::Oneway, 1); }
+
+  MessageMetadata metadata_;
+};
+
+class LaxBinaryProtocolTest : public BinaryProtocolTest {};
+
+TEST_F(BinaryProtocolTest, Name) {
   BinaryProtocolImpl proto;
   EXPECT_EQ(proto.name(), "binary");
 }
 
-TEST(BinaryProtocolTest, ReadMessageBegin) {
+TEST_F(BinaryProtocolTest, ReadMessageBegin) {
   BinaryProtocolImpl proto;
 
   // Insufficient data
   {
     Buffer::OwnedImpl buffer;
-    std::string name = "-";
-    MessageType msg_type = MessageType::Oneway;
-    int32_t seq_id = 1;
+    resetMetadata();
 
     addRepeated(buffer, 11, 'x');
 
-    EXPECT_FALSE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
-    EXPECT_EQ(name, "-");
-    EXPECT_EQ(msg_type, MessageType::Oneway);
-    EXPECT_EQ(seq_id, 1);
+    EXPECT_FALSE(proto.readMessageBegin(buffer, metadata_));
+    expectDefaultMetadata();
     EXPECT_EQ(buffer.length(), 11);
   }
 
   // Wrong protocol version
   {
     Buffer::OwnedImpl buffer;
-    std::string name = "-";
-    MessageType msg_type = MessageType::Oneway;
-    int32_t seq_id = 1;
+    resetMetadata();
 
     addInt16(buffer, 0x0102);
     addRepeated(buffer, 10, 'x');
 
-    EXPECT_THROW_WITH_MESSAGE(proto.readMessageBegin(buffer, name, msg_type, seq_id),
-                              EnvoyException, "invalid binary protocol version 0x0102 != 0x8001");
-    EXPECT_EQ(name, "-");
-    EXPECT_EQ(msg_type, MessageType::Oneway);
-    EXPECT_EQ(seq_id, 1);
+    EXPECT_THROW_WITH_MESSAGE(proto.readMessageBegin(buffer, metadata_), EnvoyException,
+                              "invalid binary protocol version 0x0102 != 0x8001");
+    expectDefaultMetadata();
     EXPECT_EQ(buffer.length(), 12);
   }
 
   // Invalid message type
   {
     Buffer::OwnedImpl buffer;
-    std::string name = "-";
-    MessageType msg_type = MessageType::Oneway;
-    int32_t seq_id = 1;
+    resetMetadata();
 
     addInt16(buffer, 0x8001);
     addInt8(buffer, 'x');
     addInt8(buffer, static_cast<int8_t>(MessageType::LastMessageType) + 1);
     addRepeated(buffer, 8, 'x');
 
-    EXPECT_THROW_WITH_MESSAGE(proto.readMessageBegin(buffer, name, msg_type, seq_id),
-                              EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(proto.readMessageBegin(buffer, metadata_), EnvoyException,
                               fmt::format("invalid binary protocol message type {}",
                                           static_cast<int8_t>(MessageType::LastMessageType) + 1));
-    EXPECT_EQ(name, "-");
-    EXPECT_EQ(msg_type, MessageType::Oneway);
-    EXPECT_EQ(seq_id, 1);
+    expectDefaultMetadata();
     EXPECT_EQ(buffer.length(), 12);
   }
 
   // Empty name
   {
     Buffer::OwnedImpl buffer;
-    std::string name = "-";
-    MessageType msg_type = MessageType::Oneway;
-    int32_t seq_id = 1;
+    resetMetadata();
 
     addInt16(buffer, 0x8001);
     addInt8(buffer, 'x');
@@ -92,19 +108,15 @@ TEST(BinaryProtocolTest, ReadMessageBegin) {
     addInt32(buffer, 0);
     addInt32(buffer, 1234);
 
-    EXPECT_TRUE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
-    EXPECT_EQ(name, "");
-    EXPECT_EQ(msg_type, MessageType::Call);
-    EXPECT_EQ(seq_id, 1234);
+    EXPECT_TRUE(proto.readMessageBegin(buffer, metadata_));
+    expectMetadata("", MessageType::Call, 1234);
     EXPECT_EQ(buffer.length(), 0);
   }
 
   // Insufficient data after checking name length
   {
     Buffer::OwnedImpl buffer;
-    std::string name = "-";
-    MessageType msg_type = MessageType::Oneway;
-    int32_t seq_id = 1;
+    resetMetadata();
 
     addInt16(buffer, 0x8001);
     addInt8(buffer, 'x');
@@ -112,19 +124,15 @@ TEST(BinaryProtocolTest, ReadMessageBegin) {
     addInt32(buffer, 4); // name length
     addString(buffer, "abcd");
 
-    EXPECT_FALSE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
-    EXPECT_EQ(name, "-");
-    EXPECT_EQ(msg_type, MessageType::Oneway);
-    EXPECT_EQ(seq_id, 1);
+    EXPECT_FALSE(proto.readMessageBegin(buffer, metadata_));
+    expectDefaultMetadata();
     EXPECT_EQ(buffer.length(), 12);
   }
 
   // Named message
   {
     Buffer::OwnedImpl buffer;
-    std::string name = "-";
-    MessageType msg_type = MessageType::Oneway;
-    int32_t seq_id = 1;
+    resetMetadata();
 
     addInt16(buffer, 0x8001);
     addInt8(buffer, 0);
@@ -133,22 +141,20 @@ TEST(BinaryProtocolTest, ReadMessageBegin) {
     addString(buffer, "the_name");
     addInt32(buffer, 5678);
 
-    EXPECT_TRUE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
-    EXPECT_EQ(name, "the_name");
-    EXPECT_EQ(msg_type, MessageType::Call);
-    EXPECT_EQ(seq_id, 5678);
+    EXPECT_TRUE(proto.readMessageBegin(buffer, metadata_));
+    expectMetadata("the_name", MessageType::Call, 5678);
     EXPECT_EQ(buffer.length(), 0);
   }
 }
 
-TEST(BinaryProtocolTest, ReadMessageEnd) {
+TEST_F(BinaryProtocolTest, ReadMessageEnd) {
   Buffer::OwnedImpl buffer;
   BinaryProtocolImpl proto;
 
   EXPECT_TRUE(proto.readMessageEnd(buffer));
 }
 
-TEST(BinaryProtocolTest, ReadStructBegin) {
+TEST_F(BinaryProtocolTest, ReadStructBegin) {
   Buffer::OwnedImpl buffer;
   BinaryProtocolImpl proto;
   std::string name = "-";
@@ -157,14 +163,14 @@ TEST(BinaryProtocolTest, ReadStructBegin) {
   EXPECT_EQ(name, "");
 }
 
-TEST(BinaryProtocolTest, ReadStructEnd) {
+TEST_F(BinaryProtocolTest, ReadStructEnd) {
   Buffer::OwnedImpl buffer;
   BinaryProtocolImpl proto;
 
   EXPECT_TRUE(proto.readStructEnd(buffer));
 }
 
-TEST(BinaryProtocolTest, ReadFieldBegin) {
+TEST_F(BinaryProtocolTest, ReadFieldBegin) {
   BinaryProtocolImpl proto;
 
   // Insufficient data
@@ -247,13 +253,13 @@ TEST(BinaryProtocolTest, ReadFieldBegin) {
   }
 }
 
-TEST(BinaryProtocolTest, ReadFieldEnd) {
+TEST_F(BinaryProtocolTest, ReadFieldEnd) {
   Buffer::OwnedImpl buffer;
   BinaryProtocolImpl proto;
   EXPECT_TRUE(proto.readFieldEnd(buffer));
 }
 
-TEST(BinaryProtocolTest, ReadMapBegin) {
+TEST_F(BinaryProtocolTest, ReadMapBegin) {
   BinaryProtocolImpl proto;
 
   // Insufficient data
@@ -310,13 +316,13 @@ TEST(BinaryProtocolTest, ReadMapBegin) {
   }
 }
 
-TEST(BinaryProtocolTest, ReadMapEnd) {
+TEST_F(BinaryProtocolTest, ReadMapEnd) {
   Buffer::OwnedImpl buffer;
   BinaryProtocolImpl proto;
   EXPECT_TRUE(proto.readMapEnd(buffer));
 }
 
-TEST(BinaryProtocolTest, ReadListBegin) {
+TEST_F(BinaryProtocolTest, ReadListBegin) {
   BinaryProtocolImpl proto;
 
   // Insufficient data
@@ -365,13 +371,13 @@ TEST(BinaryProtocolTest, ReadListBegin) {
   }
 }
 
-TEST(BinaryProtocolTest, ReadListEnd) {
+TEST_F(BinaryProtocolTest, ReadListEnd) {
   Buffer::OwnedImpl buffer;
   BinaryProtocolImpl proto;
   EXPECT_TRUE(proto.readListEnd(buffer));
 }
 
-TEST(BinaryProtocolTest, ReadSetBegin) {
+TEST_F(BinaryProtocolTest, ReadSetBegin) {
   BinaryProtocolImpl proto;
 
   // Test only the happy path, since this method is just delegated to readListBegin()
@@ -388,13 +394,13 @@ TEST(BinaryProtocolTest, ReadSetBegin) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST(BinaryProtocolTest, ReadSetEnd) {
+TEST_F(BinaryProtocolTest, ReadSetEnd) {
   Buffer::OwnedImpl buffer;
   BinaryProtocolImpl proto;
   EXPECT_TRUE(proto.readSetEnd(buffer));
 }
 
-TEST(BinaryProtocolTest, ReadIntegerTypes) {
+TEST_F(BinaryProtocolTest, ReadIntegerTypes) {
   BinaryProtocolImpl proto;
 
   // Bool
@@ -512,7 +518,7 @@ TEST(BinaryProtocolTest, ReadIntegerTypes) {
   }
 }
 
-TEST(BinaryProtocolTest, ReadDouble) {
+TEST_F(BinaryProtocolTest, ReadDouble) {
   BinaryProtocolImpl proto;
 
   // Insufficient data
@@ -540,7 +546,7 @@ TEST(BinaryProtocolTest, ReadDouble) {
   }
 }
 
-TEST(BinaryProtocolTest, ReadString) {
+TEST_F(BinaryProtocolTest, ReadString) {
   BinaryProtocolImpl proto;
 
   // Insufficient data to read length
@@ -606,7 +612,7 @@ TEST(BinaryProtocolTest, ReadString) {
   }
 }
 
-TEST(BinaryProtocolTest, ReadBinary) {
+TEST_F(BinaryProtocolTest, ReadBinary) {
   // Test only the happy path, since this method is just delegated to readString()
   BinaryProtocolImpl proto;
   Buffer::OwnedImpl buffer;
@@ -620,46 +626,54 @@ TEST(BinaryProtocolTest, ReadBinary) {
   EXPECT_EQ(buffer.length(), 0);
 }
 
-TEST(BinaryProtocolTest, WriteMessageBegin) {
+TEST_F(BinaryProtocolTest, WriteMessageBegin) {
   BinaryProtocolImpl proto;
 
   // Named call
   {
+    metadata_.setMethodName("message");
+    metadata_.setMessageType(MessageType::Call);
+    metadata_.setSequenceId(1);
+
     Buffer::OwnedImpl buffer;
-    proto.writeMessageBegin(buffer, "message", MessageType::Call, 1);
+    proto.writeMessageBegin(buffer, metadata_);
     EXPECT_EQ(std::string("\x80\x1\0\x1\0\0\0\x7message\0\0\0\x1", 19), buffer.toString());
   }
 
   // Unnamed oneway
   {
+    metadata_.setMethodName("");
+    metadata_.setMessageType(MessageType::Oneway);
+    metadata_.setSequenceId(2);
+
     Buffer::OwnedImpl buffer;
-    proto.writeMessageBegin(buffer, "", MessageType::Oneway, 2);
+    proto.writeMessageBegin(buffer, metadata_);
     EXPECT_EQ(std::string("\x80\x1\0\x4\0\0\0\0\0\0\0\x2", 12), buffer.toString());
   }
 }
 
-TEST(BinaryProtocolTest, WriteMessageEnd) {
+TEST_F(BinaryProtocolTest, WriteMessageEnd) {
   BinaryProtocolImpl proto;
   Buffer::OwnedImpl buffer;
   proto.writeMessageEnd(buffer);
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST(BinaryProtocolTest, WriteStructBegin) {
+TEST_F(BinaryProtocolTest, WriteStructBegin) {
   BinaryProtocolImpl proto;
   Buffer::OwnedImpl buffer;
   proto.writeStructBegin(buffer, "unused");
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST(BinaryProtocolTest, WriteStructEnd) {
+TEST_F(BinaryProtocolTest, WriteStructEnd) {
   BinaryProtocolImpl proto;
   Buffer::OwnedImpl buffer;
   proto.writeStructEnd(buffer);
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST(BinaryProtocolTest, WriteFieldBegin) {
+TEST_F(BinaryProtocolTest, WriteFieldBegin) {
   BinaryProtocolImpl proto;
 
   // Stop field
@@ -677,14 +691,14 @@ TEST(BinaryProtocolTest, WriteFieldBegin) {
   }
 }
 
-TEST(BinaryProtocolTest, WriteFieldEnd) {
+TEST_F(BinaryProtocolTest, WriteFieldEnd) {
   BinaryProtocolImpl proto;
   Buffer::OwnedImpl buffer;
   proto.writeFieldEnd(buffer);
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST(BinaryProtocolTest, WriteMapBegin) {
+TEST_F(BinaryProtocolTest, WriteMapBegin) {
   BinaryProtocolImpl proto;
 
   // Non-empty map
@@ -710,14 +724,14 @@ TEST(BinaryProtocolTest, WriteMapBegin) {
   }
 }
 
-TEST(BinaryProtocolTest, WriteMapEnd) {
+TEST_F(BinaryProtocolTest, WriteMapEnd) {
   BinaryProtocolImpl proto;
   Buffer::OwnedImpl buffer;
   proto.writeMapEnd(buffer);
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST(BinaryProtocolTest, WriteListBegin) {
+TEST_F(BinaryProtocolTest, WriteListBegin) {
   BinaryProtocolImpl proto;
 
   // Non-empty list
@@ -742,14 +756,14 @@ TEST(BinaryProtocolTest, WriteListBegin) {
   }
 }
 
-TEST(BinaryProtocolTest, WriteListEnd) {
+TEST_F(BinaryProtocolTest, WriteListEnd) {
   BinaryProtocolImpl proto;
   Buffer::OwnedImpl buffer;
   proto.writeListEnd(buffer);
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST(BinaryProtocolTest, WriteSetBegin) {
+TEST_F(BinaryProtocolTest, WriteSetBegin) {
   BinaryProtocolImpl proto;
 
   // Only test the happy path, as this shares an implementation with writeListBegin
@@ -759,14 +773,14 @@ TEST(BinaryProtocolTest, WriteSetBegin) {
   EXPECT_EQ(std::string("\xb\0\0\0\x3", 5), buffer.toString());
 }
 
-TEST(BinaryProtocolTest, WriteSetEnd) {
+TEST_F(BinaryProtocolTest, WriteSetEnd) {
   BinaryProtocolImpl proto;
   Buffer::OwnedImpl buffer;
   proto.writeSetEnd(buffer);
   EXPECT_EQ(0, buffer.length());
 }
 
-TEST(BinaryProtocolTest, WriteBool) {
+TEST_F(BinaryProtocolTest, WriteBool) {
   BinaryProtocolImpl proto;
 
   // True
@@ -784,7 +798,7 @@ TEST(BinaryProtocolTest, WriteBool) {
   }
 }
 
-TEST(BinaryProtocolTest, WriteByte) {
+TEST_F(BinaryProtocolTest, WriteByte) {
   BinaryProtocolImpl proto;
 
   {
@@ -800,7 +814,7 @@ TEST(BinaryProtocolTest, WriteByte) {
   }
 }
 
-TEST(BinaryProtocolTest, WriteInt16) {
+TEST_F(BinaryProtocolTest, WriteInt16) {
   BinaryProtocolImpl proto;
 
   {
@@ -816,7 +830,7 @@ TEST(BinaryProtocolTest, WriteInt16) {
   }
 }
 
-TEST(BinaryProtocolTest, WriteInt32) {
+TEST_F(BinaryProtocolTest, WriteInt32) {
   BinaryProtocolImpl proto;
 
   {
@@ -832,7 +846,7 @@ TEST(BinaryProtocolTest, WriteInt32) {
   }
 }
 
-TEST(BinaryProtocolTest, WriteInt64) {
+TEST_F(BinaryProtocolTest, WriteInt64) {
   BinaryProtocolImpl proto;
 
   {
@@ -848,14 +862,14 @@ TEST(BinaryProtocolTest, WriteInt64) {
   }
 }
 
-TEST(BinaryProtocolTest, WriteDouble) {
+TEST_F(BinaryProtocolTest, WriteDouble) {
   BinaryProtocolImpl proto;
   Buffer::OwnedImpl buffer;
   proto.writeDouble(buffer, 3.0);
   EXPECT_EQ(std::string("\x40\x8\0\0\0\0\0\0", 8), buffer.toString());
 }
 
-TEST(BinaryProtocolTest, WriteString) {
+TEST_F(BinaryProtocolTest, WriteString) {
   BinaryProtocolImpl proto;
 
   {
@@ -874,7 +888,7 @@ TEST(BinaryProtocolTest, WriteString) {
   }
 }
 
-TEST(BinaryProtocolTest, WriteBinary) {
+TEST_F(BinaryProtocolTest, WriteBinary) {
   BinaryProtocolImpl proto;
 
   // Happy path only, since this is just a synonym for writeString
@@ -886,121 +900,108 @@ TEST(BinaryProtocolTest, WriteBinary) {
             buffer.toString());
 }
 
-TEST(LaxBinaryProtocolTest, Name) {
+TEST_F(LaxBinaryProtocolTest, Name) {
   LaxBinaryProtocolImpl proto;
   EXPECT_EQ(proto.name(), "binary/non-strict");
 }
 
-TEST(LaxBinaryProtocolTest, ReadMessageBegin) {
+TEST_F(LaxBinaryProtocolTest, ReadMessageBegin) {
   LaxBinaryProtocolImpl proto;
 
   // Insufficient data
   {
     Buffer::OwnedImpl buffer;
-    std::string name = "-";
-    MessageType msg_type = MessageType::Oneway;
-    int32_t seq_id = 1;
+    resetMetadata();
 
     addRepeated(buffer, 8, 'x');
 
-    EXPECT_FALSE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
-    EXPECT_EQ(name, "-");
-    EXPECT_EQ(msg_type, MessageType::Oneway);
-    EXPECT_EQ(seq_id, 1);
+    EXPECT_FALSE(proto.readMessageBegin(buffer, metadata_));
+    expectDefaultMetadata();
     EXPECT_EQ(buffer.length(), 8);
   }
 
   // Invalid message type
   {
     Buffer::OwnedImpl buffer;
-    std::string name = "-";
-    MessageType msg_type = MessageType::Oneway;
-    int32_t seq_id = 1;
+    resetMetadata();
 
     addInt32(buffer, 0);
     addInt8(buffer, static_cast<int8_t>(MessageType::LastMessageType) + 1);
     addRepeated(buffer, 4, 'x');
 
-    EXPECT_THROW_WITH_MESSAGE(proto.readMessageBegin(buffer, name, msg_type, seq_id),
-                              EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(proto.readMessageBegin(buffer, metadata_), EnvoyException,
                               fmt::format("invalid (lax) binary protocol message type {}",
                                           static_cast<int8_t>(MessageType::LastMessageType) + 1));
-    EXPECT_EQ(name, "-");
-    EXPECT_EQ(msg_type, MessageType::Oneway);
-    EXPECT_EQ(seq_id, 1);
+    expectDefaultMetadata();
     EXPECT_EQ(buffer.length(), 9);
   }
 
   // Empty name
   {
     Buffer::OwnedImpl buffer;
-    std::string name = "-";
-    MessageType msg_type = MessageType::Oneway;
-    int32_t seq_id = 1;
+    resetMetadata();
 
     addInt32(buffer, 0);
     addInt8(buffer, MessageType::Call);
     addInt32(buffer, 1234);
 
-    EXPECT_TRUE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
-    EXPECT_EQ(name, "");
-    EXPECT_EQ(msg_type, MessageType::Call);
-    EXPECT_EQ(seq_id, 1234);
+    EXPECT_TRUE(proto.readMessageBegin(buffer, metadata_));
+    expectMetadata("", MessageType::Call, 1234);
     EXPECT_EQ(buffer.length(), 0);
   }
 
   // Insufficient data after checking name length
   {
     Buffer::OwnedImpl buffer;
-    std::string name = "-";
-    MessageType msg_type = MessageType::Oneway;
-    int32_t seq_id = 1;
+    resetMetadata();
 
     addInt32(buffer, 1); // name length
     addInt8(buffer, MessageType::Call);
     addInt32(buffer, 1234);
 
-    EXPECT_FALSE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
-    EXPECT_EQ(name, "-");
-    EXPECT_EQ(msg_type, MessageType::Oneway);
-    EXPECT_EQ(seq_id, 1);
+    EXPECT_FALSE(proto.readMessageBegin(buffer, metadata_));
+    expectDefaultMetadata();
     EXPECT_EQ(buffer.length(), 9);
   }
 
   // Named message
   {
     Buffer::OwnedImpl buffer;
-    std::string name = "-";
-    MessageType msg_type = MessageType::Oneway;
-    int32_t seq_id = 1;
+    resetMetadata();
 
     addInt32(buffer, 8);
     addString(buffer, "the_name");
     addInt8(buffer, MessageType::Call);
     addInt32(buffer, 5678);
 
-    EXPECT_TRUE(proto.readMessageBegin(buffer, name, msg_type, seq_id));
-    EXPECT_EQ(name, "the_name");
-    EXPECT_EQ(msg_type, MessageType::Call);
-    EXPECT_EQ(seq_id, 5678);
+    EXPECT_TRUE(proto.readMessageBegin(buffer, metadata_));
+    expectMetadata("the_name", MessageType::Call, 5678);
     EXPECT_EQ(buffer.length(), 0);
   }
 }
 
-TEST(LaxBinaryProtocolTest, WriteMessageBegin) {
+TEST_F(LaxBinaryProtocolTest, WriteMessageBegin) {
   LaxBinaryProtocolImpl proto;
 
   // Named call
   {
+    metadata_.setMethodName("message");
+    metadata_.setMessageType(MessageType::Call);
+    metadata_.setSequenceId(1);
+
     Buffer::OwnedImpl buffer;
-    proto.writeMessageBegin(buffer, "message", MessageType::Call, 1);
+    proto.writeMessageBegin(buffer, metadata_);
     EXPECT_EQ(std::string("\0\0\0\x7message\x1\0\0\0\x1", 16), buffer.toString());
   }
 
   // Unnamed oneway
   {
+    metadata_.setMethodName("");
+    metadata_.setMessageType(MessageType::Oneway);
+    metadata_.setSequenceId(2);
+
     Buffer::OwnedImpl buffer;
-    proto.writeMessageBegin(buffer, "", MessageType::Oneway, 2);
+    proto.writeMessageBegin(buffer, metadata_);
     EXPECT_EQ(std::string("\0\0\0\0\x4\0\0\0\x2", 9), buffer.toString());
   }
 }

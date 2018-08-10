@@ -12,6 +12,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/callback_impl.h"
+#include "common/upstream/health_discovery_service.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/config/mocks.h"
@@ -271,6 +272,17 @@ public:
 
   MOCK_METHOD1(onClusterAddOrUpdate, void(ThreadLocalCluster& cluster));
   MOCK_METHOD1(onClusterRemoval, void(const std::string& cluster_name));
+};
+
+class MockClusterInfoFactory : public ClusterInfoFactory, Logger::Loggable<Logger::Id::upstream> {
+public:
+  MOCK_METHOD10(createClusterInfo,
+                ClusterInfoConstSharedPtr(
+                    Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
+                    const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
+                    Ssl::ContextManager& ssl_context_manager, bool added_via_api,
+                    ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
+                    Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random));
 };
 
 } // namespace Upstream

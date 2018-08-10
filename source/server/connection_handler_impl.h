@@ -13,6 +13,7 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
 
 #include "common/common/linked_object.h"

@@ -98,6 +98,18 @@ the header value to *true*.
 
 This is a convenience to avoid having to parse and understand XFF.
 
+.. _config_http_conn_man_headers_x-envoy-original-dst-host:
+
+x-envoy-original-dst-host
+-------------------------
+
+The header used to override destination address when using the
+:ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
+load balancing policy.
+
+It is ignored, unless the use of it is enabled via
+:ref:`use_http_header <envoy_api_field_Cluster.OriginalDstLbConfig.use_http_header>`.
+
 .. _config_http_conn_man_headers_x-forwarded-client-cert:
 
 x-forwarded-client-cert

@@ -11,11 +11,12 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/stats/stats.h"
+#include "envoy/stats/stat_data_allocator.h"
+#include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
-#include "common/stats/stat_data_allocator.h"
+#include "common/stats/stat_data_allocator_impl.h"
 
 #include "absl/strings/string_view.h"
 
