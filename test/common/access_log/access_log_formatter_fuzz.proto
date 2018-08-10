@@ -4,7 +4,7 @@ package test.common.access_log;
 
 import "test/fuzz/common.proto";
 
-// Structured input for H2 codec_impl_fuzz_test.
+// Structured input for access_log_formatter_fuzz_test.
 
 message TestCase {
   string format = 1;
