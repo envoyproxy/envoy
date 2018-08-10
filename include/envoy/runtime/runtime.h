@@ -90,17 +90,20 @@ public:
   virtual bool featureEnabled(const std::string& key, uint64_t default_value) const PURE;
 
   /**
-   * Test if a feature is enabled using a supplied stable random value. This variant is used if
-   * the caller wants a stable result over multiple calls.
+   * Test if a feature is enabled using a supplied stable random value and total number of buckets
+   * for sampling. This variant is used if the caller wants a stable result over multiple calls
+   * and have more granularity for samples.
    * @param key supplies the feature key to lookup.
    * @param default_value supplies the default value that will be used if either the feature key
    *        does not exist or it is not an integer.
    * @param random_value supplies the stable random value to use for determining whether the feature
    *        is enabled.
+   * @param num_buckets control max number of buckets for sampling. Sampled value will be in a range
+   *        of [0, num_buckets).
    * @return true if the feature is enabled.
    */
-  virtual bool featureEnabled(const std::string& key, uint64_t default_value,
-                              uint64_t random_value) const PURE;
+  virtual bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
+                              uint64_t num_buckets) const PURE;
 
   /**
    * Test if a feature is enabled using the built in random generator and total number of buckets
@@ -112,25 +115,8 @@ public:
    * of [0, num_buckets).
    * @return true if the feature is enabled.
    */
-  virtual bool sampleFeatureEnabled(const std::string& key, uint64_t default_value,
-                                    uint64_t num_buckets) const PURE;
-
-  /**
-   * Test if a feature is enabled using a supplied stable random value and total number of buckets
-   * for sampling.
-   * This variant is used if the caller wants a stable result over multiple calls
-   * and have more granularity for samples.
-   * @param key supplies the feature key to lookup.
-   * @param default_value supplies the default value that will be used if either the feature key
-   *        does not exist or it is not an integer.
-   * @param random_value supplies the stable random value to use for determining whether the feature
-   *        is enabled.
-   * @param num_buckets control max number of buckets for sampling. Sampled value will be in a range
-   *        of [0, num_buckets).
-   * @return true if the feature is enabled.
-   */
-  virtual bool sampleFeatureEnabled(const std::string& key, uint64_t default_value,
-                                    uint64_t random_value, uint64_t num_buckets) const PURE;
+  virtual bool featureEnabled(const std::string& key, uint64_t default_value,
+                              uint64_t num_buckets) const PURE;
 
   /**
    * Fetch raw runtime data based on key.

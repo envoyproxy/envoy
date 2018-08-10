@@ -342,7 +342,7 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 
   if (runtime_) {
     matches &= loader_.snapshot().featureEnabled(runtime_.value().key_, runtime_.value().default_,
-                                                 random_value);
+                                                 random_value, 100);
   }
 
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);

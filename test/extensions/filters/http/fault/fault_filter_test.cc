@@ -266,8 +266,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
   SetUpTest(fault);
 
   // Delay related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.delay.fixed_delay_percent", 0, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 0, 100))
       .WillOnce(Return(false));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
@@ -277,7 +276,7 @@ TEST_F(FaultFilterTest, AbortWithHttpStatus) {
       .Times(0);
 
   // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("fault.http.abort.abort_percent", 100, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100, 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 429))
@@ -304,8 +303,7 @@ TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
   SetUpTest(fixed_delay_only_json);
 
   // Delay related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
       .WillOnce(Return(true));
 
   // Return 0ms delay
@@ -313,7 +311,7 @@ TEST_F(FaultFilterTest, FixedDelayZeroDuration) {
       .WillOnce(Return(0));
 
   // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("fault.http.abort.abort_percent", 0, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0, 100))
       .WillOnce(Return(false));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
@@ -341,8 +339,7 @@ TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
   SetUpTest(fault);
 
   // Delay related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.delay.fixed_delay_percent", 50, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 50, 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
@@ -357,7 +354,7 @@ TEST_F(FaultFilterTest, FixedDelayDeprecatedPercentAndNonZeroDuration) {
             filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("fault.http.abort.abort_percent", 0, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0, 100))
       .WillOnce(Return(false));
 
   // Delay only case
@@ -382,11 +379,10 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
   request_headers_.addCopy("x-envoy-downstream-service-cluster", "cluster");
 
   // Delay related calls.
-  EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
       .WillOnce(Return(false));
   EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.cluster.delay.fixed_delay_percent", 100, 100))
+              featureEnabled("fault.http.cluster.delay.fixed_delay_percent", 100, 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
@@ -401,10 +397,9 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
             filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls.
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("fault.http.abort.abort_percent", 0, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0, 100))
       .WillOnce(Return(false));
-  EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.cluster.abort.abort_percent", 0, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.cluster.abort.abort_percent", 0, 100))
       .WillOnce(Return(false));
 
   // Delay only case, no aborts.
@@ -433,11 +428,10 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
   request_headers_.addCopy("x-envoy-downstream-service-cluster", "cluster");
 
   // Delay related calls.
-  EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
       .WillOnce(Return(false));
   EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.cluster.delay.fixed_delay_percent", 100, 100))
+              featureEnabled("fault.http.cluster.delay.fixed_delay_percent", 100, 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
@@ -453,10 +447,10 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
             filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("fault.http.abort.abort_percent", 100, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100, 100))
       .WillOnce(Return(false));
   EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.cluster.abort.abort_percent", 100, 100))
+              featureEnabled("fault.http.cluster.abort.abort_percent", 100, 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 503))
@@ -489,8 +483,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
   SetUpTest(fixed_delay_and_abort_json);
 
   // Delay related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
@@ -506,7 +499,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbort) {
             filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("fault.http.abort.abort_percent", 100, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100, 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 503))
@@ -535,8 +528,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
   SetUpTest(fixed_delay_and_abort_nodes_json);
 
   // Delay related calls.
-  EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
       .WillOnce(Return(true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
       .WillOnce(Return(5000UL));
@@ -551,7 +543,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstreamNodes) {
             filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls.
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("fault.http.abort.abort_percent", 100, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100, 100))
       .WillOnce(Return(true));
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 503))
       .WillOnce(Return(503));
@@ -583,8 +575,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
   request_headers_.addCopy("x-foo2", "RandomValue");
 
   // Delay related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
@@ -600,7 +591,7 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchSuccess) {
             filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("fault.http.abort.abort_percent", 100, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 100, 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", 503))
@@ -629,11 +620,10 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortHeaderMatchFail) {
   request_headers_.addCopy("x-foo1", "Bar");
   request_headers_.addCopy("x-foo3", "Baz");
 
-  EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.delay.fixed_delay_percent", _, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", _, 100))
       .Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("fault.http.abort.abort_percent", _, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", _, 100))
       .Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
@@ -653,8 +643,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
   SetUpTest(fixed_delay_only_json);
 
   // Prep up with a 5s delay
-  EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
@@ -677,7 +666,7 @@ TEST_F(FaultFilterTest, TimerResetAfterStreamReset) {
   EXPECT_CALL(*timer_, disableTimer());
 
   // The timer callback should never be called.
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("fault.http.abort.abort_percent", _, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", _, 100))
       .Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
@@ -700,8 +689,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
       .WillOnce(ReturnRef(upstream_cluster));
 
   // Delay related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
@@ -716,7 +704,7 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchSuccess) {
             filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("fault.http.abort.abort_percent", 0, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0, 100))
       .WillOnce(Return(false));
 
   // Delay only case
@@ -741,11 +729,10 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterMatchFail) {
 
   EXPECT_CALL(filter_callbacks_.route_->route_entry_, clusterName())
       .WillOnce(ReturnRef(upstream_cluster));
-  EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.delay.fixed_delay_percent", _, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", _, 100))
       .Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("fault.http.abort.abort_percent", _, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", _, 100))
       .Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
@@ -765,11 +752,10 @@ TEST_F(FaultFilterTest, FaultWithTargetClusterNullRoute) {
   const std::string upstream_cluster("www1");
 
   EXPECT_CALL(*filter_callbacks_.route_, routeEntry()).WillRepeatedly(Return(nullptr));
-  EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.delay.fixed_delay_percent", _, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", _, 100))
       .Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", _)).Times(0);
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("fault.http.abort.abort_percent", _, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", _, 100))
       .Times(0);
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.abort.http_status", _)).Times(0);
   EXPECT_CALL(filter_callbacks_, encodeHeaders_(_, _)).Times(0);
@@ -801,8 +787,7 @@ void FaultFilterTest::TestPerFilterConfigFault(
       .WillOnce(ReturnRef(upstream_cluster));
 
   // Delay related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              sampleFeatureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.delay.fixed_delay_percent", 100, 100))
       .WillOnce(Return(true));
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("fault.http.delay.fixed_duration_ms", 5000))
@@ -817,7 +802,7 @@ void FaultFilterTest::TestPerFilterConfigFault(
             filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("fault.http.abort.abort_percent", 0, 100))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("fault.http.abort.abort_percent", 0, 100))
       .WillOnce(Return(false));
 
   EXPECT_CALL(filter_callbacks_, continueDecoding());

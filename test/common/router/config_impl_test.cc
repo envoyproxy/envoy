@@ -1764,11 +1764,11 @@ TEST(RouteMatcherTest, Runtime) {
 
   ConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
-  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 10)).WillOnce(Return(true));
+  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 10, 100)).WillOnce(Return(true));
   EXPECT_EQ("something_else",
             config.route(genHeaders("www.lyft.com", "/", "GET"), 10)->routeEntry()->clusterName());
 
-  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 20)).WillOnce(Return(false));
+  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 20, 100)).WillOnce(Return(false));
   EXPECT_EQ("www2",
             config.route(genHeaders("www.lyft.com", "/", "GET"), 20)->routeEntry()->clusterName());
 }
@@ -2700,7 +2700,8 @@ virtual_hosts:
   // Weighted Cluster with valid runtime values, default total weight
   {
     Http::TestHeaderMapImpl headers = genHeaders("www3.lyft.com", "/foo", "GET");
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("www3", 100, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("www3", 100, _, 100))
+        .WillRepeatedly(Return(true));
     EXPECT_CALL(runtime.snapshot_, getInteger("www3_weights.cluster1", 30))
         .WillRepeatedly(Return(80));
     EXPECT_CALL(runtime.snapshot_, getInteger("www3_weights.cluster2", 30))
@@ -2716,7 +2717,8 @@ virtual_hosts:
   // Weighted Cluster with invalid runtime values, default total weight
   {
     Http::TestHeaderMapImpl headers = genHeaders("www3.lyft.com", "/foo", "GET");
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("www3", 100, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("www3", 100, _, 100))
+        .WillRepeatedly(Return(true));
     EXPECT_CALL(runtime.snapshot_, getInteger("www3_weights.cluster1", 30))
         .WillRepeatedly(Return(10));
 
@@ -2735,7 +2737,8 @@ virtual_hosts:
   // Weighted Cluster with runtime values, total weight = 10000
   {
     Http::TestHeaderMapImpl headers = genHeaders("www4.lyft.com", "/foo", "GET");
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("www4", 100, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("www4", 100, _, 100))
+        .WillRepeatedly(Return(true));
     EXPECT_CALL(runtime.snapshot_, getInteger("www4_weights.cluster1", 2000))
         .WillRepeatedly(Return(8000));
     EXPECT_CALL(runtime.snapshot_, getInteger("www4_weights.cluster2", 3000))
@@ -2751,7 +2754,8 @@ virtual_hosts:
   // Weighted Cluster with invalid runtime values, total weight = 10000
   {
     Http::TestHeaderMapImpl headers = genHeaders("www4.lyft.com", "/foo", "GET");
-    EXPECT_CALL(runtime.snapshot_, featureEnabled("www4", 100, _)).WillRepeatedly(Return(true));
+    EXPECT_CALL(runtime.snapshot_, featureEnabled("www4", 100, _, 100))
+        .WillRepeatedly(Return(true));
     EXPECT_CALL(runtime.snapshot_, getInteger("www4_weights.cluster1", 2000))
         .WillRepeatedly(Return(1000));
     EXPECT_CALL(runtime.snapshot_, getInteger("www4_weights.cluster2", 3000))

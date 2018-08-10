@@ -204,15 +204,15 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(Http::HeaderMap& reque
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
     } else if (request_headers.EnvoyForceTrace()) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
-    } else if (runtime.snapshot().sampleFeatureEnabled("tracing.random_sampling",
-                                                       config.tracingConfig()->random_sampling_,
-                                                       result, 10000)) {
+    } else if (runtime.snapshot().featureEnabled("tracing.random_sampling",
+                                                 config.tracingConfig()->random_sampling_, result,
+                                                 10000)) {
       UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
     }
   }
 
   if (!runtime.snapshot().featureEnabled("tracing.global_enabled",
-                                         config.tracingConfig()->overall_sampling_, result)) {
+                                         config.tracingConfig()->overall_sampling_, result, 100)) {
     UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::NoTrace);
   }
 

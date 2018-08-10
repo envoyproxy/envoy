@@ -251,13 +251,15 @@ TEST_F(ConnectionManagerUtilityTest, UserAgentSetWhenIncomingEmpty) {
 TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
   const std::string uuid = "f4dca0a9-12c7-4307-8002-969403baf480";
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
+      .WillOnce(Return(false));
 
   {
     // Internal request, make traceable.
     TestHeaderMapImpl headers{
         {"x-forwarded-for", "10.0.0.1"}, {"x-request-id", uuid}, {"x-envoy-force-trace", "true"}};
     EXPECT_CALL(random_, uuid()).Times(0);
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _, 100))
         .WillOnce(Return(true));
 
     EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
@@ -271,7 +273,7 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
     TestHeaderMapImpl headers{
         {"x-forwarded-for", "34.0.0.1"}, {"x-request-id", uuid}, {"x-envoy-force-trace", "true"}};
     EXPECT_CALL(random_, uuid()).Times(0);
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _, 100))
         .WillOnce(Return(true));
 
     EXPECT_EQ((MutateRequestRet{"34.0.0.1:0", false}),
@@ -285,7 +287,7 @@ TEST_F(ConnectionManagerUtilityTest, InternalServiceForceTrace) {
 TEST_F(ConnectionManagerUtilityTest, EdgeRequestRegenerateRequestIdAndWipeDownstream) {
   connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("34.0.0.1");
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  ON_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _, 100))
       .WillByDefault(Return(true));
 
   {
@@ -891,9 +893,9 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsAlwaysForwardClientCert) {
 
 // Sampling, global on.
 TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("tracing.random_sampling", 10000, _, 10000))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
       .WillOnce(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _, 100))
       .WillOnce(Return(true));
 
   Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
@@ -905,9 +907,9 @@ TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
 
 // Sampling must not be done on client traced.
 TEST_F(ConnectionManagerUtilityTest, SamplingMustNotBeDoneOnClientTraced) {
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("tracing.random_sampling", 10000, _, 10000))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
       .Times(0);
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _, 100))
       .WillOnce(Return(true));
 
   // The x_request_id has TRACE_FORCED(a) set in the TRACE_BYTE_POSITION(14) character.
@@ -920,9 +922,9 @@ TEST_F(ConnectionManagerUtilityTest, SamplingMustNotBeDoneOnClientTraced) {
 
 // Sampling, global off.
 TEST_F(ConnectionManagerUtilityTest, NoTraceWhenSamplingSetButGlobalNotSet) {
-  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("tracing.random_sampling", 10000, _, 10000))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
       .WillOnce(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _, 100))
       .WillOnce(Return(false));
 
   Http::TestHeaderMapImpl request_headers{{"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"}};
@@ -936,7 +938,7 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenSamplingSetButGlobalNotSet) {
 TEST_F(ConnectionManagerUtilityTest, ClientSamplingWhenGlobalSet) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
       .WillOnce(Return(true));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _, 100))
       .WillOnce(Return(true));
 
   Http::TestHeaderMapImpl request_headers{
@@ -952,7 +954,9 @@ TEST_F(ConnectionManagerUtilityTest, ClientSamplingWhenGlobalSet) {
 TEST_F(ConnectionManagerUtilityTest, NoTraceWhenClientSamplingNotSetAndGlobalSet) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.client_enabled", 100))
       .WillOnce(Return(false));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.random_sampling", 10000, _, 10000))
+      .WillOnce(Return(false));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _, 100))
       .WillOnce(Return(true));
 
   Http::TestHeaderMapImpl request_headers{
@@ -972,7 +976,7 @@ TEST_F(ConnectionManagerUtilityTest, ForcedTracedWhenGlobalSet) {
                             {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"},
                             {"x-envoy-force-trace", "true"}};
   EXPECT_CALL(random_, uuid()).Times(0);
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _, 100))
       .WillOnce(Return(true));
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
@@ -988,7 +992,7 @@ TEST_F(ConnectionManagerUtilityTest, NoTraceWhenForcedTracedButGlobalNotSet) {
                             {"x-request-id", "125a4afb-6f55-44ba-ad80-413f09f48a28"},
                             {"x-envoy-force-trace", "true"}};
   EXPECT_CALL(random_, uuid()).Times(0);
-  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _, 100))
       .WillOnce(Return(false));
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", true}),
