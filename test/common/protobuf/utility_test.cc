@@ -255,6 +255,10 @@ TEST(UtilityTest, JsonConvertCamelSnake) {
 
 TEST(UtilityTest, YamlLoadFromStringFail) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  // loadFromYaml expects a valid YAML string.
+  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromYaml("not_a_yaml", bootstrap), EnvoyException,
+                            "Unable to convert YAML as JSON: not_a_yaml");
+  // When wrongly inputted by a file path, the loadFromYaml throws an error.
   EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromYaml("/home/configs/config.yaml", bootstrap),
                             EnvoyException,
                             "Unable to convert YAML as JSON: /home/configs/config.yaml");
