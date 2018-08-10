@@ -550,9 +550,8 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
     const HostVector& hosts_to_use = hostSourceToHosts(hosts_source);
     if (hosts_to_use.size() == 0) {
       return nullptr;
-    } else {
-      return unweightedHostPick(hosts_to_use, hosts_source);
     }
+    return unweightedHostPick(hosts_to_use, hosts_source);
   }
 }
 

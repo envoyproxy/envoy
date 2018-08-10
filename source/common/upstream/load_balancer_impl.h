@@ -34,6 +34,19 @@ public:
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
 protected:
+  /**
+   * By implementing this method instead of chooseHost, host selection will
+   * be be subject to host filters specified by LoadBalancerContext.
+   *
+   * Host selection will be retried up to the number specified by
+   * hostSelectionRetryCount on LoadBalancerContext, and if no hosts are found
+   * within the allowed attempts, the host that was selected during the last
+   * attempt will be returned.
+   *
+   * If host selection is not random (i.e. retrying will not change the outcome),
+   * sub classes should override chooseHost to avoid the unnecessary overhead of
+   * retrying host selection.
+   */
   virtual HostConstSharedPtr chooseHostOnce(LoadBalancerContext* context) PURE;
 
   /**
