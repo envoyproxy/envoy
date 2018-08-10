@@ -24,6 +24,11 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
   health_check_request_.mutable_node()->MergeFrom(node);
   hds_retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
+
+  // TODO(lilika): Add support for other types of healthchecks
+  health_check_request_.mutable_capability()->add_health_check_protocol(
+      envoy::service::discovery::v2::Capability::HTTP);
+
   establishNewStream();
 }
 
@@ -44,9 +49,6 @@ void HdsDelegate::establishNewStream() {
     return;
   }
 
-  // TODO(lilika): Add support for other types of healthchecks
-  health_check_request_.mutable_capability()->add_health_check_protocol(
-      envoy::service::discovery::v2::Capability::HTTP);
   ENVOY_LOG(debug, "Sending HealthCheckRequest {} ", health_check_request_.DebugString());
   stream_->sendMessage(health_check_request_, false);
   stats_.responses_.inc();
@@ -140,6 +142,9 @@ void HdsDelegate::onReceiveMessage(
     std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
   stats_.requests_.inc();
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
+
+  // Reset
+  hds_clusters_.clear();
 
   // Process the HealthCheckSpecifier message
   processMessage(std::move(message));
