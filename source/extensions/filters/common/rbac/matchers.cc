@@ -8,17 +8,13 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
-MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Permission& permission,
-                                      bool disable_http_rules) {
+MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Permission& permission) {
   switch (permission.rule_case()) {
   case envoy::config::rbac::v2alpha::Permission::RuleCase::kAndRules:
-    return std::make_shared<const AndMatcher>(permission.and_rules(), disable_http_rules);
+    return std::make_shared<const AndMatcher>(permission.and_rules());
   case envoy::config::rbac::v2alpha::Permission::RuleCase::kOrRules:
-    return std::make_shared<const OrMatcher>(permission.or_rules(), disable_http_rules);
+    return std::make_shared<const OrMatcher>(permission.or_rules());
   case envoy::config::rbac::v2alpha::Permission::RuleCase::kHeader:
-    if (disable_http_rules) {
-      return std::make_shared<const AlwaysMatcher>();
-    }
     return std::make_shared<const HeaderMatcher>(permission.header());
   case envoy::config::rbac::v2alpha::Permission::RuleCase::kDestinationIp:
     return std::make_shared<const IPMatcher>(permission.destination_ip(), true);
@@ -27,58 +23,46 @@ MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Permis
   case envoy::config::rbac::v2alpha::Permission::RuleCase::kAny:
     return std::make_shared<const AlwaysMatcher>();
   case envoy::config::rbac::v2alpha::Permission::RuleCase::kMetadata:
-    if (disable_http_rules) {
-      return std::make_shared<const AlwaysMatcher>();
-    }
     return std::make_shared<const MetadataMatcher>(permission.metadata());
   case envoy::config::rbac::v2alpha::Permission::RuleCase::kNotRule:
-    return std::make_shared<const NotMatcher>(permission.not_rule(), disable_http_rules);
+    return std::make_shared<const NotMatcher>(permission.not_rule());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
-MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Principal& principal,
-                                      bool disable_http_rules) {
+MatcherConstSharedPtr Matcher::create(const envoy::config::rbac::v2alpha::Principal& principal) {
   switch (principal.identifier_case()) {
   case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kAndIds:
-    return std::make_shared<const AndMatcher>(principal.and_ids(), disable_http_rules);
+    return std::make_shared<const AndMatcher>(principal.and_ids());
   case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kOrIds:
-    return std::make_shared<const OrMatcher>(principal.or_ids(), disable_http_rules);
+    return std::make_shared<const OrMatcher>(principal.or_ids());
   case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kAuthenticated:
     return std::make_shared<const AuthenticatedMatcher>(principal.authenticated());
   case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kSourceIp:
     return std::make_shared<const IPMatcher>(principal.source_ip(), false);
   case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kHeader:
-    if (disable_http_rules) {
-      return std::make_shared<const AlwaysMatcher>();
-    }
     return std::make_shared<const HeaderMatcher>(principal.header());
   case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kAny:
     return std::make_shared<const AlwaysMatcher>();
   case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kMetadata:
-    if (disable_http_rules) {
-      return std::make_shared<const AlwaysMatcher>();
-    }
     return std::make_shared<const MetadataMatcher>(principal.metadata());
   case envoy::config::rbac::v2alpha::Principal::IdentifierCase::kNotId:
-    return std::make_shared<const NotMatcher>(principal.not_id(), disable_http_rules);
+    return std::make_shared<const NotMatcher>(principal.not_id());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
-AndMatcher::AndMatcher(const envoy::config::rbac::v2alpha::Permission_Set& set,
-                       bool disable_http_rules) {
+AndMatcher::AndMatcher(const envoy::config::rbac::v2alpha::Permission_Set& set) {
   for (const auto& rule : set.rules()) {
-    matchers_.push_back(Matcher::create(rule, disable_http_rules));
+    matchers_.push_back(Matcher::create(rule));
   }
 }
 
-AndMatcher::AndMatcher(const envoy::config::rbac::v2alpha::Principal_Set& set,
-                       bool disable_http_rules) {
+AndMatcher::AndMatcher(const envoy::config::rbac::v2alpha::Principal_Set& set) {
   for (const auto& id : set.ids()) {
-    matchers_.push_back(Matcher::create(id, disable_http_rules));
+    matchers_.push_back(Matcher::create(id));
   }
 }
 
@@ -95,18 +79,16 @@ bool AndMatcher::matches(const Network::Connection& connection,
 }
 
 OrMatcher::OrMatcher(
-    const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Permission>& rules,
-    bool disable_http_rules) {
+    const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Permission>& rules) {
   for (const auto& rule : rules) {
-    matchers_.push_back(Matcher::create(rule, disable_http_rules));
+    matchers_.push_back(Matcher::create(rule));
   }
 }
 
 OrMatcher::OrMatcher(
-    const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Principal>& ids,
-    bool disable_http_rules) {
+    const Protobuf::RepeatedPtrField<::envoy::config::rbac::v2alpha::Principal>& ids) {
   for (const auto& id : ids) {
-    matchers_.push_back(Matcher::create(id, disable_http_rules));
+    matchers_.push_back(Matcher::create(id));
   }
 }
 

@@ -35,18 +35,14 @@ RoleBasedAccessControlFilterStats generateStats(const std::string& prefix, Stats
 enum class EnforcementMode { Enforced, Shadow };
 
 template <class ConfigType>
-absl::optional<RoleBasedAccessControlEngineImpl> createEngine(const ConfigType& config,
-                                                              bool disable_http_rules = false) {
-  return config.has_rules() ? absl::make_optional<RoleBasedAccessControlEngineImpl>(
-                                  config.rules(), disable_http_rules)
+absl::optional<RoleBasedAccessControlEngineImpl> createEngine(const ConfigType& config) {
+  return config.has_rules() ? absl::make_optional<RoleBasedAccessControlEngineImpl>(config.rules())
                             : absl::nullopt;
 }
 
 template <class ConfigType>
-absl::optional<RoleBasedAccessControlEngineImpl> createShadowEngine(const ConfigType& config,
-                                                                    bool disable_http_rules = false) {
-  return config.has_shadow_rules() ? absl::make_optional<RoleBasedAccessControlEngineImpl>(
-                                         config.shadow_rules(), disable_http_rules)
+absl::optional<RoleBasedAccessControlEngineImpl> createShadowEngine(const ConfigType& config) {
+  return config.has_shadow_rules() ? absl::make_optional<RoleBasedAccessControlEngineImpl>(config.shadow_rules())
                                    : absl::nullopt;
 }
 

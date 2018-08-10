@@ -12,10 +12,11 @@ import "gogoproto/gogo.proto";
 // Role-Based Access Control :ref:`configuration overview <config_network_filters_rbac>`.
 
 // RBAC network filter config.
-// Note: Header and Metadata should not be used in rules/shadow_rules in RBAC network filter as
-// these information are only available in :ref:`RBAC http filter <config_http_filters_rbac>`. Any
-// Header and Metadata specified in rules/shadow_rules will be ignored by RBAC network filter and
-// treated as always match during policy enforcement.
+//
+// Header and Metadata *MUST NOT* be used in rules/shadow_rules in RBAC network filter as
+// these information are only available in :ref:`RBAC http filter <config_http_filters_rbac>`.
+// Specifying any header or metadata will simply cause the the ruels/shadow_rules to be not matched
+// on any requests.
 message RBAC {
   // Specify the RBAC rules to be applied globally.
   // If absent, no enforcing RBAC policy will be applied.

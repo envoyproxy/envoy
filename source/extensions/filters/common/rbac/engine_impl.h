@@ -13,11 +13,7 @@ namespace RBAC {
 
 class RoleBasedAccessControlEngineImpl : public RoleBasedAccessControlEngine {
 public:
-  // Constructs an engine based off the rules. If disable_http_rules is true, header and metadata
-  // rule will be treated as always matched. This is useful for network RBAC filter where header and
-  // metadata are not available.
-  RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v2alpha::RBAC& rules,
-                                   bool disable_http_rules = false);
+  RoleBasedAccessControlEngineImpl(const envoy::config::rbac::v2alpha::RBAC& rules);
 
   bool allowed(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const envoy::api::v2::core::Metadata& metadata,

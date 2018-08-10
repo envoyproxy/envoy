@@ -21,16 +21,7 @@ public:
 
     envoy::config::rbac::v2alpha::Policy policy;
     policy.add_permissions()->set_destination_port(123);
-    // header and metadata rule should be ignored and always match.
-    auto* ids = policy.add_principals()->mutable_and_ids();
-    auto* header = ids->add_ids()->mutable_header();
-    header->set_name("header");
-    header->set_exact_match("value");
-    auto* metadata = ids->add_ids()->mutable_metadata();
-    metadata->set_filter("filter");
-    metadata->add_path()->set_key("key");
-    metadata->mutable_value()->set_bool_match(true);
-
+    policy.add_principals()->set_any(true);
     config.mutable_rules()->set_action(envoy::config::rbac::v2alpha::RBAC::ALLOW);
     (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 

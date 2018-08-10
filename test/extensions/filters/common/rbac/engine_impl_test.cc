@@ -79,35 +79,6 @@ TEST(RoleBasedAccessControlEngineImpl, DeniedBlacklist) {
   checkEngine(engine, true, conn);
 }
 
-TEST(RoleBasedAccessControlEngineImpl, DisableHttpRules) {
-  envoy::config::rbac::v2alpha::Policy policy;
-  policy.add_permissions()->set_destination_port(123);
-  auto* ids = policy.add_principals()->mutable_and_ids();
-  auto* header = ids->add_ids()->mutable_header();
-  header->set_name("header");
-  header->set_exact_match("value");
-  auto* metadata = ids->add_ids()->mutable_metadata();
-  metadata->set_filter("filter");
-  metadata->add_path()->set_key("key");
-  metadata->mutable_value()->set_bool_match(true);
-
-  envoy::config::rbac::v2alpha::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v2alpha::RBAC_Action::RBAC_Action_ALLOW);
-  (*rbac.mutable_policies())["foo"] = policy;
-
-  Envoy::Network::MockConnection conn;
-  Envoy::Network::Address::InstanceConstSharedPtr addr =
-      Envoy::Network::Utility::parseInternetAddress("1.2.3.4", 123, false);
-  EXPECT_CALL(conn, localAddress()).WillRepeatedly(ReturnRef(addr));
-
-  RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
-  checkEngine(engine, false, conn);
-
-  RBAC::RoleBasedAccessControlEngineImpl engine_disable_http_rules(rbac,
-                                                                   true /* disable_http_rules */);
-  checkEngine(engine_disable_http_rules, true, conn);
-}
-
 } // namespace
 } // namespace RBAC
 } // namespace Common

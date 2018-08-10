@@ -13,8 +13,8 @@ namespace RBACFilter {
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::config::filter::network::rbac::v2::RBAC& proto_config, Stats::Scope& scope)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(), scope)),
-      engine_(Filters::Common::RBAC::createEngine(proto_config, true /* disable_http_rules */)),
-      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config, true /* disable_http_rules */)) {}
+      engine_(Filters::Common::RBAC::createEngine(proto_config)),
+      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)) {}
 
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {
   ENVOY_LOG(
