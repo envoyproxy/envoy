@@ -188,7 +188,9 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
   v2_config_only_ = !allow_v1_config.getValue();
-  MessageUtil::allow_unknown_fields = allow_unknown_fields.getValue();
+  if (allow_unknown_fields.getValue()) {
+    MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Allow;
+  }
   admin_address_path_ = admin_address_path.getValue();
   log_path_ = log_path.getValue();
   restart_epoch_ = restart_epoch.getValue();

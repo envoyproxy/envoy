@@ -133,6 +133,8 @@ public:
   ProtoValidationException(const std::string& validation_error, const Protobuf::Message& message);
 };
 
+enum class ProtoUnknownFieldsMode { Strict, Allow };
+
 class MessageUtil {
 public:
   // std::hash
@@ -158,10 +160,10 @@ public:
     return HashUtil::xxHash64(text);
   }
 
-  static bool allow_unknown_fields;
+  static ProtoUnknownFieldsMode proto_unknown_fields;
 
   static void checkUnknownFields(const Protobuf::Message& message) {
-    if (!MessageUtil::allow_unknown_fields &&
+    if (MessageUtil::proto_unknown_fields == ProtoUnknownFieldsMode::Strict &&
         !message.GetReflection()->GetUnknownFields(message).empty()) {
       throw EnvoyException("Protobuf message (type " + message.GetTypeName() +
                            ") has unknown fields");
@@ -169,8 +171,8 @@ public:
   }
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message);
-  static void loadFromJsonCustom(const std::string& json, Protobuf::Message& message,
-                                 bool allow_unknown_fields);
+  static void loadFromJsonEx(const std::string& json, Protobuf::Message& message,
+                             ProtoUnknownFieldsMode proto_unknown_fields);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
 

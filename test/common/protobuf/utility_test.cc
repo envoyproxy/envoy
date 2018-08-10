@@ -251,11 +251,11 @@ TEST(UtilityTest, JsonConvertSuccess) {
 }
 
 TEST(UtilityTest, JsonConvertUnknownFieldSuccess) {
-  MessageUtil::allow_unknown_fields = true;
+  MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Allow;
   const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   EXPECT_NO_THROW(MessageUtil::jsonConvert(obj, bootstrap));
-  MessageUtil::allow_unknown_fields = false;
+  MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Strict;
 }
 
 TEST(UtilityTest, JsonConvertFail) {
