@@ -553,7 +553,7 @@ ClientConnectionImpl::ClientConnectionImpl(
   }
 
   if (source_address != nullptr) {
-    const Api::SysCallResult result = source_address->bind(fd());
+    const Api::SysCallIntResult result = source_address->bind(fd());
     if (result.rc_ < 0) {
       ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
                      strerror(result.errno_));
@@ -570,7 +570,7 @@ ClientConnectionImpl::ClientConnectionImpl(
 
 void ClientConnectionImpl::connect() {
   ENVOY_CONN_LOG(debug, "connecting to {}", *this, socket_->remoteAddress()->asString());
-  const Api::SysCallResult result = socket_->remoteAddress()->connect(fd());
+  const Api::SysCallIntResult result = socket_->remoteAddress()->connect(fd());
   if (result.rc_ == 0) {
     // write will become ready.
     ASSERT(connecting_);

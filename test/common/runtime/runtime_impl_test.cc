@@ -77,8 +77,10 @@ public:
 
     os_sys_calls_ = new NiceMock<Api::MockOsSysCalls>;
     ON_CALL(*os_sys_calls_, stat(_, _))
-        .WillByDefault(
-            Invoke([](const char* filename, struct stat* stat) { return ::stat(filename, stat); }));
+        .WillByDefault(Invoke([](const char* filename, struct stat* stat) {
+          const int rc = ::stat(filename, stat);
+          return Api::SysCallIntResult{rc, errno};
+        }));
   }
 
   void run(const std::string& primary_dir, const std::string& override_dir) {
@@ -159,7 +161,7 @@ TEST_F(DiskBackedLoaderImplTest, BadDirectory) {
 
 TEST_F(DiskBackedLoaderImplTest, BadStat) {
   setup();
-  EXPECT_CALL(*os_sys_calls_, stat(_, _)).WillOnce(Return(-1));
+  EXPECT_CALL(*os_sys_calls_, stat(_, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
   run("test/common/runtime/test_data/current", "envoy_override");
   EXPECT_EQ(store.counter("runtime.load_error").value(), 1);
   // We should still have the admin layer
