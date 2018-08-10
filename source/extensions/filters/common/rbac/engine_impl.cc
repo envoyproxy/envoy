@@ -9,8 +9,8 @@ namespace Common {
 namespace RBAC {
 
 namespace {
-static const Envoy::Http::HeaderMapImpl empty_header = Envoy::Http::HeaderMapImpl();
-static const envoy::api::v2::core::Metadata empty_metadata = envoy::api::v2::core::Metadata();
+const Envoy::Http::HeaderMapImpl empty_header = Envoy::Http::HeaderMapImpl();
+const envoy::api::v2::core::Metadata empty_metadata = envoy::api::v2::core::Metadata();
 } // namespace
 
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(

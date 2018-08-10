@@ -27,20 +27,20 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
                 callbacks_->connection().ssl()->subjectPeerCertificate()
           : "none");
 
-  if (shadow_engine_result_ == UNKNOWN) {
+  if (shadow_engine_result_ == Unknown) {
     // TODO(quanlin): Support metric collection for RBAC network filter.
     // Only check the engine and increase stats for the first time call to onData(), any following
     // calls to onData() could just use the cached result and no need to increase the stats anymore.
     shadow_engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow);
   }
 
-  if (engine_result_ == UNKNOWN) {
+  if (engine_result_ == Unknown) {
     engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
   }
 
-  if (engine_result_ == ALLOW) {
+  if (engine_result_ == Allow) {
     return Network::FilterStatus::Continue;
-  } else if (engine_result_ == DENY) {
+  } else if (engine_result_ == Deny) {
     callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
     return Network::FilterStatus::StopIteration;
   }
@@ -61,7 +61,7 @@ RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode
         ENVOY_LOG(debug, "enforced allowed");
         config_->stats().allowed_.inc();
       }
-      return ALLOW;
+      return Allow;
     } else {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
         ENVOY_LOG(debug, "shadow denied");
@@ -70,10 +70,10 @@ RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode
         ENVOY_LOG(debug, "enforced denied");
         config_->stats().denied_.inc();
       }
-      return DENY;
+      return Deny;
     }
   }
-  return NONE;
+  return None;
 }
 
 } // namespace RBACFilter

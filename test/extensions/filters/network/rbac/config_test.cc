@@ -17,11 +17,11 @@ namespace NetworkFilters {
 namespace RBACFilter {
 
 namespace {
-static const std::string header = R"EOF(
+const std::string header = R"EOF(
 { "header": {"name": "key", "exact_match": "value"} }
 )EOF";
 
-static const std::string metadata = R"EOF(
+const std::string metadata = R"EOF(
 {
   "metadata": {
     "filter": "t", "path": [ { "key": "a" } ], "value": { "string_match": { "exact": "x" } }
