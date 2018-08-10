@@ -227,12 +227,16 @@ TEST_F(HdsTest, TestMinimalSendResponse) {
 TEST_F(HdsTest, TestStreamConnectionFailure) {
   EXPECT_CALL(*async_client_, start(_, _))
       .WillOnce(Return(nullptr))
+      .WillOnce(Return(nullptr))
+      .WillOnce(Return(nullptr))
       .WillOnce(Return(&async_stream_));
-  EXPECT_CALL(*retry_timer_, enableTimer(_));
+  EXPECT_CALL(*retry_timer_, enableTimer(_)).Times(3);
   EXPECT_CALL(async_stream_, sendMessage(_, _));
 
   // Test connection failure and retry
   createHdsDelegate();
+  retry_timer_cb_();
+  retry_timer_cb_();
   retry_timer_cb_();
 }
 
