@@ -117,22 +117,22 @@ public:
     envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier_;
     server_health_check_specifier_.mutable_interval()->set_seconds(1);
 
-    auto* health_check = server_health_check_specifier_.add_health_check();
+    auto* health_check = server_health_check_specifier_.add_cluster_health_checks();
 
     health_check->set_cluster_name("anna");
-    health_check->add_endpoints()
+    health_check->add_locality_endpoints()
         ->add_endpoints()
         ->mutable_address()
         ->mutable_socket_address()
         ->set_address(host_upstream_->localAddress()->ip()->addressAsString());
-    health_check->mutable_endpoints(0)
+    health_check->mutable_locality_endpoints(0)
         ->mutable_endpoints(0)
         ->mutable_address()
         ->mutable_socket_address()
         ->set_port_value(host_upstream_->localAddress()->ip()->port());
-    health_check->mutable_endpoints(0)->mutable_locality()->set_region("some_region");
-    health_check->mutable_endpoints(0)->mutable_locality()->set_zone("some_zone");
-    health_check->mutable_endpoints(0)->mutable_locality()->set_sub_zone("crete");
+    health_check->mutable_locality_endpoints(0)->mutable_locality()->set_region("some_region");
+    health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("some_zone");
+    health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("crete");
 
     health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
     health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
@@ -194,7 +194,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthy) {
   // Server <--> Envoy
   waitForHdsStream();
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
-  EXPECT_EQ(envoy_msg_.capability().health_check_protocol(0),
+  EXPECT_EQ(envoy_msg_.capability().health_check_protocols(0),
             envoy::service::discovery::v2::Capability::HTTP);
 
   // Server asks for healthchecking
@@ -301,7 +301,9 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
   initialize();
 
   server_health_check_specifier_ = makeHealthCheckSpecifier();
-  auto* endpoint = server_health_check_specifier_.mutable_health_check(0)->mutable_endpoints(0);
+  auto* endpoint =
+      server_health_check_specifier_.mutable_cluster_health_checks(0)->mutable_locality_endpoints(
+          0);
   endpoint->add_endpoints()->mutable_address()->mutable_socket_address()->set_address(
       host2_upstream_->localAddress()->ip()->addressAsString());
   endpoint->mutable_endpoints(1)->mutable_address()->mutable_socket_address()->set_port_value(
@@ -348,21 +350,21 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
   server_health_check_specifier_ = makeHealthCheckSpecifier();
 
   // Add endpoint
-  auto* health_check = server_health_check_specifier_.mutable_health_check(0);
+  auto* health_check = server_health_check_specifier_.mutable_cluster_health_checks(0);
 
-  health_check->add_endpoints()
+  health_check->add_locality_endpoints()
       ->add_endpoints()
       ->mutable_address()
       ->mutable_socket_address()
       ->set_address(host2_upstream_->localAddress()->ip()->addressAsString());
-  health_check->mutable_endpoints(1)
+  health_check->mutable_locality_endpoints(1)
       ->mutable_endpoints(0)
       ->mutable_address()
       ->mutable_socket_address()
       ->set_port_value(host2_upstream_->localAddress()->ip()->port());
-  health_check->mutable_endpoints(1)->mutable_locality()->set_region("different_region");
-  health_check->mutable_endpoints(1)->mutable_locality()->set_zone("different_zone");
-  health_check->mutable_endpoints(1)->mutable_locality()->set_sub_zone("emplisi");
+  health_check->mutable_locality_endpoints(1)->mutable_locality()->set_region("different_region");
+  health_check->mutable_locality_endpoints(1)->mutable_locality()->set_zone("different_zone");
+  health_check->mutable_locality_endpoints(1)->mutable_locality()->set_sub_zone("emplisi");
 
   // Server <--> Envoy
   waitForHdsStream();
@@ -406,22 +408,22 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   server_health_check_specifier_ = makeHealthCheckSpecifier();
 
   // Add endpoint
-  auto* health_check = server_health_check_specifier_.add_health_check();
+  auto* health_check = server_health_check_specifier_.add_cluster_health_checks();
 
   health_check->set_cluster_name("cat");
-  health_check->add_endpoints()
+  health_check->add_locality_endpoints()
       ->add_endpoints()
       ->mutable_address()
       ->mutable_socket_address()
       ->set_address(host2_upstream_->localAddress()->ip()->addressAsString());
-  health_check->mutable_endpoints(0)
+  health_check->mutable_locality_endpoints(0)
       ->mutable_endpoints(0)
       ->mutable_address()
       ->mutable_socket_address()
       ->set_port_value(host2_upstream_->localAddress()->ip()->port());
-  health_check->mutable_endpoints(0)->mutable_locality()->set_region("peculiar_region");
-  health_check->mutable_endpoints(0)->mutable_locality()->set_zone("peculiar_zone");
-  health_check->mutable_endpoints(0)->mutable_locality()->set_sub_zone("paris");
+  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_region("peculiar_region");
+  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("peculiar_zone");
+  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("paris");
 
   health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
   health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
@@ -505,22 +507,22 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   envoy::service::discovery::v2::HealthCheckSpecifier new_message;
   new_message.mutable_interval()->set_seconds(1);
 
-  auto* health_check = new_message.add_health_check();
+  auto* health_check = new_message.add_cluster_health_checks();
 
   health_check->set_cluster_name("cat");
-  health_check->add_endpoints()
+  health_check->add_locality_endpoints()
       ->add_endpoints()
       ->mutable_address()
       ->mutable_socket_address()
       ->set_address(host2_upstream_->localAddress()->ip()->addressAsString());
-  health_check->mutable_endpoints(0)
+  health_check->mutable_locality_endpoints(0)
       ->mutable_endpoints(0)
       ->mutable_address()
       ->mutable_socket_address()
       ->set_port_value(host2_upstream_->localAddress()->ip()->port());
-  health_check->mutable_endpoints(0)->mutable_locality()->set_region("peculiar_region");
-  health_check->mutable_endpoints(0)->mutable_locality()->set_zone("peculiar_zone");
-  health_check->mutable_endpoints(0)->mutable_locality()->set_sub_zone("paris");
+  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_region("peculiar_region");
+  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("peculiar_zone");
+  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("paris");
 
   health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
   health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
