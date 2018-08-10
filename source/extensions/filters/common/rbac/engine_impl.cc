@@ -1,5 +1,7 @@
 #include "extensions/filters/common/rbac/engine_impl.h"
 
+#include "common/http/header_map_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
@@ -36,6 +38,11 @@ bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connec
   //   - matched and ALLOW action
   //   - not matched and DENY action
   return matched == allowed_if_matched_;
+}
+
+bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection) const {
+  return allowed(connection, Envoy::Http::HeaderMapImpl(), envoy::api::v2::core::Metadata(),
+                 nullptr);
 }
 
 } // namespace RBAC

@@ -3,8 +3,6 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/network/connection.h"
 
-#include "common/http/header_map_impl.h"
-
 #include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
@@ -49,8 +47,7 @@ EngineResult
 RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode mode) {
   const auto& engine = config_->engine(nullptr, NetworkFilterNames::get().Rbac, mode);
   if (engine.has_value()) {
-    if (engine->allowed(callbacks_->connection(), Envoy::Http::HeaderMapImpl(),
-                        envoy::api::v2::core::Metadata(), nullptr)) {
+    if (engine->allowed(callbacks_->connection())) {
       if (mode == Filters::Common::RBAC::EnforcementMode::Shadow) {
         ENVOY_LOG(debug, "shadow allowed");
         config_->stats().shadow_allowed_.inc();
