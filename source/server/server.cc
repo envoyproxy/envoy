@@ -364,9 +364,7 @@ RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm
   // Setup signals.
   sigterm_ = dispatcher.listenForSignal(SIGTERM, [this, &hot_restart, &dispatcher]() {
     ENVOY_LOG(warn, "caught SIGTERM");
-    shutdown_ = true;
-    hot_restart.terminateParent();
-    dispatcher.exit();
+    shutdown(dispatcher, hot_restart);
   });
 
   sig_usr_1_ = dispatcher.listenForSignal(SIGUSR1, [&access_log_manager]() {
@@ -410,9 +408,18 @@ RunHelper::RunHelper(Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm
   overload_manager.start();
 }
 
+void RunHelper::shutdown(Event::Dispatcher& dispatcher, HotRestart& hot_restart) {
+  shutdown_ = true;
+  hot_restart.terminateParent();
+  dispatcher.exit();
+}
+
 void InstanceImpl::run() {
-  RunHelper helper(*dispatcher_, clusterManager(), restarter_, access_log_manager_, init_manager_,
-                   overloadManager(), [this]() -> void { startWorkers(); });
+  // We need the RunHelper to be available to call from InstanceImpl::shutdown() below, so
+  // we save it as a member variable.
+  run_helper_ = std::make_unique<RunHelper>(*dispatcher_, clusterManager(), restarter_,
+                                            access_log_manager_, init_manager_, overloadManager(),
+                                            [this]() -> void { startWorkers(); });
 
   // Run the main dispatch loop waiting to exit.
   ENVOY_LOG(info, "starting main dispatch loop");
@@ -424,6 +431,7 @@ void InstanceImpl::run() {
   watchdog.reset();
 
   terminate();
+  run_helper_.reset();
 }
 
 void InstanceImpl::terminate() {
@@ -461,8 +469,8 @@ void InstanceImpl::terminate() {
 Runtime::Loader& InstanceImpl::runtime() { return *runtime_loader_; }
 
 void InstanceImpl::shutdown() {
-  ENVOY_LOG(info, "shutdown invoked. sending SIGTERM to self");
-  kill(getpid(), SIGTERM);
+  ASSERT(run_helper_.get() != nullptr);
+  run_helper_->shutdown(*dispatcher_, restarter_);
 }
 
 void InstanceImpl::shutdownAdmin() {
