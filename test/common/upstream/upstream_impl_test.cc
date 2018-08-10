@@ -1623,8 +1623,9 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
 
   auto cluster = makeCluster(yaml);
 
-  ProtocolOptionsConfigConstSharedPtr stored_options =
-      cluster->info()->extensionProtocolOptions(factory.name());
+  std::shared_ptr<const TestFilterProtocolOptionsConfig> stored_options =
+      cluster->info()->extensionProtocolOptionsTyped<TestFilterProtocolOptionsConfig>(
+          factory.name());
   EXPECT_NE(nullptr, protocol_options);
   // Same pointer
   EXPECT_EQ(stored_options.get(), protocol_options.get());

@@ -459,6 +459,16 @@ public:
   extensionProtocolOptions(const std::string& name) const PURE;
 
   /**
+   * This is a helper on top of extensionProtocolOptions() that casts the return object to the
+   * specified type.
+   */
+  template <class Derived>
+  const std::shared_ptr<const Derived>
+  extensionProtocolOptionsTyped(const std::string& name) const {
+    return std::dynamic_pointer_cast<const Derived>(extensionProtocolOptions(name));
+  }
+
+  /**
    * @return const envoy::api::v2::Cluster::CommonLbConfig& the common configuration for all
    *         load balancers for this cluster.
    */
