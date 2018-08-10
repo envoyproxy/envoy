@@ -11,11 +11,11 @@ namespace RBACFilter {
 namespace {
 
 class MockRoleBasedAccessControlRouteSpecificFilterConfig
-    : public Filters::Common::RBAC::RoleBasedAccessControlRouteSpecificFilterConfig {
+    : public RoleBasedAccessControlRouteSpecificFilterConfig {
 public:
   MockRoleBasedAccessControlRouteSpecificFilterConfig(
       const envoy::config::filter::http::rbac::v2::RBACPerRoute& r)
-      : Filters::Common::RBAC::RoleBasedAccessControlRouteSpecificFilterConfig(r){};
+      : RoleBasedAccessControlRouteSpecificFilterConfig(r){};
 
   MOCK_CONST_METHOD0(engine, Filters::Common::RBAC::RoleBasedAccessControlEngineImpl&());
 };

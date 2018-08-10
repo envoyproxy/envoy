@@ -15,9 +15,8 @@ Network::FilterFactoryCb
 RoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::rbac::v2::RBAC& proto_config,
     Server::Configuration::FactoryContext& context) {
-  Filters::Common::RBAC::RoleBasedAccessControlFilterConfigSharedPtr config(
-      std::make_shared<Filters::Common::RBAC::RoleBasedAccessControlFilterConfig>(proto_config,
-                                                                                  context.scope()));
+  RoleBasedAccessControlFilterConfigSharedPtr config(
+      std::make_shared<RoleBasedAccessControlFilterConfig>(proto_config, context.scope()));
   return [config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<RoleBasedAccessControlFilter>(config));
   };

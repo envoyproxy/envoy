@@ -17,13 +17,38 @@ namespace RBACFilter {
 enum EngineResult { UNKNOWN, NONE, ALLOW, DENY };
 
 /**
+ * Configuration for the RBAC filter.
+ */
+class RoleBasedAccessControlFilterConfig {
+ public:
+  RoleBasedAccessControlFilterConfig(
+      const envoy::config::filter::network::rbac::v2::RBAC& proto_config, Stats::Scope& scope);
+
+  Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }
+
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
+      engine(Filters::Common::RBAC::EnforcementMode mode) const {
+    return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_ : shadow_engine_;
+  }
+
+ private:
+  Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
+
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
+};
+
+typedef std::shared_ptr<RoleBasedAccessControlFilterConfig>
+    RoleBasedAccessControlFilterConfigSharedPtr;
+
+
+/**
  * Implementation of a basic RBAC network filter.
  */
 class RoleBasedAccessControlFilter : public Network::ReadFilter,
                                      public Logger::Loggable<Logger::Id::rbac> {
 public:
-  RoleBasedAccessControlFilter(
-      Filters::Common::RBAC::RoleBasedAccessControlFilterConfigSharedPtr config)
+  RoleBasedAccessControlFilter(RoleBasedAccessControlFilterConfigSharedPtr config)
       : config_(config) {}
   ~RoleBasedAccessControlFilter() {}
 
@@ -35,7 +60,7 @@ public:
   }
 
 private:
-  Filters::Common::RBAC::RoleBasedAccessControlFilterConfigSharedPtr config_;
+  RoleBasedAccessControlFilterConfigSharedPtr config_;
   Network::ReadFilterCallbacks* callbacks_{};
   EngineResult engine_result_{UNKNOWN};
   EngineResult shadow_engine_result_{UNKNOWN};

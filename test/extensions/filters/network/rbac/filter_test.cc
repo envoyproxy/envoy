@@ -15,7 +15,7 @@ namespace RBACFilter {
 
 class RoleBasedAccessControlNetworkFilterTest : public testing::Test {
 public:
-  Filters::Common::RBAC::RoleBasedAccessControlFilterConfigSharedPtr setupConfig() {
+  RoleBasedAccessControlFilterConfigSharedPtr setupConfig() {
     envoy::config::filter::network::rbac::v2::RBAC config;
     config.set_stat_prefix("tcp.");
 
@@ -40,8 +40,7 @@ public:
     config.mutable_shadow_rules()->set_action(envoy::config::rbac::v2alpha::RBAC::ALLOW);
     (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
 
-    return std::make_shared<Filters::Common::RBAC::RoleBasedAccessControlFilterConfig>(config,
-                                                                                       store_);
+    return std::make_shared<RoleBasedAccessControlFilterConfig>(config, store_);
   }
 
   RoleBasedAccessControlNetworkFilterTest() : config_(setupConfig()) {
@@ -57,7 +56,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> callbacks_;
   Stats::IsolatedStoreImpl store_;
   Buffer::OwnedImpl data_;
-  Filters::Common::RBAC::RoleBasedAccessControlFilterConfigSharedPtr config_;
+  RoleBasedAccessControlFilterConfigSharedPtr config_;
 
   std::unique_ptr<RoleBasedAccessControlFilter> filter_;
   Network::Address::InstanceConstSharedPtr address_;

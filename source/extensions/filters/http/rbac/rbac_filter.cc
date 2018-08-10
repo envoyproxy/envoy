@@ -16,6 +16,40 @@ static const std::string resp_code_403 = "403";
 static const std::string shadow_policy_id_field = "shadow_effective_policyID";
 static const std::string shadow_resp_code_field = "shadow_response_code";
 
+
+RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpecificFilterConfig(
+    const envoy::config::filter::http::rbac::v2::RBACPerRoute& per_route_config)
+    : engine_(Filters::Common::RBAC::createEngine(per_route_config.rbac())),
+      shadow_engine_(Filters::Common::RBAC::createShadowEngine(per_route_config.rbac())) {}
+
+RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
+    const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
+    const std::string& stats_prefix, Stats::Scope& scope)
+    : stats_(Filters::Common::RBAC::generateStats(stats_prefix, scope)),
+      engine_(Filters::Common::RBAC::createEngine(proto_config)),
+      shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)) {}
+
+const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
+RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr route,
+                                           Filters::Common::RBAC::EnforcementMode mode) const {
+  if (!route || !route->routeEntry()) {
+    return engine(mode);
+  }
+
+  const std::string& name = HttpFilterNames::get().Rbac;
+  const auto* entry = route->routeEntry();
+  const auto* route_local =
+      entry->perFilterConfigTyped<RoleBasedAccessControlRouteSpecificFilterConfig>(name)
+      ?: entry->virtualHost()
+          .perFilterConfigTyped<RoleBasedAccessControlRouteSpecificFilterConfig>(name);
+
+  if (route_local) {
+    return route_local->engine(mode);
+  }
+
+  return engine(mode);
+}
+
 Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::HeaderMap& headers,
                                                                       bool) {
   ENVOY_LOG(
@@ -32,9 +66,8 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
       headers, callbacks_->requestInfo().dynamicMetadata().DebugString());
 
   std::string effective_policy_id;
-  const std::string& filter_name = HttpFilterNames::get().Rbac;
-  const auto& shadow_engine = config_->engine(callbacks_->route(), filter_name,
-                                              Filters::Common::RBAC::EnforcementMode::Shadow);
+  const auto& shadow_engine = config_->engine(
+      callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Shadow);
 
   if (shadow_engine.has_value()) {
     std::string shadow_resp_code = resp_code_200;
@@ -68,8 +101,8 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
     }
   }
 
-  const auto& engine = config_->engine(callbacks_->route(), filter_name,
-                                       Filters::Common::RBAC::EnforcementMode::Enforced);
+  const auto& engine = config_->engine(
+      callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine.has_value()) {
     if (engine->allowed(*callbacks_->connection(), headers,
                         callbacks_->requestInfo().dynamicMetadata(), nullptr)) {

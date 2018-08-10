@@ -17,14 +17,58 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
 
+class RoleBasedAccessControlRouteSpecificFilterConfig : public Router::RouteSpecificFilterConfig {
+ public:
+  RoleBasedAccessControlRouteSpecificFilterConfig(
+      const envoy::config::filter::http::rbac::v2::RBACPerRoute& per_route_config);
+
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
+      engine(Filters::Common::RBAC::EnforcementMode mode) const {
+    return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_ : shadow_engine_;
+  }
+
+ private:
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
+};
+
+/**
+ * Configuration for the RBAC filter.
+ */
+class RoleBasedAccessControlFilterConfig {
+ public:
+  RoleBasedAccessControlFilterConfig(
+      const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
+      const std::string& stats_prefix, Stats::Scope& scope);
+
+  Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }
+
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>& engine(
+      const Router::RouteConstSharedPtr route, Filters::Common::RBAC::EnforcementMode mode) const;
+
+ private:
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
+      engine(Filters::Common::RBAC::EnforcementMode mode) const {
+    return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_ : shadow_engine_;
+  }
+
+  Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
+
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
+  const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
+};
+
+typedef std::shared_ptr<RoleBasedAccessControlFilterConfig>
+    RoleBasedAccessControlFilterConfigSharedPtr;
+
+
 /**
  * A filter that provides role-based access control authorization for HTTP requests.
  */
 class RoleBasedAccessControlFilter : public Http::StreamDecoderFilter,
                                      public Logger::Loggable<Logger::Id::rbac> {
 public:
-  RoleBasedAccessControlFilter(
-      Filters::Common::RBAC::RoleBasedAccessControlFilterConfigSharedPtr config)
+  RoleBasedAccessControlFilter(RoleBasedAccessControlFilterConfigSharedPtr config)
       : config_(config) {}
 
   // Http::StreamDecoderFilter
@@ -46,7 +90,7 @@ public:
   void onDestroy() override {}
 
 private:
-  Filters::Common::RBAC::RoleBasedAccessControlFilterConfigSharedPtr config_;
+  RoleBasedAccessControlFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};
 };
 

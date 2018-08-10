@@ -30,6 +30,8 @@ struct RoleBasedAccessControlFilterStats {
   ALL_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+RoleBasedAccessControlFilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
+
 enum class EnforcementMode { Enforced, Shadow };
 
 template <class ConfigType>
@@ -41,63 +43,12 @@ absl::optional<RoleBasedAccessControlEngineImpl> createEngine(const ConfigType& 
 }
 
 template <class ConfigType>
-absl::optional<RoleBasedAccessControlEngineImpl>
-createShadowEngine(const ConfigType& config, bool disable_http_rules = false) {
+absl::optional<RoleBasedAccessControlEngineImpl> createShadowEngine(const ConfigType& config,
+                                                                    bool disable_http_rules = false) {
   return config.has_shadow_rules() ? absl::make_optional<RoleBasedAccessControlEngineImpl>(
                                          config.shadow_rules(), disable_http_rules)
                                    : absl::nullopt;
 }
-
-class RoleBasedAccessControlRouteSpecificFilterConfig : public Router::RouteSpecificFilterConfig {
-public:
-  RoleBasedAccessControlRouteSpecificFilterConfig(
-      const envoy::config::filter::http::rbac::v2::RBACPerRoute& per_route_config);
-
-  const absl::optional<RoleBasedAccessControlEngineImpl>& engine(EnforcementMode mode) const {
-    return mode == EnforcementMode::Enforced ? engine_ : shadow_engine_;
-  }
-
-private:
-  const absl::optional<RoleBasedAccessControlEngineImpl> engine_;
-  const absl::optional<RoleBasedAccessControlEngineImpl> shadow_engine_;
-};
-
-/**
- * Configuration for the RBAC filter.
- */
-class RoleBasedAccessControlFilterConfig {
-public:
-  // Constructor for RBAC http filter.
-  RoleBasedAccessControlFilterConfig(
-      const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
-      const std::string& stats_prefix, Stats::Scope& scope);
-
-  // Constructor for RBAC network filter, header and metadata in proto_config will always match.
-  RoleBasedAccessControlFilterConfig(
-      const envoy::config::filter::network::rbac::v2::RBAC& proto_config, Stats::Scope& scope);
-
-  static RoleBasedAccessControlFilterStats generateStats(const std::string& prefix,
-                                                         Stats::Scope& scope);
-
-  RoleBasedAccessControlFilterStats& stats() { return stats_; }
-
-  const absl::optional<RoleBasedAccessControlEngineImpl>&
-  engine(const Router::RouteConstSharedPtr route, const std::string& filter_name,
-         EnforcementMode mode) const;
-
-private:
-  const absl::optional<RoleBasedAccessControlEngineImpl>& engine(EnforcementMode mode) const {
-    return mode == EnforcementMode::Enforced ? engine_ : shadow_engine_;
-  }
-
-  RoleBasedAccessControlFilterStats stats_;
-
-  const absl::optional<RoleBasedAccessControlEngineImpl> engine_;
-  const absl::optional<RoleBasedAccessControlEngineImpl> shadow_engine_;
-};
-
-typedef std::shared_ptr<RoleBasedAccessControlFilterConfig>
-    RoleBasedAccessControlFilterConfigSharedPtr;
 
 } // namespace RBAC
 } // namespace Common
