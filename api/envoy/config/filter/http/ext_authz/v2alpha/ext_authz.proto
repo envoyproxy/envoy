@@ -42,24 +42,31 @@ message ExtAuthz {
 // whether the request is authorized or not.
 //
 // A successful check allows the authorization service adding or overriding headers from the
-// original request before dispatching it to the upstream. This is done by including the headers in
-// the response sent back from the authorization service to the filter. Note that `Status`,
-// `Method`, `Path` and `Content Length` response headers are automatically removed from this
-// response by the filter. If other headers need be deleted, they should be specified in
-// `response_headers_to_remove` field.
+// original request before dispatching it to the upstream. This is done by configuring which headers
+// in the authorization response should be sent to the upstream. See *allowed_authorization_headers*
+// bellow.
 //
 // A failed check will cause this filter to close the HTTP request normally with 403 (Forbidden),
-// unless a different status code has been indicated by the authorization service via response
-// headers. The HTTP service also allows the authorization filter to also pass data from the
-// response body to the downstream client in case of a denied request.
+// unless a different status code has been indicated by the authorization server via response
+// headers. If other headers in the authorization response need to be sent to client, this can also
+// be done by specifying them in *allowed_authorization_headers*.
 message HttpService {
   // Sets the HTTP server URI which the authorization requests must be sent to.
   envoy.api.v2.core.HttpUri server_uri = 1;
 
-  // Sets an optional prefix to the value of authorization request header `path`.
+  // Sets an optional prefix to the value of authorization request header *Path*.
   string path_prefix = 2;
 
-  // Sets a list of headers that should be not be sent *from the authorization server* to the
-  // upstream.
-  repeated string response_headers_to_remove = 3;
+  reserved 3;
+
+  // Sets a list of headers that can be sent from the authorization server to the upstream service,
+  // or to the downstream client when present in the authorization response. Note that a matched
+  // request header will have its value overridden by the ones sent from the authorization server.
+  repeated string allowed_authorization_headers = 4;
+
+  // Sets a list of headers that should be sent *from the filter* to the authorization server
+  // when they are also present in the client request. Note that *Content-Length*, *Authority*,
+  // *Method* and *Path* are always dispatched to the authorization server by default. The message
+  // will not contain body data and the *Content-Length* will be set to zero.
+  repeated string allowed_request_headers = 5;
 }
