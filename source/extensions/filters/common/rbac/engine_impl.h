@@ -19,7 +19,7 @@ public:
                const envoy::api::v2::core::Metadata& metadata,
                std::string* effective_policy_id) const override;
 
-  bool allowed(const Network::Connection& connection) const override ;
+  bool allowed(const Network::Connection& connection) const override;
 
 private:
   const bool allowed_if_matched_;

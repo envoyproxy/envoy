@@ -33,10 +33,10 @@ public:
                        std::string* effective_policy_id) const PURE;
 
   /**
-  * Returns whether or not the current action is permitted.
-  *
-  * @param connection the downstream connection used to identify the action/principal.
-  */
+   * Returns whether or not the current action is permitted.
+   *
+   * @param connection the downstream connection used to identify the action/principal.
+   */
   virtual bool allowed(const Network::Connection& connection) const PURE;
 };
 

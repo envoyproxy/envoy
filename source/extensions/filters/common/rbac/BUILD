@@ -9,9 +9,9 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "config_lib",
-    srcs = ["config.cc"],
-    hdrs = ["config.h"],
+    name = "utility_lib",
+    srcs = ["utility.cc"],
+    hdrs = ["utility.h"],
     deps = [
         ":engine_lib",
         "//include/envoy/stats:stats_macros",

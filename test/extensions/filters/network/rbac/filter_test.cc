@@ -1,6 +1,6 @@
 #include "common/network/utility.h"
 
-#include "extensions/filters/common/rbac/config.h"
+#include "extensions/filters/common/rbac/utility.h"
 #include "extensions/filters/network/rbac/rbac_filter.h"
 
 #include "test/mocks/network/mocks.h"

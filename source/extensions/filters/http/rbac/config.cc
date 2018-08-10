@@ -2,7 +2,7 @@
 
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/common/rbac/config.h"
+#include "extensions/filters/common/rbac/utility.h"
 #include "extensions/filters/http/rbac/rbac_filter.h"
 
 namespace Envoy {
@@ -14,8 +14,8 @@ Http::FilterFactoryCb RoleBasedAccessControlFilterConfigFactory::createFilterFac
     const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
-  auto config = std::make_shared<RoleBasedAccessControlFilterConfig>(
-      proto_config, stats_prefix, context.scope());
+  auto config = std::make_shared<RoleBasedAccessControlFilterConfig>(proto_config, stats_prefix,
+                                                                     context.scope());
 
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<RoleBasedAccessControlFilter>(config));

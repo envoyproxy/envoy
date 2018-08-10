@@ -13,8 +13,7 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     : allowed_if_matched_(rules.action() ==
                           envoy::config::rbac::v2alpha::RBAC_Action::RBAC_Action_ALLOW) {
   for (const auto& policy : rules.policies()) {
-    policies_.insert(
-        std::make_pair(policy.first, PolicyMatcher(policy.second)));
+    policies_.insert(std::make_pair(policy.first, PolicyMatcher(policy.second)));
   }
 }
 

@@ -179,8 +179,7 @@ private:
 class PolicyMatcher : public Matcher {
 public:
   PolicyMatcher(const envoy::config::rbac::v2alpha::Policy& policy)
-      : permissions_(policy.permissions()),
-        principals_(policy.principals()) {}
+      : permissions_(policy.permissions()), principals_(policy.principals()) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const envoy::api::v2::core::Metadata&) const override;

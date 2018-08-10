@@ -42,8 +42,9 @@ absl::optional<RoleBasedAccessControlEngineImpl> createEngine(const ConfigType& 
 
 template <class ConfigType>
 absl::optional<RoleBasedAccessControlEngineImpl> createShadowEngine(const ConfigType& config) {
-  return config.has_shadow_rules() ? absl::make_optional<RoleBasedAccessControlEngineImpl>(config.shadow_rules())
-                                   : absl::nullopt;
+  return config.has_shadow_rules()
+             ? absl::make_optional<RoleBasedAccessControlEngineImpl>(config.shadow_rules())
+             : absl::nullopt;
 }
 
 } // namespace RBAC

@@ -6,8 +6,8 @@
 
 #include "common/common/logger.h"
 
-#include "extensions/filters/common/rbac/config.h"
 #include "extensions/filters/common/rbac/engine_impl.h"
+#include "extensions/filters/common/rbac/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,18 +20,18 @@ enum EngineResult { UNKNOWN, NONE, ALLOW, DENY };
  * Configuration for the RBAC filter.
  */
 class RoleBasedAccessControlFilterConfig {
- public:
+public:
   RoleBasedAccessControlFilterConfig(
       const envoy::config::filter::network::rbac::v2::RBAC& proto_config, Stats::Scope& scope);
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }
 
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
-      engine(Filters::Common::RBAC::EnforcementMode mode) const {
+  engine(Filters::Common::RBAC::EnforcementMode mode) const {
     return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_ : shadow_engine_;
   }
 
- private:
+private:
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
 
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
@@ -40,7 +40,6 @@ class RoleBasedAccessControlFilterConfig {
 
 typedef std::shared_ptr<RoleBasedAccessControlFilterConfig>
     RoleBasedAccessControlFilterConfigSharedPtr;
-
 
 /**
  * Implementation of a basic RBAC network filter.
