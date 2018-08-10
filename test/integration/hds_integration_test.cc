@@ -333,7 +333,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
-  // Envoys asks the endpoint
+  // Envoys asks the endpoint if it's healthy
   ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
   ASSERT_TRUE(
       host_fake_raw_connection_->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
@@ -343,7 +343,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
-  // Check that the response_ is correct
+  // Check that the response is correct
   auto endpoint = response_.endpoint_health_response().endpoints_health(0);
   EXPECT_EQ(envoy::api::v2::core::HealthStatus::UNHEALTHY, endpoint.health_status());
   EXPECT_EQ(host_upstream_->localAddress()->ip()->port(),
@@ -369,7 +369,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyTcp) {
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
-  // Envoy asks the endpoint
+  // Envoy asks the endpoint if it's healthy
   ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
   ASSERT_TRUE(
       host_fake_raw_connection_->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
@@ -379,7 +379,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyTcp) {
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
-  // Check that the response_ is correct
+  // Check that the response is correct
   auto endpoint = response_.endpoint_health_response().endpoints_health(0);
   EXPECT_EQ(envoy::api::v2::core::HealthStatus::HEALTHY, endpoint.health_status());
   EXPECT_EQ(host_upstream_->localAddress()->ip()->port(),
@@ -405,7 +405,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTcp) {
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
 
-  // Envoy asks the endpoint
+  // Envoy asks the endpoint if it's healthy
   ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
   ASSERT_TRUE(
       host_fake_raw_connection_->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
@@ -415,7 +415,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTcp) {
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
-  // Check that the response_ is correct
+  // Check that the response is correct
   auto endpoint = response_.endpoint_health_response().endpoints_health(0);
   EXPECT_EQ(envoy::api::v2::core::HealthStatus::UNHEALTHY, endpoint.health_status());
   EXPECT_EQ(host_upstream_->localAddress()->ip()->port(),
