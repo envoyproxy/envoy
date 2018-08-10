@@ -163,12 +163,14 @@ public:
   static void checkUnknownFields(const Protobuf::Message& message) {
     if (!MessageUtil::allow_unknown_fields &&
         !message.GetReflection()->GetUnknownFields(message).empty()) {
-      throw EnvoyException("Protobuf Any (type " + message.GetTypeName() + ") has unknown fields");
+      throw EnvoyException("Protobuf message (type " + message.GetTypeName() +
+                           ") has unknown fields");
     }
   }
 
   static void loadFromJson(const std::string& json, Protobuf::Message& message);
-  static void loadFromJsonLenient(const std::string& json, Protobuf::Message& message);
+  static void loadFromJsonCustom(const std::string& json, Protobuf::Message& message,
+                                 bool allow_unknown_fields);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
 

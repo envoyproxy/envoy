@@ -62,7 +62,7 @@ TEST(UtilityTest, LoadBinaryProtoUnknownFieldFromFile) {
   envoy::config::bootstrap::v2::Bootstrap proto_from_file;
   EXPECT_THROW_WITH_MESSAGE(
       MessageUtil::loadFromFile(filename, proto_from_file), EnvoyException,
-      "Protobuf Any (type envoy.config.bootstrap.v2.Bootstrap) has unknown fields");
+      "Protobuf message (type envoy.config.bootstrap.v2.Bootstrap) has unknown fields");
 }
 
 TEST(UtilityTest, LoadTextProtoFromFile) {
@@ -239,7 +239,7 @@ TEST(UtilityTest, AnyConvertWrongFields) {
   source_any.set_type_url("type.google.com/google.protobuf.Timestamp");
   EXPECT_THROW_WITH_MESSAGE(MessageUtil::anyConvert<ProtobufWkt::Timestamp>(source_any),
                             EnvoyException,
-                            "Protobuf Any (type google.protobuf.Timestamp) has unknown fields");
+                            "Protobuf message (type google.protobuf.Timestamp) has unknown fields");
 }
 
 TEST(UtilityTest, JsonConvertSuccess) {

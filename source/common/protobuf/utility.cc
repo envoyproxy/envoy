@@ -51,16 +51,13 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
 bool MessageUtil::allow_unknown_fields = false;
 
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message) {
-  Protobuf::util::JsonParseOptions options;
-  const auto status = Protobuf::util::JsonStringToMessage(json, &message, options);
-  if (!status.ok()) {
-    throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
-  }
+  MessageUtil::loadFromJsonCustom(json, message, false);
 }
 
-void MessageUtil::loadFromJsonLenient(const std::string& json, Protobuf::Message& message) {
+void MessageUtil::loadFromJsonCustom(const std::string& json, Protobuf::Message& message,
+                                     bool allow_unknown_fields) {
   Protobuf::util::JsonParseOptions options;
-  options.ignore_unknown_fields = true;
+  options.ignore_unknown_fields = allow_unknown_fields;
   const auto status = Protobuf::util::JsonStringToMessage(json, &message, options);
   if (!status.ok()) {
     throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
@@ -132,11 +129,7 @@ void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message
     throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
                                      status.ToString(), source.DebugString()));
   }
-  if (MessageUtil::allow_unknown_fields) {
-    MessageUtil::loadFromJsonLenient(json, dest);
-    return;
-  }
-  MessageUtil::loadFromJson(json, dest);
+  MessageUtil::loadFromJsonCustom(json, dest, MessageUtil::allow_unknown_fields);
 }
 
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
