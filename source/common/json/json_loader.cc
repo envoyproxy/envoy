@@ -743,8 +743,9 @@ FieldSharedPtr parseYamlNode(YAML::Node node) {
 } // namespace
 
 ObjectSharedPtr Factory::loadFromYamlString(const std::string& yaml) {
+  YAML::Node node;
   try {
-    return parseYamlNode(YAML::Load(yaml));
+    node = YAML::Load(yaml);
   } catch (YAML::ParserException& e) {
     throw EnvoyException(e.what());
   } catch (YAML::BadConversion& e) {
@@ -756,6 +757,12 @@ ObjectSharedPtr Factory::loadFromYamlString(const std::string& yaml) {
     // the Envoy Exception text.
     throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
   }
+
+  // A valid JSON can only be built from a Map or a Sequence.
+  if (node.Type() == YAML::NodeType::Map || node.Type() == YAML::NodeType::Sequence) {
+    return parseYamlNode(node);
+  }
+  throw EnvoyException(fmt::format("Unable to convert YAML as JSON: {}", yaml));
 }
 
 ObjectSharedPtr Factory::loadFromString(const std::string& json) {

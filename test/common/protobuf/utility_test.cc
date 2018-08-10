@@ -253,6 +253,13 @@ TEST(UtilityTest, JsonConvertCamelSnake) {
                        .string_value());
 }
 
+TEST(UtilityTest, YamlLoadFromStringFail) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromYaml("/home/configs/config.yaml", bootstrap),
+                            EnvoyException,
+                            "Unable to convert YAML as JSON: /home/configs/config.yaml");
+}
+
 TEST(DurationUtilTest, OutOfRange) {
   {
     ProtobufWkt::Duration duration;
