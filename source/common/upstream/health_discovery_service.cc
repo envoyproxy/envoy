@@ -35,7 +35,7 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
 }
 
 void HdsDelegate::setHdsRetryTimer() {
-  auto retry_ms = std::chrono::milliseconds(backoff_strategy_->nextBackOffMs());
+  const auto retry_ms = std::chrono::milliseconds(backoff_strategy_->nextBackOffMs());
   ENVOY_LOG(warn, "HdsDelegate stream/connection failure, will retry in {} ms.", retry_ms.count());
 
   hds_retry_timer_->enableTimer(retry_ms);
