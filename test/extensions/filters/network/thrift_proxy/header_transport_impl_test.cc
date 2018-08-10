@@ -50,12 +50,14 @@ TEST(HeaderTransportTest, NotEnoughData) {
   HeaderTransportImpl transport;
   MessageMetadata metadata;
 
+  // Empty buffer
   {
     Buffer::OwnedImpl buffer;
     EXPECT_FALSE(transport.decodeFrameStart(buffer, metadata));
     EXPECT_THAT(metadata, IsEmptyMetadata());
   }
 
+  // Too short for minimum header
   {
     Buffer::OwnedImpl buffer;
     addRepeated(buffer, 13, 0);
@@ -63,6 +65,7 @@ TEST(HeaderTransportTest, NotEnoughData) {
     EXPECT_THAT(metadata, IsEmptyMetadata());
   }
 
+  // Missing header data
   {
     Buffer::OwnedImpl buffer;
     addInt32(buffer, 100);
@@ -117,6 +120,7 @@ TEST(HeaderTransportTest, InvalidHeaderSize) {
   HeaderTransportImpl transport;
   MessageMetadata metadata;
 
+  // Minimum header size is 1 = 4 bytes
   {
     Buffer::OwnedImpl buffer;
 
@@ -130,6 +134,7 @@ TEST(HeaderTransportTest, InvalidHeaderSize) {
     EXPECT_THAT(metadata, IsEmptyMetadata());
   }
 
+  // Minimum header size is 1 = 4 bytes
   {
     Buffer::OwnedImpl buffer;
 
@@ -143,6 +148,7 @@ TEST(HeaderTransportTest, InvalidHeaderSize) {
     EXPECT_THAT(metadata, IsEmptyMetadata());
   }
 
+  // Max header size is 16384 = 65536 bytes
   {
     Buffer::OwnedImpl buffer;
 
@@ -156,6 +162,7 @@ TEST(HeaderTransportTest, InvalidHeaderSize) {
     EXPECT_THAT(metadata, IsEmptyMetadata());
   }
 
+  // Header data extends past stated header size.
   {
     Buffer::OwnedImpl buffer;
 
@@ -165,6 +172,20 @@ TEST(HeaderTransportTest, InvalidHeaderSize) {
     addInt32(buffer, 1);                            // sequence number
     addInt16(buffer, 1);                            // 4 bytes
     addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF, 0x1F}); // var int -1, exceeds header size
+    EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
+                              "unable to read header transport protocol id: header too small");
+  }
+
+  // Partial var-int at end of header
+  {
+    Buffer::OwnedImpl buffer;
+
+    addInt32(buffer, 0x100);
+    addInt16(buffer, 0x0FFF);
+    addInt16(buffer, 0);
+    addInt32(buffer, 1);                      // sequence number
+    addInt16(buffer, 1);                      // 4 bytes
+    addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF}); // partial var int
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "unable to read header transport protocol id: header too small");
   }
@@ -257,6 +278,7 @@ TEST(HeaderTransportTest, NoTransformsOrInfo) {
 TEST(HeaderTransportTest, TransformErrors) {
   MessageMetadata metadata;
 
+  // Invalid number of transforms
   {
     HeaderTransportImpl transport;
     Buffer::OwnedImpl buffer;
@@ -274,6 +296,7 @@ TEST(HeaderTransportTest, TransformErrors) {
                               "invalid header transport transform count -1");
   }
 
+  // Unknown transform ids
   for (uint8_t xform_id = 1; xform_id < 5; xform_id++) {
     HeaderTransportImpl transport;
     Buffer::OwnedImpl buffer;
@@ -312,6 +335,7 @@ TEST(HeaderTransportTest, TransformErrors) {
 }
 
 TEST(HeaderTransportTest, InvalidInfoBlock) {
+  // Unknown info block id
   {
     HeaderTransportImpl transport;
     Buffer::OwnedImpl buffer;
@@ -333,6 +357,7 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
     EXPECT_EQ(buffer.length(), 0);
   }
 
+  // Num headers info info block id 1 must be >= 0
   {
     HeaderTransportImpl transport;
     Buffer::OwnedImpl buffer;
@@ -351,6 +376,7 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
                               "invalid header transport header count -1");
   }
 
+  // Header key length exceeds max allowed size
   {
     HeaderTransportImpl transport;
     Buffer::OwnedImpl buffer;
@@ -369,6 +395,7 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
                               "header transport header key: value 1048576 exceeds max i16 (32767)");
   }
 
+  // Header key extends past stated header size
   {
     HeaderTransportImpl transport;
     Buffer::OwnedImpl buffer;
@@ -387,6 +414,7 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
                               "unable to read header transport header key: header too small");
   }
 
+  // Header key ends at stated header size (no value)
   {
     HeaderTransportImpl transport;
     Buffer::OwnedImpl buffer;
@@ -443,6 +471,7 @@ TEST(HeaderTransportTest, InfoBlock) {
   EXPECT_EQ(expected_headers, metadata.headers());
   EXPECT_EQ(buffer.length(), 0);
 }
+
 TEST(HeaderTransportTest, DecodeFrameEnd) {
   HeaderTransportImpl transport;
   Buffer::OwnedImpl buffer;
