@@ -46,9 +46,9 @@ public:
   static FieldSharedPtr createArray() { return FieldSharedPtr{new Field(Type::Array)}; }
   static FieldSharedPtr createNull() { return FieldSharedPtr{new Field(Type::Null)}; }
 
-  bool isNull() const override { return type_ == Type::Null; }
-  bool isArray() const { return type_ == Type::Array; }
-  bool isObject() const { return type_ == Type::Object; }
+  bool isNull() const override { return type_ == Type::Null; };
+  bool isArray() const override { return type_ == Type::Array; };
+  bool isObject() const override { return type_ == Type::Object; };
 
   // Value factory.
   template <typename T> static FieldSharedPtr createValue(T value) {
@@ -743,9 +743,8 @@ FieldSharedPtr parseYamlNode(YAML::Node node) {
 } // namespace
 
 ObjectSharedPtr Factory::loadFromYamlString(const std::string& yaml) {
-  YAML::Node node;
   try {
-    node = YAML::Load(yaml);
+    return parseYamlNode(YAML::Load(yaml));
   } catch (YAML::ParserException& e) {
     throw EnvoyException(e.what());
   } catch (YAML::BadConversion& e) {
@@ -757,12 +756,6 @@ ObjectSharedPtr Factory::loadFromYamlString(const std::string& yaml) {
     // the Envoy Exception text.
     throw EnvoyException(fmt::format("Unexpected YAML exception: {}", +e.what()));
   }
-
-  // A valid JSON can only be built from a Map or a Sequence.
-  if (node.Type() == YAML::NodeType::Map || node.Type() == YAML::NodeType::Sequence) {
-    return parseYamlNode(node);
-  }
-  throw EnvoyException(fmt::format("Unable to convert YAML as JSON: {}", yaml));
 }
 
 ObjectSharedPtr Factory::loadFromString(const std::string& json) {
