@@ -154,12 +154,13 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
       stats_.gauge("overload.envoy.resource_monitors.fake_resource1.pressure");
   Stats::Gauge& pressure_gauge2 =
       stats_.gauge("overload.envoy.resource_monitors.fake_resource2.pressure");
-  const OverloadActionStateCache& action_state = manager->getOverloadActionStateCache();
+  const OverloadActionState& action_state =
+      manager->getThreadLocalOverloadState().getState("envoy.overload_actions.dummy_action");
 
   factory1_.monitor_->setPressure(0.5);
   timer_cb_();
   EXPECT_FALSE(is_active);
-  EXPECT_FALSE(action_state.isActive("envoy.overload_actions.dummy_action"));
+  EXPECT_EQ(action_state, OverloadActionState::Inactive);
   EXPECT_EQ(0, cb_count);
   EXPECT_EQ(0, active_gauge.value());
   EXPECT_EQ(50, pressure_gauge1.value());
@@ -167,7 +168,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   factory1_.monitor_->setPressure(0.95);
   timer_cb_();
   EXPECT_TRUE(is_active);
-  EXPECT_TRUE(action_state.isActive("envoy.overload_actions.dummy_action"));
+  EXPECT_EQ(action_state, OverloadActionState::Active);
   EXPECT_EQ(1, cb_count);
   EXPECT_EQ(1, active_gauge.value());
   EXPECT_EQ(95, pressure_gauge1.value());
@@ -176,7 +177,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   factory1_.monitor_->setPressure(0.94);
   timer_cb_();
   EXPECT_TRUE(is_active);
-  EXPECT_TRUE(action_state.isActive("envoy.overload_actions.dummy_action"));
+  EXPECT_EQ(action_state, OverloadActionState::Active);
   EXPECT_EQ(1, cb_count);
   EXPECT_EQ(94, pressure_gauge1.value());
 
@@ -185,7 +186,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   factory2_.monitor_->setPressure(0.9);
   timer_cb_();
   EXPECT_TRUE(is_active);
-  EXPECT_TRUE(action_state.isActive("envoy.overload_actions.dummy_action"));
+  EXPECT_EQ(action_state, OverloadActionState::Active);
   EXPECT_EQ(1, cb_count);
   EXPECT_EQ(50, pressure_gauge1.value());
   EXPECT_EQ(90, pressure_gauge2.value());
@@ -193,7 +194,7 @@ TEST_F(OverloadManagerImplTest, CallbackOnlyFiresWhenStateChanges) {
   factory2_.monitor_->setPressure(0.4);
   timer_cb_();
   EXPECT_FALSE(is_active);
-  EXPECT_FALSE(action_state.isActive("envoy.overload_actions.dummy_action"));
+  EXPECT_EQ(action_state, OverloadActionState::Inactive);
   EXPECT_EQ(2, cb_count);
   EXPECT_EQ(0, active_gauge.value());
   EXPECT_EQ(40, pressure_gauge2.value());

@@ -58,7 +58,7 @@ public:
   void start() override;
   void registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                          OverloadActionCb callback) override;
-  const OverloadActionStateCache& getOverloadActionStateCache() override;
+  ThreadLocalOverloadState& getThreadLocalOverloadState() override;
 
 private:
   class Resource : public ResourceMonitor::Callbacks {

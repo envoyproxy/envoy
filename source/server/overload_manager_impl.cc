@@ -128,7 +128,7 @@ OverloadManagerImpl::OverloadManagerImpl(
   }
 
   tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<OverloadActionStateCache>();
+    return std::make_shared<ThreadLocalOverloadState>();
   });
 }
 
@@ -162,8 +162,8 @@ void OverloadManagerImpl::registerForAction(const std::string& action,
                                std::forward_as_tuple(dispatcher, callback));
 }
 
-const OverloadActionStateCache& OverloadManagerImpl::getOverloadActionStateCache() {
-  return tls_->getTyped<OverloadActionStateCache>();
+ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() {
+  return tls_->getTyped<ThreadLocalOverloadState>();
 }
 
 void OverloadManagerImpl::updateResourcePressure(const std::string& resource, double pressure) {
@@ -180,7 +180,7 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
                     ENVOY_LOG(info, "Overload action {} has become {}", action,
                               is_active ? "active" : "inactive");
                     tls_->runOnAllThreads([this, action, state] {
-                      tls_->getTyped<OverloadActionStateCache>().setState(action, state);
+                      tls_->getTyped<ThreadLocalOverloadState>().setState(action, state);
                     });
                     auto callback_range = action_to_callbacks_.equal_range(action);
                     std::for_each(callback_range.first, callback_range.second,

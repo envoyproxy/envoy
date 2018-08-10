@@ -25,16 +25,26 @@ enum class OverloadActionState {
 typedef std::function<void(OverloadActionState)> OverloadActionCb;
 
 /**
- * Thread-local cache of the current state of each configured overload action.
+ * Thread-local copy of the state of each configured overload action.
  */
-class OverloadActionStateCache : public ThreadLocal::ThreadLocalObject {
+class ThreadLocalOverloadState : public ThreadLocal::ThreadLocalObject {
 public:
-  bool isActive(const std::string& action) const {
+  const OverloadActionState& getState(const std::string& action) {
     auto it = actions_.find(action);
-    return it != actions_.end() && it->second == OverloadActionState::Active;
+    if (it == actions_.end()) {
+      it = actions_.insert(std::make_pair(action, OverloadActionState::Inactive)).first;
+    }
+    return it->second;
   }
 
-  void setState(const std::string& action, OverloadActionState state) { actions_[action] = state; }
+  void setState(const std::string& action, OverloadActionState state) {
+    auto it = actions_.find(action);
+    if (it == actions_.end()) {
+      actions_[action] = state;
+    } else {
+      it->second = state;
+    }
+  }
 
 private:
   std::unordered_map<std::string, OverloadActionState> actions_;
@@ -67,10 +77,10 @@ public:
                                  OverloadActionCb callback) PURE;
 
   /**
-   * Get the thread-local overload action state cache. Lookups in this cache can be used as
+   * Get the thread-local overload action states. Lookups in this object can be used as
    * an alternative to registering a callback for overload action state changes.
    */
-  virtual const OverloadActionStateCache& getOverloadActionStateCache() PURE;
+  virtual ThreadLocalOverloadState& getThreadLocalOverloadState() PURE;
 };
 
 } // namespace Server
