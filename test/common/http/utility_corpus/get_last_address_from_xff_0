@@ -1,0 +1,4 @@
+get_last_address_from_xff {
+  xff: "192.0.2.10, 192.0.2.1, 10.0.0.1"
+  num_to_skip: 0
+}

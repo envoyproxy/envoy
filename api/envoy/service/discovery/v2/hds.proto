@@ -77,7 +77,7 @@ message Capability {
     TCP = 1;
     REDIS = 2;
   }
-  repeated Protocol health_check_protocol = 1;
+  repeated Protocol health_check_protocols = 1;
 }
 
 message HealthCheckRequest {
@@ -113,11 +113,11 @@ message LocalityEndpoints {
 message ClusterHealthCheck {
   string cluster_name = 1;
   repeated envoy.api.v2.core.HealthCheck health_checks = 2;
-  repeated LocalityEndpoints endpoints = 3;
+  repeated LocalityEndpoints locality_endpoints = 3;
 }
 
 message HealthCheckSpecifier {
-  repeated ClusterHealthCheck health_check = 1;
+  repeated ClusterHealthCheck cluster_health_checks = 1;
   // The default is 1 second.
   google.protobuf.Duration interval = 2;
 }

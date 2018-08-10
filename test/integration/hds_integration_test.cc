@@ -117,15 +117,15 @@ public:
     envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier_;
     server_health_check_specifier_.mutable_interval()->set_seconds(1);
 
-    auto* health_check = server_health_check_specifier_.add_health_check();
+    auto* health_check = server_health_check_specifier_.add_cluster_health_checks();
 
     health_check->set_cluster_name("anna");
     Network::Utility::addressToProtobufAddress(
         *host_upstream_->localAddress(),
-        *health_check->add_endpoints()->add_endpoints()->mutable_address());
-    health_check->mutable_endpoints(0)->mutable_locality()->set_region("some_region");
-    health_check->mutable_endpoints(0)->mutable_locality()->set_zone("some_zone");
-    health_check->mutable_endpoints(0)->mutable_locality()->set_sub_zone("crete");
+        *health_check->add_locality_endpoints()->add_endpoints()->mutable_address());
+    health_check->mutable_locality_endpoints(0)->mutable_locality()->set_region("some_region");
+    health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("some_zone");
+    health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("crete");
 
     health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
     health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
@@ -144,15 +144,15 @@ public:
     envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier_;
     server_health_check_specifier_.mutable_interval()->set_seconds(1);
 
-    auto* health_check = server_health_check_specifier_.add_health_check();
+    auto* health_check = server_health_check_specifier_.add_cluster_health_checks();
 
     health_check->set_cluster_name("anna");
     Network::Utility::addressToProtobufAddress(
         *host_upstream_->localAddress(),
-        *health_check->add_endpoints()->add_endpoints()->mutable_address());
-    health_check->mutable_endpoints(0)->mutable_locality()->set_region("some_region");
-    health_check->mutable_endpoints(0)->mutable_locality()->set_zone("some_zone");
-    health_check->mutable_endpoints(0)->mutable_locality()->set_sub_zone("crete");
+        *health_check->add_locality_endpoints()->add_endpoints()->mutable_address());
+    health_check->mutable_locality_endpoints(0)->mutable_locality()->set_region("some_region");
+    health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("some_zone");
+    health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("crete");
 
     health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
     health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
@@ -215,7 +215,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttp) {
   // Server <--> Envoy
   waitForHdsStream();
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
-  EXPECT_EQ(envoy_msg_.capability().health_check_protocol(0),
+  EXPECT_EQ(envoy_msg_.capability().health_check_protocols(0),
             envoy::service::discovery::v2::Capability::HTTP);
 
   // Server asks for health checking
@@ -324,7 +324,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   // Server <--> Envoy
   waitForHdsStream();
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
-  EXPECT_EQ(envoy_msg_.capability().health_check_protocol(1),
+  EXPECT_EQ(envoy_msg_.capability().health_check_protocols(1),
             envoy::service::discovery::v2::Capability::TCP);
 
   // Server asks for health checking
@@ -433,11 +433,11 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
 
   server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
   Network::Utility::addressToProtobufAddress(
-      *host2_upstream_->localAddress(), *server_health_check_specifier_.mutable_health_check(0)
-                                             ->mutable_endpoints(0)
-                                             ->add_endpoints()
-                                             ->mutable_address());
-
+      *host2_upstream_->localAddress(),
+      *server_health_check_specifier_.mutable_cluster_health_checks(0)
+           ->mutable_locality_endpoints(0)
+           ->add_endpoints()
+           ->mutable_address());
   // Server <--> Envoy
   waitForHdsStream();
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
@@ -479,14 +479,14 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
   server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
 
   // Add endpoint
-  auto* health_check = server_health_check_specifier_.mutable_health_check(0);
+  auto* health_check = server_health_check_specifier_.mutable_cluster_health_checks(0);
 
   Network::Utility::addressToProtobufAddress(
       *host2_upstream_->localAddress(),
-      *health_check->add_endpoints()->add_endpoints()->mutable_address());
-  health_check->mutable_endpoints(1)->mutable_locality()->set_region("different_region");
-  health_check->mutable_endpoints(1)->mutable_locality()->set_zone("different_zone");
-  health_check->mutable_endpoints(1)->mutable_locality()->set_sub_zone("emplisi");
+      *health_check->add_locality_endpoints()->add_endpoints()->mutable_address());
+  health_check->mutable_locality_endpoints(1)->mutable_locality()->set_region("different_region");
+  health_check->mutable_locality_endpoints(1)->mutable_locality()->set_zone("different_zone");
+  health_check->mutable_locality_endpoints(1)->mutable_locality()->set_sub_zone("emplisi");
 
   // Server <--> Envoy
   waitForHdsStream();
@@ -530,15 +530,15 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
 
   // Add endpoint
-  auto* health_check = server_health_check_specifier_.add_health_check();
+  auto* health_check = server_health_check_specifier_.add_cluster_health_checks();
 
   health_check->set_cluster_name("cat");
   Network::Utility::addressToProtobufAddress(
       *host2_upstream_->localAddress(),
-      *health_check->add_endpoints()->add_endpoints()->mutable_address());
-  health_check->mutable_endpoints(0)->mutable_locality()->set_region("peculiar_region");
-  health_check->mutable_endpoints(0)->mutable_locality()->set_zone("peculiar_zone");
-  health_check->mutable_endpoints(0)->mutable_locality()->set_sub_zone("paris");
+      *health_check->add_locality_endpoints()->add_endpoints()->mutable_address());
+  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_region("peculiar_region");
+  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("peculiar_zone");
+  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("paris");
 
   health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
   health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
@@ -622,16 +622,16 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   envoy::service::discovery::v2::HealthCheckSpecifier new_message;
   new_message.mutable_interval()->set_seconds(1);
 
-  auto* health_check = new_message.add_health_check();
+  auto* health_check = new_message.add_cluster_health_checks();
 
   health_check->set_cluster_name("cat");
   Network::Utility::addressToProtobufAddress(
       *host2_upstream_->localAddress(),
-      *health_check->add_endpoints()->add_endpoints()->mutable_address());
+      *health_check->add_locality_endpoints()->add_endpoints()->mutable_address());
 
-  health_check->mutable_endpoints(0)->mutable_locality()->set_region("peculiar_region");
-  health_check->mutable_endpoints(0)->mutable_locality()->set_zone("peculiar_zone");
-  health_check->mutable_endpoints(0)->mutable_locality()->set_sub_zone("paris");
+  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_region("peculiar_region");
+  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("peculiar_zone");
+  health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("paris");
 
   health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
   health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
