@@ -4,28 +4,21 @@ package test.common.http.http2;
 
 import "google/protobuf/empty.proto";
 
+import "test/fuzz/common.proto";
+
 // Structured input for H2 codec_impl_fuzz_test.
 
-message Header {
-  string key = 1;
-  string value = 2;
-}
-
-message Headers {
-  repeated Header headers = 1;
-}
-
 message NewStream {
-  Headers request_headers = 1;
+  test.fuzz.Headers request_headers = 1;
   bool end_stream = 2;
 }
 
 message DirectionalAction {
   oneof directional_action_selector {
-    Headers continue_100_headers = 1;
-    Headers headers = 2;
+    test.fuzz.Headers continue_100_headers = 1;
+    test.fuzz.Headers headers = 2;
     uint32 data = 3;
-    Headers trailers = 4;
+    test.fuzz.Headers trailers = 4;
     uint32 reset = 5;
     bool read_disable = 6;
   }
