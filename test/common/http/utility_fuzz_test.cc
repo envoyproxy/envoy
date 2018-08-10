@@ -1,9 +1,3 @@
-#if 0
-// string
-void Utility::extractHostPathFromUri(const absl::string_view& uri, absl::string_view& host,
-                                     absl::string_view& path) {
-#endif
-
 #include "common/http/utility.h"
 
 #include "test/common/http/utility_fuzz.pb.h"
