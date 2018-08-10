@@ -59,6 +59,8 @@ public:
   // Server::Admin
   // TODO(jsedgwick) These can be managed with a generic version of ConfigTracker.
   // Wins would be no manual removeHandler() and code reuse.
+  //
+  // The prefix must start with "/" and contain at least one additional character.
   bool addHandler(const std::string& prefix, const std::string& help_text, HandlerCb callback,
                   bool removable, bool mutates_server_state) override;
   bool removeHandler(const std::string& prefix) override;
@@ -112,9 +114,8 @@ public:
   Http::ConnectionManagerListenerStats& listenerStats() override { return listener_.stats_; }
   bool proxy100Continue() const override { return false; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
-  Http::Code request(absl::string_view path, const Http::Utility::QueryParams& params,
-                     absl::string_view method, Http::HeaderMap& response_headers,
-                     std::string& body) override;
+  Http::Code request(absl::string_view path_and_query, absl::string_view method,
+                     Http::HeaderMap& response_headers, std::string& body) override;
 
 private:
   /**

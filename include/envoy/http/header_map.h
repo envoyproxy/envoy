@@ -7,9 +7,12 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "envoy/common/pure.h"
+
+#include "common/common/hash.h"
 
 #include "absl/strings/string_view.h"
 
@@ -28,12 +31,25 @@ public:
 
   const std::string& get() const { return string_; }
   bool operator==(const LowerCaseString& rhs) const { return string_ == rhs.string_; }
+  bool operator!=(const LowerCaseString& rhs) const { return string_ != rhs.string_; }
 
 private:
   void lower() { std::transform(string_.begin(), string_.end(), string_.begin(), tolower); }
 
   std::string string_;
 };
+
+/**
+ * Lower case string hasher.
+ */
+struct LowerCaseStringHash {
+  size_t operator()(const LowerCaseString& value) const { return HashUtil::xxHash64(value.get()); }
+};
+
+/**
+ * Convenient type for unordered set of lower case string.
+ */
+typedef std::unordered_set<LowerCaseString, LowerCaseStringHash> LowerCaseStrUnorderedSet;
 
 /**
  * This is a string implementation for use in header processing. It is heavily optimized for

@@ -20,6 +20,16 @@ void WatermarkBuffer::add(const Instance& data) {
   checkHighWatermark();
 }
 
+void WatermarkBuffer::prepend(absl::string_view data) {
+  OwnedImpl::prepend(data);
+  checkHighWatermark();
+}
+
+void WatermarkBuffer::prepend(Instance& data) {
+  OwnedImpl::prepend(data);
+  checkHighWatermark();
+}
+
 void WatermarkBuffer::commit(RawSlice* iovecs, uint64_t num_iovecs) {
   OwnedImpl::commit(iovecs, num_iovecs);
   checkHighWatermark();

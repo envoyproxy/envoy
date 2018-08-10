@@ -8,6 +8,8 @@
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/pure.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Buffer {
 
@@ -76,6 +78,19 @@ public:
    * @param data supplies the buffer to copy.
    */
   virtual void add(const Instance& data) PURE;
+
+  /**
+   * Prepend a string_view to the buffer.
+   * @param data supplies the string_view to copy.
+   */
+  virtual void prepend(absl::string_view data) PURE;
+
+  /**
+   * Prepend data from another buffer to this buffer.
+   * The supplied buffer is drained after this operation.
+   * @param data supplies the buffer to copy.
+   */
+  virtual void prepend(Instance& data) PURE;
 
   /**
    * Commit a set of slices originally obtained from reserve(). The number of slices can be

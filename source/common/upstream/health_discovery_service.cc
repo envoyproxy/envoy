@@ -30,6 +30,7 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
       envoy::service::discovery::v2::Capability::HTTP);
   health_check_request_.mutable_capability()->add_health_check_protocol(
       envoy::service::discovery::v2::Capability::TCP);
+
   establishNewStream();
 }
 
@@ -143,6 +144,9 @@ void HdsDelegate::onReceiveMessage(
     std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
   stats_.requests_.inc();
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
+
+  // Reset
+  hds_clusters_.clear();
 
   // Process the HealthCheckSpecifier message
   processMessage(std::move(message));

@@ -41,6 +41,18 @@ void OwnedImpl::add(const Instance& data) {
   }
 }
 
+void OwnedImpl::prepend(absl::string_view data) {
+  evbuffer_prepend(buffer_.get(), data.data(), data.size());
+}
+
+void OwnedImpl::prepend(Instance& data) {
+  int rc =
+      evbuffer_prepend_buffer(buffer_.get(), static_cast<LibEventInstance&>(data).buffer().get());
+  ASSERT(rc == 0);
+  ASSERT(data.length() == 0);
+  static_cast<LibEventInstance&>(data).postProcess();
+}
+
 void OwnedImpl::commit(RawSlice* iovecs, uint64_t num_iovecs) {
   int rc =
       evbuffer_commit_space(buffer_.get(), reinterpret_cast<evbuffer_iovec*>(iovecs), num_iovecs);
