@@ -415,6 +415,8 @@ void RunHelper::shutdown(Event::Dispatcher& dispatcher, HotRestart& hot_restart)
 }
 
 void InstanceImpl::run() {
+  // We need the RunHelper to be available to call from InstanceImpl::shutdown() below, so
+  // we save it as a member variable.
   run_helper_ = std::make_unique<RunHelper>(*dispatcher_, clusterManager(), restarter_,
                                             access_log_manager_, init_manager_, overloadManager(),
                                             [this]() -> void { startWorkers(); });
