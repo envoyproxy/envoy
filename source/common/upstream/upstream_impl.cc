@@ -184,10 +184,10 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
   healthy_hosts_per_locality_ = std::move(healthy_hosts_per_locality);
   locality_weights_ = std::move(locality_weights);
   // Rebuild the locality scheduler by computing the effective weight of each
-  // locality in this priority. No scheduler is built if we don't have locality weights
-  // (i.e. not using EDS) or when there are 0 healthy hosts in this priority.
+  // locality in this priority. The scheduler is reset by default, and is rebuilt only if we have
+  // locality weights (i.e. using EDS) and there is at least one healthy host in this priority.
   //
-  // We omit building a scheduler when there are zero healhty hosts in the priority as all
+  // We omit building a scheduler when there are zero healthy hosts in the priority as all
   // the localities will have zero effective weight. At selection time, we'll only ever try
   // to select a host from such a priority if all priorities have zero healthy hosts. At
   // that point we'll rely on other mechanisms such as panic mode to select a host,
@@ -198,6 +198,7 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
   // could just update locality_weight_ without rebuilding. Similar to how host
   // level WRR works, we would age out the existing entries via picks and lazily
   // apply the new weights.
+  locality_scheduler_ = nullptr;
   if (hosts_per_locality_ != nullptr && locality_weights_ != nullptr &&
       !locality_weights_->empty() && !healthy_hosts_->empty()) {
     locality_scheduler_ = std::make_unique<EdfScheduler<LocalityEntry>>();
@@ -209,8 +210,10 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
         locality_scheduler_->add(effective_weight, locality_entries_.back());
       }
     }
-  } else {
-    locality_scheduler_ = nullptr;
+    // If all effective weights were zero, reset the scheduler.
+    if (locality_scheduler_->empty()) {
+      locality_scheduler_ = nullptr;
+    }
   }
   runUpdateCallbacks(hosts_added, hosts_removed);
 }

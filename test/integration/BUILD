@@ -63,20 +63,6 @@ envoy_proto_library(
     external_deps = ["well_known_protos"],
 )
 
-envoy_cc_fuzz_test(
-    name = "h1_capture_fuzz_test",
-    srcs = ["h1_capture_fuzz_test.cc"],
-    corpus = "h1_capture_corpus",
-    deps = [
-        ":capture_fuzz_proto",
-        ":http_integration_lib",
-        "//source/common/common:assert_lib",
-        "//source/common/common:logger_lib",
-        "//test/integration:integration_lib",
-        "//test/test_common:environment_lib",
-    ],
-)
-
 envoy_cc_test(
     name = "eds_integration_test",
     srcs = ["eds_integration_test.cc"],
@@ -565,5 +551,46 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/ssl:config",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "h1_fuzz_lib",
+    srcs = [
+        "h1_fuzz.cc",
+    ],
+    hdrs = [
+        "h1_fuzz.h",
+    ],
+    deps = [
+        ":capture_fuzz_proto",
+        ":http_integration_lib",
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
+        "//test/fuzz:fuzz_runner_lib",
+        "//test/integration:integration_lib",
+        "//test/test_common:environment_lib",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "h1_capture_fuzz_test",
+    srcs = [
+        "h1_capture_fuzz_test.cc",
+    ],
+    corpus = "h1_corpus",
+    deps = [
+        ":h1_fuzz_lib",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "h1_capture_direct_response_fuzz_test",
+    srcs = [
+        "h1_capture_direct_response_fuzz_test.cc",
+    ],
+    corpus = "h1_corpus",
+    deps = [
+        ":h1_fuzz_lib",
     ],
 )

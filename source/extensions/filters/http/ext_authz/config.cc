@@ -34,7 +34,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoTyped(
     ](Http::FilterChainFactoryCallbacks & callbacks) {
       auto client = std::make_unique<Filters::Common::ExtAuthz::RawHttpClientImpl>(
           cluster_name, filter_config->cm(), std::chrono::milliseconds(timeout_ms), path_prefix,
-          filter_config->responseHeadersToRemove());
+          filter_config->allowedAuthorizationHeaders(), filter_config->allowedRequestHeaders());
       callbacks.addStreamDecoderFilter(Http::StreamDecoderFilterSharedPtr{
           std::make_shared<Filter>(filter_config, std::move(client))});
     };

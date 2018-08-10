@@ -1608,6 +1608,16 @@ TEST_F(HostSetImplLocalityTest, AllUnhealthy) {
   EXPECT_FALSE(host_set_.chooseLocality().has_value());
 }
 
+// When all locality weights are zero we should fail to select a locality.
+TEST_F(HostSetImplLocalityTest, AllZeroWeights) {
+  HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}});
+  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{0, 0}};
+  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
+  host_set_.updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, locality_weights, {},
+                        {});
+  EXPECT_FALSE(host_set_.chooseLocality().has_value());
+}
+
 // When all locality weights are the same we have unweighted RR behavior.
 TEST_F(HostSetImplLocalityTest, Unweighted) {
   HostsPerLocalitySharedPtr hosts_per_locality =

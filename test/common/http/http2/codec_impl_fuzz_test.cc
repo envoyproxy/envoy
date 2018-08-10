@@ -16,6 +16,7 @@
 
 #include "test/common/http/http2/codec_impl_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
+#include "test/fuzz/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 
@@ -46,15 +47,6 @@ public:
   nghttp2_session* session() { return session_; }
   using ClientConnectionImpl::getStream;
 };
-
-// Convert from test proto Headers to TestHeaderMapImpl.
-TestHeaderMapImpl fromHeaders(const test::common::http::http2::Headers& headers) {
-  TestHeaderMapImpl header_map;
-  for (const auto& header : headers.headers()) {
-    header_map.addCopy(header.key(), header.value());
-  }
-  return header_map;
-}
 
 // Convert from test proto Http2Settings to Http2Settings.
 Http2Settings fromHttp2Settings(const test::common::http::http2::Http2Settings& settings) {
@@ -109,7 +101,8 @@ public:
     switch (directional_action.directional_action_selector_case()) {
     case test::common::http::http2::DirectionalAction::kContinue100Headers: {
       if (state == StreamState::PendingHeaders) {
-        Http::TestHeaderMapImpl headers = fromHeaders(directional_action.continue_100_headers());
+        Http::TestHeaderMapImpl headers =
+            Fuzz::fromHeaders(directional_action.continue_100_headers());
         headers.setReferenceKey(Headers::get().Status, "100");
         encoder.encode100ContinueHeaders(headers);
       }
@@ -117,7 +110,7 @@ public:
     }
     case test::common::http::http2::DirectionalAction::kHeaders: {
       if (state == StreamState::PendingHeaders) {
-        encoder.encodeHeaders(fromHeaders(directional_action.headers()), end_stream);
+        encoder.encodeHeaders(Fuzz::fromHeaders(directional_action.headers()), end_stream);
         state = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
       }
       break;
@@ -132,7 +125,7 @@ public:
     }
     case test::common::http::http2::DirectionalAction::kTrailers: {
       if (state == StreamState::PendingDataOrTrailers) {
-        encoder.encodeTrailers(fromHeaders(directional_action.trailers()));
+        encoder.encodeTrailers(Fuzz::fromHeaders(directional_action.trailers()));
         state = StreamState::Closed;
       }
       break;
@@ -296,9 +289,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::CodecImplFuzzTestCase& inpu
       ENVOY_LOG_MISC(trace, "action {} with {} streams", action.DebugString(), streams.size());
       switch (action.action_selector_case()) {
       case test::common::http::http2::Action::kNewStream: {
-        StreamPtr stream =
-            std::make_unique<Stream>(client, fromHeaders(action.new_stream().request_headers()),
-                                     action.new_stream().end_stream());
+        StreamPtr stream = std::make_unique<Stream>(
+            client, Fuzz::fromHeaders(action.new_stream().request_headers()),
+            action.new_stream().end_stream());
         stream->moveIntoListBack(std::move(stream), pending_streams);
         break;
       }
