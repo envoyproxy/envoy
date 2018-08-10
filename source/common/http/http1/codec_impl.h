@@ -98,7 +98,6 @@ private:
 class RequestStreamEncoderImpl : public StreamEncoderImpl {
 public:
   RequestStreamEncoderImpl(ConnectionImpl& connection) : StreamEncoderImpl(connection) {}
-
   bool headRequest() { return head_request_; }
 
   // Http::StreamEncoder
@@ -327,6 +326,9 @@ public:
 
   // Http::ClientConnection
   StreamEncoder& newStream(StreamDecoder& response_decoder) override;
+  void setHeadStateForLastResponse(bool is_head) {
+    pending_responses_.back().head_request_ = is_head;
+  }
 
 private:
   struct PendingResponse {

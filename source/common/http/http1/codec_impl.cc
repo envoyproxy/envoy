@@ -250,8 +250,12 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
     // If this is an incomplete request (end_stream=false), then connection_.onEncodeComplete();
     // will not be called in StreamEncoderImpl::encodeHeaders, head request state will not be passed
     // to the corresponding response so here need to call this method
-    if (!end_stream)
-      connection_.onEncodeComplete();
+    if (!end_stream) {
+      auto c = dynamic_cast<ClientConnectionImpl*>(&connection_);
+      if (c) {
+        c->setHeadStateForLastResponse(true);
+      }
+    }
   }
 
   connection_.reserveBuffer(std::max(4096U, path->value().size() + 4096));
@@ -692,7 +696,7 @@ StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) 
 
 void ClientConnectionImpl::onEncodeComplete() {
   // Transfer head request state into the pending response before we reuse the encoder.
-  pending_responses_.back().head_request_ = request_encoder_->headRequest();
+  setHeadStateForLastResponse(request_encoder_->headRequest());
 }
 
 int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
