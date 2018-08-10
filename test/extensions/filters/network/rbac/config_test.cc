@@ -16,6 +16,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RBACFilter {
 
+namespace {
 static const std::string header = R"EOF(
 { "header": {"name": "key", "exact_match": "value"} }
 )EOF";
@@ -27,6 +28,7 @@ static const std::string metadata = R"EOF(
   }
 }
 )EOF";
+} // namespace
 
 class RoleBasedAccessControlNetworkFilterConfigFactoryTest : public testing::Test {
 public:

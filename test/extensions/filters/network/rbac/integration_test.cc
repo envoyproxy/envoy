@@ -3,12 +3,16 @@
 #include "test/integration/integration.h"
 #include "test/test_common/environment.h"
 
+#include "fmt/printf.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RBAC {
 
+namespace {
 std::string rbac_config;
+} // namespace
 
 class RoleBasedAccessControlNetworkFilterIntegrationTest
     : public BaseIntegrationTest,
@@ -18,72 +22,35 @@ public:
       : BaseIntegrationTest(GetParam(), rbac_config) {}
 
   static void SetUpTestCase() {
-    rbac_config = R"EOF(
-admin:
-  access_log_path: /dev/null
-  address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 0
-static_resources:
-  clusters:
-    name: cluster_0
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
-  listeners:
-  - name: listener_0
-    address:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 8000
+    rbac_config = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
-      - name: envoy.filters.network.rbac
-        config:
-          stat_prefix: tcp.
-          rules:
-            policies:
-              "allow_8080":
-                permissions:
-                  - destination_port: 8000
-                principals:
-                  - any: true
-          shadow_rules:
-            policies:
-              "deny_all":
-                permissions:
-                  - any: true
-                principals:
-                  - not_id:
-                      any: true
-  - name: listener_1
-    address:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 8080
-    filter_chains:
-      filters:
-      - name: envoy.filters.network.rbac
-        config:
-          stat_prefix: tcp.
-          rules:
-            policies:
-              "deny_all":
-                permissions:
-                  - any: true
-                principals:
-                  - not_id:
-                      any: true
-          shadow_rules:
-            policies:
-              "allow_8080":
-                permissions:
-                  - destination_port: 8080
-                principals:
-                  - any: true
-    )EOF";
+       -  name: envoy.filters.network.rbac
+          config:
+            stat_prefix: tcp.
+            rules:
+              policies:
+                "foo":
+                  permissions:
+                    - any: true
+                  principals:
+                    - not_id:
+                        any: true
+)EOF";
+  }
+
+  void initializeFilter(const std::string& config) {
+    config_helper_.addConfigModifier([config](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      envoy::api::v2::listener::Filter filter;
+      MessageUtil::loadFromYaml(config, filter);
+      ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
+      auto l = bootstrap.mutable_static_resources()->mutable_listeners(0);
+      ASSERT_GT(l->filter_chains_size(), 0);
+      ASSERT_GT(l->filter_chains(0).filters_size(), 0);
+      l->mutable_filter_chains(0)->mutable_filters(0)->Swap(&filter);
+    });
+
+    BaseIntegrationTest::initialize();
   }
 
   void TearDown() override {
@@ -97,8 +64,27 @@ INSTANTIATE_TEST_CASE_P(IpVersions, RoleBasedAccessControlNetworkFilterIntegrati
                         TestUtility::ipTestParamsToString);
 
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Allowed) {
-  BaseIntegrationTest::initialize();
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(8000);
+  initializeFilter(R"EOF(
+name: envoy.filters.network.rbac
+config:
+  stat_prefix: tcp.
+  rules:
+    policies:
+      "allow_all":
+        permissions:
+          - any: true
+        principals:
+          - any: true
+  shadow_rules:
+    policies:
+      "deny_all":
+        permissions:
+          - any: true
+        principals:
+          - not_id:
+              any: true
+)EOF");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write("hello");
   ASSERT_TRUE(tcp_client->connected());
   tcp_client->close();
@@ -110,8 +96,27 @@ TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Allowed) {
 }
 
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Denied) {
-  BaseIntegrationTest::initialize();
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(8080);
+  initializeFilter(R"EOF(
+name: envoy.filters.network.rbac
+config:
+  stat_prefix: tcp.
+  rules:
+    policies:
+      "deny_all":
+        permissions:
+          - any: true
+        principals:
+          - not_id:
+              any: true
+  shadow_rules:
+    policies:
+      "allow_all":
+        permissions:
+          - any: true
+        principals:
+          - any: true
+)EOF");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write("hello");
   ASSERT_TRUE(tcp_client->connected());
   tcp_client->waitForDisconnect();

@@ -8,6 +8,11 @@ namespace Filters {
 namespace Common {
 namespace RBAC {
 
+namespace {
+static const Envoy::Http::HeaderMapImpl empty_header = Envoy::Http::HeaderMapImpl();
+static const envoy::api::v2::core::Metadata empty_metadata = envoy::api::v2::core::Metadata();
+} // namespace
+
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     const envoy::config::rbac::v2alpha::RBAC& rules)
     : allowed_if_matched_(rules.action() ==
@@ -40,8 +45,7 @@ bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connec
 }
 
 bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection) const {
-  return allowed(connection, Envoy::Http::HeaderMapImpl(), envoy::api::v2::core::Metadata(),
-                 nullptr);
+  return allowed(connection, empty_header, empty_metadata, nullptr);
 }
 
 } // namespace RBAC
