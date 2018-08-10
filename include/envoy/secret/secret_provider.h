@@ -7,7 +7,7 @@ namespace Envoy {
 namespace Secret {
 
 /**
- * A secret provider for each kind of secrets.
+ * A secret provider for each kind of secret.
  */
 template <class SecretType> class SecretProvider {
 public:

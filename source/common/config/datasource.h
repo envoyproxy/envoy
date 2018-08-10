@@ -19,7 +19,7 @@ std::string read(const envoy::api::v2::core::DataSource& source, bool allow_empt
 
 /**
  * @param source data source.
- * @return std::string path to DataSource if a filename, otherwise an empty string.
+ * @return absl::optional<std::string> path to DataSource if a filename, otherwise absl::nullopt.
  */
 absl::optional<std::string> getPath(const envoy::api::v2::core::DataSource& source);
 
