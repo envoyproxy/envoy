@@ -1507,7 +1507,7 @@ public:
   std::unique_ptr<Server::Configuration::TransportSocketFactoryContextImpl> factory_context_;
 };
 
-// Cluster metadata retrieval.
+// Cluster metadata and common config retrieval.
 TEST_F(ClusterInfoImplTest, Metadata) {
   const std::string yaml = R"EOF(
     name: name
@@ -1530,6 +1530,7 @@ TEST_F(ClusterInfoImplTest, Metadata) {
   EXPECT_EQ(LoadBalancerType::Maglev, cluster->info()->lbType());
 }
 
+// Cluster extension protocol options fails validation when configured for an unregistered filter.
 TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
   const std::string yaml = R"EOF(
     name: name
@@ -1576,6 +1577,8 @@ public:
 
 struct TestFilterProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig {};
 
+// Cluster extension protocol options fails validation when configured for filter that does not
+// support options.
 TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
   TestFilterConfigFactory factory(
       []() -> ProtobufTypes::MessagePtr { return nullptr; },
@@ -1598,6 +1601,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
                             "filter envoy.test.filter does not support protocol options");
 }
 
+// Cluster retrieval of typed extension protocol options.
 TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
   auto protocol_options = std::make_shared<TestFilterProtocolOptionsConfig>();
 

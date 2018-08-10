@@ -452,15 +452,8 @@ public:
   /**
    * @param name std::string containing the well-known name of the extension for which protocol
    *        options are desired
-   * @return ProtocolOptionsConfigConstSharedPtr for extension protocol connections
-   *         created on behalf of this cluster.
-   */
-  virtual ProtocolOptionsConfigConstSharedPtr
-  extensionProtocolOptions(const std::string& name) const PURE;
-
-  /**
-   * This is a helper on top of extensionProtocolOptions() that casts the return object to the
-   * specified type.
+   * @return std::shared_ptr<const Derived> where Derived is a subclass of ProtocolOptionsConfig
+   *         and contains extension-specific protocol options for upstream connections.
    */
   template <class Derived>
   const std::shared_ptr<const Derived>
@@ -575,6 +568,17 @@ public:
    *         after a host is removed from service discovery.
    */
   virtual bool drainConnectionsOnHostRemoval() const PURE;
+
+protected:
+  /**
+   * Invoked by extensionProtocolOptionsTyped.
+   * @param name std::string containing the well-known name of the extension for which protocol
+   *        options are desired
+   * @return ProtocolOptionsConfigConstSharedPtr with extension-specific protocol options for
+   *         upstream connections.
+   */
+  virtual ProtocolOptionsConfigConstSharedPtr
+  extensionProtocolOptions(const std::string& name) const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;
