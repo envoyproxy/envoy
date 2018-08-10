@@ -6,7 +6,8 @@ option go_package = "v2";
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
-// [#protodoc-title: Thrift route configuration]
+// [#protodoc-title: Thrift Proxy Route Configuration]
+// Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
 
 // [#comment:next free field: 3]
 message RouteConfiguration {

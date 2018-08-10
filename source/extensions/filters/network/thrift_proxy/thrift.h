@@ -15,7 +15,6 @@ enum class TransportType {
 
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST TRANSPORT TYPE
   LastTransportType = Auto,
-
 };
 
 /**

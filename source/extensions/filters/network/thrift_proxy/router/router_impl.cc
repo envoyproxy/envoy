@@ -5,6 +5,7 @@
 #include "envoy/upstream/thread_local_cluster.h"
 
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -125,6 +126,19 @@ ThriftFilters::FilterStatus Router::messageBegin(MessageMetadataSharedPtr metada
     return ThriftFilters::FilterStatus::StopIteration;
   }
 
+  std::shared_ptr<const ProtocolOptionsConfig> options =
+      cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(
+          NetworkFilterNames::get().ThriftProxy);
+
+  TransportType transport_type = callbacks_->downstreamTransportType();
+  ProtocolType protocol_type = callbacks_->downstreamProtocolType();
+  if (options) {
+    transport_type = options->transport(transport_type);
+    protocol_type = options->protocol(protocol_type);
+  }
+  ASSERT(transport_type != TransportType::Auto);
+  ASSERT(protocol_type != ProtocolType::Auto);
+
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
       route_entry_->clusterName(), Upstream::ResourcePriority::Default, this);
   if (!conn_pool) {
@@ -136,17 +150,19 @@ ThriftFilters::FilterStatus Router::messageBegin(MessageMetadataSharedPtr metada
 
   ENVOY_STREAM_LOG(debug, "router decoding request", *callbacks_);
 
-  upstream_request_.reset(new UpstreamRequest(*this, *conn_pool, metadata));
+  upstream_request_.reset(
+      new UpstreamRequest(*this, *conn_pool, metadata, transport_type, protocol_type));
   return upstream_request_->start();
 }
 
 ThriftFilters::FilterStatus Router::messageEnd() {
   ProtocolConverter::messageEnd();
 
+  TransportPtr transport =
+      NamedTransportConfigFactory::getFactory(upstream_request_->transport_type_).createTransport();
   Buffer::OwnedImpl transport_buffer;
 
-  upstream_request_->transport_->encodeFrame(transport_buffer, *upstream_request_->metadata_,
-                                             upstream_request_buffer_);
+  transport->encodeFrame(transport_buffer, *upstream_request_->metadata_, upstream_request_buffer_);
   upstream_request_->conn_data_->connection().write(transport_buffer, false);
   upstream_request_->onRequestComplete();
   return ThriftFilters::FilterStatus::Continue;
@@ -156,7 +172,8 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!upstream_request_->response_complete_);
 
   if (!upstream_request_->response_started_) {
-    callbacks_->startUpstreamResponse(upstream_request_->transport_->type(), protocolType());
+    callbacks_->startUpstreamResponse(upstream_request_->transport_type_,
+                                      upstream_request_->protocol_type_);
     upstream_request_->response_started_ = true;
   }
 
@@ -208,9 +225,11 @@ void Router::convertMessageBegin(MessageMetadataSharedPtr metadata) {
 void Router::cleanup() { upstream_request_.reset(); }
 
 Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
-                                         MessageMetadataSharedPtr& metadata)
-    : parent_(parent), conn_pool_(pool), metadata_(metadata), request_complete_(false),
-      response_started_(false), response_complete_(false) {}
+                                         MessageMetadataSharedPtr& metadata,
+                                         TransportType transport_type, ProtocolType protocol_type)
+    : parent_(parent), conn_pool_(pool), metadata_(metadata), transport_type_(transport_type),
+      protocol_type_(protocol_type), request_complete_(false), response_started_(false),
+      response_complete_(false) {}
 
 Router::UpstreamRequest::~UpstreamRequest() {}
 
@@ -256,14 +275,8 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
 
   conn_pool_handle_ = nullptr;
 
-  // TODO(zuercher): let cluster specify a specific transport and protocol
-  transport_ =
-      NamedTransportConfigFactory::getFactory(parent_.callbacks_->downstreamTransportType())
-          .createTransport();
-
   parent_.initProtocolConverter(
-      NamedProtocolConfigFactory::getFactory(parent_.callbacks_->downstreamProtocolType())
-          .createProtocol(),
+      NamedProtocolConfigFactory::getFactory(protocol_type_).createProtocol(),
       parent_.upstream_request_buffer_);
 
   // TODO(zuercher): need to use an upstream-connection-specific sequence id

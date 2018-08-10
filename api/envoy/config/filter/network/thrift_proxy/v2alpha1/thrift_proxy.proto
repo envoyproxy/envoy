@@ -8,43 +8,13 @@ import "envoy/config/filter/network/thrift_proxy/v2alpha1/route.proto";
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
-// [#protodoc-title: Extensions Thrift Proxy]
-// Thrift Proxy filter configuration.
+// [#protodoc-title: Thrift Proxy]
+// Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
+
 // [#comment:next free field: 5]
 message ThriftProxy {
-  enum TransportType {
-    option (gogoproto.goproto_enum_prefix) = false;
-
-    // For every new connection, the Thrift proxy will determine which transport to use.
-    AUTO_TRANSPORT = 0;
-
-    // The Thrift proxy will assume the client is using the Thrift framed transport.
-    FRAMED = 1;
-
-    // The Thrift proxy will assume the client is using the Thrift unframed transport.
-    UNFRAMED = 2;
-  }
-
   // Supplies the type of transport that the Thrift proxy should use. Defaults to `AUTO_TRANSPORT`.
   TransportType transport = 2 [(validate.rules).enum.defined_only = true];
-
-  enum ProtocolType {
-    option (gogoproto.goproto_enum_prefix) = false;
-
-    // For every new connection, the Thrift proxy will determine which protocol to use.
-    // N.B. The older, non-strict binary protocol is not included in automatic protocol
-    // detection.
-    AUTO_PROTOCOL = 0;
-
-    // The Thrift proxy will assume the client is using the Thrift binary protocol.
-    BINARY = 1;
-
-    // The Thrift proxy will assume the client is using the Thrift non-strict binary protocol.
-    LAX_BINARY = 2;
-
-    // The Thrift proxy will assume the client is using the Thrift compact protocol.
-    COMPACT = 3;
-  }
 
   // Supplies the type of protocol that the Thrift proxy should use. Defaults to `AUTO_PROTOCOL`.
   ProtocolType protocol = 3 [(validate.rules).enum.defined_only = true];
@@ -54,4 +24,56 @@ message ThriftProxy {
 
   // The route table for the connection manager is static and is specified in this property.
   RouteConfiguration route_config = 4;
+}
+
+// Thrift transport types supported by Envoy.
+enum TransportType {
+  option (gogoproto.goproto_enum_prefix) = false;
+
+  // For downstream connections, the Thrift proxy will attempt to determine which transport to use.
+  // For upstream connections, the Thrift proxy will use same transport as the downstream
+  // connection.
+  AUTO_TRANSPORT = 0;
+
+  // The Thrift proxy will use the Thrift framed transport.
+  FRAMED = 1;
+
+  // The Thrift proxy will use the Thrift unframed transport.
+  UNFRAMED = 2;
+}
+
+// Thrift Protocol types supported by Envoy.
+enum ProtocolType {
+  option (gogoproto.goproto_enum_prefix) = false;
+
+  // For downstream connections, the Thrift proxy will attempt to determine which protocol to use.
+  // Note that the older, non-strict (or lax) binary protocol is not included in automatic protocol
+  // detection. For upstream connections, the Thrift proxy will use the same protocol as the
+  // downstream connection.
+  AUTO_PROTOCOL = 0;
+
+  // The Thrift proxy will use the Thrift binary protocol.
+  BINARY = 1;
+
+  // The Thrift proxy will use Thrift non-strict binary protocol.
+  LAX_BINARY = 2;
+
+  // The Thrift proxy will use the Thrift compact protocol.
+  COMPACT = 3;
+}
+
+// ThriftProtocolOptions specifies Thrift upstream protocol options. This object is used in
+// in :ref:`extension_protocol_options<envoy_api_field_Cluster.extension_protocol_options>`, keyed
+// by the name `envoy.filters.network.thrift_proxy`.
+// [#comment:next free field: 3]
+message ThriftProtocolOptions {
+  // Supplies the type of transport that the Thrift proxy should use for upstream connections.
+  // Selecting `AUTO_TRANSPORT` causes the proxy to use the same transport as the downstream
+  // connection. Defaults to `AUTO_TRANSPORT`.
+  TransportType transport = 1 [(validate.rules).enum.defined_only = true];
+
+  // Supplies the type of protocol that the Thrift proxy should use for upstream connections.
+  // Selecting `AUTO_PROTOCOL` causes the proxy to use the same protocol as the downstream
+  // connection. Defaults to `AUTO_PROTOCOL`.
+  ProtocolType protocol = 2 [(validate.rules).enum.defined_only = true];
 }

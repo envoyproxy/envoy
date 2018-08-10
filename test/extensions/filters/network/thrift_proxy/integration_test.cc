@@ -1,12 +1,4 @@
-#include <stdio.h>
-
-#include <fstream>
-
-#include "extensions/filters/network/thrift_proxy/protocol.h"
-#include "extensions/filters/network/thrift_proxy/transport.h"
-
-#include "test/integration/integration.h"
-#include "test/test_common/environment.h"
+#include "test/extensions/filters/network/thrift_proxy/integration.h"
 #include "test/test_common/network_utility.h"
 
 #include "gtest/gtest.h"
@@ -23,18 +15,11 @@ namespace ThriftProxy {
 
 std::string thrift_config;
 
-enum class CallResult {
-  Success,
-  IDLException,
-  Exception,
-};
-
 class ThriftConnManagerIntegrationTest
-    : public BaseIntegrationTest,
-      public TestWithParam<std::tuple<std::string, std::string, bool>> {
+    : public BaseThriftIntegrationTest,
+      public TestWithParam<std::tuple<TransportType, ProtocolType, bool>> {
 public:
-  ThriftConnManagerIntegrationTest()
-      : BaseIntegrationTest(Network::Address::IpVersion::v4, thrift_config) {}
+  ThriftConnManagerIntegrationTest() : BaseThriftIntegrationTest(thrift_config) {}
 
   static void SetUpTestCase() {
     thrift_config = ConfigHelper::BASE_CONFIG + R"EOF(
@@ -52,125 +37,80 @@ public:
       )EOF";
   }
 
-  void initializeCall(CallResult result) {
-    std::tie(transport_, protocol_, multiplexed_) = GetParam();
+  void initializeCall(DriverMode mode) {
+    TransportType transport;
+    ProtocolType protocol;
+    bool multiplexed;
+    std::tie(transport, protocol, multiplexed) = GetParam();
 
-    std::string result_mode;
-    switch (result) {
-    case CallResult::Success:
-      result_mode = "success";
-      break;
-    case CallResult::IDLException:
-      result_mode = "idl-exception";
-      break;
-    case CallResult::Exception:
-      result_mode = "exception";
-      break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    absl::optional<std::string> service_name;
+    if (multiplexed) {
+      service_name = "svcname";
     }
 
-    preparePayloads(result_mode, "execute");
+    PayloadOptions options(transport, protocol, mode, service_name, "execute");
+    preparePayloads(options, request_bytes_, response_bytes_);
     ASSERT(request_bytes_.length() > 0);
     ASSERT(response_bytes_.length() > 0);
-
-    BaseIntegrationTest::initialize();
+    initializeCommon();
   }
 
   void initializeOneway() {
-    std::tie(transport_, protocol_, multiplexed_) = GetParam();
+    TransportType transport;
+    ProtocolType protocol;
+    bool multiplexed;
+    std::tie(transport, protocol, multiplexed) = GetParam();
 
-    preparePayloads("success", "poke");
+    absl::optional<std::string> service_name;
+    if (multiplexed) {
+      service_name = "svcname";
+    }
+
+    PayloadOptions options(transport, protocol, DriverMode::Success, service_name, "poke");
+    preparePayloads(options, request_bytes_, response_bytes_);
     ASSERT(request_bytes_.length() > 0);
     ASSERT(response_bytes_.length() == 0);
-
-    BaseIntegrationTest::initialize();
+    initializeCommon();
   }
 
-  void preparePayloads(std::string result_mode, std::string method) {
-    std::vector<std::string> args = {
-        TestEnvironment::runfilesPath(
-            "test/extensions/filters/network/thrift_proxy/driver/generate_fixture.sh"),
-        result_mode,
-        transport_,
-        protocol_,
-    };
-
-    if (multiplexed_) {
-      args.push_back("svcname");
-    }
-    args.push_back("--");
-    args.push_back(method);
-
-    TestEnvironment::exec(args);
-
-    std::stringstream file_base;
-    file_base << "{{ test_tmpdir }}/" << transport_ << "-" << protocol_ << "-";
-    if (multiplexed_) {
-      file_base << "svcname-";
-    }
-    file_base << result_mode;
-
-    readAll(file_base.str() + ".request", request_bytes_);
-    readAll(file_base.str() + ".response", response_bytes_);
-  }
+  void initializeCommon() { BaseThriftIntegrationTest::initialize(); }
 
   void TearDown() override {
     test_server_.reset();
     fake_upstreams_.clear();
   }
 
-protected:
-  void readAll(std::string file, Buffer::OwnedImpl& buffer) {
-    file = TestEnvironment::substitute(file, version_);
-
-    std::ifstream is(file, std::ios::binary | std::ios::ate);
-    RELEASE_ASSERT(!is.fail(), "");
-
-    std::ifstream::pos_type len = is.tellg();
-    if (len > 0) {
-      std::vector<char> bytes(len, 0);
-      is.seekg(0, std::ios::beg);
-      RELEASE_ASSERT(!is.fail(), "");
-
-      is.read(bytes.data(), len);
-      RELEASE_ASSERT(!is.fail(), "");
-
-      buffer.add(bytes.data(), len);
-    }
-  }
-
-  std::string transport_;
-  std::string protocol_;
-  bool multiplexed_;
-
-  std::string result_;
-
   Buffer::OwnedImpl request_bytes_;
   Buffer::OwnedImpl response_bytes_;
 };
 
 static std::string
-paramToString(const TestParamInfo<std::tuple<std::string, std::string, bool>>& params) {
-  std::string transport, protocol;
+paramToString(const TestParamInfo<std::tuple<TransportType, ProtocolType, bool>>& params) {
+  TransportType transport;
+  ProtocolType protocol;
   bool multiplexed;
   std::tie(transport, protocol, multiplexed) = params.param;
-  transport = StringUtil::toUpper(absl::string_view(transport).substr(0, 1)) + transport.substr(1);
-  protocol = StringUtil::toUpper(absl::string_view(protocol).substr(0, 1)) + protocol.substr(1);
+
+  std::string transport_name = TransportNames::get().fromType(transport);
+  transport_name[0] = absl::ascii_toupper(transport_name[0]);
+
+  std::string protocol_name = ProtocolNames::get().fromType(protocol);
+  protocol_name[0] = absl::ascii_toupper(protocol_name[0]);
+
   if (multiplexed) {
-    return fmt::format("{}{}Multiplexed", transport, protocol);
+    return fmt::format("{}{}Multiplexed", transport_name, protocol_name);
   }
-  return fmt::format("{}{}", transport, protocol);
+  return fmt::format("{}{}", transport_name, protocol_name);
 }
 
-INSTANTIATE_TEST_CASE_P(
-    TransportAndProtocol, ThriftConnManagerIntegrationTest,
-    Combine(Values(TransportNames::get().FRAMED, TransportNames::get().UNFRAMED),
-            Values(ProtocolNames::get().BINARY, ProtocolNames::get().COMPACT), Values(false, true)),
-    paramToString);
+INSTANTIATE_TEST_CASE_P(TransportAndProtocol, ThriftConnManagerIntegrationTest,
+                        Combine(Values(TransportType::Framed, TransportType::Unframed),
+                                Values(ProtocolType::Binary, ProtocolType::Compact),
+                                Values(false, true)),
+                        paramToString);
 
 TEST_P(ThriftConnManagerIntegrationTest, Success) {
-  initializeCall(CallResult::Success);
+  initializeCall(DriverMode::Success);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(request_bytes_.toString());
@@ -196,7 +136,7 @@ TEST_P(ThriftConnManagerIntegrationTest, Success) {
 }
 
 TEST_P(ThriftConnManagerIntegrationTest, IDLException) {
-  initializeCall(CallResult::IDLException);
+  initializeCall(DriverMode::IDLException);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(request_bytes_.toString());
@@ -222,7 +162,7 @@ TEST_P(ThriftConnManagerIntegrationTest, IDLException) {
 }
 
 TEST_P(ThriftConnManagerIntegrationTest, Exception) {
-  initializeCall(CallResult::Exception);
+  initializeCall(DriverMode::Exception);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(request_bytes_.toString());

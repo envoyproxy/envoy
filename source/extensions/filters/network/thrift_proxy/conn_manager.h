@@ -35,6 +35,14 @@ public:
   virtual Router::Config& routerConfig() PURE;
 };
 
+class ProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig {
+public:
+  virtual ~ProtocolOptionsConfig() {}
+
+  virtual TransportType transport(TransportType downstream_transport) const PURE;
+  virtual ProtocolType protocol(ProtocolType downstream_protocol) const PURE;
+};
+
 /**
  * ConnectionManager is a Network::Filter that will perform Thrift request handling on a connection.
  */
