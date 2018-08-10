@@ -111,7 +111,7 @@ private:
     // Tcp::ConnectionPool::Callbacks
     void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
-    void onPoolReady(Tcp::ConnectionPool::ConnectionData& conn,
+    void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                      Upstream::HostDescriptionConstSharedPtr host) override;
 
     void onRequestComplete();
@@ -124,7 +124,7 @@ private:
     MessageMetadataSharedPtr metadata_;
 
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
-    Tcp::ConnectionPool::ConnectionData* conn_data_{};
+    Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
     TransportPtr transport_;
     ProtocolType proto_type_{ProtocolType::Auto};

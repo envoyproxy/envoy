@@ -334,6 +334,7 @@ public:
   COUNTER  (upstream_cx_none_healthy)                                                              \
   COUNTER  (upstream_rq_total)                                                                     \
   GAUGE    (upstream_rq_active)                                                                    \
+  COUNTER  (upstream_rq_completed)                                                                 \
   COUNTER  (upstream_rq_pending_total)                                                             \
   COUNTER  (upstream_rq_pending_overflow)                                                          \
   COUNTER  (upstream_rq_pending_failure_eject)                                                     \
