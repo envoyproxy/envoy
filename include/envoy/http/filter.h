@@ -196,6 +196,8 @@ public:
    *
    * When called in decodeData, the trailers map will be initialized to an empty map and returned by
    * reference. Calling this function more than once is invalid.
+   *
+   * @return a reference to the newly created trailers map.
    */
   virtual HeaderMap& addDecodedTrailers() PURE;
 
@@ -410,6 +412,8 @@ public:
    *
    * When called in encodeData, the trailers map will be initialized to an empty map and returned by
    * reference. Calling this function more than once is invalid.
+   *
+   * @return a reference to the newly created trailers map.
    */
   virtual HeaderMap& addEncodedTrailers() PURE;
 
