@@ -26,7 +26,7 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
   hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
 
   // TODO(lilika): Add support for other types of healthchecks
-  health_check_request_.mutable_capability()->add_health_check_protocol(
+  health_check_request_.mutable_capability()->add_health_check_protocols(
       envoy::service::discovery::v2::Capability::HTTP);
 
   establishNewStream();
@@ -101,7 +101,7 @@ void HdsDelegate::processMessage(
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
   ASSERT(message);
 
-  for (const auto& cluster_health_check : message->health_check()) {
+  for (const auto& cluster_health_check : message->cluster_health_checks()) {
     // Create HdsCluster config
     static const envoy::api::v2::core::BindConfig bind_config;
     envoy::api::v2::Cluster cluster_config;
@@ -112,7 +112,7 @@ void HdsDelegate::processMessage(
         ClusterConnectionBufferLimitBytes);
 
     // Add endpoints to cluster
-    for (const auto& locality_endpoints : cluster_health_check.endpoints()) {
+    for (const auto& locality_endpoints : cluster_health_check.locality_endpoints()) {
       for (const auto& endpoint : locality_endpoints.endpoints()) {
         cluster_config.add_hosts()->MergeFrom(endpoint.address());
       }

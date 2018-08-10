@@ -69,7 +69,7 @@ public:
         new envoy::service::discovery::v2::HealthCheckSpecifier;
     msg->mutable_interval()->set_seconds(1);
 
-    auto* health_check = msg->add_health_check();
+    auto* health_check = msg->add_cluster_health_checks();
     health_check->set_cluster_name("anna");
     health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
     health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
@@ -79,8 +79,10 @@ public:
     health_check->mutable_health_checks(0)->mutable_http_health_check()->set_use_http2(false);
     health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
 
-    auto* socket_address =
-        health_check->add_endpoints()->add_endpoints()->mutable_address()->mutable_socket_address();
+    auto* socket_address = health_check->add_locality_endpoints()
+                               ->add_endpoints()
+                               ->mutable_address()
+                               ->mutable_socket_address();
     socket_address->set_address("127.0.0.0");
     socket_address->set_port_value(1234);
 
@@ -127,10 +129,10 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
   message->mutable_interval()->set_seconds(1);
 
   for (int i = 0; i < 2; i++) {
-    auto* health_check = message->add_health_check();
+    auto* health_check = message->add_cluster_health_checks();
     health_check->set_cluster_name("anna" + std::to_string(i));
     for (int j = 0; j < 3; j++) {
-      auto* address = health_check->add_endpoints()->add_endpoints()->mutable_address();
+      auto* address = health_check->add_locality_endpoints()->add_endpoints()->mutable_address();
       address->mutable_socket_address()->set_address("127.0.0." + std::to_string(i));
       address->mutable_socket_address()->set_port_value(1234 + j);
     }
@@ -165,7 +167,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   message->mutable_interval()->set_seconds(1);
 
   for (int i = 0; i < 2; i++) {
-    auto* health_check = message->add_health_check();
+    auto* health_check = message->add_cluster_health_checks();
     health_check->set_cluster_name("minkowski" + std::to_string(i));
     for (int j = 0; j < i + 2; j++) {
       auto hc = health_check->add_health_checks();
