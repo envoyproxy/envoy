@@ -17,7 +17,7 @@ namespace RBACFilter {
 enum EngineResult { UNKNOWN, NONE, ALLOW, DENY };
 
 /**
- * Configuration for the RBAC filter.
+ * Configuration for the RBAC network filter.
  */
 class RoleBasedAccessControlFilterConfig {
 public:

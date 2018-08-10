@@ -2,7 +2,6 @@
 
 #include "envoy/registry/registry.h"
 
-#include "extensions/filters/common/rbac/utility.h"
 #include "extensions/filters/http/rbac/rbac_filter.h"
 
 namespace Envoy {

@@ -16,11 +16,6 @@ static const std::string resp_code_403 = "403";
 static const std::string shadow_policy_id_field = "shadow_effective_policyID";
 static const std::string shadow_resp_code_field = "shadow_response_code";
 
-RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpecificFilterConfig(
-    const envoy::config::filter::http::rbac::v2::RBACPerRoute& per_route_config)
-    : engine_(Filters::Common::RBAC::createEngine(per_route_config.rbac())),
-      shadow_engine_(Filters::Common::RBAC::createShadowEngine(per_route_config.rbac())) {}
-
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope)
@@ -48,6 +43,11 @@ RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr rou
 
   return engine(mode);
 }
+
+RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpecificFilterConfig(
+    const envoy::config::filter::http::rbac::v2::RBACPerRoute& per_route_config)
+    : engine_(Filters::Common::RBAC::createEngine(per_route_config.rbac())),
+      shadow_engine_(Filters::Common::RBAC::createShadowEngine(per_route_config.rbac())) {}
 
 Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::HeaderMap& headers,
                                                                       bool) {
