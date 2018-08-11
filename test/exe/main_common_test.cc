@@ -152,6 +152,31 @@ public:
   bool pause_after_run_;
 };
 
+// Class to track help with whether a lambda is destroyed without running it, by counting
+// the number of times it is constructed and destructed as a lambda-captured values.
+class ConstructDestructTracker {
+public:
+  // We use a pointer here rather than a reference to make it easier to implement operator=.
+  explicit ConstructDestructTracker(std::atomic<uint64_t>* counter) : counter_(counter) {
+    ++(*counter_);
+  }
+  ConstructDestructTracker(const ConstructDestructTracker& src) : counter_(src.counter_) {
+    ++(*counter_);
+  }
+  ~ConstructDestructTracker() { --(*counter_); }
+
+  ConstructDestructTracker& operator=(const ConstructDestructTracker& src) {
+    if (&src != this) {
+      counter_ = src.counter_;
+      ++(*counter_);
+    }
+    return *this;
+  }
+
+private:
+  std::atomic<uint64_t>* counter_;
+};
+
 // Exercise the codepath to instantiate MainCommon and destruct it, with hot restart.
 TEST_F(MainCommonTest, ConstructDestructHotRestartEnabled) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
@@ -281,16 +306,28 @@ TEST_F(MainCommonTest, AdminRequestAfterRun) {
   // destroyed yet. AdminRequests will never finish, but they won't crash.
   pause_after_run_ = true;
   adminRequest("/quitquitquit", "POST");
-  pause_point_.wait();
+  pause_point_.wait(); // run() finished, but main_common_ still exists.
 
-  // Now we are in a state that the Envoy thread has finished run(), but is blocked before
-  // destroying MainCommon. In this state, admin requests will will not work, but they will
-  // just never complete.
+  // Admin requests will not work, but will never complete. The lambda itself will be
+  // destroyed, which we can tell by tracking a captured value-arg with a destructor.
+
+  std::atomic<uint64_t> lambda_alloc_count_(0);
+  ConstructDestructTracker tracker(&lambda_alloc_count_);
+  EXPECT_EQ(1, lambda_alloc_count_); // The tracker held as a test-method local.
+
   bool admin_handler_was_called = false;
   main_common_->adminRequest(
       "/stats", "GET",
-      [&admin_handler_was_called](const Http::HeaderMap& /*response_headers*/,
-                                  absl::string_view /*body*/) { admin_handler_was_called = true; });
+      [&admin_handler_was_called, tracker](const Http::HeaderMap& /*response_headers*/,
+                                           absl::string_view /*body*/) {
+        admin_handler_was_called = true;
+        UNREFERENCED_PARAMETER(tracker);
+      });
+
+  // At this point, the lambda cannot have run, as the envoy thread has finished run(),
+  // so the tracker counting lambda allocations must be 2: one of the tracker held as
+  // a test method local, and the tracker that was copied and held in the lambda.
+  EXPECT_EQ(2, lambda_alloc_count_);
 
   // Now unblock the envoy thread so it can destroy the object, along with our unfinished
   // admin request.
@@ -298,6 +335,10 @@ TEST_F(MainCommonTest, AdminRequestAfterRun) {
 
   EXPECT_TRUE(waitForEnvoyToExit());
   EXPECT_FALSE(admin_handler_was_called);
+
+  // Now the Envoy has exited, the lambda must have been destructed without having been run, leaving
+  // us with just one allocation: the tracker held as a test-method local.
+  EXPECT_EQ(1, lambda_alloc_count_);
 }
 
 } // namespace Envoy
