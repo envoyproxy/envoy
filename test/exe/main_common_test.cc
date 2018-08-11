@@ -40,15 +40,13 @@ namespace Envoy {
  * https://github.com/envoyproxy/envoy/issues/2649
  */
 class MainCommonTest : public testing::Test {
-public:
+protected:
   MainCommonTest()
       : config_file_(Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
                      "/test/config/integration/google_com_proxy_port_0.v2.yaml"),
         random_string_(fmt::format("{}", computeBaseId())),
         argv_({"envoy-static", "--base-id", random_string_.c_str(), "-c", config_file_.c_str(),
-               nullptr}),
-        envoy_return_(false), envoy_started_(false), envoy_finished_(false),
-        pause_before_run_(false), pause_after_run_(false) {}
+               nullptr}) {}
 
   /**
    * Computes a numeric ID to incorporate into the names of
@@ -88,68 +86,9 @@ public:
     addArg("init_only");
   }
 
-  // Runs a an admin request specified in path, blocking until completion, and
-  // returning the response body.
-  std::string adminRequest(absl::string_view path, absl::string_view method) {
-    TestUtility::SyncPoint done;
-    std::string out;
-    main_common_->adminRequest(
-        path, method,
-        [&done, &out](const Http::HeaderMap& /*response_headers*/, absl::string_view body) {
-          out = std::string(body);
-          done.notify();
-        });
-    done.wait();
-    return out;
-  }
-
-  // Initiates Envoy running in its own thread.
-  void startEnvoy() {
-    envoy_thread_ = std::make_unique<Thread::Thread>([this]() {
-      // Note: main_common_ is accesesed in the testing thread, but
-      // is race-free, as MainCommon::run() does not return until
-      // triggered with an adminRequest POST to /quitquitquit, which
-      // is done in the testing thread.
-      main_common_ = std::make_unique<MainCommon>(argc(), argv());
-      envoy_started_ = true;
-      started_.notify();
-      if (pause_before_run_) {
-        pause_point_.notify();
-        resume_.wait();
-      }
-      bool status = main_common_->run();
-      if (pause_after_run_) {
-        pause_point_.notify();
-        resume_.wait();
-      }
-      main_common_.reset();
-      envoy_finished_ = true;
-      envoy_return_ = status;
-      finished_.notify();
-    });
-  }
-
-  // Having sent a /quitquitquit to Envoy, this blocks until Envoy exits.
-  bool waitForEnvoyToExit() {
-    finished_.wait();
-    envoy_thread_->join();
-    return envoy_return_;
-  }
-
   std::string config_file_;
   std::string random_string_;
   std::vector<const char*> argv_;
-  std::unique_ptr<Thread::Thread> envoy_thread_;
-  std::unique_ptr<MainCommon> main_common_;
-  TestUtility::SyncPoint started_;
-  TestUtility::SyncPoint finished_;
-  TestUtility::SyncPoint resume_;
-  TestUtility::SyncPoint pause_point_;
-  bool envoy_return_;
-  bool envoy_started_;
-  bool envoy_finished_;
-  bool pause_before_run_;
-  bool pause_after_run_;
 };
 
 // Class to track help with whether a lambda is destroyed without running it, by counting
@@ -233,11 +172,83 @@ TEST_F(MainCommonTest, LegacyMain) {
   EXPECT_EQ(EXIT_SUCCESS, return_code);
 }
 
-TEST_F(MainCommonTest, AdminRequestGetStatsAndQuit) {
+class AdminRequestTest : public MainCommonTest {
+protected:
+  AdminRequestTest()
+      : envoy_return_(false), envoy_started_(false), envoy_finished_(false),
+        pause_before_run_(false), pause_after_run_(false) {
+    addArg("--disable-hot-restart");
+  }
+
+  // Runs a an admin request specified in path, blocking until completion, and
+  // returning the response body.
+  std::string adminRequest(absl::string_view path, absl::string_view method) {
+    TestUtility::SyncPoint done;
+    std::string out;
+    main_common_->adminRequest(
+        path, method,
+        [&done, &out](const Http::HeaderMap& /*response_headers*/, absl::string_view body) {
+          out = std::string(body);
+          done.notify();
+        });
+    done.wait();
+    return out;
+  }
+
+  // Initiates Envoy running in its own thread.
+  void startEnvoy() {
+    envoy_thread_ = std::make_unique<Thread::Thread>([this]() {
+      // Note: main_common_ is accesesed in the testing thread, but
+      // is race-free, as MainCommon::run() does not return until
+      // triggered with an adminRequest POST to /quitquitquit, which
+      // is done in the testing thread.
+      main_common_ = std::make_unique<MainCommon>(argc(), argv());
+      envoy_started_ = true;
+      started_.notify();
+      pauseResumeInterlock(pause_before_run_);
+      bool status = main_common_->run();
+      pauseResumeInterlock(pause_after_run_);
+      main_common_.reset();
+      envoy_finished_ = true;
+      envoy_return_ = status;
+      finished_.notify();
+    });
+  }
+
+  // Conditionally pauses at a critical point in the Envoy thread waiting, waiting
+  // the for the test thread to try something. The test thread can then call resume_.notify()
+  // to allow the Envoy thread to resume.
+  void pauseResumeInterlock(bool enable) {
+    if (enable) {
+      pause_point_.notify();
+      resume_.wait();
+    }
+  }
+
+  // Having triggered Envoy to quit (via signal or /quitquitquit), this blocks until Envoy exits.
+  bool waitForEnvoyToExit() {
+    finished_.wait();
+    envoy_thread_->join();
+    return envoy_return_;
+  }
+
+  std::unique_ptr<Thread::Thread> envoy_thread_;
+  std::unique_ptr<MainCommon> main_common_;
+  TestUtility::SyncPoint started_;
+  TestUtility::SyncPoint finished_;
+  TestUtility::SyncPoint resume_;
+  TestUtility::SyncPoint pause_point_;
+  bool envoy_return_;
+  bool envoy_started_;
+  bool envoy_finished_;
+  bool pause_before_run_;
+  bool pause_after_run_;
+};
+
+TEST_F(AdminRequestTest, AdminRequestGetStatsAndQuit) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
     return;
   }
-  addArg("--disable-hot-restart");
   startEnvoy();
   started_.wait();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
@@ -247,11 +258,10 @@ TEST_F(MainCommonTest, AdminRequestGetStatsAndQuit) {
 
 // This test is identical to the above one, except that instead of using an admin /quitquitquit,
 // we send ourselves a SIGTERM, which should have the same effect.
-TEST_F(MainCommonTest, AdminRequestGetStatsAndKill) {
+TEST_F(AdminRequestTest, AdminRequestGetStatsAndKill) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
     return;
   }
-  addArg("--disable-hot-restart");
   startEnvoy();
   started_.wait();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
@@ -259,11 +269,10 @@ TEST_F(MainCommonTest, AdminRequestGetStatsAndKill) {
   EXPECT_TRUE(waitForEnvoyToExit());
 }
 
-TEST_F(MainCommonTest, AdminRequestBeforeRun) {
+TEST_F(AdminRequestTest, AdminRequestBeforeRun) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
     return;
   }
-  addArg("--disable-hot-restart");
   // Induce the situation where the Envoy thread is active, and main_common_ is constructed,
   // but run() hasn't been issued yet. AdminRequests will not finish immediately, but will
   // do so at some point after run() is allowed to start.
@@ -295,11 +304,10 @@ TEST_F(MainCommonTest, AdminRequestBeforeRun) {
   EXPECT_THAT(out, HasSubstr("filesystem.reopen_failed"));
 }
 
-TEST_F(MainCommonTest, AdminRequestAfterRun) {
+TEST_F(AdminRequestTest, AdminRequestAfterRun) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
     return;
   }
-  addArg("--disable-hot-restart");
   startEnvoy();
   started_.wait();
   // Induce the situation where Envoy is no longer in run(), but hasn't been
