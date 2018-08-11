@@ -91,31 +91,6 @@ protected:
   std::vector<const char*> argv_;
 };
 
-// Class to track help with whether a lambda is destroyed without running it, by counting
-// the number of times it is constructed and destructed as a lambda-captured values.
-class ConstructDestructTracker {
-public:
-  // We use a pointer here rather than a reference to make it easier to implement operator=.
-  explicit ConstructDestructTracker(std::atomic<uint64_t>* counter) : counter_(counter) {
-    ++(*counter_);
-  }
-  ConstructDestructTracker(const ConstructDestructTracker& src) : counter_(src.counter_) {
-    ++(*counter_);
-  }
-  ~ConstructDestructTracker() { --(*counter_); }
-
-  ConstructDestructTracker& operator=(const ConstructDestructTracker& src) {
-    if (&src != this) {
-      counter_ = src.counter_;
-      ++(*counter_);
-    }
-    return *this;
-  }
-
-private:
-  std::atomic<uint64_t>* counter_;
-};
-
 // Exercise the codepath to instantiate MainCommon and destruct it, with hot restart.
 TEST_F(MainCommonTest, ConstructDestructHotRestartEnabled) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
@@ -304,6 +279,16 @@ TEST_F(AdminRequestTest, AdminRequestBeforeRun) {
   EXPECT_THAT(out, HasSubstr("filesystem.reopen_failed"));
 }
 
+// Class to track whether an object has been destroyed, which it does by bumping an atomic.
+class DestroyCounter {
+public:
+  explicit DestroyCounter(std::atomic<uint64_t>& destroy_count) : destroy_count_(destroy_count) {}
+  ~DestroyCounter() { ++destroy_count_; }
+
+private:
+  std::atomic<uint64_t>& destroy_count_;
+};
+
 TEST_F(AdminRequestTest, AdminRequestAfterRun) {
   if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
     return;
@@ -317,25 +302,22 @@ TEST_F(AdminRequestTest, AdminRequestAfterRun) {
   pause_point_.wait(); // run() finished, but main_common_ still exists.
 
   // Admin requests will not work, but will never complete. The lambda itself will be
-  // destroyed, which we can tell by tracking a captured value-arg with a destructor.
+  // destroyed on thread exit, which we'll track with an object that counts destructor calls.
 
-  std::atomic<uint64_t> lambda_alloc_count_(0);
-  ConstructDestructTracker tracker(&lambda_alloc_count_);
-  EXPECT_EQ(1, lambda_alloc_count_); // The tracker held as a test-method local.
-
+  std::atomic<uint64_t> lambda_destroy_count(0);
   bool admin_handler_was_called = false;
-  main_common_->adminRequest(
-      "/stats", "GET",
-      [&admin_handler_was_called, tracker](const Http::HeaderMap& /*response_headers*/,
-                                           absl::string_view /*body*/) {
-        admin_handler_was_called = true;
-        UNREFERENCED_PARAMETER(tracker);
-      });
-
-  // At this point, the lambda cannot have run, as the envoy thread has finished run(),
-  // so the tracker counting lambda allocations must be 2: one of the tracker held as
-  // a test method local, and the tracker that was copied and held in the lambda.
-  EXPECT_EQ(2, lambda_alloc_count_);
+  {
+    // Ownership of the tracker will be passed to the lambda.
+    auto tracker = std::make_shared<DestroyCounter>(lambda_destroy_count);
+    main_common_->adminRequest(
+        "/stats", "GET",
+        [&admin_handler_was_called, tracker](const Http::HeaderMap& /*response_headers*/,
+                                             absl::string_view /*body*/) {
+          admin_handler_was_called = true;
+          UNREFERENCED_PARAMETER(tracker);
+        });
+  }
+  EXPECT_EQ(0, lambda_destroy_count); // The lambda won't be destroyed till envoy thread exit.
 
   // Now unblock the envoy thread so it can destroy the object, along with our unfinished
   // admin request.
@@ -343,10 +325,7 @@ TEST_F(AdminRequestTest, AdminRequestAfterRun) {
 
   EXPECT_TRUE(waitForEnvoyToExit());
   EXPECT_FALSE(admin_handler_was_called);
-
-  // Now the Envoy has exited, the lambda must have been destructed without having been run, leaving
-  // us with just one allocation: the tracker held as a test-method local.
-  EXPECT_EQ(1, lambda_alloc_count_);
+  EXPECT_EQ(1, lambda_destroy_count);
 }
 
 } // namespace Envoy
