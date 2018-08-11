@@ -58,8 +58,8 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
 }
 
 void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
-  const auto& loaded_object = Json::Factory::loadFromYamlString(yaml);
-  // Load to the message if the loaded object has type Object or Array.
+  const auto loaded_object = Json::Factory::loadFromYamlString(yaml);
+  // Load the message if the loaded object has type Object or Array.
   if (loaded_object->isObject() || loaded_object->isArray()) {
     const std::string json = loaded_object->asJsonString();
     loadFromJson(json, message);
