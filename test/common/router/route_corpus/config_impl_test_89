@@ -1,0 +1,38 @@
+config {
+  virtual_hosts {
+    name: "local_service"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/foo"
+      }
+      route {
+        cluster_header: ":authority"
+      }
+    }
+    routes {
+      match {
+        prefix: "/bar"
+      }
+      route {
+        cluster_header: "some_header"
+        timeout {
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/bar"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+}

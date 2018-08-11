@@ -1,0 +1,161 @@
+config {
+  name: "foo"
+  virtual_hosts {
+    name: "www2"
+    domains: "www.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+      }
+    }
+    require_tls: ALL
+  }
+  virtual_hosts {
+    name: "api"
+    domains: "api.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+      }
+    }
+    require_tls: EXTERNAL_ONLY
+  }
+  virtual_hosts {
+    name: "redirect"
+    domains: "redirect.lyft.com"
+    routes {
+      match {
+        path: "/host"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+      }
+    }
+    routes {
+      match {
+        path: "/path"
+      }
+      redirect {
+        path_redirect: "/new_path"
+      }
+    }
+    routes {
+      match {
+        path: "/https"
+      }
+      redirect {
+        https_redirect: true
+      }
+    }
+    routes {
+      match {
+        path: "/host_path"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        path_redirect: "/new_path"
+      }
+    }
+    routes {
+      match {
+        path: "/host_https"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        https_redirect: true
+      }
+    }
+    routes {
+      match {
+        path: "/path_https"
+      }
+      redirect {
+        path_redirect: "/new_path"
+        https_redirect: true
+      }
+    }
+    routes {
+      match {
+        path: "/host_path_https"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        path_redirect: "/new_path"
+        https_redirect: true
+      }
+    }
+  }
+  virtual_hosts {
+    name: "direct"
+    domains: "direct.example.com"
+    routes {
+      match {
+        prefix: "/gone"
+      }
+      direct_response {
+        status: 410
+        body {
+          inline_bytes: "Example text 1"
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/error"
+      }
+      direct_response {
+        status: 500
+        body {
+          inline_string: "Example text 2"
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/no_body"
+      }
+      direct_response {
+        status: 200
+      }
+    }
+    routes {
+      match {
+        prefix: "/static"
+      }
+      direct_response {
+        status: 200
+        body {
+          filename: "/usr/local/google/home/htuch/.cache/bazel/_bazel_htuch/89676793239ac96d94294e6c7a44597f/execroot/envoy/_tmp/5f7a60efee585bff7a74389007cb8628/direct_response_body"
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "redirect.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/host_path_https"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

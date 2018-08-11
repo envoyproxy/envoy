@@ -1,0 +1,140 @@
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "lyft.com"
+    domains: "www.lyft.com"
+    domains: "w.lyft.com"
+    domains: "ww.lyft.com"
+    domains: "wwww.lyft.com"
+    routes {
+      match {
+        prefix: "/new_endpoint"
+      }
+      route {
+        cluster: "www2"
+        prefix_rewrite: "/api/new_endpoint"
+        request_headers_to_add {
+          header {
+            key: "x-global-header1"
+            value: "route-override"
+          }
+        }
+        request_headers_to_add {
+          header {
+            key: "x-vhost-header1"
+            value: "route-override"
+          }
+        }
+        request_headers_to_add {
+          header {
+            key: "x-route-action-header"
+            value: "route-new_endpoint"
+          }
+        }
+      }
+    }
+    routes {
+      match {
+        path: "/"
+      }
+      route {
+        cluster: "root_www2"
+        request_headers_to_add {
+          header {
+            key: "x-route-action-header"
+            value: "route-allpath"
+          }
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+      }
+    }
+    request_headers_to_add {
+      header {
+        key: "x-global-header1"
+        value: "vhost-override"
+      }
+    }
+    request_headers_to_add {
+      header {
+        key: "x-vhost-header1"
+        value: "vhost1-www2"
+      }
+    }
+  }
+  virtual_hosts {
+    name: "www2_staging"
+    domains: "www-staging.lyft.net"
+    domains: "www-staging-orca.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2_staging"
+        request_headers_to_add {
+          header {
+            key: "x-route-action-header"
+            value: "route-allprefix"
+          }
+        }
+      }
+    }
+    request_headers_to_add {
+      header {
+        key: "x-vhost-header1"
+        value: "vhost1-www2_staging"
+      }
+    }
+  }
+  virtual_hosts {
+    name: "default"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "instant-server"
+        timeout {
+          seconds: 30
+        }
+      }
+    }
+  }
+  internal_only_headers: "x-lyft-user-id"
+  response_headers_to_add {
+    header {
+      key: "x-envoy-upstream-canary"
+      value: "true"
+    }
+  }
+  response_headers_to_remove: "x-envoy-upstream-canary"
+  response_headers_to_remove: "x-envoy-virtual-cluster"
+  request_headers_to_add {
+    header {
+      key: "x-global-header1"
+      value: "global1"
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/new_endpoint/foo"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+}

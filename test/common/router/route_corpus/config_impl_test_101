@@ -1,0 +1,51 @@
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "www.lyft.com"
+    routes {
+      match {
+        prefix: "/foo"
+      }
+      route {
+        cluster: "www2"
+        request_mirror_policy {
+          cluster: "some_cluster"
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/bar"
+      }
+      route {
+        cluster: "www2"
+        request_mirror_policy {
+          cluster: "some_cluster2"
+          runtime_key: "foo"
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/baz"
+      }
+      route {
+        cluster: "www2"
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/baz"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+}

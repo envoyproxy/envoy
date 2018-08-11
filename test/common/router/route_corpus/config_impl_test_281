@@ -1,0 +1,51 @@
+config {
+  name: "foo"
+  virtual_hosts {
+    name: "bar"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "baz"
+      }
+      per_filter_config {
+        key: "test.filter"
+        value {
+          fields {
+            key: "seconds"
+            value {
+              number_value: 123
+            }
+          }
+        }
+      }
+    }
+    per_filter_config {
+      key: "test.filter"
+      value {
+        fields {
+          key: "seconds"
+          value {
+            number_value: 456
+          }
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.foo.com"
+  }
+  headers {
+    key: ":path"
+    value: "/"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+}

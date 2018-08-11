@@ -1,0 +1,41 @@
+config {
+  virtual_hosts {
+    name: "local_service"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/foo"
+      }
+      route {
+        cluster: "foo"
+        hash_policy {
+          connection_properties {
+            source_ip: true
+          }
+        }
+      }
+    }
+    routes {
+      match {
+        prefix: "/bar"
+      }
+      route {
+        cluster: "bar"
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/bar"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+}

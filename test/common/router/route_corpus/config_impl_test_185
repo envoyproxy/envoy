@@ -1,0 +1,172 @@
+config {
+  name: "foo"
+  virtual_hosts {
+    name: "local_service"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/"
+        headers {
+          name: "test_header"
+          exact_match: "test"
+        }
+      }
+      route {
+        cluster: "local_service_with_headers"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+        headers {
+          name: "test_header_multiple1"
+          exact_match: "test1"
+        }
+        headers {
+          name: "test_header_multiple2"
+          exact_match: "test2"
+        }
+      }
+      route {
+        cluster: "local_service_with_multiple_headers"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+        headers {
+          name: "test_header_presence"
+        }
+      }
+      route {
+        cluster: "local_service_with_empty_headers"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+        headers {
+          name: "test_header_pattern"
+          regex_match: "^user=test-\\d+$"
+        }
+      }
+      route {
+        cluster: "local_service_with_header_pattern_set_regex"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+        headers {
+          name: "test_header_pattern"
+          exact_match: "^customer=test-\\d+$"
+        }
+      }
+      route {
+        cluster: "local_service_with_header_pattern_unset_regex"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+        headers {
+          name: "test_header_range"
+          range_match {
+            start: -9223372036854775808
+            end: -10
+          }
+        }
+      }
+      route {
+        cluster: "local_service_with_header_range_test1"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+        headers {
+          name: "test_header_multiple_range"
+          range_match {
+            start: -10
+            end: 1
+          }
+        }
+        headers {
+          name: "test_header_multiple_exact"
+          exact_match: "test"
+        }
+      }
+      route {
+        cluster: "local_service_with_header_range_test2"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+        headers {
+          name: "test_header_range"
+          range_match {
+            start: 1
+            end: 10
+          }
+        }
+      }
+      route {
+        cluster: "local_service_with_header_range_test3"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+        headers {
+          name: "test_header_range"
+          range_match {
+            start: 9223372036854775801
+            end: 9223372036854775807
+          }
+        }
+      }
+      route {
+        cluster: "local_service_with_header_range_test4"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+        headers {
+          name: "test_header_range"
+          exact_match: "9223372036854775807"
+        }
+      }
+      route {
+        cluster: "local_service_with_header_range_test5"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "local_service_without_headers"
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+  headers {
+    key: "non_existent_header"
+    value: "foo"
+  }
+}

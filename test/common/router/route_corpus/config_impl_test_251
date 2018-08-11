@@ -1,0 +1,30 @@
+config {
+  name: "foo"
+  virtual_hosts {
+    name: "redirect"
+    domains: "redirect.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        response_code: TEMPORARY_REDIRECT
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "redirect.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/foo"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

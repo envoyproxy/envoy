@@ -1,0 +1,68 @@
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "www.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        weighted_clusters {
+          clusters {
+            name: "cluster1"
+            weight {
+              value: 50
+            }
+            request_headers_to_add {
+              header {
+                key: "x-req-cluster"
+                value: "cluster1"
+              }
+            }
+            response_headers_to_add {
+              header {
+                key: "x-resp-cluster"
+                value: "cluster1"
+              }
+            }
+            response_headers_to_remove: "x-remove-cluster1"
+          }
+          clusters {
+            name: "cluster2"
+            weight {
+              value: 50
+            }
+            request_headers_to_add {
+              header {
+                key: "x-req-cluster"
+                value: "cluster2"
+              }
+            }
+            response_headers_to_add {
+              header {
+                key: "x-resp-cluster"
+                value: "cluster2"
+              }
+            }
+            response_headers_to_remove: "x-remove-cluster2"
+          }
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/foo"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+}
+random_value: 55

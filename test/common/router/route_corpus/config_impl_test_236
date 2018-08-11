@@ -1,0 +1,37 @@
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "*"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+        rate_limits {
+          actions {
+            remote_address {
+            }
+          }
+        }
+        include_vh_rate_limits {
+          value: true
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/foo"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+}

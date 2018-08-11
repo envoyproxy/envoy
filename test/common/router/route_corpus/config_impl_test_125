@@ -1,0 +1,72 @@
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "www.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+      }
+    }
+    require_tls: ALL
+  }
+  virtual_hosts {
+    name: "api"
+    domains: "api.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+      }
+    }
+    require_tls: EXTERNAL_ONLY
+  }
+  virtual_hosts {
+    name: "redirect"
+    domains: "redirect.lyft.com"
+    routes {
+      match {
+        path: "/host"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        path_redirect: ""
+      }
+    }
+    routes {
+      match {
+        path: "/path"
+      }
+      redirect {
+        path_redirect: "/new_path"
+      }
+    }
+    routes {
+      match {
+        path: "/host_path"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        path_redirect: "/new_path"
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "api.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/foo"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

@@ -1,0 +1,65 @@
+config {
+  name: "AllRedirects"
+  virtual_hosts {
+    name: "redirect"
+    domains: "redirect.lyft.com"
+    routes {
+      match {
+        prefix: "/query/true"
+      }
+      redirect {
+        prefix_rewrite: "/new/prefix"
+        strip_query: true
+      }
+    }
+    routes {
+      match {
+        prefix: "/query/false"
+      }
+      redirect {
+        prefix_rewrite: "/new/prefix"
+      }
+    }
+    routes {
+      match {
+        path: "/host/query-default"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+      }
+    }
+    routes {
+      match {
+        path: "/path/redirect/"
+      }
+      redirect {
+        path_redirect: "/new/path-redirect/"
+      }
+    }
+    routes {
+      match {
+        prefix: "/all/combinations"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        https_redirect: true
+        prefix_rewrite: "/new/prefix"
+        strip_query: true
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "redirect.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/query/true?lang=eng&con=US"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

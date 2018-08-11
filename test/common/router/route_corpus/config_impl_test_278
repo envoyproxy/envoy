@@ -1,0 +1,31 @@
+config {
+  name: "ZeroIdleTimeout"
+  virtual_hosts {
+    name: "regex"
+    domains: "idle.lyft.com"
+    routes {
+      match {
+        regex: "/regex"
+      }
+      route {
+        cluster: "some-cluster"
+        idle_timeout {
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "idle.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/regex"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "https"
+  }
+}

@@ -1,0 +1,48 @@
+config {
+  virtual_hosts {
+    name: "www2"
+    domains: "www.lyft.com"
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        weighted_clusters {
+          clusters {
+            name: "www2"
+            weight {
+              value: 100
+            }
+          }
+        }
+      }
+    }
+  }
+  virtual_hosts {
+    name: "redirect"
+    domains: "redirect.lyft.com"
+    routes {
+      match {
+        prefix: "/foo"
+      }
+      redirect {
+        host_redirect: "new.lyft.com"
+        path_redirect: ""
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "redirect.lyft.com"
+  }
+  headers {
+    key: ":path"
+    value: "/foo"
+  }
+  headers {
+    key: "x-forwarded-proto"
+    value: "http"
+  }
+}

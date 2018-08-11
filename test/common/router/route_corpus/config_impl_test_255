@@ -1,0 +1,58 @@
+config {
+  name: "foo"
+  virtual_hosts {
+    name: "bar"
+    domains: "*"
+    routes {
+      match {
+        regex: "/rege[xy]"
+      }
+      route {
+        cluster: "ww2"
+      }
+    }
+    routes {
+      match {
+        path: "/exact-path"
+      }
+      route {
+        cluster: "ww2"
+      }
+    }
+    routes {
+      match {
+        prefix: "/"
+      }
+      route {
+        cluster: "www2"
+      }
+      metadata {
+        filter_metadata {
+          key: "com.bar.foo"
+          value {
+            fields {
+              key: "baz"
+              value {
+                string_value: "test_value"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: ":authority"
+    value: "www.foo.com"
+  }
+  headers {
+    key: ":path"
+    value: "/exact-path"
+  }
+  headers {
+    key: ":method"
+    value: "GET"
+  }
+}
