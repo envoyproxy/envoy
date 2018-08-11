@@ -277,6 +277,26 @@ public:
   }
 
   static constexpr std::chrono::milliseconds DefaultTimeout = std::chrono::milliseconds(10000);
+
+  // Helper class for condvars in tests, to make it easier to test interaction
+  // between multiple threads. Adapted from
+  // https://github.com/apache/incubator-pagespeed-mod/blob/a863f1d50641ea22a9a40859b7ae98b223858db1/pagespeed/kernel/thread/worker_test_base.h#L73
+  // where other variants of this can be found.
+  class SyncPoint {
+  public:
+    SyncPoint();
+
+    // Blocks waiting for another thread to call notify().
+    void wait();
+
+    // Unblocks a thread that has called wait().
+    void notify();
+
+  private:
+    bool done_ GUARDED_BY(mutex_);
+    Thread::MutexBasicLockable mutex_;
+    Thread::CondVar condvar_;
+  };
 };
 
 /**

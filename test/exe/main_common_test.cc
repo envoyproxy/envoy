@@ -47,7 +47,8 @@ public:
         random_string_(fmt::format("{}", computeBaseId())),
         argv_({"envoy-static", "--base-id", random_string_.c_str(), "-c", config_file_.c_str(),
                nullptr}),
-        envoy_return_(false), envoy_started_(false), envoy_finished_(false) {}
+        envoy_return_(false), envoy_started_(false), envoy_finished_(false),
+        pause_before_run_(false), pause_after_run_(false) {}
 
   /**
    * Computes a numeric ID to incorporate into the names of
@@ -90,25 +91,15 @@ public:
   // Runs a an admin request specified in path, blocking until completion, and
   // returning the response body.
   std::string adminRequest(absl::string_view path, absl::string_view method) {
-    Thread::MutexBasicLockable mutex;
-    Thread::CondVar condvar;
-    bool done = false;
+    TestUtility::SyncPoint done;
     std::string out;
     main_common_->adminRequest(
         path, method,
-        [&mutex, &condvar, &done, &out](const Http::HeaderMap& /*response_headers*/,
-                                        absl::string_view body) {
-          Thread::LockGuard lock(mutex);
+        [&done, &out](const Http::HeaderMap& /*response_headers*/, absl::string_view body) {
           out = std::string(body);
-          done = true;
-          condvar.notifyOne();
+          done.notify();
         });
-    {
-      Thread::LockGuard lock(mutex);
-      while (!done) {
-        condvar.wait(mutex);
-      }
-    }
+    done.wait();
     return out;
   }
 
@@ -120,39 +111,27 @@ public:
       // triggered with an adminRequest POST to /quitquitquit, which
       // is done in the testing thread.
       main_common_ = std::make_unique<MainCommon>(argc(), argv());
-      {
-        Thread::LockGuard lock(mutex_);
-        envoy_started_ = true;
-        started_condvar_.notifyOne();
+      envoy_started_ = true;
+      started_.notify();
+      if (pause_before_run_) {
+        pause_point_.notify();
+        resume_.wait();
       }
       bool status = main_common_->run();
-      main_common_.reset();
-      {
-        Thread::LockGuard lock(mutex_);
-        envoy_finished_ = true;
-        envoy_return_ = status;
-        finished_condvar_.notifyOne();
+      if (pause_after_run_) {
+        pause_point_.notify();
+        resume_.wait();
       }
+      main_common_.reset();
+      envoy_finished_ = true;
+      envoy_return_ = status;
+      finished_.notify();
     });
-  }
-
-  // Having started Envoy in its own thread, this waits for Envoy to be
-  // responsive by sending it a simple stats request.
-  void waitForEnvoyToStart() {
-    Thread::LockGuard lock(mutex_);
-    while (!envoy_started_) {
-      started_condvar_.wait(mutex_);
-    }
   }
 
   // Having sent a /quitquitquit to Envoy, this blocks until Envoy exits.
   bool waitForEnvoyToExit() {
-    {
-      Thread::LockGuard lock(mutex_);
-      while (!envoy_finished_) {
-        finished_condvar_.wait(mutex_);
-      }
-    }
+    finished_.wait();
     envoy_thread_->join();
     return envoy_return_;
   }
@@ -162,12 +141,15 @@ public:
   std::vector<const char*> argv_;
   std::unique_ptr<Thread::Thread> envoy_thread_;
   std::unique_ptr<MainCommon> main_common_;
-  Thread::CondVar started_condvar_;
-  Thread::CondVar finished_condvar_;
-  Thread::MutexBasicLockable mutex_;
+  TestUtility::SyncPoint started_;
+  TestUtility::SyncPoint finished_;
+  TestUtility::SyncPoint resume_;
+  TestUtility::SyncPoint pause_point_;
   bool envoy_return_;
-  bool envoy_started_ GUARDED_BY(mutex_);
-  bool envoy_finished_ GUARDED_BY(mutex_);
+  bool envoy_started_;
+  bool envoy_finished_;
+  bool pause_before_run_;
+  bool pause_after_run_;
 };
 
 // Exercise the codepath to instantiate MainCommon and destruct it, with hot restart.
@@ -232,7 +214,7 @@ TEST_F(MainCommonTest, AdminRequestGetStatsAndQuit) {
   }
   addArg("--disable-hot-restart");
   startEnvoy();
-  waitForEnvoyToStart();
+  started_.wait();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
   adminRequest("/quitquitquit", "POST");
   EXPECT_TRUE(waitForEnvoyToExit());
@@ -246,10 +228,76 @@ TEST_F(MainCommonTest, AdminRequestGetStatsAndKill) {
   }
   addArg("--disable-hot-restart");
   startEnvoy();
-  waitForEnvoyToStart();
+  started_.wait();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
   kill(getpid(), SIGTERM);
   EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_F(MainCommonTest, AdminRequestBeforeRun) {
+  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
+    return;
+  }
+  addArg("--disable-hot-restart");
+  // Induce the situation where the Envoy thread is active, and main_common_ is constructed,
+  // but run() hasn't been issued yet. AdminRequests will not finish immediately, but will
+  // do so at some point after run() is allowed to start.
+  pause_before_run_ = true;
+  startEnvoy();
+  pause_point_.wait();
+
+  bool admin_handler_was_called = false;
+  std::string out;
+  main_common_->adminRequest(
+      "/stats", "GET",
+      [&admin_handler_was_called, &out](const Http::HeaderMap& /*response_headers*/,
+                                        absl::string_view body) {
+        admin_handler_was_called = true;
+        out = std::string(body);
+      });
+
+  // The admin handler can't be called until after we let run() go.
+  EXPECT_FALSE(admin_handler_was_called);
+
+  // Now unblock the envoy thread so it can wake up and process outstanding posts.
+  resume_.notify();
+
+  // We don't get a notification when run(), so it's not safe to check whether the
+  // admin handler is called until after we quit.
+  adminRequest("/quitquitquit", "POST");
+  EXPECT_TRUE(waitForEnvoyToExit());
+  EXPECT_TRUE(admin_handler_was_called);
+  EXPECT_THAT(out, HasSubstr("filesystem.reopen_failed"));
+}
+
+TEST_F(MainCommonTest, AdminRequestAfterRun) {
+  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
+    return;
+  }
+  addArg("--disable-hot-restart");
+  startEnvoy();
+  started_.wait();
+  // Induce the situation where Envoy is no longer in run(), but hasn't been
+  // destroyed yet. AdminRequests will never finish, but they won't crash.
+  pause_after_run_ = true;
+  adminRequest("/quitquitquit", "POST");
+  pause_point_.wait();
+
+  // Now we are in a state that the Envoy thread has finished run(), but is blocked before
+  // destroying MainCommon. In this state, admin requests will will not work, but they will
+  // just never complete.
+  bool admin_handler_was_called = false;
+  main_common_->adminRequest(
+      "/stats", "GET",
+      [&admin_handler_was_called](const Http::HeaderMap& /*response_headers*/,
+                                  absl::string_view /*body*/) { admin_handler_was_called = true; });
+
+  // Now unblock the envoy thread so it can destroy the object, along with our unfinished
+  // admin request.
+  resume_.notify();
+
+  EXPECT_TRUE(waitForEnvoyToExit());
+  EXPECT_FALSE(admin_handler_was_called);
 }
 
 } // namespace Envoy
