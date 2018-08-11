@@ -295,7 +295,7 @@ public:
     return dynamic_cast<const envoy::admin::v2alpha::RoutesConfigDump&>(*message_ptr);
   }
 
-  Secret::MockSecretManager secret_manager_;
+  testing::NiceMock<Secret::MockSecretManager> secret_manager_;
   Runtime::MockLoader runtime_;
   Ssl::ContextManagerImpl context_manager_{runtime_};
   FakeStreamPtr ads_stream_;
