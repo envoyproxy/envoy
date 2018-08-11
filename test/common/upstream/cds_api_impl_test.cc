@@ -77,12 +77,17 @@ public:
         .WillOnce(Invoke(
             [&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
                 const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-              EXPECT_EQ((Http::TestHeaderMapImpl{
-                            {":method", v2_rest_ ? "POST" : "GET"},
-                            {":path", v2_rest_ ? "/v2/discovery:clusters"
-                                               : "/v1/clusters/cluster_name/node_name"},
-                            {":authority", "foo_cluster"}}),
-                        request->headers());
+              Http::TestHeaderMapImpl expected_headers{
+                  {":method", v2_rest_ ? "POST" : "GET"},
+                  {":path",
+                   v2_rest_ ? "/v2/discovery:clusters" : "/v1/clusters/cluster_name/node_name"},
+                  {":authority", "foo_cluster"}};
+              if (v2_rest_) {
+                expected_headers.addCopy("content-type", "application/json");
+                expected_headers.addCopy("content-length",
+                                         fmt::FormatInt(request->body()->length()).str());
+              }
+              EXPECT_EQ(expected_headers, request->headers());
               callbacks_ = &callbacks;
               return &request_;
             }));
