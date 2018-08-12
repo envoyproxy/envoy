@@ -150,7 +150,7 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
                                     absl::string_view cluster_name,
                                     uint64_t max_concurrent_requests, uint64_t reporting_hosts,
                                     std::chrono::milliseconds rolling_window_ms,
-                                    QuantileLatencyMap& histogram, std::stringstream& ss) {
+                                    const QuantileLatencyMap& histogram, std::stringstream& ss) {
 
   std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
@@ -245,7 +245,7 @@ void HystrixSink::addClusterStatsToStream(ClusterStatsCache& cluster_stats_cache
                                           uint64_t max_concurrent_requests,
                                           uint64_t reporting_hosts,
                                           std::chrono::milliseconds rolling_window_ms,
-                                          QuantileLatencyMap& histogram, std::stringstream& ss) {
+                                          const QuantileLatencyMap& histogram, std::stringstream& ss) {
 
   addHystrixCommand(cluster_stats_cache, cluster_name, max_concurrent_requests, reporting_hosts,
                     rolling_window_ms, histogram, ss);
@@ -335,11 +335,18 @@ void HystrixSink::flush(Stats::Source& source) {
       // Make sure we found the cluster name tag
       ASSERT(it != histogram->tags().end());
       // Make sure histogram with this name was not already added
-      ASSERT(time_histograms.find(it->value_) == time_histograms.end());
-      QuantileLatencyMap& hist_map = time_histograms[it->value_];
+//      ASSERT(time_histograms.find(it->value_) == time_histograms.end());
+//      QuantileLatencyMap& hist_map = time_histograms[it->value_];
+
+      ///////////
+      auto it_bool_pair = time_histograms.emplace(std::make_pair(it->value_, QuantileLatencyMap()));
+      // Make sure histogram with this name was not already added
+      ASSERT(it_bool_pair.second);
+      QuantileLatencyMap& hist_map = it_bool_pair.first->second;
+      ///////////////
 
       const std::vector<double>& supported_quantiles =
-          histogram->cumulativeStatistics().supportedQuantiles();
+          histogram->intervalStatistics().supportedQuantiles();
       for (size_t i = 0; i < supported_quantiles.size(); ++i) {
         // binary-search here is likely not worth it, as hystrix_quantiles has <10 elements.
         if (std::find(hystrix_quantiles.begin(), hystrix_quantiles.end(), supported_quantiles[i]) !=

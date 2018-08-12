@@ -75,7 +75,7 @@ public:
                                absl::string_view cluster_name, uint64_t max_concurrent_requests,
                                uint64_t reporting_hosts,
                                std::chrono::milliseconds rolling_window_ms,
-                               QuantileLatencyMap& histogram, std::stringstream& ss);
+                               const QuantileLatencyMap& histogram, std::stringstream& ss);
 
   /**
    * Calculate values needed to create the stream and write into the map.
@@ -133,7 +133,7 @@ private:
    */
   void addHystrixCommand(ClusterStatsCache& cluster_stats_cache, absl::string_view cluster_name,
                          uint64_t max_concurrent_requests, uint64_t reporting_hosts,
-                         std::chrono::milliseconds rolling_window_ms, QuantileLatencyMap& histogram,
+                         std::chrono::milliseconds rolling_window_ms, const QuantileLatencyMap& histogram,
                          std::stringstream& ss);
 
   /**

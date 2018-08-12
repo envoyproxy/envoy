@@ -5,10 +5,12 @@
 #include "envoy/stats/stats.h"
 
 #include "extensions/stat_sinks/hystrix/hystrix.h"
+#include "common/stats/thread_local_store.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/common/stats/thread_local_store_test.cc"
 
 #include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
@@ -19,6 +21,8 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::_;
+using testing::ReturnPointee;
+
 
 namespace Envoy {
 namespace Extensions {
@@ -429,6 +433,56 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
 
   // Check that old values of test_cluster2 were deleted.
   validateResults(cluster_message_map[cluster2_name_], 0, 0, 0, 0, 0, window_size_);
+}
+
+TEST_F(HystrixSinkTest, HistogramTest) {
+//  std::unique_ptr<Stats::ThreadLocalStoreImpl> store;
+//  Stats::Histogram& histogram = store->histogram("cluster." + cluster1_name_ + ".upstream_rq_time");
+//  std::vector<uint64_t> interval_values;
+//
+//  for (size_t i = 0; i < 100; ++i) {
+//    histogram.recordValue(i);
+//    interval_values.push_back(i);
+//  }
+
+
+
+
+  std::vector<Stats::ParentHistogramSharedPtr> stored_histograms;
+
+
+  auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
+  histogram->name_ = "cluster." + cluster1_name_ + ".upstream_rq_time";
+//  const std::string tag_extracted_name = "cluster.upstream_rq_time"
+//  ON_CALL(histogram, tagExtractedName()).WillByDefault(testing::ReturnRefOfCopy(tag_extracted_name));
+
+  histogram->used_ = true;
+
+  Stats::ParentHistogramImpl histogram();
+
+  std::vector<uint64_t> h1_interval_values;
+  for (size_t i = 0; i < 100; ++i) {
+    h1_interval_values.push_back(i);
+  }
+
+  histogram_t* hist1_interval = Stats::HistogramTest::makeHistogram(h1_interval_values);
+  Stats::HistogramStatisticsImpl h1_interval_statistics(hist1_interval);
+  ON_CALL(histogram, intervalStatistics()).WillByDefault(ReturnRef(h1_interval_statisticss));
+  ON_CALL(source_, cachedHistograms()).WillByDefault(ReturnPointee(&stored_histograms));
+
+  stored_histograms.push_back(std::make_shared<Stats::MockParentHistogram>());
+
+  InSequence s;
+  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
+  // Register callback to sink.
+  sink_->registerConnection(&callbacks_);
+
+  ON_CALL(source_, cachedHistograms()).WillByDefault(ReturnPointee(&stored_histograms));
+
+  sink_->flush(source_);
+  std::unordered_map<std::string, std::string> cluster_message_map =
+      buildClusterMap(buffer.toString());
+
 }
 } // namespace Hystrix
 } // namespace StatSinks
