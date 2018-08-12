@@ -186,21 +186,6 @@ ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
 
 constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
 
-TestUtility::SyncPoint::SyncPoint() : done_(false) {}
-
-void TestUtility::SyncPoint::wait() {
-  Thread::LockGuard lock(mutex_);
-  while (!done_) {
-    condvar_.wait(mutex_);
-  }
-}
-
-void TestUtility::SyncPoint::notify() {
-  Thread::LockGuard lock(mutex_);
-  done_ = true;
-  condvar_.notifyOne();
-}
-
 namespace Http {
 
 // Satisfy linker

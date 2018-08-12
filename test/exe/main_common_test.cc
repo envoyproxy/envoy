@@ -26,6 +26,8 @@
 #include "exe/signal_action.h"
 #endif
 
+#include "absl/synchronization/notification.h"
+
 using testing::HasSubstr;
 
 namespace Envoy {
@@ -158,15 +160,15 @@ protected:
   // Runs a an admin request specified in path, blocking until completion, and
   // returning the response body.
   std::string adminRequest(absl::string_view path, absl::string_view method) {
-    TestUtility::SyncPoint done;
+    absl::Notification done;
     std::string out;
     main_common_->adminRequest(
         path, method,
         [&done, &out](const Http::HeaderMap& /*response_headers*/, absl::string_view body) {
           out = std::string(body);
-          done.notify();
+          done.Notify();
         });
-    done.wait();
+    done.WaitForNotification();
     return out;
   }
 
@@ -179,40 +181,40 @@ protected:
       // is done in the testing thread.
       main_common_ = std::make_unique<MainCommon>(argc(), argv());
       envoy_started_ = true;
-      started_.notify();
+      started_.Notify();
       pauseResumeInterlock(pause_before_run_);
       bool status = main_common_->run();
       pauseResumeInterlock(pause_after_run_);
       main_common_.reset();
       envoy_finished_ = true;
       envoy_return_ = status;
-      finished_.notify();
+      finished_.Notify();
     });
   }
 
   // Conditionally pauses at a critical point in the Envoy thread waiting, waiting
-  // the for the test thread to try something. The test thread can then call resume_.notify()
+  // the for the test thread to try something. The test thread can then call resume_.Notify()
   // to allow the Envoy thread to resume.
   void pauseResumeInterlock(bool enable) {
     if (enable) {
-      pause_point_.notify();
-      resume_.wait();
+      pause_point_.Notify();
+      resume_.WaitForNotification();
     }
   }
 
   // Having triggered Envoy to quit (via signal or /quitquitquit), this blocks until Envoy exits.
   bool waitForEnvoyToExit() {
-    finished_.wait();
+    finished_.WaitForNotification();
     envoy_thread_->join();
     return envoy_return_;
   }
 
   std::unique_ptr<Thread::Thread> envoy_thread_;
   std::unique_ptr<MainCommon> main_common_;
-  TestUtility::SyncPoint started_;
-  TestUtility::SyncPoint finished_;
-  TestUtility::SyncPoint resume_;
-  TestUtility::SyncPoint pause_point_;
+  absl::Notification started_;
+  absl::Notification finished_;
+  absl::Notification resume_;
+  absl::Notification pause_point_;
   bool envoy_return_;
   bool envoy_started_;
   bool envoy_finished_;
@@ -225,7 +227,7 @@ TEST_F(AdminRequestTest, AdminRequestGetStatsAndQuit) {
     return;
   }
   startEnvoy();
-  started_.wait();
+  started_.WaitForNotification();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
   adminRequest("/quitquitquit", "POST");
   EXPECT_TRUE(waitForEnvoyToExit());
@@ -238,7 +240,7 @@ TEST_F(AdminRequestTest, AdminRequestGetStatsAndKill) {
     return;
   }
   startEnvoy();
-  started_.wait();
+  started_.WaitForNotification();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
   kill(getpid(), SIGTERM);
   EXPECT_TRUE(waitForEnvoyToExit());
@@ -253,7 +255,7 @@ TEST_F(AdminRequestTest, AdminRequestBeforeRun) {
   // do so at some point after run() is allowed to start.
   pause_before_run_ = true;
   startEnvoy();
-  pause_point_.wait();
+  pause_point_.WaitForNotification();
 
   bool admin_handler_was_called = false;
   std::string out;
@@ -269,7 +271,7 @@ TEST_F(AdminRequestTest, AdminRequestBeforeRun) {
   EXPECT_FALSE(admin_handler_was_called);
 
   // Now unblock the envoy thread so it can wake up and process outstanding posts.
-  resume_.notify();
+  resume_.Notify();
 
   // We don't get a notification when run(), so it's not safe to check whether the
   // admin handler is called until after we quit.
@@ -294,12 +296,12 @@ TEST_F(AdminRequestTest, AdminRequestAfterRun) {
     return;
   }
   startEnvoy();
-  started_.wait();
+  started_.WaitForNotification();
   // Induce the situation where Envoy is no longer in run(), but hasn't been
   // destroyed yet. AdminRequests will never finish, but they won't crash.
   pause_after_run_ = true;
   adminRequest("/quitquitquit", "POST");
-  pause_point_.wait(); // run() finished, but main_common_ still exists.
+  pause_point_.WaitForNotification(); // run() finished, but main_common_ still exists.
 
   // Admin requests will not work, but will never complete. The lambda itself will be
   // destroyed on thread exit, which we'll track with an object that counts destructor calls.
@@ -321,7 +323,7 @@ TEST_F(AdminRequestTest, AdminRequestAfterRun) {
 
   // Now unblock the envoy thread so it can destroy the object, along with our unfinished
   // admin request.
-  resume_.notify();
+  resume_.Notify();
 
   EXPECT_TRUE(waitForEnvoyToExit());
   EXPECT_FALSE(admin_handler_was_called);
