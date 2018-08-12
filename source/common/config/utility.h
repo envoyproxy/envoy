@@ -53,7 +53,10 @@ public:
     Protobuf::RepeatedPtrField<ResourceType> typed_resources;
     for (const auto& resource : response.resources()) {
       auto* typed_resource = typed_resources.Add();
-      resource.UnpackTo(typed_resource);
+      if (!resource.UnpackTo(typed_resource)) {
+        throw EnvoyException("Unable to unpack " + resource.DebugString());
+      }
+      MessageUtil::checkUnknownFields(*typed_resource);
     }
     return typed_resources;
   }

@@ -156,6 +156,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/common:macros",
         "//source/common/common:version_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
     ],
 )

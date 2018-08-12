@@ -48,9 +48,18 @@ ProtoValidationException::ProtoValidationException(const std::string& validation
   ENVOY_LOG_MISC(debug, "Proto validation error; throwing {}", what());
 }
 
+ProtoUnknownFieldsMode MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Strict;
+
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message) {
+  MessageUtil::loadFromJsonEx(json, message, ProtoUnknownFieldsMode::Strict);
+}
+
+void MessageUtil::loadFromJsonEx(const std::string& json, Protobuf::Message& message,
+                                 ProtoUnknownFieldsMode proto_unknown_fields) {
   Protobuf::util::JsonParseOptions options;
-  options.ignore_unknown_fields = true;
+  if (proto_unknown_fields == ProtoUnknownFieldsMode::Allow) {
+    options.ignore_unknown_fields = true;
+  }
   const auto status = Protobuf::util::JsonStringToMessage(json, &message, options);
   if (!status.ok()) {
     throw EnvoyException("Unable to parse JSON as proto (" + status.ToString() + "): " + json);
@@ -68,6 +77,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   if (StringUtil::endsWith(path, ".pb")) {
     // Attempt to parse the binary format.
     if (message.ParseFromString(contents)) {
+      MessageUtil::checkUnknownFields(message);
       return;
     }
     throw EnvoyException("Unable to parse file \"" + path + "\" as a binary protobuf (type " +
@@ -121,7 +131,7 @@ void MessageUtil::jsonConvert(const Protobuf::Message& source, Protobuf::Message
     throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
                                      status.ToString(), source.DebugString()));
   }
-  MessageUtil::loadFromJson(json, dest);
+  MessageUtil::loadFromJsonEx(json, dest, MessageUtil::proto_unknown_fields);
 }
 
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {

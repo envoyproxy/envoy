@@ -54,6 +54,17 @@ TEST(UtilityTest, LoadBinaryProtoFromFile) {
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
 
+TEST(UtilityTest, LoadBinaryProtoUnknownFieldFromFile) {
+  ProtobufWkt::Duration source_duration;
+  source_duration.set_seconds(42);
+  const std::string filename =
+      TestEnvironment::writeStringToFileForTest("proto.pb", source_duration.SerializeAsString());
+  envoy::config::bootstrap::v2::Bootstrap proto_from_file;
+  EXPECT_THROW_WITH_MESSAGE(
+      MessageUtil::loadFromFile(filename, proto_from_file), EnvoyException,
+      "Protobuf message (type envoy.config.bootstrap.v2.Bootstrap) has unknown fields");
+}
+
 TEST(UtilityTest, LoadTextProtoFromFile) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   bootstrap.mutable_cluster_manager()
@@ -212,6 +223,25 @@ TEST(UtilityTest, HashedValueStdHash) {
   EXPECT_NE(set.find(hv3), set.end());
 }
 
+TEST(UtilityTest, AnyConvertWrongType) {
+  ProtobufWkt::Duration source_duration;
+  source_duration.set_seconds(42);
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(source_duration);
+  EXPECT_THROW_WITH_REGEX(MessageUtil::anyConvert<ProtobufWkt::Timestamp>(source_any),
+                          EnvoyException, "Unable to unpack .*");
+}
+
+TEST(UtilityTest, AnyConvertWrongFields) {
+  const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(obj);
+  source_any.set_type_url("type.google.com/google.protobuf.Timestamp");
+  EXPECT_THROW_WITH_MESSAGE(MessageUtil::anyConvert<ProtobufWkt::Timestamp>(source_any),
+                            EnvoyException,
+                            "Protobuf message (type google.protobuf.Timestamp) has unknown fields");
+}
+
 TEST(UtilityTest, JsonConvertSuccess) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
@@ -221,9 +251,11 @@ TEST(UtilityTest, JsonConvertSuccess) {
 }
 
 TEST(UtilityTest, JsonConvertUnknownFieldSuccess) {
+  MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Allow;
   const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   EXPECT_NO_THROW(MessageUtil::jsonConvert(obj, bootstrap));
+  MessageUtil::proto_unknown_fields = ProtoUnknownFieldsMode::Strict;
 }
 
 TEST(UtilityTest, JsonConvertFail) {
