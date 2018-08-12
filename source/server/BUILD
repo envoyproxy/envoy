@@ -167,6 +167,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/server:overload_manager_interface",
         "//include/envoy/stats:stats_interface",
+        "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
         "//source/server:resource_monitor_config_lib",
