@@ -1024,12 +1024,13 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
 TEST_F(ConnectionManagerUtilityTest, AppendXForwardedPort) {
   EXPECT_CALL(config_, appendXForwardedPort()).WillOnce(Return(true));
   const uint32_t port = 8000;
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("11.11.11.11");
   connection_.local_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12", port);
-  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  // Ignore previous proxy.
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
   TestHeaderMapImpl headers;
-  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
+  EXPECT_EQ((MutateRequestRet{"11.11.11.11:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has(Headers::get().ForwardedPort));
   EXPECT_EQ(fmt::FormatInt(port).str(), headers.get_(Headers::get().ForwardedPort));
@@ -1040,31 +1041,52 @@ TEST_F(ConnectionManagerUtilityTest, AppendXForwardedPort) {
 TEST_F(ConnectionManagerUtilityTest, DoNotAppendXForwardedPort) {
   EXPECT_CALL(config_, appendXForwardedPort()).WillOnce(Return(false));
   const uint32_t port = 8000;
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("11.11.11.11");
   connection_.local_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12", port);
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   TestHeaderMapImpl headers;
-  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
+  EXPECT_EQ((MutateRequestRet{"11.11.11.11:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_FALSE(headers.has(Headers::get().ForwardedPort));
 }
 
-// Verify when x-forwarded-port is already specified, the mutated header should skip appending
-// x-forwarded-port.
-TEST_F(ConnectionManagerUtilityTest, IgnoreAppendXForwardedPortWhenAlreadySet) {
+// Verify when useRemoteAddress() is true, set the x-forwarded-port by using the remote address
+// (i.e. the address of previous trusted proxy).
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressPort) {
   EXPECT_CALL(config_, appendXForwardedPort()).WillOnce(Return(true));
   const uint32_t port = 8000;
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+  const uint32_t previous_port = 9000;
+  connection_.remote_address_ =
+      std::make_shared<Network::Address::Ipv4Instance>("11.11.11.11", 9000);
   connection_.local_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12", port);
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
 
-  // Set by previous proxy.
+  TestHeaderMapImpl headers;
+  EXPECT_EQ((MutateRequestRet{"11.11.11.11:9000", false}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_TRUE(headers.has(Headers::get().ForwardedPort));
+  EXPECT_NE(fmt::FormatInt(port).str(), headers.get_(Headers::get().ForwardedPort));
+  EXPECT_EQ(fmt::FormatInt(previous_port).str(), headers.get_(Headers::get().ForwardedPort));
+}
+
+// Verify when x-forwarded-port is already specified and useRemoteAddress() is true the mutated
+// header should skip appending x-forwarded-port.
+TEST_F(ConnectionManagerUtilityTest, IgnoreAppendXForwardedPortWhenAlreadySet) {
+  EXPECT_CALL(config_, appendXForwardedPort()).WillOnce(Return(true));
+  const uint32_t port = 8000;
+  connection_.remote_address_ =
+      std::make_shared<Network::Address::Ipv4Instance>("11.11.11.11", 9000);
+  connection_.local_address_ =
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12", port);
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+
+  // Set by previous (trusted) proxy via x-forwarded-port header.
   const uint32_t previous_port = 9000;
   TestHeaderMapImpl headers{
       {Headers::get().ForwardedPort.get(), fmt::FormatInt(previous_port).str()}};
-  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
+  EXPECT_EQ((MutateRequestRet{"11.11.11.11:9000", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_TRUE(headers.has(Headers::get().ForwardedPort));
   EXPECT_NE(fmt::FormatInt(port).str(), headers.get_(Headers::get().ForwardedPort));

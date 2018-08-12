@@ -77,6 +77,13 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     }
     request_headers.insertForwardedProto().value().setReference(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
+
+    // If the x-forwarded-port is already set, and the useRemoteAddress() is true, we skip adding
+    // x-forwarded-port. Otherwise, we set it with remote address connection port, i.e. the port of
+    // the proxy in front of this Envoy that is used by the client to connect to.
+    if (config.appendXForwardedPort() && !request_headers.ForwardedPort()) {
+      request_headers.insertForwardedPort().value(connection.remoteAddress()->ip()->port());
+    }
   } else {
     // If we are not using remote address, attempt to pull a valid IPv4 or IPv6 address out of XFF.
     // If we find one, it will be used as the downstream address for logging. It may or may not be
@@ -84,6 +91,12 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     auto ret = Utility::getLastAddressFromXFF(request_headers, xff_num_trusted_hops);
     final_remote_address = ret.address_;
     single_xff_address = ret.single_address_;
+
+    if (config.appendXForwardedPort()) {
+      // Since we are not using remote address, we set x-forwarded-port with local connection port
+      // (i.e. the port that is used by the client to connect to this Envoy).
+      request_headers.insertForwardedPort().value(connection.localAddress()->ip()->port());
+    }
   }
 
   // If we didn't already replace x-forwarded-proto because we are using the remote address, and
@@ -91,13 +104,6 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   if (!request_headers.ForwardedProto()) {
     request_headers.insertForwardedProto().value().setReference(
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
-  }
-
-  const auto& local_address = connection.localAddress();
-  // If x-forwarded-port is desired and remote hasn't set it (trusted proxy), we set it.
-  if (config.appendXForwardedPort() && !request_headers.ForwardedPort() &&
-      local_address != nullptr && local_address->type() == Network::Address::Type::Ip) {
-    request_headers.insertForwardedPort().value(local_address->ip()->port());
   }
 
   // At this point we can determine whether this is an internal or external request. The
