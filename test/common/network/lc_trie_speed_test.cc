@@ -7,6 +7,8 @@ namespace {
 
 std::vector<Envoy::Network::Address::InstanceConstSharedPtr> addresses;
 
+std::vector<std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>> tag_data;
+
 std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> lc_trie;
 
 std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> lc_trie_nested_prefixes;
@@ -14,6 +16,16 @@ std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> lc_trie_nested_pref
 } // namespace
 
 namespace Envoy {
+
+static void BM_LcTrieConstruct(benchmark::State& state) {
+  std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> trie;
+  for (auto _ : state) {
+    trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(tag_data);
+  }
+  benchmark::DoNotOptimize(trie);
+}
+
+BENCHMARK(BM_LcTrieConstruct);
 
 static void BM_LcTrieLookup(benchmark::State& state) {
   static size_t i = 0;
@@ -54,7 +66,9 @@ int main(int argc, char** argv) {
     addresses.push_back(Envoy::Network::Utility::parseInternetAddress(address));
   }
 
-  std::vector<std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>> tag_data;
+  // Construct two sets of prefixes: one consisting of 1,024 addresses in an
+  // RFC 5737 netblock, the other consisting of those same addresses plus
+  // 0.0.0.0/0 (to exercise the LC Trie's support for nested prefixes)
   for (int i = 0; i < 32; i++) {
     for (int j = 0; j < 32; j++) {
       tag_data.emplace_back(std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
@@ -62,11 +76,15 @@ int main(int argc, char** argv) {
            {Envoy::Network::Address::CidrRange::create(fmt::format("192.0.{}.{}/32", i, j))}}));
     }
   }
+  std::vector<std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>>
+      tag_data_nested_prefixes = tag_data;
+  tag_data_nested_prefixes.emplace_back(
+      std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
+          {"tag_0", {Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
 
   lc_trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(tag_data);
-  tag_data.emplace_back(std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
-      {"tag_0", {Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
-  lc_trie_nested_prefixes = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(tag_data);
+  lc_trie_nested_prefixes =
+      std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(tag_data_nested_prefixes);
 
   benchmark::Initialize(&argc, argv);
   if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
