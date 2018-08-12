@@ -10,52 +10,15 @@
 #include "common/config/utility.h"
 #include "common/singleton/const_singleton.h"
 
+#include "extensions/filters/network/thrift_proxy/metadata.h"
+#include "extensions/filters/network/thrift_proxy/protocol.h"
+
 #include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
-
-enum class TransportType {
-  Framed,
-  Unframed,
-  Auto,
-
-  // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST TRANSPORT TYPE
-  LastTransportType = Auto,
-
-};
-
-/**
- * Names of available Transport implementations.
- */
-class TransportNameValues {
-public:
-  // Framed transport
-  const std::string FRAMED = "framed";
-
-  // Unframed transport
-  const std::string UNFRAMED = "unframed";
-
-  // Auto-detection transport
-  const std::string AUTO = "auto";
-
-  const std::string& fromType(TransportType type) const {
-    switch (type) {
-    case TransportType::Framed:
-      return FRAMED;
-    case TransportType::Unframed:
-      return UNFRAMED;
-    case TransportType::Auto:
-      return AUTO;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-  }
-};
-
-typedef ConstSingleton<TransportNameValues> TransportNames;
 
 /**
  * Transport represents a Thrift transport. The Thrift transport is nominally a generic,
@@ -80,16 +43,18 @@ public:
 
   /*
    * Decodes the start of a transport message. If successful, the start of the frame is removed
-   * from the buffer.
+   * from the buffer. Transports should not modify the buffer, headers, protocol type, or size if
+   * more data is required to decode the frame's start. If the full frame start can be decoded, the
+   * Transport must drain the frame start data from the buffer. The request metadata should be
+   * modified with any data available to the transport.
    *
    * @param buffer the currently buffered thrift data.
-   * @param size updated with the frame size on success. If frame size is not encoded, the size
-   *                is cleared on success.
+   * @param metadata MessageMetadata to be modified if transport supports additional information
    * @return bool true if a complete frame header was successfully consumed, false if more data
    *                 is required.
    * @throws EnvoyException if the data is not valid for this transport.
    */
-  virtual bool decodeFrameStart(Buffer::Instance& buffer, absl::optional<uint32_t>& size) PURE;
+  virtual bool decodeFrameStart(Buffer::Instance& buffer, MessageMetadata& metadata) PURE;
 
   /*
    * Decodes the end of a transport message. If successful, the end of the frame is removed from
@@ -106,10 +71,12 @@ public:
    * Wraps the given message buffer with the transport's header and trailer (if any). After
    * encoding, message will be empty.
    * @param buffer is the output buffer
+   * @param metadata MessageMetadata for the message
    * @param message a protocol-encoded message
    * @throws EnvoyException if the message is too large for the transport
    */
-  virtual void encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) PURE;
+  virtual void encodeFrame(Buffer::Instance& buffer, const MessageMetadata& metadata,
+                           Buffer::Instance& message) PURE;
 };
 
 typedef std::unique_ptr<Transport> TransportPtr;

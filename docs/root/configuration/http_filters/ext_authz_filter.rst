@@ -82,5 +82,5 @@ The HTTP filter outputs statistics in the *cluster.<route target cluster>.ext_au
   ok, Counter, Total responses from the filter.
   error, Counter, Total errors contacting the external service.
   denied, Counter, Total responses from the authorizations service that were to deny the traffic.
-  failure_mode_allow, Counter, "Total requests that were error(s) but were allowed through because
+  failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
   of failure_mode_allow set to true."

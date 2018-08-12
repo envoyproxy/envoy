@@ -60,17 +60,6 @@ public:
   ThriftFilters::DecoderFilter& newDecoderFilter() override;
 
 private:
-  class Message {
-  public:
-    Message(const std::string& method_name, MessageType msg_type, int32_t seq_id)
-        : method_name_(method_name), msg_type_(msg_type), seq_id_(seq_id) {}
-
-    const std::string method_name_;
-    const MessageType msg_type_;
-    const int32_t seq_id_;
-    absl::optional<bool> success_;
-  };
-
   struct ActiveRpc;
 
   struct ResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
@@ -91,12 +80,11 @@ private:
     bool onData(Buffer::Instance& data);
 
     // ProtocolConverter
-    ThriftFilters::FilterStatus messageBegin(absl::string_view name, MessageType msg_type,
-                                             int32_t seq_id) override;
+    ThriftFilters::FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
     ThriftFilters::FilterStatus fieldBegin(absl::string_view name, FieldType field_type,
                                            int16_t field_id) override;
-    ThriftFilters::FilterStatus transportBegin(absl::optional<uint32_t> size) override {
-      UNREFERENCED_PARAMETER(size);
+    ThriftFilters::FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
+      UNREFERENCED_PARAMETER(metadata);
       return ThriftFilters::FilterStatus::Continue;
     }
     ThriftFilters::FilterStatus transportEnd() override;
@@ -107,7 +95,8 @@ private:
     ActiveRpc& parent_;
     DecoderPtr decoder_;
     Buffer::OwnedImpl upstream_buffer_;
-    absl::optional<Message> reply_;
+    MessageMetadataSharedPtr metadata_;
+    absl::optional<bool> success_;
     bool complete_ : 1;
     bool first_reply_field_ : 1;
   };
@@ -139,14 +128,13 @@ private:
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
     void resetUpstreamConnection() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-    ThriftFilters::FilterStatus transportBegin(absl::optional<uint32_t> size) override {
-      return decoder_filter_->transportBegin(size);
+    ThriftFilters::FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
+      return decoder_filter_->transportBegin(metadata);
     }
     ThriftFilters::FilterStatus transportEnd() override;
-    ThriftFilters::FilterStatus messageBegin(absl::string_view name, MessageType msg_type,
-                                             int32_t seq_id) override {
-      call_.emplace(std::string(name), msg_type, seq_id);
-      return decoder_filter_->messageBegin(name, msg_type, seq_id);
+    ThriftFilters::FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override {
+      metadata_ = metadata;
+      return decoder_filter_->messageBegin(metadata);
     }
     ThriftFilters::FilterStatus messageEnd() override { return decoder_filter_->messageEnd(); }
     ThriftFilters::FilterStatus structBegin(absl::string_view name) override {
@@ -204,7 +192,7 @@ private:
     ProtocolType downstreamProtocolType() const override {
       return parent_.decoder_->protocolType();
     }
-    void sendLocalReply(ThriftFilters::DirectResponsePtr&& response) override;
+    void sendLocalReply(const DirectResponse& response) override;
     void startUpstreamResponse(TransportType transport_type, ProtocolType protocol_type) override;
     bool upstreamData(Buffer::Instance& buffer) override;
     void resetDownstreamConnection() override;
@@ -223,10 +211,10 @@ private:
     ConnectionManager& parent_;
     Stats::TimespanPtr request_timer_;
     uint64_t stream_id_;
+    MessageMetadataSharedPtr metadata_;
     ThriftFilters::DecoderFilterSharedPtr decoder_filter_;
     ResponseDecoderPtr response_decoder_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
-    absl::optional<Message> call_;
     Buffer::OwnedImpl response_buffer_;
   };
 
@@ -234,6 +222,7 @@ private:
 
   void continueDecoding();
   void dispatch();
+  void sendLocalReply(MessageMetadata& metadata, const DirectResponse& reponse);
   void doDeferredRpcDestroy(ActiveRpc& rpc);
   void resetAllRpcs();
 

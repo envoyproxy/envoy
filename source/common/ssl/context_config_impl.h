@@ -5,8 +5,10 @@
 
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/secret/secret_provider.h"
 #include "envoy/ssl/context_config.h"
 
+#include "common/common/empty_string.h"
 #include "common/json/json_loader.h"
 
 namespace Envoy {
@@ -33,13 +35,24 @@ public:
                ? INLINE_STRING
                : certificate_revocation_list_path_;
   }
-  const std::string& certChain() const override { return cert_chain_; }
-  const std::string& certChainPath() const override {
-    return (cert_chain_path_.empty() && !cert_chain_.empty()) ? INLINE_STRING : cert_chain_path_;
+  const std::string& certChain() const override {
+    return tls_certficate_provider_ == nullptr
+               ? EMPTY_STRING
+               : tls_certficate_provider_->secret()->certificateChain();
   }
-  const std::string& privateKey() const override { return private_key_; }
+  const std::string& certChainPath() const override {
+    return tls_certficate_provider_ == nullptr
+               ? EMPTY_STRING
+               : tls_certficate_provider_->secret()->certificateChainPath();
+  }
+  const std::string& privateKey() const override {
+    return tls_certficate_provider_ == nullptr ? EMPTY_STRING
+                                               : tls_certficate_provider_->secret()->privateKey();
+  }
   const std::string& privateKeyPath() const override {
-    return (private_key_path_.empty() && !private_key_.empty()) ? INLINE_STRING : private_key_path_;
+    return tls_certficate_provider_ == nullptr
+               ? EMPTY_STRING
+               : tls_certficate_provider_->secret()->privateKeyPath();
   }
   const std::vector<std::string>& verifySubjectAltNameList() const override {
     return verify_subject_alt_name_list_;
@@ -74,10 +87,7 @@ private:
   const std::string ca_cert_path_;
   const std::string certificate_revocation_list_;
   const std::string certificate_revocation_list_path_;
-  const std::string cert_chain_;
-  const std::string cert_chain_path_;
-  const std::string private_key_;
-  const std::string private_key_path_;
+  Secret::TlsCertificateConfigProviderSharedPtr tls_certficate_provider_;
   const std::vector<std::string> verify_subject_alt_name_list_;
   const std::vector<std::string> verify_certificate_hash_list_;
   const std::vector<std::string> verify_certificate_spki_list_;

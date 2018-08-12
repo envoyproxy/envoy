@@ -1,3 +1,4 @@
+#include "common/config/metadata.h"
 #include "common/network/utility.h"
 
 #include "extensions/filters/http/rbac/rbac_filter.h"
@@ -43,6 +44,7 @@ public:
 
   void SetUp() {
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
+    EXPECT_CALL(callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
@@ -53,9 +55,11 @@ public:
 
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Network::MockConnection> connection_{};
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> req_info_;
   Stats::IsolatedStoreImpl store_;
   RoleBasedAccessControlFilterConfigSharedPtr config_;
 
+  envoy::api::v2::core::Metadata metadata_;
   RoleBasedAccessControlFilter filter_;
   Network::Address::InstanceConstSharedPtr address_;
   Http::TestHeaderMapImpl headers_;
@@ -98,7 +102,7 @@ TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
   NiceMock<Filters::Common::RBAC::MockEngine> engine{route_config.rbac().rules()};
   NiceMock<MockRoleBasedAccessControlRouteSpecificFilterConfig> per_route_config_{route_config};
 
-  EXPECT_CALL(engine, allowed(_, _, _)).WillRepeatedly(Return(true));
+  EXPECT_CALL(engine, allowed(_, _, _, _)).WillRepeatedly(Return(true));
   EXPECT_CALL(per_route_config_, engine()).WillRepeatedly(ReturnRef(engine));
 
   EXPECT_CALL(callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Rbac))

@@ -15,6 +15,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
+#include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -139,6 +140,7 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  * be proxied back and forth between the two connections.
  */
 class Filter : public Network::ReadFilter,
+               Tcp::ConnectionPool::Callbacks,
                Upstream::LoadBalancerContext,
                protected Logger::Loggable<Logger::Id::filter> {
 public:
@@ -149,6 +151,12 @@ public:
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override { return initializeUpstreamConnection(); }
   void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override;
+
+  // Tcp::ConnectionPool::Callbacks
+  void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
+                     Upstream::HostDescriptionConstSharedPtr host) override;
+  void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
+                   Upstream::HostDescriptionConstSharedPtr host) override;
 
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return {}; }
@@ -167,17 +175,14 @@ public:
   void readDisableUpstream(bool disable);
   void readDisableDownstream(bool disable);
 
-  struct UpstreamCallbacks : public Network::ConnectionCallbacks,
-                             public Network::ReadFilterBaseImpl {
+  struct UpstreamCallbacks : public Tcp::ConnectionPool::UpstreamCallbacks {
     UpstreamCallbacks(Filter* parent) : parent_(parent) {}
 
-    // Network::ConnectionCallbacks
+    // Tcp::ConnectionPool::UpstreamCallbacks
+    void onUpstreamData(Buffer::Instance& data, bool end_stream) override;
     void onEvent(Network::ConnectionEvent event) override;
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
-
-    // Network::ReadFilter
-    Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
 
     void onBytesSent();
     void onIdleTimeout();
@@ -235,7 +240,6 @@ protected:
   void onDownstreamEvent(Network::ConnectionEvent event);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
   void onUpstreamEvent(Network::ConnectionEvent event);
-  void finalizeUpstreamConnectionStats();
   void onIdleTimeout();
   void resetIdleTimer();
   void disableIdleTimer();
@@ -243,29 +247,26 @@ protected:
   const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
   Network::ReadFilterCallbacks* read_callbacks_{};
-  Network::ClientConnectionPtr upstream_connection_;
+  Tcp::ConnectionPool::Cancellable* upstream_handle_{};
+  Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
   DownstreamCallbacks downstream_callbacks_;
-  Event::TimerPtr connect_timeout_timer_;
   Event::TimerPtr idle_timer_;
-  Stats::TimespanPtr connect_timespan_;
-  Stats::TimespanPtr connected_timespan_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
   RequestInfo::RequestInfoImpl request_info_;
   uint32_t connect_attempts_{};
+  bool connecting_{};
 };
 
-// This class holds ownership of an upstream connection that needs to finish
-// flushing, when the downstream connection has been closed. The TcpProxy is
-// destroyed when the downstream connection is closed, so moving the upstream
-// connection here allows it to finish draining or timeout.
+// This class deals with an upstream connection that needs to finish flushing, when the downstream
+// connection has been closed. The TcpProxy is destroyed when the downstream connection is closed,
+// so handling the upstream connection here allows it to finish draining or timeout.
 class Drainer : public Event::DeferredDeletable {
 public:
   Drainer(UpstreamDrainManager& parent, const Config::SharedConfigSharedPtr& config,
           const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
-          Network::ClientConnectionPtr&& connection, Event::TimerPtr&& idle_timer,
-          const Upstream::HostDescriptionConstSharedPtr& upstream_host,
-          Stats::TimespanPtr&& connected_timespan);
+          Tcp::ConnectionPool::ConnectionDataPtr&& conn_data, Event::TimerPtr&& idle_timer,
+          const Upstream::HostDescriptionConstSharedPtr& upstream_host);
 
   void onEvent(Network::ConnectionEvent event);
   void onData(Buffer::Instance& data, bool end_stream);
@@ -276,9 +277,8 @@ public:
 private:
   UpstreamDrainManager& parent_;
   std::shared_ptr<Filter::UpstreamCallbacks> callbacks_;
-  Network::ClientConnectionPtr upstream_connection_;
+  Tcp::ConnectionPool::ConnectionDataPtr upstream_conn_data_;
   Event::TimerPtr timer_;
-  Stats::TimespanPtr connected_timespan_;
   Upstream::HostDescriptionConstSharedPtr upstream_host_;
   Config::SharedConfigSharedPtr config_;
 };
@@ -289,11 +289,10 @@ class UpstreamDrainManager : public ThreadLocal::ThreadLocalObject {
 public:
   ~UpstreamDrainManager();
   void add(const Config::SharedConfigSharedPtr& config,
-           Network::ClientConnectionPtr&& upstream_connection,
+           Tcp::ConnectionPool::ConnectionDataPtr&& upstream_conn_data,
            const std::shared_ptr<Filter::UpstreamCallbacks>& callbacks,
            Event::TimerPtr&& idle_timer,
-           const Upstream::HostDescriptionConstSharedPtr& upstream_host,
-           Stats::TimespanPtr&& connected_timespan);
+           const Upstream::HostDescriptionConstSharedPtr& upstream_host);
   void remove(Drainer& drainer, Event::Dispatcher& dispatcher);
 
 private:
