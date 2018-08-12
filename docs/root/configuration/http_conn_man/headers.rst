@@ -333,7 +333,10 @@ will be set to either *http* or *https*.
 x-forwarded-port
 ----------------
 
-This identifies the listener port value that the client used to connect to Envoy.
+This identifies the listener port value that the client used to connect to Envoy. This header
+will be appended only when :ref:`append_x_forwarded_port
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.append_x_forwarded_port>`
+is set to true (the default value is false).
 
 .. _config_http_conn_man_headers_x-request-id:
 
