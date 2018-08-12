@@ -19,6 +19,8 @@ typedef std::vector<uint64_t> RollingWindow;
 typedef std::map<const std::string, RollingWindow> RollingStatsMap;
 
 using QuantileLatencyMap = std::unordered_map<double, double>;
+static const std::vector<double> hystrix_quantiles = {0,    0.25, 0.5,   0.75, 0.90,
+                                                      0.95, 0.99, 0.995, 1};
 
 struct {
   const std::string AllowHeadersHystrix{"Accept, Cache-Control, X-Requested-With, Last-Event-ID"};
@@ -135,8 +137,8 @@ private:
    */
   void addHystrixCommand(ClusterStatsCache& cluster_stats_cache, absl::string_view cluster_name,
                          uint64_t max_concurrent_requests, uint64_t reporting_hosts,
-                         std::chrono::milliseconds rolling_window_ms, const QuantileLatencyMap& histogram,
-                         std::stringstream& ss);
+                         std::chrono::milliseconds rolling_window_ms,
+                         const QuantileLatencyMap& histogram, std::stringstream& ss);
 
   /**
    * Generate HystrixThreadPool event stream.

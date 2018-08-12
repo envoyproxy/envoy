@@ -3,14 +3,14 @@
 #include <sstream>
 
 #include "extensions/stat_sinks/hystrix/hystrix.h"
-#include "common/stats/thread_local_store.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/common/stats/thread_local_store_test.cc"
 
 #include "absl/strings/str_split.h"
+#include "circllhist.h"
+#include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -18,9 +18,8 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::_;
 using testing::ReturnPointee;
-
+using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -208,6 +207,14 @@ public:
       }
     }
     return cluster_message_map;
+  }
+
+  histogram_t* makeHistogram(const std::vector<uint64_t>& values) {
+    histogram_t* histogram = hist_alloc();
+    for (uint64_t value : values) {
+      hist_insert_intscale(histogram, value, 0, 1);
+    }
+    return histogram;
   }
 
   TestRandomGenerator rand_;
@@ -434,53 +441,58 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
 }
 
 TEST_F(HystrixSinkTest, HistogramTest) {
-//  std::unique_ptr<Stats::ThreadLocalStoreImpl> store;
-//  Stats::Histogram& histogram = store->histogram("cluster." + cluster1_name_ + ".upstream_rq_time");
-//  std::vector<uint64_t> interval_values;
-//
-//  for (size_t i = 0; i < 100; ++i) {
-//    histogram.recordValue(i);
-//    interval_values.push_back(i);
-//  }
-
-
-
-
+  InSequence s;
   std::vector<Stats::ParentHistogramSharedPtr> stored_histograms;
 
-
+  // Create histogram for the Hystrix sink to read.
   auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram->name_ = "cluster." + cluster1_name_ + ".upstream_rq_time";
-//  const std::string tag_extracted_name = "cluster.upstream_rq_time"
-//  ON_CALL(histogram, tagExtractedName()).WillByDefault(testing::ReturnRefOfCopy(tag_extracted_name));
+  const std::string tag_extracted_name = "cluster.upstream_rq_time";
+  ON_CALL(*histogram, tagExtractedName())
+      .WillByDefault(testing::ReturnRefOfCopy(tag_extracted_name));
+  std::vector<Stats::Tag> tags;
+  Stats::Tag tag = {
+      Config::TagNames::get().CLUSTER_NAME, // name_
+      cluster1_name_                        // value_
+  };
+  tags.emplace_back(tag);
+  ON_CALL(*histogram, tags()).WillByDefault(testing::ReturnRef(tags));
 
   histogram->used_ = true;
 
-  Stats::ParentHistogramImpl histogram();
-
+  // Init with data such that the quantile value is equal to the quantile.
   std::vector<uint64_t> h1_interval_values;
   for (size_t i = 0; i < 100; ++i) {
     h1_interval_values.push_back(i);
   }
 
-  histogram_t* hist1_interval = Stats::HistogramTest::makeHistogram(h1_interval_values);
+  histogram_t* hist1_interval = makeHistogram(h1_interval_values);
   Stats::HistogramStatisticsImpl h1_interval_statistics(hist1_interval);
-  ON_CALL(histogram, intervalStatistics()).WillByDefault(ReturnRef(h1_interval_statisticss));
+  ON_CALL(*histogram, intervalStatistics())
+      .WillByDefault(testing::ReturnRef(h1_interval_statistics));
+  stored_histograms.push_back(histogram);
+
   ON_CALL(source_, cachedHistograms()).WillByDefault(ReturnPointee(&stored_histograms));
 
-  stored_histograms.push_back(std::make_shared<Stats::MockParentHistogram>());
-
-  InSequence s;
   Buffer::OwnedImpl buffer = createClusterAndCallbacks();
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
-
-  ON_CALL(source_, cachedHistograms()).WillByDefault(ReturnPointee(&stored_histograms));
-
   sink_->flush(source_);
+
   std::unordered_map<std::string, std::string> cluster_message_map =
       buildClusterMap(buffer.toString());
 
+  Json::ObjectSharedPtr latency = Json::Factory::loadFromString(cluster_message_map[cluster1_name_])
+                                      ->getObject("latencyExecute");
+
+  // Data was added such that the value equals the quantile:
+  // "latencyExecute": {"99.5": 99.500000, "95": 95.000000, "90": 90.000000, "100": 100.000000, "0":
+  // 0.000000, "25": 25.000000, "99": 99.000000, "50": 50.000000, "75": 75.000000}.
+  for (auto it = begin(hystrix_quantiles); it != end(hystrix_quantiles); ++it) {
+    EXPECT_EQ(*it * 100, latency->getDouble(fmt::sprintf("%g", (*it) * 100)));
+  }
+
+  hist_free(hist1_interval);
 }
 } // namespace Hystrix
 } // namespace StatSinks

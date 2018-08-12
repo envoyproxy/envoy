@@ -22,8 +22,6 @@ namespace StatSinks {
 namespace Hystrix {
 
 const uint64_t HystrixSink::DEFAULT_NUM_BUCKETS;
-static const std::vector<double> hystrix_quantiles = {0,    0.25, 0.5,   0.75, 0.90,
-                                                      0.95, 0.99, 0.995, 1};
 ClusterStatsCache::ClusterStatsCache(const std::string& cluster_name)
     : cluster_name_(cluster_name) {}
 
@@ -247,7 +245,8 @@ void HystrixSink::addClusterStatsToStream(ClusterStatsCache& cluster_stats_cache
                                           uint64_t max_concurrent_requests,
                                           uint64_t reporting_hosts,
                                           std::chrono::milliseconds rolling_window_ms,
-                                          const QuantileLatencyMap& histogram, std::stringstream& ss) {
+                                          const QuantileLatencyMap& histogram,
+                                          std::stringstream& ss) {
 
   addHystrixCommand(cluster_stats_cache, cluster_name, max_concurrent_requests, reporting_hosts,
                     rolling_window_ms, histogram, ss);
@@ -335,17 +334,11 @@ void HystrixSink::flush(Stats::Source& source) {
                              });
 
       // Make sure we found the cluster name tag
-      ASSERT(it != histogram->tags().end());
-      // Make sure histogram with this name was not already added
-//      ASSERT(time_histograms.find(it->value_) == time_histograms.end());
-//      QuantileLatencyMap& hist_map = time_histograms[it->value_];
-
-      ///////////
+      ASSERT(it != histogram->tags().end()); // Can remove this??
       auto it_bool_pair = time_histograms.emplace(std::make_pair(it->value_, QuantileLatencyMap()));
       // Make sure histogram with this name was not already added
       ASSERT(it_bool_pair.second);
       QuantileLatencyMap& hist_map = it_bool_pair.first->second;
-      ///////////////
 
       const std::vector<double>& supported_quantiles =
           histogram->intervalStatistics().supportedQuantiles();
