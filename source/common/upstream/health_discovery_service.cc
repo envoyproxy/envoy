@@ -22,6 +22,8 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
       info_factory_(info_factory), access_log_manager_(access_log_manager), cm_(cm),
       local_info_(local_info) {
   health_check_request_.mutable_node()->MergeFrom(node);
+  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMilliseconds,
+                                                                RetryMaxDelayMilliseconds, random_);
   hds_retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
 
@@ -35,7 +37,10 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
 }
 
 void HdsDelegate::setHdsRetryTimer() {
-  hds_retry_timer_->enableTimer(std::chrono::milliseconds(RetryDelayMilliseconds));
+  const auto retry_ms = std::chrono::milliseconds(backoff_strategy_->nextBackOffMs());
+  ENVOY_LOG(warn, "HdsDelegate stream/connection failure, will retry in {} ms.", retry_ms.count());
+
+  hds_retry_timer_->enableTimer(retry_ms);
 }
 
 void HdsDelegate::setHdsStreamResponseTimer() {
@@ -54,12 +59,10 @@ void HdsDelegate::establishNewStream() {
   ENVOY_LOG(debug, "Sending HealthCheckRequest {} ", health_check_request_.DebugString());
   stream_->sendMessage(health_check_request_, false);
   stats_.responses_.inc();
+  backoff_strategy_->reset();
 }
 
-// TODO(lilika) : Use jittered backoff as in https://github.com/envoyproxy/envoy/pull/3791
 void HdsDelegate::handleFailure() {
-  ENVOY_LOG(warn, "HdsDelegate stream/connection failure, will retry in {} ms.",
-            RetryDelayMilliseconds);
   stats_.errors_.inc();
   setHdsRetryTimer();
 }
