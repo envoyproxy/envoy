@@ -12,7 +12,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/listen_socket.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"

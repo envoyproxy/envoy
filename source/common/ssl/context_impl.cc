@@ -7,6 +7,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/base64.h"
@@ -167,10 +168,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
     SSL_CTX_set_cert_verify_callback(ctx_.get(), ContextImpl::verifyCallback, this);
   }
 
-  if (config.certChain().empty() != config.privateKey().empty()) {
-    throw EnvoyException(fmt::format("Failed to load incomplete certificate from {}, {}",
-                                     config.certChainPath(), config.privateKeyPath()));
-  }
+  // Validation happened in TlsCertificateConfigImpl
+  ASSERT(config.certChain().empty() == config.privateKey().empty());
 
   if (!config.certChain().empty()) {
     // Load certificate chain.

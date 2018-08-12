@@ -2,7 +2,7 @@
 #include <string>
 
 #include "envoy/http/codec.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"

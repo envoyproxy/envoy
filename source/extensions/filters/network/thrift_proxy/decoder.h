@@ -63,8 +63,9 @@ private:
  */
 class DecoderStateMachine {
 public:
-  DecoderStateMachine(Protocol& proto, ThriftFilters::DecoderFilter& filter)
-      : proto_(proto), filter_(filter), state_(ProtocolState::MessageBegin) {}
+  DecoderStateMachine(Protocol& proto, MessageMetadataSharedPtr& metadata,
+                      ThriftFilters::DecoderFilter& filter)
+      : proto_(proto), metadata_(metadata), filter_(filter), state_(ProtocolState::MessageBegin) {}
 
   /**
    * Consumes as much data from the configured Buffer as possible and executes the decoding state
@@ -162,6 +163,7 @@ private:
   ProtocolState popReturnState();
 
   Protocol& proto_;
+  MessageMetadataSharedPtr metadata_;
   ThriftFilters::DecoderFilter& filter_;
   ProtocolState state_;
   std::vector<Frame> stack_;
@@ -215,6 +217,7 @@ private:
   ProtocolPtr protocol_;
   DecoderCallbacks& callbacks_;
   ActiveRequestPtr request_;
+  MessageMetadataSharedPtr metadata_;
   DecoderStateMachinePtr state_machine_;
   bool frame_started_{false};
   bool frame_ended_{false};

@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/stats/scope.h"
 
 #include "common/config/utility.h"
 #include "common/filesystem/filesystem_impl.h"
@@ -12,6 +13,8 @@
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 #include "common/upstream/eds.h"
+
+#include "server/transport_socket_config_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/local_info/mocks.h"
@@ -30,6 +33,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 using testing::SaveArg;
 using testing::WithArg;
 using testing::_;
@@ -39,7 +43,9 @@ namespace Upstream {
 
 class SdsTest : public testing::Test {
 protected:
-  SdsTest() : request_(&cm_.async_client_) {
+  SdsTest() : request_(&cm_.async_client_) { resetCluster(false); }
+
+  void resetCluster(bool set_request_timeout) {
     std::string raw_config = R"EOF(
     {
       "name": "name",
@@ -55,6 +61,10 @@ protected:
     envoy::api::v2::core::ConfigSource eds_config;
     eds_config.mutable_api_config_source()->add_cluster_names("sds");
     eds_config.mutable_api_config_source()->mutable_refresh_delay()->set_seconds(1);
+    if (set_request_timeout) {
+      eds_config.mutable_api_config_source()->mutable_request_timeout()->CopyFrom(
+          Protobuf::util::TimeUtil::MillisecondsToDuration(5000));
+    }
     sds_cluster_ = parseSdsClusterFromJson(raw_config, eds_config);
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
     Upstream::MockCluster cluster;
@@ -62,8 +72,13 @@ protected:
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
-    cluster_.reset(new EdsClusterImpl(sds_cluster_, runtime_, stats_, ssl_context_manager_,
-                                      local_info_, cm_, dispatcher_, random_, false));
+    Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.",
+        sds_cluster_.alt_stat_name().empty() ? sds_cluster_.name() : sds_cluster_.alt_stat_name()));
+    Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+        ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_);
+    cluster_.reset(
+        new EdsClusterImpl(sds_cluster_, runtime_, factory_context, std::move(scope), false));
     EXPECT_EQ(Cluster::InitializePhase::Secondary, cluster_->initializePhase());
   }
 
@@ -136,6 +151,20 @@ TEST_F(SdsTest, PoolFailure) {
   setupPoolFailure();
   EXPECT_CALL(*timer_, enableTimer(_));
   cluster_->initialize([] {});
+}
+
+TEST_F(SdsTest, RequestTimeout) {
+  resetCluster(true);
+
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("sds")).WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(
+      cm_.async_client_,
+      send_(_, _, absl::optional<std::chrono::milliseconds>(std::chrono::milliseconds(5000))))
+      .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&callbacks_)), Return(&request_)));
+
+  cluster_->initialize([] {});
+  EXPECT_CALL(request_, cancel());
+  cluster_.reset();
 }
 
 TEST_F(SdsTest, NoHealthChecker) {

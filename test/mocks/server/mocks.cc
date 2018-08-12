@@ -128,6 +128,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, initManager()).WillByDefault(ReturnRef(init_manager_));
   ON_CALL(*this, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
+  ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
 }
 
 MockInstance::~MockInstance() {}

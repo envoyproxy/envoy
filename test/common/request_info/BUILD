@@ -9,6 +9,15 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "dynamic_metadata_impl_test",
+    srcs = ["dynamic_metadata_impl_test.cc"],
+    deps = [
+        "//source/common/request_info:dynamic_metadata_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "request_info_impl_test",
     srcs = ["request_info_impl_test.cc"],
     deps = [

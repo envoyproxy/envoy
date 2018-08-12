@@ -6,7 +6,9 @@
 
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/sink.h"
+#include "envoy/stats/source.h"
 
 namespace Envoy {
 namespace Extensions {

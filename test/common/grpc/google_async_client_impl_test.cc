@@ -1,4 +1,4 @@
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/google_async_client_impl.h"

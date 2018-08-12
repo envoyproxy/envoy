@@ -3,6 +3,7 @@
 #include "envoy/event/file_event.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"

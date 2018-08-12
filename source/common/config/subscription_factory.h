@@ -4,6 +4,7 @@
 
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/subscription.h"
+#include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/filesystem_subscription_impl.h"
@@ -60,6 +61,7 @@ public:
         result.reset(new HttpSubscriptionImpl<ResourceType>(
             node, cm, api_config_source.cluster_names()[0], dispatcher, random,
             Utility::apiConfigSourceRefreshDelay(api_config_source),
+            Utility::apiConfigSourceRequestTimeout(api_config_source),
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method), stats));
         break;
       case envoy::api::v2::core::ApiConfigSource::GRPC: {

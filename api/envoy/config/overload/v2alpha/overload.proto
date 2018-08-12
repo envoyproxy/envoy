@@ -8,15 +8,19 @@ import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
 
-// The Overload Manager provides an extensible framework to protect Envoy instances
-// from overload of various resources (memory, cpu, file descriptors, etc)
+// [#protodoc-title: Overload Manager]
 
-message EmptyConfig {
-}
+// The Overload Manager provides an extensible framework to protect Envoy instances
+// from overload of various resources (memory, cpu, file descriptors, etc).
+// It monitors a configurable set of resources and notifies registered listeners
+// when triggers related to those resources fire.
 
 message ResourceMonitor {
   // The name of the resource monitor to instantiate. Must match a registered
-  // resource monitor type.
+  // resource monitor type. The built-in resource monitors are:
+  //
+  // * :ref:`envoy.resource_monitors.fixed_heap
+  //   <envoy_api_msg_config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig>`
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // Configuration for the resource monitor being instantiated.
@@ -45,7 +49,7 @@ message OverloadAction {
   // DNS to ensure uniqueness.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
-  // A set of triggers for this action. If any of these triggers fires the overload action
+  // A set of triggers for this action. If any of these triggers fire the overload action
   // is activated. Listeners are notified when the overload action transitions from
   // inactivated to activated, or vice versa.
   repeated Trigger triggers = 2 [(validate.rules).repeated .min_items = 1];
@@ -59,5 +63,5 @@ message OverloadManager {
   repeated ResourceMonitor resource_monitors = 2 [(validate.rules).repeated .min_items = 1];
 
   // The set of overload actions.
-  repeated OverloadAction actions = 3 [(validate.rules).repeated .min_items = 1];
+  repeated OverloadAction actions = 3;
 }

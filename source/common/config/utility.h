@@ -8,7 +8,10 @@
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/registry/registry.h"
-#include "envoy/stats/stats.h"
+#include "envoy/server/filter_config.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_options.h"
+#include "envoy/stats/tag_producer.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
@@ -50,7 +53,10 @@ public:
     Protobuf::RepeatedPtrField<ResourceType> typed_resources;
     for (const auto& resource : response.resources()) {
       auto* typed_resource = typed_resources.Add();
-      resource.UnpackTo(typed_resource);
+      if (!resource.UnpackTo(typed_resource)) {
+        throw EnvoyException("Unable to unpack " + resource.DebugString());
+      }
+      MessageUtil::checkUnknownFields(*typed_resource);
     }
     return typed_resources;
   }
@@ -73,6 +79,14 @@ public:
    */
   static std::chrono::milliseconds
   apiConfigSourceRefreshDelay(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+
+  /**
+   * Extract request_timeout as a std::chrono::milliseconds from
+   * envoy::api::v2::core::ApiConfigSource. If request_timeout isn't set in the config source, a
+   * default value of 1s will be returned.
+   */
+  static std::chrono::milliseconds
+  apiConfigSourceRequestTimeout(const envoy::api::v2::core::ApiConfigSource& api_config_source);
 
   /**
    * Populate an envoy::api::v2::core::ApiConfigSource.
@@ -240,19 +254,41 @@ public:
   /**
    * Translate a nested config into a route-specific proto message provided by
    * the implementation factory.
-   * @param source a message that contains the opaque config for the given factory's route-local
-   *        configuration.
-   * @param factory implementation factory with the method
-   *        'createEmptyRouteConfigProto' to produce a proto to be filled with
-   *        the translated configuration.
+   * @param source Protobuf::Message containing the opaque config for the given factory's
+   *        route-local configuration.
+   * @param factory Server::Configuration::NamedHttpFilterConfigFactory implementation
+   * @return ProtobufTypes::MessagePtr the translated config
    */
-  template <class Factory>
-  static ProtobufTypes::MessagePtr translateToFactoryRouteConfig(const Protobuf::Message& source,
-                                                                 Factory& factory) {
+  static ProtobufTypes::MessagePtr
+  translateToFactoryRouteConfig(const Protobuf::Message& source,
+                                Server::Configuration::NamedHttpFilterConfigFactory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyRouteConfigProto();
 
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");
+
+    MessageUtil::jsonConvert(source, *config);
+    return config;
+  }
+
+  /**
+   * Translate a nested config into a protocol-specific options proto message provided by the
+   * implementation factory.
+   * @param source Protobuf::Message containing the opaque config for the given factory's
+   *        protocol specific configuration.
+   * @param factory Server::Configuration::NamedNetworkFilterConfigFactory implementation
+   * @return ProtobufTypes::MessagePtr the translated config
+   * @throws EnvoyException if the factory does not support protocol options
+   */
+  static ProtobufTypes::MessagePtr translateToFactoryProtocolOptionsConfig(
+      const Protobuf::Message& source,
+      Server::Configuration::NamedNetworkFilterConfigFactory& factory) {
+    ProtobufTypes::MessagePtr config = factory.createEmptyProtocolOptionsProto();
+
+    if (config == nullptr) {
+      throw EnvoyException(
+          fmt::format("filter {} does not support protocol options", factory.name()));
+    }
 
     MessageUtil::jsonConvert(source, *config);
     return config;

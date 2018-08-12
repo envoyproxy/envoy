@@ -5,8 +5,6 @@
 
 #include "common/common/utility.h"
 
-//#include "common/stats/utility.h"
-
 #include "absl/strings/str_join.h"
 
 namespace Envoy {

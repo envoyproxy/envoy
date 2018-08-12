@@ -60,6 +60,7 @@ public:
    */
   virtual const std::string& certificateRevocationListPath() const PURE;
 
+  // TODO(lizan): consider refactor 4 methods below to Ssl::TlsCertificateConfig
   /**
    * @return The certificate chain used to identify the local side.
    */
@@ -127,6 +128,8 @@ public:
   virtual bool allowRenegotiation() const PURE;
 };
 
+typedef std::unique_ptr<ClientContextConfig> ClientContextConfigPtr;
+
 class ServerContextConfig : public virtual ContextConfig {
 public:
   struct SessionTicketKey {
@@ -147,6 +150,8 @@ public:
    */
   virtual const std::vector<SessionTicketKey>& sessionTicketKeys() const PURE;
 };
+
+typedef std::unique_ptr<ServerContextConfig> ServerContextConfigPtr;
 
 } // namespace Ssl
 } // namespace Envoy

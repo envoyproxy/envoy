@@ -146,6 +146,7 @@ struct ActiveTestRequest {
 
   ActiveTestRequest(Http1ConnPoolImplTest& parent, size_t client_index, Type type)
       : parent_(parent), client_index_(client_index) {
+    uint64_t current_rq_total = parent_.cluster_->stats_.upstream_rq_total_.value();
     if (type == Type::CreateConnection) {
       parent.conn_pool_.expectClientCreate();
     }
@@ -153,6 +154,7 @@ struct ActiveTestRequest {
     if (type == Type::Immediate) {
       expectNewStream();
     }
+
     handle_ = parent.conn_pool_.newStream(outer_decoder_, callbacks_);
 
     if (type == Type::Immediate) {
@@ -167,6 +169,7 @@ struct ActiveTestRequest {
       parent.conn_pool_.test_clients_[client_index_].connection_->raiseEvent(
           Network::ConnectionEvent::Connected);
     }
+    EXPECT_EQ(current_rq_total + 1, parent_.cluster_->stats_.upstream_rq_total_.value());
   }
 
   void completeResponse(bool with_body) {
@@ -363,6 +366,7 @@ TEST_F(Http1ConnPoolImplTest, ConnectTimeout) {
   EXPECT_CALL(conn_pool_, onClientDestroy()).Times(2);
   dispatcher_.clearDeferredDeleteList();
 
+  EXPECT_EQ(2U, cluster_->stats_.upstream_rq_total_.value());
   EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(2U, cluster_->stats_.upstream_cx_connect_timeout_.value());
 }

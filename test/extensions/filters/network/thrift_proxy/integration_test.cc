@@ -46,12 +46,7 @@ public:
             route_config:
               name: "routes"
               routes:
-                - match:
-                    method_name: "execute"
-                  route:
-                    cluster: "cluster_0"
-                - match:
-                    method_name: "poke"
+                - match: {}
                   route:
                     cluster: "cluster_0"
       )EOF";

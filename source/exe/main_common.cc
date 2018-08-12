@@ -63,9 +63,9 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
 
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
                                                                  restarter_->statsAllocator());
-    server_.reset(new Server::InstanceImpl(
+    server_ = std::make_unique<Server::InstanceImpl>(
         options_, local_address, default_test_hooks_, *restarter_, *stats_store_, access_log_lock,
-        component_factory_, std::make_unique<Runtime::RandomGeneratorImpl>(), *tls_));
+        component_factory_, std::make_unique<Runtime::RandomGeneratorImpl>(), *tls_);
     break;
   }
   case Server::Mode::Validate:
@@ -91,6 +91,18 @@ bool MainCommonBase::run() {
     return true;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+void MainCommonBase::adminRequest(absl::string_view path_and_query, absl::string_view method,
+                                  const AdminRequestFn& handler) {
+  std::string path_and_query_buf = std::string(path_and_query);
+  std::string method_buf = std::string(method);
+  server_->dispatcher().post([this, path_and_query_buf, method_buf, handler]() {
+    Http::HeaderMapImpl response_headers;
+    std::string body;
+    server_->admin().request(path_and_query_buf, method_buf, response_headers, body);
+    handler(response_headers, body);
+  });
 }
 
 MainCommon::MainCommon(int argc, const char* const* argv)

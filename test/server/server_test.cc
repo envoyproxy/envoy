@@ -56,15 +56,17 @@ public:
     sigusr1_ = new Event::MockSignalEvent(&dispatcher_);
     sighup_ = new Event::MockSignalEvent(&dispatcher_);
     EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
+    EXPECT_CALL(overload_manager_, start());
 
     helper_.reset(new RunHelper(dispatcher_, cm_, hot_restart_, access_log_manager_, init_manager_,
-                                [this] { start_workers_.ready(); }));
+                                overload_manager_, [this] { start_workers_.ready(); }));
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<MockHotRestart> hot_restart_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
+  NiceMock<MockOverloadManager> overload_manager_;
   InitManagerImpl init_manager_;
   ReadyWatcher start_workers_;
   std::unique_ptr<RunHelper> helper_;

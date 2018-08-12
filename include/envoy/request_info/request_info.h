@@ -8,6 +8,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/http/protocol.h"
+#include "envoy/request_info/dynamic_metadata.h"
 #include "envoy/upstream/upstream.h"
 
 #include "absl/types/optional.h"
