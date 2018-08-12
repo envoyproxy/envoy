@@ -42,6 +42,8 @@ message RouteMatch {
     string service_name = 2;
   }
 
+  // Inverts whatever matching is done in match_specifier. Cannot be combined with wildcard matching
+  // as that would result in routes never being matched.
   bool invert = 3;
 }
 

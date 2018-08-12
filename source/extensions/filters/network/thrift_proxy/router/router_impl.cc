@@ -39,18 +39,24 @@ RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& met
 
   if (matches ^ invert_) {
     return clusterEntry();
-  } else {
-    return nullptr;
   }
+
+  return nullptr;
 }
 
 ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
   : RouteEntryImplBase(route),
-    service_name_(route.match().service_name()),
     invert_(route.match().invert()) {
-  if (service_name_.empty() && invert_) {
+  std::string service_name = route.match().service_name();
+  if (service_name.empty() && invert_) {
     throw EnvoyException("Cannot have an empty service name with inversion enabled");
+  }
+
+  if (!service_name.empty() && !StringUtil::endsWith(service_name.c_str(), ":")) {
+    service_name_ = service_name + ":";
+  } else {
+    service_name_ = service_name;
   }
 }
 
@@ -60,9 +66,9 @@ RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& me
 
   if (matches ^ invert_) {
     return clusterEntry();
-  } else {
-    return nullptr;
   }
+
+  return nullptr;
 }
 
 RouteMatcher::RouteMatcher(

@@ -85,7 +85,7 @@ public:
   RouteConstSharedPtr matches(const MessageMetadata& metadata) const override;
 
 private:
-  const std::string service_name_;
+  std::string service_name_;
   bool invert_;
 };
 

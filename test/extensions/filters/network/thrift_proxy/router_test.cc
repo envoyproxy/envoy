@@ -901,7 +901,7 @@ routes:
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 
-  metadata.setMethodName("service2");
+  metadata.setMethodName("service2:method1");
   route = matcher.route(metadata);
   EXPECT_EQ(nullptr, route);
 }
