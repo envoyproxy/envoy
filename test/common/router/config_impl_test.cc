@@ -44,7 +44,7 @@ namespace {
 
 // Wrap ConfigImpl, the target of tests to allow us to regenerate the route_fuzz_test
 // corpus when run with:
-//   bazel run //test/common/router:config_impl_test \
+//   bazel run //test/common/router:config_impl_test
 //     --test_env="ROUTE_CORPUS_PATH=$PWD/test/common/router/route_corpus"
 class TestConfigImpl : public ConfigImpl {
 public:
