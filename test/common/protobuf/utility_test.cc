@@ -285,6 +285,26 @@ TEST(UtilityTest, JsonConvertCamelSnake) {
                        .string_value());
 }
 
+TEST(UtilityTest, YamlLoadFromStringFail) {
+  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  // Verify loadFromYaml can parse valid YAML string.
+  MessageUtil::loadFromYaml("node: { id: node1 }", bootstrap);
+  // Verify loadFromYaml throws error when the input is an invalid YAML string.
+  EXPECT_THROW_WITH_MESSAGE(
+      MessageUtil::loadFromYaml("not_a_yaml_that_can_be_converted_to_json", bootstrap),
+      EnvoyException, "Unable to convert YAML as JSON: not_a_yaml_that_can_be_converted_to_json");
+  // When wrongly inputted by a file path, loadFromYaml throws an error.
+  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromYaml("/home/configs/config.yaml", bootstrap),
+                            EnvoyException,
+                            "Unable to convert YAML as JSON: /home/configs/config.yaml");
+  // Verify loadFromYaml throws error when the input leads to an Array. This error message is
+  // arguably more useful than only "Unable to convert YAML as JSON".
+  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromYaml("- node: { id: node1 }", bootstrap),
+                            EnvoyException,
+                            "Unable to parse JSON as proto (INVALID_ARGUMENT:: invalid name : Root "
+                            "element must be a message.): [{\"node\":{\"id\":\"node1\"}}]");
+}
+
 TEST(DurationUtilTest, OutOfRange) {
   {
     ProtobufWkt::Duration duration;

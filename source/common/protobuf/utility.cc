@@ -67,8 +67,14 @@ void MessageUtil::loadFromJsonEx(const std::string& json, Protobuf::Message& mes
 }
 
 void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
-  const std::string json = Json::Factory::loadFromYamlString(yaml)->asJsonString();
-  loadFromJson(json, message);
+  const auto loaded_object = Json::Factory::loadFromYamlString(yaml);
+  // Load the message if the loaded object has type Object or Array.
+  if (loaded_object->isObject() || loaded_object->isArray()) {
+    const std::string json = loaded_object->asJsonString();
+    loadFromJson(json, message);
+    return;
+  }
+  throw EnvoyException("Unable to convert YAML as JSON: " + yaml);
 }
 
 void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& message) {
