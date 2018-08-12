@@ -75,6 +75,7 @@ TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
       std::make_pair("FI", ResponseFlag::FaultInjected),
       std::make_pair("RL", ResponseFlag::RateLimited),
       std::make_pair("UAEX", ResponseFlag::UnauthorizedExternalService),
+      std::make_pair("RLSE", ResponseFlag::RateLimitServiceError),
   };
 
   EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());

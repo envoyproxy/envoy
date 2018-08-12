@@ -86,6 +86,10 @@ const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_in
     appendString(result, UNAUTHORIZED_EXTERNAL_SERVICE);
   }
 
+  if (request_info.hasResponseFlag(ResponseFlag::RateLimitServiceError)) {
+    appendString(result, RATELIMIT_SERVICE_ERROR);
+  }
+
   return result.empty() ? NONE : result;
 }
 
@@ -105,6 +109,7 @@ absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(const std::string
       {ResponseFlagUtils::FAULT_INJECTED, ResponseFlag::FaultInjected},
       {ResponseFlagUtils::RATE_LIMITED, ResponseFlag::RateLimited},
       {ResponseFlagUtils::UNAUTHORIZED_EXTERNAL_SERVICE, ResponseFlag::UnauthorizedExternalService},
+      {ResponseFlagUtils::RATELIMIT_SERVICE_ERROR, ResponseFlag::RateLimitServiceError},
   };
   const auto& it = map.find(flag);
   if (it != map.end()) {
