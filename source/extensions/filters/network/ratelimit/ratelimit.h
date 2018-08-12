@@ -59,7 +59,7 @@ private:
   std::vector<RateLimit::Descriptor> descriptors_;
   const InstanceStats stats_;
   Runtime::Loader& runtime_;
-  bool failure_mode_allow_;
+  const bool failure_mode_allow_;
 };
 
 typedef std::shared_ptr<Config> ConfigSharedPtr;

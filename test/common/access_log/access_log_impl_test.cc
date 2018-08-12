@@ -834,6 +834,7 @@ config:
       RequestInfo::ResponseFlag::FaultInjected,
       RequestInfo::ResponseFlag::RateLimited,
       RequestInfo::ResponseFlag::UnauthorizedExternalService,
+      RequestInfo::ResponseFlag::RateLimitServiceError,
   };
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);

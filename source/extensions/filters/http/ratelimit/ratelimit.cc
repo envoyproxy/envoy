@@ -132,8 +132,7 @@ void Filter::complete(RateLimit::LimitStatus status) {
     } else {
       state_ = State::Responded;
       callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr);
-      callbacks_->requestInfo().setResponseFlag(
-          RequestInfo::ResponseFlag::RateLimitingServiceError);
+      callbacks_->requestInfo().setResponseFlag(RequestInfo::ResponseFlag::RateLimitServiceError);
     }
   } else if (!initiating_call_) {
     callbacks_->continueDecoding();

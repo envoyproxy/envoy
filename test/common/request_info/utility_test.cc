@@ -30,6 +30,7 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
       std::make_pair(ResponseFlag::FaultInjected, "FI"),
       std::make_pair(ResponseFlag::RateLimited, "RL"),
       std::make_pair(ResponseFlag::UnauthorizedExternalService, "UAEX"),
+      std::make_pair(ResponseFlag::RateLimitServiceError, "RLSE"),
   };
 
   for (const auto& test_case : expected) {

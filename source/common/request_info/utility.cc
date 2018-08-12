@@ -19,6 +19,7 @@ const std::string ResponseFlagUtils::DELAY_INJECTED = "DI";
 const std::string ResponseFlagUtils::FAULT_INJECTED = "FI";
 const std::string ResponseFlagUtils::RATE_LIMITED = "RL";
 const std::string ResponseFlagUtils::UNAUTHORIZED_EXTERNAL_SERVICE = "UAEX";
+const std::string ResponseFlagUtils::RATELIMIT_SERVICE_ERROR = "RLSE";
 
 void ResponseFlagUtils::appendString(std::string& result, const std::string& append) {
   if (result.empty()) {

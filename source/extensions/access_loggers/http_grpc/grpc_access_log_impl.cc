@@ -141,6 +141,10 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
         envoy::data::accesslog::v2::ResponseFlags_Unauthorized_Reason::
             ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
   }
+
+  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::RateLimitServiceError)) {
+    common_access_log.mutable_response_flags()->set_rate_limit_service_error(true);
+  }
 }
 
 void HttpGrpcAccessLog::log(const Http::HeaderMap* request_headers,

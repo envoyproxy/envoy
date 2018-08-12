@@ -68,7 +68,7 @@ private:
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Upstream::ClusterManager& cm_;
-  bool failure_mode_allow_;
+  const bool failure_mode_allow_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;

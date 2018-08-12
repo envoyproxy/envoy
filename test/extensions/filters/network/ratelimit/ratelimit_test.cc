@@ -35,28 +35,14 @@ class RateLimitFilterTest : public testing::Test {
 public:
   RateLimitFilterTest() {}
 
-  void SetUp() override {
-    std::string json = R"EOF(
-    {
-      "domain": "foo",
-      "descriptors": [
-         [{"key": "hello", "value": "world"}, {"key": "foo", "value": "bar"}],
-         [{"key": "foo2", "value": "bar2"}]
-       ],
-       "stat_prefix": "name"
-    }
-    )EOF";
-
+  void SetUpTest(const std::string& yaml) {
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.tcp_filter_enabled", 100))
         .WillByDefault(Return(true));
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.tcp_filter_enforcing", 100))
         .WillByDefault(Return(true));
 
-    Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
     envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
-    Envoy::Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config);
-    // TODO(ramaraochavali): move the config to yaml and use a different config for failure_mode.
-    proto_config.mutable_failure_mode_allow()->set_value(failure_mode_);
+    MessageUtil::loadFromYaml(yaml, proto_config);
     config_.reset(new Config(proto_config, stats_store_, runtime_));
     client_ = new RateLimit::MockClient();
     filter_.reset(new Filter(config_, RateLimit::ClientPtr{client_}));
@@ -73,6 +59,35 @@ public:
     }
   }
 
+  const std::string filter_config_ = R"EOF(
+domain: foo
+descriptors:
+- entries:
+   - key: hello
+     value: world
+   - key: foo
+     value: bar
+- entries:
+   - key: foo2
+     value: bar2
+stat_prefix: name
+)EOF";
+
+  const std::string fail_close_config_ = R"EOF(
+domain: foo
+descriptors:
+- entries:
+   - key: hello
+     value: world
+   - key: foo
+     value: bar
+- entries:
+   - key: foo2
+     value: bar2
+stat_prefix: name
+failure_mode_allow: false
+)EOF";
+
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   ConfigSharedPtr config_;
@@ -80,16 +95,6 @@ public:
   std::unique_ptr<Filter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   RateLimit::RequestCallbacks* request_callbacks_{};
-  bool failure_mode_{true};
-};
-
-class RateLimitFilterFailureModeTest : public RateLimitFilterTest {
-public:
-  RateLimitFilterFailureModeTest() {
-    failure_mode_ = false;
-    std::cout << "setting failure mode to false..."
-              << "\n";
-  }
 };
 
 TEST_F(RateLimitFilterTest, BadRatelimitConfig) {
@@ -111,6 +116,7 @@ TEST_F(RateLimitFilterTest, BadRatelimitConfig) {
 
 TEST_F(RateLimitFilterTest, OK) {
   InSequence s;
+  SetUpTest(filter_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo",
                               testing::ContainerEq(std::vector<RateLimit::Descriptor>{
@@ -139,6 +145,7 @@ TEST_F(RateLimitFilterTest, OK) {
 
 TEST_F(RateLimitFilterTest, OverLimit) {
   InSequence s;
+  SetUpTest(filter_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo", _, _))
       .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
@@ -162,6 +169,7 @@ TEST_F(RateLimitFilterTest, OverLimit) {
 
 TEST_F(RateLimitFilterTest, OverLimitNotEnforcing) {
   InSequence s;
+  SetUpTest(filter_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo", _, _))
       .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
@@ -188,6 +196,7 @@ TEST_F(RateLimitFilterTest, OverLimitNotEnforcing) {
 
 TEST_F(RateLimitFilterTest, Error) {
   InSequence s;
+  SetUpTest(filter_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo", _, _))
       .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
@@ -213,6 +222,7 @@ TEST_F(RateLimitFilterTest, Error) {
 
 TEST_F(RateLimitFilterTest, Disconnect) {
   InSequence s;
+  SetUpTest(filter_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo", _, _))
       .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
@@ -231,6 +241,7 @@ TEST_F(RateLimitFilterTest, Disconnect) {
 
 TEST_F(RateLimitFilterTest, ImmediateOK) {
   InSequence s;
+  SetUpTest(filter_config_);
 
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, limit(_, "foo", _, _))
@@ -252,6 +263,7 @@ TEST_F(RateLimitFilterTest, ImmediateOK) {
 
 TEST_F(RateLimitFilterTest, RuntimeDisable) {
   InSequence s;
+  SetUpTest(filter_config_);
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("ratelimit.tcp_filter_enabled", 100))
       .WillOnce(Return(false));
@@ -262,8 +274,9 @@ TEST_F(RateLimitFilterTest, RuntimeDisable) {
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 }
 
-TEST_F(RateLimitFilterFailureModeTest, ErrorResponseWithFailureAllowModeOff) {
+TEST_F(RateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
   InSequence s;
+  SetUpTest(fail_close_config_);
 
   EXPECT_CALL(*client_, limit(_, "foo", _, _))
       .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
