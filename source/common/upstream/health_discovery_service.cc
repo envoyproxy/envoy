@@ -28,6 +28,8 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
   // TODO(lilika): Add support for other types of healthchecks
   health_check_request_.mutable_capability()->add_health_check_protocols(
       envoy::service::discovery::v2::Capability::HTTP);
+  health_check_request_.mutable_capability()->add_health_check_protocols(
+      envoy::service::discovery::v2::Capability::TCP);
 
   establishNewStream();
 }
