@@ -38,6 +38,8 @@ TEST_P(TcpProxyIntegrationTest, TcpProxyUpstreamWritesFirst) {
 
   ASSERT_TRUE(fake_upstream_connection->write("hello"));
   tcp_client->waitForData("hello");
+  // Make sure inexact matches work also on data already received.
+  tcp_client->waitForData("ello", false);
 
   tcp_client->write("hello");
   ASSERT_TRUE(fake_upstream_connection->waitForData(5));
