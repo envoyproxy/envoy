@@ -14,17 +14,13 @@ public:
   WebsocketIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())) {}
   bool old_style_websockets_{std::get<1>(GetParam())};
-  void TearDown() override {
-    fake_tcp_upstream_connection_.reset();
-    tcp_client_.reset();
-  }
 
 protected:
-  void performWebSocketUpgrade(const std::string& upgrade_req_string,
+  void performWebSocketUpgrade(const Http::TestHeaderMapImpl& upgrade_request_headers,
                                const std::string& upgrade_resp_string);
   void sendBidirectionalData();
 
-  void validateInitialUpstreamData(const std::string& received_data);
+  void validateInitialUpstreamData(const std::string& received_data, bool initial_headers_chunked);
   void validateInitialDownstreamData(const std::string& received_data,
                                      const std::string& expected_data);
   void validateFinalDownstreamData(const std::string& received_data,
@@ -60,7 +56,7 @@ protected:
                                                  "0\r\n\r\n";
 
   FakeRawConnectionPtr fake_tcp_upstream_connection_;
-  IntegrationTcpClientPtr tcp_client_;
+  IntegrationStreamDecoderPtr response_;
 };
 
 } // namespace Envoy
