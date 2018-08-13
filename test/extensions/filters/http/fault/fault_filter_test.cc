@@ -130,7 +130,7 @@ public:
   }
 
   void SetUpTest(const envoy::config::filter::http::fault::v2::HTTPFault fault) {
-    config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_));
+    config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_, generator_));
     filter_.reset(new FaultFilter(config_));
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
@@ -153,6 +153,7 @@ public:
   Buffer::OwnedImpl data_;
   Stats::IsolatedStoreImpl stats_;
   NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Runtime::MockRandomGenerator> generator_;
   Event::MockTimer* timer_{};
 };
 

@@ -59,9 +59,9 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
 
 FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
                                      Runtime::Loader& runtime, const std::string& stats_prefix,
-                                     Stats::Scope& scope)
+                                     Stats::Scope& scope, Runtime::RandomGenerator& generator)
     : settings_(fault), runtime_(runtime), stats_(generateStats(stats_prefix, scope)),
-      stats_prefix_(stats_prefix), scope_(scope) {}
+      stats_prefix_(stats_prefix), scope_(scope), generator_(generator) {}
 
 FaultFilter::FaultFilter(FaultFilterConfigSharedPtr config) : config_(config) {}
 
@@ -133,12 +133,12 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
 bool FaultFilter::isDelayEnabled() {
   bool enabled = config_->runtime().snapshot().featureEnabled(
       DELAY_PERCENT_KEY, fault_settings_->delayPercentage().numerator(),
-      config_->runtime().random().random(),
+      config_->randomGenerator().random(),
       ProtobufPercentHelper::fractionalPercentDenominatorToInt(fault_settings_->delayPercentage()));
   if (!downstream_cluster_delay_percent_key_.empty()) {
     enabled |= config_->runtime().snapshot().featureEnabled(
         downstream_cluster_delay_percent_key_, fault_settings_->delayPercentage().numerator(),
-        config_->runtime().random().random(),
+        config_->randomGenerator().random(),
         ProtobufPercentHelper::fractionalPercentDenominatorToInt(
             fault_settings_->delayPercentage()));
   }
@@ -148,12 +148,12 @@ bool FaultFilter::isDelayEnabled() {
 bool FaultFilter::isAbortEnabled() {
   bool enabled = config_->runtime().snapshot().featureEnabled(
       ABORT_PERCENT_KEY, fault_settings_->abortPercentage().numerator(),
-      config_->runtime().random().random(),
+      config_->randomGenerator().random(),
       ProtobufPercentHelper::fractionalPercentDenominatorToInt(fault_settings_->abortPercentage()));
   if (!downstream_cluster_abort_percent_key_.empty()) {
     enabled |= config_->runtime().snapshot().featureEnabled(
         downstream_cluster_abort_percent_key_, fault_settings_->abortPercentage().numerator(),
-        config_->runtime().random().random(),
+        config_->randomGenerator().random(),
         ProtobufPercentHelper::fractionalPercentDenominatorToInt(
             fault_settings_->abortPercentage()));
   }

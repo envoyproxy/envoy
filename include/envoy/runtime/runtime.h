@@ -165,11 +165,6 @@ public:
    * @param values the values to merge
    */
   virtual void mergeValues(const std::unordered_map<std::string, std::string>& values) PURE;
-
-  /**
-   * @return RandomGenerator& the random generator.
-   */
-  virtual RandomGenerator& random() PURE;
 };
 
 typedef std::unique_ptr<Loader> LoaderPtr;

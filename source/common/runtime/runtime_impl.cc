@@ -328,8 +328,6 @@ void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>&
   loadNewSnapshot();
 }
 
-RandomGenerator& LoaderImpl::random() { return generator_; }
-
 DiskBackedLoaderImpl::DiskBackedLoaderImpl(Event::Dispatcher& dispatcher,
                                            ThreadLocal::SlotAllocator& tls,
                                            const std::string& root_symlink_path,

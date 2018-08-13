@@ -44,10 +44,8 @@ public:
 
   MOCK_METHOD0(snapshot, Snapshot&());
   MOCK_METHOD1(mergeValues, void(const std::unordered_map<std::string, std::string>&));
-  MOCK_METHOD0(random, Runtime::RandomGenerator&());
 
   testing::NiceMock<MockSnapshot> snapshot_;
-  testing::NiceMock<MockRandomGenerator> random_;
 };
 
 class MockOverrideLayer : public Snapshot::OverrideLayer {

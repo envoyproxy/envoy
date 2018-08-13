@@ -164,7 +164,6 @@ public:
   // Runtime::Loader
   Snapshot& snapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
-  RandomGenerator& random() override;
 
 protected:
   // Identical the the public constructor but does not call loadSnapshot(). Subclasses must call

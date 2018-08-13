@@ -76,7 +76,7 @@ public:
 
   void initializeFilter() {
     filter_.reset(new TestProxyFilter("test.", store_, runtime_, access_log_, fault_config_,
-                                      drain_decision_));
+                                      drain_decision_, generator_));
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
@@ -115,6 +115,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
   Envoy::AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Network::MockDrainDecision> drain_decision_;
+  NiceMock<Runtime::MockRandomGenerator> generator_;
 };
 
 TEST_F(MongoProxyFilterTest, DelayFaults) {
