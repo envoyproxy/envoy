@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/router/string_accessor.h"
+
 #include "common/access_log/access_log_formatter.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
