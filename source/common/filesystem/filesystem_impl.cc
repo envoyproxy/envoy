@@ -107,11 +107,12 @@ FileImpl::FileImpl(const std::string& path, Event::Dispatcher& dispatcher,
 }
 
 void FileImpl::open() {
-  fd_ = os_sys_calls_.open(path_.c_str(), O_RDWR | O_APPEND | O_CREAT,
-                           S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-
+  Api::SysCallIntResult result = os_sys_calls_.open(path_.c_str(), O_RDWR | O_APPEND | O_CREAT,
+                                                    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+  fd_ = result.rc_;
   if (-1 == fd_) {
-    throw EnvoyException(fmt::format("unable to open file '{}': {}", path_, strerror(errno)));
+    throw EnvoyException(
+        fmt::format("unable to open file '{}': {}", path_, strerror(result.errno_)));
   }
 }
 
@@ -154,8 +155,8 @@ void FileImpl::doWrite(Buffer::Instance& buffer) {
   {
     Thread::LockGuard lock(file_lock_);
     for (Buffer::RawSlice& slice : slices) {
-      ssize_t rc = os_sys_calls_.write(fd_, slice.mem_, slice.len_);
-      ASSERT(rc == static_cast<ssize_t>(slice.len_));
+      const Api::SysCallSizeResult result = os_sys_calls_.write(fd_, slice.mem_, slice.len_);
+      ASSERT(result.rc_ == static_cast<ssize_t>(slice.len_));
       stats_.write_completed_.inc();
     }
   }
