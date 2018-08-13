@@ -157,7 +157,7 @@ def main(cfg):
     elif cfg.response == "exception":
         print("Thrift Server will throw Thrift exceptions for all messages")
 
-    server = TServer.TSimpleServer(processor, transport, transport_factory, protocol_factory)
+    server = TServer.TThreadedServer(processor, transport, transport_factory, protocol_factory)
     try:
         server.serve()
     except KeyboardInterrupt:

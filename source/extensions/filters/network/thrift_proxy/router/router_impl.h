@@ -105,7 +105,7 @@ private:
                     MessageMetadataSharedPtr& metadata);
     ~UpstreamRequest();
 
-    void start();
+    ThriftFilters::FilterStatus start();
     void resetStream();
 
     // Tcp::ConnectionPool::Callbacks
