@@ -48,11 +48,10 @@ void validateIpv6Supported(const std::string& address) {
 bool ipFamilySupported(int domain) {
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   const Api::SysCallIntResult result = os_sys_calls.socket(domain, SOCK_STREAM, 0);
-  const int fd = result.rc_;
-  if (fd >= 0) {
-    RELEASE_ASSERT(os_sys_calls.close(fd).rc_ == 0, "");
+  if (result.rc_ >= 0) {
+    RELEASE_ASSERT(os_sys_calls.close(result.rc_).rc_ == 0, "");
   }
-  return fd != -1;
+  return result.rc_ != -1;
 }
 
 Address::InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t ss_len,
