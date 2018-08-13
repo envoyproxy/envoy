@@ -446,13 +446,12 @@ private:
       std::sort(ip_prefixes_.begin(), ip_prefixes_.end());
 
       // Build the trie_.
-      trie_.reserve(ip_prefixes_.size());
+      trie_.reserve(size_t(ip_prefixes_.size() / fill_factor_));
       uint32_t next_free_index = 1;
       buildRecursive(0u, 0u, ip_prefixes_.size(), 0u, next_free_index);
 
       // The value of next_free_index is the final size of the trie_.
       ASSERT(next_free_index <= trie_.size());
-      trie_.resize(next_free_index);
     }
 
     // Thin wrapper around computeBranch output to facilitate code readability.

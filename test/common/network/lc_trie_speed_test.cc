@@ -9,6 +9,9 @@ std::vector<Envoy::Network::Address::InstanceConstSharedPtr> addresses;
 
 std::vector<std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>> tag_data;
 
+std::vector<std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>>
+    tag_data_nested_prefixes;
+
 std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> lc_trie;
 
 std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> lc_trie_nested_prefixes;
@@ -26,6 +29,29 @@ static void BM_LcTrieConstruct(benchmark::State& state) {
 }
 
 BENCHMARK(BM_LcTrieConstruct);
+
+static void BM_LcTrieConstructNested(benchmark::State& state) {
+  std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> trie;
+  for (auto _ : state) {
+    trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(tag_data_nested_prefixes);
+  }
+  benchmark::DoNotOptimize(trie);
+}
+
+BENCHMARK(BM_LcTrieConstructNested);
+
+static void BM_LcTrieConstructMinimal(benchmark::State& state) {
+  std::vector<std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>> tags;
+  tags.emplace_back(std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
+      {"tag_1", {Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
+  std::unique_ptr<Envoy::Network::LcTrie::LcTrie<std::string>> trie;
+  for (auto _ : state) {
+    trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(tags);
+  }
+  benchmark::DoNotOptimize(trie);
+}
+
+BENCHMARK(BM_LcTrieConstructMinimal);
 
 static void BM_LcTrieLookup(benchmark::State& state) {
   static size_t i = 0;
@@ -76,8 +102,7 @@ int main(int argc, char** argv) {
            {Envoy::Network::Address::CidrRange::create(fmt::format("192.0.{}.{}/32", i, j))}}));
     }
   }
-  std::vector<std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>>
-      tag_data_nested_prefixes = tag_data;
+  tag_data_nested_prefixes = tag_data;
   tag_data_nested_prefixes.emplace_back(
       std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
           {"tag_0", {Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
