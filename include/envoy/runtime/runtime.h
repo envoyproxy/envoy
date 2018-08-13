@@ -112,8 +112,8 @@ public:
    * of [0, num_buckets).
    * @return true if the feature is enabled.
    */
-  virtual bool featureEnabledEx(const std::string& key, uint64_t default_value,
-                                uint64_t num_buckets) const PURE;
+  virtual bool sampleFeatureEnabled(const std::string& key, uint64_t default_value,
+                                    uint64_t num_buckets) const PURE;
 
   /**
    * Test if a feature is enabled using a supplied stable random value and total number of buckets
@@ -129,8 +129,8 @@ public:
    *        of [0, num_buckets).
    * @return true if the feature is enabled.
    */
-  virtual bool featureEnabledEx(const std::string& key, uint64_t default_value,
-                                uint64_t random_value, uint64_t num_buckets) const PURE;
+  virtual bool sampleFeatureEnabled(const std::string& key, uint64_t default_value,
+                                    uint64_t random_value, uint64_t num_buckets) const PURE;
 
   /**
    * Fetch raw runtime data based on key.

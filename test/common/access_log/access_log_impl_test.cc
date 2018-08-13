@@ -204,25 +204,25 @@ TEST_F(AccessLogImplTest, RuntimeFilter) {
 
   // Value is taken from random generator.
   EXPECT_CALL(context_.random_, random()).WillOnce(Return(42));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabledEx("access_log.test_key", 0, 42, 100))
+  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("access_log.test_key", 0, 42, 100))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   EXPECT_CALL(context_.random_, random()).WillOnce(Return(43));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabledEx("access_log.test_key", 0, 43, 100))
+  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("access_log.test_key", 0, 43, 100))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   // Value is taken from x-request-id.
   request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
-  EXPECT_CALL(runtime_.snapshot_, featureEnabledEx("access_log.test_key", 0, 55, 100))
+  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("access_log.test_key", 0, 55, 100))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
-  EXPECT_CALL(runtime_.snapshot_, featureEnabledEx("access_log.test_key", 0, 55, 100))
+  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("access_log.test_key", 0, 55, 100))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
@@ -245,25 +245,25 @@ config:
 
   // Value is taken from random generator.
   EXPECT_CALL(context_.random_, random()).WillOnce(Return(42));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabledEx("access_log.test_key", 5, 42, 10000))
+  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("access_log.test_key", 5, 42, 10000))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   EXPECT_CALL(context_.random_, random()).WillOnce(Return(43));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabledEx("access_log.test_key", 5, 43, 10000))
+  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("access_log.test_key", 5, 43, 10000))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   // Value is taken from x-request-id.
   request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
-  EXPECT_CALL(runtime_.snapshot_, featureEnabledEx("access_log.test_key", 5, 255, 10000))
+  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("access_log.test_key", 5, 255, 10000))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
-  EXPECT_CALL(runtime_.snapshot_, featureEnabledEx("access_log.test_key", 5, 255, 10000))
+  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("access_log.test_key", 5, 255, 10000))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
@@ -288,13 +288,13 @@ config:
   // Value should not be taken from x-request-id.
   request_headers_.addCopy("x-request-id", "000000ff-0000-0000-0000-000000000000");
   EXPECT_CALL(context_.random_, random()).WillOnce(Return(42));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabledEx("access_log.test_key", 5, 42, 1000000))
+  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("access_log.test_key", 5, 42, 1000000))
       .WillOnce(Return(true));
   EXPECT_CALL(*file_, write(_));
   log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);
 
   EXPECT_CALL(context_.random_, random()).WillOnce(Return(43));
-  EXPECT_CALL(runtime_.snapshot_, featureEnabledEx("access_log.test_key", 5, 43, 1000000))
+  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("access_log.test_key", 5, 43, 1000000))
       .WillOnce(Return(false));
   EXPECT_CALL(*file_, write(_)).Times(0);
   log->log(&request_headers_, &response_headers_, &response_trailers_, request_info_);

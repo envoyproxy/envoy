@@ -891,7 +891,7 @@ TEST_F(ConnectionManagerUtilityTest, NonTlsAlwaysForwardClientCert) {
 
 // Sampling, global on.
 TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
-  EXPECT_CALL(runtime_.snapshot_, featureEnabledEx("tracing.random_sampling", 10000, _, 10000))
+  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("tracing.random_sampling", 10000, _, 10000))
       .WillOnce(Return(true));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
@@ -905,7 +905,7 @@ TEST_F(ConnectionManagerUtilityTest, RandomSamplingWhenGlobalSet) {
 
 // Sampling must not be done on client traced.
 TEST_F(ConnectionManagerUtilityTest, SamplingMustNotBeDoneOnClientTraced) {
-  EXPECT_CALL(runtime_.snapshot_, featureEnabledEx("tracing.random_sampling", 10000, _, 10000))
+  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("tracing.random_sampling", 10000, _, 10000))
       .Times(0);
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(true));
@@ -920,7 +920,7 @@ TEST_F(ConnectionManagerUtilityTest, SamplingMustNotBeDoneOnClientTraced) {
 
 // Sampling, global off.
 TEST_F(ConnectionManagerUtilityTest, NoTraceWhenSamplingSetButGlobalNotSet) {
-  EXPECT_CALL(runtime_.snapshot_, featureEnabledEx("tracing.random_sampling", 10000, _, 10000))
+  EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled("tracing.random_sampling", 10000, _, 10000))
       .WillOnce(Return(true));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled", 100, _))
       .WillOnce(Return(false));

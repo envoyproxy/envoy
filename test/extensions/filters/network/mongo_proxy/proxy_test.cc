@@ -94,8 +94,9 @@ public:
 
     fault_config_.reset(new FaultConfig(fault));
 
-    EXPECT_CALL(runtime_.snapshot_, featureEnabledEx(_, _, 100)).Times(AnyNumber());
-    EXPECT_CALL(runtime_.snapshot_, featureEnabledEx("mongo.fault.fixed_delay.percent", 50, 100))
+    EXPECT_CALL(runtime_.snapshot_, sampleFeatureEnabled(_, _, 100)).Times(AnyNumber());
+    EXPECT_CALL(runtime_.snapshot_,
+                sampleFeatureEnabled("mongo.fault.fixed_delay.percent", 50, 100))
         .WillOnce(Return(enable_fault));
 
     if (enable_fault) {
