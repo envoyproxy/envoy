@@ -12,8 +12,9 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
-
+namespace {
 std::string thrift_config;
+} // namespace
 
 class ThriftConnManagerIntegrationTest
     : public BaseThriftIntegrationTest,
