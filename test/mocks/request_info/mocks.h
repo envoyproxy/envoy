@@ -60,6 +60,8 @@ public:
   MOCK_METHOD2(setDynamicMetadata, void(const std::string&, const ProtobufWkt::Struct&));
   MOCK_METHOD3(setDynamicMetadata,
                void(const std::string&, const std::string&, const std::string&));
+  MOCK_METHOD0(dynamicMetadata2, DynamicMetadata&());
+  MOCK_CONST_METHOD0(dynamicMetadata2, const DynamicMetadata&());
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};

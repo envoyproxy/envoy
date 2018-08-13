@@ -2,6 +2,7 @@
 #include <functional>
 
 #include "envoy/http/protocol.h"
+#include "envoy/request_info/dynamic_metadata.h"
 #include "envoy/upstream/host_description.h"
 
 #include "common/common/fmt.h"
@@ -114,6 +115,20 @@ TEST(RequestInfoImplTest, ResponseFlagTest) {
   EXPECT_TRUE(request_info2.intersectResponseFlags(FailedLocalHealthCheck));
 }
 
+namespace {
+
+class IntAccessor : public DynamicMetadata::Object {
+public:
+  IntAccessor(int value) : value_(value) {}
+
+  int access() const { return value_; }
+
+private:
+  int value_;
+};
+
+} // namespace
+
 TEST(RequestInfoImplTest, MiscSettersAndGetters) {
   {
     RequestInfoImpl request_info(Http::Protocol::Http2);
@@ -140,6 +155,9 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
     NiceMock<Router::MockRouteEntry> route_entry;
     request_info.route_entry_ = &route_entry;
     EXPECT_EQ(&route_entry, request_info.routeEntry());
+
+    request_info.dynamicMetadata2().setData("test", std::make_unique<IntAccessor>(1));
+    EXPECT_EQ(1, request_info.dynamicMetadata2().getData<IntAccessor>("test").access());
   }
 }
 

@@ -5,8 +5,10 @@
 
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
+#include "common/request_info/dynamic_metadata_impl.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
+#include "common/router/string_accessor_impl.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -167,6 +169,87 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMis
   testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "");
 }
 
+TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDynamicMetadataVariable) {
+  Envoy::RequestInfo::DynamicMetadataImpl dynamic_metadata;
+  dynamic_metadata.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  EXPECT_EQ("test_value", dynamic_metadata.getData<StringAccessor>("testing").asString());
+
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  ON_CALL(request_info, dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
+  ON_CALL(Const(request_info), dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
+
+  testFormatting(request_info, "DYNAMIC_METADATA(\"testing\")", "test_value");
+  testFormatting(request_info, "DYNAMIC_METADATA(\"testing2\")", "");
+  EXPECT_EQ("test_value", dynamic_metadata.getData<StringAccessor>("testing").asString());
+}
+
+namespace {
+
+class IntAccessor : public ::Envoy::RequestInfo::DynamicMetadata::Object {
+public:
+  IntAccessor(int value) : value_(value) {}
+
+  int access() const { return value_; }
+
+private:
+  int value_;
+};
+
+} // namespace
+
+TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithNonStringDynamicMetadataVariable) {
+  Envoy::RequestInfo::DynamicMetadataImpl dynamic_metadata;
+  dynamic_metadata.setData("testing", std::make_unique<IntAccessor>(1));
+  EXPECT_EQ(1, dynamic_metadata.getData<IntAccessor>("testing").access());
+
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  ON_CALL(request_info, dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
+  ON_CALL(Const(request_info), dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
+
+  EXPECT_THROW_WITH_MESSAGE(testFormatting(request_info, "DYNAMIC_METADATA(\"testing\")", ""),
+                            EnvoyException,
+                            "Invalid header information: DYNAMIC_METADATA value \"testing\" exists "
+                            "but is not string accessible");
+}
+
+TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnDynamicMetadataVariable) {
+  // No quotes
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("DYNAMIC_METADATA(testing)", false),
+                            EnvoyException,
+                            "Invalid header configuration. Expected format "
+                            "DYNAMIC_METADATA(\"<data_name>\"), actual format "
+                            "DYNAMIC_METADATA(testing)");
+  // No parameters
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("DYNAMIC_METADATA()", false), EnvoyException,
+                            "Invalid header configuration. Expected format "
+                            "DYNAMIC_METADATA(\"<data_name>\"), actual format "
+                            "DYNAMIC_METADATA()");
+
+  // Missing single parens
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("DYNAMIC_METADATA(\"testing\"", false),
+                            EnvoyException,
+                            "Invalid header configuration. Expected format "
+                            "DYNAMIC_METADATA(\"<data_name>\"), actual format "
+                            "DYNAMIC_METADATA(\"testing\"");
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("DYNAMIC_METADATA\"testing\")", false),
+                            EnvoyException,
+                            "Invalid header configuration. Expected format "
+                            "DYNAMIC_METADATA(\"<data_name>\"), actual format "
+                            "DYNAMIC_METADATA\"testing\")");
+
+  // Missing single quotes
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("DYNAMIC_METADATA(\"testing)", false),
+                            EnvoyException,
+                            "Invalid header configuration. Expected format "
+                            "DYNAMIC_METADATA(\"<data_name>\"), actual format "
+                            "DYNAMIC_METADATA(\"testing)");
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("DYNAMIC_METADATA(testing\")", false),
+                            EnvoyException,
+                            "Invalid header configuration. Expected format "
+                            "DYNAMIC_METADATA(\"<data_name>\"), actual format "
+                            "DYNAMIC_METADATA(testing\")");
+}
+
 TEST_F(RequestInfoHeaderFormatterTest, UnknownVariable) { testInvalidFormat("INVALID_VARIABLE"); }
 
 TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
@@ -268,6 +351,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA([\"ns\", \t \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \n \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
+      {"%DYNAMIC_METADATA(\"testing\")%", {"test_value"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
 
       // Unescaped %
@@ -312,6 +396,21 @@ TEST(HeaderParserTest, TestParseInternal) {
         "...]), actual format UPSTREAM_METADATA( no array), because JSON supplied is not valid. "
         "Error(offset 2, line 1): Invalid value.\n"}},
 
+      {"%DYNAMIC_METADATA(no quotes)%",
+       {},
+       {"Invalid header configuration. Expected format DYNAMIC_METADATA(\"<data_name>\"), "
+        "actual format DYNAMIC_METADATA(no quotes)"}},
+
+      {"%DYNAMIC_METADATA\"no parens\"%",
+       {},
+       {"Invalid header configuration. Expected format DYNAMIC_METADATA(\"<data_name>\"), "
+        "actual format DYNAMIC_METADATA\"no parens\""}},
+
+      {"%DYNAMIC_METADATA( \"extra space\")%",
+       {},
+       {"Invalid header configuration. Expected format DYNAMIC_METADATA(\"<data_name>\"), "
+        "actual format DYNAMIC_METADATA( \"extra space\")"}},
+
       // Invalid arguments
       {"%UPSTREAM_METADATA%",
        {},
@@ -331,7 +430,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
 
-  // Metadata with percent signs in the key.
+  // Upstream metadata with percent signs in the key.
   auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(
       TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
           R"EOF(
@@ -344,6 +443,11 @@ TEST(HeaderParserTest, TestParseInternal) {
   // "2018-04-03T23:06:09.123Z".
   const SystemTime start_time(std::chrono::milliseconds(1522796769123));
   ON_CALL(request_info, startTime()).WillByDefault(Return(start_time));
+
+  Envoy::RequestInfo::DynamicMetadataImpl dynamic_metadata;
+  dynamic_metadata.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  ON_CALL(request_info, dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
+  ON_CALL(Const(request_info), dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
 
   for (const auto& test_case : test_cases) {
     Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
@@ -473,6 +577,9 @@ route:
     - header:
         key: "x-metadata"
         value: "%UPSTREAM_METADATA([\"namespace\", \"%key%\"])%"
+    - header:
+        key: "x-dynamic"
+        value: "%DYNAMIC_METADATA(\"testing\")%"
   )EOF";
 
   HeaderParserPtr req_header_parser =
@@ -495,6 +602,11 @@ route:
             "%key%": value
       )EOF"));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
+
+  Envoy::RequestInfo::DynamicMetadataImpl dynamic_metadata;
+  dynamic_metadata.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  ON_CALL(request_info, dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
+  ON_CALL(Const(request_info), dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
 
   req_header_parser->evaluateHeaders(headerMap, request_info);
 
@@ -521,6 +633,9 @@ route:
 
   EXPECT_TRUE(headerMap.has("x-metadata"));
   EXPECT_EQ("value", headerMap.get_("x-metadata"));
+
+  EXPECT_TRUE(headerMap.has("x-dynamic"));
+  EXPECT_EQ("test_value", headerMap.get_("x-dynamic"));
 }
 
 TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {

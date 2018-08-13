@@ -2,6 +2,8 @@
 
 #include "envoy/request_info/request_info.h"
 
+#include "common/request_info/dynamic_metadata_impl.h"
+
 namespace Envoy {
 
 class TestRequestInfo : public RequestInfo::RequestInfo {
@@ -154,6 +156,11 @@ public:
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
+  const ::Envoy::RequestInfo::DynamicMetadata& dynamicMetadata2() const override {
+    return metadata2_;
+  }
+  ::Envoy::RequestInfo::DynamicMetadata& dynamicMetadata2() override { return metadata2_; }
+
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
@@ -176,6 +183,7 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
+  ::Envoy::RequestInfo::DynamicMetadataImpl metadata2_{};
 };
 
 } // namespace Envoy

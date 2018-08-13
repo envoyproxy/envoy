@@ -6,6 +6,7 @@
 #include "envoy/request_info/request_info.h"
 
 #include "common/common/assert.h"
+#include "common/request_info/dynamic_metadata_impl.h"
 
 namespace Envoy {
 namespace RequestInfo {
@@ -178,6 +179,9 @@ struct RequestInfoImpl : public RequestInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
+  DynamicMetadata& dynamicMetadata2() override { return metadata2_; }
+  const DynamicMetadata& dynamicMetadata2() const override { return metadata2_; }
+
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
 
@@ -197,6 +201,7 @@ struct RequestInfoImpl : public RequestInfo {
   bool hc_request_{};
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
+  DynamicMetadataImpl metadata2_{};
 
 private:
   uint64_t bytes_received_{};
