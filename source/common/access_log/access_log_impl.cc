@@ -118,7 +118,7 @@ bool RuntimeFilter::evaluate(const RequestInfo::RequestInfo&,
     random_value = random_.random();
   }
 
-  return runtime_.snapshot().sampleFeatureEnabled(
+  return runtime_.snapshot().featureEnabledEx(
       runtime_key_, percent_.numerator(), random_value,
       ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_));
 }

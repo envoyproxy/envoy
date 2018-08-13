@@ -128,8 +128,8 @@ TEST_F(DiskBackedLoaderImplTest, All) {
   EXPECT_FALSE(loader->snapshot().featureEnabled("file3", 1, 3));
 
   // Check stable value and num buckets.
-  EXPECT_FALSE(loader->snapshot().sampleFeatureEnabled("file4", 1, 200, 300));
-  EXPECT_TRUE(loader->snapshot().sampleFeatureEnabled("file4", 1, 122, 300));
+  EXPECT_FALSE(loader->snapshot().featureEnabledEx("file4", 1, 200, 300));
+  EXPECT_TRUE(loader->snapshot().featureEnabledEx("file4", 1, 122, 300));
 
   // Overrides from override dir
   EXPECT_EQ("hello override", loader->snapshot().get("file1"));
