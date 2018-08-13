@@ -926,6 +926,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       // If we are depending on a health checker, we initialize to unhealthy.
       if (health_checker_ != nullptr) {
         hosts_added.back()->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
+        hosts_added.back()->failureTypeFlagSet(Host::FailureTypeFlag::UNKNOWN);
       }
     }
   }

@@ -74,7 +74,15 @@ HdsDelegate::sendResponse() {
         if (host->healthy()) {
           endpoint->set_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
         } else {
-          endpoint->set_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
+          if (host->failureTypeFlagGet(Host::FailureTypeFlag::TIMEOUT)) {
+            endpoint->set_health_status(envoy::api::v2::core::HealthStatus::TIMEOUT);
+          } else if (host->failureTypeFlagGet(Host::FailureTypeFlag::UNHEALTHY)) {
+            endpoint->set_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
+          } else if (host->failureTypeFlagGet(Host::FailureTypeFlag::UNKNOWN)) {
+            endpoint->set_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
+          } else {
+            throw EnvoyException("Invalid host health status");
+          }
         }
       }
     }

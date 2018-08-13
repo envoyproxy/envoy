@@ -134,7 +134,7 @@ public:
     health_check->mutable_endpoints(0)->mutable_locality()->set_zone("some_zone");
     health_check->mutable_endpoints(0)->mutable_locality()->set_sub_zone("crete");
 
-    health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
+    health_check->add_health_checks()->mutable_timeout()->set_nanos(500000000);
     health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
     health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
@@ -246,9 +246,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeout) {
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
   // Check that the response_ is correct
-  // TODO(lilika): Ideally this would be envoy::api::v2::core::HealthStatus::TIMEOUT
   checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
-                              envoy::api::v2::core::HealthStatus::UNHEALTHY,
+                              envoy::api::v2::core::HealthStatus::TIMEOUT,
                               host_upstream_->localAddress());
   checkCounters(1, 2, 0, 1);
 

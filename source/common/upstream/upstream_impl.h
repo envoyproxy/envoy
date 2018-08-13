@@ -166,6 +166,15 @@ public:
   void healthFlagClear(HealthFlag flag) override { health_flags_ &= ~enumToInt(flag); }
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
   void healthFlagSet(HealthFlag flag) override { health_flags_ |= enumToInt(flag); }
+
+  void failureTypeFlagClear() override {
+    failure_type_flag_ = enumToInt(Host::FailureTypeFlag::UNKNOWN);
+  }
+  bool failureTypeFlagGet(FailureTypeFlag flag) const override {
+    return (failure_type_flag_ == enumToInt(flag));
+  }
+  void failureTypeFlagSet(FailureTypeFlag flag) override { failure_type_flag_ = enumToInt(flag); }
+
   void setHealthChecker(HealthCheckHostMonitorPtr&& health_checker) override {
     health_checker_ = std::move(health_checker);
   }
@@ -186,6 +195,7 @@ protected:
 
 private:
   std::atomic<uint64_t> health_flags_{};
+  std::atomic<uint64_t> failure_type_flag_;
   std::atomic<uint32_t> weight_;
   std::atomic<bool> used_;
 };
