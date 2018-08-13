@@ -14,7 +14,7 @@ namespace Envoy {
 namespace RequestInfo {
 
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
-  static_assert(ResponseFlag::LastFlag == 0x1200, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x2000, "A flag has been added. Fix this code.");
 
   std::vector<std::pair<ResponseFlag, std::string>> expected = {
       std::make_pair(ResponseFlag::FailedLocalHealthCheck, "LH"),
@@ -59,7 +59,7 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
 }
 
 TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
-  static_assert(ResponseFlag::LastFlag == 0x1200, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x2000, "A flag has been added. Fix this code.");
 
   std::vector<std::pair<std::string, ResponseFlag>> expected = {
       std::make_pair("LH", ResponseFlag::FailedLocalHealthCheck),
