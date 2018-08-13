@@ -320,8 +320,8 @@ namespace Http {
 class TestHeaderMapImpl : public HeaderMapImpl {
 public:
   TestHeaderMapImpl();
-  TestHeaderMapImpl(const std::initializer_list<std::pair<std::string, std::string>>& values);
-  TestHeaderMapImpl(const HeaderMap& rhs);
+  explicit TestHeaderMapImpl(const std::initializer_list<std::pair<std::string, std::string>>& values);
+  explicit TestHeaderMapImpl(const HeaderMap& rhs);
 
   TestHeaderMapImpl& operator=(const TestHeaderMapImpl& other);
 
