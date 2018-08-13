@@ -131,11 +131,11 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
 }
 
 bool FaultFilter::isDelayEnabled() {
-  bool enabled = config_->runtime().snapshot().featureEnabled(
+  bool enabled = config_->runtime().snapshot().sampleFeatureEnabled(
       DELAY_PERCENT_KEY, fault_settings_->delayPercentage().numerator(),
       ProtobufPercentHelper::fractionalPercentDenominatorToInt(fault_settings_->delayPercentage()));
   if (!downstream_cluster_delay_percent_key_.empty()) {
-    enabled |= config_->runtime().snapshot().featureEnabled(
+    enabled |= config_->runtime().snapshot().sampleFeatureEnabled(
         downstream_cluster_delay_percent_key_, fault_settings_->delayPercentage().numerator(),
         ProtobufPercentHelper::fractionalPercentDenominatorToInt(
             fault_settings_->delayPercentage()));
@@ -144,11 +144,11 @@ bool FaultFilter::isDelayEnabled() {
 }
 
 bool FaultFilter::isAbortEnabled() {
-  bool enabled = config_->runtime().snapshot().featureEnabled(
+  bool enabled = config_->runtime().snapshot().sampleFeatureEnabled(
       ABORT_PERCENT_KEY, fault_settings_->abortPercentage().numerator(),
       ProtobufPercentHelper::fractionalPercentDenominatorToInt(fault_settings_->abortPercentage()));
   if (!downstream_cluster_abort_percent_key_.empty()) {
-    enabled |= config_->runtime().snapshot().featureEnabled(
+    enabled |= config_->runtime().snapshot().sampleFeatureEnabled(
         downstream_cluster_abort_percent_key_, fault_settings_->abortPercentage().numerator(),
         ProtobufPercentHelper::fractionalPercentDenominatorToInt(
             fault_settings_->abortPercentage()));
