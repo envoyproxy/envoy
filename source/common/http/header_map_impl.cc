@@ -276,21 +276,7 @@ void HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view data)
 
 HeaderMapImpl::HeaderMapImpl() { memset(&inline_headers_, 0, sizeof(inline_headers_)); }
 
-HeaderMapImpl::HeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl() {
-  rhs.iterate(
-      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        // TODO(mattklein123) PERF: Avoid copying here is not necessary.
-        HeaderString key_string;
-        key_string.setCopy(header.key().c_str(), header.key().size());
-        HeaderString value_string;
-        value_string.setCopy(header.value().c_str(), header.value().size());
-
-        static_cast<HeaderMapImpl*>(context)->addViaMove(std::move(key_string),
-                                                         std::move(value_string));
-        return HeaderMap::Iterate::Continue;
-      },
-      this);
-}
+HeaderMapImpl::HeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl() { copyFrom(rhs); }
 
 HeaderMapImpl::HeaderMapImpl(const HeaderMapImpl& rhs)
     : HeaderMapImpl(static_cast<const HeaderMap&>(rhs)) {}
@@ -305,6 +291,22 @@ HeaderMapImpl::HeaderMapImpl(
     value_string.setCopy(value.second.c_str(), value.second.size());
     addViaMove(std::move(key_string), std::move(value_string));
   }
+}
+
+void HeaderMapImpl::copyFrom(const HeaderMap& header_map) {
+  header_map.iterate(
+      [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
+        // TODO(mattklein123) PERF: Avoid copying here is not necessary.
+        HeaderString key_string;
+        key_string.setCopy(header.key().c_str(), header.key().size());
+        HeaderString value_string;
+        value_string.setCopy(header.value().c_str(), header.value().size());
+
+        static_cast<HeaderMapImpl*>(context)->addViaMove(std::move(key_string),
+                                                         std::move(value_string));
+        return HeaderMap::Iterate::Continue;
+      },
+      this);
 }
 
 bool HeaderMapImpl::operator==(const HeaderMapImpl& rhs) const {

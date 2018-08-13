@@ -323,6 +323,8 @@ public:
   TestHeaderMapImpl(const std::initializer_list<std::pair<std::string, std::string>>& values);
   TestHeaderMapImpl(const HeaderMap& rhs);
 
+  TestHeaderMapImpl& operator=(const TestHeaderMapImpl& other);
+
   friend std::ostream& operator<<(std::ostream& os, const TestHeaderMapImpl& p) {
     p.iterate(
         [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {

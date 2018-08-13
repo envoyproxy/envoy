@@ -81,6 +81,8 @@ public:
   size_t size() const override { return headers_.size(); }
 
 protected:
+  void copyFrom(const HeaderMap& rhs);
+
   struct HeaderEntryImpl : public HeaderEntry, NonCopyable {
     HeaderEntryImpl(const LowerCaseString& key);
     HeaderEntryImpl(const LowerCaseString& key, HeaderString&& value);
@@ -132,7 +134,7 @@ protected:
    * List of HeaderEntryImpl that keeps the pseudo headers (key starting with ':') in the front
    * of the list (as required by nghttp2) and otherwise maintains insertion order.
    */
-  class HeaderList {
+  class HeaderList : NonCopyable {
   public:
     HeaderList() : pseudo_headers_end_(headers_.end()) {}
 
