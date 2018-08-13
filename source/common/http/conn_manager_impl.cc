@@ -768,7 +768,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
 
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
   auto trailers_added_entry = decoder_filters_.end();
-  bool trailers_exists = request_trailers_ != nullptr;
+  bool trailers_exists_at_start = request_trailers_ != nullptr;
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
@@ -779,8 +779,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeData));
 
     // We check the request_trailers_ pointer here in case addDecodedTrailers
-    // is called in decodeData - at which point we communicate to the filter
-    // that the stream has not yet ended.
+    // is called in decodeData during a previous filter invocation, at which point we communicate to
+    // the current and future filters that the stream has not yet ended.
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
@@ -793,13 +793,16 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
-    if (!trailers_exists && request_trailers_ && trailers_added_entry == decoder_filters_.end()) {
+    if (!trailers_exists_at_start && request_trailers_ &&
+        trailers_added_entry == decoder_filters_.end()) {
       trailers_added_entry = entry;
     }
 
     if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_) &&
         std::next(entry) != decoder_filters_.end()) {
-      // break here to ensure that we call decodeTrailers below
+      // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
+      // processing since we need to handle the case where a terminal filter wants to buffer, but
+      // a previous filter has added trailers.
       return;
     }
   }
@@ -807,8 +810,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   // If trailers were adding during decodeData we need to trigger decodeTrailers in order
   // to allow filters to process the trailers.
   if (trailers_added_entry != decoder_filters_.end()) {
-    (*trailers_added_entry)->stopped_ = true;
-    (*trailers_added_entry)->continueDecoding();
+    decodeTrailers(trailers_added_entry->get(), *request_trailers_);
   }
 }
 
@@ -1133,13 +1135,13 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   auto trailers_added_entry = encoder_filters_.end();
 
-  bool trailers_exists = response_trailers_ != nullptr;
+  bool trailers_exists_at_start = response_trailers_ != nullptr;
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeData));
 
-    // We check the request_trailers_ pointer here in case addEncodedTrailers
-    // is called in encodeData - at which point we communicate to the filter
-    // that the stream has not yet ended.
+    // We check the response_trailers_ pointer here in case addEncodedTrailers
+    // is called in encodeData during a previous filter invocation, at which point we communicate to
+    // the current and future filters that the stream has not yet ended.
     state_.filter_call_state_ |= FilterCallState::EncodeData;
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
@@ -1153,7 +1155,8 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
     ENVOY_STREAM_LOG(trace, "encode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
-    if (!trailers_exists && response_trailers_ && trailers_added_entry == encoder_filters_.end()) {
+    if (!trailers_exists_at_start && response_trailers_ &&
+        trailers_added_entry == encoder_filters_.end()) {
       trailers_added_entry = entry;
     }
 
@@ -1171,8 +1174,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
   // to allow filters to process the trailers.
   if (trailers_added_entry != encoder_filters_.end()) {
     response_encoder_->encodeData(data, false);
-    (*trailers_added_entry)->stopped_ = true;
-    (*trailers_added_entry)->continueEncoding();
+    encodeTrailers(trailers_added_entry->get(), *response_trailers_);
   } else {
     response_encoder_->encodeData(data, end_stream);
     maybeEndEncode(end_stream);
