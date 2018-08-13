@@ -292,6 +292,9 @@ HeaderMapImpl::HeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl() {
       this);
 }
 
+HeaderMapImpl::HeaderMapImpl(const HeaderMapImpl& rhs)
+    : HeaderMapImpl(static_cast<const HeaderMap&>(rhs)) {}
+
 HeaderMapImpl::HeaderMapImpl(
     const std::initializer_list<std::pair<LowerCaseString, std::string>>& values)
     : HeaderMapImpl() {

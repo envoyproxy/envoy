@@ -48,6 +48,7 @@ public:
   HeaderMapImpl();
   HeaderMapImpl(const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
   HeaderMapImpl(const HeaderMap& rhs);
+  HeaderMapImpl(const HeaderMapImpl& rhs);
 
   /**
    * Add a header via full move. This is the expected high performance paths for codecs populating
