@@ -29,6 +29,7 @@
 #include "absl/synchronization/notification.h"
 
 using testing::HasSubstr;
+using testing::IsEmpty;
 
 namespace Envoy {
 
@@ -157,7 +158,7 @@ protected:
     addArg("--disable-hot-restart");
   }
 
-  // Runs a an admin request specified in path, blocking until completion, and
+  // Runs an admin request specified in path, blocking until completion, and
   // returning the response body.
   std::string adminRequest(absl::string_view path, absl::string_view method) {
     absl::Notification done;
@@ -192,9 +193,9 @@ protected:
     });
   }
 
-  // Conditionally pauses at a critical point in the Envoy thread waiting, waiting
-  // the for the test thread to try something. The test thread can then call resume_.Notify()
-  // to allow the Envoy thread to resume.
+  // Conditionally pauses at a critical point in the Envoy thread, waiting for
+  // the test thread to trigger something at that exact line. The test thread
+  // can then call resume_.Notify() to allow the Envoy thread to resume.
   void pauseResumeInterlock(bool enable) {
     if (enable) {
       pause_point_.Notify();
@@ -269,6 +270,7 @@ TEST_F(AdminRequestTest, AdminRequestBeforeRun) {
 
   // The admin handler can't be called until after we let run() go.
   EXPECT_FALSE(admin_handler_was_called);
+  EXPECT_THAT(out, IsEmpty());
 
   // Now unblock the envoy thread so it can wake up and process outstanding posts.
   resume_.Notify();
@@ -278,12 +280,16 @@ TEST_F(AdminRequestTest, AdminRequestBeforeRun) {
   adminRequest("/quitquitquit", "POST");
   EXPECT_TRUE(waitForEnvoyToExit());
   EXPECT_TRUE(admin_handler_was_called);
+
+  // This just checks that some stat output was reported. We could pick any stat.
   EXPECT_THAT(out, HasSubstr("filesystem.reopen_failed"));
 }
 
 // Class to track whether an object has been destroyed, which it does by bumping an atomic.
 class DestroyCounter {
 public:
+  // Note: destroy_count is captured by reference, so the variable must last longer than
+  // the DestroyCounter.
   explicit DestroyCounter(std::atomic<uint64_t>& destroy_count) : destroy_count_(destroy_count) {}
   ~DestroyCounter() { ++destroy_count_; }
 
