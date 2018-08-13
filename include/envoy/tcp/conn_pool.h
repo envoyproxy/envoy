@@ -57,6 +57,18 @@ public:
   virtual void onUpstreamData(Buffer::Instance& data, bool end_stream) PURE;
 };
 
+/**
+ * ProtocolState is a base class for protocol-specific state that must be maintained across
+ * connections. The ProtocolState assigned to a connection is automatically destroyed when the
+ * connection is closed.
+ */
+class ProtocolState {
+public:
+  virtual ~ProtocolState() {}
+};
+
+typedef std::unique_ptr<ProtocolState> ProtocolStatePtr;
+
 /*
  * ConnectionData wraps a ClientConnection allocated to a caller. Open ClientConnections are
  * released back to the pool for re-use when their containing ConnectionData is destroyed.
@@ -71,12 +83,30 @@ public:
   virtual Network::ClientConnection& connection() PURE;
 
   /**
+   * Sets the ProtocolState for this connection. Any existing ProtocolState is destroyed.
+   * @param ProtocolStatePtr&& new ProtocolState for this connection.
+   */
+  virtual void setProtocolState(ProtocolStatePtr&& state) PURE;
+
+  /**
+   * @return T* the current ProtocolState or nullptr if no state is set or if the state's type
+   *            is not T.
+   */
+  template <class T> T* protocolStateTyped() { return dynamic_cast<T*>(protocolState()); }
+
+  /**
    * Sets the ConnectionPool::UpstreamCallbacks for the connection. If no callback is attached,
    * data from the upstream will cause the connection to be closed. Callbacks cease when the
    * connection is released.
    * @param callback the UpstreamCallbacks to invoke for upstream data
    */
   virtual void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callback) PURE;
+
+protected:
+  /**
+   * @return ProtocolState* pointer to the current ProtocolState or nullptr if not set
+   */
+  virtual ProtocolState* protocolState() PURE;
 };
 
 typedef std::unique_ptr<ConnectionData> ConnectionDataPtr;

@@ -44,6 +44,10 @@ public:
   // Tcp::ConnectionPool::ConnectionData
   MOCK_METHOD0(connection, Network::ClientConnection&());
   MOCK_METHOD1(addUpstreamCallbacks, void(ConnectionPool::UpstreamCallbacks&));
+  void setProtocolState(ProtocolStatePtr&& state) override { setProtocolState_(state); }
+  MOCK_METHOD0(protocolState, ConnectionPool::ProtocolState*());
+
+  MOCK_METHOD1(setProtocolState_, void(ConnectionPool::ProtocolStatePtr& state));
 
   // If set, invoked in ~MockConnectionData, which indicates that the connection pool
   // caller has relased a connection.

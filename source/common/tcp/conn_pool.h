@@ -39,6 +39,11 @@ protected:
 
     Network::ClientConnection& connection();
     void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callbacks);
+    void setProtocolState(ConnectionPool::ProtocolStatePtr&& state) {
+      parent_.setProtocolState(std::move(state));
+    };
+    ConnectionPool::ProtocolState* protocolState() { return parent_.protocolState(); }
+
     void release(bool closed);
 
     void invalidate() { conn_valid_ = false; }
@@ -60,6 +65,10 @@ protected:
     void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callbacks) override {
       wrapper_->addUpstreamCallbacks(callbacks);
     };
+    void setProtocolState(ConnectionPool::ProtocolStatePtr&& state) override {
+      wrapper_->setProtocolState(std::move(state));
+    }
+    ConnectionPool::ProtocolState* protocolState() override { return wrapper_->protocolState(); }
 
     ConnectionWrapperSharedPtr wrapper_;
   };
@@ -90,10 +99,16 @@ protected:
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
 
+    void setProtocolState(ConnectionPool::ProtocolStatePtr&& state) {
+      conn_state_ = std::move(state);
+    }
+    ConnectionPool::ProtocolState* protocolState() { return conn_state_.get(); }
+
     ConnPoolImpl& parent_;
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
     ConnectionWrapperSharedPtr wrapper_;
     Network::ClientConnectionPtr conn_;
+    ConnectionPool::ProtocolStatePtr conn_state_;
     Event::TimerPtr connect_timer_;
     Stats::TimespanPtr conn_length_;
     uint64_t remaining_requests_;
