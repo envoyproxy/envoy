@@ -27,6 +27,11 @@ void CdsSubscription::createRequest(Http::Message& request) {
   request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   request.headers().insertPath().value(
       fmt::format("/v1/clusters/{}/{}", local_info_.clusterName(), local_info_.nodeName()));
+  request.headers().insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
+
+  const size_t empty_body_size = 0;
+  request.headers().insertContentLength().value(empty_body_size);
 }
 
 void CdsSubscription::parseResponse(const Http::Message& response) {

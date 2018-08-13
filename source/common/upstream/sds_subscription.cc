@@ -85,6 +85,11 @@ void SdsSubscription::createRequest(Http::Message& message) {
 
   message.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   message.headers().insertPath().value("/v1/registration/" + cluster_name_);
+  message.headers().insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
+
+  const size_t empty_body_size = 0;
+  message.headers().insertContentLength().value(empty_body_size);
 }
 
 void SdsSubscription::onFetchComplete() {
