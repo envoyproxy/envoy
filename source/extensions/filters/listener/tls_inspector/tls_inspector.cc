@@ -143,13 +143,13 @@ void Filter::onRead() {
   // TODO(ggreenway): write an integration test to ensure the events work as expected on all
   // platforms.
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  ssize_t n = os_syscalls.recv(cb_->socket().fd(), buf_, config_->maxClientHelloSize(), MSG_PEEK);
-  const int error = errno; // Latch errno right after the recv call.
-  ENVOY_LOG(trace, "tls inspector: recv: {}", n);
+  const Api::SysCallSizeResult result =
+      os_syscalls.recv(cb_->socket().fd(), buf_, config_->maxClientHelloSize(), MSG_PEEK);
+  ENVOY_LOG(trace, "tls inspector: recv: {}", result.rc_);
 
-  if (n == -1 && error == EAGAIN) {
+  if (result.rc_ == -1 && result.errno_ == EAGAIN) {
     return;
-  } else if (n < 0) {
+  } else if (result.rc_ < 0) {
     config_->stats().read_error_.inc();
     done(false);
     return;
@@ -157,10 +157,10 @@ void Filter::onRead() {
 
   // Because we're doing a MSG_PEEK, data we've seen before gets returned every time, so
   // skip over what we've already processed.
-  if (static_cast<uint64_t>(n) > read_) {
+  if (static_cast<uint64_t>(result.rc_) > read_) {
     const uint8_t* data = buf_ + read_;
-    const size_t len = n - read_;
-    read_ = n;
+    const size_t len = result.rc_ - read_;
+    read_ = result.rc_;
     parseClientHello(data, len);
   }
 }

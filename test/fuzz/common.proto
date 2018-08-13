@@ -8,17 +8,13 @@ import "google/protobuf/wrappers.proto";
 
 // Common fuzzing input types.
 
-message Header {
-  string key = 1;
-  string value = 2;
-}
-
 message Headers {
-  repeated Header headers = 1;
+  repeated envoy.api.v2.core.HeaderValue headers = 1;
 }
 
 message RequestInfo {
   envoy.api.v2.core.Metadata dynamic_metadata = 1;
   uint64 start_time = 2;
   google.protobuf.UInt32Value response_code = 3;
+  envoy.api.v2.core.Metadata upstream_metadata = 4;
 }

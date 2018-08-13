@@ -12,6 +12,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
@@ -110,6 +111,26 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
     return nullptr;
   }
   return cluster_options;
+}
+
+std::map<std::string, ProtocolOptionsConfigConstSharedPtr>
+parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
+  std::map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
+  for (const auto& iter : config.extension_protocol_options()) {
+    const std::string& name = iter.first;
+    const ProtobufWkt::Struct& config_struct = iter.second;
+
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<
+        Server::Configuration::NamedNetworkFilterConfigFactory>(name);
+
+    auto object = factory.createProtocolOptionsConfig(
+        *Envoy::Config::Utility::translateToFactoryProtocolOptionsConfig(config_struct, factory));
+    if (object) {
+      options[name] = object;
+    }
+  }
+
+  return options;
 }
 
 } // namespace
@@ -286,6 +307,7 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       features_(parseFeatures(config)),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
+      extension_protocol_options_(parseExtensionProtocolOptions(config)),
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
       source_address_(getSourceAddress(config, bind_config)),
@@ -335,6 +357,16 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
     idle_timeout_ = std::chrono::milliseconds(
         DurationUtil::durationToMilliseconds(config.common_http_protocol_options().idle_timeout()));
   }
+}
+
+ProtocolOptionsConfigConstSharedPtr
+ClusterInfoImpl::extensionProtocolOptions(const std::string& name) const {
+  auto i = extension_protocol_options_.find(name);
+  if (i != extension_protocol_options_.end()) {
+    return i->second;
+  }
+
+  return nullptr;
 }
 
 namespace {

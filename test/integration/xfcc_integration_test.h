@@ -56,7 +56,7 @@ private:
   Network::TransportSocketFactoryPtr client_tls_ssl_ctx_;
   Network::TransportSocketFactoryPtr client_mtls_ssl_ctx_;
   Network::TransportSocketFactoryPtr upstream_ssl_ctx_;
-  Secret::MockSecretManager secret_manager_;
+  testing::NiceMock<Secret::MockSecretManager> secret_manager_;
 };
 } // namespace Xfcc
 } // namespace Envoy

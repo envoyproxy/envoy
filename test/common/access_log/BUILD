@@ -15,7 +15,10 @@ envoy_package()
 envoy_cc_library(
     name = "test_util",
     hdrs = ["test_util.h"],
-    deps = [],
+    deps = [
+        "//include/envoy/request_info:request_info_interface",
+        "//source/common/common:assert_lib",
+    ],
 )
 
 envoy_proto_library(

@@ -11,6 +11,7 @@
 #include "envoy/server/resource_monitor.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "common/common/logger.h"
 
@@ -50,12 +51,14 @@ private:
 class OverloadManagerImpl : Logger::Loggable<Logger::Id::main>, public OverloadManager {
 public:
   OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
+                      ThreadLocal::SlotAllocator& slot_allocator,
                       const envoy::config::overload::v2alpha::OverloadManager& config);
 
   // Server::OverloadManager
   void start() override;
   void registerForAction(const std::string& action, Event::Dispatcher& dispatcher,
                          OverloadActionCb callback) override;
+  ThreadLocalOverloadState& getThreadLocalOverloadState() override;
 
 private:
   class Resource : public ResourceMonitor::Callbacks {
@@ -90,6 +93,7 @@ private:
 
   bool started_;
   Event::Dispatcher& dispatcher_;
+  ThreadLocal::SlotPtr tls_;
   const std::chrono::milliseconds refresh_interval_;
   Event::TimerPtr timer_;
   std::unordered_map<std::string, Resource> resources_;
