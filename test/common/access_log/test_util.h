@@ -156,10 +156,10 @@ public:
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  const ::Envoy::RequestInfo::FilterState& dynamicMetadata2() const override {
+  const ::Envoy::RequestInfo::FilterState& perRequestState() const override {
     return metadata2_;
   }
-  ::Envoy::RequestInfo::FilterState& dynamicMetadata2() override { return metadata2_; }
+  ::Envoy::RequestInfo::FilterState& perRequestState() override { return metadata2_; }
 
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;

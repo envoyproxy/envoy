@@ -142,7 +142,7 @@ parseDynamicMetadataField(absl::string_view param_str) {
       static_cast<std::string>(param_str2.substr(1, param_str2.size() - 2)); // trim quotes
 
   return [param](const Envoy::RequestInfo::RequestInfo& request_info) -> std::string {
-    const Envoy::RequestInfo::FilterState& dynamic_metadata = request_info.dynamicMetadata2();
+    const Envoy::RequestInfo::FilterState& dynamic_metadata = request_info.perRequestState();
 
     // No such value means don't output anything.
     if (!dynamic_metadata.hasDataWithName(param)) {

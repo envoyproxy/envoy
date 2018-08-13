@@ -179,8 +179,8 @@ struct RequestInfoImpl : public RequestInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  FilterState& dynamicMetadata2() override { return metadata2_; }
-  const FilterState& dynamicMetadata2() const override { return metadata2_; }
+  FilterState& perRequestState() override { return metadata2_; }
+  const FilterState& perRequestState() const override { return metadata2_; }
 
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;

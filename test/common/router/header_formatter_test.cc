@@ -175,8 +175,8 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDynamicMetadataVariable) {
   EXPECT_EQ("test_value", dynamic_metadata.getData<StringAccessor>("testing").asString());
 
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  ON_CALL(request_info, dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
-  ON_CALL(Const(request_info), dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
+  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
+  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
 
   testFormatting(request_info, "DYNAMIC_METADATA(\"testing\")", "test_value");
   testFormatting(request_info, "DYNAMIC_METADATA(\"testing2\")", "");
@@ -203,8 +203,8 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithNonStringDynamicMetadataVar
   EXPECT_EQ(1, dynamic_metadata.getData<IntAccessor>("testing").access());
 
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  ON_CALL(request_info, dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
-  ON_CALL(Const(request_info), dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
+  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
+  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
 
   EXPECT_THROW_WITH_MESSAGE(testFormatting(request_info, "DYNAMIC_METADATA(\"testing\")", ""),
                             EnvoyException,
@@ -446,8 +446,8 @@ TEST(HeaderParserTest, TestParseInternal) {
 
   Envoy::RequestInfo::DynamicMetadataImpl dynamic_metadata;
   dynamic_metadata.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
-  ON_CALL(request_info, dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
-  ON_CALL(Const(request_info), dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
+  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
+  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
 
   for (const auto& test_case : test_cases) {
     Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
@@ -605,8 +605,8 @@ route:
 
   Envoy::RequestInfo::DynamicMetadataImpl dynamic_metadata;
   dynamic_metadata.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
-  ON_CALL(request_info, dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
-  ON_CALL(Const(request_info), dynamicMetadata2()).WillByDefault(ReturnRef(dynamic_metadata));
+  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
+  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
 
   req_header_parser->evaluateHeaders(headerMap, request_info);
 
