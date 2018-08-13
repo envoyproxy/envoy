@@ -807,8 +807,9 @@ void StaticClusterImpl::startPreInit() {
 }
 
 bool BaseDynamicClusterImpl::updateDynamicHostList(
-    const HostVector& new_hosts, HostVector& current_hosts, HostVector& hosts_added,
-    HostVector& hosts_removed, std::unordered_map<std::string, HostSharedPtr>& updated_hosts) {
+    const HostVector& new_hosts, HostVector& current_priority_hosts,
+    HostVector& hosts_added_to_current_priority, HostVector& hosts_removed_from_current_priority,
+    std::unordered_map<std::string, HostSharedPtr>& updated_hosts) {
   uint64_t max_host_weight = 1;
 
   // Did hosts change?
@@ -834,9 +835,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   // possible for DNS to return the same address multiple times, and a bad SDS implementation could
   // do the same thing.
 
-  // Keep track of hosts we've seen during this pass so we can remove it from the
-  // list of current (i.e. existing hosts from this priority) hosts.
-  std::unordered_set<std::string> seen_hosts(current_hosts.size());
+  // Keep track of hosts we see in new_hosts that we are able to match up with an existing host.
+  std::unordered_set<std::string> existing_hosts_for_current_priority(
+      current_priority_hosts.size());
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
     if (updated_hosts.count(host->address()->asString())) {
@@ -846,7 +847,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     auto existing_host = all_hosts_.find(host->address()->asString());
 
     if (existing_host != all_hosts_.end()) {
-      seen_hosts.emplace(existing_host->first);
+      existing_hosts_for_current_priority.emplace(existing_host->first);
       // If we find a host matched based on address, we keep it. However we do change weight inline
       // so do that here.
       if (host->weight() > max_host_weight) {
@@ -901,23 +902,29 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
       updated_hosts[host->address()->asString()] = host;
       final_hosts.push_back(host);
-      hosts_added.push_back(host);
+      hosts_added_to_current_priority.push_back(host);
     }
   }
 
-  // Do a single pass over the current_hosts and remove any that were added to the map in the
-  // previous loop
-  current_hosts.erase(std::remove_if(current_hosts.begin(), current_hosts.end(),
-                                     [&seen_hosts](auto host) {
-                                       return seen_hosts.count(host->address()->asString());
-                                     }),
-                      current_hosts.end());
+  // Remove hosts from current_priority_hosts that were matched to an existing host in the previous
+  // loop.
+  current_priority_hosts.erase(std::remove_if(current_priority_hosts.begin(),
+                                              current_priority_hosts.end(),
+                                              [&existing_hosts_for_current_priority](auto host) {
+                                                return existing_hosts_for_current_priority.count(
+                                                    host->address()->asString());
+                                              }),
+                               current_priority_hosts.end());
 
+  // The remaining hosts are hosts that are not referenced in the config update. We remove them from
+  // the priority if any of the following is true:
+  // - Active health checking is not enabled.
+  // - The removed hosts are failing active health checking.
+  // - We have explicitly configured the cluster to remove hosts regardless of active health status.
   const bool dont_remove_healthy_hosts =
       health_checker_ != nullptr && !info()->drainConnectionsOnHostRemoval();
-  // If there are removed hosts, check to see if we should only delete if unhealthy.
-  if (!current_hosts.empty() && dont_remove_healthy_hosts) {
-    for (auto i = current_hosts.begin(); i != current_hosts.end();) {
+  if (!current_priority_hosts.empty() && dont_remove_healthy_hosts) {
+    for (auto i = current_priority_hosts.begin(); i != current_priority_hosts.end();) {
       if (!(*i)->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
         if ((*i)->weight() > max_host_weight) {
           max_host_weight = (*i)->weight();
@@ -925,12 +932,15 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
         final_hosts.push_back(*i);
         updated_hosts[(*i)->address()->asString()] = *i;
-        i = current_hosts.erase(i);
+        i = current_priority_hosts.erase(i);
       } else {
         i++;
       }
     }
   }
+
+  // At this point we've accounted for all the new hosts as well the hosts that previously
+  // existed in this priority.
 
   // TODO(mattklein123): This stat is used by both the RR and LR load balancer to decide at
   // runtime whether to use either the weighted or unweighted mode. If we extend weights to
@@ -938,21 +948,21 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
   // avoid pivoting on this entirely and probably just force a host set refresh if any weights
   // change.
   info_->stats().max_host_weight_.set(max_host_weight);
-  if (!hosts_added.empty() || !current_hosts.empty()) {
-    hosts_removed = std::move(current_hosts);
-    current_hosts = std::move(final_hosts);
-    return true;
-  } else {
-    // During the search populated final_hosts with either from hosts_ or from all_hosts, so
-    // move them back into current_hosts to indicate that these are the current hosts for
-    // this priority after the update.
-    current_hosts = std::move(final_hosts);
-    // We return false here in the absence of EDS health status or metadata changes, because we
-    // have no changes to host vector status (modulo weights). When we have EDS
-    // health status or metadata changed, we return true, causing updateHosts() to fire in the
-    // caller.
-    return hosts_changed;
+
+  // Whatever remains in current_priority_hosts should be removed.
+  if (!hosts_added_to_current_priority.empty() || !current_priority_hosts.empty()) {
+    hosts_removed_from_current_priority = std::move(current_priority_hosts);
+    hosts_changed = true;
   }
+
+  // During the update we populated final_hosts with all the hosts that should remain
+  // in the current priority, so move them back into current_priority_hosts.
+  current_priority_hosts = std::move(final_hosts);
+  // We return false here in the absence of EDS health status or metadata changes, because we
+  // have no changes to host vector status (modulo weights). When we have EDS
+  // health status or metadata changed, we return true, causing updateHosts() to fire in the
+  // caller.
+  return hosts_changed;
 }
 
 StrictDnsClusterImpl::StrictDnsClusterImpl(const envoy::api::v2::Cluster& cluster,
