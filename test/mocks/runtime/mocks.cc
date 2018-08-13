@@ -18,7 +18,10 @@ MockSnapshot::MockSnapshot() { ON_CALL(*this, getInteger(_, _)).WillByDefault(Re
 
 MockSnapshot::~MockSnapshot() {}
 
-MockLoader::MockLoader() { ON_CALL(*this, snapshot()).WillByDefault(ReturnRef(snapshot_)); }
+MockLoader::MockLoader() {
+  ON_CALL(*this, snapshot()).WillByDefault(ReturnRef(snapshot_));
+  ON_CALL(*this, random()).WillByDefault(ReturnRef(random_));
+}
 
 MockLoader::~MockLoader() {}
 

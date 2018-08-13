@@ -50,7 +50,7 @@ bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& ru
   }
 
   if (!policy.runtimeKey().empty() &&
-      !runtime.snapshot().sampleFeatureEnabled(policy.runtimeKey(), 0, stable_random, 10000UL)) {
+      !runtime.snapshot().featureEnabled(policy.runtimeKey(), 0, stable_random, 10000UL)) {
     return false;
   }
 

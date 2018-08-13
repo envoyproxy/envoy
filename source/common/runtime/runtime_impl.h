@@ -64,10 +64,8 @@ public:
                std::vector<OverrideLayerConstPtr>&& layers);
 
   // Runtime::Snapshot
-  bool sampleFeatureEnabled(const std::string& key, uint64_t default_value,
-                            uint64_t num_buckets) const override;
-  bool sampleFeatureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
-                            uint64_t num_buckets) const override;
+  bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
+                      uint64_t num_buckets) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value,
                       uint64_t random_value) const override;
@@ -166,6 +164,7 @@ public:
   // Runtime::Loader
   Snapshot& snapshot() override;
   void mergeValues(const std::unordered_map<std::string, std::string>& values) override;
+  RandomGenerator& random() override;
 
 protected:
   // Identical the the public constructor but does not call loadSnapshot(). Subclasses must call

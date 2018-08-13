@@ -146,13 +146,8 @@ std::string RandomGeneratorImpl::uuid() {
   return std::string(uuid, UUID_LENGTH);
 }
 
-bool SnapshotImpl::sampleFeatureEnabled(const std::string& key, uint64_t default_value,
-                                        uint64_t num_buckets) const {
-  return sampleFeatureEnabled(key, default_value, generator_.random(), num_buckets);
-}
-
-bool SnapshotImpl::sampleFeatureEnabled(const std::string& key, uint64_t default_value,
-                                        uint64_t random_value, uint64_t num_buckets) const {
+bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
+                                  uint64_t random_value, uint64_t num_buckets) const {
   return random_value % num_buckets < std::min(getInteger(key, default_value), num_buckets);
 }
 
@@ -170,7 +165,7 @@ bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value
 
 bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value,
                                   uint64_t random_value) const {
-  return sampleFeatureEnabled(key, default_value, random_value, 100);
+  return featureEnabled(key, default_value, random_value, 100);
 }
 
 const std::string& SnapshotImpl::get(const std::string& key) const {
@@ -332,6 +327,8 @@ void LoaderImpl::mergeValues(const std::unordered_map<std::string, std::string>&
   admin_layer_.mergeValues(values);
   loadNewSnapshot();
 }
+
+RandomGenerator& LoaderImpl::random() { return generator_; }
 
 DiskBackedLoaderImpl::DiskBackedLoaderImpl(Event::Dispatcher& dispatcher,
                                            ThreadLocal::SlotAllocator& tls,
