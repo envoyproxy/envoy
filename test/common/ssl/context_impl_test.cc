@@ -15,6 +15,8 @@
 
 #include "gtest/gtest.h"
 
+using testing::NiceMock;
+
 namespace Envoy {
 namespace Ssl {
 
@@ -178,7 +180,7 @@ class SslServerContextImplTicketTest : public SslContextImplTest {
 public:
   static void loadConfig(ServerContextConfigImpl& cfg) {
     Runtime::MockLoader runtime;
-    Secret::MockSecretManager secret_manager;
+    NiceMock<Secret::MockSecretManager> secret_manager;
     ContextManagerImpl manager(runtime);
     Stats::IsolatedStoreImpl store;
     ServerContextSharedPtr server_ctx(
@@ -194,14 +196,14 @@ public:
     server_cert->mutable_private_key()->set_filename(
         TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
 
-    Secret::MockSecretManager secret_manager;
+    NiceMock<Secret::MockSecretManager> secret_manager;
     ServerContextConfigImpl server_context_config(cfg, secret_manager);
     loadConfig(server_context_config);
   }
 
   static void loadConfigJson(const std::string& json) {
     Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-    Secret::MockSecretManager secret_manager;
+    NiceMock<Secret::MockSecretManager> secret_manager;
     ServerContextConfigImpl cfg(*loader, secret_manager);
     loadConfig(cfg);
   }
@@ -359,7 +361,7 @@ class ClientContextConfigImplTest : public SslCertsTest {};
 // Validate that empty SNI (according to C string rules) fails config validation.
 TEST(ClientContextConfigImplTest, EmptyServerNameIndication) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
-  Secret::MockSecretManager secret_manager;
+  NiceMock<Secret::MockSecretManager> secret_manager;
 
   tls_context.set_sni(std::string("\000", 1));
   EXPECT_THROW_WITH_MESSAGE(
@@ -374,7 +376,7 @@ TEST(ClientContextConfigImplTest, EmptyServerNameIndication) {
 // Validate that values other than a hex-encoded SHA-256 fail config validation.
 TEST(ClientContextConfigImplTest, InvalidCertificateHash) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
-  Secret::MockSecretManager secret_manager;
+  NiceMock<Secret::MockSecretManager> secret_manager;
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
       // This is valid hex-encoded string, but it doesn't represent SHA-256 (80 vs 64 chars).
@@ -391,7 +393,7 @@ TEST(ClientContextConfigImplTest, InvalidCertificateHash) {
 // Validate that values other than a base64-encoded SHA-256 fail config validation.
 TEST(ClientContextConfigImplTest, InvalidCertificateSpki) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
-  Secret::MockSecretManager secret_manager;
+  NiceMock<Secret::MockSecretManager> secret_manager;
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context()
       // Not a base64-encoded string.
@@ -408,7 +410,7 @@ TEST(ClientContextConfigImplTest, InvalidCertificateSpki) {
 // TODO(PiotrSikora): Support multiple TLS certificates.
 TEST(ClientContextConfigImplTest, MultipleTlsCertificates) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
-  Secret::MockSecretManager secret_manager;
+  NiceMock<Secret::MockSecretManager> secret_manager;
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   EXPECT_THROW_WITH_MESSAGE(
@@ -431,7 +433,7 @@ tls_certificate:
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
 
   std::unique_ptr<Secret::SecretManager> secret_manager(new Secret::SecretManagerImpl());
-  secret_manager->addOrUpdateSecret(secret_config);
+  secret_manager->addStaticSecret(secret_config);
 
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()
@@ -465,7 +467,7 @@ tls_certificate:
 
   std::unique_ptr<Secret::SecretManager> secret_manager(new Secret::SecretManagerImpl());
 
-  secret_manager->addOrUpdateSecret(secret_config);
+  secret_manager->addStaticSecret(secret_config);
 
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()
@@ -483,7 +485,7 @@ tls_certificate:
 // TODO(PiotrSikora): Support multiple TLS certificates.
 TEST(ServerContextConfigImplTest, MultipleTlsCertificates) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
-  Secret::MockSecretManager secret_manager;
+  NiceMock<Secret::MockSecretManager> secret_manager;
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl client_context_config(tls_context, secret_manager), EnvoyException,
       "A single TLS certificate is required for server contexts");
@@ -497,7 +499,7 @@ TEST(ServerContextConfigImplTest, MultipleTlsCertificates) {
 // TlsCertificate messages must have a cert for servers.
 TEST(ServerContextImplTest, TlsCertificateNonEmpty) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
-  Secret::MockSecretManager secret_manager;
+  NiceMock<Secret::MockSecretManager> secret_manager;
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   ServerContextConfigImpl client_context_config(tls_context, secret_manager);
   Runtime::MockLoader runtime;
@@ -512,7 +514,7 @@ TEST(ServerContextImplTest, TlsCertificateNonEmpty) {
 // Cannot ignore certificate expiration without a trusted CA.
 TEST(ServerContextConfigImplTest, InvalidIgnoreCertsNoCA) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
-  Secret::MockSecretManager secret_manager;
+  NiceMock<Secret::MockSecretManager> secret_manager;
 
   envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
       tls_context.mutable_common_tls_context()->mutable_validation_context();

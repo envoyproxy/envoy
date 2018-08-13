@@ -39,10 +39,9 @@ public:
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
     NiceMock<MockClusterManager> cm;
     envoy::api::v2::Cluster cluster_config = parseClusterFromJson(json);
-    Envoy::Stats::ScopePtr scope = stats_store_.createScope(
-        fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                       ? cluster_config.name()
-                                       : std::string(cluster_config.alt_stat_name())));
+    Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
+        "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                              : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
     cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,
@@ -58,10 +57,9 @@ public:
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
     NiceMock<MockClusterManager> cm;
     envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
-    Envoy::Stats::ScopePtr scope = stats_store_.createScope(
-        fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                       ? cluster_config.name()
-                                       : std::string(cluster_config.alt_stat_name())));
+    Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
+        "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                              : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
     cluster_.reset(new LogicalDnsCluster(cluster_config, runtime_, dns_resolver_, tls_,

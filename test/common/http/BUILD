@@ -206,6 +206,22 @@ envoy_cc_test(
     ],
 )
 
+envoy_proto_library(
+    name = "utility_fuzz_proto",
+    srcs = ["utility_fuzz.proto"],
+)
+
+envoy_cc_fuzz_test(
+    name = "utility_fuzz_test",
+    srcs = ["utility_fuzz_test.cc"],
+    corpus = "utility_corpus",
+    deps = [
+        ":utility_fuzz_proto",
+        "//source/common/http:utility_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],

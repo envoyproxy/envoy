@@ -46,12 +46,7 @@ public:
             route_config:
               name: "routes"
               routes:
-                - match:
-                    method_name: "execute"
-                  route:
-                    cluster: "cluster_0"
-                - match:
-                    method_name: "poke"
+                - match: {}
                   route:
                     cluster: "cluster_0"
       )EOF";
@@ -268,6 +263,24 @@ TEST_P(ThriftConnManagerIntegrationTest, Oneway) {
   EXPECT_EQ(request_bytes_.toString(), upstream_request.toString());
 
   tcp_client->close();
+
+  Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_oneway");
+  EXPECT_EQ(1U, counter->value());
+}
+
+TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClose) {
+  initializeOneway();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->write(request_bytes_.toString());
+  tcp_client->close();
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
+  Buffer::OwnedImpl upstream_request(data);
+  EXPECT_EQ(request_bytes_.toString(), upstream_request.toString());
 
   Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_oneway");
   EXPECT_EQ(1U, counter->value());

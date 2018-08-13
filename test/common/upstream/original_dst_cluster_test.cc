@@ -67,10 +67,9 @@ public:
 
   void setup(const envoy::api::v2::Cluster& cluster_config) {
     NiceMock<MockClusterManager> cm;
-    Envoy::Stats::ScopePtr scope = stats_store_.createScope(
-        fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                       ? cluster_config.name()
-                                       : std::string(cluster_config.alt_stat_name())));
+    Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
+        "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                              : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
     cluster_.reset(

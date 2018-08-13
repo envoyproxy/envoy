@@ -517,8 +517,8 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
-  const std::string logging_action = "<form action='/logging' method='post'";
-  const std::string stats_href = "<a href='/stats'";
+  const std::string logging_action = "<form action='logging' method='post'";
+  const std::string stats_href = "<a href='stats'";
   EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0));
   EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0));
 }
@@ -750,8 +750,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 TEST_P(AdminInstanceTest, GetRequest) {
   Http::HeaderMapImpl response_headers;
   std::string body;
-  EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", Http::Utility::QueryParams(), "GET",
-                                           response_headers, body));
+  EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
   EXPECT_TRUE(absl::StartsWith(body, "envoy ")) << body;
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
               HasSubstr("text/plain"));
@@ -760,9 +759,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
 TEST_P(AdminInstanceTest, GetRequestJson) {
   Http::HeaderMapImpl response_headers;
   std::string body;
-  EXPECT_EQ(Http::Code::OK,
-            admin_.request("/stats", Http::Utility::QueryParams({{"format", "json"}}), "GET",
-                           response_headers, body));
+  EXPECT_EQ(Http::Code::OK, admin_.request("/stats?format=json", "GET", response_headers, body));
   EXPECT_THAT(body, HasSubstr("{\"stats\":["));
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
               HasSubstr("application/json"));
@@ -771,9 +768,8 @@ TEST_P(AdminInstanceTest, GetRequestJson) {
 TEST_P(AdminInstanceTest, PostRequest) {
   Http::HeaderMapImpl response_headers;
   std::string body;
-  EXPECT_NO_LOGS(
-      EXPECT_EQ(Http::Code::OK, admin_.request("/healthcheck/fail", Http::Utility::QueryParams(),
-                                               "POST", response_headers, body)));
+  EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::OK,
+                           admin_.request("/healthcheck/fail", "POST", response_headers, body)));
   EXPECT_EQ(body, "OK\n");
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
               HasSubstr("text/plain"));

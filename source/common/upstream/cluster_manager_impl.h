@@ -372,6 +372,7 @@ private:
   typedef std::map<std::string, ClusterDataPtr> ClusterMap;
 
   struct PendingUpdates {
+    ~PendingUpdates() { disableTimer(); }
     void enableTimer(const uint64_t timeout) {
       ASSERT(!timer_enabled_);
       if (timer_ != nullptr) {

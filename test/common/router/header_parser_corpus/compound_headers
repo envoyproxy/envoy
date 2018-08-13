@@ -1,0 +1,67 @@
+headers_to_add {
+  header {
+    key: "x-request-start"
+    value: "%"
+  }
+}
+headers_to_add {
+  header {
+    key: "x-prefix"
+    value: "prefix-%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+  }
+}
+headers_to_add {
+  header {
+    key: "x-suffix"
+    value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%-suffix"
+  }
+}
+headers_to_add {
+  header {
+    key: "x-both"
+    value: "prefix-%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%-suffix"
+  }
+}
+headers_to_add {
+  header {
+    key: "x-escaping-1"
+    value: "%%%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%%%"
+  }
+}
+headers_to_add {
+  header {
+    key: "x-escaping-2"
+    value: "%%%%%%"
+  }
+}
+headers_to_add {
+  header {
+    key: "x-multi"
+    value: "%PROTOCOL% from %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+  }
+}
+headers_to_add {
+  header {
+    key: "x-multi-back-to-back"
+    value: "%PROTOCOL%%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+  }
+}
+headers_to_add {
+  header {
+    key: "x-metadata"
+    value: "%UPSTREAM_METADATA([\"namespace\", \"%key%\"])%"
+  }
+}
+request_info {
+  upstream_metadata {
+    filter_metadata {
+      key: "namespace"
+      value: {
+        fields {
+          key: "%key%"
+          value: { string_value: "value" }
+        }
+      }
+    }
+  }
+}

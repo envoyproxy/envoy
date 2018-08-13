@@ -27,7 +27,8 @@ public:
                              Upstream::ClusterManager& cluster_manager,
                              const absl::optional<std::chrono::milliseconds>& timeout,
                              const std::string& path_prefix,
-                             const std::vector<Http::LowerCaseString>& response_headers_to_remove);
+                             const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers,
+                             const Http::LowerCaseStrUnorderedSet& allowed_request_headers);
   ~RawHttpClientImpl();
 
   // ExtAuthz::Client
@@ -42,7 +43,8 @@ public:
 private:
   const std::string cluster_name_;
   const std::string path_prefix_;
-  const std::vector<Http::LowerCaseString> response_headers_to_remove_;
+  const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers_;
+  const Http::LowerCaseStrUnorderedSet& allowed_request_headers_;
   absl::optional<std::chrono::milliseconds> timeout_;
   Upstream::ClusterManager& cm_;
   Http::AsyncClient::Request* request_{};

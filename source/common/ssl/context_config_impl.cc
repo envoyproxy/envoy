@@ -16,23 +16,28 @@ namespace Ssl {
 
 namespace {
 
-std::string readConfig(
-    const envoy::api::v2::auth::CommonTlsContext& config, Secret::SecretManager& secret_manager,
-    const std::function<std::string(const envoy::api::v2::auth::TlsCertificate& tls_certificate)>&
-        read_inline_config,
-    const std::function<std::string(const Ssl::TlsCertificateConfig& secret)>& read_secret) {
+Secret::TlsCertificateConfigProviderSharedPtr
+getTlsCertificateConfigProvider(const envoy::api::v2::auth::CommonTlsContext& config,
+                                Secret::SecretManager& secret_manager) {
   if (!config.tls_certificates().empty()) {
-    return read_inline_config(config.tls_certificates()[0]);
-  } else if (!config.tls_certificate_sds_secret_configs().empty()) {
-    auto name = config.tls_certificate_sds_secret_configs()[0].name();
-    const Ssl::TlsCertificateConfig* secret = secret_manager.findTlsCertificate(name);
-    if (!secret) {
-      throw EnvoyException(fmt::format("Static secret is not defined: {}", name));
+    const auto& tls_certificate = config.tls_certificates(0);
+    if (!tls_certificate.has_certificate_chain() && !tls_certificate.has_private_key()) {
+      return nullptr;
     }
-    return read_secret(*secret);
-  } else {
-    return EMPTY_STRING;
+    return secret_manager.createInlineTlsCertificateProvider(config.tls_certificates(0));
   }
+  if (!config.tls_certificate_sds_secret_configs().empty()) {
+    const auto& sds_secret_config = config.tls_certificate_sds_secret_configs(0);
+
+    auto secret_provider =
+        secret_manager.findStaticTlsCertificateProvider(sds_secret_config.name());
+    if (!secret_provider) {
+      throw EnvoyException(
+          fmt::format("Static secret is not defined: {}", sds_secret_config.name()));
+    }
+    return secret_provider;
+  }
+  return nullptr;
 }
 
 } // namespace
@@ -62,35 +67,13 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), DEFAULT_ECDH_CURVES)),
       ca_cert_(Config::DataSource::read(config.validation_context().trusted_ca(), true)),
-      ca_cert_path_(Config::DataSource::getPath(config.validation_context().trusted_ca())),
+      ca_cert_path_(Config::DataSource::getPath(config.validation_context().trusted_ca())
+                        .value_or(EMPTY_STRING)),
       certificate_revocation_list_(
           Config::DataSource::read(config.validation_context().crl(), true)),
       certificate_revocation_list_path_(
-          Config::DataSource::getPath(config.validation_context().crl())),
-      cert_chain_(readConfig(
-          config, secret_manager,
-          [](const envoy::api::v2::auth::TlsCertificate& tls_certificate) -> std::string {
-            return Config::DataSource::read(tls_certificate.certificate_chain(), true);
-          },
-          [](const Ssl::TlsCertificateConfig& secret) -> std::string {
-            return secret.certificateChain();
-          })),
-      cert_chain_path_(
-          config.tls_certificates().empty()
-              ? ""
-              : Config::DataSource::getPath(config.tls_certificates()[0].certificate_chain())),
-      private_key_(readConfig(
-          config, secret_manager,
-          [](const envoy::api::v2::auth::TlsCertificate& tls_certificate) -> std::string {
-            return Config::DataSource::read(tls_certificate.private_key(), true);
-          },
-          [](const Ssl::TlsCertificateConfig& secret) -> std::string {
-            return secret.privateKey();
-          })),
-      private_key_path_(
-          config.tls_certificates().empty()
-              ? ""
-              : Config::DataSource::getPath(config.tls_certificates()[0].private_key())),
+          Config::DataSource::getPath(config.validation_context().crl()).value_or(EMPTY_STRING)),
+      tls_certficate_provider_(getTlsCertificateConfigProvider(config, secret_manager)),
       verify_subject_alt_name_list_(config.validation_context().verify_subject_alt_name().begin(),
                                     config.validation_context().verify_subject_alt_name().end()),
       verify_certificate_hash_list_(config.validation_context().verify_certificate_hash().begin(),

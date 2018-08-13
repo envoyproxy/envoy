@@ -12,6 +12,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
@@ -112,6 +113,26 @@ parseClusterSocketOptions(const envoy::api::v2::Cluster& config,
   return cluster_options;
 }
 
+std::map<std::string, ProtocolOptionsConfigConstSharedPtr>
+parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
+  std::map<std::string, ProtocolOptionsConfigConstSharedPtr> options;
+  for (const auto& iter : config.extension_protocol_options()) {
+    const std::string& name = iter.first;
+    const ProtobufWkt::Struct& config_struct = iter.second;
+
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<
+        Server::Configuration::NamedNetworkFilterConfigFactory>(name);
+
+    auto object = factory.createProtocolOptionsConfig(
+        *Envoy::Config::Utility::translateToFactoryProtocolOptionsConfig(config_struct, factory));
+    if (object) {
+      options[name] = object;
+    }
+  }
+
+  return options;
+}
+
 } // namespace
 
 Host::CreateConnectionData
@@ -184,10 +205,10 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
   healthy_hosts_per_locality_ = std::move(healthy_hosts_per_locality);
   locality_weights_ = std::move(locality_weights);
   // Rebuild the locality scheduler by computing the effective weight of each
-  // locality in this priority. No scheduler is built if we don't have locality weights
-  // (i.e. not using EDS) or when there are 0 healthy hosts in this priority.
+  // locality in this priority. The scheduler is reset by default, and is rebuilt only if we have
+  // locality weights (i.e. using EDS) and there is at least one healthy host in this priority.
   //
-  // We omit building a scheduler when there are zero healhty hosts in the priority as all
+  // We omit building a scheduler when there are zero healthy hosts in the priority as all
   // the localities will have zero effective weight. At selection time, we'll only ever try
   // to select a host from such a priority if all priorities have zero healthy hosts. At
   // that point we'll rely on other mechanisms such as panic mode to select a host,
@@ -198,6 +219,7 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
   // could just update locality_weight_ without rebuilding. Similar to how host
   // level WRR works, we would age out the existing entries via picks and lazily
   // apply the new weights.
+  locality_scheduler_ = nullptr;
   if (hosts_per_locality_ != nullptr && locality_weights_ != nullptr &&
       !locality_weights_->empty() && !healthy_hosts_->empty()) {
     locality_scheduler_ = std::make_unique<EdfScheduler<LocalityEntry>>();
@@ -209,8 +231,10 @@ void HostSetImpl::updateHosts(HostVectorConstSharedPtr hosts,
         locality_scheduler_->add(effective_weight, locality_entries_.back());
       }
     }
-  } else {
-    locality_scheduler_ = nullptr;
+    // If all effective weights were zero, reset the scheduler.
+    if (locality_scheduler_->empty()) {
+      locality_scheduler_ = nullptr;
+    }
   }
   runUpdateCallbacks(hosts_added, hosts_removed);
 }
@@ -283,6 +307,7 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       features_(parseFeatures(config)),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
+      extension_protocol_options_(parseExtensionProtocolOptions(config)),
       resource_managers_(config, runtime, name_),
       maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
       source_address_(getSourceAddress(config, bind_config)),
@@ -334,13 +359,24 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
   }
 }
 
+ProtocolOptionsConfigConstSharedPtr
+ClusterInfoImpl::extensionProtocolOptions(const std::string& name) const {
+  auto i = extension_protocol_options_.find(name);
+  if (i != extension_protocol_options_.end()) {
+    return i->second;
+  }
+
+  return nullptr;
+}
+
 namespace {
 
 Stats::ScopePtr generateStatsScope(const envoy::api::v2::Cluster& config, Stats::Store& stats) {
-  return stats.createScope(fmt::format("cluster.{}.", config.alt_stat_name().empty()
-                                                          ? config.name()
-                                                          : std::string(config.alt_stat_name())));
+  return stats.createScope(fmt::format(
+      "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
 }
+
+} // namespace
 
 Network::TransportSocketFactoryPtr createTransportSocketFactory(
     const envoy::api::v2::Cluster& config,
@@ -365,8 +401,6 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
       Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
   return config_factory.createTransportSocketFactory(*message, factory_context);
 }
-
-} // namespace
 
 ClusterSharedPtr ClusterImplBase::create(
     const envoy::api::v2::Cluster& cluster, ClusterManager& cm, Stats::Store& stats,
