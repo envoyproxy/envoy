@@ -26,10 +26,26 @@ enum class HeaderProtocolType {
   LastHeaderProtocolType = Compact,
 };
 
+// Fixed portion of frame header:
+//   Header magic: 2 bytes +
+//   Flags: 2 bytes +
+//   Sequence number: 4 bytes
+//   Header data size: 2 bytes
+constexpr uint64_t MIN_FRAME_START_SIZE_NO_HEADERS = 10;
+
+// Minimum frame size: fixed portion of frame header + 4 bytes of header data (the minimum)
+constexpr int32_t MIN_FRAME_START_SIZE = MIN_FRAME_START_SIZE_NO_HEADERS + 4;
+
+// Minimum to start decoding: 4 bytes of frame size + the fixed portion of the frame header
+constexpr uint64_t MIN_DECODE_BYTES = MIN_FRAME_START_SIZE_NO_HEADERS + 4;
+
+// Maximum size for header data.
+constexpr int32_t MAX_HEADERS_SIZE = 65536;
+
 } // namespace
 
 bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMetadata& metadata) {
-  if (buffer.length() < 14) {
+  if (buffer.length() < MIN_DECODE_BYTES) {
     return false;
   }
 
@@ -38,7 +54,7 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
 
   // Minimum header frame size is 18 bytes (4 bytes of frame size + 10 bytes of fixed header +
   // minimum 4 bytes of variable header data), so frame_size must be at least 14.
-  if (frame_size < 14 || frame_size > MaxFrameSize) {
+  if (frame_size < MIN_FRAME_START_SIZE || frame_size > MaxFrameSize) {
     throw EnvoyException(fmt::format("invalid thrift header transport frame size {}", frame_size));
   }
 
@@ -54,7 +70,7 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
   // offset 12: 16 bit (remaining) header size / 4 (spec erroneously claims / 32).
   int16_t raw_header_size = BufferHelper::peekI16(buffer, 12);
   int32_t header_size = static_cast<int32_t>(raw_header_size) * 4;
-  if (header_size < 0 || header_size > MaxHeadersSize) {
+  if (header_size < 0 || header_size > MAX_HEADERS_SIZE) {
     throw EnvoyException(fmt::format("invalid thrift header transport header size {} ({:04x})",
                                      header_size, static_cast<uint16_t>(raw_header_size)));
   }
@@ -63,18 +79,19 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
     throw EnvoyException("no header data");
   }
 
-  if (buffer.length() < static_cast<uint64_t>(header_size) + 14) {
+  if (buffer.length() < static_cast<uint64_t>(header_size) + MIN_DECODE_BYTES) {
     // Need more header data.
     return false;
   }
 
   // Header data starts at offset 14 (4 bytes of frame size followed by 10 bytes of fixed header).
-  buffer.drain(14);
+  buffer.drain(MIN_DECODE_BYTES);
 
   // Remaining frame size is the original frame size (which does not count itself), less the 10
   // fixed bytes of the header (magic, flags, etc), less the size of the variable header data
   // (header_size).
-  metadata.setFrameSize(static_cast<uint32_t>(frame_size - header_size - 10));
+  metadata.setFrameSize(
+      static_cast<uint32_t>(frame_size - header_size - MIN_FRAME_START_SIZE_NO_HEADERS));
   metadata.setSequenceId(seq_id);
 
   ProtocolType proto = ProtocolType::Auto;
@@ -156,7 +173,7 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
   }
 
   const HeaderMap& headers = metadata.headers();
-  if (headers.size() > MaxHeadersSize / 2) {
+  if (headers.size() > MAX_HEADERS_SIZE / 2) {
     // Each header takes a minimum of 2 bytes, yielding this limit.
     throw EnvoyException(
         fmt::format("invalid thrift header transport too many headers {}", headers.size()));
@@ -201,13 +218,13 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
   header_buffer.add("\0\0\0\0", padding);
   header_size += padding;
 
-  if (header_size > MaxHeadersSize) {
+  if (header_size > MAX_HEADERS_SIZE) {
     throw EnvoyException(
         fmt::format("invalid thrift header transport header size {}", header_size));
   }
 
   // Frame size does not include the frame length itself.
-  uint64_t size = header_size + msg_size + 10;
+  uint64_t size = header_size + msg_size + MIN_FRAME_START_SIZE_NO_HEADERS;
   if (size > MaxFrameSize) {
     throw EnvoyException(fmt::format("invalid thrift header transport frame size {}", size));
   }

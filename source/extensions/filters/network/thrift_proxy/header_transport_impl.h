@@ -36,11 +36,10 @@ public:
 
   static bool isMagic(uint16_t word) { return word == Magic; }
 
-  static const int32_t MaxFrameSize = 0x3FFFFFFF;
+  static constexpr int32_t MaxFrameSize = 0x3FFFFFFF;
 
 private:
-  static const int32_t MaxHeadersSize = 65536;
-  static const uint16_t Magic = 0x0FFF;
+  static constexpr uint16_t Magic = 0x0FFF;
 
   static int16_t drainVarIntI16(Buffer::Instance& buffer, int32_t& header_size, const char* desc);
   static int32_t drainVarIntI32(Buffer::Instance& buffer, int32_t& header_size, const char* desc);
