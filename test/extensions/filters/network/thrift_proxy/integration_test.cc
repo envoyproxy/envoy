@@ -53,11 +53,11 @@ public:
                 - match:
                     method_name: "execute"
                   route:
-                    cluster: "cluster_0"
+                    cluster: "cluster_1"
                 - match:
                     method_name: "poke"
                   route:
-                    cluster: "cluster_0"
+                    cluster: "cluster_2"
       )EOF";
   }
 
@@ -82,8 +82,7 @@ public:
     preparePayloads(result_mode, "execute");
     ASSERT(request_bytes_.length() > 0);
     ASSERT(response_bytes_.length() > 0);
-
-    BaseIntegrationTest::initialize();
+    initializeCommon();
   }
 
   void initializeOneway() {
@@ -92,6 +91,25 @@ public:
     preparePayloads("success", "poke");
     ASSERT(request_bytes_.length() > 0);
     ASSERT(response_bytes_.length() == 0);
+
+    initializeCommon();
+  }
+
+
+  // We allocate as many upstreams as there are clusters, with each upstream being allocated
+  // to clusters in the order they're defined in the bootstrap config.
+  void initializeCommon() {
+    setUpstreamCount(3);
+
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      auto* c1 = bootstrap.mutable_static_resources()->add_clusters();
+      c1->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      c1->set_name("cluster_1");
+
+      auto* c2 = bootstrap.mutable_static_resources()->add_clusters();
+      c2->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      c2->set_name("cluster_2");
+    });
 
     BaseIntegrationTest::initialize();
   }
@@ -149,6 +167,20 @@ protected:
     }
   }
 
+  // Multiplexed requests are handled by the service name route match,
+  // while oneway's are handled by the "poke" method. All other requests
+  // are handled by "execute".
+  FakeUpstream* getExpectedUpstream(bool oneway) {
+    int upstreamIdx = 1;
+    if (multiplexed_) {
+      upstreamIdx = 0;
+    } else if (oneway) {
+      upstreamIdx = 2;
+    }
+
+    return fake_upstreams_[upstreamIdx].get();
+  }
+
   std::string transport_;
   std::string protocol_;
   bool multiplexed_;
@@ -185,7 +217,8 @@ TEST_P(ThriftConnManagerIntegrationTest, Success) {
   tcp_client->write(request_bytes_.toString());
 
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  FakeUpstream* expected_upstream = getExpectedUpstream(false);
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
   Buffer::OwnedImpl upstream_request(data);
@@ -210,8 +243,9 @@ TEST_P(ThriftConnManagerIntegrationTest, IDLException) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(request_bytes_.toString());
 
+  FakeUpstream* expected_upstream = getExpectedUpstream(false);
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
   Buffer::OwnedImpl upstream_request(data);
@@ -236,8 +270,9 @@ TEST_P(ThriftConnManagerIntegrationTest, Exception) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(request_bytes_.toString());
 
+  FakeUpstream* expected_upstream = getExpectedUpstream(false);
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
   Buffer::OwnedImpl upstream_request(data);
@@ -262,8 +297,9 @@ TEST_P(ThriftConnManagerIntegrationTest, Oneway) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(request_bytes_.toString());
 
+  FakeUpstream* expected_upstream = getExpectedUpstream(true);
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
   Buffer::OwnedImpl upstream_request(data);
