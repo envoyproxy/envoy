@@ -173,7 +173,7 @@ public:
                          ClusterManager& cm));
 
 private:
-  Secret::MockSecretManager secret_manager_;
+  NiceMock<Secret::MockSecretManager> secret_manager_;
 };
 
 class MockClusterManager : public ClusterManager {

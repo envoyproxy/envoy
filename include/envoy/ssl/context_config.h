@@ -60,6 +60,7 @@ public:
    */
   virtual const std::string& certificateRevocationListPath() const PURE;
 
+  // TODO(lizan): consider refactor 4 methods below to Ssl::TlsCertificateConfig
   /**
    * @return The certificate chain used to identify the local side.
    */

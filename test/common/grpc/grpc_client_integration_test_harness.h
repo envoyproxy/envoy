@@ -499,7 +499,7 @@ public:
   }
 
   bool use_client_cert_{};
-  Secret::MockSecretManager secret_manager_;
+  NiceMock<Secret::MockSecretManager> secret_manager_;
 };
 
 } // namespace

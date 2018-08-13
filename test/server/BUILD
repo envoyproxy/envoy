@@ -122,6 +122,7 @@ envoy_cc_test(
         "//source/extensions/resource_monitors/common:factory_base_lib",
         "//source/server:overload_manager_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
