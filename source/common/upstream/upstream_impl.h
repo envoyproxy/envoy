@@ -167,9 +167,6 @@ public:
   bool healthFlagGet(HealthFlag flag) const override { return health_flags_ & enumToInt(flag); }
   void healthFlagSet(HealthFlag flag) override { health_flags_ |= enumToInt(flag); }
 
-  void failureTypeFlagClear() override {
-    failure_type_flag_ = enumToInt(Host::FailureTypeFlag::UNKNOWN);
-  }
   bool failureTypeFlagGet(FailureTypeFlag flag) const override {
     return (failure_type_flag_ == enumToInt(flag));
   }

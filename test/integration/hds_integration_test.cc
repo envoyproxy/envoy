@@ -155,7 +155,7 @@ public:
     health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("crete");
 
     health_check->add_health_checks()->mutable_timeout()->set_nanos(900000000);
-    health_check->mutable_health_checks(0)->mutable_interval()->set_nanos(600000000);
+    health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
     health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
     auto* tcp_hc = health_check->mutable_health_checks(0)->mutable_tcp_health_check();
@@ -336,8 +336,6 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
   ASSERT_TRUE(
       host_fake_raw_connection_->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
-
-  host_upstream_->set_allow_unexpected_disconnects(true);
 
   // No response from the endpoint
 

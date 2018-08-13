@@ -140,7 +140,6 @@ public:
   MOCK_CONST_METHOD0(gauges, std::vector<Stats::GaugeSharedPtr>());
   MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
   MOCK_METHOD1(healthFlagClear, void(HealthFlag flag));
-  MOCK_METHOD0(failureTypeFlagClear, void());
   MOCK_CONST_METHOD1(healthFlagGet, bool(HealthFlag flag));
   MOCK_CONST_METHOD1(failureTypeFlagGet, bool(FailureTypeFlag flag));
   MOCK_METHOD1(healthFlagSet, void(HealthFlag flag));

@@ -108,11 +108,6 @@ public:
   virtual bool healthy() const PURE;
 
   /**
-   * Clear a failure type flag for a host. Flags are specified in FailureTypeFlag.
-   */
-  virtual void failureTypeFlagClear() PURE;
-
-  /**
    * Get whether a failure flag is set for a host. Flags are specified in
    * FailureTypeFlag.
    */
