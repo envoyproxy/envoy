@@ -895,7 +895,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
         max_host_weight = host->weight();
       }
 
-      // If we are depending on a health checker, determine what to initialize the new host
+      // If we are depending on a health checker, we initialize to unhealthy.
       if (health_checker_ != nullptr) {
         host->healthFlagSet(Host::HealthFlag::FAILED_ACTIVE_HC);
       }
