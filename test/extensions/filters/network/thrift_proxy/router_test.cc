@@ -825,7 +825,6 @@ routes:
   EXPECT_THROW(new RouteMatcher(config), EnvoyException);
 }
 
-
 TEST(RouteMatcherTest, RouteByServiceNameWithNoInversion) {
   const std::string yaml = R"EOF(
 name: config

@@ -95,7 +95,6 @@ public:
     initializeCommon();
   }
 
-
   // We allocate as many upstreams as there are clusters, with each upstream being allocated
   // to clusters in the order they're defined in the bootstrap config.
   void initializeCommon() {
