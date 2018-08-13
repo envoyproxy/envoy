@@ -2,7 +2,7 @@
 
 #include "envoy/request_info/request_info.h"
 
-#include "common/request_info/dynamic_metadata_impl.h"
+#include "common/request_info/filter_state_impl.h"
 
 namespace Envoy {
 
@@ -156,10 +156,10 @@ public:
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  const ::Envoy::RequestInfo::DynamicMetadata& dynamicMetadata2() const override {
+  const ::Envoy::RequestInfo::FilterState& dynamicMetadata2() const override {
     return metadata2_;
   }
-  ::Envoy::RequestInfo::DynamicMetadata& dynamicMetadata2() override { return metadata2_; }
+  ::Envoy::RequestInfo::FilterState& dynamicMetadata2() override { return metadata2_; }
 
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;

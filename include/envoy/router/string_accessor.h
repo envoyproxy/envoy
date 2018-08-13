@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
-#include "envoy/request_info/dynamic_metadata.h"
+#include "envoy/request_info/filter_state.h"
 
 #include "absl/strings/string_view.h"
 
@@ -9,11 +9,11 @@ namespace Envoy {
 namespace Router {
 
 /**
- * Contains a string in a form which is usable with DynamicMetadata and
+ * Contains a string in a form which is usable with FilterState and
  * allows lazy evaluation if needed. All values meant to be accessible to the
  * custom request/response header mechanism must use this type.
  */
-class StringAccessor : public ::Envoy::RequestInfo::DynamicMetadata::Object {
+class StringAccessor : public ::Envoy::RequestInfo::FilterState::Object {
 public:
   /**
    * @return the string the accessor represents.

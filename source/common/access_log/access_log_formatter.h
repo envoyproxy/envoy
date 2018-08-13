@@ -199,7 +199,7 @@ private:
 };
 
 /**
- * Formatter based on the DynamicMetadata from RequestInfo.
+ * Formatter based on the FilterState from RequestInfo.
  */
 class DynamicMetadataFormatter : public Formatter, MetadataFormatter {
 public:

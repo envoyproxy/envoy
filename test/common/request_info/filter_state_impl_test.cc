@@ -1,6 +1,6 @@
 #include "envoy/common/exception.h"
 
-#include "common/request_info/dynamic_metadata_impl.h"
+#include "common/request_info/filter_state_impl.h"
 
 #include "test/test_common/utility.h"
 
@@ -10,7 +10,7 @@ namespace Envoy {
 namespace RequestInfo {
 namespace {
 
-class TestStoredTypeTracking : public DynamicMetadata::Object {
+class TestStoredTypeTracking : public FilterState::Object {
 public:
   TestStoredTypeTracking(int value, size_t* access_count, size_t* destruction_count)
       : value_(value), access_count_(access_count), destruction_count_(destruction_count) {}
@@ -33,7 +33,7 @@ private:
   size_t* destruction_count_;
 };
 
-class SimpleType : public DynamicMetadata::Object {
+class SimpleType : public FilterState::Object {
 public:
   SimpleType(int value) : value_(value) {}
 
@@ -48,7 +48,7 @@ public:
   DynamicMetadataImplTest() { resetDynamicMetadata(); }
 
   void resetDynamicMetadata() { dynamic_metadata_ = std::make_unique<DynamicMetadataImpl>(); }
-  DynamicMetadata& dynamic_metadata() { return *dynamic_metadata_; }
+  FilterState& dynamic_metadata() { return *dynamic_metadata_; }
 
 private:
   std::unique_ptr<DynamicMetadataImpl> dynamic_metadata_;
@@ -110,7 +110,7 @@ TEST_F(DynamicMetadataImplTest, NameConflict) {
   dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(1));
   EXPECT_THROW_WITH_MESSAGE(dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(2)),
                             EnvoyException,
-                            "DynamicMetadata::setData<T> called twice with same name.");
+                            "FilterState::setData<T> called twice with same name.");
   EXPECT_EQ(1, dynamic_metadata().getData<SimpleType>("test_1").access());
 }
 
@@ -119,12 +119,12 @@ TEST_F(DynamicMetadataImplTest, NameConflictDifferentTypes) {
   EXPECT_THROW_WITH_MESSAGE(
       dynamic_metadata().setData("test_1",
                                  std::make_unique<TestStoredTypeTracking>(2, nullptr, nullptr)),
-      EnvoyException, "DynamicMetadata::setData<T> called twice with same name.");
+      EnvoyException, "FilterState::setData<T> called twice with same name.");
 }
 
 TEST_F(DynamicMetadataImplTest, UnknownName) {
   EXPECT_THROW_WITH_MESSAGE(dynamic_metadata().getData<SimpleType>("test_1"), EnvoyException,
-                            "DynamicMetadata::getData<T> called for unknown data name.");
+                            "FilterState::getData<T> called for unknown data name.");
 }
 
 TEST_F(DynamicMetadataImplTest, WrongTypeGet) {
@@ -137,7 +137,7 @@ TEST_F(DynamicMetadataImplTest, WrongTypeGet) {
 
 namespace {
 
-class A : public DynamicMetadata::Object {};
+class A : public FilterState::Object {};
 
 class B : public A {};
 

@@ -5,7 +5,7 @@
 
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
-#include "common/request_info/dynamic_metadata_impl.h"
+#include "common/request_info/filter_state_impl.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
 #include "common/router/string_accessor_impl.h"
@@ -185,7 +185,7 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDynamicMetadataVariable) {
 
 namespace {
 
-class IntAccessor : public ::Envoy::RequestInfo::DynamicMetadata::Object {
+class IntAccessor : public ::Envoy::RequestInfo::FilterState::Object {
 public:
   IntAccessor(int value) : value_(value) {}
 

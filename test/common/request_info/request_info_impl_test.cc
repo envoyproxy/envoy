@@ -2,7 +2,7 @@
 #include <functional>
 
 #include "envoy/http/protocol.h"
-#include "envoy/request_info/dynamic_metadata.h"
+#include "envoy/request_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
 
 #include "common/common/fmt.h"
@@ -117,7 +117,7 @@ TEST(RequestInfoImplTest, ResponseFlagTest) {
 
 namespace {
 
-class IntAccessor : public DynamicMetadata::Object {
+class IntAccessor : public FilterState::Object {
 public:
   IntAccessor(int value) : value_(value) {}
 

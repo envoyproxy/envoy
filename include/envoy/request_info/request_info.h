@@ -8,7 +8,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/http/protocol.h"
-#include "envoy/request_info/dynamic_metadata.h"
+#include "envoy/request_info/filter_state.h"
 #include "envoy/upstream/upstream.h"
 
 #include "absl/types/optional.h"
@@ -307,8 +307,8 @@ public:
    * TODO(rdsmith): Replace uses of above with this object.
    * @return the dynamic metadata associated with this request.
    */
-  virtual DynamicMetadata& dynamicMetadata2() PURE;
-  virtual const DynamicMetadata& dynamicMetadata2() const PURE;
+  virtual FilterState& dynamicMetadata2() PURE;
+  virtual const FilterState& dynamicMetadata2() const PURE;
 };
 
 } // namespace RequestInfo

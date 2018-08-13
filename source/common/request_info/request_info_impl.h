@@ -6,7 +6,7 @@
 #include "envoy/request_info/request_info.h"
 
 #include "common/common/assert.h"
-#include "common/request_info/dynamic_metadata_impl.h"
+#include "common/request_info/filter_state_impl.h"
 
 namespace Envoy {
 namespace RequestInfo {
@@ -179,8 +179,8 @@ struct RequestInfoImpl : public RequestInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  DynamicMetadata& dynamicMetadata2() override { return metadata2_; }
-  const DynamicMetadata& dynamicMetadata2() const override { return metadata2_; }
+  FilterState& dynamicMetadata2() override { return metadata2_; }
+  const FilterState& dynamicMetadata2() const override { return metadata2_; }
 
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;

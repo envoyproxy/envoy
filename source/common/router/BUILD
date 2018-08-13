@@ -224,7 +224,7 @@ envoy_cc_library(
     hdrs = ["header_formatter.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/request_info:dynamic_metadata_interface",
+        "//include/envoy/request_info:filter_state_interface",
         "//include/envoy/request_info:request_info_interface",
         "//include/envoy/router:string_accessor_interface",
         "//source/common/access_log:access_log_formatter_lib",

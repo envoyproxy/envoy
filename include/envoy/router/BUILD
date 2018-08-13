@@ -71,6 +71,6 @@ envoy_cc_library(
     hdrs = ["string_accessor.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/request_info:dynamic_metadata_interface",
+        "//include/envoy/request_info:filter_state_interface",
     ],
 )
