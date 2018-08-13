@@ -854,7 +854,8 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
 }
 
 // Validate that [Test]HeaderMapImpl copy construction works. This is a
-// regression for where we were missing a valid copy constructor.
+// regression for where we were missing a valid copy constructor and had the
+// default (dangerous) move semantics takeover.
 TEST(HeaderMapImplTest, HeaderMapImplyCopy) {
   {
     HeaderMapImpl foo;

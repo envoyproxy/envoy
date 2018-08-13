@@ -48,7 +48,7 @@ public:
   HeaderMapImpl();
   explicit HeaderMapImpl(
       const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
-  explicit HeaderMapImpl(const HeaderMap& rhs);
+  HeaderMapImpl(const HeaderMap& rhs);
   HeaderMapImpl(const HeaderMapImpl& rhs);
 
   /**
@@ -134,6 +134,11 @@ protected:
   /**
    * List of HeaderEntryImpl that keeps the pseudo headers (key starting with ':') in the front
    * of the list (as required by nghttp2) and otherwise maintains insertion order.
+   *
+   * Note: the internal iterators held in fields make this unsafe to copy and move. The NonCopyable
+   * will supress both copy and move constructors/assignment.
+   * TODO(htuch): Maybe we want this to movable one day; for now, our header map moves happen on
+   * HeaderMapPtr, so the performance impact should not be evident.
    */
   class HeaderList : NonCopyable {
   public:
