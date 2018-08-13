@@ -15,21 +15,23 @@ namespace RBACFilter {
 
 class RoleBasedAccessControlNetworkFilterTest : public testing::Test {
 public:
-  RoleBasedAccessControlFilterConfigSharedPtr setupConfig() {
+  RoleBasedAccessControlFilterConfigSharedPtr setupConfig(bool with_policy = true) {
     envoy::config::filter::network::rbac::v2::RBAC config;
     config.set_stat_prefix("tcp.");
 
-    envoy::config::rbac::v2alpha::Policy policy;
-    policy.add_permissions()->set_destination_port(123);
-    policy.add_principals()->set_any(true);
-    config.mutable_rules()->set_action(envoy::config::rbac::v2alpha::RBAC::ALLOW);
-    (*config.mutable_rules()->mutable_policies())["foo"] = policy;
+    if (with_policy) {
+      envoy::config::rbac::v2alpha::Policy policy;
+      policy.add_permissions()->set_destination_port(123);
+      policy.add_principals()->set_any(true);
+      config.mutable_rules()->set_action(envoy::config::rbac::v2alpha::RBAC::ALLOW);
+      (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
-    envoy::config::rbac::v2alpha::Policy shadow_policy;
-    shadow_policy.add_permissions()->set_destination_port(456);
-    shadow_policy.add_principals()->set_any(true);
-    config.mutable_shadow_rules()->set_action(envoy::config::rbac::v2alpha::RBAC::ALLOW);
-    (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
+      envoy::config::rbac::v2alpha::Policy shadow_policy;
+      shadow_policy.add_permissions()->set_destination_port(456);
+      shadow_policy.add_principals()->set_any(true);
+      config.mutable_shadow_rules()->set_action(envoy::config::rbac::v2alpha::RBAC::ALLOW);
+      (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
+    }
 
     return std::make_shared<RoleBasedAccessControlFilterConfig>(config, store_);
   }
@@ -65,6 +67,19 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Allowed) {
   EXPECT_EQ(0U, config_->stats().denied_.value());
   EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
   EXPECT_EQ(1U, config_->stats().shadow_denied_.value());
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithNoPolicy) {
+  config_ = setupConfig(false /* with_policy */);
+  filter_.reset(new RoleBasedAccessControlFilter(config_));
+
+  // Allow access and no metric change when there is no policy.
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_allowed_.value());
+  EXPECT_EQ(0U, config_->stats().shadow_denied_.value());
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {

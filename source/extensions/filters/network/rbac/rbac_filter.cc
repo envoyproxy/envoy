@@ -28,7 +28,7 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
           : "none");
 
   if (shadow_engine_result_ == Unknown) {
-    // TODO(quanlin): Support metric collection for RBAC network filter.
+    // TODO(quanlin): Pass the shadow engine results to other filters.
     // Only check the engine and increase stats for the first time call to onData(), any following
     // calls to onData() could just use the cached result and no need to increase the stats anymore.
     shadow_engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow);
