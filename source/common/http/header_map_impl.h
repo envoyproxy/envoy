@@ -46,7 +46,8 @@ public:
   static void appendToHeader(HeaderString& header, absl::string_view data);
 
   HeaderMapImpl();
-  explicit HeaderMapImpl(const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
+  explicit HeaderMapImpl(
+      const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
   explicit HeaderMapImpl(const HeaderMap& rhs);
   HeaderMapImpl(const HeaderMapImpl& rhs);
 
