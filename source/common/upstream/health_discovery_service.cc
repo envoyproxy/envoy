@@ -22,13 +22,25 @@ HdsDelegate::HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& s
       info_factory_(info_factory), access_log_manager_(access_log_manager), cm_(cm),
       local_info_(local_info) {
   health_check_request_.mutable_node()->MergeFrom(node);
+  backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMilliseconds,
+                                                                RetryMaxDelayMilliseconds, random_);
   hds_retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   hds_stream_response_timer_ = dispatcher.createTimer([this]() -> void { sendResponse(); });
+
+  // TODO(lilika): Add support for other types of healthchecks
+  health_check_request_.mutable_capability()->add_health_check_protocols(
+      envoy::service::discovery::v2::Capability::HTTP);
+  health_check_request_.mutable_capability()->add_health_check_protocols(
+      envoy::service::discovery::v2::Capability::TCP);
+
   establishNewStream();
 }
 
 void HdsDelegate::setHdsRetryTimer() {
-  hds_retry_timer_->enableTimer(std::chrono::milliseconds(RetryDelayMilliseconds));
+  const auto retry_ms = std::chrono::milliseconds(backoff_strategy_->nextBackOffMs());
+  ENVOY_LOG(warn, "HdsDelegate stream/connection failure, will retry in {} ms.", retry_ms.count());
+
+  hds_retry_timer_->enableTimer(retry_ms);
 }
 
 void HdsDelegate::setHdsStreamResponseTimer() {
@@ -44,18 +56,13 @@ void HdsDelegate::establishNewStream() {
     return;
   }
 
-  // TODO(lilika): Add support for other types of healthchecks
-  health_check_request_.mutable_capability()->add_health_check_protocol(
-      envoy::service::discovery::v2::Capability::HTTP);
   ENVOY_LOG(debug, "Sending HealthCheckRequest {} ", health_check_request_.DebugString());
   stream_->sendMessage(health_check_request_, false);
   stats_.responses_.inc();
+  backoff_strategy_->reset();
 }
 
-// TODO(lilika) : Use jittered backoff as in https://github.com/envoyproxy/envoy/pull/3791
 void HdsDelegate::handleFailure() {
-  ENVOY_LOG(warn, "HdsDelegate stream/connection failure, will retry in {} ms.",
-            RetryDelayMilliseconds);
   stats_.errors_.inc();
   setHdsRetryTimer();
 }
@@ -107,7 +114,7 @@ void HdsDelegate::processMessage(
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
   ASSERT(message);
 
-  for (const auto& cluster_health_check : message->health_check()) {
+  for (const auto& cluster_health_check : message->cluster_health_checks()) {
     // Create HdsCluster config
     static const envoy::api::v2::core::BindConfig bind_config;
     envoy::api::v2::Cluster cluster_config;
@@ -118,7 +125,7 @@ void HdsDelegate::processMessage(
         ClusterConnectionBufferLimitBytes);
 
     // Add endpoints to cluster
-    for (const auto& locality_endpoints : cluster_health_check.endpoints()) {
+    for (const auto& locality_endpoints : cluster_health_check.locality_endpoints()) {
       for (const auto& endpoint : locality_endpoints.endpoints()) {
         cluster_config.add_hosts()->MergeFrom(endpoint.address());
       }
@@ -148,6 +155,9 @@ void HdsDelegate::onReceiveMessage(
     std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
   stats_.requests_.inc();
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
+
+  // Reset
+  hds_clusters_.clear();
 
   // Process the HealthCheckSpecifier message
   processMessage(std::move(message));

@@ -1,0 +1,6 @@
+has_set_cookie {
+  cookies: "somekey=somevalue"
+  cookies: "abc=def; Expires=Wed, 09 Jun 2021 10:18:14 GMT"
+  cookies: "key2=value2; Secure"
+  key: "somekey"
+}

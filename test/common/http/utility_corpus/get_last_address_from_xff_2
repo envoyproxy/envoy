@@ -1,0 +1,4 @@
+get_last_address_from_xff {
+  xff: ", bad"
+  num_to_skip: 0
+}

@@ -69,7 +69,7 @@ public:
         new envoy::service::discovery::v2::HealthCheckSpecifier;
     msg->mutable_interval()->set_seconds(1);
 
-    auto* health_check = msg->add_health_check();
+    auto* health_check = msg->add_cluster_health_checks();
     health_check->set_cluster_name("anna");
     health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
     health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
@@ -79,8 +79,10 @@ public:
     health_check->mutable_health_checks(0)->mutable_http_health_check()->set_use_http2(false);
     health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
 
-    auto* socket_address =
-        health_check->add_endpoints()->add_endpoints()->mutable_address()->mutable_socket_address();
+    auto* socket_address = health_check->add_locality_endpoints()
+                               ->add_endpoints()
+                               ->mutable_address()
+                               ->mutable_socket_address();
     socket_address->set_address("127.0.0.0");
     socket_address->set_port_value(1234);
 
@@ -127,10 +129,10 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
   message->mutable_interval()->set_seconds(1);
 
   for (int i = 0; i < 2; i++) {
-    auto* health_check = message->add_health_check();
+    auto* health_check = message->add_cluster_health_checks();
     health_check->set_cluster_name("anna" + std::to_string(i));
     for (int j = 0; j < 3; j++) {
-      auto* address = health_check->add_endpoints()->add_endpoints()->mutable_address();
+      auto* address = health_check->add_locality_endpoints()->add_endpoints()->mutable_address();
       address->mutable_socket_address()->set_address("127.0.0." + std::to_string(i));
       address->mutable_socket_address()->set_port_value(1234 + j);
     }
@@ -165,7 +167,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   message->mutable_interval()->set_seconds(1);
 
   for (int i = 0; i < 2; i++) {
-    auto* health_check = message->add_health_check();
+    auto* health_check = message->add_cluster_health_checks();
     health_check->set_cluster_name("minkowski" + std::to_string(i));
     for (int j = 0; j < i + 2; j++) {
       auto hc = health_check->add_health_checks();
@@ -227,12 +229,26 @@ TEST_F(HdsTest, TestMinimalSendResponse) {
 TEST_F(HdsTest, TestStreamConnectionFailure) {
   EXPECT_CALL(*async_client_, start(_, _))
       .WillOnce(Return(nullptr))
+      .WillOnce(Return(nullptr))
+      .WillOnce(Return(nullptr))
+      .WillOnce(Return(nullptr))
+      .WillOnce(Return(nullptr))
       .WillOnce(Return(&async_stream_));
-  EXPECT_CALL(*retry_timer_, enableTimer(_));
+
+  EXPECT_CALL(random_, random()).WillOnce(Return(1000005)).WillRepeatedly(Return(1234567));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(5)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(1567)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(2567)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(4567)));
+  EXPECT_CALL(*retry_timer_, enableTimer(std::chrono::milliseconds(25567)));
   EXPECT_CALL(async_stream_, sendMessage(_, _));
 
   // Test connection failure and retry
   createHdsDelegate();
+  retry_timer_cb_();
+  retry_timer_cb_();
+  retry_timer_cb_();
+  retry_timer_cb_();
   retry_timer_cb_();
 }
 

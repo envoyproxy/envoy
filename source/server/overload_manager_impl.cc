@@ -84,8 +84,9 @@ bool OverloadAction::isActive() const { return !fired_triggers_.empty(); }
 
 OverloadManagerImpl::OverloadManagerImpl(
     Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
+    ThreadLocal::SlotAllocator& slot_allocator,
     const envoy::config::overload::v2alpha::OverloadManager& config)
-    : started_(false), dispatcher_(dispatcher),
+    : started_(false), dispatcher_(dispatcher), tls_(slot_allocator.allocateSlot()),
       refresh_interval_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))) {
   Configuration::ResourceMonitorFactoryContextImpl context(dispatcher);
@@ -125,6 +126,10 @@ OverloadManagerImpl::OverloadManagerImpl(
       resource_to_actions_.insert(std::make_pair(resource, name));
     }
   }
+
+  tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalOverloadState>();
+  });
 }
 
 void OverloadManagerImpl::start() {
@@ -157,6 +162,10 @@ void OverloadManagerImpl::registerForAction(const std::string& action,
                                std::forward_as_tuple(dispatcher, callback));
 }
 
+ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() {
+  return tls_->getTyped<ThreadLocalOverloadState>();
+}
+
 void OverloadManagerImpl::updateResourcePressure(const std::string& resource, double pressure) {
   auto action_range = resource_to_actions_.equal_range(resource);
   std::for_each(action_range.first, action_range.second,
@@ -170,6 +179,9 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
                         is_active ? OverloadActionState::Active : OverloadActionState::Inactive;
                     ENVOY_LOG(info, "Overload action {} has become {}", action,
                               is_active ? "active" : "inactive");
+                    tls_->runOnAllThreads([this, action, state] {
+                      tls_->getTyped<ThreadLocalOverloadState>().setState(action, state);
+                    });
                     auto callback_range = action_to_callbacks_.equal_range(action);
                     std::for_each(callback_range.first, callback_range.second,
                                   [&](ActionToCallbackMap::value_type& cb_entry) {

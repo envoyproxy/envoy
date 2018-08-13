@@ -4490,6 +4490,9 @@ public:
                                        Server::Configuration::FactoryContext&) override {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     }
+    ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
+      return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
+    }
   };
 
   void checkEach(const std::string& yaml, uint32_t expected_entry, uint32_t expected_route,
@@ -4563,7 +4566,7 @@ virtual_hosts:
     routes:
       - match: { prefix: "/" }
         route: { cluster: baz }
-    per_filter_config: { test.default.filter: { unknown_key: 123} }
+    per_filter_config: { test.default.filter: { seconds: 123} }
 )EOF";
 
   checkNoPerFilterConfig(yaml);
