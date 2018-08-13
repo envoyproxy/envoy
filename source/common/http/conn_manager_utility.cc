@@ -79,7 +79,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
         connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
 
     // Since useRemoteAddress() is true, skip adding x-forwarded-port when the x-forwarded-port
-    // is already set
+    // is already set.
     if (config.appendXForwardedPort() && !request_headers.ForwardedPort()) {
       // Otherwise, set x-forwarded-for with remote address connection port, i.e. the port of the
       // proxy in front of this Envoy that is used by the client to connect to.
