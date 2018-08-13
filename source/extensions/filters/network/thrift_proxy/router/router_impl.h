@@ -22,24 +22,8 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace Router {
 
-/**
- * Base interface for something that matches MessageMetadata.
- */
-class Matchable {
-public:
-  virtual ~Matchable() {}
-
-  /**
-   * See if this object matches the incoming MessageMetadata.
-   * @param metadata supplies the MessageMetadata to match.
-   * @return true if input metadata match this object.
-   */
-  virtual RouteConstSharedPtr matches(const MessageMetadata& metadata) const PURE;
-};
-
 class RouteEntryImplBase : public RouteEntry,
                            public Route,
-                           public Matchable,
                            public std::enable_shared_from_this<RouteEntryImplBase> {
 public:
   RouteEntryImplBase(const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route);
@@ -49,6 +33,8 @@ public:
 
   // Router::Route
   const RouteEntry* routeEntry() const override;
+
+  virtual RouteConstSharedPtr matches(const MessageMetadata& metadata) const PURE;
 
 protected:
   RouteConstSharedPtr clusterEntry() const;
@@ -66,7 +52,7 @@ public:
 
   const std::string& methodName() const { return method_name_; }
 
-  // Router::Matchable
+  // RouteEntryImplBase
   RouteConstSharedPtr matches(const MessageMetadata& metadata) const override;
 
 private:
@@ -81,7 +67,7 @@ public:
 
   const std::string& serviceName() const { return service_name_; }
 
-  // Router::Matchable
+  // RouteEntryImplBase
   RouteConstSharedPtr matches(const MessageMetadata& metadata) const override;
 
 private:
