@@ -32,9 +32,7 @@ void LdsSubscription::createRequest(Http::Message& request) {
       fmt::format("/v1/listeners/{}/{}", local_info_.clusterName(), local_info_.nodeName()));
   request.headers().insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Json);
-
-  const size_t empty_body_size = 0;
-  request.headers().insertContentLength().value(empty_body_size);
+  request.headers().insertContentLength().value(size_t(0));
 }
 
 void LdsSubscription::parseResponse(const Http::Message& response) {
