@@ -51,7 +51,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
               bool expect_success, const Network::Address::IpVersion version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
-  Secret::MockSecretManager secret_manager;
+  NiceMock<Secret::MockSecretManager> secret_manager;
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, secret_manager);
@@ -148,7 +148,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
                              const Network::Address::IpVersion version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
-  Secret::MockSecretManager secret_manager;
+  NiceMock<Secret::MockSecretManager> secret_manager;
   ContextManagerImpl manager(runtime);
   std::string new_session = EMPTY_STRING;
 
@@ -1667,7 +1667,7 @@ TEST_P(SslSocketTest, HalfClose) {
 TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
-  Secret::MockSecretManager secret_manager;
+  NiceMock<Secret::MockSecretManager> secret_manager;
 
   std::string server_ctx_json = R"EOF(
   {
@@ -1755,7 +1755,7 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
                                  const Network::Address::IpVersion ip_version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
-  Secret::MockSecretManager secret_manager;
+  NiceMock<Secret::MockSecretManager> secret_manager;
   ContextManagerImpl manager(runtime);
 
   Json::ObjectSharedPtr server_ctx_loader1 = TestEnvironment::jsonLoadFromString(server_ctx_json1);

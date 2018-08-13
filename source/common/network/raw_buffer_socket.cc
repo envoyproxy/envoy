@@ -17,7 +17,7 @@ IoResult RawBufferSocket::doRead(Buffer::Instance& buffer) {
   bool end_stream = false;
   do {
     // 16K read is arbitrary. TODO(mattklein123) PERF: Tune the read size.
-    Api::SysCallResult result = buffer.read(callbacks_->fd(), 16384);
+    Api::SysCallIntResult result = buffer.read(callbacks_->fd(), 16384);
     ENVOY_CONN_LOG(trace, "read returns: {}", callbacks_->connection(), result.rc_);
 
     if (result.rc_ == 0) {
@@ -58,7 +58,7 @@ IoResult RawBufferSocket::doWrite(Buffer::Instance& buffer, bool end_stream) {
       action = PostIoAction::KeepOpen;
       break;
     }
-    Api::SysCallResult result = buffer.write(callbacks_->fd());
+    Api::SysCallIntResult result = buffer.write(callbacks_->fd());
     ENVOY_CONN_LOG(trace, "write returns: {}", callbacks_->connection(), result.rc_);
 
     if (result.rc_ == -1) {

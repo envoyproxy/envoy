@@ -341,6 +341,7 @@ public:
   COUNTER  (upstream_cx_none_healthy)                                                              \
   COUNTER  (upstream_rq_total)                                                                     \
   GAUGE    (upstream_rq_active)                                                                    \
+  COUNTER  (upstream_rq_completed)                                                                 \
   COUNTER  (upstream_rq_pending_total)                                                             \
   COUNTER  (upstream_rq_pending_overflow)                                                          \
   COUNTER  (upstream_rq_pending_failure_eject)                                                     \
@@ -397,6 +398,17 @@ struct ClusterLoadReportStats {
 };
 
 /**
+ * All extension protocol specific options returned by the method at
+ *   NamedNetworkFilterConfigFactory::createProtocolOptions
+ * must be derived from this class.
+ */
+class ProtocolOptionsConfig {
+public:
+  virtual ~ProtocolOptionsConfig() {}
+};
+typedef std::shared_ptr<const ProtocolOptionsConfig> ProtocolOptionsConfigConstSharedPtr;
+
+/**
  * Information about a given upstream cluster.
  */
 class ClusterInfo {
@@ -444,6 +456,18 @@ public:
    *         @see Http::Http2Settings.
    */
   virtual const Http::Http2Settings& http2Settings() const PURE;
+
+  /**
+   * @param name std::string containing the well-known name of the extension for which protocol
+   *        options are desired
+   * @return std::shared_ptr<const Derived> where Derived is a subclass of ProtocolOptionsConfig
+   *         and contains extension-specific protocol options for upstream connections.
+   */
+  template <class Derived>
+  const std::shared_ptr<const Derived>
+  extensionProtocolOptionsTyped(const std::string& name) const {
+    return std::dynamic_pointer_cast<const Derived>(extensionProtocolOptions(name));
+  }
 
   /**
    * @return const envoy::api::v2::Cluster::CommonLbConfig& the common configuration for all
@@ -552,6 +576,17 @@ public:
    *         after a host is removed from service discovery.
    */
   virtual bool drainConnectionsOnHostRemoval() const PURE;
+
+protected:
+  /**
+   * Invoked by extensionProtocolOptionsTyped.
+   * @param name std::string containing the well-known name of the extension for which protocol
+   *        options are desired
+   * @return ProtocolOptionsConfigConstSharedPtr with extension-specific protocol options for
+   *         upstream connections.
+   */
+  virtual ProtocolOptionsConfigConstSharedPtr
+  extensionProtocolOptions(const std::string& name) const PURE;
 };
 
 typedef std::shared_ptr<const ClusterInfo> ClusterInfoConstSharedPtr;

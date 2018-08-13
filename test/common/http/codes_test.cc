@@ -71,7 +71,11 @@ TEST_F(CodeUtilityTest, NoCanary) {
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.internal.upstream_rq_5xx").value());
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.internal.upstream_rq_501").value());
 
-  EXPECT_EQ(16U, cluster_scope_.counters().size());
+  EXPECT_EQ(4U, cluster_scope_.counter("prefix.upstream_rq_completed").value());
+  EXPECT_EQ(2U, cluster_scope_.counter("prefix.external.upstream_rq_completed").value());
+  EXPECT_EQ(2U, cluster_scope_.counter("prefix.internal.upstream_rq_completed").value());
+
+  EXPECT_EQ(19U, cluster_scope_.counters().size());
 }
 
 TEST_F(CodeUtilityTest, Canary) {
@@ -96,7 +100,12 @@ TEST_F(CodeUtilityTest, Canary) {
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_5xx").value());
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.canary.upstream_rq_500").value());
 
-  EXPECT_EQ(16U, cluster_scope_.counters().size());
+  EXPECT_EQ(3U, cluster_scope_.counter("prefix.upstream_rq_completed").value());
+  EXPECT_EQ(2U, cluster_scope_.counter("prefix.external.upstream_rq_completed").value());
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.internal.upstream_rq_completed").value());
+  EXPECT_EQ(2U, cluster_scope_.counter("prefix.canary.upstream_rq_completed").value());
+
+  EXPECT_EQ(20U, cluster_scope_.counters().size());
 }
 
 TEST_F(CodeUtilityTest, All) {
@@ -170,6 +179,9 @@ TEST_F(CodeUtilityTest, All) {
 TEST_F(CodeUtilityTest, RequestVirtualCluster) {
   addResponse(200, false, false, "test-vhost", "test-cluster");
 
+  EXPECT_EQ(1U,
+            global_store_.counter("vhost.test-vhost.vcluster.test-cluster.upstream_rq_completed")
+                .value());
   EXPECT_EQ(
       1U, global_store_.counter("vhost.test-vhost.vcluster.test-cluster.upstream_rq_2xx").value());
   EXPECT_EQ(
@@ -179,6 +191,7 @@ TEST_F(CodeUtilityTest, RequestVirtualCluster) {
 TEST_F(CodeUtilityTest, PerZoneStats) {
   addResponse(200, false, false, "", "", "from_az", "to_az");
 
+  EXPECT_EQ(1U, cluster_scope_.counter("prefix.zone.from_az.to_az.upstream_rq_completed").value());
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.zone.from_az.to_az.upstream_rq_200").value());
   EXPECT_EQ(1U, cluster_scope_.counter("prefix.zone.from_az.to_az.upstream_rq_2xx").value());
 }
