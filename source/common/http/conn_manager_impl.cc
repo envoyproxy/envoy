@@ -768,7 +768,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
 
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
   auto trailers_added_entry = decoder_filters_.end();
-  bool trailers_exists_at_start = request_trailers_ != nullptr;
+  const bool trailers_exists_at_start = request_trailers_ != nullptr;
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
@@ -1135,7 +1135,7 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   auto trailers_added_entry = encoder_filters_.end();
 
-  bool trailers_exists_at_start = response_trailers_ != nullptr;
+  const bool trailers_exists_at_start = response_trailers_ != nullptr;
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeData));
 

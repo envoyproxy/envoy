@@ -343,7 +343,7 @@ private:
       // to verify we do not encode100Continue headers more than once per
       // filter.
       static constexpr uint32_t Encode100ContinueHeaders  = 0x40;
-      // Used to indicate that we're processing the final [en|de]Code frame,
+      // Used to indicate that we're processing the final [En|De]codeData frame,
       // i.e. end_stream = true
       static constexpr uint32_t LastDataFrame = 0x80;
     };
