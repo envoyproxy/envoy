@@ -9,6 +9,7 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/http/codes.h"
+#include "common/http/header_utility.h"
 #include "common/router/config_impl.h"
 
 namespace Envoy {
@@ -169,22 +170,10 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
 }
 
 void Filter::addHeaders(Http::HeaderMap& headers) {
-  if (!headers_to_add_) {
-    return;
+  if (headers_to_add_) {
+    Http::HeaderUtility::addHeaders(headers, *headers_to_add_);
+    headers_to_add_ = nullptr;
   }
-
-  headers_to_add_->iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        Http::HeaderString k;
-        k.setCopy(header.key().c_str(), header.key().size());
-        Http::HeaderString v;
-        v.setCopy(header.value().c_str(), header.value().size());
-        static_cast<Http::HeaderMapImpl*>(context)->addViaMove(std::move(k), std::move(v));
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &headers);
-
-  headers_to_add_ = nullptr;
 }
 
 } // namespace RateLimitFilter
