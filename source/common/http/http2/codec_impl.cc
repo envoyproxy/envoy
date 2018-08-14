@@ -127,12 +127,15 @@ void ConnectionImpl::StreamImpl::readDisable(bool disable) {
   if (disable) {
     ++read_disable_count_;
   } else {
-    ASSERT(read_disable_count_ > 0);
-    --read_disable_count_;
-    if (!buffers_overrun()) {
-      nghttp2_session_consume(parent_.session_, stream_id_, unconsumed_bytes_);
-      unconsumed_bytes_ = 0;
-      parent_.sendPendingFrames();
+    if (read_disable_count_ != 0) {
+      --read_disable_count_;
+      if (!buffers_overrun()) {
+        nghttp2_session_consume(parent_.session_, stream_id_, unconsumed_bytes_);
+        unconsumed_bytes_ = 0;
+        parent_.sendPendingFrames();
+      }
+    } else {
+      throw EnvoyException("read_disable cannot be 0.");
     }
   }
 }
