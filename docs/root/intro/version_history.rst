@@ -8,6 +8,7 @@ Version history
 * access log: added RESPONSE_DURATION and RESPONSE_TX_DURATION.
 * admin: added :http:get:`/hystrix_event_stream` as an endpoint for monitoring envoy's statistics
   through `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
+* build: switched to clang for the release builds.
 * grpc-json: added support for building HTTP response from
   `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
 * cluster: added :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>` to merge
