@@ -301,7 +301,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
     load_stats_reporter_.reset(
-        new LoadStatsReporter(local_info.node(), *this, stats,
+        new LoadStatsReporter(local_info, *this, stats,
                               Config::Utility::factoryForGrpcApiConfigSource(
                                   *async_client_manager_, load_stats_config, stats)
                                   ->create(),
