@@ -768,6 +768,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   }
 
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
+  auto trailers_added_entry = decoder_filters_.end();
+  const bool trailers_exists_at_start = request_trailers_ != nullptr;
   if (!filter) {
     entry = decoder_filters_.begin();
   } else {
@@ -776,15 +778,52 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
 
   for (; entry != decoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeData));
+
+    // We check the request_trailers_ pointer here in case addDecodedTrailers
+    // is called in decodeData during a previous filter invocation, at which point we communicate to
+    // the current and future filters that the stream has not yet ended.
+    if (end_stream) {
+      state_.filter_call_state_ |= FilterCallState::LastDataFrame;
+    }
     state_.filter_call_state_ |= FilterCallState::DecodeData;
-    FilterDataStatus status = (*entry)->handle_->decodeData(data, end_stream);
+    FilterDataStatus status = (*entry)->handle_->decodeData(data, end_stream && !request_trailers_);
     state_.filter_call_state_ &= ~FilterCallState::DecodeData;
+    if (end_stream) {
+      state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
+    }
     ENVOY_STREAM_LOG(trace, "decode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
-    if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_)) {
+
+    if (!trailers_exists_at_start && request_trailers_ &&
+        trailers_added_entry == decoder_filters_.end()) {
+      trailers_added_entry = entry;
+    }
+
+    if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.decoder_filters_streaming_) &&
+        std::next(entry) != decoder_filters_.end()) {
+      // Stop iteration IFF this is not the last filter. If it is the last filter, continue with
+      // processing since we need to handle the case where a terminal filter wants to buffer, but
+      // a previous filter has added trailers.
       return;
     }
   }
+
+  // If trailers were adding during decodeData we need to trigger decodeTrailers in order
+  // to allow filters to process the trailers.
+  if (trailers_added_entry != decoder_filters_.end()) {
+    decodeTrailers(trailers_added_entry->get(), *request_trailers_);
+  }
+}
+
+HeaderMap& ConnectionManagerImpl::ActiveStream::addDecodedTrailers() {
+  // Trailers can only be added during the last data frame (i.e. end_stream = true).
+  ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
+
+  // Trailers can only be added once.
+  ASSERT(!request_trailers_);
+
+  request_trailers_ = std::make_unique<HeaderMapImpl>();
+  return *request_trailers_;
 }
 
 void ConnectionManagerImpl::ActiveStream::addDecodedData(ActiveStreamDecoderFilter& filter,
@@ -1059,6 +1098,17 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   }
 }
 
+HeaderMap& ConnectionManagerImpl::ActiveStream::addEncodedTrailers() {
+  // Trailers can only be added during the last data frame (i.e. end_stream = true).
+  ASSERT(state_.filter_call_state_ & FilterCallState::LastDataFrame);
+
+  // Trailers can only be added once.
+  ASSERT(!response_trailers_);
+
+  response_trailers_ = std::make_unique<HeaderMapImpl>();
+  return *response_trailers_;
+}
+
 void ConnectionManagerImpl::ActiveStream::addEncodedData(ActiveStreamEncoderFilter& filter,
                                                          Buffer::Instance& data, bool streaming) {
   if (state_.filter_call_state_ == 0 ||
@@ -1084,13 +1134,33 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
                                                      Buffer::Instance& data, bool end_stream) {
   resetIdleTimer();
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
+  auto trailers_added_entry = encoder_filters_.end();
+
+  const bool trailers_exists_at_start = response_trailers_ != nullptr;
   for (; entry != encoder_filters_.end(); entry++) {
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeData));
+
+    // We check the response_trailers_ pointer here in case addEncodedTrailers
+    // is called in encodeData during a previous filter invocation, at which point we communicate to
+    // the current and future filters that the stream has not yet ended.
     state_.filter_call_state_ |= FilterCallState::EncodeData;
-    FilterDataStatus status = (*entry)->handle_->encodeData(data, end_stream);
+    if (end_stream) {
+      state_.filter_call_state_ |= FilterCallState::LastDataFrame;
+    }
+    FilterDataStatus status =
+        (*entry)->handle_->encodeData(data, end_stream && !response_trailers_);
     state_.filter_call_state_ &= ~FilterCallState::EncodeData;
+    if (end_stream) {
+      state_.filter_call_state_ &= ~FilterCallState::LastDataFrame;
+    }
     ENVOY_STREAM_LOG(trace, "encode data called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
+
+    if (!trailers_exists_at_start && response_trailers_ &&
+        trailers_added_entry == encoder_filters_.end()) {
+      trailers_added_entry = entry;
+    }
+
     if (!(*entry)->commonHandleAfterDataCallback(status, data, state_.encoder_filters_streaming_)) {
       return;
     }
@@ -1100,8 +1170,16 @@ void ConnectionManagerImpl::ActiveStream::encodeData(ActiveStreamEncoderFilter* 
                    end_stream);
 
   request_info_.addBytesSent(data.length());
-  response_encoder_->encodeData(data, end_stream);
-  maybeEndEncode(end_stream);
+
+  // If trailers were adding during encodeData we need to trigger decodeTrailers in order
+  // to allow filters to process the trailers.
+  if (trailers_added_entry != encoder_filters_.end()) {
+    response_encoder_->encodeData(data, false);
+    encodeTrailers(trailers_added_entry->get(), *response_trailers_);
+  } else {
+    response_encoder_->encodeData(data, end_stream);
+    maybeEndEncode(end_stream);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilter* filter,
@@ -1381,6 +1459,10 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::cre
   return buffer;
 }
 
+HeaderMap& ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedTrailers() {
+  return parent_.addDecodedTrailers();
+}
+
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::addDecodedData(Buffer::Instance& data,
                                                                       bool streaming) {
   parent_.addDecodedData(*this, data, streaming);
@@ -1472,6 +1554,10 @@ Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::cre
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data,
                                                                       bool streaming) {
   return parent_.addEncodedData(*this, data, streaming);
+}
+
+HeaderMap& ConnectionManagerImpl::ActiveStreamEncoderFilter::addEncodedTrailers() {
+  return parent_.addEncodedTrailers();
 }
 
 void ConnectionManagerImpl::ActiveStreamEncoderFilter::
