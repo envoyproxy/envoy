@@ -81,6 +81,7 @@ public:
   size_t size() const override { return headers_.size(); }
 
 protected:
+  // For tests only, unoptimized, they aren't intended for regular HeaderMapImpl users.
   void copyFrom(const HeaderMap& rhs);
   void clear() { removePrefix(LowerCaseString("")); }
 
