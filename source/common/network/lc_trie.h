@@ -446,7 +446,7 @@ private:
       std::sort(ip_prefixes_.begin(), ip_prefixes_.end());
 
       // Build the trie_.
-      trie_.reserve(size_t(ip_prefixes_.size() / fill_factor_));
+      trie_.reserve(static_cast<size_t>(ip_prefixes_.size() / fill_factor_));
       uint32_t next_free_index = 1;
       buildRecursive(0u, 0u, ip_prefixes_.size(), 0u, next_free_index);
 
