@@ -321,6 +321,7 @@ envoy_cc_library(
         "//include/envoy/config:subscription_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",

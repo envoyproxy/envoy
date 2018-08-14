@@ -120,28 +120,28 @@ TEST_F(OwnedImplTest, Write) {
 
   Buffer::OwnedImpl buffer;
   buffer.add("example");
-  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(7));
-  Api::SysCallResult result = buffer.write(-1);
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{7, 0}));
+  Api::SysCallIntResult result = buffer.write(-1);
   EXPECT_EQ(7, result.rc_);
   EXPECT_EQ(0, buffer.length());
 
   buffer.add("example");
-  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(6));
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{6, 0}));
   result = buffer.write(-1);
   EXPECT_EQ(6, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
-  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(0));
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
   result = buffer.write(-1);
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
-  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(-1));
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
   result = buffer.write(-1);
   EXPECT_EQ(-1, result.rc_);
   EXPECT_EQ(1, buffer.length());
 
-  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(1));
+  EXPECT_CALL(os_sys_calls, writev(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{1, 0}));
   result = buffer.write(-1);
   EXPECT_EQ(1, result.rc_);
   EXPECT_EQ(0, buffer.length());
@@ -157,12 +157,12 @@ TEST_F(OwnedImplTest, Read) {
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
   Buffer::OwnedImpl buffer;
-  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(0));
-  Api::SysCallResult result = buffer.read(-1, 100);
+  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{0, 0}));
+  Api::SysCallIntResult result = buffer.read(-1, 100);
   EXPECT_EQ(0, result.rc_);
   EXPECT_EQ(0, buffer.length());
 
-  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(-1));
+  EXPECT_CALL(os_sys_calls, readv(_, _, _)).WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
   result = buffer.read(-1, 100);
   EXPECT_EQ(-1, result.rc_);
   EXPECT_EQ(0, buffer.length());

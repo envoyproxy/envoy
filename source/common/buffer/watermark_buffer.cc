@@ -50,8 +50,8 @@ void WatermarkBuffer::move(Instance& rhs, uint64_t length) {
   checkHighWatermark();
 }
 
-Api::SysCallResult WatermarkBuffer::read(int fd, uint64_t max_length) {
-  Api::SysCallResult result = OwnedImpl::read(fd, max_length);
+Api::SysCallIntResult WatermarkBuffer::read(int fd, uint64_t max_length) {
+  Api::SysCallIntResult result = OwnedImpl::read(fd, max_length);
   checkHighWatermark();
   return result;
 }
@@ -62,8 +62,8 @@ uint64_t WatermarkBuffer::reserve(uint64_t length, RawSlice* iovecs, uint64_t nu
   return bytes_reserved;
 }
 
-Api::SysCallResult WatermarkBuffer::write(int fd) {
-  Api::SysCallResult result = OwnedImpl::write(fd);
+Api::SysCallIntResult WatermarkBuffer::write(int fd) {
+  Api::SysCallIntResult result = OwnedImpl::write(fd);
   checkLowWatermark();
   return result;
 }

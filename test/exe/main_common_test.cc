@@ -227,11 +227,28 @@ TEST_F(MainCommonTest, LegacyMain) {
 }
 
 TEST_F(MainCommonTest, AdminRequestGetStatsAndQuit) {
+  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
+    return;
+  }
   addArg("--disable-hot-restart");
   startEnvoy();
   waitForEnvoyToStart();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
   adminRequest("/quitquitquit", "POST");
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+// This test is identical to the above one, except that instead of using an admin /quitquitquit,
+// we send ourselves a SIGTERM, which should have the same effect.
+TEST_F(MainCommonTest, AdminRequestGetStatsAndKill) {
+  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
+    return;
+  }
+  addArg("--disable-hot-restart");
+  startEnvoy();
+  waitForEnvoyToStart();
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  kill(getpid(), SIGTERM);
   EXPECT_TRUE(waitForEnvoyToExit());
 }
 

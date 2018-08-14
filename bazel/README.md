@@ -27,7 +27,7 @@ up-to-date with the latest security patches. See
 for how to update or override dependencies.
 
 1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2. Install external dependencies libtool, cmake, ninja, and realpath libraries separately.
+2. Install external dependencies libtool, cmake, ninja, realpath and curl libraries separately.
 On Ubuntu, run the following commands:
 ```
  apt-get install libtool
@@ -36,6 +36,7 @@ On Ubuntu, run the following commands:
  apt-get install clang-format-5.0
  apt-get install automake
  apt-get install ninja-build
+ apt-get install curl
 ```
 
 On Fedora (maybe also other red hat distros), run the following:
