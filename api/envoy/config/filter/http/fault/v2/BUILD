@@ -8,5 +8,6 @@ api_proto_library_internal(
     deps = [
         "//envoy/api/v2/route",
         "//envoy/config/filter/fault/v2:fault",
+        "//envoy/type:percent",
     ],
 )
