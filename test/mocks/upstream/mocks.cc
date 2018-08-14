@@ -33,22 +33,6 @@ MockHostSet::MockHostSet(uint32_t priority) : priority_(priority) {
   }));
 }
 
-std::shared_ptr<const HostSet>
-MockHostSet::filter(std::function<bool(const HostConstSharedPtr&)> predicate) const {
-  HostVector filtered_hosts;
-  HostVector filtered_healthy_hosts;
-
-  std::copy_if(hosts_.begin(), hosts_.end(), std::back_inserter(filtered_hosts), predicate);
-  std::copy_if(healthy_hosts_.begin(), healthy_hosts_.end(),
-               std::back_inserter(filtered_healthy_hosts), predicate);
-
-  auto ms = std::make_shared<NiceMock<MockHostSet>>(priority());
-  ms->hosts_ = filtered_hosts;
-  ms->healthy_hosts_ = filtered_healthy_hosts;
-
-  return ms;
-}
-
 MockPrioritySet::MockPrioritySet() {
   getHostSet(0);
   ON_CALL(*this, hostSetsPerPriority()).WillByDefault(ReturnRef(host_sets_));

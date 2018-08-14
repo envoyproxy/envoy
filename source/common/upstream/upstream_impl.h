@@ -228,10 +228,6 @@ public:
   HostSetImpl(uint32_t priority)
       : priority_(priority), hosts_(new HostVector()), healthy_hosts_(new HostVector()) {}
 
-  HostSetImpl(uint32_t priority, HostVector&& hosts, HostVector&& healthy_hosts)
-      : priority_(priority), hosts_(std::make_shared<HostVector>(std::move(hosts))),
-        healthy_hosts_(std::make_shared<HostVector>(std::move(healthy_hosts))) {}
-
   void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
                    HostsPerLocalityConstSharedPtr hosts_per_locality,
                    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
@@ -260,8 +256,6 @@ public:
   LocalityWeightsConstSharedPtr localityWeights() const override { return locality_weights_; }
   absl::optional<uint32_t> chooseLocality() override;
   uint32_t priority() const override { return priority_; }
-  std::shared_ptr<const HostSet>
-  filter(std::function<bool(const HostConstSharedPtr&)> host_predicate) const override;
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {

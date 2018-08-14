@@ -58,8 +58,6 @@ public:
                                  LocalityWeightsConstSharedPtr locality_weights,
                                  const HostVector& hosts_added, const HostVector& hosts_removed));
   MOCK_CONST_METHOD0(priority, uint32_t());
-  virtual std::shared_ptr<const HostSet>
-  filter(std::function<bool(const HostConstSharedPtr&)> predicate) const override;
 
   HostVector hosts_;
   HostVector healthy_hosts_;

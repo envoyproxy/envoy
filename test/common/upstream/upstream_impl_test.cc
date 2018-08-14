@@ -1580,44 +1580,6 @@ TEST(HostsPerLocalityImpl, Filter) {
   }
 }
 
-class HostSetImplFilterTest : public ::testing::Test {
-public:
-  HostSetImpl host_set_{0};
-  std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
-  HostVector hosts_{
-      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
-      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
-      makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
-};
-
-TEST_F(HostSetImplFilterTest, Filters) {
-  HostsPerLocalitySharedPtr hosts_per_locality =
-      makeHostsPerLocality({{hosts_[0]}, {hosts_[1]}, {hosts_[2]}});
-  LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1, 1}};
-  auto hosts = makeHostsFromHostsPerLocality(hosts_per_locality);
-  host_set_.updateHosts(hosts, hosts, hosts_per_locality, hosts_per_locality, locality_weights, {},
-                        {});
-
-  {
-    auto filtered_hosts = host_set_.filter([](auto) -> auto { return true; });
-
-    EXPECT_EQ(filtered_hosts->hosts(), host_set_.hosts());
-    EXPECT_EQ(filtered_hosts->healthyHosts(), host_set_.healthyHosts());
-  }
-
-  {
-    // filter out the first host
-    auto filtered_hosts = host_set_.filter([&](auto host) -> auto {
-      return host->address()->asString() == host_set_.hosts()[0]->address()->asString();
-    });
-
-    EXPECT_EQ(filtered_hosts->hosts().size(), 1);
-    EXPECT_EQ(filtered_hosts->hosts()[0], host_set_.hosts()[0]);
-    EXPECT_EQ(filtered_hosts->healthyHosts().size(), 1);
-    EXPECT_EQ(filtered_hosts->healthyHosts()[0], host_set_.healthyHosts()[0]);
-  }
-}
-
 class HostSetImplLocalityTest : public ::testing::Test {
 public:
   LocalityWeightsConstSharedPtr locality_weights_;

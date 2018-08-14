@@ -73,18 +73,9 @@ protected:
   const PrioritySet& priority_set_;
 
   // Called when a host set at the given priority level is updated. This updates
-  // per_priority_health for that priority level, and may update per_priority_load for all
+  // per_priority_health_ for that priority level, and may update per_priority_load_ for all
   // priority levels.
-  void recalculatePerPriorityState(uint32_t priority, std::vector<uint32_t>& per_priority_load,
-                                   std::vector<uint32_t>& per_priority_health);
-
-  // Called when a host set at the given priority level is updated. This updates
-  // per_priority_health for that priority level, and may update per_priority_load for all
-  // priority levels.
-  void recalculatePerPriorityState(
-      uint32_t priority, std::vector<uint32_t>& per_priority_load,
-      std::vector<uint32_t>& per_priority_health,
-      absl::optional<std::function<bool(uint32_t, const Host&)>> host_predicate);
+  void recalculatePerPriorityState(uint32_t priority);
 
   // The percentage load (0-100) for each priority level
   std::vector<uint32_t> per_priority_load_;
