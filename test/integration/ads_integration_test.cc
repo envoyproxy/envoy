@@ -132,7 +132,7 @@ public:
     envoy::api::v2::DiscoveryRequest discovery_request;
     VERIFY_ASSERTION(ads_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
 
-    ASSERT(discovery_request.has_node());
+    EXPECT_TRUE(discovery_request.has_node());
     EXPECT_FALSE(discovery_request.node().id().empty());
     EXPECT_FALSE(discovery_request.node().cluster().empty());
 

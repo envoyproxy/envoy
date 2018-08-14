@@ -211,7 +211,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   // Now setup ADS if needed, this might rely on a primary cluster.
   if (bootstrap.dynamic_resources().has_ads_config()) {
     ads_mux_.reset(new Config::GrpcMuxImpl(
-        local_info.node(),
+        local_info,
         Config::Utility::factoryForGrpcApiConfigSource(
             *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
             ->create(),
