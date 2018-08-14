@@ -9,7 +9,6 @@ namespace Common {
 namespace RBAC {
 
 namespace {
-const Envoy::Http::HeaderMapImpl empty_header = Envoy::Http::HeaderMapImpl();
 const envoy::api::v2::core::Metadata empty_metadata = envoy::api::v2::core::Metadata();
 } // namespace
 
@@ -45,7 +44,7 @@ bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connec
 }
 
 bool RoleBasedAccessControlEngineImpl::allowed(const Network::Connection& connection) const {
-  return allowed(connection, empty_header, empty_metadata, nullptr);
+  return allowed(connection, Http::HeaderMapImpl(), empty_metadata, nullptr);
 }
 
 } // namespace RBAC
