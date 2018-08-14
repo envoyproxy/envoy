@@ -277,7 +277,7 @@ bool ZoneAwareLoadBalancerBase::earlyExitNonLocalityRouting() {
 
 HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
   HostConstSharedPtr host;
-  size_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
+  const size_t max_attempts = context ? context->hostSelectionRetryCount() + 1 : 1;
   for (size_t i = 0; i < max_attempts; ++i) {
     host = chooseHostOnce(context);
 
