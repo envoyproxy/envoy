@@ -49,7 +49,11 @@ public:
   explicit HeaderMapImpl(
       const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
   HeaderMapImpl(const HeaderMap& rhs);
+  // The above constructor for HeaderMap is not an actual copy constructor. This also prevent the
+  // implicit move constructor, moving HeaderMapImpl is unsafe (see HeaderList comments).
   HeaderMapImpl(const HeaderMapImpl& rhs);
+  // Safe copy assignment; this is highly inefficient, don't use this except for tests.
+  HeaderMapImpl& operator=(const HeaderMapImpl& rhs);
 
   /**
    * Add a header via full move. This is the expected high performance paths for codecs populating

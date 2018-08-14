@@ -207,17 +207,6 @@ TestHeaderMapImpl::TestHeaderMapImpl(
 
 TestHeaderMapImpl::TestHeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl(rhs) {}
 
-TestHeaderMapImpl& TestHeaderMapImpl::operator=(const TestHeaderMapImpl& other) {
-  if (&other == this) {
-    return *this;
-  }
-
-  removePrefix(LowerCaseString(""));
-  copyFrom(other);
-
-  return *this;
-}
-
 void TestHeaderMapImpl::addCopy(const std::string& key, const std::string& value) {
   addCopy(LowerCaseString(key), value);
 }

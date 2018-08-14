@@ -853,22 +853,19 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
   }
 }
 
-// Validate that [Test]HeaderMapImpl copy construction works. This is a
+// Validate that HeaderMapImpl copy construction and assignment works. This is a
 // regression for where we were missing a valid copy constructor and had the
 // default (dangerous) move semantics takeover.
 TEST(HeaderMapImplTest, HeaderMapImplyCopy) {
-  {
-    HeaderMapImpl foo;
-    foo.addCopy(LowerCaseString("foo"), "bar");
-    auto headers = std::make_unique<HeaderMapImpl>(foo);
-    EXPECT_STREQ("bar", headers->get(LowerCaseString("foo"))->value().c_str());
-  }
-  {
-    TestHeaderMapImpl foo;
-    foo.addCopy("foo", "bar");
-    auto headers = std::make_unique<TestHeaderMapImpl>(foo);
-    EXPECT_EQ("bar", headers->get_("foo"));
-  }
+  HeaderMapImpl foo;
+  foo.addCopy(LowerCaseString("foo"), "bar");
+  auto headers = std::make_unique<HeaderMapImpl>(foo);
+  EXPECT_STREQ("bar", headers->get(LowerCaseString("foo"))->value().c_str());
+  HeaderMapImpl baz{{LowerCaseString("foo"), "baz"}};
+  baz = *headers;
+  EXPECT_STREQ("bar", baz.get(LowerCaseString("foo"))->value().c_str());
+  baz = baz;
+  EXPECT_STREQ("bar", baz.get(LowerCaseString("foo"))->value().c_str());
 }
 
 } // namespace Http

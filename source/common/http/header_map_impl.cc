@@ -207,6 +207,17 @@ HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(const LowerCaseString& key, Head
 HeaderMapImpl::HeaderEntryImpl::HeaderEntryImpl(HeaderString&& key, HeaderString&& value)
     : key_(std::move(key)), value_(std::move(value)) {}
 
+HeaderMapImpl& HeaderMapImpl::operator=(const HeaderMapImpl& rhs) {
+  if (&rhs == this) {
+    return *this;
+  }
+
+  removePrefix(LowerCaseString(""));
+  copyFrom(rhs);
+
+  return *this;
+}
+
 void HeaderMapImpl::HeaderEntryImpl::value(const char* value, uint32_t size) {
   value_.setCopy(value, size);
 }
@@ -296,7 +307,7 @@ HeaderMapImpl::HeaderMapImpl(
 void HeaderMapImpl::copyFrom(const HeaderMap& header_map) {
   header_map.iterate(
       [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
-        // TODO(mattklein123) PERF: Avoid copying here is not necessary.
+        // TODO(mattklein123) PERF: Avoid copying here if not necessary.
         HeaderString key_string;
         key_string.setCopy(header.key().c_str(), header.key().size());
         HeaderString value_string;
