@@ -57,7 +57,7 @@ public:
 
 private:
   const std::string method_name_;
-  bool invert_;
+  const bool invert_;
 };
 
 class ServiceNameRouteEntryImpl : public RouteEntryImplBase {
@@ -72,7 +72,7 @@ public:
 
 private:
   std::string service_name_;
-  bool invert_;
+  const bool invert_;
 };
 
 class RouteMatcher {

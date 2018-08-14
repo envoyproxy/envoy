@@ -47,12 +47,12 @@ RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& met
 ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
     : RouteEntryImplBase(route), invert_(route.match().invert()) {
-  std::string service_name = route.match().service_name();
+  const std::string service_name = route.match().service_name();
   if (service_name.empty() && invert_) {
     throw EnvoyException("Cannot have an empty service name with inversion enabled");
   }
 
-  if (!service_name.empty() && !StringUtil::endsWith(service_name.c_str(), ":")) {
+  if (!service_name.empty() && !StringUtil::endsWith(service_name, ":")) {
     service_name_ = service_name + ":";
   } else {
     service_name_ = service_name;
