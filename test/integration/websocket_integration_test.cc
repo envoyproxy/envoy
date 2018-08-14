@@ -342,6 +342,7 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
           -> void {
         auto* foo_upgrade = hcm.add_upgrade_configs();
         foo_upgrade->set_upgrade_type("foo");
+        hcm.set_append_x_forwarded_port(true);
       });
 
   config_helper_.addConfigModifier(setRouteUsingWebsocket(nullptr, old_style_websockets_));
@@ -394,7 +395,7 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
                                        "x-envoy-expected-rq-timeout-ms: 15000\r\n\r\n"
                                        "hellobye!";
 
-  std::regex extra_response_headers("x-request-id:.*\r\n");
+  std::regex extra_response_headers("(x-request-id|x-forwarded-port):.*\r\n");
   std::string stripped_data = std::regex_replace(final_data, extra_response_headers, "");
   EXPECT_EQ(upstream_payload, stripped_data);
 }

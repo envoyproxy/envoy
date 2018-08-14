@@ -101,6 +101,7 @@ public:
   bool useRemoteAddress() override { return true; }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
+  bool appendXForwardedPort() const override { return false; }
   const std::string& via() const override { return EMPTY_STRING; }
   Http::ForwardClientCertType forwardClientCert() override {
     return Http::ForwardClientCertType::Sanitize;

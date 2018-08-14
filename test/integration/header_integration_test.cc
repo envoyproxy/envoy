@@ -239,6 +239,7 @@ public:
             route_config->add_response_headers_to_remove("x-routeconfig-response-remove");
             addHeader(route_config->mutable_request_headers_to_add(), "x-routeconfig-request",
                       "routeconfig", append);
+            hcm.set_append_x_forwarded_port(true);
           }
 
           if (use_eds_) {
@@ -378,6 +379,7 @@ protected:
       headers.remove(Envoy::Http::LowerCaseString{"x-envoy-expected-rq-timeout-ms"});
       headers.remove(Envoy::Http::LowerCaseString{"x-envoy-upstream-service-time"});
     }
+    headers.remove(Envoy::Http::LowerCaseString{"x-forwarded-port"});
     headers.remove(Envoy::Http::LowerCaseString{"x-forwarded-proto"});
     headers.remove(Envoy::Http::LowerCaseString{"x-request-id"});
     headers.remove(Envoy::Http::LowerCaseString{"x-envoy-internal"});
