@@ -3,6 +3,8 @@ syntax = "proto3";
 package envoy.config.filter.fault.v2;
 option go_package = "v2";
 
+import "envoy/type/percent.proto";
+
 import "google/protobuf/duration.proto";
 
 import "validate/validate.proto";
@@ -24,7 +26,11 @@ message FaultDelay {
 
   // An integer between 0-100 indicating the percentage of operations/connection requests
   // on which the delay will be injected.
-  uint32 percent = 2 [(validate.rules).uint32.lte = 100];
+  //
+  // .. attention::
+  //
+  //   Use of integer `percent` value is deprecated. Use fractional `percentage` field instead.
+  uint32 percent = 2 [(validate.rules).uint32.lte = 100, deprecated = true];
 
   oneof fault_delay_secifier {
     option (validate.required) = true;
@@ -37,4 +43,7 @@ message FaultDelay {
     google.protobuf.Duration fixed_delay = 3
         [(validate.rules).duration.gt = {}, (gogoproto.stdduration) = true];
   }
+
+  // The percentage of operations/connection requests on which the delay will be injected.
+  envoy.type.FractionalPercent percentage = 4;
 }

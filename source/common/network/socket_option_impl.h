@@ -108,11 +108,11 @@ public:
    * @param socket the socket on which to apply the option.
    * @param optname the option name.
    * @param value the option value.
-   * @return a Api::SysCallResult with rc_ = 0 for success and rc = -1 for failure. If the call is
-   *   successful, errno_ shouldn't be used.
+   * @return a Api::SysCallIntResult with rc_ = 0 for success and rc = -1 for failure. If the call
+   * is successful, errno_ shouldn't be used.
    */
-  static Api::SysCallResult setSocketOption(Socket& socket, Network::SocketOptionName optname,
-                                            absl::string_view value);
+  static Api::SysCallIntResult setSocketOption(Socket& socket, Network::SocketOptionName optname,
+                                               absl::string_view value);
 
 private:
   const envoy::api::v2::core::SocketOption::SocketState in_state_;

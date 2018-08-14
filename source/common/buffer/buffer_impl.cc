@@ -106,7 +106,7 @@ void OwnedImpl::move(Instance& rhs, uint64_t length) {
   static_cast<LibEventInstance&>(rhs).postProcess();
 }
 
-Api::SysCallResult OwnedImpl::read(int fd, uint64_t max_length) {
+Api::SysCallIntResult OwnedImpl::read(int fd, uint64_t max_length) {
   if (max_length == 0) {
     return {0, 0};
   }
@@ -126,13 +126,13 @@ Api::SysCallResult OwnedImpl::read(int fd, uint64_t max_length) {
   ASSERT(num_slices_to_read <= MaxSlices);
   ASSERT(num_bytes_to_read <= max_length);
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const ssize_t rc = os_syscalls.readv(fd, iov, static_cast<int>(num_slices_to_read));
-  const int error = errno;
-  if (rc < 0) {
-    return {static_cast<int>(rc), error};
+  const Api::SysCallSizeResult result =
+      os_syscalls.readv(fd, iov, static_cast<int>(num_slices_to_read));
+  if (result.rc_ < 0) {
+    return {static_cast<int>(result.rc_), result.errno_};
   }
   uint64_t num_slices_to_commit = 0;
-  uint64_t bytes_to_commit = rc;
+  uint64_t bytes_to_commit = result.rc_;
   ASSERT(bytes_to_commit <= max_length);
   while (bytes_to_commit != 0) {
     slices[num_slices_to_commit].len_ =
@@ -143,7 +143,7 @@ Api::SysCallResult OwnedImpl::read(int fd, uint64_t max_length) {
   }
   ASSERT(num_slices_to_commit <= num_slices);
   commit(slices, num_slices_to_commit);
-  return {static_cast<int>(rc), error};
+  return {static_cast<int>(result.rc_), result.errno_};
 }
 
 uint64_t OwnedImpl::reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) {
@@ -164,7 +164,7 @@ ssize_t OwnedImpl::search(const void* data, uint64_t size, size_t start) const {
   return result_ptr.pos;
 }
 
-Api::SysCallResult OwnedImpl::write(int fd) {
+Api::SysCallIntResult OwnedImpl::write(int fd) {
   constexpr uint64_t MaxSlices = 16;
   RawSlice slices[MaxSlices];
   const uint64_t num_slices = std::min(getRawSlices(slices, MaxSlices), MaxSlices);
@@ -181,12 +181,11 @@ Api::SysCallResult OwnedImpl::write(int fd) {
     return {0, 0};
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const ssize_t rc = os_syscalls.writev(fd, iov, num_slices_to_write);
-  const int error = errno;
-  if (rc > 0) {
-    drain(static_cast<uint64_t>(rc));
+  const Api::SysCallSizeResult result = os_syscalls.writev(fd, iov, num_slices_to_write);
+  if (result.rc_ > 0) {
+    drain(static_cast<uint64_t>(result.rc_));
   }
-  return {static_cast<int>(rc), error};
+  return {static_cast<int>(result.rc_), result.errno_};
 }
 
 OwnedImpl::OwnedImpl() : buffer_(evbuffer_new()) {}

@@ -59,6 +59,8 @@ public:
           http_callbacks_ = &callbacks;
           UNREFERENCED_PARAMETER(timeout);
           EXPECT_EQ("POST", std::string(request->headers().Method()->value().c_str()));
+          EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
+                    std::string(request->headers().ContentType()->value().c_str()));
           EXPECT_EQ("eds_cluster", std::string(request->headers().Host()->value().c_str()));
           EXPECT_EQ("/v2/discovery:endpoints",
                     std::string(request->headers().Path()->value().c_str()));
@@ -73,6 +75,8 @@ public:
           }
           expected_request += "}";
           EXPECT_EQ(expected_request, request->bodyAsString());
+          EXPECT_EQ(fmt::FormatInt(expected_request.size()).str(),
+                    std::string(request->headers().ContentLength()->value().c_str()));
           request_in_progress_ = true;
           return &http_request_;
         }));
