@@ -110,7 +110,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
                                priority_state_manager, updated_hosts);
   }
 
-  all_hosts_ = std::move(updated_hosts);
+  updateHostMap(std::move(updated_hosts));
 
   if (!cluster_rebuilt) {
     info_->stats().update_no_rebuild_.inc();

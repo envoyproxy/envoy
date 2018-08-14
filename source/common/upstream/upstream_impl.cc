@@ -1081,7 +1081,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
         }
 
-        parent_.all_hosts_ = std::move(updated_hosts);
+        parent_.updateHostMap(std::move(updated_hosts));
 
         // If there is an initialize callback, fire it now. Note that if the cluster refers to
         // multiple DNS names, this will return initialized after a single DNS resolution

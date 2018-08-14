@@ -615,7 +615,18 @@ protected:
                              HostVector& hosts_removed_from_current_priority,
                              std::unordered_map<std::string, HostSharedPtr>& updated_hosts);
 
-  std::unordered_map<std::string, Upstream::HostSharedPtr> all_hosts_;
+  typedef std::unordered_map<std::string, Upstream::HostSharedPtr> HostMap;
+
+  /**
+   * Updates the internal collection of all hosts. This should be called with the updated
+   * map of hosts after issuing updateDynamicHostList for each priority.
+   *
+   * @param all_hosts the updated map of address to host after a cluster update.
+   */
+  void updateHostMap(HostMap&& all_hosts) { all_hosts_ = std::move(all_hosts); }
+
+private:
+  HostMap all_hosts_;
 };
 
 /**
