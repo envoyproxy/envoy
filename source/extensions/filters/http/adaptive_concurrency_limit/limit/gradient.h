@@ -18,6 +18,8 @@ namespace HttpFilters {
 namespace AdaptiveConcurrencyLimit {
 namespace Limit {
 
+const uint32_t SQRT_LOOKUP_TABLE_SIZE = 1000;
+
 /**
  * Concurrency limit algorithm that adjust the limit based on the gradient of change in the
  * samples minimum Round Trip Time (RTT) and absolute minimum RTT allowing for a queue of
@@ -38,9 +40,11 @@ public:
   void update(const Common::SampleWindow&) override;
 
 private:
-  static double getQueueSize(double estimated_limit);
+  static uint32_t getQueueSize(uint32_t estimated_limit);
   absl::optional<uint32_t> nextProbeCountdown();
 
+  // perf: pre-compute the square root of numbers up to SQRT_LOOKUP_TABLE_SIZE.
+  static const std::vector<uint32_t> sqrt_lookup_table_;
   Runtime::RandomGenerator& random_;
   // The name of the cluster this Limit is being estimated for.
   const std::string cluster_name_;

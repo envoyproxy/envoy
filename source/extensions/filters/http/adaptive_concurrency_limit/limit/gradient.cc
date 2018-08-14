@@ -29,12 +29,22 @@ Gradient::Gradient(
       probe_countdown_(nextProbeCountdown()),
       estimated_limit_((PROTOBUF_GET_WRAPPED_REQUIRED(common_config, initial_limit))) {}
 
-double Gradient::getQueueSize(double estimated_limit) {
+const std::vector<uint32_t> Gradient::sqrt_lookup_table_ = []() -> std::vector<uint32_t> {
+  std::vector<uint32_t> ret;
+  ret.reserve(SQRT_LOOKUP_TABLE_SIZE);
+  for (uint32_t i = 0; i < SQRT_LOOKUP_TABLE_SIZE; i++) {
+    ret.push_back(sqrt(i));
+  }
+  return ret;
+}();
+
+uint32_t Gradient::getQueueSize(uint32_t estimated_limit) {
   // The square root of the limit is used to get queue size
   // because it is better than a fixed queue size that becomes too
   // small for large limits. Moreover, it prevents the limit from growing
   // too much by slowing down growth as the limit grows.
-  return sqrt(estimated_limit);
+  return estimated_limit < SQRT_LOOKUP_TABLE_SIZE ? sqrt_lookup_table_[estimated_limit]
+                                                  : sqrt(estimated_limit);
 }
 
 absl::optional<uint32_t> Gradient::nextProbeCountdown() {
@@ -51,13 +61,13 @@ void Gradient::update(const Common::SampleWindow& sample) {
     return;
   }
 
-  const double queue_size = getQueueSize(estimated_limit_);
+  const uint32_t queue_size = getQueueSize(estimated_limit_);
 
   // Reduce the limit to reduce traffic and probe for a new min_rtt_.
   if (probe_interval_.has_value() && probe_countdown_.has_value()) {
     if (probe_countdown_.value() <= 0) {
       probe_countdown_ = nextProbeCountdown();
-      estimated_limit_ = std::max(min_limit_, static_cast<uint32_t>(queue_size));
+      estimated_limit_ = std::max(min_limit_, queue_size);
       min_rtt_.clear();
       ENVOY_LOG(debug, "Probe min rtt for '{}', estimated limit: {}", cluster_name_,
                 estimated_limit_);
@@ -102,8 +112,7 @@ void Gradient::update(const Common::SampleWindow& sample) {
                                                            smoothing_ * new_limit));
   }
 
-  new_limit = std::max(static_cast<uint32_t>(queue_size),
-                       std::min(max_limit_, static_cast<uint32_t>(new_limit)));
+  new_limit = std::max(queue_size, std::min(max_limit_, static_cast<uint32_t>(new_limit)));
 
   if (sample.didDrop()) {
     ENVOY_LOG(debug, "New estimated_limit for '{}'={} queue_size={} probe_countdown={} drop=true",
