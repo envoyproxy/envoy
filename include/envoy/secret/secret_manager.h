@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/ssl/tls_certificate_config.h"
+#include "envoy/secret/secret_provider.h"
 
 namespace Envoy {
 namespace Secret {
@@ -18,16 +18,25 @@ public:
   virtual ~SecretManager() {}
 
   /**
-   * @param secret a protobuf message of envoy::api::v2::auth::Secret.
-   * @throw an EnvoyException if the secret is invalid or not supported.
+   * @param add a static secret from envoy::api::v2::auth::Secret.
+   * @throw an EnvoyException if the secret is invalid or not supported, or there is duplicate.
    */
-  virtual void addOrUpdateSecret(const envoy::api::v2::auth::Secret& secret) PURE;
+  virtual void addStaticSecret(const envoy::api::v2::auth::Secret& secret) PURE;
 
   /**
-   * @param name a name of the Ssl::TlsCertificateConfig.
-   * @return the TlsCertificate secret. Returns nullptr if the secret is not found.
+   * @param name a name of the static TlsCertificateConfigProvider.
+   * @return the TlsCertificateConfigProviderSharedPtr. Returns nullptr if the static secret is not
+   * found.
    */
-  virtual const Ssl::TlsCertificateConfig* findTlsCertificate(const std::string& name) const PURE;
+  virtual TlsCertificateConfigProviderSharedPtr
+  findStaticTlsCertificateProvider(const std::string& name) const PURE;
+
+  /**
+   * @param tls_certificate the protobuf config of the TLS certificate.
+   * @return a TlsCertificateConfigProviderSharedPtr created from tls_certificate.
+   */
+  virtual TlsCertificateConfigProviderSharedPtr createInlineTlsCertificateProvider(
+      const envoy::api::v2::auth::TlsCertificate& tls_certificate) PURE;
 };
 
 } // namespace Secret

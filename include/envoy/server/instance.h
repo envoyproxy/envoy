@@ -17,6 +17,7 @@
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/listener_manager.h"
 #include "envoy/server/options.h"
+#include "envoy/server/overload_manager.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
@@ -113,6 +114,11 @@ public:
    * @return the server's listener manager.
    */
   virtual ListenerManager& listenerManager() PURE;
+
+  /**
+   * @return the server's overload manager.
+   */
+  virtual OverloadManager& overloadManager() PURE;
 
   /**
    * @return the server's secret manager

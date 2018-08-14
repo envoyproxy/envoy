@@ -48,6 +48,8 @@ public:
   MOCK_CONST_METHOD0(perConnectionBufferLimitBytes, uint32_t());
   MOCK_CONST_METHOD0(features, uint64_t());
   MOCK_CONST_METHOD0(http2Settings, const Http::Http2Settings&());
+  MOCK_CONST_METHOD1(extensionProtocolOptions,
+                     ProtocolOptionsConfigConstSharedPtr(const std::string&));
   MOCK_CONST_METHOD0(lbConfig, const envoy::api::v2::Cluster::CommonLbConfig&());
   MOCK_CONST_METHOD0(lbType, LoadBalancerType());
   MOCK_CONST_METHOD0(type, envoy::api::v2::Cluster::DiscoveryType());
@@ -71,6 +73,7 @@ public:
 
   std::string name_{"fake_cluster"};
   Http::Http2Settings http2_settings_{};
+  ProtocolOptionsConfigConstSharedPtr extension_protocol_options_;
   uint64_t max_requests_per_connection_{};
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   ClusterStats stats_;

@@ -677,10 +677,11 @@ TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   EXPECT_CALL(*client_write_buffer_, move(_))
       .WillRepeatedly(DoAll(AddBufferToStringWithoutDraining(&data_written),
                             Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove)));
-  EXPECT_CALL(*client_write_buffer_, write(_)).WillOnce(Invoke([&](int fd) -> Api::SysCallResult {
-    dispatcher_->exit();
-    return client_write_buffer_->failWrite(fd);
-  }));
+  EXPECT_CALL(*client_write_buffer_, write(_))
+      .WillOnce(Invoke([&](int fd) -> Api::SysCallIntResult {
+        dispatcher_->exit();
+        return client_write_buffer_->failWrite(fd);
+      }));
   // The write() call on the connection will buffer enough data to bring the connection above the
   // high watermark and as the data will not flush it should not return below the watermark.
   EXPECT_CALL(client_callbacks_, onAboveWriteBufferHighWatermark());
@@ -763,7 +764,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
         .WillOnce(Invoke(client_write_buffer_, &MockWatermarkBuffer::baseMove));
     EXPECT_CALL(*client_write_buffer_, write(_))
         .WillOnce(DoAll(Invoke([&](int) -> void { client_write_buffer_->drain(bytes_to_flush); }),
-                        Return(Api::SysCallResult{bytes_to_flush, 0})))
+                        Return(Api::SysCallIntResult{bytes_to_flush, 0})))
         .WillRepeatedly(testing::Invoke(client_write_buffer_, &MockWatermarkBuffer::failWrite));
     client_connection_->write(buffer_to_write, false);
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);

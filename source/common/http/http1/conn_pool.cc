@@ -82,6 +82,8 @@ void ConnPoolImpl::createNewConnection() {
 
 ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_decoder,
                                                      ConnectionPool::Callbacks& callbacks) {
+  host_->cluster().stats().upstream_rq_total_.inc();
+  host_->stats().rq_total_.inc();
   if (!ready_clients_.empty()) {
     ready_clients_.front()->moveBetweenLists(ready_clients_, busy_clients_);
     ENVOY_CONN_LOG(debug, "using existing connection", *busy_clients_.front()->codec_client_);
@@ -144,6 +146,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       // The only time this happens is if we actually saw a connect failure.
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
+
       removed = client.removeFromList(busy_clients_);
 
       // Raw connect failures should never happen under normal circumstances. If we have an upstream
@@ -264,9 +267,7 @@ ConnPoolImpl::StreamWrapper::StreamWrapper(StreamDecoder& response_decoder, Acti
       StreamDecoderWrapper(response_decoder), parent_(parent) {
 
   StreamEncoderWrapper::inner_.getStream().addCallbacks(*this);
-  parent_.parent_.host_->cluster().stats().upstream_rq_total_.inc();
   parent_.parent_.host_->cluster().stats().upstream_rq_active_.inc();
-  parent_.parent_.host_->stats().rq_total_.inc();
   parent_.parent_.host_->stats().rq_active_.inc();
 }
 

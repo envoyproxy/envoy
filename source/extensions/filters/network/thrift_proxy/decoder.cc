@@ -7,6 +7,9 @@
 #include "common/common/assert.h"
 #include "common/common/macros.h"
 
+#include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "extensions/filters/network/thrift_proxy/protocol_impl.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -14,18 +17,14 @@ namespace ThriftProxy {
 
 // MessageBegin -> StructBegin
 DecoderStateMachine::DecoderStatus DecoderStateMachine::messageBegin(Buffer::Instance& buffer) {
-  std::string message_name;
-  MessageType msg_type;
-  int32_t seq_id;
-  if (!proto_.readMessageBegin(buffer, message_name, msg_type, seq_id)) {
+  if (!proto_.readMessageBegin(buffer, *metadata_)) {
     return DecoderStatus(ProtocolState::WaitForData);
   }
 
   stack_.clear();
   stack_.emplace_back(Frame(ProtocolState::MessageEnd));
 
-  return DecoderStatus(ProtocolState::StructBegin,
-                       filter_.messageBegin(absl::string_view(message_name), msg_type, seq_id));
+  return DecoderStatus(ProtocolState::StructBegin, filter_.messageBegin(metadata_));
 }
 
 // MessageEnd -> Done
@@ -375,8 +374,11 @@ ThriftFilters::FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer
 
   if (!frame_started_) {
     // Look for start of next frame.
-    absl::optional<uint32_t> size{};
-    if (!transport_->decodeFrameStart(data, size)) {
+    if (!metadata_) {
+      metadata_ = std::make_shared<MessageMetadata>();
+    }
+
+    if (!transport_->decodeFrameStart(data, *metadata_)) {
       ENVOY_LOG(debug, "thrift: need more data for {} transport start", transport_->name());
       buffer_underflow = true;
       return ThriftFilters::FilterStatus::Continue;
@@ -385,9 +387,10 @@ ThriftFilters::FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer
 
     request_ = std::make_unique<ActiveRequest>(callbacks_.newDecoderFilter());
     frame_started_ = true;
-    state_machine_ = std::make_unique<DecoderStateMachine>(*protocol_, request_->filter_);
+    state_machine_ =
+        std::make_unique<DecoderStateMachine>(*protocol_, metadata_, request_->filter_);
 
-    if (request_->filter_.transportBegin(size) == ThriftFilters::FilterStatus::StopIteration) {
+    if (request_->filter_.transportBegin(metadata_) == ThriftFilters::FilterStatus::StopIteration) {
       return ThriftFilters::FilterStatus::StopIteration;
     }
   }
@@ -417,6 +420,7 @@ ThriftFilters::FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer
   }
 
   frame_ended_ = true;
+  metadata_.reset();
 
   ENVOY_LOG(debug, "thrift: {} transport ended", transport_->name());
   if (request_->filter_.transportEnd() == ThriftFilters::FilterStatus::StopIteration) {

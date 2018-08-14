@@ -156,6 +156,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/common:macros",
         "//source/common/common:version_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/common/stats:stats_lib",
     ],
 )
@@ -167,6 +168,7 @@ envoy_cc_library(
     deps = [
         "//include/envoy/server:overload_manager_interface",
         "//include/envoy/stats:stats_interface",
+        "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:logger_lib",
         "//source/common/config:utility_lib",
         "//source/server:resource_monitor_config_lib",
@@ -310,6 +312,7 @@ envoy_cc_library(
         "//source/common/stats:thread_local_store_lib",
         "//source/common/upstream:cluster_manager_lib",
         "//source/common/upstream:health_discovery_service_lib",
+        "//source/server:overload_manager_lib",
         "//source/server/http:admin_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
     ],
