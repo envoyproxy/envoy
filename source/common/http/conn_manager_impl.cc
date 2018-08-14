@@ -67,8 +67,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
 
 const HeaderMapImpl& ConnectionManagerImpl::continueHeader() {
   CONSTRUCT_ON_FIRST_USE(HeaderMapImpl,
-                         Http::HeaderMapImpl{{Http::Headers::get().Status,
-                                              std::to_string(enumToInt(Code::Continue))}});
+                         {Http::Headers::get().Status, std::to_string(enumToInt(Code::Continue))});
 }
 
 void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {

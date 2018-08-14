@@ -35,7 +35,7 @@ public:                                                                         
  * paths use O(1) direct access. In general, we try to copy as little as possible and allocate as
  * little as possible in any of the paths.
  */
-class HeaderMapImpl : public HeaderMap {
+class HeaderMapImpl : public HeaderMap, NonCopyable {
 public:
   /**
    * Appends data to header. If header already has a value, the string ',' is added between the
@@ -48,12 +48,7 @@ public:
   HeaderMapImpl();
   explicit HeaderMapImpl(
       const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
-  HeaderMapImpl(const HeaderMap& rhs);
-  // The above constructor for HeaderMap is not an actual copy constructor. This also prevent the
-  // implicit move constructor, moving HeaderMapImpl is unsafe (see HeaderList comments).
-  HeaderMapImpl(const HeaderMapImpl& rhs);
-  // Safe copy assignment; this is highly inefficient, don't use this except for tests.
-  HeaderMapImpl& operator=(const HeaderMapImpl& rhs);
+  explicit HeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl() { copyFrom(rhs); }
 
   /**
    * Add a header via full move. This is the expected high performance paths for codecs populating
@@ -87,6 +82,7 @@ public:
 
 protected:
   void copyFrom(const HeaderMap& rhs);
+  void clear() { removePrefix(LowerCaseString("")); }
 
   struct HeaderEntryImpl : public HeaderEntry, NonCopyable {
     HeaderEntryImpl(const LowerCaseString& key);
