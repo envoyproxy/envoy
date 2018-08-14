@@ -34,13 +34,12 @@ namespace {
 // is provided in [grpc_]subscription_impl_test.cc.
 class GrpcMuxImplTest : public testing::Test {
 public:
-  GrpcMuxImplTest()
-      : async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()), time_source_{} {
-  }
+  GrpcMuxImplTest() : async_client_(new Grpc::MockAsyncClient()), time_source_{} {}
 
   void setup() {
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
+      timer_ = new Event::MockTimer();
       return timer_;
     }));
 
