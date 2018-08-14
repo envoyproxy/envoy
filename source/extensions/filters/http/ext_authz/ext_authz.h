@@ -39,8 +39,9 @@ public:
                Runtime::Loader& runtime, Upstream::ClusterManager& cm)
       : local_info_(local_info), scope_(scope), runtime_(runtime), cm_(cm),
         cluster_name_(config.grpc_service().envoy_grpc().cluster_name()),
-        response_headers_to_remove_(config.http_service().response_headers_to_remove().begin(),
-                                    config.http_service().response_headers_to_remove().end()),
+        allowed_authorization_headers_(
+            toAuthorizationHeaders(config.http_service().allowed_authorization_headers())),
+        allowed_request_headers_(toRequestHeaders(config.http_service().allowed_request_headers())),
         failure_mode_allow_(config.failure_mode_allow()) {}
 
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
@@ -48,18 +49,44 @@ public:
   Stats::Scope& scope() { return scope_; }
   std::string cluster() { return cluster_name_; }
   Upstream::ClusterManager& cm() { return cm_; }
-  const std::vector<Http::LowerCaseString>& responseHeadersToRemove() {
-    return response_headers_to_remove_;
+  const Http::LowerCaseStrUnorderedSet& allowedAuthorizationHeaders() {
+    return allowed_authorization_headers_;
   }
+  const Http::LowerCaseStrUnorderedSet& allowedRequestHeaders() { return allowed_request_headers_; }
+
   bool failureModeAllow() const { return failure_mode_allow_; }
 
 private:
+  static Http::LowerCaseStrUnorderedSet toRequestHeaders(
+      const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& request_headers) {
+    Http::LowerCaseStrUnorderedSet headers;
+    headers.reserve(request_headers.size() + 3);
+    headers.emplace(Http::Headers::get().Path);
+    headers.emplace(Http::Headers::get().Method);
+    headers.emplace(Http::Headers::get().Host);
+    for (const auto& header : request_headers) {
+      headers.emplace(header);
+    }
+    return headers;
+  }
+
+  static Http::LowerCaseStrUnorderedSet toAuthorizationHeaders(
+      const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& response_headers) {
+    Http::LowerCaseStrUnorderedSet headers;
+    headers.reserve(response_headers.size());
+    for (const auto& header : response_headers) {
+      headers.emplace(header);
+    }
+    return headers;
+  }
+
   const LocalInfo::LocalInfo& local_info_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Upstream::ClusterManager& cm_;
   std::string cluster_name_;
-  std::vector<Http::LowerCaseString> response_headers_to_remove_;
+  Http::LowerCaseStrUnorderedSet allowed_authorization_headers_;
+  Http::LowerCaseStrUnorderedSet allowed_request_headers_;
   bool failure_mode_allow_;
 };
 

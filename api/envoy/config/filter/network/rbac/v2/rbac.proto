@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package envoy.config.filter.network.rbac.v2;
+option go_package = "v2";
+
+import "envoy/config/rbac/v2alpha/rbac.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+// [#protodoc-title: RBAC]
+// Role-Based Access Control :ref:`configuration overview <config_network_filters_rbac>`.
+
+// RBAC network filter config.
+//
+// Header and Metadata should not be used in rules/shadow_rules in RBAC network filter as
+// this information is only available in :ref:`RBAC http filter <config_http_filters_rbac>`.
+message RBAC {
+  // Specify the RBAC rules to be applied globally.
+  // If absent, no enforcing RBAC policy will be applied.
+  config.rbac.v2alpha.RBAC rules = 1;
+
+  // Shadow rules are not enforced by the filter but will emit stats and logs
+  // and can be used for rule testing.
+  // If absent, no shadow RBAC policy will be applied.
+  config.rbac.v2alpha.RBAC shadow_rules = 2;
+
+  // The prefix to use when emitting statistics.
+  string stat_prefix = 3 [(validate.rules).string.min_bytes = 1];
+}

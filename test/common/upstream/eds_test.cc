@@ -54,10 +54,9 @@ protected:
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
-    Envoy::Stats::ScopePtr scope = stats_.createScope(
-        fmt::format("cluster.{}.", eds_cluster_.alt_stat_name().empty()
-                                       ? eds_cluster_.name()
-                                       : std::string(eds_cluster_.alt_stat_name())));
+    Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.",
+        eds_cluster_.alt_stat_name().empty() ? eds_cluster_.name() : eds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_);
     cluster_.reset(
@@ -396,6 +395,100 @@ TEST_F(EdsTest, EndpointRemoval) {
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 1);
+  }
+}
+
+// Verifies that if an endpoint is moved between priorities, the health check value
+// of the host is preserved
+TEST_F(EdsTest, EndpointMoved) {
+  resetCluster(R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      type: EDS
+      lb_policy: ROUND_ROBIN
+      drain_connections_on_host_removal: true
+      eds_cluster_config:
+        service_name: fare
+        eds_config:
+          api_config_source:
+            cluster_names:
+            - eds
+            refresh_delay: 1s
+  )EOF");
+
+  auto health_checker = std::make_shared<MockHealthChecker>();
+  EXPECT_CALL(*health_checker, start());
+  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+  cluster_->setHealthChecker(health_checker);
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
+  auto* cluster_load_assignment = resources.Add();
+  cluster_load_assignment->set_cluster_name("fare");
+
+  auto add_endpoint = [cluster_load_assignment](int port, int priority) {
+    auto* endpoints = cluster_load_assignment->add_endpoints();
+    endpoints->set_priority(priority);
+
+    auto* socket_address = endpoints->add_lb_endpoints()
+                               ->mutable_endpoint()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_address("1.2.3.4");
+    socket_address->set_port_value(port);
+  };
+
+  add_endpoint(80, 0);
+  add_endpoint(81, 1);
+
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    // Mark the host as healthy
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    // Mark the host as healthy
+    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+  }
+
+  // Moves the endpoints between priorities
+  cluster_load_assignment->clear_endpoints();
+  add_endpoint(81, 0);
+  add_endpoint(80, 1);
+
+  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+    //
+    // assert that it moved
+    EXPECT_EQ(hosts[0]->address()->asString(), "1.2.3.4:81");
+
+    // The endpoint was healthy in the original priority, so moving it
+    // around should preserve that.
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(hosts.size(), 1);
+
+    // assert that it moved
+    EXPECT_EQ(hosts[0]->address()->asString(), "1.2.3.4:80");
+
+    // The endpoint was healthy in the original priority, so moving it
+    // around should preserve that.
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   }
 }
 

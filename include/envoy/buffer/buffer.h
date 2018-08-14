@@ -8,6 +8,8 @@
 #include "envoy/api/os_sys_calls.h"
 #include "envoy/common/pure.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Buffer {
 
@@ -78,6 +80,19 @@ public:
   virtual void add(const Instance& data) PURE;
 
   /**
+   * Prepend a string_view to the buffer.
+   * @param data supplies the string_view to copy.
+   */
+  virtual void prepend(absl::string_view data) PURE;
+
+  /**
+   * Prepend data from another buffer to this buffer.
+   * The supplied buffer is drained after this operation.
+   * @param data supplies the buffer to copy.
+   */
+  virtual void prepend(Instance& data) PURE;
+
+  /**
    * Commit a set of slices originally obtained from reserve(). The number of slices can be
    * different from the number obtained from reserve(). The size of each slice can also be altered.
    * @param iovecs supplies the array of slices to commit.
@@ -143,10 +158,10 @@ public:
    * Read from a file descriptor directly into the buffer.
    * @param fd supplies the descriptor to read from.
    * @param max_length supplies the maximum length to read.
-   * @return a Api::SysCallResult with rc_ = the number of bytes read if successful, or rc_ = -1
+   * @return a Api::SysCallIntResult with rc_ = the number of bytes read if successful, or rc_ = -1
    *   for failure. If the call is successful, errno_ shouldn't be used.
    */
-  virtual Api::SysCallResult read(int fd, uint64_t max_length) PURE;
+  virtual Api::SysCallIntResult read(int fd, uint64_t max_length) PURE;
 
   /**
    * Reserve space in the buffer.
@@ -175,10 +190,10 @@ public:
   /**
    * Write the buffer out to a file descriptor.
    * @param fd supplies the descriptor to write to.
-   * @return a Api::SysCallResult with rc_ = the number of bytes written if successful, or rc_ = -1
-   *   for failure. If the call is successful, errno_ shouldn't be used.
+   * @return a Api::SysCallIntResult with rc_ = the number of bytes written if successful, or rc_ =
+   * -1 for failure. If the call is successful, errno_ shouldn't be used.
    */
-  virtual Api::SysCallResult write(int fd) PURE;
+  virtual Api::SysCallIntResult write(int fd) PURE;
 };
 
 typedef std::unique_ptr<Instance> InstancePtr;

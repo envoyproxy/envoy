@@ -120,7 +120,7 @@ public:
       reply_headers->addReference(value.first, value.second);
     }
     expectInitialMetadata(metadata);
-    fake_stream_->encodeHeaders(*reply_headers, false);
+    fake_stream_->encodeHeaders(Http::HeaderMapImpl(*reply_headers), false);
   }
 
   void sendReply() {
@@ -499,7 +499,7 @@ public:
   }
 
   bool use_client_cert_{};
-  Secret::MockSecretManager secret_manager_;
+  NiceMock<Secret::MockSecretManager> secret_manager_;
 };
 
 } // namespace

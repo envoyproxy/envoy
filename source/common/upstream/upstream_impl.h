@@ -353,6 +353,8 @@ public:
   }
   uint64_t features() const override { return features_; }
   const Http::Http2Settings& http2Settings() const override { return http2_settings_; }
+  ProtocolOptionsConfigConstSharedPtr
+  extensionProtocolOptions(const std::string& name) const override;
   LoadBalancerType lbType() const override { return lb_type_; }
   envoy::api::v2::Cluster::DiscoveryType type() const override { return type_; }
   const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&
@@ -412,6 +414,7 @@ private:
   mutable ClusterLoadReportStats load_report_stats_;
   const uint64_t features_;
   const Http::Http2Settings http2_settings_;
+  const std::map<std::string, ProtocolOptionsConfigConstSharedPtr> extension_protocol_options_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
   const Network::Address::InstanceConstSharedPtr source_address_;
@@ -602,8 +605,37 @@ class BaseDynamicClusterImpl : public ClusterImplBase {
 protected:
   using ClusterImplBase::ClusterImplBase;
 
-  bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_hosts,
-                             HostVector& hosts_added, HostVector& hosts_removed);
+  /**
+   * Updates the host list of a single priority by reconciling the list of new hosts
+   * with existing hosts.
+   *
+   * @param new_hosts the full lists of hosts in the new configuration.
+   * @param current_priority_hosts the full lists of hosts for the priority to be updated. The list
+   * will be modified to contain the updated list of hosts.
+   * @param hosts_added_to_current_priority will be populated with hosts added to the priority.
+   * @param hosts_removed_from_current_priority will be populated with hosts removed from the
+   * priority.
+   * @param updated_hosts is used to aggregate the new state of all hosts accross priority, and will
+   * be updated with the hosts that remain in this priority after the update.
+   * @return whether the hosts for the priority changed.
+   */
+  bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_priority_hosts,
+                             HostVector& hosts_added_to_current_priority,
+                             HostVector& hosts_removed_from_current_priority,
+                             std::unordered_map<std::string, HostSharedPtr>& updated_hosts);
+
+  typedef std::unordered_map<std::string, Upstream::HostSharedPtr> HostMap;
+
+  /**
+   * Updates the internal collection of all hosts. This should be called with the updated
+   * map of hosts after issuing updateDynamicHostList for each priority.
+   *
+   * @param all_hosts the updated map of address to host after a cluster update.
+   */
+  void updateHostMap(HostMap&& all_hosts) { all_hosts_ = std::move(all_hosts); }
+
+private:
+  HostMap all_hosts_;
 };
 
 /**

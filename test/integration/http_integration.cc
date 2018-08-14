@@ -109,6 +109,13 @@ IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers, uint
   return response;
 }
 
+void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, absl::string_view data,
+                                      bool end_stream) {
+  Buffer::OwnedImpl buffer_data(data.data(), data.size());
+  encoder.encodeData(buffer_data, end_stream);
+  flushWrite();
+}
+
 void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, Buffer::Instance& data,
                                       bool end_stream) {
   encoder.encodeData(data, end_stream);
@@ -409,7 +416,6 @@ void HttpIntegrationTest::testComputedHealthCheck() {
 name: envoy.health_check
 config:
     pass_through_mode: false
-    endpoint: /healthcheck
     cluster_min_healthy_percentages:
         example_cluster_name: { value: 75 }
 )EOF");

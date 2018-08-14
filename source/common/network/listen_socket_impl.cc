@@ -16,7 +16,7 @@ namespace Envoy {
 namespace Network {
 
 void ListenSocketImpl::doBind() {
-  const Api::SysCallResult result = local_address_->bind(fd_);
+  const Api::SysCallIntResult result = local_address_->bind(fd_);
   if (result.rc_ == -1) {
     close();
     throw EnvoyException(

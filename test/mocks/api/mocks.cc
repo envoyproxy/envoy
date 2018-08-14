@@ -20,41 +20,41 @@ MockOsSysCalls::MockOsSysCalls() { num_writes_ = num_open_ = 0; }
 
 MockOsSysCalls::~MockOsSysCalls() {}
 
-int MockOsSysCalls::open(const std::string& full_path, int flags, int mode) {
+SysCallIntResult MockOsSysCalls::open(const std::string& full_path, int flags, int mode) {
   Thread::LockGuard lock(open_mutex_);
 
-  int result = open_(full_path, flags, mode);
+  int rc = open_(full_path, flags, mode);
   num_open_++;
   open_event_.notifyOne();
 
-  return result;
+  return SysCallIntResult{rc, errno};
 }
 
-ssize_t MockOsSysCalls::write(int fd, const void* buffer, size_t num_bytes) {
+SysCallSizeResult MockOsSysCalls::write(int fd, const void* buffer, size_t num_bytes) {
   Thread::LockGuard lock(write_mutex_);
 
-  ssize_t result = write_(fd, buffer, num_bytes);
+  ssize_t rc = write_(fd, buffer, num_bytes);
   num_writes_++;
   write_event_.notifyOne();
 
-  return result;
+  return SysCallSizeResult{rc, errno};
 }
 
-int MockOsSysCalls::setsockopt(int sockfd, int level, int optname, const void* optval,
-                               socklen_t optlen) {
+SysCallIntResult MockOsSysCalls::setsockopt(int sockfd, int level, int optname, const void* optval,
+                                            socklen_t optlen) {
   ASSERT(optlen == sizeof(int));
 
   // Allow mocking system call failure.
   if (setsockopt_(sockfd, level, optname, optval, optlen) != 0) {
-    return -1;
+    return SysCallIntResult{-1, 0};
   }
 
   boolsockopts_[SockOptKey(sockfd, level, optname)] = !!*reinterpret_cast<const int*>(optval);
-  return 0;
+  return SysCallIntResult{0, 0};
 };
 
-int MockOsSysCalls::getsockopt(int sockfd, int level, int optname, void* optval,
-                               socklen_t* optlen) {
+SysCallIntResult MockOsSysCalls::getsockopt(int sockfd, int level, int optname, void* optval,
+                                            socklen_t* optlen) {
   ASSERT(*optlen == sizeof(int));
   int val = 0;
   const auto& it = boolsockopts_.find(SockOptKey(sockfd, level, optname));
@@ -63,10 +63,10 @@ int MockOsSysCalls::getsockopt(int sockfd, int level, int optname, void* optval,
   }
   // Allow mocking system call failure.
   if (getsockopt_(sockfd, level, optname, optval, optlen) != 0) {
-    return -1;
+    return {-1, 0};
   }
   *reinterpret_cast<int*>(optval) = val;
-  return 0;
+  return {0, 0};
 }
 
 } // namespace Api
