@@ -179,8 +179,8 @@ struct RequestInfoImpl : public RequestInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  FilterState& perRequestState() override { return metadata2_; }
-  const FilterState& perRequestState() const override { return metadata2_; }
+  FilterState& perRequestState() override { return per_request_state_; }
+  const FilterState& perRequestState() const override { return per_request_state_; }
 
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
@@ -201,7 +201,7 @@ struct RequestInfoImpl : public RequestInfo {
   bool hc_request_{};
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
-  DynamicMetadataImpl metadata2_{};
+  FilterStateImpl per_request_state_{};
 
 private:
   uint64_t bytes_received_{};

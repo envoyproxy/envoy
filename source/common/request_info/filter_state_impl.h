@@ -9,7 +9,7 @@
 namespace Envoy {
 namespace RequestInfo {
 
-class DynamicMetadataImpl : public FilterState {
+class FilterStateImpl : public FilterState {
 public:
   // FilterState
   void setData(absl::string_view data_name, std::unique_ptr<Object>&& data) override;

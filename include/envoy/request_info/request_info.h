@@ -303,9 +303,10 @@ public:
   virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
 
   /**
-   * More general dynamic metadata object.
-   * TODO(rdsmith): Replace uses of above with this object.
-   * @return the dynamic metadata associated with this request.
+   * Object on which filters can share data on a per-request basis.
+   * Only one filter can produce a named data object, but it may be
+   * consumed by many other objects.
+   * @return the per-request state associated with this request.
    */
   virtual FilterState& perRequestState() PURE;
   virtual const FilterState& perRequestState() const PURE;

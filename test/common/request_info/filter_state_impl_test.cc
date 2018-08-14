@@ -43,20 +43,20 @@ private:
   int value_;
 };
 
-class DynamicMetadataImplTest : public testing::Test {
+class FilterStateImplTest : public testing::Test {
 public:
-  DynamicMetadataImplTest() { resetDynamicMetadata(); }
+  FilterStateImplTest() { resetDynamicMetadata(); }
 
-  void resetDynamicMetadata() { dynamic_metadata_ = std::make_unique<DynamicMetadataImpl>(); }
+  void resetDynamicMetadata() { dynamic_metadata_ = std::make_unique<FilterStateImpl>(); }
   FilterState& dynamic_metadata() { return *dynamic_metadata_; }
 
 private:
-  std::unique_ptr<DynamicMetadataImpl> dynamic_metadata_;
+  std::unique_ptr<FilterStateImpl> dynamic_metadata_;
 };
 
 } // namespace
 
-TEST_F(DynamicMetadataImplTest, Simple) {
+TEST_F(FilterStateImplTest, Simple) {
   size_t access_count = 0u;
   size_t destruction_count = 0u;
   dynamic_metadata().setData(
@@ -73,7 +73,7 @@ TEST_F(DynamicMetadataImplTest, Simple) {
   EXPECT_EQ(1u, destruction_count);
 }
 
-TEST_F(DynamicMetadataImplTest, SameTypes) {
+TEST_F(FilterStateImplTest, SameTypes) {
   size_t access_count_1 = 0u;
   size_t access_count_2 = 0u;
   size_t destruction_count = 0u;
@@ -98,7 +98,7 @@ TEST_F(DynamicMetadataImplTest, SameTypes) {
   EXPECT_EQ(2u, destruction_count);
 }
 
-TEST_F(DynamicMetadataImplTest, SimpleType) {
+TEST_F(FilterStateImplTest, SimpleType) {
   dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(1));
   dynamic_metadata().setData("test_2", std::make_unique<SimpleType>(2));
 
@@ -106,7 +106,7 @@ TEST_F(DynamicMetadataImplTest, SimpleType) {
   EXPECT_EQ(2, dynamic_metadata().getData<SimpleType>("test_2").access());
 }
 
-TEST_F(DynamicMetadataImplTest, NameConflict) {
+TEST_F(FilterStateImplTest, NameConflict) {
   dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(1));
   EXPECT_THROW_WITH_MESSAGE(dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(2)),
                             EnvoyException,
@@ -114,7 +114,7 @@ TEST_F(DynamicMetadataImplTest, NameConflict) {
   EXPECT_EQ(1, dynamic_metadata().getData<SimpleType>("test_1").access());
 }
 
-TEST_F(DynamicMetadataImplTest, NameConflictDifferentTypes) {
+TEST_F(FilterStateImplTest, NameConflictDifferentTypes) {
   dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(1));
   EXPECT_THROW_WITH_MESSAGE(
       dynamic_metadata().setData("test_1",
@@ -122,12 +122,12 @@ TEST_F(DynamicMetadataImplTest, NameConflictDifferentTypes) {
       EnvoyException, "FilterState::setData<T> called twice with same name.");
 }
 
-TEST_F(DynamicMetadataImplTest, UnknownName) {
+TEST_F(FilterStateImplTest, UnknownName) {
   EXPECT_THROW_WITH_MESSAGE(dynamic_metadata().getData<SimpleType>("test_1"), EnvoyException,
                             "FilterState::getData<T> called for unknown data name.");
 }
 
-TEST_F(DynamicMetadataImplTest, WrongTypeGet) {
+TEST_F(FilterStateImplTest, WrongTypeGet) {
   dynamic_metadata().setData("test_name",
                              std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr));
   EXPECT_EQ(5, dynamic_metadata().getData<TestStoredTypeTracking>("test_name").access());
@@ -145,7 +145,7 @@ class C : public B {};
 
 } // namespace
 
-TEST_F(DynamicMetadataImplTest, FungibleInheritance) {
+TEST_F(FilterStateImplTest, FungibleInheritance) {
   dynamic_metadata().setData("testB", std::make_unique<B>());
   EXPECT_TRUE(dynamic_metadata().hasData<B>("testB"));
   EXPECT_TRUE(dynamic_metadata().hasData<A>("testB"));
@@ -157,7 +157,7 @@ TEST_F(DynamicMetadataImplTest, FungibleInheritance) {
   EXPECT_TRUE(dynamic_metadata().hasData<C>("testC"));
 }
 
-TEST_F(DynamicMetadataImplTest, HasData) {
+TEST_F(FilterStateImplTest, HasData) {
   dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(1));
   EXPECT_TRUE(dynamic_metadata().hasData<SimpleType>("test_1"));
   EXPECT_FALSE(dynamic_metadata().hasData<SimpleType>("test_2"));

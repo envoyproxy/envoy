@@ -157,9 +157,9 @@ public:
   };
 
   const ::Envoy::RequestInfo::FilterState& perRequestState() const override {
-    return metadata2_;
+    return per_request_state_;
   }
-  ::Envoy::RequestInfo::FilterState& perRequestState() override { return metadata2_; }
+  ::Envoy::RequestInfo::FilterState& perRequestState() override { return per_request_state_; }
 
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
@@ -183,7 +183,7 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
-  ::Envoy::RequestInfo::DynamicMetadataImpl metadata2_{};
+  ::Envoy::RequestInfo::FilterStateImpl  per_request_state_{};
 };
 
 } // namespace Envoy

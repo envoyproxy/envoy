@@ -33,10 +33,10 @@ std::string formatUpstreamMetadataParseException(absl::string_view params,
                      params, reason);
 }
 
-std::string formatDynamicMetadataParseException(absl::string_view params) {
+std::string formatFilterStateParseException(absl::string_view params) {
   return fmt::format("Invalid header configuration. Expected format "
-                     "DYNAMIC_METADATA(\"<data_name>\"), actual format "
-                     "DYNAMIC_METADATA{}",
+                     "PER_REQUEST_STATE(\"<data_name>\"), actual format "
+                     "PER_REQUEST_STATE{}",
                      params);
 }
 
@@ -122,21 +122,21 @@ parseUpstreamMetadataField(absl::string_view params_str) {
   };
 }
 
-// Parses the parameters for DYNAMIC_METADATA and returns a function suitable for accessing the
+// Parses the parameters for PER_REQUEST_STATE and returns a function suitable for accessing the
 // specified metadata from an RequestInfo::RequestInfo. Expects a string formatted as:
-//   ("<metadata_name>")
-// The metadata name is expected to be in reverse DNS format, though this is not enforced by
+//   ("<state_name>")
+// The state name is expected to be in reverse DNS format, though this is not enforced by
 // this function.
 std::function<std::string(const Envoy::RequestInfo::RequestInfo&)>
-parseDynamicMetadataField(absl::string_view param_str) {
+parseFilterStateField(absl::string_view param_str) {
   param_str = StringUtil::trim(param_str);
   if (param_str.empty() || param_str.front() != '(' || param_str.back() != ')') {
-    throw EnvoyException(formatDynamicMetadataParseException(param_str));
+    throw EnvoyException(formatFilterStateParseException(param_str));
   }
   absl::string_view param_str2 = param_str.substr(1, param_str.size() - 2); // trim parens
 
   if (param_str2.empty() || param_str2.front() != '"' || param_str2.back() != '"') {
-    throw EnvoyException(formatDynamicMetadataParseException(param_str));
+    throw EnvoyException(formatFilterStateParseException(param_str));
   }
   std::string param =
       static_cast<std::string>(param_str2.substr(1, param_str2.size() - 2)); // trim quotes
@@ -151,7 +151,7 @@ parseDynamicMetadataField(absl::string_view param_str) {
 
     // Value exists but isn't string accessible is a contract violation; throw an error.
     if (!dynamic_metadata.hasData<StringAccessor>(param)) {
-      throw EnvoyException(fmt::format("Invalid header information: DYNAMIC_METADATA value \"{}\" "
+      throw EnvoyException(fmt::format("Invalid header information: PER_REQUEST_STATE value \"{}\" "
                                        "exists but is not string accessible",
                                        param));
     }
@@ -197,9 +197,9 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
   } else if (field_name.find("UPSTREAM_METADATA") == 0) {
     field_extractor_ =
         parseUpstreamMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));
-  } else if (field_name.find("DYNAMIC_METADATA") == 0) {
+  } else if (field_name.find("PER_REQUEST_STATE") == 0) {
     field_extractor_ =
-        parseDynamicMetadataField(field_name.substr(STATIC_STRLEN("DYNAMIC_METADATA")));
+        parseFilterStateField(field_name.substr(STATIC_STRLEN("PER_REQUEST_STATE")));
   } else {
     throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }

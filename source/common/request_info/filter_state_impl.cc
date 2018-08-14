@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace RequestInfo {
 
-void DynamicMetadataImpl::setData(absl::string_view data_name, std::unique_ptr<Object>&& data) {
+void FilterStateImpl::setData(absl::string_view data_name, std::unique_ptr<Object>&& data) {
   if (data_storage_.find(data_name) != data_storage_.end()) {
     throw EnvoyException("FilterState::setData<T> called twice with same name.");
   }
@@ -14,12 +14,12 @@ void DynamicMetadataImpl::setData(absl::string_view data_name, std::unique_ptr<O
   data_storage_[static_cast<std::string>(data_name)] = std::move(data);
 }
 
-bool DynamicMetadataImpl::hasDataWithName(absl::string_view data_name) const {
+bool FilterStateImpl::hasDataWithName(absl::string_view data_name) const {
   return data_storage_.count(data_name) > 0;
 }
 
 const FilterState::Object*
-DynamicMetadataImpl::getDataGeneric(absl::string_view data_name) const {
+FilterStateImpl::getDataGeneric(absl::string_view data_name) const {
   const auto& it = data_storage_.find(data_name);
 
   if (it == data_storage_.end()) {
