@@ -147,14 +147,14 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, ui
 
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
                                         absl::string_view data, milliseconds timeout) {
-  auto success = waitForData(client_dispatcher, data.length(), timeout);
-  if (success) {
+  auto succeeded = waitForData(client_dispatcher, data.length(), timeout);
+  if (succeeded) {
     Buffer::OwnedImpl buffer(data.data(), data.length());
     if (!TestUtility::buffersEqual(body(), buffer)) {
       return AssertionFailure() << body().toString() << " not equal to " << data;
     }
   }
-  return success;
+  return succeeded;
 }
 
 AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher,

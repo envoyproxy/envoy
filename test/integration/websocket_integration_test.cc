@@ -36,9 +36,18 @@ Http::TestHeaderMapImpl upgradeResponseHeaders(const char* upgrade_type = "webso
                                  {"content-length", "0"}};
 }
 
-void validateUpgradeRequestHeaders(const Http::HeaderMap& original_proxied_request_headers,
-                                   const Http::HeaderMap& original_request_headers,
-                                   bool old_style) {
+static std::string websocketTestParamsToString(
+    const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>> params) {
+  return absl::StrCat(std::get<0>(params.param) == Network::Address::IpVersion::v4 ? "IPv4"
+                                                                                   : "IPv6",
+                      "_", std::get<1>(params.param) == true ? "OldStyle" : "NewStyle");
+}
+
+} // namespace
+
+void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
+    const Http::HeaderMap& original_proxied_request_headers,
+    const Http::HeaderMap& original_request_headers) {
   Http::TestHeaderMapImpl proxied_request_headers(original_proxied_request_headers);
   if (proxied_request_headers.ForwardedProto()) {
     ASSERT_STREQ(proxied_request_headers.ForwardedProto()->value().c_str(), "http");
@@ -49,7 +58,7 @@ void validateUpgradeRequestHeaders(const Http::HeaderMap& original_proxied_reque
     proxied_request_headers.removeScheme();
   }
 
-  if (!old_style) {
+  if (!old_style_websockets_) {
     // Check for and remove headers added by default for HTTP requests.
     ASSERT_TRUE(proxied_request_headers.RequestId() != nullptr);
     ASSERT_TRUE(proxied_request_headers.EnvoyExpectedRequestTimeoutMs() != nullptr);
@@ -61,21 +70,17 @@ void validateUpgradeRequestHeaders(const Http::HeaderMap& original_proxied_reque
     ASSERT_STREQ(proxied_request_headers.EnvoyOriginalPath()->value().c_str(), "/websocket/test");
     proxied_request_headers.removeEnvoyOriginalPath();
   }
-  // If no content length is specified, the HTTP codec should add a chunked encoding header.
-  if (original_request_headers.ContentLength() == nullptr) {
-    ASSERT_STREQ(proxied_request_headers.TransferEncoding()->value().c_str(), "chunked");
-    proxied_request_headers.removeTransferEncoding();
-  }
+  commonValidate(proxied_request_headers, original_request_headers);
   proxied_request_headers.removeRequestId();
 
   EXPECT_EQ(proxied_request_headers, original_request_headers);
 }
 
-void validateUpgradeResponseHeaders(const Http::HeaderMap& original_proxied_response_headers,
-                                    const Http::HeaderMap& original_response_headers,
-                                    bool old_style) {
+void WebsocketIntegrationTest::validateUpgradeResponseHeaders(
+    const Http::HeaderMap& original_proxied_response_headers,
+    const Http::HeaderMap& original_response_headers) {
   Http::TestHeaderMapImpl proxied_response_headers(original_proxied_response_headers);
-  if (!old_style) {
+  if (!old_style_websockets_) {
     // Check for and remove headers added by default for HTTP responses.
     ASSERT_TRUE(proxied_response_headers.Date() != nullptr);
     ASSERT_TRUE(proxied_response_headers.Server() != nullptr);
@@ -83,23 +88,19 @@ void validateUpgradeResponseHeaders(const Http::HeaderMap& original_proxied_resp
     proxied_response_headers.removeDate();
     proxied_response_headers.removeServer();
   }
-  // If no content length is specified, the HTTP codec should add a chunked encoding header.
-  if (original_response_headers.ContentLength() == nullptr) {
-    ASSERT_STREQ(proxied_response_headers.TransferEncoding()->value().c_str(), "chunked");
-    proxied_response_headers.removeTransferEncoding();
-  }
+  commonValidate(proxied_response_headers, original_response_headers);
 
   EXPECT_EQ(proxied_response_headers, original_response_headers);
 }
 
-static std::string websocketTestParamsToString(
-    const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>> params) {
-  return absl::StrCat(std::get<0>(params.param) == Network::Address::IpVersion::v4 ? "IPv4"
-                                                                                   : "IPv6",
-                      "_", std::get<1>(params.param) == true ? "OldStyle" : "NewStyle");
+void WebsocketIntegrationTest::commonValidate(Http::HeaderMap& proxied_headers,
+                                              const Http::HeaderMap& original_headers) {
+  // If no content length is specified, the HTTP codec should add a chunked encoding header.
+  if (original_headers.ContentLength() == nullptr) {
+    ASSERT_STREQ(proxied_headers.TransferEncoding()->value().c_str(), "chunked");
+    proxied_headers.removeTransferEncoding();
+  }
 }
-
-} // namespace
 
 INSTANTIATE_TEST_CASE_P(IpVersions, WebsocketIntegrationTest,
                         testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -154,16 +155,14 @@ void WebsocketIntegrationTest::performUpgrade(
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
   ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
-  validateUpgradeRequestHeaders(upstream_request_->headers(), upgrade_request_headers,
-                                old_style_websockets_);
+  validateUpgradeRequestHeaders(upstream_request_->headers(), upgrade_request_headers);
 
   // Send the upgrade response
   upstream_request_->encodeHeaders(upgrade_response_headers, false);
 
   // Verify the upgrade response was received downstream.
   response_->waitForHeaders();
-  validateUpgradeResponseHeaders(response_->headers(), upgrade_response_headers,
-                                 old_style_websockets_);
+  validateUpgradeResponseHeaders(response_->headers(), upgrade_response_headers);
 }
 
 void WebsocketIntegrationTest::sendBidirectionalData() {
@@ -250,8 +249,7 @@ TEST_P(WebsocketIntegrationTest, EarlyData) {
 
   response_->waitForHeaders();
   auto upgrade_response_headers(upgradeResponseHeaders());
-  validateUpgradeResponseHeaders(response_->headers(), upgrade_response_headers,
-                                 old_style_websockets_);
+  validateUpgradeResponseHeaders(response_->headers(), upgrade_response_headers);
   response_->waitForBodyData(5);
   codec_client_->waitForDisconnect();
   EXPECT_EQ("world", response_->body());
@@ -374,8 +372,7 @@ TEST_P(WebsocketIntegrationTest, NonWebsocketUpgrade) {
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 
   auto upgrade_response_headers(upgradeResponseHeaders("foo"));
-  validateUpgradeResponseHeaders(response_->headers(), upgrade_response_headers,
-                                 old_style_websockets_);
+  validateUpgradeResponseHeaders(response_->headers(), upgrade_response_headers);
 }
 
 TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
