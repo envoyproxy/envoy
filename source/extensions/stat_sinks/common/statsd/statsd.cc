@@ -24,7 +24,7 @@ Writer::Writer(Network::Address::InstanceConstSharedPtr address) {
   fd_ = address->socket(Network::Address::SocketType::Datagram);
   ASSERT(fd_ != -1);
 
-  const Api::SysCallResult result = address->connect(fd_);
+  const Api::SysCallIntResult result = address->connect(fd_);
   ASSERT(result.rc_ != -1);
 }
 

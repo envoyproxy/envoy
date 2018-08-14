@@ -155,7 +155,7 @@ void IntegrationTcpClient::close() { connection_->close(Network::ConnectionClose
 
 void IntegrationTcpClient::waitForData(const std::string& data, bool exact_match) {
   auto found = payload_reader_->data().find(data);
-  if ((exact_match && found != std::string::npos) || (!exact_match && found == 0)) {
+  if (found == 0 || (!exact_match && found != std::string::npos)) {
     return;
   }
 

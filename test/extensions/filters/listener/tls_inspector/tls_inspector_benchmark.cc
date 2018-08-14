@@ -62,10 +62,10 @@ class FastMockOsSysCalls : public Api::MockOsSysCalls {
 public:
   FastMockOsSysCalls(const std::vector<uint8_t>& client_hello) : client_hello_(client_hello) {}
 
-  ssize_t recv(int, void* buffer, size_t length, int) override {
+  Api::SysCallSizeResult recv(int, void* buffer, size_t length, int) override {
     RELEASE_ASSERT(length >= client_hello_.size(), "");
     memcpy(buffer, client_hello_.data(), client_hello_.size());
-    return client_hello_.size();
+    return Api::SysCallSizeResult{ssize_t(client_hello_.size()), 0};
   }
 
   const std::vector<uint8_t> client_hello_;

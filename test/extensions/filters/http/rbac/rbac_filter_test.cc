@@ -1,6 +1,7 @@
 #include "common/config/metadata.h"
 #include "common/network/utility.h"
 
+#include "extensions/filters/common/rbac/utility.h"
 #include "extensions/filters/http/rbac/rbac_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 

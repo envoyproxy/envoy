@@ -43,30 +43,33 @@ public:
   ~MockOsSysCalls();
 
   // Api::OsSysCalls
-  ssize_t write(int fd, const void* buffer, size_t num_bytes) override;
-  int open(const std::string& full_path, int flags, int mode) override;
-  int setsockopt(int sockfd, int level, int optname, const void* optval, socklen_t optlen) override;
-  int getsockopt(int sockfd, int level, int optname, void* optval, socklen_t* optlen) override;
+  SysCallSizeResult write(int fd, const void* buffer, size_t num_bytes) override;
+  SysCallIntResult open(const std::string& full_path, int flags, int mode) override;
+  SysCallIntResult setsockopt(int sockfd, int level, int optname, const void* optval,
+                              socklen_t optlen) override;
+  SysCallIntResult getsockopt(int sockfd, int level, int optname, void* optval,
+                              socklen_t* optlen) override;
 
-  MOCK_METHOD3(bind, int(int sockfd, const sockaddr* addr, socklen_t addrlen));
-  MOCK_METHOD3(ioctl, int(int sockfd, unsigned long int request, void* argp));
-  MOCK_METHOD1(close, int(int));
+  MOCK_METHOD3(bind, SysCallIntResult(int sockfd, const sockaddr* addr, socklen_t addrlen));
+  MOCK_METHOD3(ioctl, SysCallIntResult(int sockfd, unsigned long int request, void* argp));
+  MOCK_METHOD1(close, SysCallIntResult(int));
   MOCK_METHOD3(open_, int(const std::string& full_path, int flags, int mode));
   MOCK_METHOD3(write_, ssize_t(int, const void*, size_t));
-  MOCK_METHOD3(writev, ssize_t(int, const iovec*, int));
-  MOCK_METHOD3(readv, ssize_t(int, const iovec*, int));
-  MOCK_METHOD4(recv, ssize_t(int socket, void* buffer, size_t length, int flags));
+  MOCK_METHOD3(writev, SysCallSizeResult(int, const iovec*, int));
+  MOCK_METHOD3(readv, SysCallSizeResult(int, const iovec*, int));
+  MOCK_METHOD4(recv, SysCallSizeResult(int socket, void* buffer, size_t length, int flags));
 
-  MOCK_METHOD3(shmOpen, int(const char*, int, mode_t));
-  MOCK_METHOD1(shmUnlink, int(const char*));
-  MOCK_METHOD2(ftruncate, int(int fd, off_t length));
-  MOCK_METHOD6(mmap, void*(void* addr, size_t length, int prot, int flags, int fd, off_t offset));
-  MOCK_METHOD2(stat, int(const char* name, struct stat* stat));
+  MOCK_METHOD3(shmOpen, SysCallIntResult(const char*, int, mode_t));
+  MOCK_METHOD1(shmUnlink, SysCallIntResult(const char*));
+  MOCK_METHOD2(ftruncate, SysCallIntResult(int fd, off_t length));
+  MOCK_METHOD6(mmap, SysCallPtrResult(void* addr, size_t length, int prot, int flags, int fd,
+                                      off_t offset));
+  MOCK_METHOD2(stat, SysCallIntResult(const char* name, struct stat* stat));
   MOCK_METHOD5(setsockopt_,
                int(int sockfd, int level, int optname, const void* optval, socklen_t optlen));
   MOCK_METHOD5(getsockopt_,
                int(int sockfd, int level, int optname, void* optval, socklen_t* optlen));
-  MOCK_METHOD3(socket, int(int domain, int type, int protocol));
+  MOCK_METHOD3(socket, SysCallIntResult(int domain, int type, int protocol));
 
   size_t num_writes_;
   size_t num_open_;

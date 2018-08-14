@@ -31,6 +31,13 @@ public:
   virtual bool allowed(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                        const envoy::api::v2::core::Metadata& metadata,
                        std::string* effective_policy_id) const PURE;
+
+  /**
+   * Returns whether or not the current action is permitted.
+   *
+   * @param connection the downstream connection used to identify the action/principal.
+   */
+  virtual bool allowed(const Network::Connection& connection) const PURE;
 };
 
 } // namespace RBAC

@@ -115,6 +115,10 @@ public:
             AccessLog::AccessLogManager& access_log_manager, InitManagerImpl& init_manager,
             OverloadManager& overload_manager, std::function<void()> workers_start_cb);
 
+  // Helper function to inititate a shutdown. This can be triggered either by catching SIGTERM
+  // or be called from ServerImpl::shutdown().
+  void shutdown(Event::Dispatcher& dispatcher, HotRestart& hot_restart);
+
 private:
   Event::SignalEventPtr sigterm_;
   Event::SignalEventPtr sig_usr_1_;
@@ -225,6 +229,7 @@ private:
   Upstream::ProdClusterInfoFactory info_factory_;
   Upstream::HdsDelegatePtr hds_delegate_;
   std::unique_ptr<OverloadManagerImpl> overload_manager_;
+  std::unique_ptr<RunHelper> run_helper_;
 };
 
 } // namespace Server

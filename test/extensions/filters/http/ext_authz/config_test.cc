@@ -52,9 +52,10 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoHttp) {
       cluster: "ext_authz"
       timeout: 0.25s
     path_prefix: "/test"
-    response_headers_to_remove:
+    allowed_authorization_headers:
       - foo_header_key
-      - baz_header_key
+    allowed_request_headers:
+      - bar_header_key
   failure_mode_allow: true
   )EOF";
 

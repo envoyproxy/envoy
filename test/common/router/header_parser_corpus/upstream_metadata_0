@@ -1,0 +1,20 @@
+headers_to_add {
+  header {
+    key: "x-header"
+    value: "%UPSTREAM_METADATA([\"ns\", \"key\"])%"
+  }
+}
+request_info {
+  start_time: 1522796769123
+  upstream_metadata {
+    filter_metadata {
+      key: "ns"
+      value: {
+        fields {
+          key: "key"
+          value: { string_value: "value" }
+        }
+      }
+    }
+  }
+}

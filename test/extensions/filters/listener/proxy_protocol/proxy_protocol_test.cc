@@ -257,20 +257,27 @@ TEST_P(ProxyProtocolTest, errorRecv_2) {
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, recv(_, _, _, _)).Times(AnyNumber()).WillOnce(Return((errno = 0, -1)));
+  EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
+      .Times(AnyNumber())
+      .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
-        return ::ioctl(fd, request, argp);
+        const int rc = ::ioctl(fd, request, argp);
+        return Api::SysCallIntResult{rc, errno};
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::writev(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::readv(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
 
   connect(false);
   write(buffer, sizeof(buffer));
@@ -287,15 +294,19 @@ TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
-  EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _)).WillOnce(Return(-1));
+  EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::writev(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::readv(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
 
   connect(false);
   write(buffer, sizeof(buffer));
@@ -481,25 +492,31 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
       .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
         int x = ::ioctl(fd, request, argp);
         if (x == 0 && *static_cast<int*>(argp) == sizeof(tlv)) {
-          return -1;
+          return Api::SysCallIntResult{-1, errno};
         } else {
-          return x;
+          return Api::SysCallIntResult{x, errno};
         }
       }));
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, void* buf, size_t len, int flags) { return ::recv(fd, buf, len, flags); }));
+      .WillRepeatedly(Invoke([](int fd, void* buf, size_t len, int flags) {
+        const ssize_t rc = ::recv(fd, buf, len, flags);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
 
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::writev(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::readv(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
 
   connect(false);
   write(buffer, sizeof(buffer));
@@ -603,23 +620,32 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, void* buf, size_t len, int flags) { return ::recv(fd, buf, len, flags); }));
-  EXPECT_CALL(os_sys_calls, recv(_, _, 1, _)).Times(AnyNumber()).WillOnce(Return(-1));
+      .WillRepeatedly(Invoke([](int fd, void* buf, size_t len, int flags) {
+        const ssize_t rc = ::recv(fd, buf, len, flags);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
+  EXPECT_CALL(os_sys_calls, recv(_, _, 1, _))
+      .Times(AnyNumber())
+      .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
 
   EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
-        return ::ioctl(fd, request, argp);
+        const int rc = ::ioctl(fd, request, argp);
+        return Api::SysCallIntResult{rc, errno};
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::writev(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::readv(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
 
   connect(false);
   write(buffer, 17);
@@ -640,23 +666,32 @@ TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, void* buf, size_t len, int flags) { return ::recv(fd, buf, len, flags); }));
-  EXPECT_CALL(os_sys_calls, recv(_, _, 4, _)).Times(AnyNumber()).WillOnce(Return(-1));
+      .WillRepeatedly(Invoke([](int fd, void* buf, size_t len, int flags) {
+        const ssize_t rc = ::recv(fd, buf, len, flags);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
+  EXPECT_CALL(os_sys_calls, recv(_, _, 4, _))
+      .Times(AnyNumber())
+      .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
 
   EXPECT_CALL(os_sys_calls, ioctl(_, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
-        return ::ioctl(fd, request, argp);
+        const int rc = ::ioctl(fd, request, argp);
+        return Api::SysCallIntResult{rc, errno};
       }));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::writev(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::writev(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
   EXPECT_CALL(os_sys_calls, readv(_, _, _))
       .Times(AnyNumber())
-      .WillRepeatedly(Invoke(
-          [](int fd, const struct iovec* iov, int iovcnt) { return ::readv(fd, iov, iovcnt); }));
+      .WillRepeatedly(Invoke([](int fd, const struct iovec* iov, int iovcnt) {
+        const ssize_t rc = ::readv(fd, iov, iovcnt);
+        return Api::SysCallSizeResult{rc, errno};
+      }));
 
   connect(false);
   write(buffer, 10);

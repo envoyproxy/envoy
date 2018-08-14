@@ -7,6 +7,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/upstream.h"
 
+#include "common/common/backoff_strategy.h"
 #include "common/common/logger.h"
 #include "common/config/utility.h"
 #include "common/grpc/async_client_impl.h"
@@ -170,11 +171,17 @@ private:
 
   Event::TimerPtr hds_stream_response_timer_;
   Event::TimerPtr hds_retry_timer_;
+  BackOffStrategyPtr backoff_strategy_;
 
-  // TODO(lilika): Add API knob for RetryDelayMilliseconds, instead of
-  // hardcoding it.
-  // How often we retry to establish a stream to the management server
-  const uint32_t RetryDelayMilliseconds = 5000;
+  /**
+   * TODO(lilika): Add API knob for RetryInitialDelayMilliseconds
+   * and RetryMaxDelayMilliseconds, instead of hardcoding them.
+   *
+   * Parameters of the jittered backoff strategy that defines how often
+   * we retry to establish a stream to the management server
+   */
+  const uint32_t RetryInitialDelayMilliseconds = 1000;
+  const uint32_t RetryMaxDelayMilliseconds = 30000;
 
   // Soft limit on size of the cluster’s connections read and write buffers.
   static constexpr uint32_t ClusterConnectionBufferLimitBytes = 32768;

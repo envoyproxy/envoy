@@ -353,6 +353,8 @@ public:
   }
   uint64_t features() const override { return features_; }
   const Http::Http2Settings& http2Settings() const override { return http2_settings_; }
+  ProtocolOptionsConfigConstSharedPtr
+  extensionProtocolOptions(const std::string& name) const override;
   LoadBalancerType lbType() const override { return lb_type_; }
   envoy::api::v2::Cluster::DiscoveryType type() const override { return type_; }
   const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&
@@ -412,6 +414,7 @@ private:
   mutable ClusterLoadReportStats load_report_stats_;
   const uint64_t features_;
   const Http::Http2Settings http2_settings_;
+  const std::map<std::string, ProtocolOptionsConfigConstSharedPtr> extension_protocol_options_;
   mutable ResourceManagers resource_managers_;
   const std::string maintenance_mode_runtime_key_;
   const Network::Address::InstanceConstSharedPtr source_address_;

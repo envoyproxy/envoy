@@ -137,8 +137,7 @@ ThriftFilters::FilterStatus Router::messageBegin(MessageMetadataSharedPtr metada
   ENVOY_STREAM_LOG(debug, "router decoding request", *callbacks_);
 
   upstream_request_.reset(new UpstreamRequest(*this, *conn_pool, metadata));
-  upstream_request_->start();
-  return ThriftFilters::FilterStatus::StopIteration;
+  return upstream_request_->start();
 }
 
 ThriftFilters::FilterStatus Router::messageEnd() {
@@ -215,31 +214,44 @@ Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::In
 
 Router::UpstreamRequest::~UpstreamRequest() {}
 
-void Router::UpstreamRequest::start() {
+ThriftFilters::FilterStatus Router::UpstreamRequest::start() {
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);
   if (handle) {
+    // Pause while we wait for a connection.
     conn_pool_handle_ = handle;
+    return ThriftFilters::FilterStatus::StopIteration;
   }
+
+  return ThriftFilters::FilterStatus::Continue;
 }
 
 void Router::UpstreamRequest::resetStream() {
+  if (conn_pool_handle_) {
+    conn_pool_handle_->cancel();
+  }
+
   if (conn_data_ != nullptr) {
     conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
-    conn_data_ = nullptr;
+    conn_data_.reset();
   }
 }
 
 void Router::UpstreamRequest::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
                                             Upstream::HostDescriptionConstSharedPtr host) {
+  conn_pool_handle_ = nullptr;
+
   // Mimic an upstream reset.
   onUpstreamHostSelected(host);
   onResetStream(reason);
 }
 
-void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionData& conn_data,
+void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
                                           Upstream::HostDescriptionConstSharedPtr host) {
+  // Only invoke continueDecoding if we'd previously stopped the filter chain.
+  bool continue_decoding = conn_pool_handle_ != nullptr;
+
   onUpstreamHostSelected(host);
-  conn_data_ = &conn_data;
+  conn_data_ = std::move(conn_data);
   conn_data_->addUpstreamCallbacks(parent_);
 
   conn_pool_handle_ = nullptr;
@@ -257,17 +269,16 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionData& c
   // TODO(zuercher): need to use an upstream-connection-specific sequence id
   parent_.convertMessageBegin(metadata_);
 
-  parent_.callbacks_->continueDecoding();
+  if (continue_decoding) {
+    parent_.callbacks_->continueDecoding();
+  }
 }
 
 void Router::UpstreamRequest::onRequestComplete() { request_complete_ = true; }
 
 void Router::UpstreamRequest::onResponseComplete() {
   response_complete_ = true;
-  if (conn_data_ != nullptr) {
-    conn_data_->release();
-  }
-  conn_data_ = nullptr;
+  conn_data_.reset();
 }
 
 void Router::UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
@@ -275,6 +286,13 @@ void Router::UpstreamRequest::onUpstreamHostSelected(Upstream::HostDescriptionCo
 }
 
 void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReason reason) {
+  if (metadata_->messageType() == MessageType::Oneway) {
+    // For oneway requests, we should not attempt a response. Reset the downstream to signal
+    // an error.
+    parent_.callbacks_->resetDownstreamConnection();
+    return;
+  }
+
   switch (reason) {
   case Tcp::ConnectionPool::PoolFailureReason::Overflow:
     parent_.callbacks_->sendLocalReply(AppException(
@@ -292,6 +310,7 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
       return;
     }
 
+    // Error occurred after a partial response, propagate the reset to the downstream.
     parent_.callbacks_->resetDownstreamConnection();
     break;
   default:
