@@ -19,6 +19,20 @@ inline Http::TestHeaderMapImpl fromHeaders(const test::fuzz::Headers& headers) {
   return header_map;
 }
 
+// Convert from HeaderMap to test proto Headers.
+inline test::fuzz::Headers toHeaders(const Http::HeaderMapImpl headers) {
+  test::fuzz::Headers fuzz_headers;
+  headers.iterate(
+      [](const Http::HeaderEntry& header, void* ctxt) -> Http::HeaderMap::Iterate {
+        auto* fuzz_header = static_cast<test::fuzz::Headers*>(ctxt)->add_headers();
+        fuzz_header->set_key(header.key().c_str());
+        fuzz_header->set_value(header.value().c_str());
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      &fuzz_headers);
+  return fuzz_headers;
+}
+
 inline TestRequestInfo fromRequestInfo(const test::fuzz::RequestInfo& request_info) {
   TestRequestInfo test_request_info;
   test_request_info.metadata_ = request_info.dynamic_metadata();
