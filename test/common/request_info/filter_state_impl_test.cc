@@ -109,8 +109,7 @@ TEST_F(FilterStateImplTest, SimpleType) {
 TEST_F(FilterStateImplTest, NameConflict) {
   dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(1));
   EXPECT_THROW_WITH_MESSAGE(dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(2)),
-                            EnvoyException,
-                            "FilterState::setData<T> called twice with same name.");
+                            EnvoyException, "FilterState::setData<T> called twice with same name.");
   EXPECT_EQ(1, dynamic_metadata().getData<SimpleType>("test_1").access());
 }
 

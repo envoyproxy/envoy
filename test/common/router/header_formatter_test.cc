@@ -206,10 +206,10 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithNonStringDynamicMetadataVar
   ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
   ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
 
-  EXPECT_THROW_WITH_MESSAGE(testFormatting(request_info, "PER_REQUEST_STATE(\"testing\")", ""),
-                            EnvoyException,
-                            "Invalid header information: PER_REQUEST_STATE value \"testing\" exists "
-                            "but is not string accessible");
+  EXPECT_THROW_WITH_MESSAGE(
+      testFormatting(request_info, "PER_REQUEST_STATE(\"testing\")", ""), EnvoyException,
+      "Invalid header information: PER_REQUEST_STATE value \"testing\" exists "
+      "but is not string accessible");
 }
 
 TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnDynamicMetadataVariable) {
@@ -220,7 +220,8 @@ TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnDynamicMetadataVariable) {
                             "PER_REQUEST_STATE(\"<data_name>\"), actual format "
                             "PER_REQUEST_STATE(testing)");
   // No parameters
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE()", false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE()", false),
+                            EnvoyException,
                             "Invalid header configuration. Expected format "
                             "PER_REQUEST_STATE(\"<data_name>\"), actual format "
                             "PER_REQUEST_STATE()");

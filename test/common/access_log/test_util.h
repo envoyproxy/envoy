@@ -183,7 +183,7 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
-  ::Envoy::RequestInfo::FilterStateImpl  per_request_state_{};
+  ::Envoy::RequestInfo::FilterStateImpl per_request_state_{};
 };
 
 } // namespace Envoy

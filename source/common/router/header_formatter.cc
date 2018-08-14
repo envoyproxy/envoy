@@ -198,8 +198,7 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
     field_extractor_ =
         parseUpstreamMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));
   } else if (field_name.find("PER_REQUEST_STATE") == 0) {
-    field_extractor_ =
-        parseFilterStateField(field_name.substr(STATIC_STRLEN("PER_REQUEST_STATE")));
+    field_extractor_ = parseFilterStateField(field_name.substr(STATIC_STRLEN("PER_REQUEST_STATE")));
   } else {
     throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }
