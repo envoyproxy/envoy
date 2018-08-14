@@ -161,7 +161,7 @@ private:
     Envoy::Common::CallbackHandle* local_host_set_member_update_cb_handle_;
   };
 
-  struct LbContextImpl : public Upstream::LoadBalancerContext {
+  struct LbContextImpl : public Upstream::LoadBalancerContextBase {
     LbContextImpl(const std::string& hash_key) : hash_key_(std::hash<std::string>()(hash_key)) {}
     // TODO(danielhochman): convert to HashUtil::xxHash64 when we have a migration strategy.
     // Upstream::LoadBalancerContext
@@ -169,12 +169,6 @@ private:
     const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
     const Network::Connection* downstreamConnection() const override { return nullptr; }
     const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
-    absl::optional<std::function<bool(uint32_t, const Upstream::Host&)>>
-    prePrioritySelectionFilter() override {
-      return {};
-    };
-    bool postHostSelectionFilter(const Upstream::Host&) override { return true; }
-    uint32_t hostSelectionRetryCount() override { return 0; }
 
     const absl::optional<uint64_t> hash_key_;
   };

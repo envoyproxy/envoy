@@ -92,6 +92,17 @@ protected:
   std::vector<uint32_t> per_priority_health_;
 };
 
+class LoadBalancerContextBase : public LoadBalancerContext {
+  const PriorityLoad& determinePriorityLoad(const PrioritySet&,
+                                            const PriorityLoad& original_priority_load) override {
+    return original_priority_load;
+  }
+
+  bool shouldSelectAnotherHost(const Host&) override { return false; }
+
+  uint32_t hostSelectionRetryCount() override { return 0; }
+};
+
 /**
  * Base class for zone aware load balancers
  */

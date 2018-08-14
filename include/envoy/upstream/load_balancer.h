@@ -10,6 +10,8 @@
 namespace Envoy {
 namespace Upstream {
 
+typedef std::vector<uint32_t> PriorityLoad;
+
 /**
  * Context information passed to a load balancer to use when choosing a host. Not all load
  * balancers make use of all context information.
@@ -45,19 +47,25 @@ public:
   virtual const Http::HeaderMap* downstreamHeaders() const PURE;
 
   /**
-   * Called to retrieve an optional pre priority selection host predicate. If present, this will be
-   * used to rebuild the per priority load data which only includes hosts that match the predicate.
+   * Called to retrieve a reference to the priority load data that should be used when selecting a
+   * priority. Implementations may return the provided original reference to make no changes, or
+   * return a reference to alternative PriorityLoad held internally.
+   *
+   * @param priority_state current priority state of the cluster being being load balanced.
+   * @param original_priority_load the cached priority load for the cluster being load balanced.
+   * @return a reference to the priority load data that should be used to select a priority.
    *
    */
-  virtual absl::optional<std::function<bool(uint32_t, const Host&)>>
-  prePrioritySelectionFilter() PURE;
+  virtual const PriorityLoad&
+  determinePriorityLoad(const PrioritySet& priority_set,
+                        const PriorityLoad& original_priority_load) PURE;
 
   /**
    * Called to determine whether we should reperform host selection. The load balancer
-   * will retry host selection until either the postHostSelectionFilter returns true
-   * or hostSelectionRetryCount is reached.
+   * will retry host selection until either this function returns true or hostSelectionRetryCount is
+   * reached.
    */
-  virtual bool postHostSelectionFilter(const Host& host) PURE;
+  virtual bool shouldSelectAnotherHost(const Host& host) PURE;
 
   /**
    * Called to determine how many times host selection should be retried until the filter is

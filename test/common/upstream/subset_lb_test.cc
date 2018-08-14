@@ -87,7 +87,7 @@ private:
   std::vector<Router::MetadataMatchCriterionConstSharedPtr> matches_;
 };
 
-class TestLoadBalancerContext : public LoadBalancerContext {
+class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
   TestLoadBalancerContext(
       std::initializer_list<std::map<std::string, std::string>::value_type> metadata_matches)
@@ -99,11 +99,6 @@ public:
   const Network::Connection* downstreamConnection() const override { return nullptr; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return matches_.get(); }
   const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
-  absl::optional<std::function<bool(uint32_t, const Host&)>> prePrioritySelectionFilter() override {
-    return {};
-  }
-  bool postHostSelectionFilter(const Host&) override { return true; }
-  uint32_t hostSelectionRetryCount() override { return 0; }
 
 private:
   const std::shared_ptr<Router::MetadataMatchCriteria> matches_;

@@ -120,9 +120,8 @@ public:
   MOCK_METHOD0(metadataMatchCriteria, Router::MetadataMatchCriteria*());
   MOCK_CONST_METHOD0(downstreamConnection, const Network::Connection*());
   MOCK_CONST_METHOD0(downstreamHeaders, const Http::HeaderMap*());
-  MOCK_METHOD0(prePrioritySelectionFilter,
-               absl::optional<std::function<bool(uint32_t, const Host&)>>());
-  MOCK_METHOD1(postHostSelectionFilter, bool(const Host&));
+  MOCK_METHOD2(determinePriorityLoad, const PriorityLoad&(const PrioritySet&, const PriorityLoad&));
+  MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host&));
   MOCK_METHOD0(hostSelectionRetryCount, uint32_t());
 };
 

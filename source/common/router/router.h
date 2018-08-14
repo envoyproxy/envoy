@@ -138,7 +138,7 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
  */
 class Filter : Logger::Loggable<Logger::Id::router>,
                public Http::StreamDecoderFilter,
-               public Upstream::LoadBalancerContext {
+               public Upstream::LoadBalancerContextBase {
 public:
   Filter(FilterConfig& config)
       : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
@@ -198,12 +198,6 @@ public:
     return callbacks_->connection();
   }
   const Http::HeaderMap* downstreamHeaders() const override { return downstream_headers_; }
-  absl::optional<std::function<bool(uint32_t, const Upstream::Host&)>>
-  prePrioritySelectionFilter() override {
-    return {};
-  }
-  bool postHostSelectionFilter(const Upstream::Host&) override { return true; }
-  uint32_t hostSelectionRetryCount() override { return 0; }
   /**
    * Set a computed cookie to be sent with the downstream headers.
    * @param key supplies the size of the cookie

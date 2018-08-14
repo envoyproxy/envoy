@@ -117,20 +117,11 @@ void LoadBalancerBase::recalculatePerPriorityState(
 
 HostSet& LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
   if (context) {
-    const auto& pre_priority_filter = context->prePrioritySelectionFilter();
+    const auto& per_priority_load =
+        context->determinePriorityLoad(priority_set_, per_priority_load_);
 
-    if (pre_priority_filter) {
-      // recompute per_priority_state with filter applied
-      std::vector<uint32_t> per_priority_load;
-      std::vector<uint32_t> per_priority_health;
-
-      for (auto& host_set : priority_set_.hostSetsPerPriority()) {
-        recalculatePerPriorityState(host_set->priority(), per_priority_load, per_priority_health,
-                                    *pre_priority_filter);
-      }
-      const uint32_t priority = choosePriority(random_.random(), per_priority_load);
-      return *priority_set_.hostSetsPerPriority()[priority];
-    }
+    const uint32_t priority = choosePriority(random_.random(), per_priority_load);
+    return *priority_set_.hostSetsPerPriority()[priority];
   }
 
   const uint32_t priority = choosePriority(random_.random(), per_priority_load_);
@@ -311,7 +302,7 @@ HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
 
     // If host selection failed or the host is accepted by the filter, return.
     // Otherwise, try again.
-    if (!host || !context || context->postHostSelectionFilter(*host)) {
+    if (!host || !context || !context->shouldSelectAnotherHost(*host)) {
       return host;
     }
   }

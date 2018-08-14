@@ -23,6 +23,7 @@
 #include "common/network/filter_impl.h"
 #include "common/network/utility.h"
 #include "common/request_info/request_info_impl.h"
+#include "common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
 namespace TcpProxy {
@@ -139,7 +140,7 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  * be proxied back and forth between the two connections.
  */
 class Filter : public Network::ReadFilter,
-               Upstream::LoadBalancerContext,
+               Upstream::LoadBalancerContextBase,
                protected Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager);
@@ -161,15 +162,6 @@ public:
   }
 
   const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
-
-  absl::optional<std::function<bool(uint32_t, const Upstream::Host&)>>
-  prePrioritySelectionFilter() override {
-    return {};
-  }
-
-  bool postHostSelectionFilter(const Upstream::Host&) override { return true; }
-
-  uint32_t hostSelectionRetryCount() override { return 0; }
 
   // These two functions allow enabling/disabling reads on the upstream and downstream connections.
   // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.
