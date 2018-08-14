@@ -406,7 +406,7 @@ TEST_F(ListenerManagerImplTest, AddListenerAddressNotMatching) {
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
-// Make sure that a listener creation does not fail on IPv4 ony setups when FilterChainMatch is not
+// Make sure that a listener creation does not fail on IPv4 only setups when FilterChainMatch is not
 // specified and we try to create default CidrRange. See convertDestinationIPsMapToTrie function for
 // more details.
 TEST_F(ListenerManagerImplTest, AddListenerOnIpv4OnlySetups) {
@@ -426,8 +426,8 @@ TEST_F(ListenerManagerImplTest, AddListenerOnIpv4OnlySetups) {
 
   ListenerHandle* listener_foo = expectListenerCreate(false);
 
-  EXPECT_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillOnce(Return(5));
-  EXPECT_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillOnce(Return(-1));
+  EXPECT_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillOnce(Return(Api::SysCallIntResult{5, 0}));
+  EXPECT_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
 
@@ -436,7 +436,7 @@ TEST_F(ListenerManagerImplTest, AddListenerOnIpv4OnlySetups) {
   EXPECT_CALL(*listener_foo, onDestroy());
 }
 
-// Make sure that a listener creation does not fail on IPv6 ony setups when FilterChainMatch is not
+// Make sure that a listener creation does not fail on IPv6 only setups when FilterChainMatch is not
 // specified and we try to create default CidrRange. See convertDestinationIPsMapToTrie function for
 // more details.
 TEST_F(ListenerManagerImplTest, AddListenerOnIpv6OnlySetups) {
@@ -456,8 +456,8 @@ TEST_F(ListenerManagerImplTest, AddListenerOnIpv6OnlySetups) {
 
   ListenerHandle* listener_foo = expectListenerCreate(false);
 
-  EXPECT_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillOnce(Return(-1));
-  EXPECT_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillOnce(Return(5));
+  EXPECT_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillOnce(Return(Api::SysCallIntResult{5, 0}));
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
 

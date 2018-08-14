@@ -2,6 +2,8 @@
 
 #include "envoy/request_info/request_info.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 
 class TestRequestInfo : public RequestInfo::RequestInfo {

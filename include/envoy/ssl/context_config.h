@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/ssl/tls_certificate_config.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -61,26 +62,9 @@ public:
   virtual const std::string& certificateRevocationListPath() const PURE;
 
   /**
-   * @return The certificate chain used to identify the local side.
+   * @return TlsCertificateConfig the certificate config used to identify the local side.
    */
-  virtual const std::string& certChain() const PURE;
-
-  /**
-   * @return Path of the certificate chain used to identify the local side or "<inline>"
-   * if the certificate chain was inlined.
-   */
-  virtual const std::string& certChainPath() const PURE;
-
-  /**
-   * @return The private key used to identify the local side.
-   */
-  virtual const std::string& privateKey() const PURE;
-
-  /**
-   * @return Path of the private key used to identify the local side or "<inline>"
-   * if the private key was inlined.
-   */
-  virtual const std::string& privateKeyPath() const PURE;
+  virtual const TlsCertificateConfig* tlsCertificate() const PURE;
 
   /**
    * @return The subject alt names to be verified, if enabled. Otherwise, ""
@@ -127,6 +111,8 @@ public:
   virtual bool allowRenegotiation() const PURE;
 };
 
+typedef std::unique_ptr<ClientContextConfig> ClientContextConfigPtr;
+
 class ServerContextConfig : public virtual ContextConfig {
 public:
   struct SessionTicketKey {
@@ -147,6 +133,8 @@ public:
    */
   virtual const std::vector<SessionTicketKey>& sessionTicketKeys() const PURE;
 };
+
+typedef std::unique_ptr<ServerContextConfig> ServerContextConfigPtr;
 
 } // namespace Ssl
 } // namespace Envoy

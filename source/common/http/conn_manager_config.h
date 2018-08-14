@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/router/rds.h"
+#include "envoy/stats/scope.h"
 
 #include "common/http/date_provider.h"
 
@@ -48,6 +49,7 @@ namespace Http {
   COUNTER  (downstream_rq_non_relative_path)                                                       \
   COUNTER  (downstream_rq_ws_on_non_ws_route)                                                      \
   COUNTER  (downstream_rq_too_large)                                                               \
+  COUNTER  (downstream_rq_completed)                                                               \
   COUNTER  (downstream_rq_1xx)                                                                     \
   COUNTER  (downstream_rq_2xx)                                                                     \
   COUNTER  (downstream_rq_3xx)                                                                     \
@@ -110,6 +112,7 @@ typedef std::unique_ptr<TracingConnectionManagerConfig> TracingConnectionManager
  */
 // clang-format off
 #define CONN_MAN_LISTENER_STATS(COUNTER)                                                           \
+  COUNTER(downstream_rq_completed)                                                                 \
   COUNTER(downstream_rq_1xx)                                                                       \
   COUNTER(downstream_rq_2xx)                                                                       \
   COUNTER(downstream_rq_3xx)                                                                       \

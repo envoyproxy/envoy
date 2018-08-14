@@ -35,6 +35,7 @@ envoy_cc_library(
     ],
     deps = [
         "//include/envoy/secret:secret_manager_interface",
+        "//include/envoy/secret:secret_provider_interface",
         "//include/envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -68,6 +69,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:base64_lib",
         "//source/common/common:hex_lib",
+        "//source/common/common:utility_lib",
     ],
 )
 
@@ -77,6 +79,7 @@ envoy_cc_library(
     hdrs = ["tls_certificate_config_impl.h"],
     deps = [
         "//include/envoy/ssl:tls_certificate_config_interface",
+        "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
         "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],

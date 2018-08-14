@@ -13,6 +13,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
@@ -24,7 +25,7 @@
 #include "common/grpc/common.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -219,7 +220,6 @@ public:
   // This provides direct access to the underlying connection, but only to const methods.
   // Stateful connection related methods should happen on the connection's dispatcher via
   // executeOnDispatcher.
-  // TODO(htuch): This seems a sketchy pattern; even if we're using const methods, there may be
   // thread safety violations when crossing between the test thread and FakeUpstream thread.
   Network::Connection& connection() const { return connection_; }
 
@@ -586,4 +586,7 @@ private:
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
 };
+
+typedef std::unique_ptr<FakeUpstream> FakeUpstreamPtr;
+
 } // namespace Envoy

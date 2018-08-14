@@ -188,8 +188,6 @@ void Http2UpstreamIntegrationTest::simultaneousRequest(uint32_t request1_bytes,
                                                           {":authority", "host"}});
   Http::StreamEncoder* encoder2 = &encoder_decoder2.first;
   auto response2 = std::move(encoder_decoder2.second);
-  // DO NOT SUBMIT replace other ASSERT_TRUE with ASSERT (?)
-  // (in places like this, ASSERT_TRUE is probably fine)
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request2));
 
   // Finish request 1

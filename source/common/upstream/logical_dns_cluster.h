@@ -5,6 +5,7 @@
 #include <functional>
 #include <string>
 
+#include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/empty_string.h"
@@ -29,10 +30,9 @@ namespace Upstream {
 class LogicalDnsCluster : public ClusterImplBase {
 public:
   LogicalDnsCluster(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                    Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
-                    const LocalInfo::LocalInfo& local_info,
                     Network::DnsResolverSharedPtr dns_resolver, ThreadLocal::SlotAllocator& tls,
-                    ClusterManager& cm, Event::Dispatcher& dispatcher, bool added_via_api);
+                    Server::Configuration::TransportSocketFactoryContext& factory_context,
+                    Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   ~LogicalDnsCluster();
 

@@ -37,6 +37,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, http2Settings()).WillByDefault(ReturnRef(http2_settings_));
+  ON_CALL(*this, extensionProtocolOptions(_)).WillByDefault(Return(extension_protocol_options_));
   ON_CALL(*this, maxRequestsPerConnection())
       .WillByDefault(ReturnPointee(&max_requests_per_connection_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_));
@@ -51,6 +52,7 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
   ON_CALL(*this, lbSubsetInfo()).WillByDefault(ReturnRef(lb_subset_));
   ON_CALL(*this, lbRingHashConfig()).WillByDefault(ReturnRef(lb_ring_hash_config_));
+  ON_CALL(*this, lbOriginalDstConfig()).WillByDefault(ReturnRef(lb_original_dst_config_));
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
   ON_CALL(*this, clusterSocketOptions()).WillByDefault(ReturnRef(cluster_socket_options_));
 }

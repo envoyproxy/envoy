@@ -9,7 +9,6 @@
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/admin.h"
-#include "envoy/stats/stats.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/common/fmt.h"

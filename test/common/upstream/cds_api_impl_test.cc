@@ -77,12 +77,16 @@ public:
         .WillOnce(Invoke(
             [&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
                 const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-              EXPECT_EQ((Http::TestHeaderMapImpl{
-                            {":method", v2_rest_ ? "POST" : "GET"},
-                            {":path", v2_rest_ ? "/v2/discovery:clusters"
-                                               : "/v1/clusters/cluster_name/node_name"},
-                            {":authority", "foo_cluster"}}),
-                        request->headers());
+              EXPECT_EQ(
+                  (Http::TestHeaderMapImpl{
+                      {":method", v2_rest_ ? "POST" : "GET"},
+                      {":path",
+                       v2_rest_ ? "/v2/discovery:clusters" : "/v1/clusters/cluster_name/node_name"},
+                      {":authority", "foo_cluster"},
+                      {"content-type", "application/json"},
+                      {"content-length",
+                       request->body() ? fmt::FormatInt(request->body()->length()).str() : "0"}}),
+                  request->headers());
               callbacks_ = &callbacks;
               return &request_;
             }));
@@ -121,6 +125,24 @@ TEST_F(CdsApiImplTest, ValidateFail) {
 
   EXPECT_THROW(dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, ""),
                ProtoValidationException);
+  EXPECT_CALL(request_, cancel());
+}
+
+// Validate onConfigUpadte throws EnvoyException with duplicate clusters.
+TEST_F(CdsApiImplTest, ValidateDuplicateClusters) {
+  InSequence s;
+
+  setup(true);
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::Cluster> clusters;
+  auto* cluster_1 = clusters.Add();
+  cluster_1->set_name("duplicate_cluster");
+
+  auto* cluster_2 = clusters.Add();
+  cluster_2->set_name("duplicate_cluster");
+
+  EXPECT_THROW_WITH_MESSAGE(dynamic_cast<CdsApiImpl*>(cds_.get())->onConfigUpdate(clusters, ""),
+                            EnvoyException, "duplicate cluster duplicate_cluster found");
   EXPECT_CALL(request_, cancel());
 }
 

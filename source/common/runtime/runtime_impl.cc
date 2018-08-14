@@ -9,7 +9,6 @@
 #include <unordered_map>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/stats/stats.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/assert.h"
@@ -259,8 +258,8 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
     }
 
     struct stat stat_result;
-    int rc = os_sys_calls_.stat(full_path.c_str(), &stat_result);
-    if (rc != 0) {
+    const Api::SysCallIntResult result = os_sys_calls_.stat(full_path.c_str(), &stat_result);
+    if (result.rc_ != 0) {
       throw EnvoyException(fmt::format("unable to stat file: '{}'", full_path));
     }
 

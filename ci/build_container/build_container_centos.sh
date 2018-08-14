@@ -14,6 +14,7 @@ yum install -y java-1.8.0-openjdk-devel unzip which openssl rpm-build \
 yum clean all
 
 ln -s /usr/bin/cmake3 /usr/bin/cmake
+ln -s /usr/bin/ninja-build /usr/bin/ninja
 
 # latest bazel installer
 BAZEL_VERSION="$(curl -s https://api.github.com/repos/bazelbuild/bazel/releases/latest |

@@ -22,7 +22,6 @@
 #include "common/http/websocket/ws_handler_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/stats_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
@@ -381,6 +380,8 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
 
   EXPECT_EQ(1U, stats_.named_.downstream_rq_2xx_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_2xx_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_completed_.value());
+  EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
@@ -435,6 +436,8 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
   EXPECT_EQ(1U, listener_stats_.downstream_rq_1xx_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_rq_2xx_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_2xx_.value());
+  EXPECT_EQ(2U, stats_.named_.downstream_rq_completed_.value());
+  EXPECT_EQ(2U, listener_stats_.downstream_rq_completed_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, 100ContinueResponseWithEncoderFiltersProxyingDisabled) {
@@ -1918,6 +1921,8 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_drain_close_.value());
   EXPECT_EQ(1U, stats_.named_.downstream_rq_3xx_.value());
   EXPECT_EQ(1U, listener_stats_.downstream_rq_3xx_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_completed_.value());
+  EXPECT_EQ(1U, listener_stats_.downstream_rq_completed_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {

@@ -20,9 +20,8 @@ public:
   bool removeHandler(const std::string&) override;
   const Network::Socket& socket() override;
   ConfigTracker& getConfigTracker() override;
-  Http::Code request(absl::string_view path, const Http::Utility::QueryParams& params,
-                     absl::string_view method, Http::HeaderMap& response_headers,
-                     std::string& body) override;
+  Http::Code request(absl::string_view path_and_query, absl::string_view method,
+                     Http::HeaderMap& response_headers, std::string& body) override;
 
 private:
   ConfigTrackerImpl config_tracker_;

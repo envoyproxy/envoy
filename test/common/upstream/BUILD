@@ -71,6 +71,7 @@ envoy_cc_test(
         "//source/common/config:utility_lib",
         "//source/common/upstream:eds_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/server:transport_socket_config_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/ssl:ssl_mocks",
@@ -162,6 +163,24 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "hds_test",
+    srcs = ["hds_test.cc"],
+    deps = [
+        "//source/common/ssl:context_lib",
+        "//source/common/upstream:health_discovery_service_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/endpoint:load_report_cc",
+        "@envoy_api//envoy/service/discovery/v2:hds_cc",
+    ],
+)
+
+envoy_cc_test(
     name = "logical_dns_cluster_test",
     srcs = ["logical_dns_cluster_test.cc"],
     deps = [
@@ -171,6 +190,7 @@ envoy_cc_test(
         "//source/common/upstream:logical_dns_cluster_lib",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/server:transport_socket_config_lib",
         "//test/mocks:common_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
@@ -193,8 +213,10 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//test/mocks:common_lib",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
@@ -282,6 +304,7 @@ envoy_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/upstream:eds_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/server:transport_socket_config_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/ssl:ssl_mocks",
@@ -326,12 +349,14 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/server:transport_socket_config_lib",
         "//test/mocks:common_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
 )

@@ -11,6 +11,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -500,6 +501,11 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
     cluster_entry->cluster_->initialize([this, cluster_name] {
       auto warming_it = warming_clusters_.find(cluster_name);
       auto& cluster_entry = *warming_it->second;
+
+      // If the cluster is being updated, we need to cancel any pending merged updates.
+      // Othewise, applyUpdates() will fire with a dangling cluster reference.
+      updates_map_.erase(cluster_name);
+
       active_clusters_[cluster_name] = std::move(warming_it->second);
       warming_clusters_.erase(warming_it);
 
@@ -573,8 +579,7 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
   if (removed) {
     cm_stats_.cluster_removed_.inc();
     updateGauges();
-    // Did we ever deliver merged updates for this cluster?
-    // No need to manually disable timers, this should take care of it.
+    // Cancel any pending merged updates.
     updates_map_.erase(cluster_name);
   }
 
@@ -1062,7 +1067,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     case LoadBalancerType::OriginalDst: {
       ASSERT(lb_factory_ == nullptr);
       lb_.reset(new OriginalDstCluster::LoadBalancer(
-          priority_set_, parent.parent_.active_clusters_.at(cluster->name())->cluster_));
+          priority_set_, parent.parent_.active_clusters_.at(cluster->name())->cluster_,
+          cluster->lbOriginalDstConfig()));
       break;
     }
     }

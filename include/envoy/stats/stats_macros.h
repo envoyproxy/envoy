@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 
 namespace Envoy {

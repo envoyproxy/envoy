@@ -48,6 +48,16 @@
   ((message).has_##field_name() ? DurationUtil::durationToSeconds((message).field_name())          \
                                 : throw MissingFieldException(#field_name, (message)))
 
+// Set the value of a FractionalPercent field with the value from a protobuf message if present.
+// Otherwise, convert the default field value into FractionalPercent and set it.
+#define PROTOBUF_SET_FRACTIONAL_PERCENT_OR_DEFAULT(field, message, field_name, default_field_name) \
+  if ((message).has_##field_name()) {                                                              \
+    field = (message).field_name();                                                                \
+  } else {                                                                                         \
+    field.set_numerator((message).default_field_name());                                           \
+    field.set_denominator(envoy::type::FractionalPercent::HUNDRED);                                \
+  }
+
 namespace Envoy {
 namespace ProtobufPercentHelper {
 
@@ -133,6 +143,8 @@ public:
   ProtoValidationException(const std::string& validation_error, const Protobuf::Message& message);
 };
 
+enum class ProtoUnknownFieldsMode { Strict, Allow };
+
 class MessageUtil {
 public:
   // std::hash
@@ -158,7 +170,19 @@ public:
     return HashUtil::xxHash64(text);
   }
 
+  static ProtoUnknownFieldsMode proto_unknown_fields;
+
+  static void checkUnknownFields(const Protobuf::Message& message) {
+    if (MessageUtil::proto_unknown_fields == ProtoUnknownFieldsMode::Strict &&
+        !message.GetReflection()->GetUnknownFields(message).empty()) {
+      throw EnvoyException("Protobuf message (type " + message.GetTypeName() +
+                           ") has unknown fields");
+    }
+  }
+
   static void loadFromJson(const std::string& json, Protobuf::Message& message);
+  static void loadFromJsonEx(const std::string& json, Protobuf::Message& message,
+                             ProtoUnknownFieldsMode proto_unknown_fields);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message);
   static void loadFromFile(const std::string& path, Protobuf::Message& message);
 
@@ -214,6 +238,7 @@ public:
     if (!message.UnpackTo(&typed_message)) {
       throw EnvoyException("Unable to unpack " + message.DebugString());
     }
+    checkUnknownFields(typed_message);
     return typed_message;
   };
 

@@ -18,18 +18,10 @@ LdsSubscription::LdsSubscription(Config::SubscriptionStats stats,
                                  Runtime::RandomGenerator& random,
                                  const LocalInfo::LocalInfo& local_info,
                                  const Stats::StatsOptions& stats_options)
-    : RestApiFetcher(cm, lds_config.api_config_source().cluster_names()[0], dispatcher, random,
-                     Config::Utility::apiConfigSourceRefreshDelay(lds_config.api_config_source())),
+    : RestApiFetcher(cm, lds_config.api_config_source(), dispatcher, random),
       local_info_(local_info), stats_(stats), stats_options_(stats_options) {
-  const auto& api_config_source = lds_config.api_config_source();
-  UNREFERENCED_PARAMETER(lds_config);
-  // If we are building an LdsSubscription, the ConfigSource should be REST_LEGACY.
-  ASSERT(api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
-  // TODO(htuch): Add support for multiple clusters, #1170.
-  ASSERT(api_config_source.cluster_names().size() == 1);
-  ASSERT(api_config_source.has_refresh_delay());
-  Envoy::Config::Utility::checkClusterAndLocalInfo("lds", api_config_source.cluster_names()[0], cm,
-                                                   local_info);
+  Envoy::Config::Utility::checkClusterAndLocalInfo(
+      "lds", lds_config.api_config_source().cluster_names()[0], cm, local_info);
 }
 
 void LdsSubscription::createRequest(Http::Message& request) {
@@ -38,6 +30,9 @@ void LdsSubscription::createRequest(Http::Message& request) {
   request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
   request.headers().insertPath().value(
       fmt::format("/v1/listeners/{}/{}", local_info_.clusterName(), local_info_.nodeName()));
+  request.headers().insertContentType().value().setReference(
+      Http::Headers::get().ContentTypeValues.Json);
+  request.headers().insertContentLength().value(size_t(0));
 }
 
 void LdsSubscription::parseResponse(const Http::Message& response) {

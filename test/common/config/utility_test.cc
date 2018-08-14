@@ -8,7 +8,6 @@
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
@@ -47,6 +46,16 @@ TEST(UtilityTest, GetTypedResources) {
   EXPECT_EQ("1", typed_resources[1].cluster_name());
 }
 
+TEST(UtilityTest, GetTypedResourcesWrongType) {
+  envoy::api::v2::DiscoveryResponse response;
+  envoy::api::v2::ClusterLoadAssignment load_assignment_0;
+  load_assignment_0.set_cluster_name("0");
+  response.add_resources()->PackFrom(load_assignment_0);
+
+  EXPECT_THROW_WITH_REGEX(Utility::getTypedResources<envoy::api::v2::Listener>(response),
+                          EnvoyException, "Unable to unpack .*");
+}
+
 TEST(UtilityTest, ComputeHashedVersion) {
   EXPECT_EQ("hash_2e1472b57af294d1", Utility::computeHashedVersion("{}").first);
   EXPECT_EQ("hash_33bf00a859c4ba3f", Utility::computeHashedVersion("foo").first);
@@ -57,6 +66,18 @@ TEST(UtilityTest, ApiConfigSourceRefreshDelay) {
   api_config_source.mutable_refresh_delay()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
   EXPECT_EQ(1234, Utility::apiConfigSourceRefreshDelay(api_config_source).count());
+}
+
+TEST(UtilityTest, ApiConfigSourceDefaultRequestTimeout) {
+  envoy::api::v2::core::ApiConfigSource api_config_source;
+  EXPECT_EQ(1000, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
+}
+
+TEST(UtilityTest, ApiConfigSourceRequestTimeout) {
+  envoy::api::v2::core::ApiConfigSource api_config_source;
+  api_config_source.mutable_request_timeout()->CopyFrom(
+      Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
+  EXPECT_EQ(1234, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
 }
 
 TEST(UtilityTest, TranslateApiConfigSource) {

@@ -1,7 +1,6 @@
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/buffer_helper.h"
 #include "extensions/filters/network/thrift_proxy/config.h"
@@ -84,11 +83,17 @@ public:
     filter_->onBelowWriteBufferLowWatermark();
   }
 
-  void writeFramedBinaryMessage(Buffer::Instance& buffer, MessageType msg_type, int32_t seq_id) {
+  void writeMessage(Buffer::Instance& buffer, TransportType transport_type,
+                    ProtocolType protocol_type, MessageType msg_type, int32_t seq_id) {
     Buffer::OwnedImpl msg;
-    ProtocolPtr proto =
-        NamedProtocolConfigFactory::getFactory(ProtocolType::Binary).createProtocol();
-    proto->writeMessageBegin(msg, "name", msg_type, seq_id);
+    ProtocolPtr proto = NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol();
+    MessageMetadata metadata;
+    metadata.setProtocol(protocol_type);
+    metadata.setMethodName("name");
+    metadata.setMessageType(msg_type);
+    metadata.setSequenceId(seq_id);
+
+    proto->writeMessageBegin(msg, metadata);
     proto->writeStructBegin(msg, "response");
     proto->writeFieldBegin(msg, "success", FieldType::String, 0);
     proto->writeString(msg, "field");
@@ -98,8 +103,12 @@ public:
     proto->writeMessageEnd(msg);
 
     TransportPtr transport =
-        NamedTransportConfigFactory::getFactory(TransportType::Framed).createTransport();
-    transport->encodeFrame(buffer, msg);
+        NamedTransportConfigFactory::getFactory(transport_type).createTransport();
+    transport->encodeFrame(buffer, metadata, msg);
+  }
+
+  void writeFramedBinaryMessage(Buffer::Instance& buffer, MessageType msg_type, int32_t seq_id) {
+    writeMessage(buffer, TransportType::Framed, ProtocolType::Binary, msg_type, seq_id);
   }
 
   void writeComplexFramedBinaryMessage(Buffer::Instance& buffer, MessageType msg_type,
@@ -107,7 +116,12 @@ public:
     Buffer::OwnedImpl msg;
     ProtocolPtr proto =
         NamedProtocolConfigFactory::getFactory(ProtocolType::Binary).createProtocol();
-    proto->writeMessageBegin(msg, "name", msg_type, seq_id);
+    MessageMetadata metadata;
+    metadata.setMethodName("name");
+    metadata.setMessageType(msg_type);
+    metadata.setSequenceId(seq_id);
+
+    proto->writeMessageBegin(msg, metadata);
     proto->writeStructBegin(msg, "wrapper"); // call args struct or response struct
     proto->writeFieldBegin(msg, "wrapper_field", FieldType::Struct, 0); // call arg/response success
 
@@ -169,7 +183,7 @@ public:
 
     TransportPtr transport =
         NamedTransportConfigFactory::getFactory(TransportType::Framed).createTransport();
-    transport->encodeFrame(buffer, msg);
+    transport->encodeFrame(buffer, metadata, msg);
   }
 
   void writePartialFramedBinaryMessage(Buffer::Instance& buffer, MessageType msg_type,
@@ -189,7 +203,12 @@ public:
     Buffer::OwnedImpl msg;
     ProtocolPtr proto =
         NamedProtocolConfigFactory::getFactory(ProtocolType::Binary).createProtocol();
-    proto->writeMessageBegin(msg, "name", MessageType::Exception, seq_id);
+    MessageMetadata metadata;
+    metadata.setMethodName("name");
+    metadata.setMessageType(MessageType::Exception);
+    metadata.setSequenceId(seq_id);
+
+    proto->writeMessageBegin(msg, metadata);
     proto->writeStructBegin(msg, "");
     proto->writeFieldBegin(msg, "", FieldType::String, 1);
     proto->writeString(msg, "error");
@@ -203,14 +222,19 @@ public:
 
     TransportPtr transport =
         NamedTransportConfigFactory::getFactory(TransportType::Framed).createTransport();
-    transport->encodeFrame(buffer, msg);
+    transport->encodeFrame(buffer, metadata, msg);
   }
 
   void writeFramedBinaryIDLException(Buffer::Instance& buffer, int32_t seq_id) {
     Buffer::OwnedImpl msg;
     ProtocolPtr proto =
         NamedProtocolConfigFactory::getFactory(ProtocolType::Binary).createProtocol();
-    proto->writeMessageBegin(msg, "name", MessageType::Reply, seq_id);
+    MessageMetadata metadata;
+    metadata.setMethodName("name");
+    metadata.setMessageType(MessageType::Reply);
+    metadata.setSequenceId(seq_id);
+
+    proto->writeMessageBegin(msg, metadata);
     proto->writeStructBegin(msg, "");
     proto->writeFieldBegin(msg, "", FieldType::Struct, 2);
 
@@ -228,7 +252,7 @@ public:
 
     TransportPtr transport =
         NamedTransportConfigFactory::getFactory(TransportType::Framed).createTransport();
-    transport->encodeFrame(buffer, msg);
+    transport->encodeFrame(buffer, metadata, msg);
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
@@ -285,7 +309,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
       .WillOnce(
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
-  EXPECT_CALL(*decoder_filter_, messageBegin(_, _, _))
+  EXPECT_CALL(*decoder_filter_, messageBegin(_))
       .WillOnce(Return(ThriftFilters::FilterStatus::StopIteration));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -506,7 +530,7 @@ route_config:
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
       .WillOnce(
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
-  EXPECT_CALL(*decoder_filter_, messageBegin(_, _, _))
+  EXPECT_CALL(*decoder_filter_, messageBegin(_))
       .WillOnce(Return(ThriftFilters::FilterStatus::StopIteration));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);

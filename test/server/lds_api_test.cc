@@ -82,12 +82,16 @@ public:
         .WillOnce(Invoke(
             [&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
                 const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-              EXPECT_EQ((Http::TestHeaderMapImpl{
-                            {":method", v2_rest_ ? "POST" : "GET"},
-                            {":path", v2_rest_ ? "/v2/discovery:listeners"
-                                               : "/v1/listeners/cluster_name/node_name"},
-                            {":authority", "foo_cluster"}}),
-                        request->headers());
+              EXPECT_EQ(
+                  (Http::TestHeaderMapImpl{
+                      {":method", v2_rest_ ? "POST" : "GET"},
+                      {":path", v2_rest_ ? "/v2/discovery:listeners"
+                                         : "/v1/listeners/cluster_name/node_name"},
+                      {":authority", "foo_cluster"},
+                      {"content-type", "application/json"},
+                      {"content-length",
+                       request->body() ? fmt::FormatInt(request->body()->length()).str() : "0"}}),
+                  request->headers());
               callbacks_ = &callbacks;
               return &request_;
             }));
@@ -179,6 +183,24 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
 
   EXPECT_THROW_WITH_MESSAGE(lds_->onConfigUpdate(listeners, ""), EnvoyException,
                             "Error adding/updating listener invalid-listener: something is wrong");
+  EXPECT_CALL(request_, cancel());
+}
+
+// Validate onConfigUpadte throws EnvoyException with duplicate listeners.
+TEST_F(LdsApiTest, ValidateDuplicateListeners) {
+  InSequence s;
+
+  setup(true);
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::Listener> listeners;
+  auto* listener_1 = listeners.Add();
+  listener_1->set_name("duplicate_listener");
+
+  auto* listener_2 = listeners.Add();
+  listener_2->set_name("duplicate_listener");
+
+  EXPECT_THROW_WITH_MESSAGE(lds_->onConfigUpdate(listeners, ""), EnvoyException,
+                            "duplicate listener duplicate_listener found");
   EXPECT_CALL(request_, cancel());
 }
 

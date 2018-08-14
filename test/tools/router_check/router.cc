@@ -7,7 +7,6 @@
 
 #include "common/network/utility.h"
 #include "common/request_info/request_info_impl.h"
-#include "common/stats/stats_impl.h"
 
 #include "test/test_common/printers.h"
 

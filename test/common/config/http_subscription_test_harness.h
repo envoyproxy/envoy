@@ -37,9 +37,9 @@ public:
       timer_cb_ = timer_cb;
       return timer_;
     }));
-    subscription_.reset(new HttpEdsSubscriptionImpl(node_, cm_, "eds_cluster", dispatcher_,
-                                                    random_gen_, std::chrono::milliseconds(1),
-                                                    *method_descriptor_, stats_));
+    subscription_.reset(new HttpEdsSubscriptionImpl(
+        node_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
+        std::chrono::milliseconds(1000), *method_descriptor_, stats_));
   }
 
   ~HttpSubscriptionTestHarness() {
@@ -59,6 +59,8 @@ public:
           http_callbacks_ = &callbacks;
           UNREFERENCED_PARAMETER(timeout);
           EXPECT_EQ("POST", std::string(request->headers().Method()->value().c_str()));
+          EXPECT_EQ(Http::Headers::get().ContentTypeValues.Json,
+                    std::string(request->headers().ContentType()->value().c_str()));
           EXPECT_EQ("eds_cluster", std::string(request->headers().Host()->value().c_str()));
           EXPECT_EQ("/v2/discovery:endpoints",
                     std::string(request->headers().Path()->value().c_str()));
@@ -73,6 +75,8 @@ public:
           }
           expected_request += "}";
           EXPECT_EQ(expected_request, request->bodyAsString());
+          EXPECT_EQ(fmt::FormatInt(expected_request.size()).str(),
+                    std::string(request->headers().ContentLength()->value().c_str()));
           request_in_progress_ = true;
           return &http_request_;
         }));

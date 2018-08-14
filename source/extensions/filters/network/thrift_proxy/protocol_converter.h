@@ -31,9 +31,8 @@ public:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   void resetUpstreamConnection() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  ThriftFilters::FilterStatus messageBegin(absl::string_view name, MessageType msg_type,
-                                           int32_t seq_id) override {
-    proto_->writeMessageBegin(*buffer_, std::string(name), msg_type, seq_id);
+  ThriftFilters::FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override {
+    proto_->writeMessageBegin(*buffer_, *metadata);
     return ThriftFilters::FilterStatus::Continue;
   }
 

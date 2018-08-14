@@ -10,10 +10,11 @@
 
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/options.h"
+#include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
 #include "common/common/block_memory_hash_set.h"
-#include "common/stats/stats_impl.h"
+#include "common/stats/raw_stat_data.h"
 
 namespace Envoy {
 namespace Server {

@@ -15,8 +15,11 @@ public:
   MockEngine(const envoy::config::rbac::v2alpha::RBAC& rules)
       : RoleBasedAccessControlEngineImpl(rules){};
 
-  MOCK_CONST_METHOD3(allowed, bool(const Envoy::Network::Connection&, const Envoy::Http::HeaderMap&,
-                                   const envoy::api::v2::core::Metadata&));
+  MOCK_CONST_METHOD4(allowed,
+                     bool(const Envoy::Network::Connection&, const Envoy::Http::HeaderMap&,
+                          const envoy::api::v2::core::Metadata&, std::string* effective_policy_id));
+
+  MOCK_CONST_METHOD1(allowed, bool(const Envoy::Network::Connection&));
 };
 
 } // namespace RBAC

@@ -1,10 +1,14 @@
 #include "server/overload_manager_impl.h"
 
+#include "envoy/stats/scope.h"
+
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
 #include "server/resource_monitor_config_impl.h"
+
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Server {
@@ -29,9 +33,15 @@ private:
   absl::optional<double> value_;
 };
 
+std::string StatsName(const std::string& a, const std::string& b) {
+  return absl::StrCat("overload.", a, b);
+}
+
 } // namespace
 
-OverloadAction::OverloadAction(const envoy::config::overload::v2alpha::OverloadAction& config) {
+OverloadAction::OverloadAction(const envoy::config::overload::v2alpha::OverloadAction& config,
+                               Stats::Scope& stats_scope)
+    : active_gauge_(stats_scope.gauge(StatsName(config.name(), ".active"))) {
   for (const auto& trigger_config : config.triggers()) {
     TriggerPtr trigger;
 
@@ -57,9 +67,11 @@ bool OverloadAction::updateResourcePressure(const std::string& name, double pres
   ASSERT(it != triggers_.end());
   if (it->second->updateValue(pressure)) {
     if (it->second->isFired()) {
+      active_gauge_.set(1);
       const auto result = fired_triggers_.insert(name);
       ASSERT(result.second);
     } else {
+      active_gauge_.set(0);
       const auto result = fired_triggers_.erase(name);
       ASSERT(result == 1);
     }
@@ -71,8 +83,10 @@ bool OverloadAction::updateResourcePressure(const std::string& name, double pres
 bool OverloadAction::isActive() const { return !fired_triggers_.empty(); }
 
 OverloadManagerImpl::OverloadManagerImpl(
-    Event::Dispatcher& dispatcher, const envoy::config::overload::v2alpha::OverloadManager& config)
-    : started_(false), dispatcher_(dispatcher),
+    Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
+    ThreadLocal::SlotAllocator& slot_allocator,
+    const envoy::config::overload::v2alpha::OverloadManager& config)
+    : started_(false), dispatcher_(dispatcher), tls_(slot_allocator.allocateSlot()),
       refresh_interval_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))) {
   Configuration::ResourceMonitorFactoryContextImpl context(dispatcher);
@@ -84,8 +98,9 @@ OverloadManagerImpl::OverloadManagerImpl(
     auto config = Config::Utility::translateToFactoryConfig(resource, factory);
     auto monitor = factory.createResourceMonitor(*config, context);
 
-    auto result = resources_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
-                                     std::forward_as_tuple(name, std::move(monitor), *this));
+    auto result =
+        resources_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
+                           std::forward_as_tuple(name, std::move(monitor), *this, stats_scope));
     if (!result.second) {
       throw EnvoyException(fmt::format("Duplicate resource monitor {}", name));
     }
@@ -95,7 +110,7 @@ OverloadManagerImpl::OverloadManagerImpl(
     const auto& name = action.name();
     ENVOY_LOG(debug, "Adding overload action {}", name);
     auto result = actions_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
-                                   std::forward_as_tuple(action));
+                                   std::forward_as_tuple(action, stats_scope));
     if (!result.second) {
       throw EnvoyException(fmt::format("Duplicate overload action {}", name));
     }
@@ -111,11 +126,18 @@ OverloadManagerImpl::OverloadManagerImpl(
       resource_to_actions_.insert(std::make_pair(resource, name));
     }
   }
+
+  tls_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalOverloadState>();
+  });
 }
 
 void OverloadManagerImpl::start() {
   ASSERT(!started_);
   started_ = true;
+  if (resources_.empty()) {
+    return;
+  }
   timer_ = dispatcher_.createTimer([this]() -> void {
     for (auto& resource : resources_) {
       resource.second.update();
@@ -140,6 +162,10 @@ void OverloadManagerImpl::registerForAction(const std::string& action,
                                std::forward_as_tuple(dispatcher, callback));
 }
 
+ThreadLocalOverloadState& OverloadManagerImpl::getThreadLocalOverloadState() {
+  return tls_->getTyped<ThreadLocalOverloadState>();
+}
+
 void OverloadManagerImpl::updateResourcePressure(const std::string& resource, double pressure) {
   auto action_range = resource_to_actions_.equal_range(resource);
   std::for_each(action_range.first, action_range.second,
@@ -153,6 +179,9 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
                         is_active ? OverloadActionState::Active : OverloadActionState::Inactive;
                     ENVOY_LOG(info, "Overload action {} has become {}", action,
                               is_active ? "active" : "inactive");
+                    tls_->runOnAllThreads([this, action, state] {
+                      tls_->getTyped<ThreadLocalOverloadState>().setState(action, state);
+                    });
                     auto callback_range = action_to_callbacks_.equal_range(action);
                     std::for_each(callback_range.first, callback_range.second,
                                   [&](ActionToCallbackMap::value_type& cb_entry) {
@@ -163,6 +192,13 @@ void OverloadManagerImpl::updateResourcePressure(const std::string& resource, do
                 });
 }
 
+OverloadManagerImpl::Resource::Resource(const std::string& name, ResourceMonitorPtr monitor,
+                                        OverloadManagerImpl& manager, Stats::Scope& stats_scope)
+    : name_(name), monitor_(std::move(monitor)), manager_(manager), pending_update_(false),
+      pressure_gauge_(stats_scope.gauge(StatsName(name, ".pressure"))),
+      failed_updates_counter_(stats_scope.counter(StatsName(name, ".failed_updates"))),
+      skipped_updates_counter_(stats_scope.counter(StatsName(name, ".skipped_updates"))) {}
+
 void OverloadManagerImpl::Resource::update() {
   if (!pending_update_) {
     pending_update_ = true;
@@ -170,19 +206,19 @@ void OverloadManagerImpl::Resource::update() {
     return;
   }
   ENVOY_LOG(debug, "Skipping update for resource {} which has pending update", name_);
-  // TODO(eziskind) add stat
+  skipped_updates_counter_.inc();
 }
 
 void OverloadManagerImpl::Resource::onSuccess(const ResourceUsage& usage) {
   pending_update_ = false;
   manager_.updateResourcePressure(name_, usage.resource_pressure_);
+  pressure_gauge_.set(usage.resource_pressure_ * 100); // convert to percent
 }
 
 void OverloadManagerImpl::Resource::onFailure(const EnvoyException& error) {
   pending_update_ = false;
   ENVOY_LOG(info, "Failed to update resource {}: {}", name_, error.what());
-
-  // TODO(eziskind): add stat
+  failed_updates_counter_.inc();
 }
 
 } // namespace Server
