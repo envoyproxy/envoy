@@ -72,6 +72,8 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Allowed) {
 TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithNoPolicy) {
   config_ = setupConfig(false /* with_policy */);
   filter_.reset(new RoleBasedAccessControlFilter(config_));
+  filter_->initializeReadFilterCallbacks(callbacks_);
+  setDestinationPort(0);
 
   // Allow access and no metric change when there is no policy.
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
