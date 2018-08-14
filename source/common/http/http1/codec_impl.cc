@@ -244,20 +244,10 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
   if (!method || !path) {
     throw CodecClientException(":method and :path must be specified");
   }
-
   if (method->value() == Headers::get().MethodValues.Head.c_str()) {
     head_request_ = true;
-    // If this is an incomplete request (end_stream=false), then connection_.onEncodeComplete();
-    // will not be called in StreamEncoderImpl::encodeHeaders, head request state will not be passed
-    // to the corresponding response so here need to call this method
-    if (!end_stream) {
-      auto c = dynamic_cast<ClientConnectionImpl*>(&connection_);
-      if (c) {
-        c->setHeadStateForLastResponse(true);
-      }
-    }
   }
-
+  connection_.onEncodeHeader(headers);
   connection_.reserveBuffer(std::max(4096U, path->value().size() + 4096));
   connection_.copyToBuffer(method->value().c_str(), method->value().size());
   connection_.addCharToBuffer(' ');
@@ -694,9 +684,12 @@ StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) 
   return *request_encoder_;
 }
 
-void ClientConnectionImpl::onEncodeComplete() {
-  // Transfer head request state into the pending response before we reuse the encoder.
-  setHeadStateForLastResponse(request_encoder_->headRequest());
+void ClientConnectionImpl::onEncodeComplete() {}
+
+void ClientConnectionImpl::onEncodeHeader(const HeaderMapImpl& headers) {
+  if (headers.Method()->value() == Headers::get().MethodValues.Head.c_str()) {
+    pending_responses_.back().head_request_ = true;
+  }
 }
 
 int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
