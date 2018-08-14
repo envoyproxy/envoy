@@ -31,10 +31,10 @@ namespace Envoy {
 namespace Tcp {
 namespace {
 
-struct TestProtocolState : public ConnectionPool::ProtocolState {
-  TestProtocolState(int id, std::function<void()> on_destructor)
+struct TestConnectionState : public ConnectionPool::ConnectionState {
+  TestConnectionState(int id, std::function<void()> on_destructor)
       : id_(id), on_destructor_(on_destructor) {}
-  ~TestProtocolState() { on_destructor_(); }
+  ~TestConnectionState() { on_destructor_(); }
 
   int id_;
   std::function<void()> on_destructor_;
@@ -422,9 +422,9 @@ TEST_F(TcpConnPoolImplTest, MultipleRequestAndResponse) {
 }
 
 /**
- * Tests ProtocolState assignment, lookup and destruction.
+ * Tests ConnectionState assignment, lookup and destruction.
  */
-TEST_F(TcpConnPoolImplTest, ProtocolStateLifecycle) {
+TEST_F(TcpConnPoolImplTest, ConnectionStateLifecycle) {
   InSequence s;
 
   bool state_destroyed = false;
@@ -432,10 +432,10 @@ TEST_F(TcpConnPoolImplTest, ProtocolStateLifecycle) {
   // Request 1 should kick off a new connection.
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
 
-  auto* state = new TestProtocolState(1, [&]() -> void { state_destroyed = true; });
-  c1.callbacks_.conn_data_->setProtocolState(std::unique_ptr<TestProtocolState>(state));
+  auto* state = new TestConnectionState(1, [&]() -> void { state_destroyed = true; });
+  c1.callbacks_.conn_data_->setConnectionState(std::unique_ptr<TestConnectionState>(state));
 
-  EXPECT_EQ(state, c1.callbacks_.conn_data_->protocolStateTyped<TestProtocolState>());
+  EXPECT_EQ(state, c1.callbacks_.conn_data_->connectionStateTyped<TestConnectionState>());
 
   EXPECT_CALL(conn_pool_, onConnReleasedForTest());
   c1.releaseConn();
@@ -445,7 +445,7 @@ TEST_F(TcpConnPoolImplTest, ProtocolStateLifecycle) {
   // Request 2 should not.
   ActiveTestConn c2(*this, 0, ActiveTestConn::Type::Immediate);
 
-  EXPECT_EQ(state, c2.callbacks_.conn_data_->protocolStateTyped<TestProtocolState>());
+  EXPECT_EQ(state, c2.callbacks_.conn_data_->connectionStateTyped<TestConnectionState>());
 
   EXPECT_CALL(conn_pool_, onConnReleasedForTest());
   c2.releaseConn();
@@ -758,22 +758,22 @@ TEST_F(TcpConnPoolImplTest, ConcurrentConnections) {
 }
 
 /**
- * Tests ProtocolState lifecycle with multiple concurrent connections.
+ * Tests ConnectionState lifecycle with multiple concurrent connections.
  */
-TEST_F(TcpConnPoolImplTest, ProtocolStateWithConcurrentConnections) {
+TEST_F(TcpConnPoolImplTest, ConnectionStateWithConcurrentConnections) {
   InSequence s;
 
   int state_destroyed = 0;
-  auto* s1 = new TestProtocolState(1, [&]() -> void { state_destroyed |= 1; });
-  auto* s2 = new TestProtocolState(2, [&]() -> void { state_destroyed |= 2; });
-  auto* s3 = new TestProtocolState(2, [&]() -> void { state_destroyed |= 4; });
+  auto* s1 = new TestConnectionState(1, [&]() -> void { state_destroyed |= 1; });
+  auto* s2 = new TestConnectionState(2, [&]() -> void { state_destroyed |= 2; });
+  auto* s3 = new TestConnectionState(2, [&]() -> void { state_destroyed |= 4; });
 
   cluster_->resource_manager_.reset(
       new Upstream::ResourceManagerImpl(runtime_, "fake_key", 2, 1024, 1024, 1));
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
-  c1.callbacks_.conn_data_->setProtocolState(std::unique_ptr<TestProtocolState>(s1));
+  c1.callbacks_.conn_data_->setConnectionState(std::unique_ptr<TestConnectionState>(s1));
   ActiveTestConn c2(*this, 1, ActiveTestConn::Type::CreateConnection);
-  c2.callbacks_.conn_data_->setProtocolState(std::unique_ptr<TestProtocolState>(s2));
+  c2.callbacks_.conn_data_->setConnectionState(std::unique_ptr<TestConnectionState>(s2));
   ActiveTestConn c3(*this, 0, ActiveTestConn::Type::Pending);
 
   EXPECT_EQ(0, state_destroyed);
@@ -787,11 +787,11 @@ TEST_F(TcpConnPoolImplTest, ProtocolStateWithConcurrentConnections) {
   conn_pool_.expectAndRunUpstreamReady();
 
   // c3 now has the state set by c1.
-  EXPECT_EQ(s1, c3.callbacks_.conn_data_->protocolStateTyped<TestProtocolState>());
-  EXPECT_EQ(s2, c2.callbacks_.conn_data_->protocolStateTyped<TestProtocolState>());
+  EXPECT_EQ(s1, c3.callbacks_.conn_data_->connectionStateTyped<TestConnectionState>());
+  EXPECT_EQ(s2, c2.callbacks_.conn_data_->connectionStateTyped<TestConnectionState>());
 
   // replace c3's state
-  c3.callbacks_.conn_data_->setProtocolState(std::unique_ptr<TestProtocolState>(s3));
+  c3.callbacks_.conn_data_->setConnectionState(std::unique_ptr<TestConnectionState>(s3));
   EXPECT_EQ(1, state_destroyed);
 
   EXPECT_CALL(conn_pool_, onConnReleasedForTest()).Times(2);

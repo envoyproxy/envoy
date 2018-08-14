@@ -39,10 +39,10 @@ protected:
 
     Network::ClientConnection& connection();
     void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callbacks);
-    void setProtocolState(ConnectionPool::ProtocolStatePtr&& state) {
-      parent_.setProtocolState(std::move(state));
+    void setConnectionState(ConnectionPool::ConnectionStatePtr&& state) {
+      parent_.setConnectionState(std::move(state));
     };
-    ConnectionPool::ProtocolState* protocolState() { return parent_.protocolState(); }
+    ConnectionPool::ConnectionState* connectionState() { return parent_.connectionState(); }
 
     void release(bool closed);
 
@@ -65,10 +65,12 @@ protected:
     void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callbacks) override {
       wrapper_->addUpstreamCallbacks(callbacks);
     };
-    void setProtocolState(ConnectionPool::ProtocolStatePtr&& state) override {
-      wrapper_->setProtocolState(std::move(state));
+    void setConnectionState(ConnectionPool::ConnectionStatePtr&& state) override {
+      wrapper_->setConnectionState(std::move(state));
     }
-    ConnectionPool::ProtocolState* protocolState() override { return wrapper_->protocolState(); }
+    ConnectionPool::ConnectionState* connectionState() override {
+      return wrapper_->connectionState();
+    }
 
     ConnectionWrapperSharedPtr wrapper_;
   };
@@ -99,16 +101,16 @@ protected:
     void onAboveWriteBufferHighWatermark() override;
     void onBelowWriteBufferLowWatermark() override;
 
-    void setProtocolState(ConnectionPool::ProtocolStatePtr&& state) {
+    void setConnectionState(ConnectionPool::ConnectionStatePtr&& state) {
       conn_state_ = std::move(state);
     }
-    ConnectionPool::ProtocolState* protocolState() { return conn_state_.get(); }
+    ConnectionPool::ConnectionState* connectionState() { return conn_state_.get(); }
 
     ConnPoolImpl& parent_;
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
     ConnectionWrapperSharedPtr wrapper_;
     Network::ClientConnectionPtr conn_;
-    ConnectionPool::ProtocolStatePtr conn_state_;
+    ConnectionPool::ConnectionStatePtr conn_state_;
     Event::TimerPtr connect_timer_;
     Stats::TimespanPtr conn_length_;
     uint64_t remaining_requests_;

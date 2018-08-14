@@ -58,16 +58,20 @@ public:
 };
 
 /**
- * ProtocolState is a base class for protocol-specific state that must be maintained across
- * connections. The ProtocolState assigned to a connection is automatically destroyed when the
- * connection is closed.
+ * ConnectionState is a base class for connection state maintained across requests. For example, a
+ * protocol may maintain a connection-specific request sequence number or negotiate options that
+ * affect the behavior of requests for the duration of the connection. A ConnectionState subclass
+ * is assigned to the ConnectionData to track this state when the connection is returned to the
+ * pool so that the state is available when the connection is re-used for a subsequent request.
+ * The ConnectionState assigned to a connection is automatically destroyed when the connection is
+ * closed.
  */
-class ProtocolState {
+class ConnectionState {
 public:
-  virtual ~ProtocolState() {}
+  virtual ~ConnectionState() {}
 };
 
-typedef std::unique_ptr<ProtocolState> ProtocolStatePtr;
+typedef std::unique_ptr<ConnectionState> ConnectionStatePtr;
 
 /*
  * ConnectionData wraps a ClientConnection allocated to a caller. Open ClientConnections are
@@ -83,16 +87,16 @@ public:
   virtual Network::ClientConnection& connection() PURE;
 
   /**
-   * Sets the ProtocolState for this connection. Any existing ProtocolState is destroyed.
-   * @param ProtocolStatePtr&& new ProtocolState for this connection.
+   * Sets the ConnectionState for this connection. Any existing ConnectionState is destroyed.
+   * @param ConnectionStatePtr&& new ConnectionState for this connection.
    */
-  virtual void setProtocolState(ProtocolStatePtr&& state) PURE;
+  virtual void setConnectionState(ConnectionStatePtr&& state) PURE;
 
   /**
-   * @return T* the current ProtocolState or nullptr if no state is set or if the state's type
+   * @return T* the current ConnectionState or nullptr if no state is set or if the state's type
    *            is not T.
    */
-  template <class T> T* protocolStateTyped() { return dynamic_cast<T*>(protocolState()); }
+  template <class T> T* connectionStateTyped() { return dynamic_cast<T*>(connectionState()); }
 
   /**
    * Sets the ConnectionPool::UpstreamCallbacks for the connection. If no callback is attached,
@@ -104,9 +108,9 @@ public:
 
 protected:
   /**
-   * @return ProtocolState* pointer to the current ProtocolState or nullptr if not set
+   * @return ConnectionState* pointer to the current ConnectionState or nullptr if not set
    */
-  virtual ProtocolState* protocolState() PURE;
+  virtual ConnectionState* connectionState() PURE;
 };
 
 typedef std::unique_ptr<ConnectionData> ConnectionDataPtr;
