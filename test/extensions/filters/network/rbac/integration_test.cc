@@ -89,10 +89,10 @@ config:
   ASSERT_TRUE(tcp_client->connected());
   tcp_client->close();
 
-  EXPECT_EQ(1U, test_server_->counter("tcp.rbac.allowed")->value());
+  test_server_->waitForCounterGe("tcp.rbac.allowed", 1);
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.denied")->value());
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.shadow_allowed")->value());
-  EXPECT_EQ(1U, test_server_->counter("tcp.rbac.shadow_denied")->value());
+  test_server_->waitForCounterGe("tcp.rbac.shadow_denied", 1);
 }
 
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Denied) {
@@ -118,7 +118,6 @@ config:
 )EOF");
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write("hello");
-  ASSERT_TRUE(tcp_client->connected());
   tcp_client->waitForDisconnect();
 
   EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
