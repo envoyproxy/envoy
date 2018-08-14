@@ -207,6 +207,20 @@ TestHeaderMapImpl::TestHeaderMapImpl(
 
 TestHeaderMapImpl::TestHeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl(rhs) {}
 
+TestHeaderMapImpl::TestHeaderMapImpl(const TestHeaderMapImpl& rhs)
+    : TestHeaderMapImpl(static_cast<const HeaderMap&>(rhs)) {}
+
+TestHeaderMapImpl& TestHeaderMapImpl::operator=(const TestHeaderMapImpl& rhs) {
+  if (&rhs == this) {
+    return *this;
+  }
+
+  clear();
+  copyFrom(rhs);
+
+  return *this;
+}
+
 void TestHeaderMapImpl::addCopy(const std::string& key, const std::string& value) {
   addCopy(LowerCaseString(key), value);
 }
