@@ -109,6 +109,13 @@ IntegrationCodecClient::makeRequestWithBody(const Http::HeaderMap& headers, uint
   return response;
 }
 
+void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, absl::string_view data,
+                                      bool end_stream) {
+  Buffer::OwnedImpl buffer_data(data.data(), data.size());
+  encoder.encodeData(buffer_data, end_stream);
+  flushWrite();
+}
+
 void IntegrationCodecClient::sendData(Http::StreamEncoder& encoder, Buffer::Instance& data,
                                       bool end_stream) {
   encoder.encodeData(data, end_stream);
