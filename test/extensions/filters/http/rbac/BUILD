@@ -27,6 +27,7 @@ envoy_extension_cc_test(
     srcs = ["rbac_filter_test.cc"],
     extension_name = "envoy.filters.http.rbac",
     deps = [
+        "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
         "//test/extensions/filters/common/rbac:engine_mocks",
         "//test/extensions/filters/http/rbac:route_config_mocks",
@@ -51,6 +52,6 @@ envoy_extension_cc_mock(
     hdrs = ["mocks.h"],
     extension_name = "envoy.filters.http.rbac",
     deps = [
-        "//source/extensions/filters/http/rbac:rbac_filter_lib",
+        "//source/extensions/filters/common/rbac:utility_lib",
     ],
 )
