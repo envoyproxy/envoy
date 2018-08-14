@@ -52,7 +52,7 @@ if [[ "$1" == "bazel.release" ]]; then
     exit 0
   fi
   
-  setup_gcc_toolchain
+  setup_clang_toolchain
   echo "bazel release build with tests..."
   bazel_release_binary_build
   
@@ -72,7 +72,7 @@ if [[ "$1" == "bazel.release" ]]; then
   fi
   exit 0
 elif [[ "$1" == "bazel.release.server_only" ]]; then
-  setup_gcc_toolchain
+  setup_clang_toolchain
   echo "bazel release build..."
   bazel_release_binary_build
   exit 0
