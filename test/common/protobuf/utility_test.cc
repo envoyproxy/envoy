@@ -299,10 +299,9 @@ TEST(UtilityTest, YamlLoadFromStringFail) {
                             "Unable to convert YAML as JSON: /home/configs/config.yaml");
   // Verify loadFromYaml throws error when the input leads to an Array. This error message is
   // arguably more useful than only "Unable to convert YAML as JSON".
-  EXPECT_THROW_WITH_MESSAGE(MessageUtil::loadFromYaml("- node: { id: node1 }", bootstrap),
-                            EnvoyException,
-                            "Unable to parse JSON as proto (INVALID_ARGUMENT:: invalid name : Root "
-                            "element must be a message.): [{\"node\":{\"id\":\"node1\"}}]");
+  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromYaml("- node: { id: node1 }", bootstrap),
+                          EnvoyException,
+                          "Unable to parse JSON as proto.*Root element must be a message.*");
 }
 
 TEST(DurationUtilTest, OutOfRange) {
