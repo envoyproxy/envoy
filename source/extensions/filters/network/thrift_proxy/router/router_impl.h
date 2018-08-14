@@ -9,6 +9,7 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "common/common/logger.h"
+#include "common/upstream/load_balancer_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
@@ -70,7 +71,7 @@ private:
 };
 
 class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
-               public Upstream::LoadBalancerContext,
+               public Upstream::LoadBalancerContextBase,
                public ProtocolConverter,
                Logger::Loggable<Logger::Id::thrift> {
 public:
@@ -92,12 +93,6 @@ public:
   const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
   const Network::Connection* downstreamConnection() const override;
   const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
-  absl::optional<std::function<bool(uint32_t, const Upstream::Host&)>>
-  prePrioritySelectionFilter() override {
-    return {};
-  }
-  bool postHostSelectionFilter(const Upstream::Host&) override { return true; }
-  uint32_t hostSelectionRetryCount() override { return 0; }
 
   // Tcp::ConnectionPool::UpstreamCallbacks
   void onUpstreamData(Buffer::Instance& data, bool end_stream) override;

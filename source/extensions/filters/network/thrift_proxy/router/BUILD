@@ -40,6 +40,7 @@ envoy_cc_library(
         "//include/envoy/upstream:load_balancer_interface",
         "//include/envoy/upstream:thread_local_cluster_interface",
         "//source/common/common:logger_lib",
+        "//source/common/upstream:load_balancer_lib",
         "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
         "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",

@@ -15,6 +15,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/upstream/load_balancer_impl.h"
 
 #include "extensions/filters/network/redis_proxy/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
