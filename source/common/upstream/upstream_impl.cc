@@ -951,15 +951,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
         hosts_changed = true;
       }
 
-      // Did health check configuration change?
-      const bool health_check_changed =
-          health_checker_ != nullptr &&
-          existing_host->second->healthCheckAddress() != host->healthCheckAddress();
-      if (health_check_changed) {
-        // If health check configuration changed, we need to rebuild.
-        hosts_changed = true;
-      }
-
       existing_host->second->weight(host->weight());
       final_hosts.push_back(existing_host->second);
       updated_hosts[existing_host->second->address()->asString()] = existing_host->second;
