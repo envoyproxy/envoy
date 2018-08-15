@@ -22,6 +22,11 @@ class TsiSocketTest : public testing::Test {
 protected:
   TsiSocketTest() {}
 
+  void TearDown() override {
+    client_.tsi_socket_->closeSocket(Network::ConnectionEvent::LocalClose);
+    server_.tsi_socket_->closeSocket(Network::ConnectionEvent::RemoteClose);
+  }
+
   void initialize(HandshakeValidator server_validator, HandshakeValidator client_validator) {
     auto server_handshaker_factory = [](Event::Dispatcher& dispatcher) {
       CHandshakerPtr handshaker{tsi_create_fake_handshaker(/*is_client=*/0)};
@@ -134,13 +139,16 @@ protected:
 
     EXPECT_CALL(*server_.raw_socket_, doRead(_));
     EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+    EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
     expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                    server_.tsi_socket_->doRead(server_.read_buffer_));
     EXPECT_EQ(makeFakeTsiFrame("SERVER_FINISHED"), server_to_client_.toString());
 
     EXPECT_CALL(*client_.raw_socket_, doRead(_));
+    EXPECT_CALL(client_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
     expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                    client_.tsi_socket_->doRead(client_.read_buffer_));
+
   }
 
   struct SocketForTest {
@@ -159,6 +167,25 @@ protected:
 
   NiceMock<Event::MockDispatcher> dispatcher_;
 };
+
+TEST_F(TsiSocketTest, DoesNotHaveSsl) {
+  initialize(nullptr, nullptr);
+  EXPECT_EQ(nullptr, client_.tsi_socket_->ssl());
+
+  const auto& socket_ = *client_.tsi_socket_;
+  EXPECT_EQ(nullptr, socket_.ssl());
+}
+
+TEST_F(TsiSocketTest, ProxyCallbacks) {
+  initialize(nullptr, nullptr);
+
+  EXPECT_CALL(client_.callbacks_, fd()).WillOnce(Return(111));
+  EXPECT_EQ(111, client_.raw_socket_->callbacks_->fd());
+
+  EXPECT_EQ(&client_.callbacks_.connection_, &client_.raw_socket_->callbacks_->connection());
+
+  EXPECT_FALSE(client_.raw_socket_->callbacks_->shouldDrainReadBuffer());
+}
 
 TEST_F(TsiSocketTest, HandshakeWithoutValidationAndTransferData) {
   initialize(nullptr, nullptr);
@@ -180,9 +207,6 @@ TEST_F(TsiSocketTest, HandshakeWithoutValidationAndTransferData) {
   expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
                  server_.tsi_socket_->doRead(server_.read_buffer_));
   EXPECT_EQ("hello from client", server_.read_buffer_.toString());
-
-  client_.tsi_socket_->closeSocket(Network::ConnectionEvent::LocalClose);
-  server_.tsi_socket_->closeSocket(Network::ConnectionEvent::RemoteClose);
 }
 
 TEST_F(TsiSocketTest, HandshakeWithSucessfulValidationAndTransferData) {
@@ -206,9 +230,6 @@ TEST_F(TsiSocketTest, HandshakeWithSucessfulValidationAndTransferData) {
   expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
                  server_.tsi_socket_->doRead(server_.read_buffer_));
   EXPECT_EQ("hello from client", server_.read_buffer_.toString());
-
-  client_.tsi_socket_->closeSocket(Network::ConnectionEvent::LocalClose);
-  server_.tsi_socket_->closeSocket(Network::ConnectionEvent::RemoteClose);
 }
 
 TEST_F(TsiSocketTest, HandshakeValidationFail) {
@@ -232,9 +253,6 @@ TEST_F(TsiSocketTest, HandshakeValidationFail) {
   expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  server_.tsi_socket_->doRead(server_.read_buffer_));
   EXPECT_EQ(0, server_to_client_.length());
-
-  client_.tsi_socket_->closeSocket(Network::ConnectionEvent::LocalClose);
-  server_.tsi_socket_->closeSocket(Network::ConnectionEvent::RemoteClose);
 }
 
 class TsiSocketFactoryTest : public testing::Test {
