@@ -181,11 +181,32 @@ public:
   virtual std::string name() PURE;
 };
 
+class ProtocolOptionsConsumer {
+public:
+  virtual ~ProtocolOptionsConsumer() {}
+
+  /**
+   * Create a particular network filter's protocol specific options implementation. If the factory
+   * implementation is unable to produce a factory with the provided parameters, it should throw an
+   * EnvoyException.
+   * @param config supplies the protobuf configuration for the filter
+   * @return Upstream::ProtocoOptionsConfigConstSharedPtr the protocol options
+   */
+  virtual Upstream::ProtocolOptionsConfigConstSharedPtr
+  createProtocolOptionsConfig(const Protobuf::Message& config) PURE;
+
+  /**
+   * @return ProtobufTypes::MessagePtr a newly created empty protocol specific options message or
+   *         nullptr if protocol specific options are not available.
+   */
+  virtual ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() PURE;
+};
+
 /**
  * Implemented by each network filter and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
  */
-class NamedNetworkFilterConfigFactory {
+class NamedNetworkFilterConfigFactory : public ProtocolOptionsConsumer {
 public:
   virtual ~NamedNetworkFilterConfigFactory() {}
 
@@ -220,24 +241,15 @@ public:
    */
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
 
-  /**
-   * Create a particular network filter's protocol specific options implementation. If the factory
-   * implementation is unable to produce a factory with the provided parameters, it should throw an
-   * EnvoyException.
-   * @param config supplies the protobuf configuration for the filter
-   * @return Upstream::ProtocoOptionsConfigConstSharedPtr the protocol options
-   */
-  virtual Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsConfig(const Protobuf::Message& config) {
+  // ProtocolOptionsConsumer
+  Upstream::ProtocolOptionsConfigConstSharedPtr
+  createProtocolOptionsConfig(const Protobuf::Message& config) override {
     UNREFERENCED_PARAMETER(config);
     return nullptr;
   }
 
-  /**
-   * @return ProtobufTypes::MessagePtr a newly created empty protocol specific options message or
-   *         nullptr if protocol specific options are not available.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() { return nullptr; }
+  // ProtocolOptionsConsumer
+  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override { return nullptr; }
 
   /**
    * @return std::string the identifying name for a particular implementation of a network filter
@@ -250,7 +262,7 @@ public:
  * Implemented by each HTTP filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class NamedHttpFilterConfigFactory {
+class NamedHttpFilterConfigFactory : public ProtocolOptionsConsumer {
 public:
   virtual ~NamedHttpFilterConfigFactory() {}
 
@@ -310,6 +322,16 @@ public:
   createRouteSpecificFilterConfig(const Protobuf::Message&, FactoryContext&) {
     return nullptr;
   }
+
+  // ProtocolOptionsConsumer
+  Upstream::ProtocolOptionsConfigConstSharedPtr
+  createProtocolOptionsConfig(const Protobuf::Message& config) override {
+    UNREFERENCED_PARAMETER(config);
+    return nullptr;
+  }
+
+  // ProtocolOptionsConsumer
+  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override { return nullptr; }
 
   /**
    * @return std::string the identifying name for a particular implementation of an http filter
