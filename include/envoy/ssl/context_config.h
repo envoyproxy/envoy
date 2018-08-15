@@ -5,9 +5,12 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/ssl/tls_certificate_config.h"
+#include "envoy/secret/secret_provider.h"
 
 namespace Envoy {
+namespace Secret {
+class SecretCallbacks;
+}
 namespace Ssl {
 
 /**
@@ -95,6 +98,17 @@ public:
    * @return The maximum TLS protocol version to negotiate.
    */
   virtual unsigned maxProtocolVersion() const PURE;
+
+  /**
+   * @return true if the ssl config is ready.
+   */
+  virtual bool isReady() const PURE;
+
+  /**
+   * Add secret callback into context config.
+   * @param callback callback that is executed by context config.
+   */
+  virtual void setUpdateCallback(Secret::SecretCallbacks& callback) PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

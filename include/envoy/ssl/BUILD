@@ -22,7 +22,7 @@ envoy_cc_library(
     name = "context_config_interface",
     hdrs = ["context_config.h"],
     deps = [
-        ":tls_certificate_config_interface",
+        "//include/envoy/secret:secret_provider_interface",
     ],
 )
 

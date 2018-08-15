@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/secret/secret_callbacks.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
 namespace Envoy {
@@ -18,7 +19,17 @@ public:
    */
   virtual const SecretType* secret() const PURE;
 
-  // TODO(lizan): Add more methods for dynamic secret provider.
+  /**
+   * Add secret callback into secret provider.
+   * @param callback callback that is executed by secret provider.
+   */
+  virtual void addUpdateCallback(SecretCallbacks& callback) PURE;
+
+  /**
+   * Remove secret callback from secret provider.
+   * @param callback callback that is executed by secret provider.
+   */
+  virtual void removeUpdateCallback(SecretCallbacks& callback) PURE;
 };
 
 typedef SecretProvider<Ssl::TlsCertificateConfig> TlsCertificateConfigProvider;

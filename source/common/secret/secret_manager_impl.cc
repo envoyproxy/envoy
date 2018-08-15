@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
+#include "common/secret/sds_api.h"
 #include "common/secret/secret_provider_impl.h"
 #include "common/ssl/tls_certificate_config_impl.h"
 
@@ -35,6 +36,39 @@ SecretManagerImpl::findStaticTlsCertificateProvider(const std::string& name) con
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::createInlineTlsCertificateProvider(
     const envoy::api::v2::auth::TlsCertificate& tls_certificate) {
   return std::make_shared<TlsCertificateConfigProviderImpl>(tls_certificate);
+}
+
+TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateDynamicSecretProvider(
+    const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+  std::string map_key = std::to_string(MessageUtil::hash(sds_config_source)) + config_name;
+
+  auto secret_provider = dynamic_secret_providers_[map_key].lock();
+  if (!secret_provider) {
+    ASSERT(secret_provider_context.initManager() != nullptr);
+
+    std::function<void()> unregister_secret_provider = [map_key, config_name, sds_config_source,
+                                                        this]() {
+      ENVOY_LOG(debug, "Unregister secret provider. name: {}, sds config: {}", config_name,
+                sds_config_source.DebugString());
+      auto secret_provider = dynamic_secret_providers_.find(map_key);
+      if (secret_provider != dynamic_secret_providers_.end()) {
+        dynamic_secret_providers_.erase(map_key);
+      } else {
+        ENVOY_LOG(error, "secret provider does not exist. name: {}, sds config: {}", config_name,
+                  sds_config_source.DebugString());
+      }
+    };
+
+    secret_provider = std::make_shared<SdsApi>(
+        secret_provider_context.localInfo(), secret_provider_context.dispatcher(),
+        secret_provider_context.random(), secret_provider_context.stats(),
+        secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
+        sds_config_source, config_name, unregister_secret_provider);
+    dynamic_secret_providers_[map_key] = secret_provider;
+  }
+
+  return secret_provider;
 }
 
 } // namespace Secret
