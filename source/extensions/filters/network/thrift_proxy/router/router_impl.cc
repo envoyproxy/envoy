@@ -126,18 +126,18 @@ ThriftFilters::FilterStatus Router::messageBegin(MessageMetadataSharedPtr metada
     return ThriftFilters::FilterStatus::StopIteration;
   }
 
-  std::shared_ptr<const ProtocolOptionsConfig> options =
+  const std::shared_ptr<const ProtocolOptionsConfig> options =
       cluster_->extensionProtocolOptionsTyped<ProtocolOptionsConfig>(
           NetworkFilterNames::get().ThriftProxy);
 
-  TransportType transport_type = callbacks_->downstreamTransportType();
-  ProtocolType protocol_type = callbacks_->downstreamProtocolType();
-  if (options) {
-    transport_type = options->transport(transport_type);
-    protocol_type = options->protocol(protocol_type);
-  }
-  ASSERT(transport_type != TransportType::Auto);
-  ASSERT(protocol_type != ProtocolType::Auto);
+  const TransportType transport = options
+                                      ? options->transport(callbacks_->downstreamTransportType())
+                                      : callbacks_->downstreamTransportType();
+  ASSERT(transport != TransportType::Auto);
+
+  const ProtocolType protocol = options ? options->protocol(callbacks_->downstreamProtocolType())
+                                        : callbacks_->downstreamProtocolType();
+  ASSERT(protocol != ProtocolType::Auto);
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
       route_entry_->clusterName(), Upstream::ResourcePriority::Default, this);
@@ -150,8 +150,7 @@ ThriftFilters::FilterStatus Router::messageBegin(MessageMetadataSharedPtr metada
 
   ENVOY_STREAM_LOG(debug, "router decoding request", *callbacks_);
 
-  upstream_request_.reset(
-      new UpstreamRequest(*this, *conn_pool, metadata, transport_type, protocol_type));
+  upstream_request_.reset(new UpstreamRequest(*this, *conn_pool, metadata, transport, protocol));
   return upstream_request_->start();
 }
 
