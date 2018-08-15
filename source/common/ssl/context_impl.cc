@@ -168,19 +168,18 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
     SSL_CTX_set_cert_verify_callback(ctx_.get(), ContextImpl::verifyCallback, this);
   }
 
-  // Validation happened in TlsCertificateConfigImpl
-  ASSERT(config.certChain().empty() == config.privateKey().empty());
-
-  if (!config.certChain().empty()) {
+  if (config.tlsCertificate() != nullptr) {
     // Load certificate chain.
-    cert_chain_file_path_ = config.certChainPath();
+    const auto& tls_certificate = *config.tlsCertificate();
+    cert_chain_file_path_ = tls_certificate.certificateChainPath();
     bssl::UniquePtr<BIO> bio(
-        BIO_new_mem_buf(const_cast<char*>(config.certChain().data()), config.certChain().size()));
+        BIO_new_mem_buf(const_cast<char*>(tls_certificate.certificateChain().data()),
+                        tls_certificate.certificateChain().size()));
     RELEASE_ASSERT(bio != nullptr, "");
     cert_chain_.reset(PEM_read_bio_X509_AUX(bio.get(), nullptr, nullptr, nullptr));
     if (cert_chain_ == nullptr || !SSL_CTX_use_certificate(ctx_.get(), cert_chain_.get())) {
       throw EnvoyException(
-          fmt::format("Failed to load certificate chain from {}", config.certChainPath()));
+          fmt::format("Failed to load certificate chain from {}", cert_chain_file_path_));
     }
     // Read rest of the certificate chain.
     while (true) {
@@ -190,7 +189,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
       }
       if (!SSL_CTX_add_extra_chain_cert(ctx_.get(), cert.get())) {
         throw EnvoyException(
-            fmt::format("Failed to load certificate chain from {}", config.certChainPath()));
+            fmt::format("Failed to load certificate chain from {}", cert_chain_file_path_));
       }
       // SSL_CTX_add_extra_chain_cert() takes ownership.
       cert.release();
@@ -201,17 +200,17 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const ContextConfig& config)
       ERR_clear_error();
     } else {
       throw EnvoyException(
-          fmt::format("Failed to load certificate chain from {}", config.certChainPath()));
+          fmt::format("Failed to load certificate chain from {}", cert_chain_file_path_));
     }
 
     // Load private key.
-    bio.reset(
-        BIO_new_mem_buf(const_cast<char*>(config.privateKey().data()), config.privateKey().size()));
+    bio.reset(BIO_new_mem_buf(const_cast<char*>(tls_certificate.privateKey().data()),
+                              tls_certificate.privateKey().size()));
     RELEASE_ASSERT(bio != nullptr, "");
     bssl::UniquePtr<EVP_PKEY> pkey(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
     if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ctx_.get(), pkey.get())) {
       throw EnvoyException(
-          fmt::format("Failed to load private key from {}", config.privateKeyPath()));
+          fmt::format("Failed to load private key from {}", tls_certificate.privateKeyPath()));
     }
   }
 
@@ -499,7 +498,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextCon
                                      Runtime::Loader& runtime)
     : ContextImpl(scope, config), runtime_(runtime),
       session_ticket_keys_(config.sessionTicketKeys()) {
-  if (config.certChain().empty()) {
+  if (config.tlsCertificate() == nullptr) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
   if (!config.caCert().empty()) {

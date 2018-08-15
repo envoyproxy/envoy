@@ -65,6 +65,8 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
     throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
                                      cluster_load_assignment.cluster_name()));
   }
+
+  std::unordered_map<std::string, HostSharedPtr> updated_hosts;
   PriorityStateManager priority_state_manager(*this, local_info_);
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     const uint32_t priority = locality_lb_endpoint.priority();
@@ -96,9 +98,9 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
       if (locality_weights_map_.size() <= i) {
         locality_weights_map_.resize(i + 1);
       }
-      cluster_rebuilt |= updateHostsPerLocality(i, overprovisioning_factor,
-                                                *priority_state[i].first, locality_weights_map_[i],
-                                                priority_state[i].second, priority_state_manager);
+      cluster_rebuilt |=
+          updateHostsPerLocality(i, overprovisioning_factor, *priority_state[i].first, locality_weights_map_[i],
+                                 priority_state[i].second, priority_state_manager, updated_hosts);
     }
   }
 
@@ -112,9 +114,11 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
       locality_weights_map_.resize(i + 1);
     }
     cluster_rebuilt |=
-        updateHostsPerLocality(i, overprovisioning_factor, empty_hosts, locality_weights_map_[i],
-                               empty_locality_map, priority_state_manager);
+        updateHostsPerLocality(i, overprovisioning_factor, empty_hosts, locality_weights_map_[i], empty_locality_map,
+                               priority_state_manager, updated_hosts);
   }
+
+  updateHostMap(std::move(updated_hosts));
 
   if (!cluster_rebuilt) {
     info_->stats().update_no_rebuild_.inc();
@@ -125,6 +129,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
   onPreInitComplete();
 }
 
+<<<<<<< HEAD
 bool EdsClusterImpl::updateHostsPerLocality(const uint32_t priority,
                                             const uint32_t overprovisioning_factor,
                                             const HostVector& new_hosts,
@@ -132,6 +137,13 @@ bool EdsClusterImpl::updateHostsPerLocality(const uint32_t priority,
                                             LocalityWeightsMap& new_locality_weights_map,
                                             PriorityStateManager& priority_state_manager) {
   const auto& host_set = priority_set_.getOrCreateHostSet(priority, overprovisioning_factor);
+=======
+bool EdsClusterImpl::updateHostsPerLocality(
+    const uint32_t priority, const HostVector& new_hosts, LocalityWeightsMap& locality_weights_map,
+    LocalityWeightsMap& new_locality_weights_map, PriorityStateManager& priority_state_manager,
+    std::unordered_map<std::string, HostSharedPtr>& updated_hosts) {
+  const auto& host_set = priority_set_.getOrCreateHostSet(priority);
+>>>>>>> da500d20fb41b4e89dabc3ae2ce6680b09968ece
   HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
 
   HostVector hosts_added;
@@ -145,7 +157,8 @@ bool EdsClusterImpl::updateHostsPerLocality(const uint32_t priority,
   // object for locality weights that we can update here, we should add something like this to
   // improve performance and scalability of locality weight updates.
   if (host_set.overprovisioning_factor() != overprovisioning_factor ||
-      updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed) ||
+  updateDynamicHostList(new_hosts, *current_hosts_copy, hosts_added, hosts_removed,
+                            updated_hosts) ||
       locality_weights_map != new_locality_weights_map) {
     locality_weights_map = new_locality_weights_map;
     ENVOY_LOG(debug, "EDS hosts or locality weights changed for cluster: {} ({}) priority {}",

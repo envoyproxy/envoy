@@ -19,7 +19,7 @@ message RBAC {
 
   // Shadow rules are not enforced by the filter (i.e., returning a 403)
   // but will emit stats and logs and can be used for rule testing.
-  // If absent, no shadow RBAC policy with be applied.
+  // If absent, no shadow RBAC policy will be applied.
   config.rbac.v2alpha.RBAC shadow_rules = 2;
 }
 
