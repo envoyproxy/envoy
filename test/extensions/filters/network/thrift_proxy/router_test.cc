@@ -688,16 +688,16 @@ TEST_P(ThriftRouterContainerTest, DecoderFilterCallbacks) {
   destroyRouter();
 }
 
-TEST(RouteMatcherTest, Route) {
+TEST(RouteMatcherTest, RouteByMethodNameWithNoInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
   - match:
-      method: "method1"
+      method_name: "method1"
     route:
       cluster: "cluster1"
   - match:
-      method: "method2"
+      method_name: "method2"
     route:
       cluster: "cluster2"
 )EOF";
@@ -724,15 +724,60 @@ routes:
   EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
 }
 
-TEST(RouteMatcherTest, RouteMatchAny) {
+TEST(RouteMatcherTest, RouteByMethodNameWithInversion) {
   const std::string yaml = R"EOF(
 name: config
 routes:
   - match:
-      method: "method1"
+      method_name: "method1"
     route:
       cluster: "cluster1"
-  - match: {}
+  - match:
+      method_name: "method2"
+      invert: true
+    route:
+      cluster: "cluster2"
+)EOF";
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+
+  RouteMatcher matcher(config);
+  MessageMetadata metadata;
+  RouteConstSharedPtr route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
+
+  metadata.setMethodName("unknown");
+  route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
+
+  metadata.setMethodName("METHOD1");
+  route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
+
+  metadata.setMethodName("method1");
+  route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
+
+  metadata.setMethodName("method2");
+  route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+}
+
+TEST(RouteMatcherTest, RouteByAnyMethodNameWithNoInversion) {
+  const std::string yaml = R"EOF(
+name: config
+routes:
+  - match:
+      method_name: "method1"
+    route:
+      cluster: "cluster1"
+  - match:
+      method_name: ""
     route:
       cluster: "cluster2"
 )EOF";
@@ -761,6 +806,160 @@ routes:
     EXPECT_NE(nullptr, route2);
     EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
   }
+}
+
+TEST(RouteMatcherTest, RouteByAnyMethodNameWithInversion) {
+  const std::string yaml = R"EOF(
+name: config
+routes:
+  - match:
+      method_name: ""
+      invert: true
+    route:
+      cluster: "cluster2"
+)EOF";
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+
+  EXPECT_THROW(new RouteMatcher(config), EnvoyException);
+}
+
+TEST(RouteMatcherTest, RouteByServiceNameWithNoInversion) {
+  const std::string yaml = R"EOF(
+name: config
+routes:
+  - match:
+      method_name: "method1"
+    route:
+      cluster: "cluster1"
+  - match:
+      service_name: "service2"
+    route:
+      cluster: "cluster2"
+)EOF";
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+
+  RouteMatcher matcher(config);
+  MessageMetadata metadata;
+  EXPECT_EQ(nullptr, matcher.route(metadata));
+  metadata.setMethodName("unknown");
+  EXPECT_EQ(nullptr, matcher.route(metadata));
+  metadata.setMethodName("METHOD1");
+  EXPECT_EQ(nullptr, matcher.route(metadata));
+
+  metadata.setMethodName("service2:method1");
+  RouteConstSharedPtr route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
+
+  metadata.setMethodName("service2:method2");
+  RouteConstSharedPtr route2 = matcher.route(metadata);
+  EXPECT_NE(nullptr, route2);
+  EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
+}
+
+TEST(RouteMatcherTest, RouteByServiceNameWithInversion) {
+  const std::string yaml = R"EOF(
+name: config
+routes:
+  - match:
+      method_name: "method1"
+    route:
+      cluster: "cluster1"
+  - match:
+      service_name: "service2"
+      invert: true
+    route:
+      cluster: "cluster2"
+)EOF";
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+
+  RouteMatcher matcher(config);
+  MessageMetadata metadata;
+  RouteConstSharedPtr route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
+
+  metadata.setMethodName("unknown");
+  route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
+
+  metadata.setMethodName("METHOD1");
+  route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
+
+  metadata.setMethodName("method1");
+  route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
+
+  metadata.setMethodName("service2:method1");
+  route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+}
+
+TEST(RouteMatcherTest, RouteByAnyServiceNameWithNoInversion) {
+  const std::string yaml = R"EOF(
+name: config
+routes:
+  - match:
+      method_name: "method1"
+    route:
+      cluster: "cluster1"
+  - match:
+      service_name: ""
+    route:
+      cluster: "cluster2"
+)EOF";
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+
+  RouteMatcher matcher(config);
+
+  {
+    MessageMetadata metadata;
+    metadata.setMethodName("method1");
+    RouteConstSharedPtr route = matcher.route(metadata);
+    EXPECT_NE(nullptr, route);
+    EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
+
+    metadata.setMethodName("anything");
+    RouteConstSharedPtr route2 = matcher.route(metadata);
+    EXPECT_NE(nullptr, route2);
+    EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
+  }
+
+  {
+    MessageMetadata metadata;
+    RouteConstSharedPtr route2 = matcher.route(metadata);
+    EXPECT_NE(nullptr, route2);
+    EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
+  }
+}
+
+TEST(RouteMatcherTest, RouteByAnyServiceNameWithInversion) {
+  const std::string yaml = R"EOF(
+name: config
+routes:
+  - match:
+      service_name: ""
+      invert: true
+    route:
+      cluster: "cluster2"
+)EOF";
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+
+  EXPECT_THROW(new RouteMatcher(config), EnvoyException);
 }
 
 } // namespace Router

@@ -4,6 +4,8 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
+#include "common/common/utility.h"
+
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
 
 namespace Envoy {
@@ -24,14 +26,45 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry() const { return shared_fro
 
 MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
-    : RouteEntryImplBase(route), method_name_(route.match().method()) {}
+    : RouteEntryImplBase(route), method_name_(route.match().method_name()),
+      invert_(route.match().invert()) {
+  if (method_name_.empty() && invert_) {
+    throw EnvoyException("Cannot have an empty method name with inversion enabled");
+  }
+}
 
 RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
-  if (method_name_.empty()) {
+  bool matches =
+      method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
+
+  if (matches ^ invert_) {
     return clusterEntry();
   }
 
-  if (metadata.hasMethodName() && metadata.methodName() == method_name_) {
+  return nullptr;
+}
+
+ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
+    const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
+    : RouteEntryImplBase(route), invert_(route.match().invert()) {
+  const std::string service_name = route.match().service_name();
+  if (service_name.empty() && invert_) {
+    throw EnvoyException("Cannot have an empty service name with inversion enabled");
+  }
+
+  if (!service_name.empty() && !StringUtil::endsWith(service_name, ":")) {
+    service_name_ = service_name + ":";
+  } else {
+    service_name_ = service_name;
+  }
+}
+
+RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
+  bool matches = service_name_.empty() ||
+                 (metadata.hasMethodName() &&
+                  StringUtil::startsWith(metadata.methodName().c_str(), service_name_));
+
+  if (matches ^ invert_) {
     return clusterEntry();
   }
 
@@ -40,8 +73,19 @@ RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& met
 
 RouteMatcher::RouteMatcher(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration& config) {
+  using envoy::config::filter::network::thrift_proxy::v2alpha1::RouteMatch;
+
   for (const auto& route : config.routes()) {
-    routes_.emplace_back(new MethodNameRouteEntryImpl(route));
+    switch (route.match().match_specifier_case()) {
+    case RouteMatch::MatchSpecifierCase::kMethodName:
+      routes_.emplace_back(new MethodNameRouteEntryImpl(route));
+      break;
+    case RouteMatch::MatchSpecifierCase::kServiceName:
+      routes_.emplace_back(new ServiceNameRouteEntryImpl(route));
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
   }
 }
 
