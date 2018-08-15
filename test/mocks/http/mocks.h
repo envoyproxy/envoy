@@ -222,6 +222,7 @@ public:
 
   MOCK_METHOD0(continueDecoding, void());
   MOCK_METHOD2(addDecodedData, void(Buffer::Instance& data, bool streaming));
+  MOCK_METHOD0(addDecodedTrailers, HeaderMap&());
   MOCK_METHOD0(decodingBuffer, const Buffer::Instance*());
   MOCK_METHOD1(encode100ContinueHeaders_, void(HeaderMap& headers));
   MOCK_METHOD2(encodeHeaders_, void(HeaderMap& headers, bool end_stream));
@@ -259,6 +260,7 @@ public:
 
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD2(addEncodedData, void(Buffer::Instance& data, bool streaming));
+  MOCK_METHOD0(addEncodedTrailers, HeaderMap&());
   MOCK_METHOD0(continueEncoding, void());
   MOCK_METHOD0(encodingBuffer, const Buffer::Instance*());
 

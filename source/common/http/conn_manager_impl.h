@@ -163,6 +163,7 @@ private:
 
     // Http::StreamDecoderFilterCallbacks
     void addDecodedData(Buffer::Instance& data, bool streaming) override;
+    HeaderMap& addDecodedTrailers() override;
     void continueDecoding() override;
     const Buffer::Instance* decodingBuffer() override {
       return parent_.buffered_request_data_.get();
@@ -230,6 +231,7 @@ private:
 
     // Http::StreamEncoderFilterCallbacks
     void addEncodedData(Buffer::Instance& data, bool streaming) override;
+    HeaderMap& addEncodedTrailers() override;
     void onEncoderFilterAboveWriteBufferHighWatermark() override;
     void onEncoderFilterBelowWriteBufferLowWatermark() override;
     void setEncoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
@@ -268,11 +270,13 @@ private:
     commonEncodePrefix(ActiveStreamEncoderFilter* filter, bool end_stream);
     const Network::Connection* connection();
     void addDecodedData(ActiveStreamDecoderFilter& filter, Buffer::Instance& data, bool streaming);
+    HeaderMap& addDecodedTrailers();
     void decodeHeaders(ActiveStreamDecoderFilter* filter, HeaderMap& headers, bool end_stream);
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
+    HeaderMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, const std::string& body,
                         std::function<void(HeaderMap& headers)> modify_headers);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
@@ -340,6 +344,9 @@ private:
       // to verify we do not encode100Continue headers more than once per
       // filter.
       static constexpr uint32_t Encode100ContinueHeaders  = 0x40;
+      // Used to indicate that we're processing the final [En|De]codeData frame,
+      // i.e. end_stream = true
+      static constexpr uint32_t LastDataFrame = 0x80;
     };
     // clang-format on
 
