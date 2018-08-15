@@ -51,10 +51,10 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
               bool expect_success, const Network::Address::IpVersion version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
-  NiceMock<Secret::MockSecretManager> secret_manager;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, secret_manager);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, factory_context);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         std::vector<std::string>{});
@@ -68,7 +68,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  auto client_cfg = std::make_unique<ClientContextConfigImpl>(*client_ctx_loader, secret_manager);
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(*client_ctx_loader, factory_context);
   Ssl::ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
                                                         stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
@@ -149,7 +149,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
                              const Network::Address::IpVersion version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
-  NiceMock<Secret::MockSecretManager> secret_manager;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   ContextManagerImpl manager(runtime);
   std::string new_session = EMPTY_STRING;
 
@@ -159,7 +159,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
   auto server_cfg =
-      std::make_unique<Ssl::ServerContextConfigImpl>(filter_chain.tls_context(), secret_manager);
+      std::make_unique<Ssl::ServerContextConfigImpl>(filter_chain.tls_context(), factory_context);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         server_names);
 
@@ -171,7 +171,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher.createListener(socket, callbacks, true, false);
 
-  auto client_cfg = std::make_unique<ClientContextConfigImpl>(client_ctx_proto, secret_manager);
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(client_ctx_proto, factory_context);
   ClientContextSharedPtr client_ctx(manager.createSslClientContext(stats_store, *client_cfg));
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
@@ -1546,7 +1546,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, secret_manager_);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, factory_context_);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         std::vector<std::string>{});
@@ -1603,7 +1603,7 @@ TEST_P(SslSocketTest, HalfClose) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, secret_manager_);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, factory_context_);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         std::vector<std::string>{});
@@ -1623,7 +1623,7 @@ TEST_P(SslSocketTest, HalfClose) {
   )EOF";
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  auto client_cfg = std::make_unique<ClientContextConfigImpl>(*client_ctx_loader, secret_manager_);
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(*client_ctx_loader, factory_context_);
   ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -1675,7 +1675,7 @@ TEST_P(SslSocketTest, HalfClose) {
 TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
-  NiceMock<Secret::MockSecretManager> secret_manager;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
 
   std::string server_ctx_json = R"EOF(
   {
@@ -1686,7 +1686,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, secret_manager);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, factory_context);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         std::vector<std::string>{});
@@ -1705,7 +1705,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
   )EOF";
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  auto client_cfg = std::make_unique<ClientContextConfigImpl>(*client_ctx_loader, secret_manager);
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(*client_ctx_loader, factory_context);
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -1762,13 +1762,15 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
                                  const Network::Address::IpVersion ip_version) {
   Stats::IsolatedStoreImpl stats_store;
   Runtime::MockLoader runtime;
-  NiceMock<Secret::MockSecretManager> secret_manager;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   ContextManagerImpl manager(runtime);
 
   Json::ObjectSharedPtr server_ctx_loader1 = TestEnvironment::jsonLoadFromString(server_ctx_json1);
   Json::ObjectSharedPtr server_ctx_loader2 = TestEnvironment::jsonLoadFromString(server_ctx_json2);
-  auto server_cfg1 = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader1, secret_manager);
-  auto server_cfg2 = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader2, secret_manager);
+  auto server_cfg1 =
+      std::make_unique<ServerContextConfigImpl>(*server_ctx_loader1, factory_context);
+  auto server_cfg2 =
+      std::make_unique<ServerContextConfigImpl>(*server_ctx_loader2, factory_context);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory1(std::move(server_cfg1), manager,
                                                          stats_store, server_names1);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory2(std::move(server_cfg2), manager,
@@ -1786,7 +1788,7 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
   Network::ListenerPtr listener2 = dispatcher.createListener(socket2, callbacks, true, false);
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  auto client_cfg = std::make_unique<ClientContextConfigImpl>(*client_ctx_loader, secret_manager);
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(*client_ctx_loader, factory_context);
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher.createClientConnection(
       socket1.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -2127,10 +2129,10 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, secret_manager_);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, factory_context_);
   Json::ObjectSharedPtr server2_ctx_loader = TestEnvironment::jsonLoadFromString(server2_ctx_json);
   auto server2_cfg =
-      std::make_unique<ServerContextConfigImpl>(*server2_ctx_loader, secret_manager_);
+      std::make_unique<ServerContextConfigImpl>(*server2_ctx_loader, factory_context_);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         std::vector<std::string>{});
@@ -2154,7 +2156,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   )EOF";
 
   Json::ObjectSharedPtr client_ctx_loader = TestEnvironment::jsonLoadFromString(client_ctx_json);
-  auto client_cfg = std::make_unique<ClientContextConfigImpl>(*client_ctx_loader, secret_manager_);
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(*client_ctx_loader, factory_context_);
   ClientSslSocketFactory ssl_socket_factory(std::move(client_cfg), manager, stats_store);
   Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
       socket.localAddress(), Network::Address::InstanceConstSharedPtr(),
@@ -2241,7 +2243,7 @@ TEST_P(SslSocketTest, SslError) {
   )EOF";
 
   Json::ObjectSharedPtr server_ctx_loader = TestEnvironment::jsonLoadFromString(server_ctx_json);
-  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, secret_manager_);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(*server_ctx_loader, factory_context_);
   ContextManagerImpl manager(runtime);
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         std::vector<std::string>{});
@@ -2583,7 +2585,7 @@ public:
   void initialize() {
     server_ctx_loader_ = TestEnvironment::jsonLoadFromString(server_ctx_json_);
     auto server_cfg =
-        std::make_unique<ServerContextConfigImpl>(*server_ctx_loader_, secret_manager_);
+        std::make_unique<ServerContextConfigImpl>(*server_ctx_loader_, factory_context_);
     manager_.reset(new ContextManagerImpl(runtime_));
     server_ssl_socket_factory_.reset(new ServerSslSocketFactory(
         std::move(server_cfg), *manager_, stats_store_, std::vector<std::string>{}));
@@ -2592,7 +2594,7 @@ public:
 
     client_ctx_loader_ = TestEnvironment::jsonLoadFromString(client_ctx_json_);
     auto client_cfg =
-        std::make_unique<ClientContextConfigImpl>(*client_ctx_loader_, secret_manager_);
+        std::make_unique<ClientContextConfigImpl>(*client_ctx_loader_, factory_context_);
 
     client_ssl_socket_factory_.reset(
         new ClientSslSocketFactory(std::move(client_cfg), *manager_, stats_store_));

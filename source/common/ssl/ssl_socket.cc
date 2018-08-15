@@ -402,39 +402,67 @@ std::string SslSocket::subjectLocalCertificate() const {
   return getSubjectFromCertificate(cert);
 }
 
+namespace {
+SslSocketFactoryStats generateStats(const std::string& prefix, Stats::Scope& store) {
+  return {
+      ALL_SSL_SOCKET_FACTORY_STATS(POOL_COUNTER_PREFIX(store, prefix + "_ssl_socket_factory."))};
+}
+} // namespace
+
 ClientSslSocketFactory::ClientSslSocketFactory(ClientContextConfigPtr config,
                                                Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope)
-    : manager_(manager), stats_scope_(stats_scope), config_(std::move(config)),
-      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {}
+    : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("client", stats_scope)),
+      config_(std::move(config)),
+      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {
+  config_->setUpdateCallback(*this);
+}
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() const {
   if (ssl_ctx_) {
     return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Client);
   } else {
+    ENVOY_LOG(debug, "Create NotReadySslSocket");
+    stats_.upstream_connection_reset_by_sds_.inc();
     return std::make_unique<NotReadySslSocket>();
   }
 }
 
 bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
+void ClientSslSocketFactory::onAddOrUpdateSecret() {
+  ENVOY_LOG(debug, "Secret is updated.");
+  ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
+  stats_.ssl_context_update_by_sds_.inc();
+}
+
 ServerSslSocketFactory::ServerSslSocketFactory(ServerContextConfigPtr config,
                                                Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope,
                                                const std::vector<std::string>& server_names)
-    : manager_(manager), stats_scope_(stats_scope), config_(std::move(config)),
-      server_names_(server_names),
-      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_)) {}
+    : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("server", stats_scope)),
+      config_(std::move(config)), server_names_(server_names),
+      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_)) {
+  config_->setUpdateCallback(*this);
+}
 
 Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() const {
   if (ssl_ctx_) {
     return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Server);
   } else {
+    ENVOY_LOG(debug, "Create NotReadySslSocket");
+    stats_.downstream_connection_reset_by_sds_.inc();
     return std::make_unique<NotReadySslSocket>();
   }
 }
 
 bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
+
+void ServerSslSocketFactory::onAddOrUpdateSecret() {
+  ENVOY_LOG(debug, "Secret is updated.");
+  ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
+  stats_.ssl_context_update_by_sds_.inc();
+}
 
 } // namespace Ssl
 } // namespace Envoy

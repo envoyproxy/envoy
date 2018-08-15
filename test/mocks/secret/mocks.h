@@ -2,6 +2,7 @@
 
 #include "envoy/secret/secret_callbacks.h"
 #include "envoy/secret/secret_manager.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
 #include "gmock/gmock.h"
@@ -21,6 +22,17 @@ public:
   MOCK_METHOD1(createInlineTlsCertificateProvider,
                TlsCertificateConfigProviderSharedPtr(
                    const envoy::api::v2::auth::TlsCertificate& tls_certificate));
+  MOCK_METHOD3(findOrCreateDynamicSecretProvider,
+               TlsCertificateConfigProviderSharedPtr(
+                   const envoy::api::v2::core::ConfigSource&, const std::string&,
+                   Server::Configuration::TransportSocketFactoryContext&));
+};
+
+class MockSecretCallbacks : public SecretCallbacks {
+public:
+  MockSecretCallbacks();
+  ~MockSecretCallbacks();
+  MOCK_METHOD0(onAddOrUpdateSecret, void());
 };
 
 class MockSecretCallbacks : public SecretCallbacks {

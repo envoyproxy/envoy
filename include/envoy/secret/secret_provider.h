@@ -4,6 +4,7 @@
 
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
+#include "envoy/secret/secret_callbacks.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
 namespace Envoy {

@@ -171,7 +171,9 @@ MockFactoryContext::MockFactoryContext()
 
 MockFactoryContext::~MockFactoryContext() {}
 
-MockTransportSocketFactoryContext::MockTransportSocketFactoryContext() {}
+MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
+    : secret_manager_(new Secret::SecretManagerImpl()) {}
+
 MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() {}
 
 MockListenerFactoryContext::MockListenerFactoryContext() {}
