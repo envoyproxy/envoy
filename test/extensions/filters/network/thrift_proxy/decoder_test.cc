@@ -1040,8 +1040,6 @@ TEST(DecoderTest, OnDataHandlesStopIterationAndResumes) {
   Buffer::OwnedImpl buffer;
   bool underflow = true;
 
-  HeaderMap headers{{"test", "header"}};
-
   EXPECT_CALL(*transport, decodeFrameStart(Ref(buffer), _))
       .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
         metadata.setFrameSize(100);

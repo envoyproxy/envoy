@@ -45,7 +45,7 @@ public:
     EXPECT_FALSE(metadata_.hasFrameSize());
     EXPECT_FALSE(metadata_.hasProtocol());
     EXPECT_FALSE(metadata_.hasAppException());
-    EXPECT_TRUE(metadata_.headers().empty());
+    EXPECT_EQ(metadata_.headers().size(), 0);
   }
 
   void expectDefaultMetadata() { expectMetadata("-", MessageType::Oneway, -1); }
