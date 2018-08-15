@@ -18,7 +18,8 @@ using testing::_;
 namespace Envoy {
 namespace Upstream {
 
-MockHostSet::MockHostSet(uint32_t priority) : priority_(priority) {
+MockHostSet::MockHostSet(uint32_t priority, uint32_t overprovisioning_factor)
+    : priority_(priority), overprovisioning_factor_(overprovisioning_factor) {
   ON_CALL(*this, priority()).WillByDefault(Return(priority_));
   ON_CALL(*this, hosts()).WillByDefault(ReturnRef(hosts_));
   ON_CALL(*this, healthyHosts()).WillByDefault(ReturnRef(healthy_hosts_));
