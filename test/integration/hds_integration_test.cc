@@ -118,7 +118,7 @@ public:
   // one HTTP health_check
   envoy::service::discovery::v2::HealthCheckSpecifier makeHttpHealthCheckSpecifier() {
     envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier_;
-    server_health_check_specifier_.mutable_interval()->set_seconds(1);
+    server_health_check_specifier_.mutable_interval()->set_nanos(100000000);
 
     auto* health_check = server_health_check_specifier_.add_cluster_health_checks();
 
@@ -130,8 +130,8 @@ public:
     health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("some_zone");
     health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("crete");
 
-    health_check->add_health_checks()->mutable_timeout()->set_seconds(2);
-    health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
+    health_check->add_health_checks()->mutable_timeout()->set_seconds(100);
+    health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(100);
     health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_grpc_health_check();
@@ -145,7 +145,7 @@ public:
   // one TCP health_check
   envoy::service::discovery::v2::HealthCheckSpecifier makeTcpHealthCheckSpecifier() {
     envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier_;
-    server_health_check_specifier_.mutable_interval()->set_seconds(1);
+    server_health_check_specifier_.mutable_interval()->set_nanos(100000000);
 
     auto* health_check = server_health_check_specifier_.add_cluster_health_checks();
 
@@ -157,8 +157,8 @@ public:
     health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("some_zone");
     health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("crete");
 
-    health_check->add_health_checks()->mutable_timeout()->set_seconds(2);
-    health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
+    health_check->add_health_checks()->mutable_timeout()->set_seconds(100);
+    health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(100);
     health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
     auto* tcp_hc = health_check->mutable_health_checks(0)->mutable_tcp_health_check();
@@ -234,6 +234,9 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttp) {
   host_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   host_stream_->encodeData(1024, true);
 
+  // Make sure the cluster processed the endpoint's response
+  test_server_->waitForCounterGe("cluster.anna.health_check.success", 1);
+
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
@@ -253,6 +256,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttp) {
 TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
   initialize();
   server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
+
   server_health_check_specifier_.mutable_cluster_health_checks(0)
       ->mutable_health_checks(0)
       ->mutable_timeout()
@@ -260,7 +264,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
   server_health_check_specifier_.mutable_cluster_health_checks(0)
       ->mutable_health_checks(0)
       ->mutable_timeout()
-      ->set_nanos(800000000);
+      ->set_nanos(100000000);
+
   // Server <--> Envoy
   waitForHdsStream();
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
@@ -274,6 +279,9 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
   healthcheckEndpoints();
 
   // Endpoint doesn't repond to the health check
+
+  // Make sure the cluster processed the endpoint's (lack of) response
+  test_server_->waitForCounterGe("cluster.anna.health_check.failure", 1);
 
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
@@ -312,6 +320,9 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyHttp) {
   host_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "404"}}, false);
   host_stream_->encodeData(1024, true);
 
+  // Make sure the cluster processed the endpoint's response
+  test_server_->waitForCounterGe("cluster.anna.health_check.failure", 1);
+
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
@@ -346,7 +357,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   server_health_check_specifier_.mutable_cluster_health_checks(0)
       ->mutable_health_checks(0)
       ->mutable_timeout()
-      ->set_nanos(800000000);
+      ->set_nanos(100000000);
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
@@ -355,9 +366,12 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   ASSERT_TRUE(host_upstream_->waitForRawConnection(host_fake_raw_connection_));
   ASSERT_TRUE(
       host_fake_raw_connection_->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
-
   host_upstream_->set_allow_unexpected_disconnects(true);
+
   // No response from the endpoint
+
+  // Make sure the cluster processed the endpoint's (lack of) response
+  test_server_->waitForCounterGe("cluster.anna.health_check.failure", 1);
 
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
@@ -396,6 +410,9 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyTcp) {
   RELEASE_ASSERT(result, result.message());
   host_upstream_->set_allow_unexpected_disconnects(true);
 
+  // Make sure the cluster processed the endpoint's response
+  test_server_->waitForCounterGe("cluster.anna.health_check.success", 1);
+
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
@@ -432,6 +449,9 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTcp) {
   AssertionResult result = host_fake_raw_connection_->write("Voronoi");
   RELEASE_ASSERT(result, result.message());
   host_upstream_->set_allow_unexpected_disconnects(true);
+
+  // TODO(lilika): TcpHealthchecker is not incrementing the stats in failure
+  // so we can't wait for the cluster to process the endpoint's response
 
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
@@ -475,6 +495,10 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
   host_stream_->encodeData(1024, true);
   host2_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   host2_stream_->encodeData(1024, true);
+
+  // Make sure the cluster processed the endpoints' response
+  test_server_->waitForCounterGe("cluster.anna.health_check.failure", 1);
+  test_server_->waitForCounterGe("cluster.anna.health_check.success", 1);
 
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
@@ -527,6 +551,10 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
   host2_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   host2_stream_->encodeData(1024, true);
 
+  // Make sure the cluster processed the endpoints' response
+  test_server_->waitForCounterGe("cluster.anna.health_check.failure", 1);
+  test_server_->waitForCounterGe("cluster.anna.health_check.success", 1);
+
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
@@ -561,8 +589,8 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("peculiar_zone");
   health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("paris");
 
-  health_check->add_health_checks()->mutable_timeout()->set_seconds(2);
-  health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
+  health_check->add_health_checks()->mutable_timeout()->set_seconds(100);
+  health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(100);
   health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
   health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
   health_check->mutable_health_checks(0)->mutable_grpc_health_check();
@@ -586,6 +614,10 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   host_stream_->encodeData(1024, true);
   host2_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   host2_stream_->encodeData(1024, true);
+
+  // Make sure the cluster processed the endpoints' response
+  test_server_->waitForCounterGe("cluster.anna.health_check.failure", 1);
+  test_server_->waitForCounterGe("cluster.cat.health_check.success", 1);
 
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
@@ -628,6 +660,9 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   host_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   host_stream_->encodeData(1024, true);
 
+  // Make sure the cluster processed the endpoint's response
+  test_server_->waitForCounterGe("cluster.anna.health_check.success", 1);
+
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
@@ -641,7 +676,7 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
 
   // New HealthCheckSpecifier message
   envoy::service::discovery::v2::HealthCheckSpecifier new_message;
-  new_message.mutable_interval()->set_seconds(1);
+  new_message.mutable_interval()->set_nanos(100000000);
 
   auto* health_check = new_message.add_cluster_health_checks();
 
@@ -654,8 +689,8 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("peculiar_zone");
   health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("paris");
 
-  health_check->add_health_checks()->mutable_timeout()->set_seconds(2);
-  health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
+  health_check->add_health_checks()->mutable_timeout()->set_seconds(100);
+  health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(100);
   health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
   health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
   health_check->mutable_health_checks(0)->mutable_grpc_health_check();
@@ -671,9 +706,13 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   ASSERT_TRUE(host2_fake_connection_->waitForNewStream(*dispatcher_, host2_stream_));
   ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
   host2_upstream_->set_allow_unexpected_disconnects(true);
+
   // Endpoint responds to the health check
   host2_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "404"}}, false);
   host2_stream_->encodeData(1024, true);
+
+  // Make sure the cluster processed the endpoint's response
+  test_server_->waitForCounterGe("cluster.cat.health_check.failure", 1);
 
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
