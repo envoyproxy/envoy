@@ -1,8 +1,7 @@
 #include "extensions/transport_sockets/alts/noop_transport_socket_callbacks.h"
 
-#include "test/mocks/network/mocks.h"
-
 #include "gtest/gtest.h"
+#include "test/mocks/network/mocks.h"
 
 namespace Envoy {
 namespace Extensions {
