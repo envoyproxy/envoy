@@ -99,7 +99,7 @@ private:
   Status status_{Status::NotStarted};
   bool calling_limit_{};
 };
-}
+} // namespace RateLimitFilter
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
