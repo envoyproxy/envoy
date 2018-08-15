@@ -899,8 +899,16 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
     }
 
     auto existing_host = all_hosts_.find(host->address()->asString());
+    const bool existing_host_found = existing_host != all_hosts_.end();
 
-    if (existing_host != all_hosts_.end()) {
+    // When an existing host is found, check if the health check address of that host is requested
+    // to be changed. This condition matters if the cluster active health checker is activated. If
+    // true, we need to rebuild.
+    const bool health_check_changed =
+        existing_host_found && health_checker_ != nullptr &&
+        *existing_host->second->healthCheckAddress() != *host->healthCheckAddress();
+
+    if (existing_host_found && !health_check_changed) {
       existing_hosts_for_current_priority.emplace(existing_host->first);
       // If we find a host matched based on address and the health check address is not changed, we
       // keep it. However we do change weight inline so do that here.
