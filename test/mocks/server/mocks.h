@@ -80,6 +80,7 @@ public:
   std::string service_cluster_name_;
   std::string service_node_name_;
   std::string service_zone_name_;
+  spdlog::level::level_enum log_level_{spdlog::level::trace};
   std::string log_path_;
   Stats::StatsOptionsImpl stats_options_;
   bool hot_restart_disabled_{};
