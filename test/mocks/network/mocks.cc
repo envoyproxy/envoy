@@ -204,9 +204,8 @@ MockConnectionHandler::MockConnectionHandler() {}
 MockConnectionHandler::~MockConnectionHandler() {}
 
 MockTransportSocket::MockTransportSocket() {
-  ON_CALL(*this, setTransportSocketCallbacks(_)).WillByDefault(Invoke([&](TransportSocketCallbacks& callbacks) {
-    callbacks_ = &callbacks;
-  }));
+  ON_CALL(*this, setTransportSocketCallbacks(_))
+      .WillByDefault(Invoke([&](TransportSocketCallbacks& callbacks) { callbacks_ = &callbacks; }));
 }
 MockTransportSocket::~MockTransportSocket() {}
 

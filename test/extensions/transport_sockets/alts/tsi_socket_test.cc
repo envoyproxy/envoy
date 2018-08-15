@@ -148,7 +148,6 @@ protected:
     EXPECT_CALL(client_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
     expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                    client_.tsi_socket_->doRead(client_.read_buffer_));
-
   }
 
   struct SocketForTest {
