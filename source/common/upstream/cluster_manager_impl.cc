@@ -958,7 +958,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
   cluster_entry->priority_set_.getOrCreateHostSet(priority).updateHosts(
       std::move(hosts), std::move(healthy_hosts), std::move(hosts_per_locality),
       std::move(healthy_hosts_per_locality), std::move(locality_weights), hosts_added,
-      hosts_removed);
+      hosts_removed, absl::nullopt);
 
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (cluster_entry->lb_factory_ != nullptr) {
