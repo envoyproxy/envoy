@@ -53,3 +53,23 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "tsi_socket",
+    srcs = [
+        "tsi_socket.cc",
+    ],
+    hdrs = [
+        "tsi_socket.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":tsi_frame_protector",
+        ":tsi_handshaker",
+        "//include/envoy/network:transport_socket_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:enum_to_int",
+        "//source/common/network:raw_buffer_socket_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
+)
