@@ -428,9 +428,7 @@ public:
   MockTransportSocket();
   ~MockTransportSocket();
 
-  void setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) {
-    callbacks_ = &callbacks;
-  }
+  void setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) { callbacks_ = &callbacks; }
   MOCK_CONST_METHOD0(protocol, std::string());
   MOCK_METHOD0(canFlushClose, bool());
   MOCK_METHOD1(closeSocket, void(Network::ConnectionEvent event));
