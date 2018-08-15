@@ -29,6 +29,7 @@ public:
   void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
     hds_upstream_ = fake_upstreams_.back().get();
+    hds_upstream_->set_allow_unexpected_disconnects(true);
     HttpIntegrationTest::createUpstreams();
   }
 
@@ -70,6 +71,7 @@ public:
     ASSERT_TRUE(host_fake_connection_->waitForNewStream(*dispatcher_, host_stream_));
     ASSERT_TRUE(host_stream_->waitForEndStream(*dispatcher_));
 
+    host_upstream_->set_allow_unexpected_disconnects(true);
     EXPECT_STREQ(host_stream_->headers().Path()->value().c_str(), "/healthcheck");
     EXPECT_STREQ(host_stream_->headers().Method()->value().c_str(), "GET");
     EXPECT_STREQ(host_stream_->headers().Host()->value().c_str(), "anna");
@@ -79,6 +81,7 @@ public:
       ASSERT_TRUE(host2_fake_connection_->waitForNewStream(*dispatcher_, host2_stream_));
       ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
 
+      host2_upstream_->set_allow_unexpected_disconnects(true);
       EXPECT_STREQ(host2_stream_->headers().Path()->value().c_str(), "/healthcheck");
       EXPECT_STREQ(host2_stream_->headers().Method()->value().c_str(), "GET");
       EXPECT_STREQ(host2_stream_->headers().Host()->value().c_str(), cluster2.c_str());
@@ -127,7 +130,7 @@ public:
     health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("some_zone");
     health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("crete");
 
-    health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
+    health_check->add_health_checks()->mutable_timeout()->set_seconds(2);
     health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
     health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
@@ -154,7 +157,7 @@ public:
     health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("some_zone");
     health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("crete");
 
-    health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
+    health_check->add_health_checks()->mutable_timeout()->set_seconds(2);
     health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
     health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
@@ -250,7 +253,14 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttp) {
 TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
   initialize();
   server_health_check_specifier_ = makeHttpHealthCheckSpecifier();
-
+  server_health_check_specifier_.mutable_cluster_health_checks(0)
+      ->mutable_health_checks(0)
+      ->mutable_timeout()
+      ->set_seconds(0);
+  server_health_check_specifier_.mutable_cluster_health_checks(0)
+      ->mutable_health_checks(0)
+      ->mutable_timeout()
+      ->set_nanos(800000000);
   // Server <--> Envoy
   waitForHdsStream();
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, envoy_msg_));
@@ -329,6 +339,14 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
 
   // Server asks for health checking
   server_health_check_specifier_ = makeTcpHealthCheckSpecifier();
+  server_health_check_specifier_.mutable_cluster_health_checks(0)
+      ->mutable_health_checks(0)
+      ->mutable_timeout()
+      ->set_seconds(0);
+  server_health_check_specifier_.mutable_cluster_health_checks(0)
+      ->mutable_health_checks(0)
+      ->mutable_timeout()
+      ->set_nanos(800000000);
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
@@ -338,6 +356,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   ASSERT_TRUE(
       host_fake_raw_connection_->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
 
+  host_upstream_->set_allow_unexpected_disconnects(true);
   // No response from the endpoint
 
   // Envoy reports back to server
@@ -375,6 +394,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyTcp) {
       host_fake_raw_connection_->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
   AssertionResult result = host_fake_raw_connection_->write("Pong");
   RELEASE_ASSERT(result, result.message());
+  host_upstream_->set_allow_unexpected_disconnects(true);
 
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
@@ -411,6 +431,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTcp) {
       host_fake_raw_connection_->waitForData(FakeRawConnection::waitForInexactMatch("Ping")));
   AssertionResult result = host_fake_raw_connection_->write("Voronoi");
   RELEASE_ASSERT(result, result.message());
+  host_upstream_->set_allow_unexpected_disconnects(true);
 
   // Envoy reports back to server
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
@@ -540,7 +561,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("peculiar_zone");
   health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("paris");
 
-  health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
+  health_check->add_health_checks()->mutable_timeout()->set_seconds(2);
   health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
   health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
   health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
@@ -633,7 +654,7 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("peculiar_zone");
   health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("paris");
 
-  health_check->add_health_checks()->mutable_timeout()->set_seconds(1);
+  health_check->add_health_checks()->mutable_timeout()->set_seconds(2);
   health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(1);
   health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
   health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
@@ -649,7 +670,7 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   ASSERT_TRUE(host2_upstream_->waitForHttpConnection(*dispatcher_, host2_fake_connection_));
   ASSERT_TRUE(host2_fake_connection_->waitForNewStream(*dispatcher_, host2_stream_));
   ASSERT_TRUE(host2_stream_->waitForEndStream(*dispatcher_));
-
+  host2_upstream_->set_allow_unexpected_disconnects(true);
   // Endpoint responds to the health check
   host2_stream_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "404"}}, false);
   host2_stream_->encodeData(1024, true);
