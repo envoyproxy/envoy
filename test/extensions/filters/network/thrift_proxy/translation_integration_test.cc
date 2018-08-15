@@ -38,7 +38,7 @@ public:
               name: "routes"
               routes:
                 - match:
-                    method: "add"
+                    method_name: "add"
                   route:
                     cluster: "cluster_0"
       )EOF";
