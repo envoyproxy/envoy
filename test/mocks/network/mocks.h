@@ -428,7 +428,9 @@ public:
   MockTransportSocket();
   ~MockTransportSocket();
 
-  MOCK_METHOD1(setTransportSocketCallbacks, void(TransportSocketCallbacks& callbacks));
+  void setTransportSocketCallbacks(TransportSocketCallbacks& callbacks) {
+    callbacks_ = &callbacks;
+  }
   MOCK_CONST_METHOD0(protocol, std::string());
   MOCK_METHOD0(canFlushClose, bool());
   MOCK_METHOD1(closeSocket, void(Network::ConnectionEvent event));
@@ -437,7 +439,10 @@ public:
   MOCK_METHOD0(onConnected, void());
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
-  MOCK_METHOD0(callbacks, Network::TransportSocketCallbacks*());
+  Network::TransportSocketCallbacks* callbacks() { return callbacks_; }
+
+private:
+  Network::TransportSocketCallbacks* callbacks_;
 };
 
 class MockTransportSocketFactory : public TransportSocketFactory {
