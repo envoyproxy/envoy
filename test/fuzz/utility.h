@@ -20,7 +20,7 @@ inline Http::TestHeaderMapImpl fromHeaders(const test::fuzz::Headers& headers) {
 }
 
 // Convert from HeaderMap to test proto Headers.
-inline test::fuzz::Headers toHeaders(const Http::HeaderMapImpl headers) {
+inline test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
   test::fuzz::Headers fuzz_headers;
   headers.iterate(
       [](const Http::HeaderEntry& header, void* ctxt) -> Http::HeaderMap::Iterate {
