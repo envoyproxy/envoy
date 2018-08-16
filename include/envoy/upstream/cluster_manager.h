@@ -26,7 +26,6 @@
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
-
 namespace Upstream {
 
 /**
