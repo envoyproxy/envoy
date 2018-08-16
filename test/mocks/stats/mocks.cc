@@ -14,7 +14,6 @@ namespace Envoy {
 namespace Stats {
 
 MockCounter::MockCounter() {
-  ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));
@@ -24,7 +23,6 @@ MockCounter::MockCounter() {
 MockCounter::~MockCounter() {}
 
 MockGauge::MockGauge() {
-  ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, tagExtractedName()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, tags()).WillByDefault(ReturnRef(tags_));
   ON_CALL(*this, used()).WillByDefault(ReturnPointee(&used_));

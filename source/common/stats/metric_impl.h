@@ -5,6 +5,8 @@
 
 #include "envoy/stats/stats.h"
 
+#include "common/common/assert.h"
+
 namespace Envoy {
 namespace Stats {
 
@@ -14,10 +16,10 @@ namespace Stats {
  */
 class MetricImpl : public virtual Metric {
 public:
-  MetricImpl(const std::string& name, std::string&& tag_extracted_name, std::vector<Tag>&& tags)
-      : name_(name), tag_extracted_name_(std::move(tag_extracted_name)), tags_(std::move(tags)) {}
+  MetricImpl(std::string&& tag_extracted_name, std::vector<Tag>&& tags)
+      : tag_extracted_name_(std::move(tag_extracted_name)), tags_(std::move(tags)) {}
 
-  const std::string& name() const override { return name_; }
+  const std::string name() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   const std::string& tagExtractedName() const override { return tag_extracted_name_; }
   const std::vector<Tag>& tags() const override { return tags_; }
 
@@ -30,7 +32,6 @@ protected:
   };
 
 private:
-  const std::string name_;
   const std::string tag_extracted_name_;
   const std::vector<Tag> tags_;
 };
