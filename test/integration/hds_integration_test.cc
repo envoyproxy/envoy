@@ -118,7 +118,7 @@ public:
   // one HTTP health_check
   envoy::service::discovery::v2::HealthCheckSpecifier makeHttpHealthCheckSpecifier() {
     envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier_;
-    server_health_check_specifier_.mutable_interval()->set_nanos(100000000);
+    server_health_check_specifier_.mutable_interval()->set_nanos(100000000); // 0.1 seconds
 
     auto* health_check = server_health_check_specifier_.add_cluster_health_checks();
 
@@ -145,7 +145,7 @@ public:
   // one TCP health_check
   envoy::service::discovery::v2::HealthCheckSpecifier makeTcpHealthCheckSpecifier() {
     envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier_;
-    server_health_check_specifier_.mutable_interval()->set_nanos(100000000);
+    server_health_check_specifier_.mutable_interval()->set_nanos(100000000); // 0.1 seconds
 
     auto* health_check = server_health_check_specifier_.add_cluster_health_checks();
 
@@ -265,7 +265,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
   server_health_check_specifier_.mutable_cluster_health_checks(0)
       ->mutable_health_checks(0)
       ->mutable_timeout()
-      ->set_nanos(100000000);
+      ->set_nanos(100000000); // 0.1 seconds
 
   // Server <--> Envoy
   waitForHdsStream();
@@ -358,7 +358,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   server_health_check_specifier_.mutable_cluster_health_checks(0)
       ->mutable_health_checks(0)
       ->mutable_timeout()
-      ->set_nanos(100000000);
+      ->set_nanos(100000000); // 0.1 seconds
 
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
@@ -678,7 +678,7 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
 
   // New HealthCheckSpecifier message
   envoy::service::discovery::v2::HealthCheckSpecifier new_message;
-  new_message.mutable_interval()->set_nanos(100000000);
+  new_message.mutable_interval()->set_nanos(100000000); // 0.1 seconds
 
   auto* health_check = new_message.add_cluster_health_checks();
 
