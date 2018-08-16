@@ -209,6 +209,12 @@ bool Utility::isUpgrade(const HeaderMap& headers) {
                                            Http::Headers::get().ConnectionValues.Upgrade.c_str()));
 }
 
+bool Utility::isH2UpgradeRequest(const HeaderMap& headers) {
+  return headers.Method() &&
+         headers.Method()->value().c_str() == Http::Headers::get().MethodValues.Connect &&
+         headers.Protocol() && !headers.Protocol()->value().empty();
+}
+
 bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
   return (isUpgrade(headers) && (0 == StringUtil::caseInsensitiveCompare(
                                           headers.Upgrade()->value().c_str(),
@@ -227,6 +233,8 @@ Utility::parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOptions& co
   ret.initial_connection_window_size_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, initial_connection_window_size,
                                       Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+  ret.allow_connect_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_connect,
+                                                       Http::Http2Settings::DEFAULT_ALLOW_CONNECT);
   return ret;
 }
 
@@ -390,6 +398,51 @@ std::string Utility::queryParamsToString(const QueryParams& params) {
     delim = "&";
   }
   return out;
+}
+
+void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
+  ASSERT(Utility::isUpgrade(headers));
+
+  const HeaderString& upgrade = headers.Upgrade()->value();
+  headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Connect);
+  headers.insertProtocol().value().setCopy(upgrade.c_str(), upgrade.size());
+  headers.removeUpgrade();
+  headers.removeConnection();
+  if (headers.ContentLength() == nullptr) {
+    headers.insertTransferEncoding().value().setReference(
+        Http::Headers::get().TransferEncodingValues.Chunked);
+  }
+}
+
+void Utility::transformUpgradeResponseFromH1toH2(HeaderMap& headers) {
+  if (getResponseStatus(headers) == 101) {
+    headers.insertStatus().value().setCopy("200", 3);
+  }
+  headers.removeUpgrade();
+  headers.removeConnection();
+  if (headers.ContentLength() == nullptr) {
+    headers.insertTransferEncoding().value().setReference(
+        Http::Headers::get().TransferEncodingValues.Chunked);
+  }
+}
+
+void Utility::transformUpgradeRequestFromH2toH1(HeaderMap& headers) {
+  ASSERT(Utility::isH2UpgradeRequest(headers));
+
+  const HeaderString& protocol = headers.Protocol()->value();
+  headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
+  headers.insertUpgrade().value().setCopy(protocol.c_str(), protocol.size());
+  headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
+  headers.removeProtocol();
+}
+
+void Utility::transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade) {
+  if (getResponseStatus(headers) == 200) {
+    headers.insertStatus().value().setCopy("101", 3);
+  }
+  // TODO(alyssawilk) what should we do for websocket responses on the failure path?
+  headers.insertUpgrade().value().setCopy(upgrade.data(), upgrade.size());
+  headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
 }
 
 } // namespace Http

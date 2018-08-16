@@ -74,6 +74,93 @@ TEST(HttpUtility, isUpgrade) {
       TestHeaderMapImpl{{"connection", "keep-alive, Upgrade"}, {"upgrade", "FOO"}}));
 }
 
+// Start with H1 style websocket request headers. Transform to H2 and back.
+TEST(HttpUtility, H1H2H1Request) {
+  TestHeaderMapImpl converted_headers = {
+      {":method", "GET"}, {"content-length", "0"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
+  const TestHeaderMapImpl original_headers(converted_headers);
+
+  ASSERT_TRUE(Utility::isUpgrade(converted_headers));
+  ASSERT_FALSE(Utility::isH2UpgradeRequest(converted_headers));
+  Utility::transformUpgradeRequestFromH1toH2(converted_headers);
+
+  ASSERT_FALSE(Utility::isUpgrade(converted_headers));
+  ASSERT_TRUE(Utility::isH2UpgradeRequest(converted_headers));
+  Utility::transformUpgradeRequestFromH2toH1(converted_headers);
+
+  ASSERT_TRUE(Utility::isUpgrade(converted_headers));
+  ASSERT_FALSE(Utility::isH2UpgradeRequest(converted_headers));
+  ASSERT_EQ(converted_headers, original_headers);
+}
+
+// Start with H2 style websocket request headers. Transform to H1 and back.
+TEST(HttpUtility, H2H1H2Request) {
+  TestHeaderMapImpl converted_headers = {
+      {":method", "CONNECT"}, {"content-length", "0"}, {":protocol", "websocket"}};
+  const TestHeaderMapImpl original_headers(converted_headers);
+
+  ASSERT_FALSE(Utility::isUpgrade(converted_headers));
+  ASSERT_TRUE(Utility::isH2UpgradeRequest(converted_headers));
+  Utility::transformUpgradeRequestFromH2toH1(converted_headers);
+
+  ASSERT_TRUE(Utility::isUpgrade(converted_headers));
+  ASSERT_FALSE(Utility::isH2UpgradeRequest(converted_headers));
+  Utility::transformUpgradeRequestFromH1toH2(converted_headers);
+
+  ASSERT_FALSE(Utility::isUpgrade(converted_headers));
+  ASSERT_TRUE(Utility::isH2UpgradeRequest(converted_headers));
+  ASSERT_EQ(converted_headers, original_headers);
+}
+
+// Start with H1 style websocket response headers. Transform to H2 and back.
+TEST(HttpUtility, H1H2H1Response) {
+  TestHeaderMapImpl converted_headers = {{":status", "101"},
+                                         {"content-length", "0"},
+                                         {"upgrade", "websocket"},
+                                         {"connection", "upgrade"}};
+  const TestHeaderMapImpl original_headers(converted_headers);
+
+  ASSERT_TRUE(Utility::isUpgrade(converted_headers));
+  Utility::transformUpgradeResponseFromH1toH2(converted_headers);
+
+  ASSERT_FALSE(Utility::isUpgrade(converted_headers));
+  Utility::transformUpgradeResponseFromH2toH1(converted_headers, "websocket");
+
+  ASSERT_TRUE(Utility::isUpgrade(converted_headers));
+  ASSERT_EQ(converted_headers, original_headers);
+}
+
+// Users of the transformation functions should not expect the results to be
+// identical. Because the headers are always added in a set order, the original
+// header order may not be preserved.
+TEST(HttpUtility, OrderNotPreserved) {
+  TestHeaderMapImpl expected_headers = {
+      {":method", "GET"}, {"content-length", "0"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
+
+  TestHeaderMapImpl converted_headers = {
+      {":method", "GET"}, {"content-length", "0"}, {"Connection", "upgrade"}, {"Upgrade", "foo"}};
+
+  Utility::transformUpgradeRequestFromH1toH2(converted_headers);
+  Utility::transformUpgradeRequestFromH2toH1(converted_headers);
+  EXPECT_EQ(converted_headers, expected_headers);
+}
+
+// A more serious problem with using WebSocket help for general Upgrades, is that method for
+// WebSocket is always GET but the method for other upgrades is allowed to be a
+// POST. This is a documented weakness in Envoy docs and can be addressed with
+// a custom x-envoy-original-method header if it is ever needed.
+TEST(HttpUtility, MethodNotPreserved) {
+  TestHeaderMapImpl expected_headers = {
+      {":method", "GET"}, {"content-length", "0"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
+
+  TestHeaderMapImpl converted_headers = {
+      {":method", "POST"}, {"content-length", "0"}, {"Upgrade", "foo"}, {"Connection", "upgrade"}};
+
+  Utility::transformUpgradeRequestFromH1toH2(converted_headers);
+  Utility::transformUpgradeRequestFromH2toH1(converted_headers);
+  EXPECT_EQ(converted_headers, expected_headers);
+}
+
 TEST(HttpUtility, appendXff) {
   {
     TestHeaderMapImpl headers;

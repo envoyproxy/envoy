@@ -20,6 +20,31 @@ one can set up custom
 for the given upgrade type, up to and including only using the router filter to send the WebSocket
 data upstream.
 
+Handling H2 hops (implementation in progress)
+---------------------------------------------
+
+One oft requested feature for Envoy was to allow WebSocket to traverse HTTP/2 hops, where there
+was a set-up such as
+
+Client ---- HTTP/1.1 ---- Frontline Envoy ---- HTTP/2 ---- Second tier Envoy ---- H1  ---- Upstream
+
+In this case, if a client is for example using WebSocket, we want the Websocket to arive at the
+upstream server functionally intact, which means it needs to traverse the HTTP/2 hop.
+
+TODO(alyssawilk) copy the warnings from the config here, or just land the docs when we unhide.
+
+This is accomplished via
+`extended CONNECT <https://tools.ietf.org/html/draft-mcmanus-httpbis-h2-websockets`_ support. The
+WebSocket request will be transformed into an HTTP/2 CONNECT stream, with :protocol header
+indicating the original upgrade, traverse the HTTP/2 hop, and be downgraded back into an HTTP/1
+WebSocket Upgrade. This same Upgrade-CONNECT-Upgrade transformation will be performed on any
+HTTP/2 hop, with the documented flaw that the HTTP/1.1 method is always assumed to be GET.
+Non-WebSocket upgrades are allowed to use any valid HTTP method (i.e. POST) and the current
+upgrade/downgrade mechanism will drop the original method and transform the Upgrade request to
+a GET method on the final Envoy-Upstream hop.
+
+TODO(alyssawilk) link to the config changes required to enable upgrade upstream/downstream
+
 Old style WebSocket support
 ===========================
 

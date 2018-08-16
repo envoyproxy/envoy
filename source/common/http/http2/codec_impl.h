@@ -187,11 +187,16 @@ protected:
     // I don't fully understand.
     static const uint64_t MAX_HEADER_SIZE = 63 * 1024;
 
+    // Does any necessary WebSocket/Upgrade conversion, then passes the headers
+    // to the decoder_.
+    void decodeHeaders();
+
     bool buffers_overrun() const { return read_disable_count_ > 0; }
 
     ConnectionImpl& parent_;
     HeaderMapImplPtr headers_;
     StreamDecoder* decoder_{};
+    std::string upgrade_type_;
     int32_t stream_id_{-1};
     uint32_t unconsumed_bytes_{0};
     uint32_t read_disable_count_{0};

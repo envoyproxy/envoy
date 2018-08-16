@@ -88,11 +88,11 @@ public:
   // This is a convenience method used to call mutateRequestHeaders(). It is done in this
   // convoluted way to force tests to check both the final downstream address as well as whether
   // the request is internal/external, given the importance of these two pieces of data.
-  MutateRequestRet callMutateRequestHeaders(HeaderMap& headers, Protocol protocol) {
+  MutateRequestRet callMutateRequestHeaders(HeaderMap& headers, Protocol) {
     MutateRequestRet ret;
     ret.downstream_address_ =
-        ConnectionManagerUtility::mutateRequestHeaders(
-            headers, protocol, connection_, config_, route_config_, random_, runtime_, local_info_)
+        ConnectionManagerUtility::mutateRequestHeaders(headers, connection_, config_, route_config_,
+                                                       random_, runtime_, local_info_)
             ->asString();
     ret.internal_ = headers.EnvoyInternalRequest() != nullptr;
     return ret;
@@ -532,16 +532,6 @@ TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForNonWebSocketReque
 
   EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
             callMutateRequestHeaders(headers, Protocol::Http11));
-  EXPECT_FALSE(headers.has("connection"));
-  EXPECT_FALSE(headers.has("upgrade"));
-}
-
-// Make sure we remove connections headers for a WS request over h2.
-TEST_F(ConnectionManagerUtilityTest, RemoveConnectionUpgradeForHttp2Requests) {
-  TestHeaderMapImpl headers{{"connection", "upgrade"}, {"upgrade", "websocket"}};
-
-  EXPECT_EQ((MutateRequestRet{"10.0.0.3:50000", false}),
-            callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_FALSE(headers.has("connection"));
   EXPECT_FALSE(headers.has("upgrade"));
 }
