@@ -1545,7 +1545,7 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
 
   EXPECT_THROW_WITH_MESSAGE(
       makeCluster(yaml), EnvoyException,
-      "Didn't find a registered network or http implementation for name: 'no_such_filter'");
+      "Didn't find a registered network or http filter implementation for name: 'no_such_filter'");
 }
 
 class TestFilterConfigFactoryBase {

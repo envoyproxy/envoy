@@ -130,7 +130,7 @@ parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
 
     if (factory == nullptr) {
       throw EnvoyException(fmt::format(
-          "Didn't find a registered network or http implementation for name: '{}'", name));
+          "Didn't find a registered network or http filter implementation for name: '{}'", name));
     }
 
     auto object = factory->createProtocolOptionsConfig(
