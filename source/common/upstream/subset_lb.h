@@ -39,8 +39,8 @@ private:
   class HostSubsetImpl : public HostSetImpl {
   public:
     HostSubsetImpl(const HostSet& original_host_set, bool locality_weight_aware)
-        : HostSetImpl(original_host_set.priority()), original_host_set_(original_host_set),
-          locality_weight_aware_(locality_weight_aware) {}
+        : HostSetImpl(original_host_set.priority(), original_host_set.overprovisioning_factor()),
+          original_host_set_(original_host_set), locality_weight_aware_(locality_weight_aware) {}
 
     void update(const HostVector& hosts_added, const HostVector& hosts_removed,
                 HostPredicate predicate);
@@ -79,7 +79,8 @@ private:
     LoadBalancerPtr lb_;
 
   protected:
-    HostSetImplPtr createHostSet(uint32_t priority) override;
+    HostSetImplPtr createHostSet(uint32_t priority,
+                                 absl::optional<uint32_t> overprovisioning_factor) override;
 
   private:
     const PrioritySet& original_priority_set_;

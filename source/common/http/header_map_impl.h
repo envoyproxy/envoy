@@ -35,7 +35,7 @@ public:                                                                         
  * paths use O(1) direct access. In general, we try to copy as little as possible and allocate as
  * little as possible in any of the paths.
  */
-class HeaderMapImpl : public HeaderMap {
+class HeaderMapImpl : public HeaderMap, NonCopyable {
 public:
   /**
    * Appends data to header. If header already has a value, the string ',' is added between the
@@ -46,8 +46,9 @@ public:
   static void appendToHeader(HeaderString& header, absl::string_view data);
 
   HeaderMapImpl();
-  HeaderMapImpl(const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
-  HeaderMapImpl(const HeaderMap& rhs);
+  explicit HeaderMapImpl(
+      const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
+  explicit HeaderMapImpl(const HeaderMap& rhs) : HeaderMapImpl() { copyFrom(rhs); }
 
   /**
    * Add a header via full move. This is the expected high performance paths for codecs populating
@@ -80,6 +81,10 @@ public:
   size_t size() const override { return headers_.size(); }
 
 protected:
+  // For tests only, unoptimized, they aren't intended for regular HeaderMapImpl users.
+  void copyFrom(const HeaderMap& rhs);
+  void clear() { removePrefix(LowerCaseString("")); }
+
   struct HeaderEntryImpl : public HeaderEntry, NonCopyable {
     HeaderEntryImpl(const LowerCaseString& key);
     HeaderEntryImpl(const LowerCaseString& key, HeaderString&& value);
@@ -130,8 +135,15 @@ protected:
   /**
    * List of HeaderEntryImpl that keeps the pseudo headers (key starting with ':') in the front
    * of the list (as required by nghttp2) and otherwise maintains insertion order.
+   *
+   * Note: the internal iterators held in fields make this unsafe to copy and move, since the
+   * reference to end() is not preserved across a move (see Notes in
+   * https://en.cppreference.com/w/cpp/container/list/list). The NonCopyable will supress both copy
+   * and move constructors/assignment.
+   * TODO(htuch): Maybe we want this to movable one day; for now, our header map moves happen on
+   * HeaderMapPtr, so the performance impact should not be evident.
    */
-  class HeaderList {
+  class HeaderList : NonCopyable {
   public:
     HeaderList() : pseudo_headers_end_(headers_.end()) {}
 

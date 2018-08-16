@@ -31,7 +31,7 @@ Address::InstanceConstSharedPtr findOrCheckFreePort(Address::InstanceConstShared
   // Not setting REUSEADDR, therefore if the address has been recently used we won't reuse it here.
   // However, because we're going to use the address while checking if it is available, we'll need
   // to set REUSEADDR on listener sockets created by tests using an address validated by this means.
-  Api::SysCallResult result = addr_port->bind(fd);
+  Api::SysCallIntResult result = addr_port->bind(fd);
   int err;
   const char* failing_fn = nullptr;
   if (result.rc_ != 0) {
@@ -156,7 +156,7 @@ std::pair<Address::InstanceConstSharedPtr, int> bindFreeLoopbackPort(Address::Ip
                                                                      Address::SocketType type) {
   Address::InstanceConstSharedPtr addr = getCanonicalLoopbackAddress(version);
   const int fd = addr->socket(type);
-  Api::SysCallResult result = addr->bind(fd);
+  Api::SysCallIntResult result = addr->bind(fd);
   if (0 != result.rc_) {
     close(fd);
     std::string msg = fmt::format("bind failed for address {} with error: {} ({})",

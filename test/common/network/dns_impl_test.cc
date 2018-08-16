@@ -358,8 +358,8 @@ public:
   }
   const std::string& asString() const override { return antagonistic_name_; }
   const std::string& logicalName() const override { return antagonistic_name_; }
-  Api::SysCallResult bind(int fd) const override { return instance_.bind(fd); }
-  Api::SysCallResult connect(int fd) const override { return instance_.connect(fd); }
+  Api::SysCallIntResult bind(int fd) const override { return instance_.bind(fd); }
+  Api::SysCallIntResult connect(int fd) const override { return instance_.connect(fd); }
   const Address::Ip* ip() const override { return instance_.ip(); }
   int socket(Address::SocketType type) const override { return instance_.socket(type); }
   Address::Type type() const override { return instance_.type(); }

@@ -323,6 +323,12 @@ public:
   TestHeaderMapImpl(const std::initializer_list<std::pair<std::string, std::string>>& values);
   TestHeaderMapImpl(const HeaderMap& rhs);
 
+  // The above constructor for TestHeaderMap is not an actual copy constructor.
+  TestHeaderMapImpl(const TestHeaderMapImpl& rhs);
+  TestHeaderMapImpl& operator=(const TestHeaderMapImpl& rhs);
+
+  bool operator==(const TestHeaderMapImpl& rhs) const { return HeaderMapImpl::operator==(rhs); }
+
   friend std::ostream& operator<<(std::ostream& os, const TestHeaderMapImpl& p) {
     p.iterate(
         [](const HeaderEntry& header, void* context) -> HeaderMap::Iterate {
