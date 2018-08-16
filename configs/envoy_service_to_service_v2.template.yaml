@@ -23,7 +23,7 @@
                 prefix: "/"
                 headers:
                 - name: content-type
-                  value: application/grpc
+                  exact_match: application/grpc
               route:
                 cluster: local_service_grpc
             - match:
@@ -34,7 +34,9 @@
         - name: envoy.health_check
           config:
            pass_through_mode: true
-           endpoint: "/healthcheck"
+           headers:
+             - name: ":path"
+               exact_match: "/healthcheck"
            cache_time: 2.5s
         - name: envoy.buffer
           config:
@@ -168,8 +170,9 @@ static_resources:
             config_source:
                api_config_source:
                  api_type: GRPC
-                 cluster_names:
-                 - rds
+                 grpc_services:
+                   envoy_grpc:
+                     cluster_name: "rds"
             route_config_name: rds_config_for_listener_1
           add_user_agent: true
           tracing:
@@ -430,7 +433,7 @@ static_resources:
           - collector-grpc.lightstep.com
   - name: cds_cluster
     connect_timeout: 0.25s
-    type: STRICT_DNS  
+    type: STRICT_DNS
     lb_policy: ROUND_ROBIN
     hosts:
     - socket_address:
