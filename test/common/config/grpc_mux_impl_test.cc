@@ -34,7 +34,9 @@ namespace {
 class GrpcMuxImplTest : public testing::Test {
 public:
   GrpcMuxImplTest()
-      : async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()), time_source_{} {
+      : async_client_(new Grpc::MockAsyncClient()), timer_(new Event::MockTimer()),
+        mock_time_source_(mock_system_time_, mock_monotonic_time_) {
+    dispatcher_.setTimeSource(mock_time_source_);
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
@@ -80,7 +82,9 @@ public:
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcMuxImpl> grpc_mux_;
   NiceMock<MockGrpcMuxCallbacks> callbacks_;
-  NiceMock<MockMonotonicTimeSource> time_source_;
+  NiceMock<MockSystemTimeSource> mock_system_time_;
+  NiceMock<MockMonotonicTimeSource> mock_monotonic_time_;
+  TimeSource mock_time_source_;
 };
 
 // Validate behavior when multiple type URL watches are maintained, watches are created/destroyed
@@ -298,7 +302,7 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
 TEST_F(GrpcMuxImplTest, TooManyRequests) {
   EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(100));
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-  EXPECT_CALL(time_source_, currentTime())
+  EXPECT_CALL(mock_monotonic_time_, currentTime())
       .WillRepeatedly(Return(std::chrono::steady_clock::time_point{}));
 
   const auto onReceiveMessage = [&](uint64_t burst) {
@@ -324,7 +328,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequests) {
                       onReceiveMessage(1));
 
   // Logging limiter waits for 5s, so a second warning message is expected.
-  EXPECT_CALL(time_source_, currentTime())
+  EXPECT_CALL(mock_monotonic_time_, currentTime())
       .Times(4)
       .WillOnce(Return(std::chrono::steady_clock::time_point{}))
       .WillOnce(Return(std::chrono::steady_clock::time_point{std::chrono::seconds(5)}))

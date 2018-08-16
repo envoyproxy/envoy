@@ -96,13 +96,11 @@ public:
   FilterConfig(const std::string& stat_prefix, const LocalInfo::LocalInfo& local_info,
                Stats::Scope& scope, Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                Runtime::RandomGenerator& random, ShadowWriterPtr&& shadow_writer,
-               bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers,
-               TimeSource& time_source)
+               bool emit_dynamic_stats, bool start_child_span, bool suppress_envoy_headers)
       : scope_(scope), local_info_(local_info), cm_(cm), runtime_(runtime),
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
-        suppress_envoy_headers_(suppress_envoy_headers), time_source_(time_source),
-        shadow_writer_(std::move(shadow_writer)) {}
+        suppress_envoy_headers_(suppress_envoy_headers), shadow_writer_(std::move(shadow_writer)) {}
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
@@ -110,14 +108,14 @@ public:
       : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
-                     config.start_child_span(), config.suppress_envoy_headers(),
-                     context.timeSource()) {
+                     config.start_child_span(), config.suppress_envoy_headers()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
   }
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
+  TimeSource& timeSource() { return cm_.timeSource(); }
 
   Stats::Scope& scope_;
   const LocalInfo::LocalInfo& local_info_;
@@ -128,7 +126,6 @@ public:
   const bool emit_dynamic_stats_;
   const bool start_child_span_;
   const bool suppress_envoy_headers_;
-  TimeSource& time_source_;
   std::list<AccessLog::InstanceSharedPtr> upstream_logs_;
 
 private:
@@ -349,7 +346,7 @@ private:
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream);
-  TimeSource& timeSource() { return config_.time_source_; }
+  TimeSource& timeSource() { return config_.timeSource(); }
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};

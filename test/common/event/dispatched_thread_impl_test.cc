@@ -23,7 +23,7 @@ class DispatchedThreadTest : public testing::Test {
 protected:
   DispatchedThreadTest()
       : config_(1000, 1000, 1000, 1000), guard_dog_(fakestats_, config_, test_time_.timeSource()),
-        thread_(time_source_) {}
+        thread_(test_time_.timeSource()) {}
 
   void SetUp() { thread_.start(guard_dog_); }
   NiceMock<Server::Configuration::MockMain> config_;
