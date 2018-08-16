@@ -40,10 +40,8 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::createInlineTlsCertific
 
 void SecretManagerImpl::removeDynamicSecretProvider(const std::string& map_key) {
   ENVOY_LOG(debug, "Unregister secret provider. hash key: {}", map_key);
-  auto secret_provider = dynamic_secret_providers_.find(map_key);
-  if (secret_provider != dynamic_secret_providers_.end()) {
-    dynamic_secret_providers_.erase(map_key);
-  } else {
+
+  if (dynamic_secret_providers_.erase(map_key) == 0) {
     ENVOY_LOG(error, "secret provider does not exist. hash key: {}", map_key);
   }
 }
