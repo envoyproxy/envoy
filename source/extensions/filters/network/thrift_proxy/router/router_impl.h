@@ -89,10 +89,7 @@ public:
   ThriftFilters::FilterStatus messageEnd() override;
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return {}; }
-  const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
   const Network::Connection* downstreamConnection() const override;
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
   // Tcp::ConnectionPool::UpstreamCallbacks
   void onUpstreamData(Buffer::Instance& data, bool end_stream) override;

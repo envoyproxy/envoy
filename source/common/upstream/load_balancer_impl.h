@@ -84,6 +84,14 @@ protected:
 };
 
 class LoadBalancerContextBase : public LoadBalancerContext {
+  absl::optional<uint64_t> computeHashKey() override { return {}; }
+
+  const Network::Connection* downstreamConnection() const override { return nullptr; }
+
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
+
+  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
+
   const PriorityLoad& determinePriorityLoad(const PrioritySet&,
                                             const PriorityLoad& original_priority_load) override {
     return original_priority_load;

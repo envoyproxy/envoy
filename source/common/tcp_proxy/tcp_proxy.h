@@ -160,7 +160,6 @@ public:
                    Upstream::HostDescriptionConstSharedPtr host) override;
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return {}; }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
     return config_->metadataMatchCriteria();
   }
@@ -168,8 +167,6 @@ public:
   const Network::Connection* downstreamConnection() const override {
     return &read_callbacks_->connection();
   }
-
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
   // These two functions allow enabling/disabling reads on the upstream and downstream connections.
   // They are called by the Downstream/Upstream Watermark callbacks to limit buffering.
