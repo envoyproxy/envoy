@@ -68,9 +68,8 @@ TEST_F(SubscriptionFactoryTest, RestClusterEmpty) {
   config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
 
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
-  EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config), EnvoyException,
-      "API configs must have either a gRPC service or a cluster name defined");
+  EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
+                          "API configs must have either a gRPC service or a cluster name defined:");
 }
 
 TEST_F(SubscriptionFactoryTest, GrpcClusterEmpty) {
@@ -80,9 +79,8 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterEmpty) {
   config.mutable_api_config_source()->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
 
   EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
-  EXPECT_THROW_WITH_MESSAGE(
-      subscriptionFromConfigSource(config), EnvoyException,
-      "API configs must have either a gRPC service or a cluster name defined");
+  EXPECT_THROW_WITH_REGEX(subscriptionFromConfigSource(config), EnvoyException,
+                          "API configs must have either a gRPC service or a cluster name defined:");
 }
 
 TEST_F(SubscriptionFactoryTest, RestClusterSingleton) {
@@ -150,9 +148,9 @@ TEST_F(SubscriptionFactoryTest, RestClusterMultiton) {
   EXPECT_CALL(cm_, clusters()).WillRepeatedly(Return(cluster_map));
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillRepeatedly(Return(false));
   EXPECT_CALL(*cluster.info_, type()).WillRepeatedly(Return(envoy::api::v2::Cluster::STATIC));
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       subscriptionFromConfigSource(config), EnvoyException,
-      "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified");
+      "envoy::api::v2::core::ConfigSource must have a singleton cluster name specified:");
 }
 
 TEST_F(SubscriptionFactoryTest, GrpcClusterMultiton) {
@@ -174,9 +172,9 @@ TEST_F(SubscriptionFactoryTest, GrpcClusterMultiton) {
   EXPECT_CALL(*cluster.info_, addedViaApi()).WillRepeatedly(Return(false));
   EXPECT_CALL(*cluster.info_, type()).WillRepeatedly(Return(envoy::api::v2::Cluster::STATIC));
 
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       subscriptionFromConfigSource(config), EnvoyException,
-      "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
+      "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified:");
 }
 
 TEST_F(SubscriptionFactoryTest, FilesystemSubscription) {
