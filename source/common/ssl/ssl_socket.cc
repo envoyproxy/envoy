@@ -24,15 +24,15 @@ class NotReadySslSocket : public Network::TransportSocket, public Connection {
 public:
   // Ssl::Connection
   bool peerCertificatePresented() const override { return false; }
-  std::string uriSanLocalCertificate() override { return EMPTY_STRING; }
+  std::string uriSanLocalCertificate() const override { return EMPTY_STRING; }
   const std::string& sha256PeerCertificateDigest() const override { return EMPTY_STRING; }
   std::string serialNumberPeerCertificate() const override { return EMPTY_STRING; }
   std::string subjectPeerCertificate() const override { return EMPTY_STRING; }
   std::string subjectLocalCertificate() const override { return EMPTY_STRING; }
   std::string uriSanPeerCertificate() const override { return EMPTY_STRING; }
   const std::string& urlEncodedPemEncodedPeerCertificate() const override { return EMPTY_STRING; }
-  std::vector<std::string> dnsSansPeerCertificate() override { return {}; }
-  std::vector<std::string> dnsSansLocalCertificate() override { return {}; }
+  std::vector<std::string> dnsSansPeerCertificate() const override { return {}; }
+  std::vector<std::string> dnsSansLocalCertificate() const override { return {}; }
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks&) override {}
@@ -44,7 +44,6 @@ public:
     return {PostIoAction::Close, 0, false};
   }
   void onConnected() override {}
-  Ssl::Connection* ssl() override { return this; }
   const Ssl::Connection* ssl() const override { return this; }
 };
 
