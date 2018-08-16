@@ -27,6 +27,9 @@ public:
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
 private:
+  // Remove dynamic secret provider which has been deleted.
+  void removeDynamicSecretProvider(const std::string& map_key);
+
   // Manages pairs of secret name and TlsCertificateConfigProviderSharedPtr.
   std::unordered_map<std::string, TlsCertificateConfigProviderSharedPtr>
       static_tls_certificate_providers_;
