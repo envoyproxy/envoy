@@ -9,21 +9,27 @@
 namespace Envoy {
 namespace Fuzz {
 
-void Runner::setupEnvironment(int argc, char** argv) {
+spdlog::level::level_enum Runner::log_level_;
+
+void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum default_log_level) {
   Event::Libevent::Global::initialize();
 
   TestEnvironment::initializeOptions(argc, argv);
 
   static auto* lock = new Thread::MutexBasicLockable();
   const auto environment_log_level = TestEnvironment::getOptions().logLevel();
-  Logger::Registry::initialize(std::min(environment_log_level, spdlog::level::info),
-                               TestEnvironment::getOptions().logFormat(), *lock);
+  // We only override the default log level if it looks like we're debugging;
+  // otherwise the default environment log level might override the default and
+  // spew too much when running under a fuzz engine.
+  log_level_ =
+      environment_log_level <= spdlog::level::debug ? environment_log_level : default_log_level;
+  Logger::Registry::initialize(log_level_, TestEnvironment::getOptions().logFormat(), *lock);
 }
 
 } // namespace Fuzz
 } // namespace Envoy
 
 extern "C" int LLVMFuzzerInitialize(int* /*argc*/, char*** argv) {
-  Envoy::Fuzz::Runner::setupEnvironment(1, *argv);
+  Envoy::Fuzz::Runner::setupEnvironment(1, *argv, spdlog::level::off);
   return 0;
 }

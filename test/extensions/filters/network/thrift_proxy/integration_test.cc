@@ -144,11 +144,11 @@ paramToString(const TestParamInfo<std::tuple<TransportType, ProtocolType, bool>>
   return fmt::format("{}{}", transport_name, protocol_name);
 }
 
-INSTANTIATE_TEST_CASE_P(TransportAndProtocol, ThriftConnManagerIntegrationTest,
-                        Combine(Values(TransportType::Framed, TransportType::Unframed),
-                                Values(ProtocolType::Binary, ProtocolType::Compact),
-                                Values(false, true)),
-                        paramToString);
+INSTANTIATE_TEST_CASE_P(
+    TransportAndProtocol, ThriftConnManagerIntegrationTest,
+    Combine(Values(TransportType::Framed, TransportType::Unframed, TransportType::Header),
+            Values(ProtocolType::Binary, ProtocolType::Compact), Values(false, true)),
+    paramToString);
 
 TEST_P(ThriftConnManagerIntegrationTest, Success) {
   initializeCall(DriverMode::Success);

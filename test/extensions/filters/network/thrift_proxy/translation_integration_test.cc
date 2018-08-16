@@ -60,6 +60,10 @@ public:
       upstream_transport_proto =
           envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::UNFRAMED;
       break;
+    case TransportType::Header:
+      upstream_transport_proto =
+          envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::HEADER;
+      break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
@@ -148,12 +152,13 @@ static std::string paramToString(
                      us_protocol_name);
 }
 
-INSTANTIATE_TEST_CASE_P(TransportsAndProtocols, ThriftTranslationIntegrationTest,
-                        Combine(Values(TransportType::Framed, TransportType::Unframed),
-                                Values(ProtocolType::Binary, ProtocolType::Compact),
-                                Values(TransportType::Framed, TransportType::Unframed),
-                                Values(ProtocolType::Binary, ProtocolType::Compact)),
-                        paramToString);
+INSTANTIATE_TEST_CASE_P(
+    TransportsAndProtocols, ThriftTranslationIntegrationTest,
+    Combine(Values(TransportType::Framed, TransportType::Unframed, TransportType::Header),
+            Values(ProtocolType::Binary, ProtocolType::Compact),
+            Values(TransportType::Framed, TransportType::Unframed, TransportType::Header),
+            Values(ProtocolType::Binary, ProtocolType::Compact)),
+    paramToString);
 
 // Tests that the proxy will translate between different downstream and upstream transports and
 // protocols.

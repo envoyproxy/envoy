@@ -87,7 +87,7 @@ public:
   void cancel() override {}
   void limit(RequestCallbacks& callbacks, const std::string&, const std::vector<Descriptor>&,
              Tracing::Span&) override {
-    callbacks.complete(LimitStatus::OK);
+    callbacks.complete(LimitStatus::OK, nullptr);
   }
 };
 

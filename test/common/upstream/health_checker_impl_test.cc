@@ -3164,13 +3164,19 @@ TEST(HealthCheckEventLoggerImplTest, All) {
   NiceMock<MockClusterInfo> cluster;
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster));
 
-  HealthCheckEventLoggerImpl event_logger(log_manager, "foo");
+  NiceMock<MockSystemTimeSource> system_time_source;
+  EXPECT_CALL(system_time_source, currentTime())
+      // This is rendered as "2009-02-13T23:31:31.234Z".
+      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
+
+  HealthCheckEventLoggerImpl event_logger(log_manager, system_time_source, "foo");
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
                          "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
                          "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                         "cluster\",\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\"}}\n"}));
+                         "cluster\",\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\"},"
+                         "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
   event_logger.logEjectUnhealthy(envoy::data::core::v2alpha::HealthCheckerType::HTTP, host,
                                  envoy::data::core::v2alpha::HealthCheckFailureType::ACTIVE);
 
@@ -3178,8 +3184,8 @@ TEST(HealthCheckEventLoggerImplTest, All) {
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
                          "\"protocol\":\"TCP\",\"address\":\"10.0.0.1\",\"resolver_name\":\"\","
                          "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
-                         "cluster\",\"add_healthy_event\":{\"first_check\":false}}\n"}));
-
+                         "cluster\",\"add_healthy_event\":{\"first_check\":false},\"timestamp\":"
+                         "\"2009-02-13T23:31:31.234Z\"}\n"}));
   event_logger.logAddHealthy(envoy::data::core::v2alpha::HealthCheckerType::HTTP, host, false);
 }
 

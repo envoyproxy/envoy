@@ -11,9 +11,9 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 const std::string& PayloadOptions::modeName() const {
-  static std::string success = "success";
-  static std::string idl_exception = "idl-exception";
-  static std::string exception = "exception";
+  static const std::string success = "success";
+  static const std::string idl_exception = "idl-exception";
+  static const std::string exception = "exception";
 
   switch (mode_) {
   case DriverMode::Success:
@@ -28,22 +28,25 @@ const std::string& PayloadOptions::modeName() const {
 }
 
 const std::string& PayloadOptions::transportName() const {
-  static std::string framed = "framed";
-  static std::string unframed = "unframed";
+  static const std::string framed = "framed";
+  static const std::string unframed = "unframed";
+  static const std::string header = "header";
 
   switch (transport_) {
   case TransportType::Framed:
     return framed;
   case TransportType::Unframed:
     return unframed;
+  case TransportType::Header:
+    return header;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
 const std::string& PayloadOptions::protocolName() const {
-  static std::string binary = "binary";
-  static std::string compact = "compact";
+  static const std::string binary = "binary";
+  static const std::string compact = "compact";
 
   switch (protocol_) {
   case ProtocolType::Binary:

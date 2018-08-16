@@ -40,6 +40,9 @@ enum TransportType {
 
   // The Thrift proxy will use the Thrift unframed transport.
   UNFRAMED = 2;
+
+  // The Thrift proxy will assume the client is using the Thrift header transport.
+  HEADER = 3;
 }
 
 // Thrift Protocol types supported by Envoy.

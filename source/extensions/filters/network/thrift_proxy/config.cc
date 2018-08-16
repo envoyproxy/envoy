@@ -39,6 +39,8 @@ static const TransportTypeMap& transportTypeMap() {
            TransportType::Framed},
           {envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::UNFRAMED,
            TransportType::Unframed},
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::HEADER,
+           TransportType::Header},
       });
 }
 
