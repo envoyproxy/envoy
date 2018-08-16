@@ -28,6 +28,14 @@ GrpcMuxImpl::~GrpcMuxImpl() {
   }
 }
 
+void GrpcMuxImpl::noMoreRequestSending() {
+  for (const auto& api_state : api_state_) {
+    for (auto watch : api_state.second.watches_) {
+      watch->send_update_ = false;
+    }
+  }
+}
+
 void GrpcMuxImpl::start() { establishNewStream(); }
 
 void GrpcMuxImpl::setRetryTimer() {

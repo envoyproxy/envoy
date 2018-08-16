@@ -30,6 +30,9 @@ public:
               MonotonicTimeSource& time_source = ProdMonotonicTimeSource::instance_);
   ~GrpcMuxImpl();
 
+  // Not to send any request, the object is about to be deleted.
+  void noMoreRequestSending();
+
   void start() override;
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::vector<std::string>& resources,
                             GrpcMuxCallbacks& callbacks) override;
@@ -57,14 +60,14 @@ private:
     GrpcMuxWatchImpl(const std::vector<std::string>& resources, GrpcMuxCallbacks& callbacks,
                      const std::string& type_url, GrpcMuxImpl& parent)
         : resources_(resources), callbacks_(callbacks), type_url_(type_url), parent_(parent),
-          inserted_(true) {
+          inserted_(true), send_update_(true) {
       entry_ = parent.api_state_[type_url].watches_.emplace(
           parent.api_state_[type_url].watches_.begin(), this);
     }
     ~GrpcMuxWatchImpl() override {
       if (inserted_) {
         parent_.api_state_[type_url_].watches_.erase(entry_);
-        if (!resources_.empty()) {
+        if (send_update_ && !resources_.empty()) {
           parent_.sendDiscoveryRequest(type_url_);
         }
       }
@@ -75,6 +78,7 @@ private:
     GrpcMuxImpl& parent_;
     std::list<GrpcMuxWatchImpl*>::iterator entry_;
     bool inserted_;
+    bool send_update_;
   };
 
   // Per muxed API state.
