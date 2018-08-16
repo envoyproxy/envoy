@@ -189,7 +189,6 @@ def _python_deps():
         build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
     )
 
-
 # Bazel native C++ dependencies. For the depedencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
     _repository_impl("grpc_httpjson_transcoding")
