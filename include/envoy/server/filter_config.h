@@ -193,13 +193,16 @@ public:
    * @return Upstream::ProtocoOptionsConfigConstSharedPtr the protocol options
    */
   virtual Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsConfig(const Protobuf::Message& config) PURE;
+  createProtocolOptionsConfig(const Protobuf::Message& config) {
+    UNREFERENCED_PARAMETER(config);
+    return nullptr;
+  }
 
   /**
    * @return ProtobufTypes::MessagePtr a newly created empty protocol specific options message or
    *         nullptr if protocol specific options are not available.
    */
-  virtual ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() PURE;
+  virtual ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() { return nullptr; }
 };
 
 /**
@@ -240,16 +243,6 @@ public:
    *         is deprecated.
    */
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() { return nullptr; }
-
-  // ProtocolOptionsConsumer
-  Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsConfig(const Protobuf::Message& config) override {
-    UNREFERENCED_PARAMETER(config);
-    return nullptr;
-  }
-
-  // ProtocolOptionsConsumer
-  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override { return nullptr; }
 
   /**
    * @return std::string the identifying name for a particular implementation of a network filter
@@ -322,16 +315,6 @@ public:
   createRouteSpecificFilterConfig(const Protobuf::Message&, FactoryContext&) {
     return nullptr;
   }
-
-  // ProtocolOptionsConsumer
-  Upstream::ProtocolOptionsConfigConstSharedPtr
-  createProtocolOptionsConfig(const Protobuf::Message& config) override {
-    UNREFERENCED_PARAMETER(config);
-    return nullptr;
-  }
-
-  // ProtocolOptionsConsumer
-  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override { return nullptr; }
 
   /**
    * @return std::string the identifying name for a particular implementation of an http filter
