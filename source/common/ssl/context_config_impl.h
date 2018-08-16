@@ -19,12 +19,7 @@ static const std::string INLINE_STRING = "<inline>";
 
 class ContextConfigImpl : public virtual Ssl::ContextConfig {
 public:
-  ~ContextConfigImpl() override {
-    if (tls_certficate_provider_.get() != nullptr && secret_callback_ != nullptr) {
-      tls_certficate_provider_->removeUpdateCallback(*secret_callback_);
-      secret_callback_ = nullptr;
-    }
-  }
+  ~ContextConfigImpl() override;
 
   // Ssl::ContextConfig
   const std::string& alpnProtocols() const override { return alpn_protocols_; }
@@ -66,11 +61,11 @@ public:
   }
 
   void setSecretUpdateCallback(Secret::SecretCallbacks& callback) override {
-    if (tls_certficate_provider_.get() != nullptr && secret_callback_ != nullptr) {
-      tls_certficate_provider_->removeUpdateCallback(*secret_callback_);
-    }
-    secret_callback_ = &callback;
-    if (tls_certficate_provider_.get() != nullptr) {
+    if (tls_certficate_provider_) {
+      if (secret_callback_) {
+        tls_certficate_provider_->removeUpdateCallback(*secret_callback_);
+      }
+      secret_callback_ = &callback;
       tls_certficate_provider_->addUpdateCallback(callback);
     }
   }
