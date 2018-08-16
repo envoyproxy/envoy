@@ -178,7 +178,7 @@ struct RequestInfoImpl : public RequestInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  void setRequestedServerName(const absl::string_view& requested_server_name) override {
+  void setRequestedServerName(const absl::string_view requested_server_name) override {
     requested_server_name_ = requested_server_name;
   }
 
@@ -203,7 +203,7 @@ struct RequestInfoImpl : public RequestInfo {
   bool hc_request_{};
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
-  absl::string_view requestedServerName_;
+  //  absl::string_view requestedServerName_;
 
 private:
   uint64_t bytes_received_{};

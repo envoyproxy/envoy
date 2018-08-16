@@ -305,7 +305,7 @@ public:
   /**
    * @param SNI value requested
    */
-  virtual void setRequestedServerName(const absl::string_view& requested_server_name) PURE;
+  virtual void setRequestedServerName(const absl::string_view requested_server_name) PURE;
 
   /**
    * @return SNI value for downstream host

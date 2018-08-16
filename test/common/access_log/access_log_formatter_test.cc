@@ -186,17 +186,19 @@ TEST(AccessLogFormatterTest, requestInfoFormatter) {
     EXPECT_EQ("127.0.0.1:0", upstream_format.format(header, header, header, request_info));
   }
 
-  // {
-  //   RequestInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
-  //   absl::string_view requested_server_name = "stub_server";
-  //   EXPECT_CALL(request_info,
-  //   requestedServerName()).WillRepeatedly(ReturnRef(requested_server_name));
-  //   EXPECT_EQ("stub_server", upstream_format.format(header, header, header, request_info));
-  // }
+  {
+    RequestInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
+    absl::string_view requested_server_name = "stub_server";
+    EXPECT_CALL(request_info, requestedServerName())
+        .WillRepeatedly(ReturnRef(requested_server_name));
+    EXPECT_EQ("stub_server", upstream_format.format(header, header, header, request_info));
+  }
 
   {
     RequestInfoFormatter upstream_format("REQUESTED_SERVER_NAME");
-    // EXPECT_CALL(request_info, requestedServerName()).WillOnce(Return(nullptr));
+    absl::string_view requested_server_name;
+    EXPECT_CALL(request_info, requestedServerName())
+        .WillRepeatedly(ReturnRef(requested_server_name));
     EXPECT_EQ("-", upstream_format.format(header, header, header, request_info));
   }
 }
