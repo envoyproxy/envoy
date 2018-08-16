@@ -121,7 +121,7 @@ private:
   std::unique_ptr<lightstep::LightStepTracerOptions> options_;
   const PropagationMode propagation_mode_;
 };
-}
+} // namespace Lightstep
 } // namespace Tracers
 } // namespace Extensions
 } // namespace Envoy

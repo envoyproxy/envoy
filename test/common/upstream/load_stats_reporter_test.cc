@@ -11,11 +11,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::_;
 
 // The tests in this file provide just coverage over some corner cases in error handling. The test
 // for the happy path for LoadStatsReporter is provided in //test/integration:load_stats_reporter.

@@ -11,11 +11,11 @@
 
 #include "gmock/gmock.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::Throw;
-using testing::_;
 
 namespace Envoy {
 namespace Server {

@@ -26,7 +26,7 @@ Currently there are three build images:
 * `envoyproxy/envoy-build-ubuntu` &mdash; based on Ubuntu 16.04 (Xenial) which uses the GCC 5.4 compiler.
 * `envoyproxy/envoy-build-centos` &mdash; based on CentOS 7 which uses the GCC 5.3.1 compiler (devtoolset-4).
 
-We also install and use the clang-5.0 compiler for some sanitizing runs.
+We also install and use the clang-6.0 compiler for some sanitizing runs.
 
 # Building and running tests as a developer
 
@@ -77,8 +77,8 @@ The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/env
 
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
-* `bazel.api` &mdash; build and run API tests under `-c fastbuild` with clang-5.0.
-* `bazel.asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang-5.0.
+* `bazel.api` &mdash; build and run API tests under `-c fastbuild` with clang-6.0.
+* `bazel.asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang-6.0.
 * `bazel.debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
 * `bazel.debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
 * `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with gcc.
@@ -87,9 +87,9 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with gcc.
 * `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
 * `bazel.coverity` &mdash; build Envoy static binary and run Coverity Scan static analysis.
-* `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang-5.0.
-* `check_format`&mdash; run `clang-format` 5.0 and `buildifier` on entire source tree.
-* `fix_format`&mdash; run and enforce `clang-format` 5.0 and `buildifier` on entire source tree.
+* `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang-6.0.
+* `check_format`&mdash; run `clang-format-6.0` and `buildifier` on entire source tree.
+* `fix_format`&mdash; run and enforce `clang-format-6.0` and `buildifier` on entire source tree.
 * `docs`&mdash; build documentation tree in `generated/docs`.
 
 # Testing changes to the build image as a developer

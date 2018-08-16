@@ -12,6 +12,7 @@
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
@@ -20,7 +21,6 @@ using testing::Property;
 using testing::Ref;
 using testing::SaveArg;
 using testing::StrictMock;
-using testing::_;
 
 namespace Envoy {
 namespace Server {
