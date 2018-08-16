@@ -181,12 +181,16 @@ public:
   virtual std::string name() PURE;
 };
 
-class ProtocolOptionsConsumer {
+/**
+ * Implemented by filter factories that require more options to process the protocol used by the
+ * upstream cluster.
+ */
+class ProtocolOptionsFactory {
 public:
-  virtual ~ProtocolOptionsConsumer() {}
+  virtual ~ProtocolOptionsFactory() {}
 
   /**
-   * Create a particular network filter's protocol specific options implementation. If the factory
+   * Create a particular filter's protocol specific options implementation. If the factory
    * implementation is unable to produce a factory with the provided parameters, it should throw an
    * EnvoyException.
    * @param config supplies the protobuf configuration for the filter
@@ -209,7 +213,7 @@ public:
  * Implemented by each network filter and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
  */
-class NamedNetworkFilterConfigFactory : public ProtocolOptionsConsumer {
+class NamedNetworkFilterConfigFactory : public ProtocolOptionsFactory {
 public:
   virtual ~NamedNetworkFilterConfigFactory() {}
 
@@ -255,7 +259,7 @@ public:
  * Implemented by each HTTP filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class NamedHttpFilterConfigFactory : public ProtocolOptionsConsumer {
+class NamedHttpFilterConfigFactory : public ProtocolOptionsFactory {
 public:
   virtual ~NamedHttpFilterConfigFactory() {}
 

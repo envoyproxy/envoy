@@ -119,7 +119,7 @@ parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
   for (const auto& iter : config.extension_protocol_options()) {
     const std::string& name = iter.first;
     const ProtobufWkt::Struct& config_struct = iter.second;
-    Server::Configuration::ProtocolOptionsConsumer* factory = nullptr;
+    Server::Configuration::ProtocolOptionsFactory* factory = nullptr;
 
     factory = Registry::FactoryRegistry<
         Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(name);

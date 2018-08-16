@@ -282,7 +282,7 @@ public:
    */
   static ProtobufTypes::MessagePtr
   translateToFactoryProtocolOptionsConfig(const Protobuf::Message& source, const std::string& name,
-                                          Server::Configuration::ProtocolOptionsConsumer& factory) {
+                                          Server::Configuration::ProtocolOptionsFactory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyProtocolOptionsProto();
 
     if (config == nullptr) {
