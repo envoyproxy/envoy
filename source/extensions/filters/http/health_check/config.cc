@@ -23,7 +23,7 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
 
   auto header_match_data = std::make_shared<std::vector<Http::HeaderUtility::HeaderData>>();
 
-  for (const envoy::api::v2::route::HeaderMatcher& matcher : proto_config.headers()) {
+  for (const envoy::type::matcher::HeaderMatcher& matcher : proto_config.headers()) {
     Http::HeaderUtility::HeaderData single_header_match(matcher);
     header_match_data->push_back(std::move(single_header_match));
   }

@@ -3,7 +3,7 @@
 #include <regex>
 #include <vector>
 
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/type/matcher/header.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"
 #include "envoy/type/range.pb.h"
@@ -22,7 +22,7 @@ public:
   // to match in a request's header, specified in the header_match_type_ member.
   // It is the runtime equivalent of the HeaderMatchSpecifier proto in RDS API.
   struct HeaderData {
-    HeaderData(const envoy::api::v2::route::HeaderMatcher& config);
+    HeaderData(const envoy::type::matcher::HeaderMatcher& config);
     HeaderData(const Json::Object& config);
 
     const Http::LowerCaseString name_;

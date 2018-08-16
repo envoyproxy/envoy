@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/type/matcher/header.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/rbac/v2alpha/rbac.pb.h"
 #include "envoy/http/header_map.h"
@@ -116,7 +117,7 @@ private:
  */
 class HeaderMatcher : public Matcher {
 public:
-  HeaderMatcher(const envoy::api::v2::route::HeaderMatcher& matcher) : header_(matcher) {}
+  HeaderMatcher(const envoy::type::matcher::HeaderMatcher& matcher) : header_(matcher) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const envoy::api::v2::core::Metadata&) const override;

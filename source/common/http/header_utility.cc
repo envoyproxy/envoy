@@ -22,34 +22,34 @@ namespace Http {
 //   d.present_match: Match will succeed if the header is present.
 //   f.prefix_match: Match will succeed if header value matches the prefix value specified here.
 //   g.suffix_match: Match will succeed if header value matches the suffix value specified here.
-HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher& config)
+  HeaderUtility::HeaderData::HeaderData(const envoy::type::matcher::HeaderMatcher& config)
     : name_(config.name()), invert_match_(config.invert_match()) {
   switch (config.header_match_specifier_case()) {
-  case envoy::api::v2::route::HeaderMatcher::kExactMatch:
+  case envoy::type::matcher::HeaderMatcher::kExactMatch:
     header_match_type_ = HeaderMatchType::Value;
     value_ = config.exact_match();
     break;
-  case envoy::api::v2::route::HeaderMatcher::kRegexMatch:
+  case envoy::type::matcher::HeaderMatcher::kRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
     regex_pattern_ = RegexUtil::parseRegex(config.regex_match());
     break;
-  case envoy::api::v2::route::HeaderMatcher::kRangeMatch:
+  case envoy::type::matcher::HeaderMatcher::kRangeMatch:
     header_match_type_ = HeaderMatchType::Range;
     range_.set_start(config.range_match().start());
     range_.set_end(config.range_match().end());
     break;
-  case envoy::api::v2::route::HeaderMatcher::kPresentMatch:
+  case envoy::type::matcher::HeaderMatcher::kPresentMatch:
     header_match_type_ = HeaderMatchType::Present;
     break;
-  case envoy::api::v2::route::HeaderMatcher::kPrefixMatch:
+  case envoy::type::matcher::HeaderMatcher::kPrefixMatch:
     header_match_type_ = HeaderMatchType::Prefix;
     value_ = config.prefix_match();
     break;
-  case envoy::api::v2::route::HeaderMatcher::kSuffixMatch:
+  case envoy::type::matcher::HeaderMatcher::kSuffixMatch:
     header_match_type_ = HeaderMatchType::Suffix;
     value_ = config.suffix_match();
     break;
-  case envoy::api::v2::route::HeaderMatcher::HEADER_MATCH_SPECIFIER_NOT_SET:
+  case envoy::type::matcher::HeaderMatcher::HEADER_MATCH_SPECIFIER_NOT_SET:
     FALLTHRU;
   default:
     header_match_type_ = HeaderMatchType::Present;
@@ -59,7 +59,7 @@ HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher
 
 HeaderUtility::HeaderData::HeaderData(const Json::Object& config)
     : HeaderData([&config] {
-        envoy::api::v2::route::HeaderMatcher header_matcher;
+        envoy::type::matcher::HeaderMatcher header_matcher;
         Envoy::Config::RdsJson::translateHeaderMatcher(config, header_matcher);
         return header_matcher;
       }()) {}

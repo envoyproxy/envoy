@@ -6,8 +6,8 @@ api_proto_library_internal(
     name = "health_check",
     srcs = ["health_check.proto"],
     deps = [
-        "//envoy/api/v2/route",
         "//envoy/type:percent",
+        "//envoy/type/matcher:header",
     ],
 )
 
@@ -15,7 +15,7 @@ api_go_proto_library(
     name = "health_check",
     proto = ":health_check",
     deps = [
-        "//envoy/api/v2/route:route_go_proto",
         "//envoy/type:percent_go_proto",
+        "//envoy/type/matcher:header_go_proto",
     ],
 )

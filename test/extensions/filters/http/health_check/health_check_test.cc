@@ -46,7 +46,7 @@ public:
       bool pass_through,
       ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages = nullptr) {
     header_data_ = std::make_shared<std::vector<Http::HeaderUtility::HeaderData>>();
-    envoy::api::v2::route::HeaderMatcher matcher;
+    envoy::type::matcher::HeaderMatcher matcher;
     matcher.set_name(":path");
     matcher.set_exact_match("/healthcheck");
     header_data_->emplace_back(matcher);

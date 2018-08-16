@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/websocket.h"

@@ -6,8 +6,8 @@ api_proto_library_internal(
     name = "fault",
     srcs = ["fault.proto"],
     deps = [
-        "//envoy/api/v2/route",
         "//envoy/config/filter/fault/v2:fault",
         "//envoy/type:percent",
+        "//envoy/type/matcher:header",
     ],
 )

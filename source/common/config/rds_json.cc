@@ -81,7 +81,7 @@ void RdsJson::translateRateLimit(const Json::Object& json_rate_limit,
       std::transform(headers.cbegin(), headers.cend(),
                      Protobuf::RepeatedPtrFieldBackInserter(header_value_match->mutable_headers()),
                      [](const Json::ObjectSharedPtr& json_header_matcher) {
-                       envoy::api::v2::route::HeaderMatcher header_matcher;
+                       envoy::type::matcher::HeaderMatcher header_matcher;
                        translateHeaderMatcher(*json_header_matcher, header_matcher);
                        return header_matcher;
                      });
@@ -90,7 +90,7 @@ void RdsJson::translateRateLimit(const Json::Object& json_rate_limit,
 }
 
 void RdsJson::translateHeaderMatcher(const Json::Object& json_header_matcher,
-                                     envoy::api::v2::route::HeaderMatcher& header_matcher) {
+                                     envoy::type::matcher::HeaderMatcher& header_matcher) {
   json_header_matcher.validateSchema(Json::Schema::HEADER_DATA_CONFIGURATION_SCHEMA);
   JSON_UTIL_SET_STRING(json_header_matcher, header_matcher, name);
 

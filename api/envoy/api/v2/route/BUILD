@@ -9,6 +9,7 @@ api_proto_library_internal(
     deps = [
         "//envoy/api/v2/core:base",
         "//envoy/type:range",
+        "//envoy/type/matcher:header"
     ],
 )
 
@@ -18,5 +19,6 @@ api_go_proto_library(
     deps = [
         "//envoy/api/v2/core:base_go_proto",
         "//envoy/type:range_go_proto",
+        "//envoy/type/matcher:header_go_proto",
     ],
 )
