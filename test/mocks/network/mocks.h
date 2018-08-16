@@ -437,7 +437,7 @@ public:
   MOCK_METHOD0(onConnected, void());
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
-  Network::TransportSocketCallbacks* callbacks() { return callbacks_; }
+  Network::TransportSocketCallbacks* callbacks() override { return callbacks_; }
 
 private:
   Network::TransportSocketCallbacks* callbacks_;

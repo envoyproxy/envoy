@@ -21,7 +21,7 @@ public:
   IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   Ssl::Connection* ssl() override { return nullptr; }
   const Ssl::Connection* ssl() const override { return nullptr; }
-  TransportSocketCallbacks* callbacks() { return callbacks_; }
+  TransportSocketCallbacks* callbacks() override { return callbacks_; }
 
 private:
   TransportSocketCallbacks* callbacks_{};

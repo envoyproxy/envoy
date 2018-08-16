@@ -27,7 +27,7 @@ public:
   void onConnected() override;
   Ssl::Connection* ssl() override;
   const Ssl::Connection* ssl() const override;
-  Network::TransportSocketCallbacks* callbacks() { return callbacks_; }
+  Network::TransportSocketCallbacks* callbacks() override { return callbacks_; }
 
 private:
   const std::string& path_prefix_;

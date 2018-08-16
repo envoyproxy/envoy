@@ -45,7 +45,7 @@ public:
   void onConnected() override;
   Ssl::Connection* ssl() override { return this; }
   const Ssl::Connection* ssl() const override { return this; }
-  Network::TransportSocketCallbacks* callbacks() { return callbacks_; }
+  Network::TransportSocketCallbacks* callbacks() override { return callbacks_; }
 
   SSL* rawSslForTest() { return ssl_.get(); }
 
