@@ -205,6 +205,8 @@ ThriftFilters::FilterStatus Router::messageEnd() {
       NamedTransportConfigFactory::getFactory(upstream_request_->transport_type_).createTransport();
   Buffer::OwnedImpl transport_buffer;
 
+  upstream_request_->metadata_->setProtocol(upstream_request_->protocol_type_);
+
   transport->encodeFrame(transport_buffer, *upstream_request_->metadata_, upstream_request_buffer_);
   upstream_request_->conn_data_->connection().write(transport_buffer, false);
   upstream_request_->onRequestComplete();
