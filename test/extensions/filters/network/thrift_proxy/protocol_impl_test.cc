@@ -342,6 +342,18 @@ TEST_F(AutoProtocolTest, Type) {
   EXPECT_EQ(proto.type(), ProtocolType::Auto);
 }
 
+TEST_F(AutoProtocolTest, SetUnexpectedType) {
+  Buffer::OwnedImpl buffer;
+  AutoProtocolImpl proto;
+  resetMetadata();
+
+  addInt16(buffer, 0x0102);
+
+  proto.setType(ProtocolType::Auto);
+  EXPECT_THROW_WITH_MESSAGE(proto.readMessageBegin(buffer, metadata_), EnvoyException,
+                            "unknown thrift auto protocol message start 0102");
+}
+
 } // namespace ThriftProxy
 } // namespace NetworkFilters
 } // namespace Extensions

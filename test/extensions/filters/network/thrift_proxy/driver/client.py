@@ -79,6 +79,12 @@ def main(cfg, reqhandle, resphandle):
             transport,
             client_type=THeaderTransport.CLIENT_TYPE.HEADER,
         )
+        if cfg.protocol == "binary":
+            transport.set_protocol_id(THeaderTransport.T_BINARY_PROTOCOL)
+        elif cfg.protocol == "compact":
+            transport.set_protocol_id(THeaderTransport.T_COMPACT_PROTOCOL)
+        else:
+            sys.exit("header transport cannot be used with protocol {0}".format(cfg.protocol))
     else:
         sys.exit("unknown transport {0}".format(cfg.transport))
 
