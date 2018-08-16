@@ -44,7 +44,7 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     Server::Configuration::FactoryContext& factory_context,
     RouteConfigProviderManagerImpl& route_config_provider_manager)
     : config_(new ConfigImpl(config, factory_context, true)), route_config_proto_{config},
-      last_updated_(factory_context.systemTimeSource().currentTime()),
+      last_updated_(factory_context.timeSource().systemTime()),
       route_config_provider_manager_(route_config_provider_manager) {
   route_config_provider_manager_.static_route_config_providers_.insert(this);
 }
@@ -64,8 +64,8 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
       stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
-      manager_identifier_(manager_identifier), time_source_(factory_context.systemTimeSource()),
-      last_updated_(factory_context.systemTimeSource().currentTime()) {
+      manager_identifier_(manager_identifier), time_source_(factory_context.timeSource().system()),
+      last_updated_(factory_context.timeSource().systemTime()) {
   ::Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
 
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<

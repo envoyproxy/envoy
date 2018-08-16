@@ -24,7 +24,7 @@ public:
   /**
    * @return the current system time.
    */
-  virtual SystemTime currentTime() PURE;
+  virtual SystemTime currentTime() const PURE;
 };
 
 /**
@@ -37,6 +37,32 @@ public:
   /**
    * @return the current monotonic time.
    */
-  virtual MonotonicTime currentTime() PURE;
+  virtual MonotonicTime currentTime() const PURE;
 };
+
+class TimeSource {
+public:
+  TimeSource(SystemTimeSource& system, MonotonicTimeSource& monotonic)
+      : system_(system), monotonic_(monotonic) {}
+
+  /**
+   * @return the current system time; not guaranteed to be monotonically increasing.
+   */
+  SystemTime systemTime() const { return system_.currentTime(); }
+
+  /**
+   * @return the current monotonic time.
+   */
+  MonotonicTime monotonicTime() const { return monotonic_.currentTime(); }
+
+  // TODO(jmarantz): Eliminate these methods and the SystemTimeSource and MonotonicTimeSource
+  // classes, and change method calls to work directly off of TimeSource.
+  SystemTimeSource& system() { return system_; }
+  MonotonicTimeSource& monotonic() { return monotonic_; }
+
+private:
+  SystemTimeSource& system_;
+  MonotonicTimeSource& monotonic_;
+};
+
 } // namespace Envoy

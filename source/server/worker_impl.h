@@ -24,7 +24,7 @@ public:
       : tls_(tls), api_(api), hooks_(hooks) {}
 
   // Server::WorkerFactory
-  WorkerPtr createWorker() override;
+  WorkerPtr createWorker(TimeSource&) override;
 
 private:
   ThreadLocal::Instance& tls_;

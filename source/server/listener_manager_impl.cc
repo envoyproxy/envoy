@@ -525,7 +525,7 @@ void ListenerImpl::debugLog(const std::string& message) {
 }
 
 void ListenerImpl::initialize() {
-  last_updated_ = systemTimeSource().currentTime();
+  last_updated_ = timeSource().systemTime();
   // If workers have already started, we shift from using the global init manager to using a local
   // per listener init manager. See ~ListenerImpl() for why we gate the onListenerWarmed() call
   // with initialize_canceled_.
@@ -572,14 +572,13 @@ void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
 
 ListenerManagerImpl::ListenerManagerImpl(Instance& server,
                                          ListenerComponentFactory& listener_factory,
-                                         WorkerFactory& worker_factory,
-                                         SystemTimeSource& system_time_source)
-    : server_(server), system_time_source_(system_time_source), factory_(listener_factory),
+                                         WorkerFactory& worker_factory, TimeSource& time_source)
+    : server_(server), time_source_(time_source), factory_(listener_factory),
       stats_(generateStats(server.stats())),
       config_tracker_entry_(server.admin().getConfigTracker().add(
           "listeners", [this] { return dumpListenerConfigs(); })) {
   for (uint32_t i = 0; i < std::max(1U, server.options().concurrency()); i++) {
-    workers_.emplace_back(worker_factory.createWorker());
+    workers_.emplace_back(worker_factory.createWorker(time_source_));
   }
 }
 

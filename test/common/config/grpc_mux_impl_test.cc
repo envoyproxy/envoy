@@ -45,7 +45,7 @@ public:
         dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, time_source_));
+        random_));
   }
 
   void expectSendMessage(const std::string& type_url,

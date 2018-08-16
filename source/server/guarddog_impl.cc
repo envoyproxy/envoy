@@ -14,7 +14,7 @@ namespace Envoy {
 namespace Server {
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
-                           MonotonicTimeSource& tsource)
+                           TimeSource& tsource)
     : time_source_(tsource), miss_timeout_(config.wdMissTimeout()),
       megamiss_timeout_(config.wdMegaMissTimeout()), kill_timeout_(config.wdKillTimeout()),
       multi_kill_timeout_(config.wdMultiKillTimeout()),
@@ -37,7 +37,7 @@ GuardDogImpl::~GuardDogImpl() { stop(); }
 
 void GuardDogImpl::threadRoutine() {
   do {
-    const auto now = time_source_.currentTime();
+    const auto now = time_source_.monotonicTime();
     bool seen_one_multi_timeout(false);
     Thread::LockGuard guard(wd_lock_);
     for (auto& watched_dog : watched_dogs_) {

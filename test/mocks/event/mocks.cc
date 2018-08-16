@@ -13,7 +13,7 @@ using testing::_;
 namespace Envoy {
 namespace Event {
 
-MockDispatcher::MockDispatcher() {
+MockDispatcher::MockDispatcher() : time_source_(system_time_, monotonic_time_) {
   ON_CALL(*this, clearDeferredDeleteList()).WillByDefault(Invoke([this]() -> void {
     to_delete_.clear();
   }));

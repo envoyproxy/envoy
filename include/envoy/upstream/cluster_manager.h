@@ -209,6 +209,8 @@ public:
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks& callbacks) PURE;
 
   virtual ClusterManagerFactory& clusterManagerFactory() PURE;
+
+  virtual TimeSource& timeSource() PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;

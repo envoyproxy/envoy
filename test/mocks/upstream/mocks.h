@@ -190,6 +190,7 @@ public:
   ClusterManagerFactory& clusterManagerFactory() override { return cluster_manager_factory_; }
 
   // Upstream::ClusterManager
+  MOCK_METHOD0(timeSource, TimeSource&());
   MOCK_METHOD2(addOrUpdateCluster,
                bool(const envoy::api::v2::Cluster& cluster, const std::string& version_info));
   MOCK_METHOD1(setInitializedCb, void(std::function<void()>));
@@ -215,6 +216,11 @@ public:
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
   MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks,
                std::unique_ptr<ClusterUpdateCallbacksHandle>(ClusterUpdateCallbacks& callbacks));
+
+  // TODO(jmarantz): Switch these to using mock-time.
+  ProdSystemTimeSource system_time_;
+  ProdMonotonicTimeSource monotonic_time_;
+  TimeSource time_source_;
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;

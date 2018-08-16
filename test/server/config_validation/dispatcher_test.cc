@@ -7,6 +7,7 @@
 
 #include "server/config_validation/api.h"
 
+//#include "test/mocks/common.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
@@ -22,9 +23,10 @@ public:
     Event::Libevent::Global::initialize();
 
     validation_ = std::make_unique<Api::ValidationImpl>(std::chrono::milliseconds(1000));
-    dispatcher_ = validation_->allocateDispatcher();
+    dispatcher_ = validation_->allocateDispatcher(test_time_.timeSource());
   }
 
+  TestTime test_time_;
   Event::DispatcherPtr dispatcher_;
 
 private:

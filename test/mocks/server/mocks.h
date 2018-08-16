@@ -234,9 +234,11 @@ public:
   ~MockWorkerFactory();
 
   // Server::WorkerFactory
-  WorkerPtr createWorker() override { return WorkerPtr{createWorker_()}; }
+  WorkerPtr createWorker(TimeSource& time_source) override {
+    return WorkerPtr{createWorker_(time_source)};
+  }
 
-  MOCK_METHOD0(createWorker_, Worker*());
+  MOCK_METHOD1(createWorker_, Worker*(TimeSource&));
 };
 
 class MockWorker : public Worker {
@@ -401,6 +403,8 @@ public:
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
   MOCK_METHOD0(systemTimeSource, SystemTimeSource&());
+  MOCK_METHOD0(monotonicTimeSource, MonotonicTimeSource&());
+  MOCK_METHOD0(timeSource, TimeSource&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -417,6 +421,8 @@ public:
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
   testing::NiceMock<MockSystemTimeSource> system_time_source_;
+  testing::NiceMock<MockMonotonicTimeSource> monotonic_time_source_;
+  TimeSource time_source_;
 };
 
 class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {

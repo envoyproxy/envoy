@@ -84,7 +84,7 @@ public:
   /**
    * @return WorkerPtr a new worker.
    */
-  virtual WorkerPtr createWorker() PURE;
+  virtual WorkerPtr createWorker(TimeSource&) PURE;
 };
 
 } // namespace Server
