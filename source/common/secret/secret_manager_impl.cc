@@ -56,7 +56,7 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateDynamicSecr
     ASSERT(secret_provider_context.initManager() != nullptr);
 
     std::function<void()> unregister_secret_provider = [map_key, this]() {
-      this->removeDynamicSecretProvider(map_key);
+      removeDynamicSecretProvider(map_key);
     };
 
     secret_provider = std::make_shared<SdsApi>(
