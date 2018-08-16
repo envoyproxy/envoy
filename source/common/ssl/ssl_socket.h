@@ -25,15 +25,15 @@ public:
 
   // Ssl::Connection
   bool peerCertificatePresented() const override;
-  std::string uriSanLocalCertificate() override;
+  std::string uriSanLocalCertificate() const override;
   const std::string& sha256PeerCertificateDigest() const override;
   std::string serialNumberPeerCertificate() const override;
   std::string subjectPeerCertificate() const override;
   std::string subjectLocalCertificate() const override;
   std::string uriSanPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
-  std::vector<std::string> dnsSansPeerCertificate() override;
-  std::vector<std::string> dnsSansLocalCertificate() override;
+  std::vector<std::string> dnsSansPeerCertificate() const override;
+  std::vector<std::string> dnsSansLocalCertificate() const override;
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -43,10 +43,9 @@ public:
   Network::IoResult doRead(Buffer::Instance& read_buffer) override;
   Network::IoResult doWrite(Buffer::Instance& write_buffer, bool end_stream) override;
   void onConnected() override;
-  Ssl::Connection* ssl() override { return this; }
   const Ssl::Connection* ssl() const override { return this; }
 
-  SSL* rawSslForTest() { return ssl_.get(); }
+  SSL* rawSslForTest() const { return ssl_.get(); }
 
 private:
   Network::PostIoAction doHandshake();
@@ -56,7 +55,7 @@ private:
   // TODO: Move helper functions to the `Ssl::Utility` namespace.
   std::string getUriSanFromCertificate(X509* cert) const;
   std::string getSubjectFromCertificate(X509* cert) const;
-  std::vector<std::string> getDnsSansFromCertificate(X509* cert);
+  std::vector<std::string> getDnsSansFromCertificate(X509* cert) const;
 
   Network::TransportSocketCallbacks* callbacks_{};
   ContextImplSharedPtr ctx_;

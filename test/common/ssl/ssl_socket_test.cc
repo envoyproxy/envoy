@@ -177,7 +177,8 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
       client_ssl_socket_factory.createTransportSocket(), nullptr);
 
   if (!client_session.empty()) {
-    Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
+    const Ssl::SslSocket* ssl_socket =
+        dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
     SSL* client_ssl_socket = ssl_socket->rawSslForTest();
     SSL_CTX* client_ssl_context = SSL_get_SSL_CTX(client_ssl_socket);
     SSL_SESSION* client_ssl_session =
@@ -218,7 +219,8 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
         EXPECT_EQ(expected_alpn_protocol, client_connection->nextProtocol());
       }
       EXPECT_EQ(expected_client_cert_uri, server_connection->ssl()->uriSanPeerCertificate());
-      Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
+      const Ssl::SslSocket* ssl_socket =
+          dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
       SSL* client_ssl_socket = ssl_socket->rawSslForTest();
       if (!expected_protocol_version.empty()) {
         EXPECT_EQ(expected_protocol_version, SSL_get_version(client_ssl_socket));
@@ -1705,7 +1707,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
       ssl_socket_factory.createTransportSocket(), nullptr);
 
   // Verify that server sent list with 2 acceptable client certificate CA names.
-  Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
+  const Ssl::SslSocket* ssl_socket = dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
   SSL_set_cert_cb(ssl_socket->rawSslForTest(),
                   [](SSL* ssl, void*) -> int {
                     STACK_OF(X509_NAME)* list = SSL_get_client_CA_list(ssl);
@@ -1805,7 +1807,8 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
 
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
-        Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
+        const Ssl::SslSocket* ssl_socket =
+            dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
         ssl_session = SSL_get1_session(ssl_socket->rawSslForTest());
         EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
         client_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -1822,7 +1825,7 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
       socket2.localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(), nullptr);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
-  Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
+  const Ssl::SslSocket* ssl_socket = dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
   SSL_set_session(ssl_socket->rawSslForTest(), ssl_session);
   SSL_SESSION_free(ssl_session);
 
@@ -2179,7 +2182,8 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
   EXPECT_CALL(server_connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   EXPECT_CALL(client_connection_callbacks, onEvent(Network::ConnectionEvent::Connected))
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void {
-        Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
+        const Ssl::SslSocket* ssl_socket =
+            dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
         ssl_session = SSL_get1_session(ssl_socket->rawSslForTest());
         EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
         server_connection->close(Network::ConnectionCloseType::NoFlush);
@@ -2197,7 +2201,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
       socket2.localAddress(), Network::Address::InstanceConstSharedPtr(),
       ssl_socket_factory.createTransportSocket(), nullptr);
   client_connection->addConnectionCallbacks(client_connection_callbacks);
-  Ssl::SslSocket* ssl_socket = dynamic_cast<Ssl::SslSocket*>(client_connection->ssl());
+  const Ssl::SslSocket* ssl_socket = dynamic_cast<const Ssl::SslSocket*>(client_connection->ssl());
   SSL_set_session(ssl_socket->rawSslForTest(), ssl_session);
   SSL_SESSION_free(ssl_session);
 
