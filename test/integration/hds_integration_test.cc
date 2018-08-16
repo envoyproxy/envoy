@@ -130,8 +130,8 @@ public:
     health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("some_zone");
     health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("crete");
 
-    health_check->add_health_checks()->mutable_timeout()->set_seconds(100);
-    health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(100);
+    health_check->add_health_checks()->mutable_timeout()->set_seconds(MaxTimeout);
+    health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(MaxTimeout);
     health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_grpc_health_check();
@@ -157,8 +157,8 @@ public:
     health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("some_zone");
     health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("crete");
 
-    health_check->add_health_checks()->mutable_timeout()->set_seconds(100);
-    health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(100);
+    health_check->add_health_checks()->mutable_timeout()->set_seconds(MaxTimeout);
+    health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(MaxTimeout);
     health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
     auto* tcp_hc = health_check->mutable_health_checks(0)->mutable_tcp_health_check();
@@ -180,9 +180,9 @@ public:
   }
 
   // Checks if the cluster counters are correct
-  void checkCounters(int requests, int response_s, int successes, int failures) {
+  void checkCounters(int requests, int responses, int successes, int failures) {
     EXPECT_EQ(requests, test_server_->counter("hds_delegate.requests")->value());
-    EXPECT_EQ(response_s, test_server_->counter("hds_delegate.responses")->value());
+    EXPECT_LE(responses, test_server_->counter("hds_delegate.responses")->value());
     EXPECT_EQ(successes, test_server_->counter("cluster.anna.health_check.success")->value());
     EXPECT_EQ(failures, test_server_->counter("cluster.anna.health_check.failure")->value());
   }
@@ -201,6 +201,7 @@ public:
   FakeHttpConnectionPtr host2_fake_connection_;
   FakeRawConnectionPtr host_fake_raw_connection_;
 
+  int MaxTimeout = 100;
   envoy::service::discovery::v2::HealthCheckRequest envoy_msg_;
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse response_;
   envoy::service::discovery::v2::HealthCheckSpecifier server_health_check_specifier_;
@@ -358,6 +359,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
       ->mutable_health_checks(0)
       ->mutable_timeout()
       ->set_nanos(100000000);
+
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);
@@ -589,8 +591,8 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("peculiar_zone");
   health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("paris");
 
-  health_check->add_health_checks()->mutable_timeout()->set_seconds(100);
-  health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(100);
+  health_check->add_health_checks()->mutable_timeout()->set_seconds(MaxTimeout);
+  health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(MaxTimeout);
   health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
   health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
   health_check->mutable_health_checks(0)->mutable_grpc_health_check();
@@ -689,8 +691,8 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   health_check->mutable_locality_endpoints(0)->mutable_locality()->set_zone("peculiar_zone");
   health_check->mutable_locality_endpoints(0)->mutable_locality()->set_sub_zone("paris");
 
-  health_check->add_health_checks()->mutable_timeout()->set_seconds(100);
-  health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(100);
+  health_check->add_health_checks()->mutable_timeout()->set_seconds(MaxTimeout);
+  health_check->mutable_health_checks(0)->mutable_interval()->set_seconds(MaxTimeout);
   health_check->mutable_health_checks(0)->mutable_unhealthy_threshold()->set_value(2);
   health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
   health_check->mutable_health_checks(0)->mutable_grpc_health_check();
