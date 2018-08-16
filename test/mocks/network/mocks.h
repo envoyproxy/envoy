@@ -77,7 +77,6 @@ public:
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
-  MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_CONST_METHOD0(state, State());
@@ -117,7 +116,6 @@ public:
   MOCK_CONST_METHOD0(remoteAddress, const Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(setConnectionStats, void(const ConnectionStats& stats));
-  MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
   MOCK_CONST_METHOD0(requestedServerName, absl::string_view());
   MOCK_CONST_METHOD0(state, State());
@@ -435,7 +433,6 @@ public:
   MOCK_METHOD1(doRead, IoResult(Buffer::Instance& buffer));
   MOCK_METHOD2(doWrite, IoResult(Buffer::Instance& buffer, bool end_stream));
   MOCK_METHOD0(onConnected, void());
-  MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
 };
 
