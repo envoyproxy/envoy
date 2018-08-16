@@ -24,8 +24,6 @@ namespace ThriftProxy {
  */
 class HeaderTransportImpl : public Transport {
 public:
-  HeaderTransportImpl() {}
-
   // Transport
   const std::string& name() const override { return TransportNames::get().HEADER; }
   TransportType type() const override { return TransportType::Header; }
