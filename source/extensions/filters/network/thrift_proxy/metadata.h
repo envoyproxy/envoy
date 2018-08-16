@@ -48,14 +48,11 @@ public:
   MessageType messageType() const { return msg_type_.value(); }
   void setMessageType(MessageType msg_type) { msg_type_ = msg_type; }
 
-  void addHeader(const std::string key, const std::string value) {
-    headers_.addReference(Http::LowerCaseString(key), value);
-  }
-
   /**
    * @return HeaderMap of current headers (never throws)
    */
   const Http::HeaderMap& headers() const { return headers_; }
+  Http::HeaderMap& headers() { return headers_; }
 
   bool hasAppException() const { return app_ex_type_.has_value(); }
   void setAppException(AppExceptionType app_ex_type, const std::string& message) {

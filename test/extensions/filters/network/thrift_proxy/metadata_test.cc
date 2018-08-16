@@ -56,8 +56,7 @@ TEST(MessageMetadataTest, Headers) {
   MessageMetadata metadata;
 
   EXPECT_EQ(metadata.headers().size(), 0);
-
-  metadata.addHeader("k", "v");
+  metadata.headers().addReference(Http::LowerCaseString("k"), "v");
   EXPECT_EQ(metadata.headers().size(), 1);
 }
 
