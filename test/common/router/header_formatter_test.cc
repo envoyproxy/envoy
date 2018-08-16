@@ -300,10 +300,10 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"% ", {}, {"Invalid header configuration. Un-terminated variable expression ' '"}},
 
       // Mismatched array beginning and termination.
-      {"%START_TIME([\"testing)%",
+      {"%UPSTREAM_METADATA([\"testing)%",
        {},
        {"Invalid header configuration. Un-terminated variable expression "
-        "'START_TIME([\"testing)%'"}},
+        "'UPSTREAM_METADATA([\"testing)%'"}},
 
       // TODO(dio): Un-terminated variable expressions with arguments and argument errors for
       // generic %VAR are not checked anymore. Find a way to get the same granularity as before for
