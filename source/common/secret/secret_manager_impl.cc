@@ -38,6 +38,16 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::createInlineTlsCertific
   return std::make_shared<TlsCertificateConfigProviderImpl>(tls_certificate);
 }
 
+void SecretManagerImpl::removeDynamicSecretProvider(const std::string& map_key) {
+  ENVOY_LOG(debug, "Unregister secret provider. hash key: {}", map_key);
+  auto secret_provider = dynamic_secret_providers_.find(map_key);
+  if (secret_provider != dynamic_secret_providers_.end()) {
+    dynamic_secret_providers_.erase(map_key);
+  } else {
+    ENVOY_LOG(error, "secret provider does not exist. hash key: {}", map_key);
+  }
+}
+
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateDynamicSecretProvider(
     const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
@@ -47,17 +57,8 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateDynamicSecr
   if (!secret_provider) {
     ASSERT(secret_provider_context.initManager() != nullptr);
 
-    std::function<void()> unregister_secret_provider = [map_key, config_name, sds_config_source,
-                                                        this]() {
-      ENVOY_LOG(debug, "Unregister secret provider. name: {}, sds config: {}", config_name,
-                sds_config_source.DebugString());
-      auto secret_provider = dynamic_secret_providers_.find(map_key);
-      if (secret_provider != dynamic_secret_providers_.end()) {
-        dynamic_secret_providers_.erase(map_key);
-      } else {
-        ENVOY_LOG(error, "secret provider does not exist. name: {}, sds config: {}", config_name,
-                  sds_config_source.DebugString());
-      }
+    std::function<void()> unregister_secret_provider = [map_key, this]() {
+      this->removeDynamicSecretProvider(map_key);
     };
 
     secret_provider = std::make_shared<SdsApi>(

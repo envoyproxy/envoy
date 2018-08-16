@@ -108,7 +108,7 @@ public:
    * Add secret callback into context config.
    * @param callback callback that is executed by context config.
    */
-  virtual void setUpdateCallback(Secret::SecretCallbacks& callback) PURE;
+  virtual void setSecretUpdateCallback(Secret::SecretCallbacks& callback) PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

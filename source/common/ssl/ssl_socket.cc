@@ -415,7 +415,7 @@ ClientSslSocketFactory::ClientSslSocketFactory(ClientContextConfigPtr config,
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("client", stats_scope)),
       config_(std::move(config)),
       ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {
-  config_->setUpdateCallback(*this);
+  config_->setSecretUpdateCallback(*this);
 }
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() const {
@@ -443,7 +443,7 @@ ServerSslSocketFactory::ServerSslSocketFactory(ServerContextConfigPtr config,
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("server", stats_scope)),
       config_(std::move(config)), server_names_(server_names),
       ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_)) {
-  config_->setUpdateCallback(*this);
+  config_->setSecretUpdateCallback(*this);
 }
 
 Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() const {

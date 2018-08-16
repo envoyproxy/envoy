@@ -65,7 +65,7 @@ public:
     return !tls_certficate_provider_ || tls_certficate_provider_->secret();
   }
 
-  void setUpdateCallback(Secret::SecretCallbacks& callback) override {
+  void setSecretUpdateCallback(Secret::SecretCallbacks& callback) override {
     if (tls_certficate_provider_.get() != nullptr && secret_callback_ != nullptr) {
       tls_certficate_provider_->removeUpdateCallback(*secret_callback_);
     }
