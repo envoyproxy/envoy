@@ -81,11 +81,11 @@ HdsDelegate::sendResponse() {
         if (host->healthy()) {
           endpoint->set_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
         } else {
-          if (host->failureTypeFlagGet(Host::FailureTypeFlag::TIMEOUT)) {
+          if (host->getHealthFailureType(Host::HealthFailureType::TIMEOUT)) {
             endpoint->set_health_status(envoy::api::v2::core::HealthStatus::TIMEOUT);
-          } else if (host->failureTypeFlagGet(Host::FailureTypeFlag::UNHEALTHY)) {
+          } else if (host->getHealthFailureType(Host::HealthFailureType::UNHEALTHY)) {
             endpoint->set_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
-          } else if (host->failureTypeFlagGet(Host::FailureTypeFlag::UNKNOWN)) {
+          } else if (host->getHealthFailureType(Host::HealthFailureType::UNKNOWN)) {
             endpoint->set_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
           } else {
             throw EnvoyException("Invalid host failure type flag.");

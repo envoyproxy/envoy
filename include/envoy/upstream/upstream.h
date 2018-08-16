@@ -45,8 +45,8 @@ public:
     FAILED_EDS_HEALTH = 0x04,
   };
 
-  enum class FailureTypeFlag {
-    // The failure type is unknown
+  enum class HealthFailureType {
+    // The failure type is unknown, all hosts' failure types are initialized as UNKNOWN
     UNKNOWN,
     // The host is actively responding it's unhealthy
     UNHEALTHY,
@@ -108,15 +108,15 @@ public:
   virtual bool healthy() const PURE;
 
   /**
-   * Get whether a failure flag is set for a host. Flags are specified in
-   * FailureTypeFlag.
+   * Get whether a health failure type is set for a host. Types are specified in
+   * HealthFailureType.
    */
-  virtual bool failureTypeFlagGet(FailureTypeFlag flag) const PURE;
+  virtual bool getHealthFailureType(HealthFailureType flag) const PURE;
 
   /**
-   * Set a failure type flag for a host. Flags are specified in FailureTypeFlag.
+   * Set the most recent health failure type for a host. Types are specified in HealthFailureType.
    */
-  virtual void failureTypeFlagSet(FailureTypeFlag flag) PURE;
+  virtual void setHealthFailureType(HealthFailureType flag) PURE;
 
   /**
    * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
