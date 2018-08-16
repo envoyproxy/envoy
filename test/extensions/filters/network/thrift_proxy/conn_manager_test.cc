@@ -309,8 +309,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
       .WillOnce(
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
-  EXPECT_CALL(*decoder_filter_, messageBegin(_))
-      .WillOnce(Return(ThriftFilters::FilterStatus::StopIteration));
+  EXPECT_CALL(*decoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::StopIteration));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(0U, store_.counter("test.request").value());
@@ -572,8 +571,7 @@ route_config:
   EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
       .WillOnce(
           Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
-  EXPECT_CALL(*decoder_filter_, messageBegin(_))
-      .WillOnce(Return(ThriftFilters::FilterStatus::StopIteration));
+  EXPECT_CALL(*decoder_filter_, messageBegin(_)).WillOnce(Return(FilterStatus::StopIteration));
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
   EXPECT_EQ(0U, store_.counter("test.request").value());
