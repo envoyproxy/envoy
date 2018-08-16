@@ -227,6 +227,10 @@ The following command operators are supported:
   TCP
     Not implemented ("-").
 
+%REQUESTED_SERVER_NAME%
+  TCP
+    String value set on ssl connection socket for Server Name Indication (SNI)
+
 .. _config_access_log_default_format:
 
 Default format
