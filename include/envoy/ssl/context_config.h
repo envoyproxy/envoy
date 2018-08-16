@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Secret {
 class SecretCallbacks;
-}
+} // namespace Secret
 namespace Ssl {
 
 /**
