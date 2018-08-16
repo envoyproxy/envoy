@@ -274,6 +274,7 @@ public:
     return config_.metadata();
   };
   TimeSource& timeSource() override { return parent_.time_source_; }
+  SystemTimeSource& systemTimeSource() override { return parent_.time_source_.system(); }
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
       listen_socket_options_ =

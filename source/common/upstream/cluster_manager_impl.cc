@@ -172,7 +172,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                                        const LocalInfo::LocalInfo& local_info,
                                        AccessLog::AccessLogManager& log_manager,
                                        Event::Dispatcher& main_thread_dispatcher,
-                                       Server::Admin& admin)
+                                       Server::Admin& admin, SystemTimeSource& system_time_source,
+                                       MonotonicTimeSource& monotonic_time_source)
     : factory_(factory), runtime_(runtime), stats_(stats), tls_(tls.allocateSlot()),
       random_(random), log_manager_(log_manager),
       bind_config_(bootstrap.cluster_manager().upstream_bind_config()), local_info_(local_info),
@@ -180,14 +181,17 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
       init_helper_([this](Cluster& cluster) { onClusterInit(cluster); }),
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
-      time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher) {
+      time_source_(system_time_source, monotonic_time_source),
+      dispatcher_(main_thread_dispatcher) {
+  ASSERT(&system_time_source == &main_thread_dispatcher.timeSource().system());
+  ASSERT(&monotonic_time_source == &main_thread_dispatcher.timeSource().monotonic());
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
     if (!event_log_file_path.empty()) {
       outlier_event_logger_.reset(new Outlier::EventLoggerImpl(
-          log_manager, event_log_file_path, time_source_.system(), time_source_.monotonic()));
+          log_manager, event_log_file_path, system_time_source, monotonic_time_source));
     }
   }
 
@@ -1175,9 +1179,11 @@ ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
     ThreadLocal::Instance& tls, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     const LocalInfo::LocalInfo& local_info, AccessLog::AccessLogManager& log_manager,
     Server::Admin& admin) {
+  TimeSource& time_source = main_thread_dispatcher_.timeSource();
   return ClusterManagerPtr{new ClusterManagerImpl(bootstrap, *this, stats, tls, runtime, random,
                                                   local_info, log_manager, main_thread_dispatcher_,
-                                                  admin)};
+                                                  admin, time_source.system(),
+                                                  time_source.monotonic())};
 }
 
 Http::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateConnPool(

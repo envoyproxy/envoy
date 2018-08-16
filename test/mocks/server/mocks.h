@@ -424,7 +424,7 @@ public:
   Stats::IsolatedStoreImpl listener_scope_;
   testing::NiceMock<MockSystemTimeSource> system_time_source_;
   testing::NiceMock<MockMonotonicTimeSource> monotonic_time_source_;
-  TestTime test_time_;
+  TimeSource time_source_;
 };
 
 class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {

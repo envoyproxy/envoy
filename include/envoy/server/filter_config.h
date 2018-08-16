@@ -131,6 +131,11 @@ public:
   virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
 
   /**
+   * @return SystemTimeSource& a reference to the system time source.
+   */
+  virtual SystemTimeSource& systemTimeSource() PURE;
+
+  /**
    * @return TimeSource& a reference to the time source.
    */
   virtual TimeSource& timeSource() PURE;

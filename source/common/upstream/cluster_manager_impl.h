@@ -438,10 +438,7 @@ private:
   std::string local_cluster_name_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
-  // TODO(#4160): temporarily, system_time_source_ can differ from time_source_.system(),
-  // and this will be ironed out with https://github.com/envoyproxy/envoy/issues/4160
-  SystemTimeSource& system_time_source_;
-  TimeSource& time_source_;
+  TimeSource time_source_;
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
 };
