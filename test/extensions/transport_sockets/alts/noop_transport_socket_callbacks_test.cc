@@ -32,8 +32,7 @@ private:
 class NoOpTransportSocketCallbacksTest : public testing::Test {
 protected:
   NoOpTransportSocketCallbacksTest()
-      : wrapper_callbacks_(&connection_), wrapped_callbacks_(wrapper_callbacks_) {
-  }
+      : wrapper_callbacks_(&connection_), wrapped_callbacks_(wrapper_callbacks_) {}
 
   Network::MockConnection connection_;
   TestTransportSocketCallbacks wrapper_callbacks_;
