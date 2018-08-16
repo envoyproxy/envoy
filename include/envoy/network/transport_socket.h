@@ -132,6 +132,11 @@ public:
    * @return the const SSL connection data if this is an SSL connection, or nullptr if it is not.
    */
   virtual const Ssl::Connection* ssl() const PURE;
+
+  /**
+   * @return the TransportSocketCallbacks object passed in through setTransportSocketCallbacks().
+   */
+  virtual TransportSocketCallbacks* callbacks() PURE;
 };
 
 typedef std::unique_ptr<TransportSocket> TransportSocketPtr;

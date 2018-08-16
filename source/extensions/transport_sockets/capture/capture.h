@@ -26,6 +26,7 @@ public:
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   void onConnected() override;
   const Ssl::Connection* ssl() const override;
+  Network::TransportSocketCallbacks* callbacks() { return callbacks_; }
 
 private:
   const std::string& path_prefix_;
