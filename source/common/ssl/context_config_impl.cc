@@ -14,7 +14,9 @@
 namespace Envoy {
 namespace Ssl {
 
-Secret::TlsCertificateConfigProviderSharedPtr ContextConfigImpl::getTlsCertificateConfigProvider(
+namespace {
+
+Secret::TlsCertificateConfigProviderSharedPtr getTlsCertificateConfigProvider(
     const envoy::api::v2::auth::CommonTlsContext& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
   if (!config.tls_certificates().empty()) {
@@ -42,6 +44,8 @@ Secret::TlsCertificateConfigProviderSharedPtr ContextConfigImpl::getTlsCertifica
   }
   return nullptr;
 }
+
+} // namespace
 
 const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
     "[ECDHE-ECDSA-AES128-GCM-SHA256|ECDHE-ECDSA-CHACHA20-POLY1305]:"

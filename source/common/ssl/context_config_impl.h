@@ -84,10 +84,6 @@ private:
   tlsVersionFromProto(const envoy::api::v2::auth::TlsParameters_TlsProtocol& version,
                       unsigned default_version);
 
-  Secret::TlsCertificateConfigProviderSharedPtr getTlsCertificateConfigProvider(
-      const envoy::api::v2::auth::CommonTlsContext& config,
-      Server::Configuration::TransportSocketFactoryContext& factory_context);
-
   static const std::string DEFAULT_CIPHER_SUITES;
   static const std::string DEFAULT_ECDH_CURVES;
 
