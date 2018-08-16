@@ -5,9 +5,9 @@ set -e
 # Pin to this commit to pick up fix for building on Visual Studio 15.8
 COMMIT=0f9a586ca1dc29c2ecb8dd715a315b93e3f40f79 # 2018-06-30
 
-git clone https://github.com/jbeder/yaml-cpp
-cd yaml-cpp
-git reset --hard "$COMMIT"
+curl https://github.com/jbeder/yaml-cpp/archive/"$COMMIT".tar.gz -sLo yaml-cpp-"$COMMIT".tar.gz
+tar xf yaml-cpp-"$COMMIT".tar.gz
+cd yaml-cpp-"$COMMIT"
 
 mkdir build
 cd build
