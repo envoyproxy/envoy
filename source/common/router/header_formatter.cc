@@ -143,7 +143,10 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
     }
     field_extractor_ = [this, pattern](const Envoy::RequestInfo::RequestInfo& request_info) {
       const auto& formatters = start_time_formatters_.at(pattern);
-      ASSERT(formatters.size() == 1);
+      if (formatters.size() != 1) {
+        throw EnvoyException(
+            fmt::format("multiple start_time values found: {}", formatters.size()));
+      }
       Http::HeaderMapImpl empty_map;
       return formatters.at(0)->format(empty_map, empty_map, empty_map, request_info);
     };
