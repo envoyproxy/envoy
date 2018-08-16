@@ -15,6 +15,7 @@
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::Property;
 using testing::Ref;
 using testing::SaveArg;
@@ -297,6 +298,34 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
           std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_)),
       EnvoyException, "unable to read file: ");
+}
+
+// Validate that when std::exception is unexpectedly thrown, we exit safely.
+// This is a regression test for when we used to crash.
+TEST_P(ServerInstanceImplTest, StdExceptionThrowInConstructor) {
+  EXPECT_CALL(restart_, initialize(_, _)).WillOnce(InvokeWithoutArgs([] {
+    throw(std::runtime_error("foobar"));
+  }));
+  EXPECT_THROW_WITH_MESSAGE(initialize("test/server/node_bootstrap.yaml"), std::runtime_error,
+                            "foobar");
+}
+
+// Neither EnvoyException nor std::exception derived.
+class FakeException {
+public:
+  FakeException(const std::string& what) : what_(what) {}
+  const std::string& what() const { return what_; }
+
+  const std::string what_;
+};
+
+// Validate that when a totally unknown exception is unexpectedly thrown, we
+// exit safely. This is a regression test for when we used to crash.
+TEST_P(ServerInstanceImplTest, UnknownExceptionThrowInConstructor) {
+  EXPECT_CALL(restart_, initialize(_, _)).WillOnce(InvokeWithoutArgs([] {
+    throw(FakeException("foobar"));
+  }));
+  EXPECT_THROW_WITH_MESSAGE(initialize("test/server/node_bootstrap.yaml"), FakeException, "foobar");
 }
 
 } // namespace Server
