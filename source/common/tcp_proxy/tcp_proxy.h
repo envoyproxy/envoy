@@ -141,7 +141,7 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
  * be proxied back and forth between the two connections.
  */
 class Filter : public Network::ReadFilter,
-               Upstream::LoadBalancerContextBase,
+               public Upstream::LoadBalancerContextBase,
                Tcp::ConnectionPool::Callbacks,
                protected Logger::Loggable<Logger::Id::filter> {
 public:
