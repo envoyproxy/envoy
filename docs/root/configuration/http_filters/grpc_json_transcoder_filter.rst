@@ -87,8 +87,9 @@ as its output message type. The implementation needs to set
 Sample Envoy configuration
 --------------------------
 
-Here's a sample Envoy configuration that proxies to a gRPC server running on localhost:50051. Port 51051 proxies gRPC
-requests, while port 51052 uses the gRPC-JSON transcoder filter to provide the RESTful JSON mapping.
+Here's a sample Envoy configuration that proxies to a gRPC server running on localhost:50051. Port 51051 proxies
+gRPC requests and uses the gRPC-JSON transcoder filter to provide the RESTful JSON mapping. I.e., you can make either
+gRPC or RESTful JSON requests to localhost:51051.
 
 .. code-block:: yaml
 
@@ -102,26 +103,6 @@ requests, while port 51052 uses the gRPC-JSON transcoder filter to provide the R
     - name: listener1
       address:
         socket_address: { address: 0.0.0.0, port_value: 51051 }
-      filter_chains:
-      - filters:
-        - name: envoy.http_connection_manager
-          config:
-            stat_prefix: grpc
-            codec_type: AUTO
-            route_config:
-              name: local_route
-              virtual_hosts:
-              - name: local_service
-                domains: ["*"]
-                routes:
-                - match: { prefix: "/" }
-                  route: { cluster: grpc, timeout: { seconds: 60 } }
-            http_filters:
-            - name: envoy.router
-
-    - name: listener2
-      address:
-        socket_address: { address: 0.0.0.0, port_value: 51052 }
       filter_chains:
       - filters:
         - name: envoy.http_connection_manager
