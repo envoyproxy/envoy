@@ -43,7 +43,7 @@ fi
 
 source "${BUILD_DIR}"/venv/bin/activate
 
-bazel --batch build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
+bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
   tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED  --spawn_strategy=standalone
 
 # These are the protos we want to put in docs, this list will grow.
