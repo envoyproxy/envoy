@@ -225,7 +225,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
-        EnvoyException, "API configs must have either a gRPC service or a cluster name defined");
+        EnvoyException, "API configs must have either a gRPC service or a cluster name defined:");
   }
 
   {
@@ -236,7 +236,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified");
+        "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified:");
   }
 
   {
@@ -247,7 +247,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified.");
+        "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified:");
   }
 
   {
@@ -258,7 +258,7 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
-        "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified.");
+        "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified:");
   }
 
   {
@@ -270,7 +270,16 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException,
         "envoy::api::v2::core::ConfigSource, if not of type gRPC, must not have a gRPC service "
-        "specified");
+        "specified:");
+  }
+
+  {
+    envoy::api::v2::core::ApiConfigSource api_config_source;
+    api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
+    api_config_source.add_cluster_names("foo");
+    EXPECT_THROW_WITH_REGEX(
+        Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
+        EnvoyException, "envoy::api::v2::core::ConfigSource type must be GRPC:");
   }
 
   {
@@ -303,9 +312,9 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
   api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
 
   // GRPC cluster without GRPC services.
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
-      EnvoyException, "API configs must have either a gRPC service or a cluster name defined");
+      EnvoyException, "API configs must have either a gRPC service or a cluster name defined:");
 
   // Non-existent cluster.
   api_config_source->add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo_cluster");
@@ -344,10 +353,10 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
 
   // API with cluster_names set should be rejected.
   api_config_source->add_cluster_names("foo_cluster");
-  EXPECT_THROW_WITH_MESSAGE(
+  EXPECT_THROW_WITH_REGEX(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,
-      "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified.");
+      "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified:");
 }
 
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTypes) {

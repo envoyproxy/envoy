@@ -237,17 +237,24 @@ public:
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
+   * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
    */
   virtual void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
                            HostsPerLocalityConstSharedPtr hosts_per_locality,
                            HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
                            LocalityWeightsConstSharedPtr locality_weights,
-                           const HostVector& hosts_added, const HostVector& hosts_removed) PURE;
+                           const HostVector& hosts_added, const HostVector& hosts_removed,
+                           absl::optional<uint32_t> overprovisioning_factor) PURE;
 
   /**
    * @return uint32_t the priority of this host set.
    */
   virtual uint32_t priority() const PURE;
+
+  /**
+   * @return uint32_t the overprovisioning factor of this host set.
+   */
+  virtual uint32_t overprovisioning_factor() const PURE;
 };
 
 typedef std::unique_ptr<HostSet> HostSetPtr;

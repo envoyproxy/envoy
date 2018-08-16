@@ -112,7 +112,7 @@ TEST_F(RateLimitFilterTest, OK) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
   EXPECT_CALL(filter_callbacks_, continueReading());
-  request_callbacks_->complete(RateLimit::LimitStatus::OK);
+  request_callbacks_->complete(RateLimit::LimitStatus::OK, nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -137,7 +137,7 @@ TEST_F(RateLimitFilterTest, OverLimit) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*client_, cancel()).Times(0);
-  request_callbacks_->complete(RateLimit::LimitStatus::OverLimit);
+  request_callbacks_->complete(RateLimit::LimitStatus::OverLimit, nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -163,7 +163,7 @@ TEST_F(RateLimitFilterTest, OverLimitNotEnforcing) {
   EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(0);
   EXPECT_CALL(*client_, cancel()).Times(0);
   EXPECT_CALL(filter_callbacks_, continueReading());
-  request_callbacks_->complete(RateLimit::LimitStatus::OverLimit);
+  request_callbacks_->complete(RateLimit::LimitStatus::OverLimit, nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -185,7 +185,7 @@ TEST_F(RateLimitFilterTest, Error) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
   EXPECT_CALL(filter_callbacks_, continueReading());
-  request_callbacks_->complete(RateLimit::LimitStatus::Error);
+  request_callbacks_->complete(RateLimit::LimitStatus::Error, nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -220,7 +220,7 @@ TEST_F(RateLimitFilterTest, ImmediateOK) {
   EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
   EXPECT_CALL(*client_, limit(_, "foo", _, _))
       .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
-        callbacks.complete(RateLimit::LimitStatus::OK);
+        callbacks.complete(RateLimit::LimitStatus::OK, nullptr);
       })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());

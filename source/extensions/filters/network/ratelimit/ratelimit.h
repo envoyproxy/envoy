@@ -88,7 +88,7 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   // RateLimit::RequestCallbacks
-  void complete(RateLimit::LimitStatus status) override;
+  void complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& headers) override;
 
 private:
   enum class Status { NotStarted, Calling, Complete };

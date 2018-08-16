@@ -518,7 +518,7 @@ route_config:
   name: "routes"
   routes:
     - match:
-        method: name
+        method_name: name
       route:
         cluster: cluster
 )EOF";

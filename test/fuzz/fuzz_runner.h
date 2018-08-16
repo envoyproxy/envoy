@@ -6,6 +6,7 @@
 // Bring in DEFINE_PROTO_FUZZER definition as per
 // https://github.com/google/libprotobuf-mutator#integrating-with-libfuzzer.
 #include "libprotobuf_mutator/src/libfuzzer/libfuzzer_macro.h"
+#include "spdlog/spdlog.h"
 
 namespace Envoy {
 namespace Fuzz {
@@ -17,8 +18,17 @@ public:
    * invoked in this environment.
    * @param argc number of command-line args.
    * @param argv array of command-line args.
+   * @param default_loglevel default log level (overridable with -l).
    */
-  static void setupEnvironment(int argc, char** argv);
+  static void setupEnvironment(int argc, char** argv, spdlog::level::level_enum default_log_level);
+
+  /**
+   * @return spdlog::level::level_enum the log level for the fuzzer.
+   */
+  static spdlog::level::level_enum logLevel() { return log_level_; }
+
+private:
+  static spdlog::level::level_enum log_level_;
 };
 
 } // namespace Fuzz

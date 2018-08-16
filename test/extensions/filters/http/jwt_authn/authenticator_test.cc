@@ -164,6 +164,19 @@ TEST_F(AuthenticatorTest, TestInvalidPrefix) {
   auth_->verify(headers, &mock_cb_);
 }
 
+// This test verifies when a JWT is non-expiring without audience specified, JwtAudienceNotAllowed
+// is returned.
+TEST_F(AuthenticatorTest, TestNonExpiringJWT) {
+  EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
+  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
+    ASSERT_EQ(status, Status::JwtAudienceNotAllowed);
+  }));
+
+  auto headers =
+      Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(NonExpiringToken)}};
+  auth_->verify(headers, &mock_cb_);
+}
+
 // This test verifies when a JWT is expired, JwtExpired status is returned.
 TEST_F(AuthenticatorTest, TestExpiredJWT) {
   EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);

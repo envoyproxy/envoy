@@ -248,7 +248,7 @@ void HdsCluster::initialize(std::function<void()> callback) {
   auto healthy = createHealthyHostList(*initial_hosts_);
 
   first_host_set.updateHosts(initial_hosts_, healthy, HostsPerLocalityImpl::empty(),
-                             HostsPerLocalityImpl::empty(), {}, *initial_hosts_, {});
+                             HostsPerLocalityImpl::empty(), {}, *initial_hosts_, {}, absl::nullopt);
 }
 
 void HdsCluster::setOutlierDetector(const Outlier::DetectorSharedPtr&) {

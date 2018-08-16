@@ -212,9 +212,9 @@ public:
     }
     local_hosts_per_locality_ = makeHostsPerLocality(std::move(local_hosts_per_locality_vector));
 
-    local_priority_set_.getOrCreateHostSet(0).updateHosts(local_hosts_, local_hosts_,
-                                                          local_hosts_per_locality_,
-                                                          local_hosts_per_locality_, {}, {}, {});
+    local_priority_set_.getOrCreateHostSet(0).updateHosts(
+        local_hosts_, local_hosts_, local_hosts_per_locality_, local_hosts_per_locality_, {}, {},
+        {}, absl::nullopt);
 
     lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, &local_priority_set_, stats_,
                                      runtime_, random_, subset_info_, ring_hash_lb_config_,
@@ -310,7 +310,7 @@ public:
     if (GetParam() == REMOVES_FIRST && !remove.empty()) {
       local_priority_set_.getOrCreateHostSet(0).updateHosts(
           local_hosts_, local_hosts_, local_hosts_per_locality_, local_hosts_per_locality_, {}, {},
-          remove);
+          remove, absl::nullopt);
     }
 
     for (const auto& host : add) {
@@ -324,12 +324,12 @@ public:
       if (!add.empty()) {
         local_priority_set_.getOrCreateHostSet(0).updateHosts(
             local_hosts_, local_hosts_, local_hosts_per_locality_, local_hosts_per_locality_, {},
-            add, {});
+            add, {}, absl::nullopt);
       }
     } else if (!add.empty() || !remove.empty()) {
       local_priority_set_.getOrCreateHostSet(0).updateHosts(
           local_hosts_, local_hosts_, local_hosts_per_locality_, local_hosts_per_locality_, {}, add,
-          remove);
+          remove, absl::nullopt);
     }
   }
 
