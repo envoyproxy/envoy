@@ -109,6 +109,13 @@ ContextConfigImpl::ContextConfigImpl(
   }
 }
 
+ContextConfigImpl::~ContextConfigImpl() {
+  if (tls_certficate_provider_.get() != nullptr && secret_callback_ != nullptr) {
+    tls_certficate_provider_->removeUpdateCallback(*secret_callback_);
+    secret_callback_ = nullptr;
+  }
+}
+
 unsigned ContextConfigImpl::tlsVersionFromProto(
     const envoy::api::v2::auth::TlsParameters_TlsProtocol& version, unsigned default_version) {
   switch (version) {

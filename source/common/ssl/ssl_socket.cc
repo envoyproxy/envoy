@@ -19,6 +19,7 @@ namespace Ssl {
 
 namespace {
 
+// This SslSocket will be used when SSL secret is not fetched from SDS server.
 class NotReadySslSocket : public Network::TransportSocket, public Connection {
 public:
   // Ssl::Connection
