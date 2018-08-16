@@ -13,10 +13,11 @@ namespace Alts {
  */
 class NoOpTransportSocketCallbacks : public Network::TransportSocketCallbacks {
 public:
-  explicit NoOpTransportSocketCallbacks(Network::TransportSocket* parent) : parent_(parent) {}
+  explicit NoOpTransportSocketCallbacks(Network::TransportSocketCallbacks& parent)
+      : parent_(parent) {}
 
-  int fd() const override { return parent_->callbacks()->fd(); }
-  Network::Connection& connection() override { return parent_->callbacks()->connection(); }
+  int fd() const override { return parent_.fd(); }
+  Network::Connection& connection() override { return parent_.connection(); }
   bool shouldDrainReadBuffer() override { return false; }
   /*
    * No-op for these two methods to hold back the callbacks.
@@ -25,7 +26,7 @@ public:
   void raiseEvent(Network::ConnectionEvent) override {}
 
 private:
-  Network::TransportSocket* parent_;
+  Network::TransportSocketCallbacks& parent_;
 };
 
 } // namespace Alts
