@@ -28,7 +28,7 @@ private:
   Network::TransportSocket* parent_;
 };
 
-}  // namespace Alts
-}  // namespace TransportSockets
-}  // namespace Extensions
-}  // namespace Envoy
+} // namespace Alts
+} // namespace TransportSockets
+} // namespace Extensions
+} // namespace Envoy
