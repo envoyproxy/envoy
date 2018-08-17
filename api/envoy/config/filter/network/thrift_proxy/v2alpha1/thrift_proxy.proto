@@ -23,6 +23,9 @@ message ThriftProxy {
 
     // The Thrift proxy will assume the client is using the Thrift unframed transport.
     UNFRAMED = 2;
+
+    // The Thrift proxy will assume the client is using the Thrift header transport.
+    HEADER = 3;
   }
 
   // Supplies the type of transport that the Thrift proxy should use. Defaults to `AUTO_TRANSPORT`.

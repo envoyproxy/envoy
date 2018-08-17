@@ -76,7 +76,7 @@ public:
 private:
   OpenTracingTracerStats tracer_stats_;
 };
-}
+} // namespace Ot
 } // namespace Common
 } // namespace Tracers
 } // namespace Extensions

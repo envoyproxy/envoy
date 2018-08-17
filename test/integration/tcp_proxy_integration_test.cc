@@ -12,10 +12,10 @@
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::MatchesRegex;
 using testing::NiceMock;
-using testing::_;
 
 namespace Envoy {
 namespace {

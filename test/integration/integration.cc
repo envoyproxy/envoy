@@ -28,11 +28,11 @@
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::_;
 
 namespace Envoy {
 
