@@ -1,4 +1,5 @@
 #include "test/extensions/filters/network/thrift_proxy/integration.h"
+#include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/network_utility.h"
 
 #include "gtest/gtest.h"
@@ -12,18 +13,13 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
-namespace {
-std::string thrift_config;
-} // namespace
 
 class ThriftConnManagerIntegrationTest
     : public BaseThriftIntegrationTest,
       public TestWithParam<std::tuple<TransportType, ProtocolType, bool>> {
 public:
-  ThriftConnManagerIntegrationTest() : BaseThriftIntegrationTest(thrift_config) {}
-
   static void SetUpTestCase() {
-    thrift_config = ConfigHelper::BASE_CONFIG + R"EOF(
+    thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
         - name: envoy.filters.network.thrift_proxy
@@ -132,11 +128,8 @@ paramToString(const TestParamInfo<std::tuple<TransportType, ProtocolType, bool>>
   bool multiplexed;
   std::tie(transport, protocol, multiplexed) = params.param;
 
-  std::string transport_name = TransportNames::get().fromType(transport);
-  transport_name[0] = absl::ascii_toupper(transport_name[0]);
-
-  std::string protocol_name = ProtocolNames::get().fromType(protocol);
-  protocol_name[0] = absl::ascii_toupper(protocol_name[0]);
+  std::string transport_name = transportNameForTest(transport);
+  std::string protocol_name = protocolNameForTest(protocol);
 
   if (multiplexed) {
     return fmt::format("{}{}Multiplexed", transport_name, protocol_name);

@@ -3,6 +3,7 @@
 #include "extensions/filters/network/well_known_names.h"
 
 #include "test/extensions/filters/network/thrift_proxy/integration.h"
+#include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/network_utility.h"
 
 #include "absl/strings/ascii.h"
@@ -17,18 +18,13 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
-namespace {
-std::string thrift_config;
-} // namespace
 
 class ThriftTranslationIntegrationTest
     : public BaseThriftIntegrationTest,
       public TestWithParam<std::tuple<TransportType, ProtocolType, TransportType, ProtocolType>> {
 public:
-  ThriftTranslationIntegrationTest() : BaseThriftIntegrationTest(thrift_config) {}
-
   static void SetUpTestCase() {
-    thrift_config = ConfigHelper::BASE_CONFIG + R"EOF(
+    thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
         - name: envoy.filters.network.thrift_proxy
@@ -50,37 +46,8 @@ public:
     std::tie(downstream_transport, downstream_protocol, upstream_transport, upstream_protocol) =
         GetParam();
 
-    envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType upstream_transport_proto;
-    switch (upstream_transport) {
-    case TransportType::Framed:
-      upstream_transport_proto =
-          envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::FRAMED;
-      break;
-    case TransportType::Unframed:
-      upstream_transport_proto =
-          envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::UNFRAMED;
-      break;
-    case TransportType::Header:
-      upstream_transport_proto =
-          envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::HEADER;
-      break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-
-    envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType upstream_protocol_proto;
-    switch (upstream_protocol) {
-    case ProtocolType::Binary:
-      upstream_protocol_proto =
-          envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::BINARY;
-      break;
-    case ProtocolType::Compact:
-      upstream_protocol_proto =
-          envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::COMPACT;
-      break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
+    auto upstream_transport_proto = transportTypeToProto(upstream_transport);
+    auto upstream_protocol_proto = protocolTypeToProto(upstream_protocol);
 
     envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProtocolOptions proto_opts;
     proto_opts.set_transport(upstream_transport_proto);
@@ -96,7 +63,7 @@ public:
       (*opts)[NetworkFilterNames::get().ThriftProxy] = struct_opts;
     });
 
-    // Invent some varying, but deterministic values to add. We use the add method instead of
+    // Invent some varying, but deterministic, values to add. We use the add method instead of
     // execute because the default execute params contains a set and the ordering can vary across
     // generated payloads.
     std::vector<std::string> args({
@@ -136,20 +103,10 @@ static std::string paramToString(
   std::tie(downstream_transport, downstream_protocol, upstream_transport, upstream_protocol) =
       params.param;
 
-  std::string ds_transport_name = TransportNames::get().fromType(downstream_transport);
-  ds_transport_name[0] = absl::ascii_toupper(ds_transport_name[0]);
-
-  std::string ds_protocol_name = ProtocolNames::get().fromType(downstream_protocol);
-  ds_protocol_name[0] = absl::ascii_toupper(ds_protocol_name[0]);
-
-  std::string us_transport_name = TransportNames::get().fromType(upstream_transport);
-  us_transport_name[0] = absl::ascii_toupper(us_transport_name[0]);
-
-  std::string us_protocol_name = ProtocolNames::get().fromType(upstream_protocol);
-  us_protocol_name[0] = absl::ascii_toupper(us_protocol_name[0]);
-
-  return fmt::format("From{}{}To{}{}", ds_transport_name, ds_protocol_name, us_transport_name,
-                     us_protocol_name);
+  return fmt::format("From{}{}To{}{}", transportNameForTest(downstream_transport),
+                     protocolNameForTest(downstream_protocol),
+                     transportNameForTest(upstream_transport),
+                     protocolNameForTest(upstream_protocol));
 }
 
 INSTANTIATE_TEST_CASE_P(

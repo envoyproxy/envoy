@@ -17,12 +17,16 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
+/**
+ * Provides Thrift-specific cluster options.
+ */
 class ProtocolOptionsConfigImpl : public ProtocolOptionsConfig {
 public:
   ProtocolOptionsConfigImpl(
       const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProtocolOptions&
           proto_config);
 
+  // ProtocolOptionsConfig
   TransportType transport(TransportType downstream_transport) const override;
   ProtocolType protocol(ProtocolType downstream_protocol) const override;
 
@@ -82,8 +86,8 @@ private:
   Server::Configuration::FactoryContext& context_;
   const std::string stats_prefix_;
   ThriftFilterStats stats_;
-  TransportType transport_;
-  ProtocolType proto_;
+  const TransportType transport_;
+  const ProtocolType proto_;
   std::unique_ptr<Router::RouteMatcher> route_matcher_;
 
   std::list<ThriftFilters::FilterFactoryCb> filter_factories_;

@@ -2,6 +2,8 @@
 
 #include <initializer_list>
 
+#include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/byte_order.h"
 
@@ -92,6 +94,44 @@ inline std::string fieldTypeToString(const FieldType& field_type) {
 
 inline std::string fieldTypeParamToString(const TestParamInfo<FieldType>& params) {
   return fieldTypeToString(params.param);
+}
+
+inline envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType
+transportTypeToProto(TransportType transport_type) {
+  switch (transport_type) {
+  case TransportType::Framed:
+    return envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::FRAMED;
+  case TransportType::Unframed:
+    return envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::UNFRAMED;
+  case TransportType::Header:
+    return envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::HEADER;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+inline envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType
+protocolTypeToProto(ProtocolType protocol_type) {
+  switch (protocol_type) {
+  case ProtocolType::Binary:
+    return envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::BINARY;
+  case ProtocolType::Compact:
+    return envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::COMPACT;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
+}
+
+inline std::string transportNameForTest(TransportType transport_type) {
+  std::string name = TransportNames::get().fromType(transport_type);
+  name[0] = absl::ascii_toupper(name[0]);
+  return name;
+}
+
+inline std::string protocolNameForTest(ProtocolType protocol_type) {
+  std::string name = ProtocolNames::get().fromType(protocol_type);
+  name[0] = absl::ascii_toupper(name[0]);
+  return name;
 }
 
 MATCHER(IsEmptyMetadata, "") {

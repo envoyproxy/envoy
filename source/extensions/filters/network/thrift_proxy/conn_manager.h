@@ -35,6 +35,9 @@ public:
   virtual Router::Config& routerConfig() PURE;
 };
 
+/**
+ * Extends Upstream::ProtocolOptionsConfig with Thrift-specific cluster options.
+ */
 class ProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig {
 public:
   virtual ~ProtocolOptionsConfig() {}

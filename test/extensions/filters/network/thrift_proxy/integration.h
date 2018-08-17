@@ -33,9 +33,9 @@ struct PayloadOptions {
       : transport_(transport), protocol_(protocol), mode_(mode), service_name_(service_name),
         method_name_(method_name), method_args_(method_args) {}
 
-  const std::string& modeName() const;
-  const std::string& transportName() const;
-  const std::string& protocolName() const;
+  std::string modeName() const;
+  std::string transportName() const;
+  std::string protocolName() const;
 
   const TransportType transport_;
   const ProtocolType protocol_;
@@ -47,8 +47,8 @@ struct PayloadOptions {
 
 class BaseThriftIntegrationTest : public BaseIntegrationTest {
 public:
-  BaseThriftIntegrationTest(const std::string& thrift_config)
-      : BaseIntegrationTest(Network::Address::IpVersion::v4, thrift_config) {}
+  BaseThriftIntegrationTest()
+      : BaseIntegrationTest(Network::Address::IpVersion::v4, thrift_config_) {}
 
   /**
    * Given PayloadOptions, generate a client request and server response and store the
@@ -56,6 +56,11 @@ public:
    */
   void preparePayloads(const PayloadOptions& options, Buffer::Instance& request_buffer,
                        Buffer::Instance& response_buffer);
+
+protected:
+  // Tests should use a static SetUpTestCase method to initialize this field with a suitable
+  // configuration.
+  static std::string thrift_config_;
 
 private:
   void readAll(std::string file, Buffer::Instance& buffer);

@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <fstream>
 
+#include "common/filesystem/filesystem_impl.h"
+
 #include "test/test_common/environment.h"
 
 namespace Envoy {
@@ -10,53 +12,44 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-const std::string& PayloadOptions::modeName() const {
-  static const std::string success = "success";
-  static const std::string idl_exception = "idl-exception";
-  static const std::string exception = "exception";
-
+std::string PayloadOptions::modeName() const {
   switch (mode_) {
   case DriverMode::Success:
-    return success;
+    return "success";
   case DriverMode::IDLException:
-    return idl_exception;
+    return "idl-exception";
   case DriverMode::Exception:
-    return exception;
+    return "exception";
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
-const std::string& PayloadOptions::transportName() const {
-  static const std::string framed = "framed";
-  static const std::string unframed = "unframed";
-  static const std::string header = "header";
-
+std::string PayloadOptions::transportName() const {
   switch (transport_) {
   case TransportType::Framed:
-    return framed;
+    return "framed";
   case TransportType::Unframed:
-    return unframed;
+    return "unframed";
   case TransportType::Header:
-    return header;
+    return "header";
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
-const std::string& PayloadOptions::protocolName() const {
-  static const std::string binary = "binary";
-  static const std::string compact = "compact";
-
+std::string PayloadOptions::protocolName() const {
   switch (protocol_) {
   case ProtocolType::Binary:
-    return binary;
+    return "binary";
   case ProtocolType::Compact:
-    return compact;
+    return "compact";
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
+
+std::string BaseThriftIntegrationTest::thrift_config_;
 
 void BaseThriftIntegrationTest::preparePayloads(const PayloadOptions& options,
                                                 Buffer::Instance& request_buffer,
@@ -93,20 +86,8 @@ void BaseThriftIntegrationTest::preparePayloads(const PayloadOptions& options,
 void BaseThriftIntegrationTest::readAll(std::string file, Buffer::Instance& buffer) {
   file = TestEnvironment::substitute(file, version_);
 
-  std::ifstream is(file, std::ios::binary | std::ios::ate);
-  RELEASE_ASSERT(!is.fail(), "");
-
-  std::ifstream::pos_type len = is.tellg();
-  if (len > 0) {
-    std::vector<char> bytes(len, 0);
-    is.seekg(0, std::ios::beg);
-    RELEASE_ASSERT(!is.fail(), "");
-
-    is.read(bytes.data(), len);
-    RELEASE_ASSERT(!is.fail(), "");
-
-    buffer.add(bytes.data(), len);
-  }
+  std::string data = Filesystem::fileReadToEnd(file);
+  buffer.add(data);
 }
 
 } // namespace ThriftProxy

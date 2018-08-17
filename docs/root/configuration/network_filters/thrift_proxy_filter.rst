@@ -3,7 +3,6 @@
 Thrift proxy
 ============
 
-* The Thrift proxy is not supported in the v1 API.
 * :ref:`v2 API reference <envoy_api_msg_config.filter.network.thrift_proxy.v2alpha1.ThriftProxy>`
 
 Cluster Protocol Options
