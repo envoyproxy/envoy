@@ -578,7 +578,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
       config_tracker_entry_(server.admin().getConfigTracker().add(
           "listeners", [this] { return dumpListenerConfigs(); })) {
   for (uint32_t i = 0; i < std::max(1U, server.options().concurrency()); i++) {
-    workers_.emplace_back(worker_factory.createWorker(time_source_));
+    workers_.emplace_back(worker_factory.createWorker());
   }
 }
 

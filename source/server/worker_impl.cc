@@ -14,8 +14,8 @@
 namespace Envoy {
 namespace Server {
 
-WorkerPtr ProdWorkerFactory::createWorker(TimeSource& time_source) {
-  Event::DispatcherPtr dispatcher(api_.allocateDispatcher(time_source));
+WorkerPtr ProdWorkerFactory::createWorker() {
+  Event::DispatcherPtr dispatcher(api_.allocateDispatcher(time_source_));
   return WorkerPtr{new WorkerImpl(
       tls_, hooks_, std::move(dispatcher),
       Network::ConnectionHandlerPtr{new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher)})};

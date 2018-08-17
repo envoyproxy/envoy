@@ -52,7 +52,7 @@ public:
 class ListenerManagerImplTest : public testing::Test {
 public:
   ListenerManagerImplTest() : time_source_(system_time_source_, monotonic_time_source_) {
-    EXPECT_CALL(worker_factory_, createWorker_(time_source_)).WillOnce(Return(worker_));
+    EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
     manager_.reset(
         new ListenerManagerImpl(server_, listener_factory_, worker_factory_, time_source_));
   }

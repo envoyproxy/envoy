@@ -83,9 +83,8 @@ public:
 
   /**
    * @return WorkerPtr a new worker.
-   * TODO(jmarantz): consider having the factory own the TimeSource
    */
-  virtual WorkerPtr createWorker(TimeSource&) PURE;
+  virtual WorkerPtr createWorker() PURE;
 };
 
 } // namespace Server

@@ -127,7 +127,7 @@ public:
   uint64_t nextListenerTag() override { return 0; }
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(TimeSource&) override {
+  WorkerPtr createWorker() override {
     // Returned workers are not currently used so we can return nothing here safely vs. a
     // validation mock.
     return nullptr;

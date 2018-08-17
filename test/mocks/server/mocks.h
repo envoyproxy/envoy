@@ -234,11 +234,9 @@ public:
   ~MockWorkerFactory();
 
   // Server::WorkerFactory
-  WorkerPtr createWorker(TimeSource& time_source) override {
-    return WorkerPtr{createWorker_(time_source)};
-  }
+  WorkerPtr createWorker() override { return WorkerPtr{createWorker_()}; }
 
-  MOCK_METHOD1(createWorker_, Worker*(TimeSource&));
+  MOCK_METHOD0(createWorker_, Worker*());
 };
 
 class MockWorker : public Worker {
