@@ -16,7 +16,7 @@ inside
 
 Just compile Envoy as normal:
 
-    $ bazel build //source/exe:envoy-static --copt='-ltcmalloc'
+    $ bazel build //source/exe:envoy-static
 
 ### Running a statically-linked Envoy with `pprof`
 
