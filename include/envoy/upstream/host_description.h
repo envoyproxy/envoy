@@ -112,5 +112,5 @@ public:
 
 typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;
 
-} // Upstream
+} // namespace Upstream
 } // namespace Envoy

@@ -25,6 +25,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::AnyNumber;
 using testing::DoAll;
 using testing::InSequence;
@@ -35,7 +36,6 @@ using testing::SaveArg;
 using testing::Sequence;
 using testing::StrictMock;
 using testing::Test;
-using testing::_;
 
 namespace Envoy {
 namespace Network {

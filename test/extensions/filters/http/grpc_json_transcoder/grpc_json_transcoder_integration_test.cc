@@ -164,7 +164,8 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryGet) {
   testTranscoding<Empty, bookstore::ListShelvesResponse>(
       Http::TestHeaderMapImpl{{":method", "GET"}, {":path", "/shelves"}, {":authority", "host"}},
       "", {""}, {R"(shelves { id: 20 theme: "Children" }
-          shelves { id: 1 theme: "Foo" } )"}, Status(),
+          shelves { id: 1 theme: "Foo" } )"},
+      Status(),
       Http::TestHeaderMapImpl{{":status", "200"},
                               {"content-type", "application/json"},
                               {"content-length", "69"},
