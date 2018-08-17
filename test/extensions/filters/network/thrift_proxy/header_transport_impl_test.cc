@@ -31,10 +31,11 @@ public:
   MOCK_CONST_METHOD0(length, uint64_t());
 };
 
-MessageMetadata mkMessageMetadata(uint32_t num_headers) {
-  MessageMetadata metadata;
+MessageMetadataSharedPtr mkMessageMetadata(uint32_t num_headers) {
+  MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
+
   while (num_headers-- > 0) {
-    metadata.addHeader(Header("x", "y"));
+    metadata->headers().addCopy(Http::LowerCaseString("x"), "y");
   }
   return metadata;
 }
@@ -439,7 +440,7 @@ TEST(HeaderTransportTest, InfoBlock) {
   HeaderTransportImpl transport;
   Buffer::OwnedImpl buffer;
   MessageMetadata metadata;
-  metadata.addHeader(Header("not", "empty"));
+  metadata.headers().addCopy(Http::LowerCaseString("not"), "empty");
 
   addInt32(buffer, 200);
   addInt16(buffer, 0x0FFF);
@@ -459,16 +460,17 @@ TEST(HeaderTransportTest, InfoBlock) {
   addInt8(buffer, 0); // empty value
   addInt8(buffer, 0); // padding
 
-  HeaderMap expected_headers{
-      {"not", "empty"},
-      {"key", "value"},
-      {"key2", std::string(128, 'x')},
-      {"", ""},
-  };
+  Http::HeaderMapImpl expected_headers;
+  expected_headers.addCopy(Http::LowerCaseString("not"), "empty");
+  expected_headers.addCopy(Http::LowerCaseString("key"), "value");
+  expected_headers.addCopy(Http::LowerCaseString("key2"), std::string(128, 'x'));
+  expected_headers.addCopy(Http::LowerCaseString(""), "");
 
   EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
   EXPECT_THAT(metadata, HasFrameSize(38U));
-  EXPECT_EQ(expected_headers, metadata.headers());
+
+  Http::HeaderMapImpl& actual_headers = dynamic_cast<Http::HeaderMapImpl&>(metadata.headers());
+  EXPECT_EQ(expected_headers, actual_headers);
   EXPECT_EQ(buffer.length(), 0);
 }
 
@@ -530,13 +532,13 @@ TEST(HeaderTransportImpl, TestEncodeFrame) {
   // Too many headers
   {
     Buffer::OwnedImpl buffer;
-    MessageMetadata metadata = mkMessageMetadata(32769);
-    metadata.setProtocol(ProtocolType::Binary);
+    MessageMetadataSharedPtr metadata = mkMessageMetadata(32769);
+    metadata->setProtocol(ProtocolType::Binary);
 
     Buffer::OwnedImpl msg;
     msg.add("fake message");
 
-    EXPECT_THROW_WITH_MESSAGE(transport.encodeFrame(buffer, metadata, msg), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(transport.encodeFrame(buffer, *metadata, msg), EnvoyException,
                               "invalid thrift header transport too many headers 32769");
   }
 
@@ -545,7 +547,7 @@ TEST(HeaderTransportImpl, TestEncodeFrame) {
     Buffer::OwnedImpl buffer;
     MessageMetadata metadata;
     metadata.setProtocol(ProtocolType::Binary);
-    metadata.addHeader(Header("key", std::string(32768, 'x')));
+    metadata.headers().addCopy(Http::LowerCaseString("key"), std::string(32768, 'x'));
 
     Buffer::OwnedImpl msg;
     msg.add("fake message");
@@ -559,10 +561,10 @@ TEST(HeaderTransportImpl, TestEncodeFrame) {
     Buffer::OwnedImpl buffer;
     MessageMetadata metadata;
     metadata.setProtocol(ProtocolType::Binary);
-    metadata.addHeader(Header("k1", std::string(16384, 'x')));
-    metadata.addHeader(Header("k2", std::string(16384, 'x')));
-    metadata.addHeader(Header("k3", std::string(16384, 'x')));
-    metadata.addHeader(Header("k4", std::string(16384, 'x')));
+    metadata.headers().addCopy(Http::LowerCaseString("k1"), std::string(16384, 'x'));
+    metadata.headers().addCopy(Http::LowerCaseString("k2"), std::string(16384, 'x'));
+    metadata.headers().addCopy(Http::LowerCaseString("k3"), std::string(16384, 'x'));
+    metadata.headers().addCopy(Http::LowerCaseString("k4"), std::string(16384, 'x'));
 
     Buffer::OwnedImpl msg;
     msg.add("fake message");
@@ -620,8 +622,8 @@ TEST(HeaderTransportImpl, TestEncodeFrame) {
     MessageMetadata metadata;
     metadata.setProtocol(ProtocolType::Compact);
     metadata.setSequenceId(10);
-    metadata.addHeader(Header("key", "value"));
-    metadata.addHeader(Header("", ""));
+    metadata.headers().addCopy(Http::LowerCaseString("key"), "value");
+    metadata.headers().addCopy(Http::LowerCaseString(""), "");
     Buffer::OwnedImpl msg;
     msg.add("fake message");
 

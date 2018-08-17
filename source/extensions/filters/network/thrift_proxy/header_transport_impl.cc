@@ -144,9 +144,10 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
     }
 
     while (num_headers-- > 0) {
-      std::string key = drainVarString(buffer, header_size, "header key");
-      std::string value = drainVarString(buffer, header_size, "header value");
-      metadata.addHeader(Header(key, value));
+      const Http::LowerCaseString key =
+          Http::LowerCaseString(drainVarString(buffer, header_size, "header key"));
+      const std::string value = drainVarString(buffer, header_size, "header value");
+      metadata.headers().addCopy(key, value);
     }
   }
 
@@ -172,7 +173,7 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
     throw EnvoyException(fmt::format("invalid thrift header transport message size {}", msg_size));
   }
 
-  const HeaderMap& headers = metadata.headers();
+  const Http::HeaderMap& headers = metadata.headers();
   if (headers.size() > MaxHeadersSize / 2) {
     // Each header takes a minimum of 2 bytes, yielding this limit.
     throw EnvoyException(
@@ -205,10 +206,14 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
     // Num headers
     BufferHelper::writeVarIntI32(header_buffer, static_cast<int32_t>(headers.size()));
 
-    for (const Header& header : headers) {
-      writeVarString(header_buffer, header.key());
-      writeVarString(header_buffer, header.value());
-    }
+    headers.iterate(
+        [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+          Buffer::Instance* hb = static_cast<Buffer::Instance*>(context);
+          writeVarString(*hb, header.key().getStringView());
+          writeVarString(*hb, header.value().getStringView());
+          return Http::HeaderMap::Iterate::Continue;
+        },
+        &header_buffer);
   }
 
   uint64_t header_size = header_buffer.length();
@@ -286,7 +291,7 @@ std::string HeaderTransportImpl::drainVarString(Buffer::Instance& buffer, int32_
   return value;
 }
 
-void HeaderTransportImpl::writeVarString(Buffer::Instance& buffer, const std::string& str) {
+void HeaderTransportImpl::writeVarString(Buffer::Instance& buffer, const absl::string_view str) {
   std::string::size_type len = str.length();
   if (len > static_cast<uint32_t>(std::numeric_limits<int16_t>::max())) {
     throw EnvoyException(fmt::format("header string too long: {}", len));
@@ -296,7 +301,7 @@ void HeaderTransportImpl::writeVarString(Buffer::Instance& buffer, const std::st
   if (len == 0) {
     return;
   }
-  buffer.add(str);
+  buffer.add(str.data(), len);
 }
 
 class HeaderTransportConfigFactory : public TransportFactoryBase<HeaderTransportImpl> {
