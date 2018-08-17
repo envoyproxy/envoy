@@ -7,6 +7,8 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/network_utility.h"
 
 #include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
@@ -224,6 +226,19 @@ public:
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
 };
 
+class AdminStreamMock : public Server::AdminStream {
+public:
+  // void setEndStreamOnComplete(bool end_stream) override {end_stream_on_complete_ = end_stream; }
+  // void addOnDestroyCallback(std::function<void()> cb) override {  on_destroy_callbacks_.push_back(std::move(cb)); }
+  MOCK_METHOD1(setEndStreamOnComplete, void(bool));
+  MOCK_METHOD1(addOnDestroyCallback, void(std::function<void()>));
+  MOCK_CONST_METHOD0(getRequestHeaders, Http::HeaderMap&());
+  MOCK_CONST_METHOD0(getDecoderFilterCallbacks, NiceMock<Http::MockStreamDecoderFilterCallbacks>&());
+// private:
+  // bool end_stream_on_complete_ = true;
+  // std::list<std::function<void()>> on_destroy_callbacks_;
+};
+
 TEST_F(HystrixSinkTest, EmptyFlush) {
   InSequence s;
   Buffer::OwnedImpl buffer = createClusterAndCallbacks();
@@ -428,6 +443,52 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   // Check that old values of test_cluster2 were deleted.
   validateResults(cluster_message_map[cluster2_name_], 0, 0, 0, 0, 0, window_size_);
 }
+
+TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
+  InSequence s;
+  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
+  // Register callback to sink.
+  sink_->registerConnection(&callbacks_);
+
+  // This value don't matter in handlerHystrixEventStream
+  absl::string_view path_and_query;
+
+  Http::HeaderMapImpl response_headers;
+  Stats::IsolatedStoreImpl listener_scope_;
+
+  // basic AdminImpl taken from constructor of admin_test.cc
+  // Server::AdminImpl admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"),
+  //                          TestEnvironment::temporaryPath("admin.address"),
+  //                          Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4),
+  //                          server_, listener_scope_.createScope("listener.admin."));
+  // Server::AdminFilter admin_stream(admin_);
+  // admin_stream.setDecoderFilterCallbacks(callbacks_);
+
+  NiceMock<AdminStreamMock> admin_stream_mock;
+
+  ON_CALL(admin_stream_mock, setEndStreamOnComplete(_)).WillByDefault(Return());
+  ON_CALL(admin_stream_mock, addOnDestroyCallback(_)).WillByDefault(Return());
+
+  // EXPECT_CALL(admin_stream_mock, getDecoderFilterCallbacks());
+  ON_CALL(admin_stream_mock, getDecoderFilterCallbacks())
+    .WillByDefault(ReturnRef(callbacks_));
+
+  ASSERT_EQ(sink_->handlerHystrixEventStream(path_and_query, response_headers,
+                                             buffer, admin_stream_mock), Http::Code::OK);
+
+  // Check that response_headers has been set correctly
+  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
+              testing::HasSubstr("text/event-stream"));
+  EXPECT_THAT(std::string(response_headers.CacheControl()->value().getStringView()),
+              testing::HasSubstr("no-cache"));
+  EXPECT_THAT(std::string(response_headers.Connection()->value().getStringView()),
+              testing::HasSubstr("close"));
+  EXPECT_THAT(std::string(response_headers.AccessControlAllowHeaders()->value().getStringView()),
+              testing::HasSubstr("Accept"));
+  EXPECT_THAT(std::string(response_headers.AccessControlAllowOrigin()->value().getStringView()),
+              testing::HasSubstr("*"));
+}
+
 } // namespace Hystrix
 } // namespace StatSinks
 } // namespace Extensions
