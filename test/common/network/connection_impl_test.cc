@@ -879,10 +879,13 @@ public:
     EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
         .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(file_event_)));
     transport_socket_ = new NiceMock<MockTransportSocket>;
+    EXPECT_CALL(*transport_socket_, setTransportSocketCallbacks(_))
+        .WillOnce(Invoke([this](TransportSocketCallbacks& callbacks) {
+          transport_socket_callbacks_ = &callbacks;
+        }));
     connection_.reset(
         new ConnectionImpl(dispatcher_, std::make_unique<ConnectionSocketImpl>(0, nullptr, nullptr),
                            TransportSocketPtr(transport_socket_), true));
-    transport_socket_callbacks_ = transport_socket_->callbacks();
     connection_->addConnectionCallbacks(callbacks_);
   }
 

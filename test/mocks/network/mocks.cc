@@ -203,7 +203,12 @@ MockListener::~MockListener() { onDestroy(); }
 MockConnectionHandler::MockConnectionHandler() {}
 MockConnectionHandler::~MockConnectionHandler() {}
 
-MockTransportSocket::MockTransportSocket() {}
+MockTransportSocket::MockTransportSocket() {
+  ON_CALL(*this, setTransportSocketCallbacks(_))
+      .WillByDefault(Invoke([&](TransportSocketCallbacks& callbacks) { callbacks_ = &callbacks; }));
+  ON_CALL(*this, callbacks()).WillByDefault(Return(callbacks_));
+}
+
 MockTransportSocket::~MockTransportSocket() {}
 
 MockTransportSocketFactory::MockTransportSocketFactory() {}
