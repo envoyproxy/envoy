@@ -516,7 +516,7 @@ protected:
   void onPreInitComplete();
 
   /**
-   * Called by every concrete cluster after all Sds api targets registered at SDS init manager are
+   * Called by every concrete cluster after all targets registered at init manager are
    * initialized. At this point, shared init takes over and determines if there is an initial health
    * check pass needed, etc.
    */

@@ -112,7 +112,6 @@ ContextConfigImpl::ContextConfigImpl(
 ContextConfigImpl::~ContextConfigImpl() {
   if (tls_certficate_provider_.get() != nullptr && secret_callback_ != nullptr) {
     tls_certficate_provider_->removeUpdateCallback(*secret_callback_);
-    secret_callback_ = nullptr;
   }
 }
 
