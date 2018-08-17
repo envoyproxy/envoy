@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string>
-
 #include "envoy/common/pure.h"
 
 namespace Envoy {
