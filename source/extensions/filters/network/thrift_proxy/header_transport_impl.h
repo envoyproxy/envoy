@@ -43,7 +43,7 @@ private:
   static int32_t drainVarIntI32(Buffer::Instance& buffer, int32_t& header_size, const char* desc);
   static std::string drainVarString(Buffer::Instance& buffer, int32_t& header_size,
                                     const char* desc);
-  static void writeVarString(Buffer::Instance& buffer, const std::string& str);
+  static void writeVarString(Buffer::Instance& buffer, const absl::string_view str);
 
   void setException(AppExceptionType type, std::string reason) {
     if (exception_.has_value()) {
