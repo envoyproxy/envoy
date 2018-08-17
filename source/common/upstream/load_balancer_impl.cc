@@ -283,6 +283,7 @@ HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
 
     // If host selection failed or the host is accepted by the filter, return.
     // Otherwise, try again.
+    // Note: in the future we might want to allow retrying when chooseHostOnce returns nullptr.
     if (!host || !context || !context->shouldSelectAnotherHost(*host)) {
       return host;
     }
