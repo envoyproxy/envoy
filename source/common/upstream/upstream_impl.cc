@@ -917,9 +917,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
         health_checker_ != nullptr && existing_host_found &&
         *existing_host->second->healthCheckAddress() != *host->healthCheckAddress();
 
-    // When there is a match and we decided to do in-place update, we potentially updating the
-    // host's health check flag and metadata. Afterwards, the host is pushed back into the
-    // final_hosts, i.e. hosts that should be preserved in the current priority.
+    // When there is a match and we decided to do in-place update, we potentially update the host's
+    // health check flag and metadata. Afterwards, the host is pushed back into the final_hosts,
+    // i.e. hosts that should be preserved in the current priority.
     if (existing_host_found && !skip_inplace_host_update) {
       existing_hosts_for_current_priority.emplace(existing_host->first);
       // If we find a host matched based on address, we keep it. However we do change weight inline
