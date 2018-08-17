@@ -76,7 +76,14 @@ InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstShar
   } catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
-
+    terminate();
+    throw;
+  } catch (const std::exception& e) {
+    ENVOY_LOG(critical, "error initializing due to unexpected exception: {}", e.what());
+    terminate();
+    throw;
+  } catch (...) {
+    ENVOY_LOG(critical, "error initializing due to unknown exception");
     terminate();
     throw;
   }

@@ -130,10 +130,23 @@ public:
                  response_->headers().Status()->value().c_str());
   }
 
-  void sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code code) {
+  void sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code code,
+                             const Http::HeaderMapImpl& headers) {
     ratelimit_request_->startGrpcStream();
     envoy::service::ratelimit::v2::RateLimitResponse response_msg;
     response_msg.set_overall_code(code);
+
+    headers.iterate(
+        [](const Http::HeaderEntry& h, void* context) -> Http::HeaderMap::Iterate {
+          auto header = static_cast<envoy::service::ratelimit::v2::RateLimitResponse*>(context)
+                            ->mutable_headers()
+                            ->Add();
+          header->set_key(h.key().c_str());
+          header->set_value(h.value().c_str());
+          return Http::HeaderMap::Iterate::Continue;
+        },
+        &response_msg);
+
     ratelimit_request_->sendGrpcMessage(response_msg);
     ratelimit_request_->finishGrpcStream(Grpc::Status::Ok);
   }
@@ -165,8 +178,34 @@ INSTANTIATE_TEST_CASE_P(IpVersionsClientType, RatelimitIntegrationTest,
 TEST_P(RatelimitIntegrationTest, Ok) {
   initiateClientConnection();
   waitForRatelimitRequest();
-  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK);
+  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK,
+                        Http::HeaderMapImpl{});
   waitForSuccessfulUpstreamResponse();
+  cleanup();
+
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+}
+
+TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
+  initiateClientConnection();
+  waitForRatelimitRequest();
+  Http::TestHeaderMapImpl ratelimit_headers{{"x-ratelimit-limit", "1000"},
+                                            {"x-ratelimit-remaining", "500"}};
+  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK,
+                        ratelimit_headers);
+  waitForSuccessfulUpstreamResponse();
+
+  ratelimit_headers.iterate(
+      [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
+        IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
+        Http::LowerCaseString lower_key{entry.key().c_str()};
+        EXPECT_STREQ(entry.value().c_str(), response->headers().get(lower_key)->value().c_str());
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      response_.get());
+
   cleanup();
 
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.ok")->value());
@@ -177,8 +216,34 @@ TEST_P(RatelimitIntegrationTest, Ok) {
 TEST_P(RatelimitIntegrationTest, OverLimit) {
   initiateClientConnection();
   waitForRatelimitRequest();
-  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT);
+  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT,
+                        Http::HeaderMapImpl{});
   waitForFailedUpstreamResponse(429);
+  cleanup();
+
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.over_limit")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.error"));
+}
+
+TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
+  initiateClientConnection();
+  waitForRatelimitRequest();
+  Http::TestHeaderMapImpl ratelimit_headers{
+      {"x-ratelimit-limit", "1000"}, {"x-ratelimit-remaining", "0"}, {"retry-after", "33"}};
+  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT,
+                        ratelimit_headers);
+  waitForFailedUpstreamResponse(429);
+
+  ratelimit_headers.iterate(
+      [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
+        IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);
+        Http::LowerCaseString lower_key{entry.key().c_str()};
+        EXPECT_STREQ(entry.value().c_str(), response->headers().get(lower_key)->value().c_str());
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      response_.get());
+
   cleanup();
 
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));

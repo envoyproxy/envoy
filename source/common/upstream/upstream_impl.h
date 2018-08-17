@@ -225,14 +225,18 @@ private:
  */
 class HostSetImpl : public HostSet {
 public:
-  HostSetImpl(uint32_t priority)
-      : priority_(priority), hosts_(new HostVector()), healthy_hosts_(new HostVector()) {}
+  HostSetImpl(uint32_t priority, absl::optional<uint32_t> overprovisioning_factor)
+      : priority_(priority), overprovisioning_factor_(overprovisioning_factor.has_value()
+                                                          ? overprovisioning_factor.value()
+                                                          : kDefaultOverProvisioningFactor),
+        hosts_(new HostVector()), healthy_hosts_(new HostVector()) {}
 
   void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
                    HostsPerLocalityConstSharedPtr hosts_per_locality,
                    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed) override;
+                   const HostVector& hosts_removed,
+                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
 
   /**
    * Install a callback that will be invoked when the host set membership changes.
@@ -256,6 +260,7 @@ public:
   LocalityWeightsConstSharedPtr localityWeights() const override { return locality_weights_; }
   absl::optional<uint32_t> chooseLocality() override;
   uint32_t priority() const override { return priority_; }
+  uint32_t overprovisioning_factor() const override { return overprovisioning_factor_; }
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
@@ -267,6 +272,7 @@ private:
   double effectiveLocalityWeight(uint32_t index) const;
 
   uint32_t priority_;
+  uint32_t overprovisioning_factor_;
   HostVectorConstSharedPtr hosts_;
   HostVectorConstSharedPtr healthy_hosts_;
   HostsPerLocalityConstSharedPtr hosts_per_locality_{HostsPerLocalityImpl::empty()};
@@ -304,12 +310,14 @@ public:
   }
   std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() override { return host_sets_; }
   // Get the host set for this priority level, creating it if necessary.
-  HostSet& getOrCreateHostSet(uint32_t priority);
+  HostSet& getOrCreateHostSet(uint32_t priority,
+                              absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
-  virtual HostSetImplPtr createHostSet(uint32_t priority) {
-    return HostSetImplPtr{new HostSetImpl(priority)};
+  virtual HostSetImplPtr createHostSet(uint32_t priority,
+                                       absl::optional<uint32_t> overprovisioning_factor) {
+    return HostSetImplPtr{new HostSetImpl(priority, overprovisioning_factor)};
   }
 
 private:
@@ -562,7 +570,8 @@ public:
   updateClusterPrioritySet(const uint32_t priority, HostVectorSharedPtr&& current_hosts,
                            const absl::optional<HostVector>& hosts_added,
                            const absl::optional<HostVector>& hosts_removed,
-                           const absl::optional<Upstream::Host::HealthFlag> health_checker_flag);
+                           const absl::optional<Upstream::Host::HealthFlag> health_checker_flag,
+                           absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
   // Returns the size of the current cluster priority state.
   size_t size() const { return priority_state_.size(); }

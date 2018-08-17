@@ -113,7 +113,7 @@ private:
   bool calling_check_{};
   envoy::service::auth::v2alpha::CheckRequest check_request_{};
 };
-}
+} // namespace ExtAuthz
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

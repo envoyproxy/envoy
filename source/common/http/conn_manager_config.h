@@ -293,5 +293,5 @@ public:
    */
   virtual const Http::Http1Settings& http1Settings() const PURE;
 };
-}
+} // namespace Http
 } // namespace Envoy

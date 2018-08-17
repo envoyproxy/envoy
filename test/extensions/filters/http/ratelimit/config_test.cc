@@ -36,7 +36,7 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectJson) {
   RateLimitFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 
@@ -56,7 +56,7 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectProto) {
   RateLimitFilterConfig factory;
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 
@@ -79,7 +79,7 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
 
   Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
-  EXPECT_CALL(filter_callback, addStreamDecoderFilter(_));
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 

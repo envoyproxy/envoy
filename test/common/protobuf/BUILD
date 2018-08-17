@@ -24,5 +24,7 @@ envoy_cc_fuzz_test(
     name = "value_util_fuzz_test",
     srcs = ["value_util_fuzz_test.cc"],
     corpus = "value_util_corpus",
+    # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
+    tags = ["no_fuzz"],
     deps = ["//source/common/protobuf:utility_lib"],
 )

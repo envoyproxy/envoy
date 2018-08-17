@@ -5,10 +5,10 @@
 
 #include "gmock/gmock.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Ref;
 using testing::ReturnPointee;
-using testing::_;
 
 namespace Envoy {
 namespace ThreadLocal {

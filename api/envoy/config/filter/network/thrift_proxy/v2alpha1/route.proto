@@ -27,11 +27,24 @@ message Route {
   RouteAction route = 2 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
 }
 
-// [#comment:next free field: 2]
+// [#comment:next free field: 4]
 message RouteMatch {
-  // If specified, the route must exactly match the request method name. As a special case, an
-  // empty string matches any request method name.
-  string method = 1;
+  oneof match_specifier {
+    option (validate.required) = true;
+
+    // If specified, the route must exactly match the request method name. As a special case, an
+    // empty string matches any request method name.
+    string method_name = 1;
+
+    // If specified, the route must have the service name as the request method name prefix. As a
+    // special case, an empty string matches any service name. Only relevant when service
+    // multiplexing.
+    string service_name = 2;
+  }
+
+  // Inverts whatever matching is done in match_specifier. Cannot be combined with wildcard matching
+  // as that would result in routes never being matched.
+  bool invert = 3;
 }
 
 // [#comment:next free field: 2]

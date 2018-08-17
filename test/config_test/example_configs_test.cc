@@ -17,10 +17,11 @@ TEST(ExampleConfigsTest, All) {
 
 #ifdef __APPLE__
   // freebind/freebind.yaml is not supported on OS X and disabled via Bazel.
-  EXPECT_EQ(29UL, ConfigTest::run(directory));
+  EXPECT_EQ(27UL, ConfigTest::run(directory));
 #else
-  EXPECT_EQ(30UL, ConfigTest::run(directory));
+  EXPECT_EQ(28UL, ConfigTest::run(directory));
 #endif
+
   ConfigTest::testMerge();
   ConfigTest::testIncompatibleMerge();
 
