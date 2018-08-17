@@ -300,7 +300,7 @@ void HeaderTransportImpl::writeVarString(Buffer::Instance& buffer, const absl::s
   if (len == 0) {
     return;
   }
-  buffer.add(str.data(), str.length());
+  buffer.add(str.data(), len);
 }
 
 class HeaderTransportConfigFactory : public TransportFactoryBase<HeaderTransportImpl> {
