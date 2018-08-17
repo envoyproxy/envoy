@@ -144,8 +144,8 @@ protected:
   Stats::TestIsolatedStoreImpl stats_store_;
   Thread::MutexBasicLockable fakelock_;
   TestComponentFactory component_factory_;
-  std::unique_ptr<InstanceImpl> server_;
   TestTime test_time_;
+  std::unique_ptr<InstanceImpl> server_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, ServerInstanceImplTest,

@@ -56,33 +56,41 @@ public:
 class TimeSource {
 public:
   TimeSource(SystemTimeSource& system, MonotonicTimeSource& monotonic)
-      : system_(system), monotonic_(monotonic) {}
+      : system_(&system), monotonic_(&monotonic) {}
+  TimeSource(const TimeSource& src) : system_(src.system_), monotonic_(src.monotonic_) {}
+  TimeSource& operator=(const TimeSource& src) {
+    if (&src != this) {
+      system_ = src.system_;
+      monotonic_ = src.monotonic_;
+    }
+    return *this;
+  }
 
   /**
    * @return the current system time; not guaranteed to be monotonically increasing.
    */
-  SystemTime systemTime() const { return system_.currentTime(); }
+  SystemTime systemTime() const { return system_->currentTime(); }
 
   /**
    * @return the current monotonic time.
    */
-  MonotonicTime monotonicTime() const { return monotonic_.currentTime(); }
+  MonotonicTime monotonicTime() const { return monotonic_->currentTime(); }
 
   /**
    * Compares two time-sources for equality; this is needed for mocks.
    */
   bool operator==(const TimeSource& ts) const {
-    return &system_ == &ts.system_ && &monotonic_ == &ts.monotonic_;
+    return system_ == ts.system_ && monotonic_ == ts.monotonic_;
   }
 
   // TODO(jmarantz): Eliminate these methods and the SystemTimeSource and MonotonicTimeSource
   // classes, and change method calls to work directly off of TimeSource.
-  SystemTimeSource& system() { return system_; }
-  MonotonicTimeSource& monotonic() { return monotonic_; }
+  SystemTimeSource& system() { return *system_; }
+  MonotonicTimeSource& monotonic() { return *monotonic_; }
 
 private:
-  SystemTimeSource& system_;
-  MonotonicTimeSource& monotonic_;
+  SystemTimeSource* system_;
+  MonotonicTimeSource* monotonic_;
 };
 
 } // namespace Envoy

@@ -138,7 +138,7 @@ private:
                   ComponentFactory& component_factory);
 
   Options& options_;
-  TimeSource& time_source_;
+  TimeSource time_source_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;

@@ -121,7 +121,7 @@ public:
   void stopWorkers() override;
 
   Instance& server_;
-  TimeSource& time_source_;
+  TimeSource time_source_;
   ListenerComponentFactory& factory_;
 
 private:

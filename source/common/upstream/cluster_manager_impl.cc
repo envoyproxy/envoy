@@ -182,8 +182,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
       time_source_(system_time_source, monotonic_time_source), dispatcher_(main_thread_dispatcher) {
-  // ASSERT(&system_time_source == &main_thread_dispatcher.timeSource().system());
-  // ASSERT(&monotonic_time_source == &main_thread_dispatcher.timeSource().monotonic());
+  ASSERT(&system_time_source == &main_thread_dispatcher.timeSource().system());
+  ASSERT(&monotonic_time_source == &main_thread_dispatcher.timeSource().monotonic());
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {

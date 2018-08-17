@@ -166,6 +166,10 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 
 class ClusterManagerImplTest : public testing::Test {
 public:
+  ClusterManagerImplTest() : time_source_(system_time_source_, monotonic_time_source_) {
+    factory_.dispatcher_.setTimeSource(time_source_);
+  }
+
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_.reset(new ClusterManagerImpl(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
@@ -244,6 +248,7 @@ public:
   NiceMock<MockSystemTimeSource> system_time_source_;
   NiceMock<MockMonotonicTimeSource> monotonic_time_source_;
   MockLocalClusterUpdate local_cluster_update_;
+  TimeSource time_source_;
 };
 
 envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {
