@@ -45,7 +45,7 @@ public:
     FAILED_EDS_HEALTH = 0x04,
   };
 
-  enum class HealthFailureType {
+  enum class ActiveHealthFailureType {
     // The failure type is unknown, all hosts' failure types are initialized as UNKNOWN
     UNKNOWN,
     // The host is actively responding it's unhealthy
@@ -108,15 +108,15 @@ public:
   virtual bool healthy() const PURE;
 
   /**
-   * Get whether a health failure type is set for a host. Types are specified in
-   * HealthFailureType.
+   * Returns the host's ActiveHealthFailureType. Types are specified in ActiveHealthFailureType.
    */
-  virtual bool getHealthFailureType(HealthFailureType flag) const PURE;
+  virtual ActiveHealthFailureType getActiveHealthFailureType() const PURE;
 
   /**
-   * Set the most recent health failure type for a host. Types are specified in HealthFailureType.
+   * Set the most recent health failure type for a host. Types are specified in
+   * ActiveHealthFailureType.
    */
-  virtual void setHealthFailureType(HealthFailureType flag) PURE;
+  virtual void setActiveHealthFailureType(ActiveHealthFailureType flag) PURE;
 
   /**
    * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
