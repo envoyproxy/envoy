@@ -15,7 +15,7 @@ TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
 
   EXPECT_EQ(0ULL, buffer.pendingSpans());
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
-  EXPECT_FALSE(buffer.addSpan(Span(test_time.timesource())));
+  EXPECT_FALSE(buffer.addSpan(Span(test_time.timeSource())));
 
   buffer.allocateBuffer(2);
   EXPECT_EQ(0ULL, buffer.pendingSpans());

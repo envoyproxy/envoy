@@ -22,7 +22,7 @@ namespace Envoy {
 namespace Server {
 
 class GuardDogTestBase : public testing::Test {
- protected:
+protected:
   GuardDogTestBase() : time_source_(system_time_source_, monotonic_time_source_) {}
 
   NiceMock<MockMonotonicTimeSource> monotonic_time_source_;

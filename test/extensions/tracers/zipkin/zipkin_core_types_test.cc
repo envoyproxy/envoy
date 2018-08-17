@@ -90,7 +90,8 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
 
   TestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-      TestTime.timeSource().systemTime().time_since_epoch()).count();
+                           test_time.timeSource().systemTime().time_since_epoch())
+                           .count();
   ann.setTimestamp(timestamp);
   EXPECT_EQ(timestamp, ann.timestamp());
 
@@ -146,8 +147,9 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
+  TestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                           ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                           test_time.timeSource().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
 
@@ -170,8 +172,9 @@ TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
+  TestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                           ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                           test_time.timeSource().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
   Annotation ann2(ann);
@@ -187,8 +190,9 @@ TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
+  TestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                           ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                           test_time.timeSource().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
   Annotation ann2 = ann;
@@ -285,7 +289,8 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, assignmentOperator) {
 }
 
 TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
-  Span span;
+  TestTime test_time;
+  Span span(test_time.timeSource());
 
   EXPECT_EQ(0ULL, span.id());
   EXPECT_EQ(0ULL, span.traceId());
@@ -305,40 +310,40 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
             R"("annotations":[],"binaryAnnotations":[]})",
             span.toJson());
 
-  uint64_t id = Util::generateRandom64();
+  uint64_t id = Util::generateRandom64(test_time.timeSource());
   std::string id_hex = Hex::uint64ToHex(id);
   span.setId(id);
   EXPECT_EQ(id, span.id());
   EXPECT_EQ(id_hex, span.idAsHexString());
 
-  id = Util::generateRandom64();
+  id = Util::generateRandom64(test_time.timeSource());
   id_hex = Hex::uint64ToHex(id);
   span.setParentId(id);
   EXPECT_EQ(id, span.parentId());
   EXPECT_EQ(id_hex, span.parentIdAsHexString());
   EXPECT_TRUE(span.isSetParentId());
 
-  id = Util::generateRandom64();
+  id = Util::generateRandom64(test_time.timeSource());
   id_hex = Hex::uint64ToHex(id);
   span.setTraceId(id);
   EXPECT_EQ(id, span.traceId());
   EXPECT_EQ(id_hex, span.traceIdAsHexString());
 
-  id = Util::generateRandom64();
+  id = Util::generateRandom64(test_time.timeSource());
   id_hex = Hex::uint64ToHex(id);
   span.setTraceIdHigh(id);
   EXPECT_EQ(id, span.traceIdHigh());
   EXPECT_TRUE(span.isSetTraceIdHigh());
 
   int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                          test_time.timeSource().systemTime().time_since_epoch())
                           .count();
   span.setTimestamp(timestamp);
   EXPECT_EQ(timestamp, span.timestamp());
   EXPECT_TRUE(span.isSetTimestamp());
 
   int64_t start_time = std::chrono::duration_cast<std::chrono::microseconds>(
-                           ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch())
+                           test_time.timeSource().monotonicTime().time_since_epoch())
                            .count();
   span.setStartTime(start_time);
   EXPECT_EQ(start_time, span.startTime());
@@ -485,15 +490,16 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
 }
 
 TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
-  Span span;
+  TestTime test_time;
+  Span span(test_time.timeSource());
 
-  uint64_t id = Util::generateRandom64();
+  uint64_t id = Util::generateRandom64(test_time.timeSource());
   std::string id_hex = Hex::uint64ToHex(id);
   span.setId(id);
   span.setParentId(id);
   span.setTraceId(id);
   int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                          test_time.timeSource().systemTime().time_since_epoch())
                           .count();
   span.setTimestamp(timestamp);
   span.setDuration(3000LL);
@@ -521,15 +527,16 @@ TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
 }
 
 TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
-  Span span;
+  TestTime test_time;
+  Span span(test_time.timeSource());
 
-  uint64_t id = Util::generateRandom64();
+  uint64_t id = Util::generateRandom64(test_time.timeSource());
   std::string id_hex = Hex::uint64ToHex(id);
   span.setId(id);
   span.setParentId(id);
   span.setTraceId(id);
   int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                          test_time.timeSource().systemTime().time_since_epoch())
                           .count();
   span.setTimestamp(timestamp);
   span.setDuration(3000LL);
@@ -557,7 +564,8 @@ TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
 }
 
 TEST(ZipkinCoreTypesSpanTest, setTag) {
-  Span span;
+  TestTime test_time;
+  Span span(test_time.timeSource());
 
   span.setTag("key1", "value1");
   span.setTag("key2", "value2");

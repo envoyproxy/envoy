@@ -50,8 +50,8 @@ class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVers
                           protected Logger::Loggable<Logger::Id::main> {
 public:
   ProxyProtocolTest()
-      : socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true),
-        dispatcher_(test_time_.timeSource()),
+      : dispatcher_(test_time_.timeSource()),
+        socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true),
         connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
 
