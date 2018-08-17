@@ -347,8 +347,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
 ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(const std::string& name,
                                                    std::string&& tag_extracted_name,
                                                    std::vector<Tag>&& tags)
-    : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), current_active_(0),
-      flags_(0), created_thread_id_(std::this_thread::get_id()) {
+    : MetricImpl(std::move(tag_extracted_name), std::move(tags)), current_active_(0), flags_(0),
+      created_thread_id_(std::this_thread::get_id()), name_(name) {
   histograms_[0] = hist_alloc();
   histograms_[1] = hist_alloc();
 }
@@ -373,10 +373,10 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
 ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
                                          TlsScope& tls_scope, std::string&& tag_extracted_name,
                                          std::vector<Tag>&& tags)
-    : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
+    : MetricImpl(std::move(tag_extracted_name), std::move(tags)), parent_(parent),
       tls_scope_(tls_scope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_),
-      merged_(false) {}
+      merged_(false), name_(name) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
   hist_free(interval_histogram_);

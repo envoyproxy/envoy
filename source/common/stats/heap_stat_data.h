@@ -24,6 +24,11 @@ struct HeapStatData {
    */
   absl::string_view key() const { return name_; }
 
+  /**
+   * @returns std::string the name as a std::string.
+   */
+  std::string name() const { return name_; }
+
   std::atomic<uint64_t> value_{0};
   std::atomic<uint64_t> pending_increment_{0};
   std::atomic<uint16_t> flags_{0};
