@@ -1686,19 +1686,25 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
       envoy.test.filter: { option: "value" }
   )EOF";
 
+  // This vector is used to gather clusters with extension_protocol_options from the different
+  // types of extension factories (network, http).
   std::vector<std::unique_ptr<StrictDnsClusterImpl>> clusters;
+
   {
+    // Get the cluster with extension_protocol_options for a network filter factory.
     TestNetworkFilterConfigFactory factory(factoryBase);
     Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
         factory);
     clusters.push_back(makeCluster(yaml));
   }
   {
+    // Get the cluster with extension_protocol_options for an http filter factory.
     TestHttpFilterConfigFactory factory(factoryBase);
     Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(factory);
     clusters.push_back(makeCluster(yaml));
   }
 
+  // Make sure that the clusters created from both factories are as expected.
   for (auto&& cluster : clusters) {
     std::shared_ptr<const TestFilterProtocolOptionsConfig> stored_options =
         cluster->info()->extensionProtocolOptionsTyped<TestFilterProtocolOptionsConfig>(
