@@ -31,8 +31,8 @@ public:
   ProtocolType protocol(ProtocolType downstream_protocol) const override;
 
 private:
-  TransportType transport_;
-  ProtocolType protocol_;
+  const TransportType transport_;
+  const ProtocolType protocol_;
 };
 
 /**
