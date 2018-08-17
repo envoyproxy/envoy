@@ -539,7 +539,7 @@ TEST(HeaderTransportImpl, TestEncodeFrame) {
 
     EXPECT_THROW_WITH_MESSAGE(transport.encodeFrame(buffer, *metadata, msg), EnvoyException,
                               "invalid thrift header transport too many headers 32769");
-    delete(metadata);
+    delete (metadata);
   }
 
   // Header string too large
