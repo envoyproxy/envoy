@@ -198,6 +198,7 @@ public:
     return callbacks_->connection();
   }
   const Http::HeaderMap* downstreamHeaders() const override { return downstream_headers_; }
+
   /**
    * Set a computed cookie to be sent with the downstream headers.
    * @param key supplies the size of the cookie

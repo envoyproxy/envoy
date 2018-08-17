@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace Upstream {
 
-// Mapping from a priority to how much of the total traffic load should be direct to this
+// Mapping from a priority to how much of the total traffic load should be directed to this
 // priority. For example, {50, 30, 20} means that 50% of traffic should go to P0, 30% to P1
 // and 20% to P2.
 //
