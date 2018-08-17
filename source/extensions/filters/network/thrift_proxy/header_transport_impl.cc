@@ -206,13 +206,13 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
     BufferHelper::writeVarIntI32(header_buffer, static_cast<int32_t>(headers.size()));
 
     headers.iterate(
-      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        Buffer::Instance* hb = static_cast<Buffer::Instance*>(context);
-        writeVarString(*hb, header.key().getStringView());
-        writeVarString(*hb, header.value().getStringView());
-        return Http::HeaderMap::Iterate::Continue;
-      },
-      &header_buffer);
+        [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+          Buffer::Instance* hb = static_cast<Buffer::Instance*>(context);
+          writeVarString(*hb, header.key().getStringView());
+          writeVarString(*hb, header.value().getStringView());
+          return Http::HeaderMap::Iterate::Continue;
+        },
+        &header_buffer);
   }
 
   uint64_t header_size = header_buffer.length();
