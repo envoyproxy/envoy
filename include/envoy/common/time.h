@@ -55,6 +55,10 @@ public:
    */
   MonotonicTime monotonicTime() const { return monotonic_.currentTime(); }
 
+  bool operator==(const TimeSource& ts) const {
+    return &system_ == &ts.system_ && &monotonic_ == &ts.monotonic_;
+  }
+
   // TODO(jmarantz): Eliminate these methods and the SystemTimeSource and MonotonicTimeSource
   // classes, and change method calls to work directly off of TimeSource.
   SystemTimeSource& system() { return system_; }

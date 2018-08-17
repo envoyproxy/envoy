@@ -5,6 +5,8 @@
 #include "extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
+#include "test/test_common/test_time.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -86,9 +88,9 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   EXPECT_EQ("", ann.value());
   EXPECT_FALSE(ann.isSetEndpoint());
 
+  TestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                           ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
-                           .count();
+      TestTime.timeSource().systemTime().time_since_epoch()).count();
   ann.setTimestamp(timestamp);
   EXPECT_EQ(timestamp, ann.timestamp());
 

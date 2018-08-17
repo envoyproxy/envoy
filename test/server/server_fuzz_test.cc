@@ -12,6 +12,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_time.h"
 
 namespace Envoy {
 namespace Server {
@@ -24,6 +25,7 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
   Thread::MutexBasicLockable fakelock;
   TestComponentFactory component_factory;
   ThreadLocal::InstanceImpl thread_local_instance;
+  TestTime test_time;
 
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
 
@@ -37,7 +39,8 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
 
   try {
     auto server = std::make_unique<InstanceImpl>(
-        options, std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart,
+        options, test_time.timeSource(),
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart,
         stats_store, fakelock, component_factory, std::make_unique<Runtime::RandomGeneratorImpl>(),
         thread_local_instance);
   } catch (const EnvoyException& ex) {
