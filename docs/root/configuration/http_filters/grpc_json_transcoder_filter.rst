@@ -138,5 +138,5 @@ gRPC or RESTful JSON requests to localhost:51051.
       http2_protocol_options: {}
       hosts:
       - socket_address:
-        address: docker.for.mac.localhost
-        port_value: 50051
+          address: docker.for.mac.localhost
+          port_value: 50051
