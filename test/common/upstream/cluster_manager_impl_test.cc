@@ -141,12 +141,9 @@ public:
                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                          AccessLog::AccessLogManager& log_manager,
                          Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                         SystemTimeSource& system_time_source,
-                         MonotonicTimeSource& monotonic_time_source,
                          MockLocalClusterUpdate& local_cluster_update)
       : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
-                           main_thread_dispatcher, admin, system_time_source,
-                           monotonic_time_source),
+                           main_thread_dispatcher, admin),
         local_cluster_update_(local_cluster_update) {}
 
 protected:
@@ -173,8 +170,7 @@ public:
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_.reset(new ClusterManagerImpl(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, system_time_source_,
-        monotonic_time_source_));
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_));
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -206,8 +202,7 @@ public:
 
     cluster_manager_.reset(new TestClusterManagerImpl(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, system_time_source_,
-        monotonic_time_source_, local_cluster_update_));
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, local_cluster_update_));
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,

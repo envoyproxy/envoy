@@ -39,9 +39,7 @@ ValidationClusterManager::ValidationClusterManager(
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
     Server::Admin& admin)
     : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
-                         main_thread_dispatcher, admin,
-                         main_thread_dispatcher.timeSource().system(),
-                         main_thread_dispatcher.timeSource().monotonic()),
+                         main_thread_dispatcher, admin),
       async_client_(main_thread_dispatcher.timeSource()) {}
 
 Http::ConnectionPool::Instance*
