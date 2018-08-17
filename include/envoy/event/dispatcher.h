@@ -34,6 +34,11 @@ public:
 
   /**
    * Returns a time-source to use with this dispatcher.
+   *
+   * TODO(#4160) the implementations currently manage timer events that
+   * ignore the time-source, and thus can't be mocked or faked. So it's
+   * difficult to mock time in an integration test without mocking out
+   * the dispatcher.
    */
   virtual TimeSource& timeSource() PURE;
 

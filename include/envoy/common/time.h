@@ -16,6 +16,8 @@ typedef std::chrono::time_point<std::chrono::steady_clock> MonotonicTime;
 
 /**
  * Abstraction for getting the current system time. Useful for testing.
+ *
+ * TODO(#4160): eliminate this class and pass TimeSource everywhere.
  */
 class SystemTimeSource {
 public:
@@ -28,7 +30,10 @@ public:
 };
 
 /**
- * Abstraction for getting the current monotonically increasing time. Useful for testing.
+ * Abstraction for getting the current monotonically increasing time. Useful for
+ * testing.
+ *
+ * TODO(#4160): eliminate this class and pass TimeSource everywhere.
  */
 class MonotonicTimeSource {
 public:
@@ -40,6 +45,14 @@ public:
   virtual MonotonicTime currentTime() const PURE;
 };
 
+/**
+ * Captures a system-time source, capable of computing both monotonically increasing
+ * and real time.
+ *
+ * TODO(#4160): currently this is just a container for SystemTimeSource and
+ * MonotonicTimeSource but we should clean that up and just have this as the
+ * base class.
+ */
 class TimeSource {
 public:
   TimeSource(SystemTimeSource& system, MonotonicTimeSource& monotonic)
@@ -55,6 +68,9 @@ public:
    */
   MonotonicTime monotonicTime() const { return monotonic_.currentTime(); }
 
+  /**
+   * Compares two time-sources for equality; this is needed for mocks.
+   */
   bool operator==(const TimeSource& ts) const {
     return &system_ == &ts.system_ && &monotonic_ == &ts.monotonic_;
   }

@@ -132,6 +132,8 @@ public:
 
   /**
    * @return SystemTimeSource& a reference to the system time source.
+   * TODO(#4160): This method should be eliminated, and call-sites and mocks should
+   * be converted to work with timeSource() below.
    */
   virtual SystemTimeSource& systemTimeSource() PURE;
 
