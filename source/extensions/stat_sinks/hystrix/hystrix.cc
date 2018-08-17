@@ -334,7 +334,7 @@ void HystrixSink::flush(Stats::Source& source) {
                              });
 
       // Make sure we found the cluster name tag
-      ASSERT(it != histogram->tags().end()); // Can remove this??
+      ASSERT(it != histogram->tags().end());
       auto it_bool_pair = time_histograms.emplace(std::make_pair(it->value_, QuantileLatencyMap()));
       // Make sure histogram with this name was not already added
       ASSERT(it_bool_pair.second);

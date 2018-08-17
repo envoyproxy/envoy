@@ -488,8 +488,8 @@ TEST_F(HystrixSinkTest, HistogramTest) {
   // Data was added such that the value equals the quantile:
   // "latencyExecute": {"99.5": 99.500000, "95": 95.000000, "90": 90.000000, "100": 100.000000, "0":
   // 0.000000, "25": 25.000000, "99": 99.000000, "50": 50.000000, "75": 75.000000}.
-  for (auto it = begin(hystrix_quantiles); it != end(hystrix_quantiles); ++it) {
-    EXPECT_EQ(*it * 100, latency->getDouble(fmt::sprintf("%g", (*it) * 100)));
+  for (const double quantile : hystrix_quantiles) {
+    EXPECT_EQ(quantile * 100, latency->getDouble(fmt::sprintf("%g", quantile * 100)));
   }
 
   hist_free(hist1_interval);
