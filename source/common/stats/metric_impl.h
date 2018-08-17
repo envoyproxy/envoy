@@ -13,6 +13,9 @@ namespace Stats {
 /**
  * Implementation of the Metric interface. Virtual inheritance is used because the interfaces that
  * will inherit from Metric will have other base classes that will also inherit from Metric.
+ *
+ * MetricImpl is not meant to be instantiated as-is. For performance reasons we keep name() virtual
+ * and expect child classes to implement it.
  */
 class MetricImpl : public virtual Metric {
 public:
