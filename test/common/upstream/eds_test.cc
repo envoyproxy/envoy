@@ -1239,7 +1239,6 @@ TEST_F(EdsWithHealthCheckUpdateTest, EndpointUpdateHealthCheckConfig) {
   initializeCluster({80, 81}, false);
 
   const uint32_t new_health_check_port = 8000;
-
   updateHealthCheckPort(0, new_health_check_port);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -1286,7 +1285,6 @@ TEST_F(EdsWithHealthCheckUpdateTest, EndpointUpdateHealthCheckConfigWithDrainCon
   initializeCluster({80, 81}, true);
 
   const uint32_t new_health_check_port = 8000;
-
   updateHealthCheckPort(0, new_health_check_port);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
