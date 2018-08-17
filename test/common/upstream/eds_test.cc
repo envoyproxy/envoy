@@ -75,6 +75,89 @@ protected:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
+class EdsWithHealthCheckUpdateTest : public EdsTest {
+protected:
+  EdsWithHealthCheckUpdateTest() {}
+
+  // Build the initial cluster with some endpoints.
+  void initializeCluster(const std::vector<uint32_t> endpoint_ports,
+                         const bool drain_connections_on_host_removal) {
+    resetCluster(drain_connections_on_host_removal);
+
+    auto health_checker = std::make_shared<MockHealthChecker>();
+    EXPECT_CALL(*health_checker, start());
+    EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
+    cluster_->setHealthChecker(health_checker);
+
+    cluster_load_assignment_ = resources_.Add();
+    cluster_load_assignment_->set_cluster_name("fare");
+
+    for (const auto& port : endpoint_ports) {
+      addEndpoint(port);
+    }
+
+    VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources_, ""));
+
+    // Make sure the cluster is rebuilt.
+    EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+    {
+      auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+      EXPECT_EQ(hosts.size(), 2);
+
+      EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+      EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+
+      // Mark the hosts as healthy
+      hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+      hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
+    }
+  }
+
+  void resetCluster(const bool drain_connections_on_host_removal) {
+    const std::string config = R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      type: EDS
+      lb_policy: ROUND_ROBIN
+      drain_connections_on_host_removal: {}
+      eds_cluster_config:
+        service_name: fare
+        eds_config:
+          api_config_source:
+            cluster_names:
+            - eds
+            refresh_delay: 1s
+      )EOF";
+    EdsTest::resetCluster(fmt::format(config, drain_connections_on_host_removal));
+  }
+
+  void addEndpoint(const uint32_t port) {
+    auto* endpoints = cluster_load_assignment_->add_endpoints();
+    auto* socket_address = endpoints->add_lb_endpoints()
+                               ->mutable_endpoint()
+                               ->mutable_address()
+                               ->mutable_socket_address();
+    socket_address->set_address("1.2.3.4");
+    socket_address->set_port_value(port);
+  }
+
+  void updateHealthCheckPort(const uint32_t index, const uint32_t port) {
+    cluster_load_assignment_->mutable_endpoints(index)
+        ->mutable_lb_endpoints(0)
+        ->mutable_endpoint()
+        ->mutable_health_check_config()
+        ->set_port_value(port);
+
+    VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources_, ""));
+
+    // Always rebuild if health check config is changed.
+    EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
+  }
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources_;
+  envoy::api::v2::ClusterLoadAssignment* cluster_load_assignment_;
+};
+
 // Negative test for protoc-gen-validate constraints.
 TEST_F(EdsTest, ValidateFail) {
   Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
@@ -1152,75 +1235,12 @@ TEST_F(EdsTest, PriorityAndLocalityWeighted) {
   EXPECT_EQ(1UL, stats_.counter("cluster.name.update_no_rebuild").value());
 }
 
-TEST_F(EdsTest, EndpointUpdateHealthCheckConfig) {
-  resetCluster(R"EOF(
-      name: name
-      connect_timeout: 0.25s
-      type: EDS
-      lb_policy: ROUND_ROBIN
-      eds_cluster_config:
-        service_name: fare
-        eds_config:
-          api_config_source:
-            cluster_names:
-            - eds
-            refresh_delay: 1s
-  )EOF");
-
-  auto health_checker = std::make_shared<MockHealthChecker>();
-  EXPECT_CALL(*health_checker, start());
-  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
-  cluster_->setHealthChecker(health_checker);
-
-  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
-  auto* cluster_load_assignment = resources.Add();
-  cluster_load_assignment->set_cluster_name("fare");
-
-  auto add_endpoint = [cluster_load_assignment](int port) {
-    auto* endpoints = cluster_load_assignment->add_endpoints();
-
-    auto* socket_address = endpoints->add_lb_endpoints()
-                               ->mutable_endpoint()
-                               ->mutable_address()
-                               ->mutable_socket_address();
-    socket_address->set_address("1.2.3.4");
-    socket_address->set_port_value(port);
-  };
-
-  auto update_health_check_port = [cluster_load_assignment](const uint32_t index,
-                                                            const uint32_t port) {
-    cluster_load_assignment->mutable_endpoints(index)
-        ->mutable_lb_endpoints(0)
-        ->mutable_endpoint()
-        ->mutable_health_check_config()
-        ->set_port_value(port);
-  };
-
-  add_endpoint(80);
-  add_endpoint(81);
-
-  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
-  // Make sure the custer is rebuilt.
-  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
-
-  {
-    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(hosts.size(), 2);
-
-    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
-    EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
-
-    // Mark the hosts as healthy
-    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-    hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  }
+TEST_F(EdsWithHealthCheckUpdateTest, EndpointUpdateHealthCheckConfig) {
+  initializeCluster({80, 81}, false);
 
   const uint32_t new_health_check_port = 8000;
-  update_health_check_port(0, new_health_check_port);
 
-  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
-  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
-
+  updateHealthCheckPort(0, new_health_check_port);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 3);
@@ -1234,17 +1254,13 @@ TEST_F(EdsTest, EndpointUpdateHealthCheckConfig) {
 
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 
-    // The old hosts still active. The health checker continues to do health checking to these
+    // The old hosts are still active. The health checker continues to do health checking to these
     // hosts, until they are removed.
     EXPECT_FALSE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_FALSE(hosts[2]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   }
 
-  update_health_check_port(1, new_health_check_port);
-
-  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
-  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
-
+  updateHealthCheckPort(1, new_health_check_port);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 4);
@@ -1259,81 +1275,19 @@ TEST_F(EdsTest, EndpointUpdateHealthCheckConfig) {
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 
-    // The old hosts still active.
+    // The old hosts are still active.
     EXPECT_FALSE(hosts[2]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_FALSE(hosts[3]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   }
 }
 
-TEST_F(EdsTest, EndpointUpdateHealthCheckConfigWithDrainConnectionsOnRemoval) {
-  resetCluster(R"EOF(
-      name: name
-      connect_timeout: 0.25s
-      type: EDS
-      lb_policy: ROUND_ROBIN
-      drain_connections_on_host_removal: true
-      eds_cluster_config:
-        service_name: fare
-        eds_config:
-          api_config_source:
-            cluster_names:
-            - eds
-            refresh_delay: 1s
-  )EOF");
-
-  auto health_checker = std::make_shared<MockHealthChecker>();
-  EXPECT_CALL(*health_checker, start());
-  EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_)).Times(2);
-  cluster_->setHealthChecker(health_checker);
-
-  Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> resources;
-  auto* cluster_load_assignment = resources.Add();
-  cluster_load_assignment->set_cluster_name("fare");
-
-  auto add_endpoint = [cluster_load_assignment](int port) {
-    auto* endpoints = cluster_load_assignment->add_endpoints();
-
-    auto* socket_address = endpoints->add_lb_endpoints()
-                               ->mutable_endpoint()
-                               ->mutable_address()
-                               ->mutable_socket_address();
-    socket_address->set_address("1.2.3.4");
-    socket_address->set_port_value(port);
-  };
-
-  auto update_health_check_port = [cluster_load_assignment](const uint32_t index,
-                                                            const uint32_t port) {
-    cluster_load_assignment->mutable_endpoints(index)
-        ->mutable_lb_endpoints(0)
-        ->mutable_endpoint()
-        ->mutable_health_check_config()
-        ->set_port_value(port);
-  };
-
-  add_endpoint(80);
-  add_endpoint(81);
-
-  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
-  // Make sure the custer is rebuilt.
-  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
-
-  {
-    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
-    EXPECT_EQ(hosts.size(), 2);
-
-    EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
-    EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
-    // Mark the hosts as healthy
-    hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-    hosts[1]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
-  }
+TEST_F(EdsWithHealthCheckUpdateTest, EndpointUpdateHealthCheckConfigWithDrainConnectionsOnRemoval) {
+  // Set the cluster to drain connections on host removal.
+  initializeCluster({80, 81}, true);
 
   const uint32_t new_health_check_port = 8000;
-  update_health_check_port(0, new_health_check_port);
 
-  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
-  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
-
+  updateHealthCheckPort(0, new_health_check_port);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     // Since drain_connections_on_host_removal is set to true, the old hosts are removed
@@ -1345,11 +1299,7 @@ TEST_F(EdsTest, EndpointUpdateHealthCheckConfigWithDrainConnectionsOnRemoval) {
     EXPECT_NE(new_health_check_port, hosts[1]->healthCheckAddress()->ip()->port());
   }
 
-  update_health_check_port(1, new_health_check_port);
-
-  VERBOSE_EXPECT_NO_THROW(cluster_->onConfigUpdate(resources, ""));
-  EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
-
+  updateHealthCheckPort(1, new_health_check_port);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 2);
