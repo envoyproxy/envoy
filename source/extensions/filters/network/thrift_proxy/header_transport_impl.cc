@@ -144,9 +144,10 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
     }
 
     while (num_headers-- > 0) {
-      std::string key = drainVarString(buffer, header_size, "header key");
-      std::string value = drainVarString(buffer, header_size, "header value");
-      metadata.headers().addCopy(Http::LowerCaseString(key), value);
+      const Http::LowerCaseString key =
+          Http::LowerCaseString(drainVarString(buffer, header_size, "header key"));
+      const std::string value = drainVarString(buffer, header_size, "header value");
+      metadata.headers().addCopy(key, value);
     }
   }
 
