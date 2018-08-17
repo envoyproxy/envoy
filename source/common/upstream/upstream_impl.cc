@@ -905,9 +905,22 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       continue;
     }
 
+    // To match a new host with an existing host means comparing their addresses.
     auto existing_host = all_hosts_.find(host->address()->asString());
+    const bool existing_host_found = existing_host != all_hosts_.end();
 
-    if (existing_host != all_hosts_.end()) {
+    // Check if in-place host update should be skipped, i.e. when the following criteria are met
+    // (currently there is only one criterion, but we might add more in the future):
+    // - The cluster health checker is activated and a new host is matched with the existing one,
+    //   but the health check address is different.
+    const bool skip_inplace_host_update =
+        health_checker_ != nullptr && existing_host_found &&
+        *existing_host->second->healthCheckAddress() != *host->healthCheckAddress();
+
+    // When there is a match and we decided to do in-place update, we potentially update the host's
+    // health check flag and metadata. Afterwards, the host is pushed back into the final_hosts,
+    // i.e. hosts that should be preserved in the current priority.
+    if (existing_host_found && !skip_inplace_host_update) {
       existing_hosts_for_current_priority.emplace(existing_host->first);
       // If we find a host matched based on address, we keep it. However we do change weight inline
       // so do that here.
