@@ -24,7 +24,7 @@ instantiation of `MainCommonBase::MainCommonBase`:
 
 ```c++
     // includes
-    #include "gperftools/heap-profiler.h
+    #include "gperftools/heap-profiler.h"
     ...
     MainCommonBase::MainCommonBase(...) : ... {
 +       HeapProfilerStart("main_common_base"); // first line
@@ -36,7 +36,7 @@ instantiation of `MainCommonBase::MainCommonBase`:
 
 ```c++
     // includes
-    #include "gperftools/heap-profiler.h
+    #include "gperftools/heap-profiler.h"
     ...
     void InstanceImpl::Initialize(...) : ... {
         ...
