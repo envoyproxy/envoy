@@ -120,7 +120,7 @@ public:
   MOCK_CONST_METHOD0(downstreamHeaders, const Http::HeaderMap*());
   MOCK_METHOD2(determinePriorityLoad, const PriorityLoad&(const PrioritySet&, const PriorityLoad&));
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host&));
-  MOCK_METHOD0(hostSelectionRetryCount, uint32_t());
+  MOCK_CONST_METHOD0(hostSelectionRetryCount, uint32_t());
 };
 
 class MockLoadBalancer : public LoadBalancer {
