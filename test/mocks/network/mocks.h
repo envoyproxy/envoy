@@ -437,10 +437,6 @@ public:
   MOCK_METHOD0(onConnected, void());
   MOCK_METHOD0(ssl, Ssl::Connection*());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
-  MOCK_METHOD0(callbacks, Network::TransportSocketCallbacks*());
-
-private:
-  Network::TransportSocketCallbacks* callbacks_;
 };
 
 class MockTransportSocketFactory : public TransportSocketFactory {
