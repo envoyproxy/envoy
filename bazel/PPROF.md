@@ -9,7 +9,8 @@ specific place yourself.
 ## Static Linking
 
 Static linking is already available (because of a `HeapProfilerDump()` call
-inside `Envoy::Profiler::Heap::forceLink()`).
+inside
+[`Envoy::Profiler::Heap::forceLink()`](https://github.com/envoyproxy/envoy/blob/master/source/common/profiler/profiler.cc#L21-L26)).
 
 ### Compiling a statically-linked Envoy
 
@@ -27,9 +28,8 @@ And run the binary with a `HEAPPROFILE` env var, like so:
 
 ### Adding `tcmalloc_dep` to Envoy
 
-To add a `HeapProfiler` breakpoint yourself, add `tcmalloc` as a dependency under
-the `envoy_cc_library` rule:
-`source/exe/BUILD`
+To add a `HeapProfiler` breakpoint yourself, add `tcmalloc` as a dependency
+under the `envoy_cc_library` rule: `source/exe/BUILD`
 
 ```c++
     envoy_cc_library(
@@ -88,7 +88,7 @@ This will output your `.heap` files to the working directory.
 
 # Methodology
 
-For consistent testing, it makes sense to run envoy for a constant amount of
+For consistent testing, it makes sense to run Envoy for a constant amount of
 time across trials:
 
     $ timeout <num_seconds> bazel-bin/source/exe/envoy <options>
@@ -108,9 +108,9 @@ wherever `HEAPPROFILE` points to. Otherwise, they are in the current directory
 by default. They'll be named something like `main_common_base.0001.heap`,
 `main_common_base.0002.heap`, etc.
 
-*NB:* There is no reason this needs to be titled `main_common_base`: whatever flag you
-supply `HeapProfilerStart` / `HeapProfilerDump` will become the filename.
-Multiple ranges could be tested at the same time with this method.
+*NB:* There is no reason this needs to be titled `main_common_base`: whatever
+flag you supply `HeapProfilerStart` / `HeapProfilerDump` will become the
+filename. Multiple ranges could be tested at the same time with this method.
 
 # Analyzing with `pprof`
 
