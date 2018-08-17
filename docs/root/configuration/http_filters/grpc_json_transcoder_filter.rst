@@ -120,13 +120,13 @@ gRPC or RESTful JSON requests to localhost:51051.
             http_filters:
             - name: envoy.grpc_json_transcoder
               config:
-                  proto_descriptor: "/tmp/envoy/proto.pb"
-                  services: ["HelloWorld"]
-                  print_options:
-                      add_whitespace: true
-                      always_print_primitive_fields: true
-                      always_print_enums_as_ints: false
-                      preserve_proto_field_names: false
+                proto_descriptor: "/tmp/envoy/proto.pb"
+                services: ["HelloWorld"]
+                print_options:
+                  add_whitespace: true
+                  always_print_primitive_fields: true
+                  always_print_enums_as_ints: false
+                  preserve_proto_field_names: false
             - name: envoy.router
 
     clusters:
@@ -138,5 +138,5 @@ gRPC or RESTful JSON requests to localhost:51051.
       http2_protocol_options: {}
       hosts:
       - socket_address:
-          address: docker.for.mac.localhost
-          port_value: 50051
+        address: docker.for.mac.localhost
+        port_value: 50051
