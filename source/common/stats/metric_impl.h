@@ -19,7 +19,6 @@ public:
   MetricImpl(std::string&& tag_extracted_name, std::vector<Tag>&& tags)
       : tag_extracted_name_(std::move(tag_extracted_name)), tags_(std::move(tags)) {}
 
-  const std::string name() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   const std::string& tagExtractedName() const override { return tag_extracted_name_; }
   const std::vector<Tag>& tags() const override { return tags_; }
 
