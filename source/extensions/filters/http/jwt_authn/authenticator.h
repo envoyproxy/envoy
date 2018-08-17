@@ -1,5 +1,6 @@
 #pragma once
 
+#include "extensions/filters/http/common/jwks_fetcher.h"
 #include "extensions/filters/http/jwt_authn/filter_config.h"
 
 #include "jwt_verify_lib/status.h"
@@ -35,7 +36,8 @@ public:
   virtual void sanitizePayloadHeaders(Http::HeaderMap& headers) const PURE;
 
   // Authenticator factory function.
-  static AuthenticatorPtr create(FilterConfigSharedPtr config);
+  static AuthenticatorPtr create(FilterConfigSharedPtr config,
+                                 Common::JwksFetcher::JwksFetcherPtr& fetcher);
 };
 
 } // namespace JwtAuthn

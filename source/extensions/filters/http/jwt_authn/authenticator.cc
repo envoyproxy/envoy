@@ -24,28 +24,22 @@ namespace {
  */
 class AuthenticatorImpl : public Logger::Loggable<Logger::Id::filter>,
                           public Authenticator,
-                          public Http::AsyncClient::Callbacks {
+                          public Common::JwksFetcher::JwksReceiver {
 public:
-  AuthenticatorImpl(FilterConfigSharedPtr config) : config_(config) {}
+  AuthenticatorImpl(FilterConfigSharedPtr config, Common::JwksFetcher::JwksFetcherPtr& fetcher)
+      : config_(config), fetcher_(std::move(fetcher)) {}
 
+  // Following functions are for JwksFetcher::JwksReceiver interface
+  void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
+  void onJwksError(Failure reason) override;
   // Following functions are for Authenticator interface
   void verify(Http::HeaderMap& headers, Authenticator::Callbacks* callback) override;
   void onDestroy() override;
   void sanitizePayloadHeaders(Http::HeaderMap& headers) const override;
 
 private:
-  // Fetch a remote public key.
-  void fetchRemoteJwks();
-
-  // Following two functions are for AyncClient::Callbacks
-  void onSuccess(Http::MessagePtr&& response) override;
-  void onFailure(Http::AsyncClient::FailureReason) override;
-
   // Verify with a specific public key.
   void verifyKey();
-
-  // Handle the public key fetch done event.
-  void onFetchRemoteJwksDone(const std::string& jwks_str);
 
   // Calls the callback with status.
   void doneWithStatus(const Status& status);
@@ -55,6 +49,9 @@ private:
 
   // The config object.
   FilterConfigSharedPtr config_;
+
+  // The Jwks fetcher object
+  Common::JwksFetcher::JwksFetcherPtr fetcher_;
 
   // The token data
   JwtLocationConstPtr token_;
@@ -115,13 +112,19 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
     return;
   }
 
+  // TODO: Cross-platform-wise the below unix_timestamp code is wrong as the
+  // epoch is not guaranteed to be defined as the unix epoch. We should use
+  // the abseil time functionality instead.
+  // TODO: We should use the jwt_verify_lib to check the validity of a JWT.
   // Check "exp" claim.
   const auto unix_timestamp = std::chrono::duration_cast<std::chrono::seconds>(
                                   std::chrono::system_clock::now().time_since_epoch())
                                   .count();
-  // NOTE: Service account tokens generally don't have an expiration time (due to being long lived)
-  // and defaulted to 0 by google::jwt_verify library but are still valid.
-  if (jwt_.exp_ > 0 && jwt_.exp_ < unix_timestamp) {
+  if (jwt_.nbf_ > unix_timestamp) {
+    doneWithStatus(Status::JwtNotYetValid);
+    return;
+  }
+  if (jwt_.exp && jwt_.exp_ < unix_timestamp) {
     doneWithStatus(Status::JwtExpired);
     return;
   }
@@ -137,7 +140,8 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
     return;
   }
 
-  if (jwks_data_->getJwksObj() != nullptr && !jwks_data_->isExpired()) {
+  auto jwks_obj = jwks_data_->getJwksObj();
+  if (jwks_obj != nullptr && !jwks_data_->isExpired()) {
     verifyKey();
     return;
   }
@@ -146,71 +150,27 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
   // If request 1 triggers a remote jwks fetching, but is not yet replied when the request 2
   // of using the same jwks comes. The request 2 will trigger another remote fetching for the
   // jwks. This can be optimized; the same remote jwks fetching can be shared by two requrests.
-  fetchRemoteJwks();
-}
-
-void AuthenticatorImpl::fetchRemoteJwks() {
-  const auto& http_uri = jwks_data_->getJwtProvider().remote_jwks().http_uri();
-
-  Http::MessagePtr message = Http::Utility::prepareHeaders(http_uri);
-  message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
-
-  if (config_->cm().get(http_uri.cluster()) == nullptr) {
-    doneWithStatus(Status::JwksFetchFail);
-    return;
-  }
-
-  uri_ = http_uri.uri();
-  ENVOY_LOG(debug, "fetch pubkey from [uri = {}]: start", uri_);
-  request_ = config_->cm()
-                 .httpAsyncClientForCluster(http_uri.cluster())
-                 .send(std::move(message), *this,
-                       std::chrono::milliseconds(
-                           DurationUtil::durationToMilliseconds(http_uri.timeout())));
-}
-
-void AuthenticatorImpl::onSuccess(Http::MessagePtr&& response) {
-  request_ = nullptr;
-  const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
-  if (status_code == enumToInt(Http::Code::OK)) {
-    ENVOY_LOG(debug, "fetch pubkey [uri = {}]: success", uri_);
-    if (response->body()) {
-      const auto len = response->body()->length();
-      const auto body = std::string(static_cast<char*>(response->body()->linearize(len)), len);
-      onFetchRemoteJwksDone(body);
-      return;
-    } else {
-      ENVOY_LOG(debug, "fetch pubkey [uri = {}]: body is empty", uri_);
-    }
+  if (jwks_data_->getJwtProvider().has_remote_jwks()) {
+    fetcher_->fetch(jwks_data_->getJwtProvider().remote_jwks().http_uri(), this);
   } else {
-    ENVOY_LOG(debug, "fetch pubkey [uri = {}]: response status code {}", uri_, status_code);
-  }
-  doneWithStatus(Status::JwksFetchFail);
-}
-
-void AuthenticatorImpl::onFailure(Http::AsyncClient::FailureReason) {
-  request_ = nullptr;
-  ENVOY_LOG(debug, "fetch pubkey [uri = {}]: failed", uri_);
-  doneWithStatus(Status::JwksFetchFail);
-}
-
-void AuthenticatorImpl::onDestroy() {
-  if (request_ != nullptr) {
-    request_->cancel();
-    request_ = nullptr;
-    ENVOY_LOG(debug, "fetch pubkey [uri = {}]: canceled", uri_);
+    // No valid keys for this issuer. This may happen as a result of incorrect local
+    // JWKS configuration.
+    doneWithStatus(Status::JwksNoValidKeys);
   }
 }
 
-// Handle the public key fetch done event.
-void AuthenticatorImpl::onFetchRemoteJwksDone(const std::string& jwks_str) {
-  const Status status = jwks_data_->setRemoteJwks(jwks_str);
+void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
+  const Status status = jwks_data_->setRemoteJwks(std::move(jwks))->getStatus();
   if (status != Status::Ok) {
     doneWithStatus(status);
   } else {
     verifyKey();
   }
 }
+
+void AuthenticatorImpl::onJwksError(Failure) { doneWithStatus(Status::JwksFetchFail); }
+
+void AuthenticatorImpl::onDestroy() { fetcher_->close(); }
 
 // Verify with a specific public key.
 void AuthenticatorImpl::verifyKey() {
@@ -249,8 +209,9 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 
 } // namespace
 
-AuthenticatorPtr Authenticator::create(FilterConfigSharedPtr config) {
-  return std::make_unique<AuthenticatorImpl>(config);
+AuthenticatorPtr Authenticator::create(FilterConfigSharedPtr config,
+                                       Common::JwksFetcher::JwksFetcherPtr& fetcher) {
+  return std::make_unique<AuthenticatorImpl>(config, fetcher);
 }
 
 } // namespace JwtAuthn

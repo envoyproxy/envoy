@@ -2,7 +2,7 @@
 
 #include "extensions/filters/http/jwt_authn/filter_factory.h"
 
-#include "test/extensions/filters/http/jwt_authn/test_common.h"
+#include "test/extensions/filters/http/common/test_common.h"
 #include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
@@ -21,7 +21,7 @@ namespace JwtAuthn {
 TEST(HttpJwtAuthnFilterFactoryTest, GoodRemoteJwks) {
   FilterFactory factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  MessageUtil::loadFromYaml(ExampleConfig, *proto_config);
+  MessageUtil::loadFromYaml(Common::ExampleConfig, *proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
@@ -35,7 +35,7 @@ TEST(HttpJwtAuthnFilterFactoryTest, GoodLocalJwks) {
   JwtAuthentication proto_config;
   auto& provider = (*proto_config.mutable_providers())["provider"];
   provider.set_issuer("issuer");
-  provider.mutable_local_jwks()->set_inline_string(PublicKey);
+  provider.mutable_local_jwks()->set_inline_string(Common::PublicKey);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterFactory factory;
