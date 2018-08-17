@@ -141,7 +141,7 @@ protected:
     socket_address->set_port_value(port);
   }
 
-  void updateHealthCheckPort(const uint32_t index, const uint32_t port) {
+  void updateEndpointHealthCheckPortAtIndex(const uint32_t index, const uint32_t port) {
     cluster_load_assignment_->mutable_endpoints(index)
         ->mutable_lb_endpoints(0)
         ->mutable_endpoint()
@@ -1236,10 +1236,13 @@ TEST_F(EdsTest, PriorityAndLocalityWeighted) {
 }
 
 TEST_F(EdsWithHealthCheckUpdateTest, EndpointUpdateHealthCheckConfig) {
-  initializeCluster({80, 81}, false);
-
+  const std::vector<uint32_t> endpoint_ports = {80, 81};
   const uint32_t new_health_check_port = 8000;
-  updateHealthCheckPort(0, new_health_check_port);
+
+  // Initialize the cluster with two endpoints without draining connections on host removal.
+  initializeCluster(endpoint_ports, false);
+
+  updateEndpointHealthCheckPortAtIndex(0, new_health_check_port);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 3);
@@ -1248,8 +1251,8 @@ TEST_F(EdsWithHealthCheckUpdateTest, EndpointUpdateHealthCheckConfig) {
 
     EXPECT_NE(new_health_check_port, hosts[1]->healthCheckAddress()->ip()->port());
     EXPECT_NE(new_health_check_port, hosts[2]->healthCheckAddress()->ip()->port());
-    EXPECT_EQ(81, hosts[1]->healthCheckAddress()->ip()->port());
-    EXPECT_EQ(80, hosts[2]->healthCheckAddress()->ip()->port());
+    EXPECT_EQ(endpoint_ports[1], hosts[1]->healthCheckAddress()->ip()->port());
+    EXPECT_EQ(endpoint_ports[0], hosts[2]->healthCheckAddress()->ip()->port());
 
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
 
@@ -1259,7 +1262,7 @@ TEST_F(EdsWithHealthCheckUpdateTest, EndpointUpdateHealthCheckConfig) {
     EXPECT_FALSE(hosts[2]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   }
 
-  updateHealthCheckPort(1, new_health_check_port);
+  updateEndpointHealthCheckPortAtIndex(1, new_health_check_port);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 4);
@@ -1268,8 +1271,8 @@ TEST_F(EdsWithHealthCheckUpdateTest, EndpointUpdateHealthCheckConfig) {
     // Make sure the second endpoint health check port is updated.
     EXPECT_EQ(new_health_check_port, hosts[1]->healthCheckAddress()->ip()->port());
 
-    EXPECT_EQ(81, hosts[2]->healthCheckAddress()->ip()->port());
-    EXPECT_EQ(80, hosts[3]->healthCheckAddress()->ip()->port());
+    EXPECT_EQ(endpoint_ports[1], hosts[2]->healthCheckAddress()->ip()->port());
+    EXPECT_EQ(endpoint_ports[0], hosts[3]->healthCheckAddress()->ip()->port());
 
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
     EXPECT_TRUE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
@@ -1281,11 +1284,13 @@ TEST_F(EdsWithHealthCheckUpdateTest, EndpointUpdateHealthCheckConfig) {
 }
 
 TEST_F(EdsWithHealthCheckUpdateTest, EndpointUpdateHealthCheckConfigWithDrainConnectionsOnRemoval) {
-  // Set the cluster to drain connections on host removal.
-  initializeCluster({80, 81}, true);
-
+  const std::vector<uint32_t> endpoint_ports = {80, 81};
   const uint32_t new_health_check_port = 8000;
-  updateHealthCheckPort(0, new_health_check_port);
+
+  // Initialize the cluster with two endpoints with draining connections on host removal.
+  initializeCluster(endpoint_ports, true);
+
+  updateEndpointHealthCheckPortAtIndex(0, new_health_check_port);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     // Since drain_connections_on_host_removal is set to true, the old hosts are removed
@@ -1297,7 +1302,7 @@ TEST_F(EdsWithHealthCheckUpdateTest, EndpointUpdateHealthCheckConfigWithDrainCon
     EXPECT_NE(new_health_check_port, hosts[1]->healthCheckAddress()->ip()->port());
   }
 
-  updateHealthCheckPort(1, new_health_check_port);
+  updateEndpointHealthCheckPortAtIndex(1, new_health_check_port);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 2);
