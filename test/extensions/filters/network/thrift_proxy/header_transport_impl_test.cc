@@ -31,8 +31,9 @@ public:
   MOCK_CONST_METHOD0(length, uint64_t());
 };
 
-MessageMetadata* mkMessageMetadata(uint32_t num_headers) {
-  MessageMetadata* metadata = new MessageMetadata;
+MessageMetadataSharedPtr mkMessageMetadata(uint32_t num_headers) {
+  MessageMetadataSharedPtr metadata = std::make_shared<MessageMetadata>();
+
   while (num_headers-- > 0) {
     metadata->headers().addCopy(Http::LowerCaseString("x"), "y");
   }
@@ -531,7 +532,7 @@ TEST(HeaderTransportImpl, TestEncodeFrame) {
   // Too many headers
   {
     Buffer::OwnedImpl buffer;
-    MessageMetadata* metadata = mkMessageMetadata(32769);
+    MessageMetadataSharedPtr metadata = mkMessageMetadata(32769);
     metadata->setProtocol(ProtocolType::Binary);
 
     Buffer::OwnedImpl msg;
@@ -539,7 +540,6 @@ TEST(HeaderTransportImpl, TestEncodeFrame) {
 
     EXPECT_THROW_WITH_MESSAGE(transport.encodeFrame(buffer, *metadata, msg), EnvoyException,
                               "invalid thrift header transport too many headers 32769");
-    delete (metadata);
   }
 
   // Header string too large
