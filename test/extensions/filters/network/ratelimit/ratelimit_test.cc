@@ -286,7 +286,7 @@ TEST_F(RateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
-  request_callbacks_->complete(RateLimit::LimitStatus::Error);
+  request_callbacks_->complete(RateLimit::LimitStatus::Error, nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 

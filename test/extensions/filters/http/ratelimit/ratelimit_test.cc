@@ -350,7 +350,7 @@ TEST_F(HttpRateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
-  request_callbacks_->complete(RateLimit::LimitStatus::Error);
+  request_callbacks_->complete(RateLimit::LimitStatus::Error, nullptr);
 
   EXPECT_CALL(filter_callbacks_.request_info_,
               setResponseFlag(RequestInfo::ResponseFlag::RateLimitServiceError))
