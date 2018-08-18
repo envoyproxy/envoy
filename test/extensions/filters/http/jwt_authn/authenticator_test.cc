@@ -80,8 +80,7 @@ TEST_F(AuthenticatorTest, TestOkJWTandCache) {
     EXPECT_CALL(mock_cb, onComplete(_)).WillOnce(Invoke([](const Status& status) {
       ASSERT_EQ(status, Status::Ok);
     }));
-
-    auth_->verify(headers, &mock_cb);
+    auth_->verify(nullptr, absl::nullopt, headers, &mock_cb);
 
     EXPECT_EQ(headers.get_("sec-istio-auth-userinfo"), ExpectedPayloadValue);
     // Verify the token is removed.
@@ -107,7 +106,7 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
     ASSERT_EQ(status, Status::Ok);
   }));
 
-  auth_->verify(headers, &mock_cb);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb);
 
   // Verify the token is NOT removed.
   EXPECT_TRUE(headers.Authorization());
@@ -126,7 +125,7 @@ TEST_F(AuthenticatorTest, TestJwtWithNonExistKid) {
     ASSERT_EQ(status, Status::JwtVerificationFail);
   }));
 
-  auth_->verify(headers, &mock_cb);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb);
 }
 
 // This test verifies if Jwt is missing, proper status is called.
@@ -138,7 +137,7 @@ TEST_F(AuthenticatorTest, TestMissedJWT) {
 
   // Empty headers.
   auto headers = Http::TestHeaderMapImpl{};
-  auth_->verify(headers, &mock_cb_);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb_);
 }
 
 // This test verifies if Jwt is invalid, JwtBadFormat status is returned.
@@ -150,7 +149,7 @@ TEST_F(AuthenticatorTest, TestInvalidJWT) {
 
   std::string token = "invalidToken";
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + token}};
-  auth_->verify(headers, &mock_cb_);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb_);
 }
 
 // This test verifies if Authorization header has invalid prefix, JwtMissed status is returned
@@ -161,7 +160,7 @@ TEST_F(AuthenticatorTest, TestInvalidPrefix) {
   }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer-invalid"}};
-  auth_->verify(headers, &mock_cb_);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb_);
 }
 
 // This test verifies when a JWT is non-expiring without audience specified, JwtAudienceNotAllowed
@@ -174,7 +173,7 @@ TEST_F(AuthenticatorTest, TestNonExpiringJWT) {
 
   auto headers =
       Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(NonExpiringToken)}};
-  auth_->verify(headers, &mock_cb_);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb_);
 }
 
 // This test verifies when a JWT is expired, JwtExpired status is returned.
@@ -185,7 +184,7 @@ TEST_F(AuthenticatorTest, TestExpiredJWT) {
   }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(ExpiredToken)}};
-  auth_->verify(headers, &mock_cb_);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb_);
 }
 
 // This test verifies when a JWT is with invalid audience, JwtAudienceNotAllowed is returned.
@@ -197,7 +196,7 @@ TEST_F(AuthenticatorTest, TestNonMatchAudJWT) {
 
   auto headers =
       Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(InvalidAudToken)}};
-  auth_->verify(headers, &mock_cb_);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb_);
 }
 
 // This test verifies when invalid cluster is configured for remote jwks, JwksFetchFail is returned.
@@ -215,7 +214,7 @@ TEST_F(AuthenticatorTest, TestWrongCluster) {
   }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  auth_->verify(headers, &mock_cb_);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb_);
 }
 
 // This test verifies when Jwt issuer is not configured, JwtUnknownIssuer is returned.
@@ -230,7 +229,7 @@ TEST_F(AuthenticatorTest, TestIssuerNotFound) {
   }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  auth_->verify(headers, &mock_cb_);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb_);
 }
 
 // This test verifies that when Jwks fetching fails, JwksFetchFail status is returned.
@@ -263,7 +262,7 @@ TEST_F(AuthenticatorTest, TestPubkeyFetchFail) {
   }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  auth_->verify(headers, &mock_cb_);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb_);
 
   Http::MessagePtr response_message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "401"}}}));
@@ -287,7 +286,7 @@ TEST_F(AuthenticatorTest, TestPubkeyFetchFailWithEmptyBody) {
   }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  auth_->verify(headers, &mock_cb_);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb_);
 
   Http::MessagePtr response_message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
@@ -311,7 +310,7 @@ TEST_F(AuthenticatorTest, TestPubkeyFetchFailWithOnFailure) {
   }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  auth_->verify(headers, &mock_cb_);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb_);
 
   callbacks->onFailure(Http::AsyncClient::FailureReason::Reset);
 }
@@ -346,7 +345,7 @@ TEST_F(AuthenticatorTest, TestInvalidPubkey) {
   }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  auth_->verify(headers, &mock_cb_);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb_);
 
   Http::MessagePtr response_message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
@@ -388,7 +387,7 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
   EXPECT_CALL(mock_cb_, onComplete(_)).Times(0);
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  auth_->verify(headers, &mock_cb_);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb_);
 
   // Destroy the authenticating process.
   auth_->onDestroy();
@@ -407,11 +406,93 @@ TEST_F(AuthenticatorTest, TestNoForwardPayloadHeader) {
   EXPECT_CALL(mock_cb, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
   }));
-  auth_->verify(headers, &mock_cb);
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb);
 
   // Test when forward_payload_header is not set, the output should NOT
   // contain the sec-istio-auth-userinfo header.
   EXPECT_FALSE(headers.has("sec-istio-auth-userinfo"));
+}
+
+// This test verifies that path match prefix, and JWT authenticates.
+TEST_F(AuthenticatorTest, TestPrefixPathMatch) {
+  auto& rule = *proto_config_.add_rules();
+  rule.mutable_match()->set_prefix("/abc");
+  rule.mutable_requires()->set_provider_name(ProviderName);
+  CreateAuthenticator();
+
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+
+  auto headers = Http::TestHeaderMapImpl{
+      {"Authorization", "Bearer " + std::string(GoodToken)},
+      {":path", "/abc/xyz"},
+  };
+
+  MockAuthenticatorCallbacks mock_cb;
+  EXPECT_CALL(mock_cb, onComplete(_)).WillOnce(Invoke([](const Status& status) {
+    ASSERT_EQ(status, Status::Ok);
+  }));
+
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb);
+
+  EXPECT_EQ(headers.get_("sec-istio-auth-userinfo"), ExpectedPayloadValue);
+  // Verify the token is removed.
+  EXPECT_FALSE(headers.Authorization());
+  EXPECT_EQ(mock_pubkey.called_count(), 1);
+}
+
+// This test verifies that path match regex, and JWT authenticates.
+TEST_F(AuthenticatorTest, TestRegexPathMatch) {
+  auto& rule = *proto_config_.add_rules();
+  rule.mutable_match()->set_regex("/b[oi]t");
+  rule.mutable_requires()->set_provider_name(ProviderName);
+  CreateAuthenticator();
+
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+
+  auto headers = Http::TestHeaderMapImpl{
+      {"Authorization", "Bearer " + std::string(GoodToken)},
+      {":path", "/bit?x=y"},
+  };
+
+  MockAuthenticatorCallbacks mock_cb;
+  EXPECT_CALL(mock_cb, onComplete(_)).WillOnce(Invoke([](const Status& status) {
+    ASSERT_EQ(status, Status::Ok);
+  }));
+
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb);
+
+  EXPECT_EQ(headers.get_("sec-istio-auth-userinfo"), ExpectedPayloadValue);
+  // Verify the token is removed.
+  EXPECT_FALSE(headers.Authorization());
+  EXPECT_EQ(mock_pubkey.called_count(), 1);
+}
+
+TEST_F(AuthenticatorTest, TestMultipleTokenProviderName) {
+  auto& provider = (*proto_config_.mutable_providers())[std::string(ProviderName)];
+  std::vector<std::string> names = {"a", "b", "c"};
+  for (const auto& it : names) {
+    auto header = provider.add_from_headers();
+    header->set_name(it);
+    header->set_value_prefix("Bearer ");
+  }
+
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+
+  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
+    ASSERT_EQ(status, Status::Ok);
+  }));
+  auto headers = Http::TestHeaderMapImpl{
+      {"a", "Bearer " + std::string(ExpiredToken)},
+      {"b", "Bearer " + std::string(GoodToken)},
+      {"c", "Bearer " + std::string(InvalidAudToken)},
+      {":path", "/"},
+  };
+  CreateAuthenticator();
+  auth_->verify(nullptr, absl::nullopt, headers, &mock_cb_);
+
+  EXPECT_TRUE(headers.has("a"));
+  EXPECT_FALSE(headers.has("b"));
+  EXPECT_TRUE(headers.has("c"));
 }
 
 } // namespace JwtAuthn

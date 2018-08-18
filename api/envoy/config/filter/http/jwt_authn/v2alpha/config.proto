@@ -350,7 +350,7 @@ message RequirementRule {
 //              - provider_name: "provider1"
 //              - provider_name: "provider2"
 //
-//// [#not-implemented-hide:]
+// [#not-implemented-hide:]
 message JwtAuthentication {
   // Map of provider names to JwtProviders.
   //

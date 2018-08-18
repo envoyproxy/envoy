@@ -8,6 +8,7 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 
+#include "jwt_verify_lib/check_audience.h"
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"
 
@@ -26,10 +27,18 @@ class AuthenticatorImpl : public Logger::Loggable<Logger::Id::filter>,
                           public Authenticator,
                           public Http::AsyncClient::Callbacks {
 public:
-  AuthenticatorImpl(FilterConfigSharedPtr config) : config_(config) {}
+  AuthenticatorImpl(const std::vector<std::string>& audiences, FilterConfigSharedPtr config)
+      : config_(config) {
+    if (audiences.empty()) {
+      audiences_ = nullptr;
+    } else {
+      audiences_ = std::make_unique<::google::jwt_verify::CheckAudience>(audiences);
+    }
+  }
 
   // Following functions are for Authenticator interface
-  void verify(Http::HeaderMap& headers, Authenticator::Callbacks* callback) override;
+  void verify(const ExtractParam* extract_param, const absl::optional<std::string>& issuer,
+              Http::HeaderMap& headers, Authenticator::Callbacks* callback) override;
   void onDestroy() override;
   void sanitizePayloadHeaders(Http::HeaderMap& headers) const override;
 
@@ -50,14 +59,14 @@ private:
   // Calls the callback with status.
   void doneWithStatus(const Status& status);
 
-  // Return true if it is OK to forward this request without JWT.
-  bool okToBypass() const;
+  // Start verification process
+  void startVerify();
 
   // The config object.
   FilterConfigSharedPtr config_;
 
   // The token data
-  JwtLocationConstPtr token_;
+  std::vector<JwtLocationConstPtr> tokens_;
   // The JWT object.
   ::google::jwt_verify::Jwt jwt_;
   // The JWKS data object
@@ -72,6 +81,10 @@ private:
   std::string uri_;
   // The pending remote request so it can be canceled.
   Http::AsyncClient::Request* request_{};
+  // Check audience object for overriding the providers.
+  ::google::jwt_verify::CheckAudiencePtr audiences_;
+  // specific issuer or not.
+  absl::optional<std::string> issuer_opt_;
 };
 
 void AuthenticatorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
@@ -82,71 +95,84 @@ void AuthenticatorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
     }
   }
 }
-
-void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callbacks* callback) {
+void AuthenticatorImpl::verify(const ExtractParam* extract_param,
+                               const absl::optional<std::string>& issuer, Http::HeaderMap& headers,
+                               Authenticator::Callbacks* callback) {
   headers_ = &headers;
   callback_ = callback;
+  issuer_opt_ = issuer;
 
   ENVOY_LOG(debug, "Jwt authentication starts");
-  auto tokens = config_->getExtractor().extract(headers);
-  if (tokens.empty()) {
-    if (okToBypass()) {
-      doneWithStatus(Status::Ok);
-    } else {
-      doneWithStatus(Status::JwtMissed);
+  tokens_ = config_->getExtractor().extract(headers, extract_param);
+  if (tokens_.empty()) {
+    doneWithStatus(Status::JwtMissed);
+    return;
+  }
+
+  startVerify();
+}
+
+void AuthenticatorImpl::startVerify() {
+  Status status;
+  while (!tokens_.empty()) {
+    jwt_ = {};
+    status = jwt_.parseFromString(tokens_.back()->token());
+    if (status != Status::Ok) {
+      tokens_.pop_back();
+      continue;
     }
+
+    // Check if token is extracted from the location specified by the issuer.
+    const bool has_issuer = issuer_opt_ ? jwt_.iss_ == issuer_opt_.value()
+                                        : tokens_.back()->isIssuerSpecified(jwt_.iss_);
+    if (!has_issuer) {
+      ENVOY_LOG(debug, "Jwt issuer {} does not match required", jwt_.iss_);
+      status = Status::JwtUnknownIssuer;
+      tokens_.pop_back();
+      continue;
+    }
+
+    // Check "exp" claim.
+    const auto unix_timestamp = std::chrono::duration_cast<std::chrono::seconds>(
+                                    std::chrono::system_clock::now().time_since_epoch())
+                                    .count();
+    // NOTE: Service account tokens generally don't have an expiration time (due to being long
+    // lived) and defaulted to 0 by google::jwt_verify library but are still valid.
+    if (jwt_.exp_ > 0 && jwt_.exp_ < unix_timestamp) {
+      status = Status::JwtExpired;
+      tokens_.pop_back();
+      continue;
+    }
+
+    // Check the issuer is configured or not.
+    jwks_data_ = config_->getCache().getJwksCache().findByIssuer(jwt_.iss_);
+    // isIssuerSpecified() check already make sure the issuer is in the cache.
+    ASSERT(jwks_data_ != nullptr);
+
+    // Check if audience is allowed
+    bool allowed = audiences_ ? audiences_->areAudiencesAllowed(jwt_.audiences_)
+                              : jwks_data_->areAudiencesAllowed(jwt_.audiences_);
+
+    if (!allowed) {
+      status = Status::JwtAudienceNotAllowed;
+      tokens_.pop_back();
+      continue;
+    }
+
+    if (jwks_data_->getJwksObj() != nullptr && !jwks_data_->isExpired()) {
+      verifyKey();
+      return;
+    }
+
+    // TODO(qiwzhang): potential optimization.
+    // If request 1 triggers a remote jwks fetching, but is not yet replied when the request 2
+    // of using the same jwks comes. The request 2 will trigger another remote fetching for the
+    // jwks. This can be optimized; the same remote jwks fetching can be shared by two requrests.
+    fetchRemoteJwks();
     return;
   }
-
-  // TODO(qiwzhang), add supports for multiple tokens.
-  // Only process the first token for now.
-  token_.swap(tokens[0]);
-
-  const Status status = jwt_.parseFromString(token_->token());
-  if (status != Status::Ok) {
-    doneWithStatus(status);
-    return;
-  }
-
-  // Check if token is extracted from the location specified by the issuer.
-  if (!token_->isIssuerSpecified(jwt_.iss_)) {
-    ENVOY_LOG(debug, "Jwt for issuer {} is not extracted from the specified locations", jwt_.iss_);
-    doneWithStatus(Status::JwtUnknownIssuer);
-    return;
-  }
-
-  // Check "exp" claim.
-  const auto unix_timestamp = std::chrono::duration_cast<std::chrono::seconds>(
-                                  std::chrono::system_clock::now().time_since_epoch())
-                                  .count();
-  // NOTE: Service account tokens generally don't have an expiration time (due to being long lived)
-  // and defaulted to 0 by google::jwt_verify library but are still valid.
-  if (jwt_.exp_ > 0 && jwt_.exp_ < unix_timestamp) {
-    doneWithStatus(Status::JwtExpired);
-    return;
-  }
-
-  // Check the issuer is configured or not.
-  jwks_data_ = config_->getCache().getJwksCache().findByIssuer(jwt_.iss_);
-  // isIssuerSpecified() check already make sure the issuer is in the cache.
-  ASSERT(jwks_data_ != nullptr);
-
-  // Check if audience is allowed
-  if (!jwks_data_->areAudiencesAllowed(jwt_.audiences_)) {
-    doneWithStatus(Status::JwtAudienceNotAllowed);
-    return;
-  }
-
-  if (jwks_data_->getJwksObj() != nullptr && !jwks_data_->isExpired()) {
-    verifyKey();
-    return;
-  }
-
-  // TODO(qiwzhang): potential optimization.
-  // If request 1 triggers a remote jwks fetching, but is not yet replied when the request 2
-  // of using the same jwks comes. The request 2 will trigger another remote fetching for the
-  // jwks. This can be optimized; the same remote jwks fetching can be shared by two requrests.
-  fetchRemoteJwks();
+  // send the last error status
+  doneWithStatus(status);
 }
 
 void AuthenticatorImpl::fetchRemoteJwks() {
@@ -229,18 +255,19 @@ void AuthenticatorImpl::verifyKey() {
 
   if (!provider.forward()) {
     // Remove JWT from headers.
-    token_->removeJwt(*headers_);
+    tokens_.back()->removeJwt(*headers_);
   }
 
   doneWithStatus(Status::Ok);
 }
 
-bool AuthenticatorImpl::okToBypass() const {
-  // TODO(qiwzhang): use requirement field
-  return false;
-}
-
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
+  if (Status::Ok != status && tokens_.size() > 1) {
+    tokens_.pop_back();
+    startVerify();
+    return;
+  }
+  tokens_.clear();
   ENVOY_LOG(debug, "Jwt authentication completed with: {}",
             ::google::jwt_verify::getStatusString(status));
   callback_->onComplete(status);
@@ -249,8 +276,9 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 
 } // namespace
 
-AuthenticatorPtr Authenticator::create(FilterConfigSharedPtr config) {
-  return std::make_unique<AuthenticatorImpl>(config);
+AuthenticatorPtr Authenticator::create(FilterConfigSharedPtr config,
+                                       const std::vector<std::string>& audiences) {
+  return std::make_unique<AuthenticatorImpl>(audiences, config);
 }
 
 } // namespace JwtAuthn

@@ -36,6 +36,16 @@ public:
   virtual void removeJwt(Http::HeaderMap& headers) const PURE;
 };
 
+/**
+ * Struct to hold data that limits the location to extract from.
+ */
+struct ExtractParam {
+  // header keys to extract from. (header name + value prefix)
+  std::unordered_set<std::string> header_keys_;
+  // param keys to extract from. (param name)
+  std::unordered_set<std::string> param_keys_;
+};
+
 typedef std::unique_ptr<const JwtLocation> JwtLocationConstPtr;
 
 class Extractor;
@@ -66,11 +76,15 @@ public:
   virtual ~Extractor() {}
 
   /**
-   * Extract all JWT tokens from the headers
+   * Extract all JWT tokens from the headers. If set of header_keys or param_keys
+   * is not empty only those in the matching locations wil be returned.
+   *
    * @param headers is the HTTP request headers.
+   * @param extract_param used to limit tokens returned by header or param location.
    * @return list of extracted Jwt location info.
    */
-  virtual std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers) const PURE;
+  virtual std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers,
+                                                   const ExtractParam* extract_param) const PURE;
 
   /**
    * Create an instance of Extractor for a given config.

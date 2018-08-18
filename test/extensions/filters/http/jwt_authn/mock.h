@@ -14,7 +14,8 @@ public:
 
 class MockAuthenticator : public Authenticator {
 public:
-  MOCK_METHOD2(verify, void(Http::HeaderMap& headers, Authenticator::Callbacks* callback));
+  MOCK_METHOD4(verify, void(const ExtractParam* e_params, const absl::optional<std::string>& issuer,
+                            Http::HeaderMap& headers, Authenticator::Callbacks* callback));
   MOCK_METHOD0(onDestroy, void());
   MOCK_CONST_METHOD1(sanitizePayloadHeaders, void(Http::HeaderMap& headers));
 };

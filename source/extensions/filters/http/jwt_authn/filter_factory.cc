@@ -46,8 +46,18 @@ FilterFactory::createFilterFactoryFromProtoTyped(const JwtAuthentication& proto_
   validateJwtConfig(proto_config);
   auto filter_config = std::make_shared<FilterConfig>(proto_config, prefix, context);
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    std::vector<AsyncMatcherSharedPtr> rule_matchers;
+    const auto& proto_config = filter_config->getProtoConfig();
+    for (const auto& it : proto_config.rules()) {
+      rule_matchers.push_back(AsyncMatcher::create(it, filter_config));
+    }
+    if (proto_config.rules_size() == 0) {
+      ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirement empty;
+      // add allow all matcher for empty equirements.
+      rule_matchers.push_back(AsyncMatcher::create(empty, filter_config));
+    }
     callbacks.addStreamDecoderFilter(
-        std::make_shared<Filter>(filter_config->stats(), Authenticator::create(filter_config)));
+        std::make_shared<Filter>(filter_config->stats(), rule_matchers));
   };
 }
 

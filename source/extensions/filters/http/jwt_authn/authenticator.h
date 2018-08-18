@@ -26,7 +26,10 @@ public:
     virtual ~Callbacks() {}
     virtual void onComplete(const ::google::jwt_verify::Status& status) PURE;
   };
-  virtual void verify(Http::HeaderMap& headers, Callbacks* callback) PURE;
+  // Verify if headers satisfyies the JWT requirements. Can be limited to single provider with
+  // extract_param.
+  virtual void verify(const ExtractParam* extract_param, const absl::optional<std::string>& issuer,
+                      Http::HeaderMap& headers, Callbacks* callback) PURE;
 
   // Called when the object is about to be destroyed.
   virtual void onDestroy() PURE;
@@ -35,7 +38,8 @@ public:
   virtual void sanitizePayloadHeaders(Http::HeaderMap& headers) const PURE;
 
   // Authenticator factory function.
-  static AuthenticatorPtr create(FilterConfigSharedPtr config);
+  static AuthenticatorPtr create(FilterConfigSharedPtr config,
+                                 const std::vector<std::string>& audiences = {});
 };
 
 } // namespace JwtAuthn

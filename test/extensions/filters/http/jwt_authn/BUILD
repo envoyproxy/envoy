@@ -101,3 +101,16 @@ envoy_extension_cc_test(
         "//test/integration:http_protocol_integration_lib",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "matcher_test",
+    srcs = ["matcher_test.cc"],
+    extension_name = "envoy.filters.http.jwt_authn",
+    deps = [
+        ":mock_lib",
+        ":test_common_lib",
+        "//source/extensions/filters/http/jwt_authn:matchers_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)

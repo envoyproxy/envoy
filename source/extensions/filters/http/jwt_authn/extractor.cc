@@ -81,7 +81,8 @@ class ExtractorImpl : public Extractor {
 public:
   ExtractorImpl(const JwtAuthentication& config);
 
-  std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers) const override;
+  std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers,
+                                           const ExtractParam* extract_param) const override;
 
 private:
   // add a header config
@@ -149,11 +150,16 @@ void ExtractorImpl::addQueryParamConfig(const std::string& issuer, const std::st
   param_location_spec.specified_issuers_.insert(issuer);
 }
 
-std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& headers) const {
+std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& headers,
+                                                        const ExtractParam* extract_param) const {
   std::vector<JwtLocationConstPtr> tokens;
 
   // Check header locations first
   for (const auto& location_it : header_locations_) {
+    if (extract_param != nullptr &&
+        extract_param->header_keys_.find(location_it.first) == extract_param->header_keys_.end()) {
+      continue;
+    }
     const auto& location_spec = location_it.second;
     const Http::HeaderEntry* entry = headers.get(location_spec->header_);
     if (entry) {
@@ -179,6 +185,10 @@ std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& h
   const auto& params = Http::Utility::parseQueryString(headers.Path()->value().c_str());
   for (const auto& location_it : param_locations_) {
     const auto& param_key = location_it.first;
+    if (extract_param != nullptr &&
+        extract_param->param_keys_.find(param_key) == extract_param->param_keys_.end()) {
+      continue;
+    }
     const auto& location_spec = location_it.second;
     const auto& it = params.find(param_key);
     if (it != params.end()) {

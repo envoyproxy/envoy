@@ -9,28 +9,30 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-Filter::Filter(JwtAuthnFilterStats& stats, AuthenticatorPtr auth)
-    : stats_(stats), auth_(std::move(auth)) {}
+Filter::Filter(JwtAuthnFilterStats& stats, std::vector<AsyncMatcherSharedPtr> rule_matchers)
+    : stats_(stats), rule_matchers_(rule_matchers) {}
 
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
-  if (auth_) {
-    auth_->onDestroy();
+  for (const auto& it : rule_matchers_) {
+    it->close();
   }
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
 
-  // Remove headers configured to pass payload
-  auth_->sanitizePayloadHeaders(headers);
-
   state_ = Calling;
   stopped_ = false;
 
-  // TODO(qiwzhang): support per-route config.
   // Verify the JWT token, onComplete() will be called when completed.
-  auth_->verify(headers, this);
+  {
+    Thread::LockGuard lock(lock_);
+    count_ = 0;
+  }
+  for (const auto& matcher : rule_matchers_) {
+    matcher->matches(headers, *this);
+  }
   if (state_ == Complete) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -45,7 +47,12 @@ void Filter::onComplete(const Status& status) {
   if (state_ == Responded) {
     return;
   }
-  if (status != Status::Ok) {
+  bool done = false;
+  {
+    Thread::LockGuard lock(lock_);
+    done = (++count_ == rule_matchers_.size());
+  }
+  if (done && Status::Ok != status) {
     stats_.denied_.inc();
     state_ = Responded;
     // verification failed
@@ -55,11 +62,12 @@ void Filter::onComplete(const Status& status) {
                                   ::google::jwt_verify::getStatusString(status));
     return;
   }
-
-  stats_.allowed_.inc();
-  state_ = Complete;
-  if (stopped_) {
-    decoder_callbacks_->continueDecoding();
+  if (Status::Ok == status) {
+    stats_.allowed_.inc();
+    state_ = Complete;
+    if (stopped_) {
+      decoder_callbacks_->continueDecoding();
+    }
   }
 }
 
