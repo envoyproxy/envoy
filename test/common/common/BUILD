@@ -40,6 +40,8 @@ envoy_cc_fuzz_test(
     name = "base64_fuzz_test",
     srcs = ["base64_fuzz_test.cc"],
     corpus = "base64_corpus",
+    # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
+    tags = ["no_fuzz"],
     deps = ["//source/common/common:base64_lib"],
 )
 
@@ -47,6 +49,8 @@ envoy_cc_fuzz_test(
     name = "utility_fuzz_test",
     srcs = ["utility_fuzz_test.cc"],
     corpus = "utility_corpus",
+    # Fuzzer is stable, no bugs, simple test target; avoid emitting CO2.
+    tags = ["no_fuzz"],
     deps = ["//source/common/common:utility_lib"],
 )
 

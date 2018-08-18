@@ -78,6 +78,13 @@ void FakeStream::encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stre
   });
 }
 
+void FakeStream::encodeData(absl::string_view data, bool end_stream) {
+  parent_.connection().dispatcher().post([this, data, end_stream]() -> void {
+    Buffer::OwnedImpl fake_data(data.data(), data.size());
+    encoder_.encodeData(fake_data, end_stream);
+  });
+}
+
 void FakeStream::encodeData(uint64_t size, bool end_stream) {
   parent_.connection().dispatcher().post([this, size, end_stream]() -> void {
     Buffer::OwnedImpl data(std::string(size, 'a'));
@@ -136,6 +143,18 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, ui
     }
   }
   return AssertionSuccess();
+}
+
+AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
+                                        absl::string_view data, milliseconds timeout) {
+  auto succeeded = waitForData(client_dispatcher, data.length(), timeout);
+  if (succeeded) {
+    Buffer::OwnedImpl buffer(data.data(), data.length());
+    if (!TestUtility::buffersEqual(body(), buffer)) {
+      return AssertionFailure() << body().toString() << " not equal to " << data;
+    }
+  }
+  return succeeded;
 }
 
 AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher,

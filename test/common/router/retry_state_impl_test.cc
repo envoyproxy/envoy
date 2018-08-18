@@ -13,9 +13,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Router {

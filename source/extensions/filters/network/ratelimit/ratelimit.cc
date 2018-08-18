@@ -69,7 +69,7 @@ void Filter::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void Filter::complete(RateLimit::LimitStatus status) {
+void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&&) {
   status_ = Status::Complete;
   config_->stats().active_.dec();
 

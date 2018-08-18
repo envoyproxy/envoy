@@ -91,7 +91,6 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "metadata_lib",
-    srcs = ["metadata.cc"],
     hdrs = ["metadata.h"],
     external_deps = ["abseil_optional"],
     deps = [
@@ -187,11 +186,13 @@ envoy_cc_library(
     name = "transport_lib",
     srcs = [
         "framed_transport_impl.cc",
+        "header_transport_impl.cc",
         "transport_impl.cc",
         "unframed_transport_impl.cc",
     ],
     hdrs = [
         "framed_transport_impl.h",
+        "header_transport_impl.h",
         "transport_impl.h",
         "unframed_transport_impl.h",
     ],

@@ -47,12 +47,16 @@ public:
   void recordValue(uint64_t value) override;
   bool used() const override { return flags_ & Flags::Used; }
 
+  // Stats::Metric
+  const std::string name() const override { return name_; }
+
 private:
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
   uint64_t current_active_;
   histogram_t* histograms_[2];
   std::atomic<uint16_t> flags_;
   std::thread::id created_thread_id_;
+  const std::string name_;
 };
 
 typedef std::shared_ptr<ThreadLocalHistogramImpl> TlsHistogramSharedPtr;
@@ -86,6 +90,9 @@ public:
   }
   const std::string summary() const override;
 
+  // Stats::Metric
+  const std::string name() const override { return name_; }
+
 private:
   bool usedLockHeld() const EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
 
@@ -98,6 +105,7 @@ private:
   mutable Thread::MutexBasicLockable merge_lock_;
   std::list<TlsHistogramSharedPtr> tls_histograms_ GUARDED_BY(merge_lock_);
   bool merged_;
+  const std::string name_;
 };
 
 typedef std::shared_ptr<ParentHistogramImpl> ParentHistogramImplSharedPtr;

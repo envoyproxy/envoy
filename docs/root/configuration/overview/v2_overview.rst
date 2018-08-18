@@ -96,6 +96,7 @@ A minimal fully static bootstrap config is provided below:
       type: STATIC
       lb_policy: ROUND_ROBIN
       load_assignment:
+        cluster_name: some_service
         endpoints:
         - lb_endpoints:
           - endpoint:
@@ -158,6 +159,7 @@ on 127.0.0.3:5678 is provided below:
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {}
       load_assignment:
+        cluster_name: xds_cluster
         endpoints:
         - lb_endpoints:
           - endpoint:

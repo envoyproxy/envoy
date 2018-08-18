@@ -6,6 +6,7 @@ import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
@@ -30,6 +31,9 @@ message HealthCheckEvent {
     // Host addition.
     HealthCheckAddHealthy add_healthy_event = 5;
   }
+
+  // Timestamp for event.
+  google.protobuf.Timestamp timestamp = 6 [(gogoproto.stdtime) = true];
 }
 
 enum HealthCheckFailureType {

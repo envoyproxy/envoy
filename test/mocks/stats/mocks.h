@@ -27,10 +27,13 @@ public:
   MockCounter();
   ~MockCounter();
 
+  // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
+  // creates a deadlock in gmock and is an unintended use of mock functions.
+  const std::string name() const override { return name_; };
+
   MOCK_METHOD1(add, void(uint64_t amount));
   MOCK_METHOD0(inc, void());
   MOCK_METHOD0(latch, uint64_t());
-  MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(tagExtractedName, const std::string&());
   MOCK_CONST_METHOD0(tags, const std::vector<Tag>&());
   MOCK_METHOD0(reset, void());
@@ -49,10 +52,13 @@ public:
   MockGauge();
   ~MockGauge();
 
+  // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
+  // creates a deadlock in gmock and is an unintended use of mock functions.
+  const std::string name() const override { return name_; };
+
   MOCK_METHOD1(add, void(uint64_t amount));
   MOCK_METHOD0(dec, void());
   MOCK_METHOD0(inc, void());
-  MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(tagExtractedName, const std::string&());
   MOCK_CONST_METHOD0(tags, const std::vector<Tag>&());
   MOCK_METHOD1(set, void(uint64_t value));
@@ -73,7 +79,7 @@ public:
 
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
-  const std::string& name() const override { return name_; };
+  const std::string name() const override { return name_; };
 
   MOCK_CONST_METHOD0(tagExtractedName, const std::string&());
   MOCK_CONST_METHOD0(tags, const std::vector<Tag>&());
@@ -92,7 +98,7 @@ public:
 
   // Note: cannot be mocked because it is accessed as a Property in a gmock EXPECT_CALL. This
   // creates a deadlock in gmock and is an unintended use of mock functions.
-  const std::string& name() const override { return name_; };
+  const std::string name() const override { return name_; };
   void merge() override {}
   const std::string summary() const override { return ""; };
 

@@ -78,7 +78,6 @@ public:
     return socket_->localAddress();
   }
   void setConnectionStats(const ConnectionStats& stats) override;
-  Ssl::Connection* ssl() override { return transport_socket_->ssl(); }
   const Ssl::Connection* ssl() const override { return transport_socket_->ssl(); }
   State state() const override;
   void write(Buffer::Instance& data, bool end_stream) override;

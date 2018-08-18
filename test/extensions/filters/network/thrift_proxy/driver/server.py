@@ -133,7 +133,14 @@ def main(cfg):
     elif cfg.transport == "unframed":
         transport_factory = TTransport.TBufferedTransportFactory()
     elif cfg.transport == "header":
-        transport_factory = THeaderTransport.THeaderTransportFactory()
+        if cfg.protocol == "binary":
+            transport_factory = THeaderTransport.THeaderTransportFactory(
+                THeaderTransport.T_BINARY_PROTOCOL)
+        elif cfg.protocol == "compact":
+            transport_factory = THeaderTransport.THeaderTransportFactory(
+                THeaderTransport.T_COMPACT_PROTOCOL)
+        else:
+            sys.exit("header transport cannot be used with protocol {0}".format(cfg.protocol))
     else:
         sys.exit("unknown transport {0}".format(cfg.transport))
 
@@ -157,7 +164,7 @@ def main(cfg):
     elif cfg.response == "exception":
         print("Thrift Server will throw Thrift exceptions for all messages")
 
-    server = TServer.TSimpleServer(processor, transport, transport_factory, protocol_factory)
+    server = TServer.TThreadedServer(processor, transport, transport_factory, protocol_factory)
     try:
         server.serve()
     except KeyboardInterrupt:

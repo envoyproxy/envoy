@@ -11,6 +11,13 @@ This is a filter which allows a RESTful JSON API client to send requests to Envo
 and get proxied to a gRPC service. The HTTP mapping for the gRPC service has to be defined by
 `custom options <https://cloud.google.com/service-management/reference/rpc/google.api#http>`_.
 
+JSON mapping
+------------
+
+The protobuf to JSON mapping is defined `here <https://developers.google.com/protocol-buffers/docs/proto3#json>`_. For
+gRPC stream request parameters, Envoy expects an array of messages, and it returns an array of messages for stream
+response parameters.
+
 .. _config_grpc_json_generate_proto_descriptor_set:
 
 How to generate proto descriptor set
@@ -75,3 +82,61 @@ as its output message type. The implementation needs to set
 (which sets the value of the HTTP response `Content-Type` header) and
 `data <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto#L71>`_
 (which sets the HTTP response body) accordingly.
+
+
+Sample Envoy configuration
+--------------------------
+
+Here's a sample Envoy configuration that proxies to a gRPC server running on localhost:50051. Port 51051 proxies
+gRPC requests and uses the gRPC-JSON transcoder filter to provide the RESTful JSON mapping. I.e., you can make either
+gRPC or RESTful JSON requests to localhost:51051.
+
+.. code-block:: yaml
+
+  admin:
+    access_log_path: /tmp/admin_access.log
+    address:
+      socket_address: { address: 0.0.0.0, port_value: 9901 }
+
+  static_resources:
+    listeners:
+    - name: listener1
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 51051 }
+      filter_chains:
+      - filters:
+        - name: envoy.http_connection_manager
+          config:
+            stat_prefix: grpc_json
+            codec_type: AUTO
+            route_config:
+              name: local_route
+              virtual_hosts:
+              - name: local_service
+                domains: ["*"]
+                routes:
+                - match: { prefix: "/" }
+                  route: { cluster: grpc, timeout: { seconds: 60 } }
+            http_filters:
+            - name: envoy.grpc_json_transcoder
+              config:
+                proto_descriptor: "/tmp/envoy/proto.pb"
+                services: ["HelloWorld"]
+                print_options:
+                  add_whitespace: true
+                  always_print_primitive_fields: true
+                  always_print_enums_as_ints: false
+                  preserve_proto_field_names: false
+            - name: envoy.router
+
+    clusters:
+    - name: grpc
+      connect_timeout: 1.25s
+      type: logical_dns
+      lb_policy: round_robin
+      dns_lookup_family: V4_ONLY
+      http2_protocol_options: {}
+      hosts:
+      - socket_address:
+          address: docker.for.mac.localhost
+          port_value: 50051
