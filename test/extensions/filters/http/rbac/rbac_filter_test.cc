@@ -41,11 +41,17 @@ public:
     return std::make_shared<RoleBasedAccessControlFilterConfig>(config, "test", store_);
   }
 
-  RoleBasedAccessControlFilterTest() : config_(setupConfig()), filter_(config_) {}
+  RoleBasedAccessControlFilterTest() : config_(setupConfig()), filter_(config_) {
+    metadata_.mutable_filter_metadata()->insert(
+        Protobuf::MapPair<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>(HttpFilterNames::get().Rbac, metrics_));
+
+  }
 
   void SetUp() {
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
     EXPECT_CALL(callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
+    EXPECT_CALL(req_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
+    //EXPECT_CALL(metadata_, filter_metadata()).WillRepeatedly(ReturnRef(metadata_));
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
@@ -60,6 +66,7 @@ public:
   Stats::IsolatedStoreImpl store_;
   RoleBasedAccessControlFilterConfigSharedPtr config_;
 
+  Protobuf::Struct metrics_;
   envoy::api::v2::core::Metadata metadata_;
   RoleBasedAccessControlFilter filter_;
   Network::Address::InstanceConstSharedPtr address_;
@@ -92,6 +99,7 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers_, true));
   EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(1U, config_->stats().shadow_allowed_.value());
+  EXPECT_EQ("200", (*metrics_.mutable_fields())["shadow_response_code"].string_value());
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
