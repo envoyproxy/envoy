@@ -80,23 +80,44 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
       shadow_resp_code = resp_code_403;
     }
 
+
     const auto& filter_metadata = callbacks_->requestInfo().dynamicMetadata().filter_metadata();
+    //auto filter_metadata = callbacks_->requestInfo().dynamicMetadata().mutable_filter_metadata();
     const auto filter_it = filter_metadata.find(HttpFilterNames::get().Rbac);
     if (filter_it != filter_metadata.end()) {
+      std::cout << "***Found dynamic_metadata found for filter for rbac";
       ProtobufWkt::Struct metrics;
 
       if (!effective_policy_id.empty()) {
         ProtobufWkt::Value policy_id;
         policy_id.set_string_value(effective_policy_id);
         (*metrics.mutable_fields())[shadow_policy_id_field] = policy_id;
+        std::cout << "***policy_id " << policy_id.string_value() << "\n";
       }
 
       ProtobufWkt::Value resp_code;
       resp_code.set_string_value(shadow_resp_code);
       (*metrics.mutable_fields())[shadow_resp_code_field] = resp_code;
+      std::cout << "***shadow_resp_code " << resp_code.string_value() << "\n";
 
-      auto filter_meta = filter_metadata.at(HttpFilterNames::get().Rbac);
-      filter_meta.MergeFrom(metrics);
+
+      //auto filter_meta = filter_metadata.at(HttpFilterNames::get().Rbac);
+      //filter_meta.MergeFrom(metrics);
+      callbacks_->requestInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
+      std::cout << "*****metrics length " << metrics.fields().size() << "\n";
+
+      std::cout << "*****fileds length " << callbacks_->requestInfo().dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac).fields().size();
+
+      auto fm = callbacks_->requestInfo().dynamicMetadata().filter_metadata();
+      auto fields = fm[HttpFilterNames::get().Rbac].fields();
+      for (auto it = fields.begin(); it != fields.end(); it++) {
+        std::cout << "-----first " << it->first << "\n";
+        std::cout << "-----second " << it->second.string_value() << "\n";
+      }
+    } else {
+      ENVOY_LOG(debug, "No dynamic_metadata found for filter {}",
+                Extensions::HttpFilters::HttpFilterNames::get().Rbac);
+      std::cout << "***No dynamic_metadata found for filter for rbac";
     }
   }
 
