@@ -644,7 +644,7 @@ route:
 
   // Initialize start_time as 2018-04-03T23:06:09.123Z in microseconds.
   const SystemTime start_time(std::chrono::microseconds(1522796769123456));
-  EXPECT_CALL(request_info, startTime()).Times(4).WillRepeatedly(Return(start_time));
+  EXPECT_CALL(request_info, startTime()).Times(7).WillRepeatedly(Return(start_time));
 
   resp_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("x-client-ip"));
