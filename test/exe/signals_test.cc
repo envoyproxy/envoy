@@ -124,4 +124,4 @@ TEST(Signals, HandlerTest) {
   SignalAction::sigHandler(SIGURG, &fake_si, nullptr);
 }
 
-} // Envoy
+} // namespace Envoy

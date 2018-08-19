@@ -33,9 +33,10 @@ public:
   virtual ~RequestCallbacks() {}
 
   /**
-   * Called when a limit request is complete. The resulting status is supplied.
+   * Called when a limit request is complete. The resulting status and
+   * response headers are supplied.
    */
-  virtual void complete(LimitStatus status) PURE;
+  virtual void complete(LimitStatus status, Http::HeaderMapPtr&& headers) PURE;
 };
 
 /**

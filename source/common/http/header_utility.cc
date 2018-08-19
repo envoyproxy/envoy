@@ -2,6 +2,7 @@
 
 #include "common/common/utility.h"
 #include "common/config/rds_json.h"
+#include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/match.h"
@@ -113,6 +114,19 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
   }
 
   return match != header_data.invert_match_;
+}
+
+void HeaderUtility::addHeaders(Http::HeaderMap& headers, const Http::HeaderMap& headers_to_add) {
+  headers_to_add.iterate(
+      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+        Http::HeaderString k;
+        k.setCopy(header.key().c_str(), header.key().size());
+        Http::HeaderString v;
+        v.setCopy(header.value().c_str(), header.value().size());
+        static_cast<Http::HeaderMapImpl*>(context)->addViaMove(std::move(k), std::move(v));
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      &headers);
 }
 
 } // namespace Http

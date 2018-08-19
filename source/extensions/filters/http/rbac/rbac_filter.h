@@ -10,31 +10,12 @@
 #include "common/common/logger.h"
 
 #include "extensions/filters/common/rbac/engine_impl.h"
+#include "extensions/filters/common/rbac/utility.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
-
-/**
- * All stats for the RBAC filter. @see stats_macros.h
- */
-// clang-format off
-#define ALL_RBAC_FILTER_STATS(COUNTER)                                                             \
-  COUNTER(allowed)                                                                                 \
-  COUNTER(denied)                                                                                  \
-  COUNTER(shadow_allowed)                                                                          \
-  COUNTER(shadow_denied)
-// clang-format on
-
-/**
- * Wrapper struct for RBAC filter stats. @see stats_macros.h
- */
-struct RoleBasedAccessControlFilterStats {
-  ALL_RBAC_FILTER_STATS(GENERATE_COUNTER_STRUCT)
-};
-
-enum class EnforcementMode { Enforced, Shadow };
 
 class RoleBasedAccessControlRouteSpecificFilterConfig : public Router::RouteSpecificFilterConfig {
 public:
@@ -42,8 +23,8 @@ public:
       const envoy::config::filter::http::rbac::v2::RBACPerRoute& per_route_config);
 
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
-  engine(EnforcementMode mode) const {
-    return mode == EnforcementMode::Enforced ? engine_ : shadow_engine_;
+  engine(Filters::Common::RBAC::EnforcementMode mode) const {
+    return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_ : shadow_engine_;
   }
 
 private:
@@ -60,18 +41,19 @@ public:
       const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
       const std::string& stats_prefix, Stats::Scope& scope);
 
-  RoleBasedAccessControlFilterStats& stats() { return stats_; }
+  Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }
 
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
-  engine(const Router::RouteConstSharedPtr route, EnforcementMode mode) const;
+  engine(const Router::RouteConstSharedPtr route,
+         Filters::Common::RBAC::EnforcementMode mode) const;
 
 private:
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
-  engine(EnforcementMode mode) const {
-    return mode == EnforcementMode::Enforced ? engine_ : shadow_engine_;
+  engine(Filters::Common::RBAC::EnforcementMode mode) const {
+    return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_ : shadow_engine_;
   }
 
-  RoleBasedAccessControlFilterStats stats_;
+  Filters::Common::RBAC::RoleBasedAccessControlFilterStats stats_;
 
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> engine_;
   const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl> shadow_engine_;
@@ -88,9 +70,6 @@ class RoleBasedAccessControlFilter : public Http::StreamDecoderFilter,
 public:
   RoleBasedAccessControlFilter(RoleBasedAccessControlFilterConfigSharedPtr config)
       : config_(config) {}
-
-  static RoleBasedAccessControlFilterStats generateStats(const std::string& prefix,
-                                                         Stats::Scope& scope);
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;

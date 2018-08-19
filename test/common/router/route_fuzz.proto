@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package test.common.router;
+
+import "envoy/api/v2/rds.proto";
+import "test/fuzz/common.proto";
+
+// Structured input for route_fuzz_test.
+
+message RouteTestCase {
+  envoy.api.v2.RouteConfiguration config = 1;
+  test.fuzz.Headers headers = 2;
+  uint32 random_value = 3;
+}

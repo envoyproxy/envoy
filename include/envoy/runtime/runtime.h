@@ -112,8 +112,8 @@ public:
    *        does not exist or it is not an integer.
    * @param random_value supplies the stable random value to use for determining whether the feature
    *        is enabled.
-   * @param control max number of buckets for sampling. Sampled value will be in a range of
-   *        [0, num_buckets).
+   * @param num_buckets control max number of buckets for sampling. Sampled value will be in a range
+   *        of [0, num_buckets).
    * @return true if the feature is enabled.
    */
   virtual bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,

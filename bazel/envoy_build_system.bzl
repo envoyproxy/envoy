@@ -233,7 +233,7 @@ def envoy_cc_binary(
     )
 
 # Envoy C++ fuzz test targes. These are not included in coverage runs.
-def envoy_cc_fuzz_test(name, corpus, deps = [], **kwargs):
+def envoy_cc_fuzz_test(name, corpus, deps = [], tags = [], **kwargs):
     test_lib_name = name + "_lib"
     envoy_cc_test_library(
         name = test_lib_name,
@@ -255,6 +255,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], **kwargs):
                 "//test/fuzz:main",
             ],
         }),
+        tags = tags,
     )
     native.cc_binary(
         name = name + "_driverless",
@@ -263,7 +264,7 @@ def envoy_cc_fuzz_test(name, corpus, deps = [], **kwargs):
         linkstatic = 1,
         testonly = 1,
         deps = [":" + test_lib_name],
-        tags = ["manual"],
+        tags = ["manual"] + tags,
     )
 
 # Envoy C++ test targets should be specified with this function.

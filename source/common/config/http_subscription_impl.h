@@ -69,6 +69,9 @@ public:
     request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
     request.headers().insertPath().value(path_);
     request.body().reset(new Buffer::OwnedImpl(MessageUtil::getJsonStringFromMessage(request_)));
+    request.headers().insertContentType().value().setReference(
+        Http::Headers::get().ContentTypeValues.Json);
+    request.headers().insertContentLength().value(request.body()->length());
   }
 
   void parseResponse(const Http::Message& response) override {

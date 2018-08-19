@@ -102,13 +102,15 @@ typedef std::shared_ptr<AccessLog> AccessLogSharedPtr;
 class FaultConfig {
 public:
   FaultConfig(const envoy::config::filter::fault::v2::FaultDelay& fault_config)
-      : delay_percent_(fault_config.percent()),
-        duration_ms_(PROTOBUF_GET_MS_REQUIRED(fault_config, fixed_delay)) {}
-  uint32_t delayPercent() const { return delay_percent_; }
+      : duration_ms_(PROTOBUF_GET_MS_REQUIRED(fault_config, fixed_delay)) {
+    PROTOBUF_SET_FRACTIONAL_PERCENT_OR_DEFAULT(delay_percentage_, fault_config, percentage,
+                                               percent);
+  }
+  envoy::type::FractionalPercent delayPercentage() const { return delay_percentage_; }
   uint64_t delayDuration() const { return duration_ms_; }
 
 private:
-  const uint32_t delay_percent_;
+  envoy::type::FractionalPercent delay_percentage_;
   const uint64_t duration_ms_;
 };
 
@@ -125,7 +127,7 @@ class ProxyFilter : public Network::Filter,
 public:
   ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
               AccessLogSharedPtr access_log, const FaultConfigSharedPtr& fault_config,
-              const Network::DrainDecision& drain_decision);
+              const Network::DrainDecision& drain_decision, Runtime::RandomGenerator& generator);
   ~ProxyFilter();
 
   virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
@@ -193,6 +195,7 @@ private:
   MongoProxyStats stats_;
   Runtime::Loader& runtime_;
   const Network::DrainDecision& drain_decision_;
+  Runtime::RandomGenerator& generator_;
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
   bool sniffing_{true};

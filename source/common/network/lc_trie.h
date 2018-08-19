@@ -445,19 +445,13 @@ private:
       ip_prefixes_ = data;
       std::sort(ip_prefixes_.begin(), ip_prefixes_.end());
 
-      // In theory, the trie_ vector can have at most twice the number of ip_prefixes entries - 1.
-      // However, due to the fill factor a buffer is added to the size of the
-      // trie_. The buffer value(2000000) is reused from the reference implementation in
-      // http://www.csc.kth.se/~snilsson/software/router/C/trie.c.
-      // TODO(ccaraman): Define a better buffer value when resizing the trie_.
-      maximum_trie_node_size = 2 * ip_prefixes_.size() + 2000000;
-      trie_.resize(maximum_trie_node_size);
-
       // Build the trie_.
+      trie_.reserve(static_cast<size_t>(ip_prefixes_.size() / fill_factor_));
       uint32_t next_free_index = 1;
       buildRecursive(0u, 0u, ip_prefixes_.size(), 0u, next_free_index);
 
       // The value of next_free_index is the final size of the trie_.
+      ASSERT(next_free_index <= trie_.size());
       trie_.resize(next_free_index);
       trie_.shrink_to_fit();
     }
@@ -575,21 +569,23 @@ private:
      */
     void buildRecursive(uint32_t prefix, uint32_t first, uint32_t n, uint32_t position,
                         uint32_t& next_free_index) {
-      // Setting a leaf, the branch and skip are 0.
-      if (n == 1) {
+      if (position >= trie_.size()) {
         // There is no way to predictably determine the number of trie nodes required to build a
         // LC-Trie. If while building the trie the position that is being set exceeds the maximum
         // number of supported trie_ entries, throw an Envoy Exception.
-        if (position >= maximum_trie_node_size) {
+        if (position >= MaxLcTrieNodes) {
           // Adding 1 to the position to count how many nodes are trying to be set.
           throw EnvoyException(
               fmt::format("The number of internal nodes required for the LC-Trie "
                           "exceeded the maximum number of "
                           "supported nodes. Minimum number of internal nodes required: "
                           "'{0}'. Maximum number of supported nodes: '{1}'.",
-                          (position + 1), maximum_trie_node_size));
+                          (position + 1), MaxLcTrieNodes));
         }
-
+        trie_.resize(position + 1);
+      }
+      // Setting a leaf, the branch and skip are 0.
+      if (n == 1) {
         trie_[position].address_ = first;
         return;
       }
@@ -681,10 +677,6 @@ private:
       uint32_t skip_ : 7;
       uint32_t address_ : 20; // If this 20-bit size changes, please change MaxLcTrieNodes too.
     };
-
-    // During build(), an estimate of the number of nodes required will be made and set this
-    // value. This is used to ensure no out_of_range exception is thrown.
-    uint32_t maximum_trie_node_size;
 
     // The CIDR range and data needs to be maintained separately from the LC-Trie. A LC-Trie skips
     // chunks of data while searching for a match. This means that the node found in the LC-Trie

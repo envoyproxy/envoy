@@ -219,7 +219,7 @@ bool SslSocket::peerCertificatePresented() const {
   return cert != nullptr;
 }
 
-std::string SslSocket::uriSanLocalCertificate() {
+std::string SslSocket::uriSanLocalCertificate() const {
   // The cert object is not owned.
   X509* cert = SSL_get_certificate(ssl_.get());
   if (!cert) {
@@ -228,7 +228,7 @@ std::string SslSocket::uriSanLocalCertificate() {
   return getUriSanFromCertificate(cert);
 }
 
-std::vector<std::string> SslSocket::dnsSansLocalCertificate() {
+std::vector<std::string> SslSocket::dnsSansLocalCertificate() const {
   X509* cert = SSL_get_certificate(ssl_.get());
   if (!cert) {
     return {};
@@ -284,7 +284,7 @@ std::string SslSocket::uriSanPeerCertificate() const {
   return getUriSanFromCertificate(cert.get());
 }
 
-std::vector<std::string> SslSocket::dnsSansPeerCertificate() {
+std::vector<std::string> SslSocket::dnsSansPeerCertificate() const {
   bssl::UniquePtr<X509> cert(SSL_get_peer_certificate(ssl_.get()));
   if (!cert) {
     return {};
@@ -309,7 +309,7 @@ std::string SslSocket::getUriSanFromCertificate(X509* cert) const {
   return "";
 }
 
-std::vector<std::string> SslSocket::getDnsSansFromCertificate(X509* cert) {
+std::vector<std::string> SslSocket::getDnsSansFromCertificate(X509* cert) const {
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names == nullptr) {

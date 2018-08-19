@@ -131,6 +131,50 @@ TEST(AutoTransportTest, DecodeFrameStart) {
     EXPECT_EQ(transport.type(), TransportType::Unframed);
     EXPECT_EQ(buffer.length(), 8);
   }
+
+  // Header transport + binary protocol
+  {
+    AutoTransportImpl transport;
+    Buffer::OwnedImpl buffer;
+    addInt32(buffer, 0xFF);
+    addInt16(buffer, 0x0FFF); // header magic
+    addInt16(buffer, 0x0000);
+    addInt32(buffer, 0xEE); // sequence id
+    addInt16(buffer, 1);
+    addInt32(buffer, 0); // protocol (binary), 0 transforms + padding
+    addInt16(buffer, 0x8001);
+
+    MessageMetadata metadata;
+    EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
+    EXPECT_THAT(metadata, HasFrameSize(241U));
+    EXPECT_THAT(metadata, HasProtocol(ProtocolType::Binary));
+    EXPECT_THAT(metadata, HasSequenceId(0xEE));
+    EXPECT_EQ(transport.name(), "header(auto)");
+    EXPECT_EQ(transport.type(), TransportType::Header);
+    EXPECT_EQ(buffer.length(), 2);
+  }
+
+  // Header transport + compact protocol
+  {
+    AutoTransportImpl transport;
+    Buffer::OwnedImpl buffer;
+    addInt32(buffer, 0xFF);
+    addInt16(buffer, 0x0FFF); // header magic
+    addInt16(buffer, 0x0000);
+    addInt32(buffer, 0xEE); // sequence id
+    addInt16(buffer, 1);
+    addInt32(buffer, 0x02000000); // protocol (binary), 0 transforms + padding
+    addInt16(buffer, 0x8201);
+
+    MessageMetadata metadata;
+    EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
+    EXPECT_THAT(metadata, HasFrameSize(241U));
+    EXPECT_THAT(metadata, HasProtocol(ProtocolType::Compact));
+    EXPECT_THAT(metadata, HasSequenceId(0xEE));
+    EXPECT_EQ(transport.name(), "header(auto)");
+    EXPECT_EQ(transport.type(), TransportType::Header);
+    EXPECT_EQ(buffer.length(), 2);
+  }
 }
 
 TEST(AutoTransportTest, DecodeFrameEnd) {
