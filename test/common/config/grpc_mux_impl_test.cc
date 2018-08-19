@@ -426,7 +426,9 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, time_source_),
-      EnvoyException, "ads: setting --service-cluster and --service-node is required");
+      EnvoyException,
+      "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
+      "--service-node and --service-cluster options.");
 }
 
 TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
@@ -437,7 +439,9 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
           random_, time_source_),
-      EnvoyException, "ads: setting --service-cluster and --service-node is required");
+      EnvoyException,
+      "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
+      "--service-node and --service-cluster options.");
 }
 
 } // namespace
