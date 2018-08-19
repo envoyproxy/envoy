@@ -618,6 +618,10 @@ route:
         value: "%START_TIME(%s.%3f)%"
       append: true
     - header:
+        key: "x-request-start"
+        value: "%START_TIME(%s.%3f)%  %START_TIME% %START_TIME(%s)%"
+      append: true
+    - header:
         key: "x-request-start-f"
         value: "%START_TIME(f)%"
       append: true
