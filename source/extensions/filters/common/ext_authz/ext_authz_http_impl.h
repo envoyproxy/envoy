@@ -41,6 +41,7 @@ public:
   void onFailure(Http::AsyncClient::FailureReason reason) override;
 
 private:
+  ResponsePtr messageToResponse(Http::MessagePtr& message);
   const std::string cluster_name_;
   const std::string path_prefix_;
   const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers_;

@@ -16,6 +16,7 @@
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/logger.h"
 #include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/common/ext_authz/check_request_utils.h"
@@ -45,7 +46,9 @@ typedef ConstSingleton<ConstantValues> Constants;
  * The gRPC client does not rewrite path. NOTE: We create gRPC client for each filter stack instead
  * of a client per thread. That is ok since this is unary RPC and the cost of doing this is minimal.
  */
-class GrpcClientImpl : public Client, public ExtAuthzAsyncCallbacks {
+class GrpcClientImpl : public Client,
+                       public ExtAuthzAsyncCallbacks,
+                       Logger::Loggable<Logger::Id::config> {
 public:
   GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
                  const absl::optional<std::chrono::milliseconds>& timeout);

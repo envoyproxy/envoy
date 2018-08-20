@@ -2,6 +2,7 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/http/async_client_impl.h"
+#include "common/http/codes.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -63,42 +64,67 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        timeout_);
 }
 
-void RawHttpClientImpl::onSuccess(Http::MessagePtr&& response) {
-  ResponsePtr authz_response = std::make_unique<Response>(Response{});
+ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr& message) {
+  ResponsePtr response = std::make_unique<Response>(Response{});
 
-  uint64_t status_code;
-  if (StringUtil::atoul(response->headers().Status()->value().c_str(), status_code)) {
-    if (status_code == enumToInt(Http::Code::OK)) {
-      authz_response->status = CheckStatus::OK;
-      authz_response->status_code = Http::Code::OK;
-    } else {
-      authz_response->status = CheckStatus::Denied;
-      authz_response->body = response->bodyAsString();
-      authz_response->status_code = static_cast<Http::Code>(status_code);
-    }
-  } else {
-    ENVOY_LOG(warn, "Authz_Ext failed to parse the HTTP response code.");
-    authz_response->status_code = Http::Code::Forbidden;
-    authz_response->status = CheckStatus::Denied;
+  // Set an error status if parsing status code fails. A Forbidden response is sent to the client
+  // if the filter has not been configured with failure_mode_allow.
+  uint64_t status_code{};
+  if (!StringUtil::atoul(message->headers().Status()->value().c_str(), status_code)) {
+    ENVOY_LOG(warn, "ext_authz HTTP client failed to parse the HTTP status code.");
+    response->status = CheckStatus::Error;
+    response->status_code = Http::Code::Forbidden;
+    return response;
   }
 
+  // Set an error status if the call to the authorization server returns any of the 5xx HTTP error
+  // codes. A Forbidden response is sent to the client if the filter has not been configured with
+  // failure_mode_allow.
+  if (Http::CodeUtility::is5xx(status_code)) {
+    ENVOY_LOG(warn, "{} HTTP error code received from the authorization server.", status_code);
+    response->status = CheckStatus::Error;
+    response->status_code = Http::Code::Forbidden;
+    return response;
+  }
+
+  // Set an accepted authorization response if status is OK.
+  if (status_code == enumToInt(Http::Code::OK)) {
+    response->status = CheckStatus::OK;
+    response->status_code = Http::Code::OK;
+    return response;
+  }
+
+  // Deny otherwise.
+  response->status = CheckStatus::Denied;
+  response->status_code = static_cast<Http::Code>(status_code);
+
+  // Copy the body message that should be in the response.
+  response->body = message->bodyAsString();
+
+  // Copy all headers from the message that should be in the response.
   for (const auto& allowed_header : allowed_authorization_headers_) {
-    const auto* entry = response->headers().get(allowed_header);
+    const auto* entry = message->headers().get(allowed_header);
     if (entry) {
-      authz_response->headers_to_add.emplace_back(Http::LowerCaseString{entry->key().c_str()},
-                                                  std::string{entry->value().c_str()});
+      response->headers_to_add.emplace_back(Http::LowerCaseString{entry->key().c_str()},
+                                            std::string{entry->value().c_str()});
     }
   }
 
-  callbacks_->onComplete(std::move(authz_response));
+  return response;
+}
+
+void RawHttpClientImpl::onSuccess(Http::MessagePtr&& response) {
+  callbacks_->onComplete(messageToResponse(response));
   callbacks_ = nullptr;
 }
 
 void RawHttpClientImpl::onFailure(Http::AsyncClient::FailureReason reason) {
+  ENVOY_LOG(warn, "ext_authz HTTP client failed to call the authorization server.");
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
-  Response authz_response{};
-  authz_response.status = CheckStatus::Error;
-  callbacks_->onComplete(std::make_unique<Response>(authz_response));
+  Response response{};
+  response.status = CheckStatus::Error;
+  response.status_code = Http::Code::Forbidden;
+  callbacks_->onComplete(std::make_unique<Response>(response));
   callbacks_ = nullptr;
 }
 
