@@ -196,13 +196,11 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
         std::string args = token[StartTimeParamStart - 1] == '('
                                ? token.substr(StartTimeParamStart, parameters_end)
                                : "";
-        std::cerr << "args " << args << std::endl;
         if (args[0] == '"') {
           if (args[args.length() - 1] != '"') {
             throw EnvoyException(fmt::format("Unterminated string format: {}", args));
           }
           args = args.substr(1, args.length() - 2);
-          std::cerr << "args " << args << std::endl;
         }
         formatters.emplace_back(new StartTimeFormatter(args));
       } else {
