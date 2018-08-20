@@ -7,8 +7,6 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/test_common/environment.h"
-#include "test/test_common/network_utility.h"
 
 #include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
@@ -445,8 +443,6 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
 
   NiceMock<Envoy::Server::Configuration::MockAdminStream> admin_stream_mock;
 
-  ON_CALL(admin_stream_mock, setEndStreamOnComplete(_)).WillByDefault(Return());
-  ON_CALL(admin_stream_mock, addOnDestroyCallback(_)).WillByDefault(Return());
   ON_CALL(admin_stream_mock, getDecoderFilterCallbacks()).WillByDefault(ReturnRef(callbacks_));
 
   ASSERT_EQ(
@@ -454,11 +450,10 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
       Http::Code::OK);
 
   // Check that response_headers has been set correctly
-  EXPECT_EQ(std::string(response_headers.ContentType()->value().getStringView()),
-            "text/event-stream");
-  EXPECT_EQ(std::string(response_headers.CacheControl()->value().getStringView()), "no-cache");
-  EXPECT_EQ(std::string(response_headers.Connection()->value().getStringView()), "close");
-  EXPECT_EQ(std::string(response_headers.AccessControlAllowOrigin()->value().getStringView()), "*");
+  EXPECT_EQ(response_headers.ContentType()->value(), "text/event-stream");
+  EXPECT_EQ(response_headers.CacheControl()->value(), "no-cache");
+  EXPECT_EQ(response_headers.Connection()->value(), "close");
+  EXPECT_EQ(response_headers.AccessControlAllowOrigin()->value(), "*");
   EXPECT_THAT(std::string(response_headers.AccessControlAllowHeaders()->value().getStringView()),
               testing::HasSubstr("Accept"));
 }
