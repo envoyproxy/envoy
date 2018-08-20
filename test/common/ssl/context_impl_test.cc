@@ -445,10 +445,10 @@ tls_certificate:
 
   const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-            client_context_config.certChain());
+            client_context_config.tlsCertificate()->certificateChain());
   const std::string key_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
-            client_context_config.privateKey());
+            client_context_config.tlsCertificate()->privateKey());
 }
 
 TEST(ClientContextConfigImplTest, MissingStaticSecretTlsCertificates) {

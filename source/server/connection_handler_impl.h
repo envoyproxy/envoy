@@ -168,5 +168,5 @@ private:
   std::atomic<uint64_t> num_connections_{};
 };
 
-} // Server
+} // namespace Server
 } // namespace Envoy

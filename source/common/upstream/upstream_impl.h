@@ -225,14 +225,18 @@ private:
  */
 class HostSetImpl : public HostSet {
 public:
-  HostSetImpl(uint32_t priority)
-      : priority_(priority), hosts_(new HostVector()), healthy_hosts_(new HostVector()) {}
+  HostSetImpl(uint32_t priority, absl::optional<uint32_t> overprovisioning_factor)
+      : priority_(priority), overprovisioning_factor_(overprovisioning_factor.has_value()
+                                                          ? overprovisioning_factor.value()
+                                                          : kDefaultOverProvisioningFactor),
+        hosts_(new HostVector()), healthy_hosts_(new HostVector()) {}
 
   void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
                    HostsPerLocalityConstSharedPtr hosts_per_locality,
                    HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-                   const HostVector& hosts_removed) override;
+                   const HostVector& hosts_removed,
+                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
 
   /**
    * Install a callback that will be invoked when the host set membership changes.
@@ -256,6 +260,7 @@ public:
   LocalityWeightsConstSharedPtr localityWeights() const override { return locality_weights_; }
   absl::optional<uint32_t> chooseLocality() override;
   uint32_t priority() const override { return priority_; }
+  uint32_t overprovisioning_factor() const override { return overprovisioning_factor_; }
 
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
@@ -267,6 +272,7 @@ private:
   double effectiveLocalityWeight(uint32_t index) const;
 
   uint32_t priority_;
+  uint32_t overprovisioning_factor_;
   HostVectorConstSharedPtr hosts_;
   HostVectorConstSharedPtr healthy_hosts_;
   HostsPerLocalityConstSharedPtr hosts_per_locality_{HostsPerLocalityImpl::empty()};
@@ -304,12 +310,14 @@ public:
   }
   std::vector<std::unique_ptr<HostSet>>& hostSetsPerPriority() override { return host_sets_; }
   // Get the host set for this priority level, creating it if necessary.
-  HostSet& getOrCreateHostSet(uint32_t priority);
+  HostSet& getOrCreateHostSet(uint32_t priority,
+                              absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
 protected:
   // Allows subclasses of PrioritySetImpl to create their own type of HostSetImpl.
-  virtual HostSetImplPtr createHostSet(uint32_t priority) {
-    return HostSetImplPtr{new HostSetImpl(priority)};
+  virtual HostSetImplPtr createHostSet(uint32_t priority,
+                                       absl::optional<uint32_t> overprovisioning_factor) {
+    return HostSetImplPtr{new HostSetImpl(priority, overprovisioning_factor)};
   }
 
 private:
@@ -562,7 +570,8 @@ public:
   updateClusterPrioritySet(const uint32_t priority, HostVectorSharedPtr&& current_hosts,
                            const absl::optional<HostVector>& hosts_added,
                            const absl::optional<HostVector>& hosts_removed,
-                           const absl::optional<Upstream::Host::HealthFlag> health_checker_flag);
+                           const absl::optional<Upstream::Host::HealthFlag> health_checker_flag,
+                           absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
   // Returns the size of the current cluster priority state.
   size_t size() const { return priority_state_.size(); }
@@ -605,8 +614,37 @@ class BaseDynamicClusterImpl : public ClusterImplBase {
 protected:
   using ClusterImplBase::ClusterImplBase;
 
-  bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_hosts,
-                             HostVector& hosts_added, HostVector& hosts_removed);
+  /**
+   * Updates the host list of a single priority by reconciling the list of new hosts
+   * with existing hosts.
+   *
+   * @param new_hosts the full lists of hosts in the new configuration.
+   * @param current_priority_hosts the full lists of hosts for the priority to be updated. The list
+   * will be modified to contain the updated list of hosts.
+   * @param hosts_added_to_current_priority will be populated with hosts added to the priority.
+   * @param hosts_removed_from_current_priority will be populated with hosts removed from the
+   * priority.
+   * @param updated_hosts is used to aggregate the new state of all hosts accross priority, and will
+   * be updated with the hosts that remain in this priority after the update.
+   * @return whether the hosts for the priority changed.
+   */
+  bool updateDynamicHostList(const HostVector& new_hosts, HostVector& current_priority_hosts,
+                             HostVector& hosts_added_to_current_priority,
+                             HostVector& hosts_removed_from_current_priority,
+                             std::unordered_map<std::string, HostSharedPtr>& updated_hosts);
+
+  typedef std::unordered_map<std::string, Upstream::HostSharedPtr> HostMap;
+
+  /**
+   * Updates the internal collection of all hosts. This should be called with the updated
+   * map of hosts after issuing updateDynamicHostList for each priority.
+   *
+   * @param all_hosts the updated map of address to host after a cluster update.
+   */
+  void updateHostMap(HostMap&& all_hosts) { all_hosts_ = std::move(all_hosts); }
+
+private:
+  HostMap all_hosts_;
 };
 
 /**

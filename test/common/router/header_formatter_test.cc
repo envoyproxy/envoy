@@ -618,6 +618,10 @@ route:
         value: "%START_TIME(%s.%3f)%"
       append: true
     - header:
+        key: "x-request-start-multiple"
+        value: "%START_TIME(%s.%3f)% %START_TIME% %START_TIME(%s)%"
+      append: true
+    - header:
         key: "x-request-start-f"
         value: "%START_TIME(f)%"
       append: true
@@ -640,14 +644,17 @@ route:
 
   // Initialize start_time as 2018-04-03T23:06:09.123Z in microseconds.
   const SystemTime start_time(std::chrono::microseconds(1522796769123456));
-  EXPECT_CALL(request_info, startTime()).Times(4).WillRepeatedly(Return(start_time));
+  EXPECT_CALL(request_info, startTime()).Times(7).WillRepeatedly(Return(start_time));
 
   resp_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("x-client-ip"));
+  EXPECT_TRUE(headerMap.has("x-request-start-multiple"));
   EXPECT_TRUE(headerMap.has("x-safe"));
   EXPECT_FALSE(headerMap.has("x-nope"));
   EXPECT_TRUE(headerMap.has("x-request-start"));
   EXPECT_EQ("1522796769.123", headerMap.get_("x-request-start"));
+  EXPECT_EQ("1522796769.123 2018-04-03T23:06:09.123Z 1522796769",
+            headerMap.get_("x-request-start-multiple"));
   EXPECT_TRUE(headerMap.has("x-request-start-f"));
   EXPECT_EQ("f", headerMap.get_("x-request-start-f"));
   EXPECT_TRUE(headerMap.has("x-request-start-default"));

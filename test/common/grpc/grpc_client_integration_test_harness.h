@@ -19,12 +19,12 @@
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/environment.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Grpc {
@@ -120,7 +120,7 @@ public:
       reply_headers->addReference(value.first, value.second);
     }
     expectInitialMetadata(metadata);
-    fake_stream_->encodeHeaders(*reply_headers, false);
+    fake_stream_->encodeHeaders(Http::HeaderMapImpl(*reply_headers), false);
   }
 
   void sendReply() {

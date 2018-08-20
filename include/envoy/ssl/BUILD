@@ -21,6 +21,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "context_config_interface",
     hdrs = ["context_config.h"],
+    deps = [
+        ":tls_certificate_config_interface",
+    ],
 )
 
 envoy_cc_library(

@@ -23,12 +23,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::WithArgs;
-using testing::_;
 
 namespace Envoy {
 namespace Network {
@@ -206,7 +206,7 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   EXPECT_CALL(factory_context.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
       .WillOnce(Return(&conn_pool));
 
-  request_callbacks->complete(RateLimit::LimitStatus::OK);
+  request_callbacks->complete(RateLimit::LimitStatus::OK, nullptr);
 
   conn_pool.poolReady(upstream_connection);
 

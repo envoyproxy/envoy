@@ -87,6 +87,27 @@ TEST_P(LocalJwksIntegrationTest, ExpiredToken) {
   EXPECT_STREQ("401", response->headers().Status()->value().c_str());
 }
 
+TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
+  config_helper_.addFilter(getFilterConfig(true));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+      {":method", "HEAD"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"Authorization", "Bearer " + std::string(ExpiredToken)},
+  });
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("401", response->headers().Status()->value().c_str());
+  EXPECT_STRNE("0", response->headers().ContentLength()->value().c_str());
+  EXPECT_STREQ("", response->body().c_str());
+}
+
 // The test case with a fake upstream for remote Jwks server.
 class RemoteJwksIntegrationTest : public HttpProtocolIntegrationTest {
 public:

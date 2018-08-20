@@ -1,6 +1,7 @@
 #include "common/config/metadata.h"
 #include "common/network/utility.h"
 
+#include "extensions/filters/common/rbac/utility.h"
 #include "extensions/filters/http/rbac/rbac_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -9,10 +10,10 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {

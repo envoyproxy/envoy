@@ -14,6 +14,7 @@
 
 #include "gmock/gmock.h"
 
+using testing::_;
 using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
@@ -21,7 +22,6 @@ using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::StrEq;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
