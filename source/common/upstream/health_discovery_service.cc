@@ -89,7 +89,7 @@ HdsDelegate::sendResponse() {
           } else if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::UNKNOWN) {
             endpoint->set_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
           } else {
-            throw EnvoyException("Invalid host failure type flag.");
+            NOT_REACHED_GCOVR_EXCL_LINE;
           }
         }
       }
