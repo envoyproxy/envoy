@@ -19,7 +19,6 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::_;
-using Envoy::Server::Configuration::AdminStreamMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -438,13 +437,13 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   // Register callback to sink.
   sink_->registerConnection(&callbacks_);
 
-  // This value don't matter in handlerHystrixEventStream
+  // This value doesn't matter in handlerHystrixEventStream
   absl::string_view path_and_query;
 
   Http::HeaderMapImpl response_headers;
   Stats::IsolatedStoreImpl listener_scope_;
 
-  NiceMock<AdminStreamMock> admin_stream_mock;
+  NiceMock<Envoy::Server::Configuration::MockAdminStream> admin_stream_mock;
 
   ON_CALL(admin_stream_mock, setEndStreamOnComplete(_)).WillByDefault(Return());
   ON_CALL(admin_stream_mock, addOnDestroyCallback(_)).WillByDefault(Return());
