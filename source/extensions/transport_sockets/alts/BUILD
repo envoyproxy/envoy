@@ -11,6 +11,19 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["config.h"],
+    deps = [
+        ":tsi_socket",
+        "//include/envoy/registry",
+        "//include/envoy/server:transport_socket_config_interface",
+        "//source/extensions/transport_sockets:well_known_names",
+        "@envoy_api//envoy/config/transport_socket/alts/v2alpha:alts_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "grpc_tsi_wrapper",
     hdrs = [
         "grpc_tsi.h",
@@ -51,5 +64,25 @@ envoy_cc_library(
         ":grpc_tsi_wrapper",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "tsi_socket",
+    srcs = [
+        "tsi_socket.cc",
+    ],
+    hdrs = [
+        "tsi_socket.h",
+    ],
+    repository = "@envoy",
+    deps = [
+        ":tsi_frame_protector",
+        ":tsi_handshaker",
+        "//include/envoy/network:transport_socket_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:enum_to_int",
+        "//source/common/network:raw_buffer_socket_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )
