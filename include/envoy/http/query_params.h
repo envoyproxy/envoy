@@ -1,5 +1,11 @@
+#pragma once
+
 #include <map>
 #include <string>
+
+#include "envoy/common/pure.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Http {
@@ -9,7 +15,29 @@ namespace Utility {
 // using proper formatting. Perhaps similar to
 // https://github.com/apache/incubator-pagespeed-mod/blob/master/pagespeed/kernel/http/query_params.h
 
-typedef std::map<std::string, std::string> QueryParams;
+typedef std::map<std::string, std::string> QueryParamsMap;
+
+class QueryParams {
+public:
+  virtual ~QueryParams(){};
+
+  /**
+   * @param url supplies the url to parse.
+   * @return QueryParamsMap of the parsed parameters, if any.
+   */
+  virtual QueryParamsMap parseQueryString(absl::string_view) PURE;
+
+  /**
+   * @param QueryParamsMap of desired string.
+   * @return QueryParamsMap serialized into a string.
+   */
+  virtual absl::string_view queryParamsToString(const QueryParamsMap&) PURE;
+
+  virtual QueryParamsMap::const_iterator find(const std::string key) const PURE;
+  virtual QueryParamsMap::const_iterator begin() const PURE;
+  virtual QueryParamsMap::const_iterator end() const PURE;
+  virtual int size() PURE;
+};
 
 } // namespace Utility
 } // namespace Http
