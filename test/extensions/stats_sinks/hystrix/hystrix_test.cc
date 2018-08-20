@@ -447,21 +447,18 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
 
   ON_CALL(admin_stream_mock, setEndStreamOnComplete(_)).WillByDefault(Return());
   ON_CALL(admin_stream_mock, addOnDestroyCallback(_)).WillByDefault(Return());
-  ON_CALL(admin_stream_mock, getDecoderFilterCallbacks())
-    .WillByDefault(ReturnRef(callbacks_));
+  ON_CALL(admin_stream_mock, getDecoderFilterCallbacks()).WillByDefault(ReturnRef(callbacks_));
 
-  ASSERT_EQ(sink_->handlerHystrixEventStream(path_and_query, response_headers,
-                                             buffer, admin_stream_mock), Http::Code::OK);
+  ASSERT_EQ(
+      sink_->handlerHystrixEventStream(path_and_query, response_headers, buffer, admin_stream_mock),
+      Http::Code::OK);
 
   // Check that response_headers has been set correctly
   EXPECT_EQ(std::string(response_headers.ContentType()->value().getStringView()),
             "text/event-stream");
-  EXPECT_EQ(std::string(response_headers.CacheControl()->value().getStringView()),
-            "no-cache");
-  EXPECT_EQ(std::string(response_headers.Connection()->value().getStringView()),
-            "close");
-  EXPECT_EQ(std::string(response_headers.AccessControlAllowOrigin()->value().getStringView()),
-            "*");
+  EXPECT_EQ(std::string(response_headers.CacheControl()->value().getStringView()), "no-cache");
+  EXPECT_EQ(std::string(response_headers.Connection()->value().getStringView()), "close");
+  EXPECT_EQ(std::string(response_headers.AccessControlAllowOrigin()->value().getStringView()), "*");
   EXPECT_THAT(std::string(response_headers.AccessControlAllowHeaders()->value().getStringView()),
               testing::HasSubstr("Accept"));
 }
