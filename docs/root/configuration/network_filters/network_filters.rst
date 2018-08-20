@@ -18,3 +18,4 @@ filters.
   rbac_filter
   redis_proxy_filter
   tcp_proxy_filter
+  thrift_proxy_filter
