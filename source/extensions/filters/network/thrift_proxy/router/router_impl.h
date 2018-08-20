@@ -118,7 +118,8 @@ public:
 private:
   struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks {
     UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
-                    MessageMetadataSharedPtr& metadata);
+                    MessageMetadataSharedPtr& metadata, TransportType transport_type,
+                    ProtocolType protocol_type);
     ~UpstreamRequest();
 
     ThriftFilters::FilterStatus start();
@@ -142,8 +143,8 @@ private:
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
     Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
-    TransportPtr transport_;
-    ProtocolType proto_type_{ProtocolType::Auto};
+    TransportType transport_type_;
+    ProtocolType protocol_type_;
 
     bool request_complete_ : 1;
     bool response_started_ : 1;

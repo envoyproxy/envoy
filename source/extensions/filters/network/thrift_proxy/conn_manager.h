@@ -36,6 +36,17 @@ public:
 };
 
 /**
+ * Extends Upstream::ProtocolOptionsConfig with Thrift-specific cluster options.
+ */
+class ProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig {
+public:
+  virtual ~ProtocolOptionsConfig() {}
+
+  virtual TransportType transport(TransportType downstream_transport) const PURE;
+  virtual ProtocolType protocol(ProtocolType downstream_protocol) const PURE;
+};
+
+/**
  * ConnectionManager is a Network::Filter that will perform Thrift request handling on a connection.
  */
 class ConnectionManager : public Network::ReadFilter,

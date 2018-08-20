@@ -25,7 +25,7 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace {
 
-typedef std::map<envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_TransportType,
+typedef std::map<envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType,
                  TransportType>
     TransportTypeMap;
 
@@ -33,41 +33,72 @@ static const TransportTypeMap& transportTypeMap() {
   CONSTRUCT_ON_FIRST_USE(
       TransportTypeMap,
       {
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::
-               ThriftProxy_TransportType_AUTO_TRANSPORT,
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::AUTO_TRANSPORT,
            TransportType::Auto},
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_TransportType_FRAMED,
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::FRAMED,
            TransportType::Framed},
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::
-               ThriftProxy_TransportType_UNFRAMED,
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::UNFRAMED,
            TransportType::Unframed},
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_TransportType_HEADER,
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::HEADER,
            TransportType::Header},
       });
 }
 
-typedef std::map<envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_ProtocolType,
-                 ProtocolType>
+typedef std::map<envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType, ProtocolType>
     ProtocolTypeMap;
 
 static const ProtocolTypeMap& protocolTypeMap() {
   CONSTRUCT_ON_FIRST_USE(
       ProtocolTypeMap,
       {
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::
-               ThriftProxy_ProtocolType_AUTO_PROTOCOL,
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::AUTO_PROTOCOL,
            ProtocolType::Auto},
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_ProtocolType_BINARY,
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::BINARY,
            ProtocolType::Binary},
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::
-               ThriftProxy_ProtocolType_LAX_BINARY,
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::LAX_BINARY,
            ProtocolType::LaxBinary},
-          {envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_ProtocolType_COMPACT,
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::COMPACT,
            ProtocolType::Compact},
       });
 }
 
+TransportType
+lookupTransport(envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType transport) {
+  const auto& transport_iter = transportTypeMap().find(transport);
+  if (transport_iter == transportTypeMap().end()) {
+    throw EnvoyException(fmt::format(
+        "unknown transport {}",
+        envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType_Name(transport)));
+  }
+
+  return transport_iter->second;
+}
+
+ProtocolType
+lookupProtocol(envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType protocol) {
+  const auto& protocol_iter = protocolTypeMap().find(protocol);
+  if (protocol_iter == protocolTypeMap().end()) {
+    throw EnvoyException(fmt::format(
+        "unknown protocol {}",
+        envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType_Name(protocol)));
+  }
+  return protocol_iter->second;
+}
+
 } // namespace
+
+ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
+    const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProtocolOptions& config)
+    : transport_(lookupTransport(config.transport())),
+      protocol_(lookupProtocol(config.protocol())) {}
+
+TransportType ProtocolOptionsConfigImpl::transport(TransportType downstream_transport) const {
+  return (transport_ == TransportType::Auto) ? downstream_transport : transport_;
+}
+
+ProtocolType ProtocolOptionsConfigImpl::protocol(ProtocolType downstream_protocol) const {
+  return (protocol_ == ProtocolType::Auto) ? downstream_protocol : protocol_;
+}
 
 Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy& proto_config,
@@ -91,22 +122,8 @@ ConfigImpl::ConfigImpl(
     Server::Configuration::FactoryContext& context)
     : context_(context), stats_prefix_(fmt::format("thrift.{}.", config.stat_prefix())),
       stats_(ThriftFilterStats::generateStats(stats_prefix_, context_.scope())),
-      transport_(config.transport()), proto_(config.protocol()),
+      transport_(lookupTransport(config.transport())), proto_(lookupProtocol(config.protocol())),
       route_matcher_(new Router::RouteMatcher(config.route_config())) {
-
-  if (transportTypeMap().find(transport_) == transportTypeMap().end()) {
-    throw EnvoyException(fmt::format(
-        "unknown transport {}",
-        envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_TransportType_Name(
-            transport_)));
-  }
-
-  if (protocolTypeMap().find(proto_) == protocolTypeMap().end()) {
-    throw EnvoyException(fmt::format(
-        "unknown protocol {}",
-        envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_ProtocolType_Name(
-            proto_)));
-  }
 
   // Construct the only Thrift DecoderFilter: the Router
   auto& factory =
@@ -130,16 +147,11 @@ DecoderPtr ConfigImpl::createDecoder(DecoderCallbacks& callbacks) {
 }
 
 TransportPtr ConfigImpl::createTransport() {
-  TransportTypeMap::const_iterator i = transportTypeMap().find(transport_);
-  ASSERT(i != transportTypeMap().end());
-
-  return NamedTransportConfigFactory::getFactory(i->second).createTransport();
+  return NamedTransportConfigFactory::getFactory(transport_).createTransport();
 }
 
 ProtocolPtr ConfigImpl::createProtocol() {
-  ProtocolTypeMap::const_iterator i = protocolTypeMap().find(proto_);
-  ASSERT(i != protocolTypeMap().end());
-  return NamedProtocolConfigFactory::getFactory(i->second).createProtocol();
+  return NamedProtocolConfigFactory::getFactory(proto_).createProtocol();
 }
 
 } // namespace ThriftProxy

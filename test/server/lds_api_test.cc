@@ -224,10 +224,12 @@ TEST_F(LdsApiTest, BadLocalInfo) {
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type());
   ON_CALL(local_info_, clusterName()).WillByDefault(Return(std::string()));
-  EXPECT_THROW_WITH_MESSAGE(LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_,
-                                       local_info_, store_, listener_manager_),
-                            EnvoyException,
-                            "lds: setting --service-cluster and --service-node is required");
+  EXPECT_THROW_WITH_MESSAGE(
+      LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_, local_info_, store_,
+                 listener_manager_),
+      EnvoyException,
+      "lds: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
+      "--service-node and --service-cluster options.");
 }
 
 TEST_F(LdsApiTest, Basic) {

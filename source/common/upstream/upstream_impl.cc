@@ -119,12 +119,23 @@ parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
   for (const auto& iter : config.extension_protocol_options()) {
     const std::string& name = iter.first;
     const ProtobufWkt::Struct& config_struct = iter.second;
+    Server::Configuration::ProtocolOptionsFactory* factory = nullptr;
 
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<
-        Server::Configuration::NamedNetworkFilterConfigFactory>(name);
+    factory = Registry::FactoryRegistry<
+        Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(name);
+    if (factory == nullptr) {
+      factory = Registry::FactoryRegistry<
+          Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(name);
+    }
 
-    auto object = factory.createProtocolOptionsConfig(
-        *Envoy::Config::Utility::translateToFactoryProtocolOptionsConfig(config_struct, factory));
+    if (factory == nullptr) {
+      throw EnvoyException(fmt::format(
+          "Didn't find a registered network or http filter implementation for name: '{}'", name));
+    }
+
+    auto object = factory->createProtocolOptionsConfig(
+        *Envoy::Config::Utility::translateToFactoryProtocolOptionsConfig(config_struct, name,
+                                                                         *factory));
     if (object) {
       options[name] = object;
     }
