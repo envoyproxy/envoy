@@ -12,10 +12,11 @@ namespace {
 
 class TestTransportSocketCallbacks : public Network::TransportSocketCallbacks {
 public:
-  TestTransportSocketCallbacks(Network::Connection* connection) : connection_(connection) {}
+  explicit TestTransportSocketCallbacks(Network::Connection& connection)
+      : connection_(connection) {}
 
   int fd() const override { return 1; }
-  Network::Connection& connection() override { return *connection_; }
+  Network::Connection& connection() override { return connection_; }
   bool shouldDrainReadBuffer() override { return false; }
   void setReadBufferReady() override { set_read_buffer_ready_ = true; }
   void raiseEvent(Network::ConnectionEvent) override { event_raised_ = true; }
@@ -26,13 +27,13 @@ public:
 private:
   bool event_raised_{false};
   bool set_read_buffer_ready_{false};
-  Network::Connection* connection_;
+  Network::Connection& connection_;
 };
 
 class NoOpTransportSocketCallbacksTest : public testing::Test {
 protected:
   NoOpTransportSocketCallbacksTest()
-      : wrapper_callbacks_(&connection_), wrapped_callbacks_(wrapper_callbacks_) {}
+      : wrapper_callbacks_(connection_), wrapped_callbacks_(wrapper_callbacks_) {}
 
   Network::MockConnection connection_;
   TestTransportSocketCallbacks wrapper_callbacks_;
