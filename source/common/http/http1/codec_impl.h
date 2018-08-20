@@ -98,7 +98,6 @@ private:
 class RequestStreamEncoderImpl : public StreamEncoderImpl {
 public:
   RequestStreamEncoderImpl(ConnectionImpl& connection) : StreamEncoderImpl(connection) {}
-
   bool headRequest() { return head_request_; }
 
   // Http::StreamEncoder
@@ -122,6 +121,11 @@ public:
    * Called when the active encoder has completed encoding the outbound half of the stream.
    */
   virtual void onEncodeComplete() PURE;
+
+  /**
+   * Called when headers are encoded.
+   */
+  virtual void onEncodeHeaders(const HeaderMap& headers) PURE;
 
   /**
    * Called when resetStream() has been called on an active stream. In HTTP/1.1 the only
@@ -303,6 +307,7 @@ private:
 
   // ConnectionImpl
   void onEncodeComplete() override;
+  void onEncodeHeaders(const HeaderMap&) override {}
   void onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;
@@ -339,7 +344,8 @@ private:
   bool cannotHaveBody();
 
   // ConnectionImpl
-  void onEncodeComplete() override;
+  void onEncodeComplete() override {}
+  void onEncodeHeaders(const HeaderMap& headers) override;
   void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;
