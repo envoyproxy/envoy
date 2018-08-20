@@ -29,7 +29,6 @@ envoy_cc_library(
         "//include/envoy/network:connection_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:matchers_lib",
-        "//source/common/http:header_utility_lib",
         "//source/common/network:cidr_range_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",
         "@envoy_api//envoy/config/rbac/v2alpha:rbac_cc",

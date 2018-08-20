@@ -876,7 +876,8 @@ message RateLimit {
       // specified headers in the config. A match will happen if all the
       // headers in the config are present in the request with the same values
       // (or based on presence if the value field is not in the config).
-      repeated envoy.type.matcher.HeaderMatcher headers = 3 [(validate.rules).repeated .min_items = 1];
+      repeated envoy.type.matcher.HeaderMatcher headers = 3
+          [(validate.rules).repeated .min_items = 1];
     }
 
     oneof action_specifier {

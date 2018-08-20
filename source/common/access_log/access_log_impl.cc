@@ -12,10 +12,10 @@
 
 #include "common/access_log/access_log_formatter.h"
 #include "common/common/assert.h"
+#include "common/common/matchers.h"
 #include "common/common/utility.h"
 #include "common/config/utility.h"
 #include "common/http/header_map_impl.h"
-#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
@@ -172,12 +172,12 @@ bool NotHealthCheckFilter::evaluate(const RequestInfo::RequestInfo& info, const 
 }
 
 HeaderFilter::HeaderFilter(const envoy::config::filter::accesslog::v2::HeaderFilter& config) {
-  header_data_.push_back(Http::HeaderUtility::HeaderData(config.header()));
+  header_data_.push_back(Matchers::HeaderUtility::HeaderData(config.header()));
 }
 
 bool HeaderFilter::evaluate(const RequestInfo::RequestInfo&,
                             const Http::HeaderMap& request_headers) {
-  return Http::HeaderUtility::matchHeaders(request_headers, header_data_);
+  return Matchers::HeaderUtility::matchHeaders(request_headers, header_data_);
 }
 
 ResponseFlagFilter::ResponseFlagFilter(

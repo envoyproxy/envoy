@@ -73,7 +73,6 @@ api_proto_library_internal(
     deps = [
         "//envoy/type:range",
     ],
-
 )
 
 api_go_proto_library(

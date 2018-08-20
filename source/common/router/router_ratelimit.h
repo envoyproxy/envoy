@@ -8,8 +8,8 @@
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 
+#include "common/common/matchers.h"
 #include "common/config/rds_json.h"
-#include "common/http/header_utility.h"
 
 namespace Envoy {
 namespace Router {
@@ -97,7 +97,7 @@ public:
 private:
   const std::string descriptor_value_;
   const bool expect_match_;
-  std::vector<Http::HeaderUtility::HeaderData> action_headers_;
+  std::vector<Matchers::HeaderUtility::HeaderData> action_headers_;
 };
 
 /*

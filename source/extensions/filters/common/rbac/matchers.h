@@ -2,14 +2,13 @@
 
 #include <memory>
 
-#include "envoy/type/matcher/header.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/rbac/v2alpha/rbac.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/type/matcher/header.pb.h"
 
 #include "common/common/matchers.h"
-#include "common/http/header_utility.h"
 #include "common/network/cidr_range.h"
 
 namespace Envoy {
@@ -123,7 +122,7 @@ public:
                const envoy::api::v2::core::Metadata&) const override;
 
 private:
-  const Envoy::Http::HeaderUtility::HeaderData header_;
+  const Envoy::Matchers::HeaderUtility::HeaderData header_;
 };
 
 /**

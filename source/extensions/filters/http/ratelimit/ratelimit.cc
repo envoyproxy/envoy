@@ -8,8 +8,8 @@
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/matchers.h"
 #include "common/http/codes.h"
-#include "common/http/header_utility.h"
 #include "common/router/config_impl.h"
 
 namespace Envoy {
@@ -171,7 +171,7 @@ void Filter::populateRateLimitDescriptors(const Router::RateLimitPolicy& rate_li
 
 void Filter::addHeaders(Http::HeaderMap& headers) {
   if (headers_to_add_) {
-    Http::HeaderUtility::addHeaders(headers, *headers_to_add_);
+    Matchers::HeaderUtility::addHeaders(headers, *headers_to_add_);
     headers_to_add_ = nullptr;
   }
 }

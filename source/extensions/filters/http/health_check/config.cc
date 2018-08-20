@@ -2,8 +2,8 @@
 
 #include "envoy/registry/registry.h"
 
+#include "common/common/matchers.h"
 #include "common/config/filter_json.h"
-#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 
 #include "extensions/filters/http/health_check/health_check.h"
@@ -21,10 +21,10 @@ Http::FilterFactoryCb HealthCheckFilterConfig::createFilterFactoryFromProtoTyped
   const bool pass_through_mode = proto_config.pass_through_mode().value();
   const int64_t cache_time_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config, cache_time, 0);
 
-  auto header_match_data = std::make_shared<std::vector<Http::HeaderUtility::HeaderData>>();
+  auto header_match_data = std::make_shared<std::vector<Matchers::HeaderUtility::HeaderData>>();
 
   for (const envoy::type::matcher::HeaderMatcher& matcher : proto_config.headers()) {
-    Http::HeaderUtility::HeaderData single_header_match(matcher);
+    Matchers::HeaderUtility::HeaderData single_header_match(matcher);
     header_match_data->push_back(std::move(single_header_match));
   }
 

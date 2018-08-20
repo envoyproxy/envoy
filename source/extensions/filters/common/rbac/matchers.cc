@@ -112,7 +112,7 @@ bool NotMatcher::matches(const Network::Connection& connection,
 
 bool HeaderMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap& headers,
                             const envoy::api::v2::core::Metadata&) const {
-  return Envoy::Http::HeaderUtility::matchHeaders(headers, header_);
+  return Envoy::Matchers::HeaderUtility::matchHeaders(headers, header_);
 }
 
 bool IPMatcher::matches(const Network::Connection& connection, const Envoy::Http::HeaderMap&,
