@@ -234,6 +234,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "query_params_lib",
+    srcs = ["query_params_impl.cc"],
+    hdrs = ["query_params_impl.h"],
+    deps = [
+        "//include/envoy/http:query_params_interface",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
@@ -245,7 +255,7 @@ envoy_cc_library(
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/http:header_map_interface",
-        "//include/envoy/http:query_params_interface",
+        "//source/common/http:query_params_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",

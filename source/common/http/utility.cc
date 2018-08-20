@@ -55,34 +55,34 @@ std::string Utility::createSslRedirectPath(const HeaderMap& headers) {
                      headers.Path()->value().c_str());
 }
 
-Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
-  QueryParams params;
-  size_t start = url.find('?');
-  if (start == std::string::npos) {
-    return params;
-  }
+// Utility::QueryParams Utility::parseQueryString(absl::string_view url) {
+//   QueryParams params;
+//   size_t start = url.find('?');
+//   if (start == std::string::npos) {
+//     return params;
+//   }
 
-  start++;
-  while (start < url.size()) {
-    size_t end = url.find('&', start);
-    if (end == std::string::npos) {
-      end = url.size();
-    }
-    absl::string_view param(url.data() + start, end - start);
+//   start++;
+//   while (start < url.size()) {
+//     size_t end = url.find('&', start);
+//     if (end == std::string::npos) {
+//       end = url.size();
+//     }
+//     absl::string_view param(url.data() + start, end - start);
 
-    const size_t equal = param.find('=');
-    if (equal != std::string::npos) {
-      params.emplace(StringUtil::subspan(url, start, start + equal),
-                     StringUtil::subspan(url, start + equal + 1, end));
-    } else {
-      params.emplace(StringUtil::subspan(url, start, end), "");
-    }
+//     const size_t equal = param.find('=');
+//     if (equal != std::string::npos) {
+//       params.emplace(StringUtil::subspan(url, start, start + equal),
+//                      StringUtil::subspan(url, start + equal + 1, end));
+//     } else {
+//       params.emplace(StringUtil::subspan(url, start, end), "");
+//     }
 
-    start = end + 1;
-  }
+//     start = end + 1;
+//   }
 
-  return params;
-}
+//   return params;
+// }
 
 const char* Utility::findQueryStringStart(const HeaderString& path) {
   return std::find(path.c_str(), path.c_str() + path.size(), '?');
@@ -388,15 +388,15 @@ MessagePtr Utility::prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_u
 
 // TODO(jmarantz): make QueryParams a real class and put this serializer there,
 // along with proper URL escaping of the name and value.
-std::string Utility::queryParamsToString(const QueryParams& params) {
-  std::string out;
-  std::string delim = "?";
-  for (auto p : params) {
-    absl::StrAppend(&out, delim, p.first, "=", p.second);
-    delim = "&";
-  }
-  return out;
-}
+// std::string Utility::queryParamsToString(const QueryParams& params) {
+//   std::string out;
+//   std::string delim = "?";
+//   for (auto p : params) {
+//     absl::StrAppend(&out, delim, p.first, "=", p.second);
+//     delim = "&";
+//   }
+//   return out;
+// }
 
 } // namespace Http
 } // namespace Envoy
