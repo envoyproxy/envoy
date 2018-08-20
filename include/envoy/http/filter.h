@@ -191,6 +191,17 @@ public:
   virtual void addDecodedData(Buffer::Instance& data, bool streaming_filter) PURE;
 
   /**
+   * Adds decoded trailers. May only be called in decodeData when end_stream is set to true.
+   * If called in any other context, an assertion will be triggered.
+   *
+   * When called in decodeData, the trailers map will be initialized to an empty map and returned by
+   * reference. Calling this function more than once is invalid.
+   *
+   * @return a reference to the newly created trailers map.
+   */
+  virtual HeaderMap& addDecodedTrailers() PURE;
+
+  /**
    * Create a locally generated response using the provided response_code and body_text parameters.
    * If the request was a gRPC request the local reply will be encoded as a gRPC response with a 200
    * HTTP response code and grpc-status and grpc-message headers mapped from the provided
@@ -394,6 +405,17 @@ public:
    * @param streaming_filter boolean supplies if this filter streams data or buffers the full body.
    */
   virtual void addEncodedData(Buffer::Instance& data, bool streaming_filter) PURE;
+
+  /**
+   * Adds encoded trailers. May only be called in encodeData when end_stream is set to true.
+   * If called in any other context, an assertion will be triggered.
+   *
+   * When called in encodeData, the trailers map will be initialized to an empty map and returned by
+   * reference. Calling this function more than once is invalid.
+   *
+   * @return a reference to the newly created trailers map.
+   */
+  virtual HeaderMap& addEncodedTrailers() PURE;
 
   /**
    * Called when an encoder filter goes over its high watermark.

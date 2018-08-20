@@ -3,6 +3,7 @@
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.validate.h"
+#include "envoy/stats/scope.h"
 
 #include "common/config/filter_json.h"
 #include "common/config/utility.h"
@@ -23,12 +24,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Router {

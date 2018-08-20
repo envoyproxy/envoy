@@ -11,11 +11,12 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/stats/stats.h"
+#include "envoy/stats/stat_data_allocator.h"
+#include "envoy/stats/stats_options.h"
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
-#include "common/stats/stat_data_allocator.h"
+#include "common/stats/stat_data_allocator_impl.h"
 
 #include "absl/strings/string_view.h"
 
@@ -72,6 +73,11 @@ struct RawStatData {
    * Returns the name as a string_view with no truncation.
    */
   absl::string_view key() const { return absl::string_view(name_); }
+
+  /**
+   * Returns the name as a std::string.
+   */
+  std::string name() const { return std::string(name_); }
 
   std::atomic<uint64_t> value_;
   std::atomic<uint64_t> pending_increment_;

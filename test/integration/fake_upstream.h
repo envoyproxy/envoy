@@ -13,6 +13,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
@@ -51,6 +52,7 @@ public:
   void encodeHeaders(const Http::HeaderMapImpl& headers, bool end_stream);
   void encodeData(uint64_t size, bool end_stream);
   void encodeData(Buffer::Instance& data, bool end_stream);
+  void encodeData(absl::string_view data, bool end_stream);
   void encodeTrailers(const Http::HeaderMapImpl& trailers);
   void encodeResetStream();
   const Http::HeaderMap& headers() { return *headers_; }
@@ -64,6 +66,11 @@ public:
   ABSL_MUST_USE_RESULT
   testing::AssertionResult
   waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length,
+              std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
+
+  ABSL_MUST_USE_RESULT
+  testing::AssertionResult
+  waitForData(Event::Dispatcher& client_dispatcher, absl::string_view body,
               std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   ABSL_MUST_USE_RESULT
@@ -585,4 +592,7 @@ private:
   FakeListener listener_;
   const Network::FilterChainSharedPtr filter_chain_;
 };
+
+typedef std::unique_ptr<FakeUpstream> FakeUpstreamPtr;
+
 } // namespace Envoy

@@ -66,6 +66,29 @@ TEST_P(RBACIntegrationTest, Denied) {
   EXPECT_STREQ("403", response->headers().Status()->value().c_str());
 }
 
+TEST_P(RBACIntegrationTest, DeniedHeadReply) {
+  config_helper_.addFilter(RBAC_CONFIG);
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestHeaderMapImpl{
+          {":method", "HEAD"},
+          {":path", "/"},
+          {":scheme", "http"},
+          {":authority", "host"},
+          {"x-forwarded-for", "10.0.0.1"},
+      },
+      1024);
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("403", response->headers().Status()->value().c_str());
+  ASSERT_TRUE(response->headers().ContentLength());
+  EXPECT_STRNE("0", response->headers().ContentLength()->value().c_str());
+  EXPECT_STREQ("", response->body().c_str());
+}
+
 TEST_P(RBACIntegrationTest, RouteOverride) {
   config_helper_.addConfigModifier(
       [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {

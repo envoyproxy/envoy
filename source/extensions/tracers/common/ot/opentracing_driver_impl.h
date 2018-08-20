@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/stats/store.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/common/logger.h"
@@ -75,7 +76,7 @@ public:
 private:
   OpenTracingTracerStats tracer_stats_;
 };
-}
+} // namespace Ot
 } // namespace Common
 } // namespace Tracers
 } // namespace Extensions

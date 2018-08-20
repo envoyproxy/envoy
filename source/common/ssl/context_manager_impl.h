@@ -2,10 +2,10 @@
 
 #include <functional>
 #include <list>
-#include <shared_mutex>
 
 #include "envoy/runtime/runtime.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/stats/scope.h"
 
 namespace Envoy {
 namespace Ssl {

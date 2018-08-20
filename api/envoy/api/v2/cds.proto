@@ -46,7 +46,7 @@ service ClusterDiscoveryService {
 // [#protodoc-title: Clusters]
 
 // Configuration for a single upstream cluster.
-// [#comment:next free field: 35]
+// [#comment:next free field: 36]
 message Cluster {
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting
@@ -225,6 +225,12 @@ message Cluster {
   // with ALPN, `http2_protocol_options` must be specified. As an aside this allows HTTP/2
   // connections to happen over plain text.
   core.Http2ProtocolOptions http2_protocol_options = 14;
+
+  // The extension_protocol_options field is used to provide extension-specific protocol options
+  // for upstream connections. The key should match the extension filter name, such as
+  // "envoy.filters.network.thrift_proxy". See the extension's documentation for details on
+  // specific options.
+  map<string, google.protobuf.Struct> extension_protocol_options = 35;
 
   reserved 15;
 

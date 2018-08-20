@@ -2,8 +2,6 @@
 #include <memory>
 #include <sstream>
 
-#include "envoy/stats/stats.h"
-
 #include "extensions/stat_sinks/hystrix/hystrix.h"
 
 #include "test/mocks/server/mocks.h"
@@ -14,11 +12,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {

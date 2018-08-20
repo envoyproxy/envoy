@@ -268,6 +268,7 @@ private:
   Tracing::Span& activeSpan() override { return active_span_; }
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  HeaderMap& addDecodedTrailers() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
   void sendLocalReply(Code code, const std::string& body,
@@ -281,7 +282,7 @@ private:
           encodeHeaders(std::move(headers), end_stream);
         },
         [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
-        remote_closed_, code, body);
+        remote_closed_, code, body, is_head_request_);
   }
   // The async client won't pause if sending an Expect: 100-Continue so simply
   // swallows any incoming encode100Continue.
@@ -307,6 +308,7 @@ private:
   bool remote_closed_{};
   Buffer::InstancePtr buffered_body_;
   bool is_grpc_request_{};
+  bool is_head_request_{false};
   friend class AsyncClientImpl;
 };
 

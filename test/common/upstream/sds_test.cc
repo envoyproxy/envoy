@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/stats/scope.h"
 
 #include "common/config/utility.h"
 #include "common/filesystem/filesystem_impl.h"
@@ -27,6 +28,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -35,7 +37,6 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
 using testing::WithArg;
-using testing::_;
 
 namespace Envoy {
 namespace Upstream {
@@ -71,10 +72,9 @@ protected:
     EXPECT_CALL(cm_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
-    Envoy::Stats::ScopePtr scope = stats_.createScope(
-        fmt::format("cluster.{}.", sds_cluster_.alt_stat_name().empty()
-                                       ? sds_cluster_.name()
-                                       : std::string(sds_cluster_.alt_stat_name())));
+    Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
+        "cluster.{}.",
+        sds_cluster_.alt_stat_name().empty() ? sds_cluster_.name() : sds_cluster_.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         ssl_context_manager_, *scope, cm_, local_info_, dispatcher_, random_, stats_);
     cluster_.reset(

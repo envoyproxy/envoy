@@ -9,8 +9,9 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
-#include "envoy/stats/stats.h"
-#include "envoy/stats/stats_macros.h"
+#include "envoy/stats/scope.h"
+
+//#include "envoy/stats/stats_macros.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/watermark_buffer.h"

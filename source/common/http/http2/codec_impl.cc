@@ -8,6 +8,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
@@ -672,7 +673,6 @@ ConnectionImpl::Http2Callbacks::Http2Callbacks() {
       callbacks_,
       [](nghttp2_session*, const nghttp2_frame* frame, const uint8_t* raw_name, size_t name_length,
          const uint8_t* raw_value, size_t value_length, uint8_t, void* user_data) -> int {
-
         // TODO PERF: Can reference count here to avoid copies.
         HeaderString name;
         name.setCopy(reinterpret_cast<const char*>(raw_name), name_length);

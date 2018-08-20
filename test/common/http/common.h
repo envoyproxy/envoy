@@ -63,6 +63,6 @@ struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
  */
 class HttpTestUtility {
 public:
-  static void addDefaultHeaders(Http::HeaderMap& headers);
+  static void addDefaultHeaders(Http::HeaderMap& headers, const std::string default_method = "GET");
 };
 } // namespace Envoy

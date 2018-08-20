@@ -1,5 +1,7 @@
 #include "common/config/bootstrap_json.h"
 
+#include "envoy/stats/stats_options.h"
+
 #include "common/common/assert.h"
 #include "common/config/address_json.h"
 #include "common/config/cds_json.h"

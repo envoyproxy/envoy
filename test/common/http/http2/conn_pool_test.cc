@@ -19,6 +19,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
@@ -27,7 +28,6 @@ using testing::Property;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Http {
@@ -392,6 +392,7 @@ TEST_F(Http2ConnPoolImplTest, ConnectTimeout) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
+  EXPECT_EQ(2U, cluster_->stats_.upstream_rq_total_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_fail_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_connect_timeout_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_pending_failure_eject_.value());

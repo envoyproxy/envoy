@@ -54,6 +54,7 @@ envoy_cc_library(
     hdrs = ["metric_impl.h"],
     deps = [
         "//include/envoy/stats:stats_interface",
+        "//source/common/common:assert_lib",
     ],
 )
 
@@ -83,7 +84,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "stat_data_allocator_lib",
-    hdrs = ["stat_data_allocator.h"],
+    hdrs = ["stat_data_allocator_impl.h"],
     deps = [
         ":metric_impl_lib",
         "//include/envoy/stats:stats_interface",

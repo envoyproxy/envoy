@@ -15,6 +15,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/context_manager.h"
+#include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -371,6 +372,7 @@ private:
   typedef std::map<std::string, ClusterDataPtr> ClusterMap;
 
   struct PendingUpdates {
+    ~PendingUpdates() { disableTimer(); }
     void enableTimer(const uint64_t timeout) {
       ASSERT(!timer_enabled_);
       if (timer_ != nullptr) {

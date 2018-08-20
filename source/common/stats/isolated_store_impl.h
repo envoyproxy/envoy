@@ -6,6 +6,8 @@
 #include <string>
 
 #include "envoy/stats/stats.h"
+#include "envoy/stats/stats_options.h"
+#include "envoy/stats/store.h"
 
 #include "common/common/utility.h"
 #include "common/stats/heap_stat_data.h"

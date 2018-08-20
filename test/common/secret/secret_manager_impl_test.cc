@@ -34,19 +34,20 @@ tls_certificate:
 
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
 
-  secret_manager->addOrUpdateSecret(secret_config);
+  secret_manager->addStaticSecret(secret_config);
 
-  ASSERT_EQ(secret_manager->findTlsCertificate("undefined"), nullptr);
+  ASSERT_EQ(secret_manager->findStaticTlsCertificateProvider("undefined"), nullptr);
 
-  ASSERT_NE(secret_manager->findTlsCertificate("abc.com"), nullptr);
+  ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
 
   const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem";
-  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-            secret_manager->findTlsCertificate("abc.com")->certificateChain());
+  EXPECT_EQ(
+      TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
+      secret_manager->findStaticTlsCertificateProvider("abc.com")->secret()->certificateChain());
 
   const std::string key_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
-            secret_manager->findTlsCertificate("abc.com")->privateKey());
+            secret_manager->findStaticTlsCertificateProvider("abc.com")->secret()->privateKey());
 }
 
 TEST_F(SecretManagerImplTest, NotImplementedException) {
@@ -64,7 +65,7 @@ session_ticket_keys:
 
   std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
 
-  EXPECT_THROW_WITH_MESSAGE(secret_manager->addOrUpdateSecret(secret_config), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(secret_manager->addStaticSecret(secret_config), EnvoyException,
                             "Secret type not implemented");
 }
 

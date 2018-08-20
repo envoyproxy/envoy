@@ -3,7 +3,7 @@
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/cluster/circuit_breaker.pb.h"
 #include "envoy/json/json_object.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/stats_options.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "absl/types/optional.h"

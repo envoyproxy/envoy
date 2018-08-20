@@ -1,5 +1,3 @@
-#include "envoy/stats/stats.h"
-
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/hex.h"
 
@@ -14,12 +12,12 @@
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Return;
 using testing::ReturnRef;
 using testing::WithArg;
-using testing::_;
 
 namespace Envoy {
 namespace Server {
@@ -31,10 +29,10 @@ public:
     EXPECT_CALL(os_sys_calls_, shmOpen(_, _, _));
     EXPECT_CALL(os_sys_calls_, ftruncate(_, _)).WillOnce(WithArg<1>(Invoke([this](off_t size) {
       buffer_.resize(size);
-      return 0;
+      return Api::SysCallIntResult{0, 0};
     })));
     EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _)).WillOnce(InvokeWithoutArgs([this]() {
-      return buffer_.data();
+      return Api::SysCallPtrResult{buffer_.data(), 0};
     }));
     EXPECT_CALL(os_sys_calls_, bind(_, _, _));
     EXPECT_CALL(options_, statsOptions()).WillRepeatedly(ReturnRef(stats_options_));
@@ -144,7 +142,8 @@ TEST_F(HotRestartImplTest, crossAlloc) {
 
   EXPECT_CALL(options_, restartEpoch()).WillRepeatedly(Return(1));
   EXPECT_CALL(os_sys_calls_, shmOpen(_, _, _));
-  EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _)).WillOnce(Return(buffer_.data()));
+  EXPECT_CALL(os_sys_calls_, mmap(_, _, _, _, _, _))
+      .WillOnce(Return(Api::SysCallPtrResult{buffer_.data(), 0}));
   EXPECT_CALL(os_sys_calls_, bind(_, _, _));
   HotRestartImpl hot_restart2(options_);
   Stats::RawStatData* stat1_prime = hot_restart2.alloc("stat1");

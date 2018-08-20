@@ -7,7 +7,7 @@
 #include "common/common/hash.h"
 #include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
-#include "common/stats/stat_data_allocator.h"
+#include "common/stats/stat_data_allocator_impl.h"
 
 namespace Envoy {
 namespace Stats {
@@ -23,6 +23,11 @@ struct HeapStatData {
    * @returns absl::string_view the name as a string_view.
    */
   absl::string_view key() const { return name_; }
+
+  /**
+   * @returns std::string the name as a std::string.
+   */
+  std::string name() const { return name_; }
 
   std::atomic<uint64_t> value_{0};
   std::atomic<uint64_t> pending_increment_{0};

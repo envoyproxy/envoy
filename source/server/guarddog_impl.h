@@ -6,6 +6,7 @@
 #include "envoy/server/configuration.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/watchdog.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
 #include "common/common/lock_guard.h"

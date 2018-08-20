@@ -1,5 +1,7 @@
 #include "common/config/lds_json.h"
 
+#include "envoy/stats/stats_options.h"
+
 #include "common/common/assert.h"
 #include "common/config/address_json.h"
 #include "common/config/json_utility.h"
@@ -39,8 +41,9 @@ void LdsJson::translateListener(const Json::Object& json_listener,
         json_filter->getString("name")));
     JSON_UTIL_SET_STRING(*json_filter, *filter->mutable_deprecated_v1(), type);
 
-    const std::string json_config = "{\"deprecated_v1\": true, \"value\": " +
-                                    json_filter->getObject("config")->asJsonString() + "}";
+    const std::string json_config =
+        "{\"deprecated_v1\": true, \"value\": " + json_filter->getObject("config")->asJsonString() +
+        "}";
 
     const auto status = Protobuf::util::JsonStringToMessage(json_config, filter->mutable_config());
     // JSON schema has already validated that this is a valid JSON object.

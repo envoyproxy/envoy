@@ -3,6 +3,7 @@
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
+#include "envoy/stats/scope.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"

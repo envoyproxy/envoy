@@ -33,6 +33,7 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
     bootstrap_file << input.DebugString();
     options.config_path_ = bootstrap_path;
     options.v2_config_only_ = true;
+    options.log_level_ = Fuzz::Runner::logLevel();
   }
 
   try {

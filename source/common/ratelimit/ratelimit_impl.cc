@@ -6,8 +6,10 @@
 #include <vector>
 
 #include "envoy/api/v2/ratelimit/ratelimit.pb.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
+#include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 
 namespace Envoy {
@@ -66,14 +68,23 @@ void GrpcClientImpl::onSuccess(
     span.setTag(Constants::get().TraceStatus, Constants::get().TraceOk);
   }
 
-  callbacks_->complete(status);
+  if (response->headers_size()) {
+    Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>();
+    for (const auto& h : response->headers()) {
+      headers->addCopy(Http::LowerCaseString(h.key()), h.value());
+    }
+    callbacks_->complete(status, std::move(headers));
+  } else {
+    callbacks_->complete(status, nullptr);
+  }
+
   callbacks_ = nullptr;
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
   ASSERT(status != Grpc::Status::GrpcStatus::Ok);
-  callbacks_->complete(LimitStatus::Error);
+  callbacks_->complete(LimitStatus::Error, nullptr);
   callbacks_ = nullptr;
 }
 

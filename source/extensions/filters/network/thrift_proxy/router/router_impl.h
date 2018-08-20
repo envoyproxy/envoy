@@ -34,7 +34,7 @@ public:
   // Router::Route
   const RouteEntry* routeEntry() const override;
 
-  virtual RouteConstSharedPtr matches(const std::string& method_name) const PURE;
+  virtual RouteConstSharedPtr matches(const MessageMetadata& metadata) const PURE;
 
 protected:
   RouteConstSharedPtr clusterEntry() const;
@@ -52,18 +52,34 @@ public:
 
   const std::string& methodName() const { return method_name_; }
 
-  // RoutEntryImplBase
-  RouteConstSharedPtr matches(const std::string& method_name) const override;
+  // RouteEntryImplBase
+  RouteConstSharedPtr matches(const MessageMetadata& metadata) const override;
 
 private:
   const std::string method_name_;
+  const bool invert_;
+};
+
+class ServiceNameRouteEntryImpl : public RouteEntryImplBase {
+public:
+  ServiceNameRouteEntryImpl(
+      const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route);
+
+  const std::string& serviceName() const { return service_name_; }
+
+  // RouteEntryImplBase
+  RouteConstSharedPtr matches(const MessageMetadata& metadata) const override;
+
+private:
+  std::string service_name_;
+  const bool invert_;
 };
 
 class RouteMatcher {
 public:
   RouteMatcher(const envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration&);
 
-  RouteConstSharedPtr route(const std::string& method_name) const;
+  RouteConstSharedPtr route(const MessageMetadata& metadata) const;
 
 private:
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
@@ -82,10 +98,9 @@ public:
   void onDestroy() override;
   void setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) override;
   void resetUpstreamConnection() override;
-  ThriftFilters::FilterStatus transportBegin(absl::optional<uint32_t> size) override;
+  ThriftFilters::FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
   ThriftFilters::FilterStatus transportEnd() override;
-  ThriftFilters::FilterStatus messageBegin(absl::string_view name, MessageType msg_type,
-                                           int32_t seq_id) override;
+  ThriftFilters::FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
   ThriftFilters::FilterStatus messageEnd() override;
 
   // Upstream::LoadBalancerContext
@@ -103,16 +118,17 @@ public:
 private:
   struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks {
     UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
-                    absl::string_view method_name, MessageType msg_type, int32_t seq_id);
+                    MessageMetadataSharedPtr& metadata, TransportType transport_type,
+                    ProtocolType protocol_type);
     ~UpstreamRequest();
 
-    void start();
+    ThriftFilters::FilterStatus start();
     void resetStream();
 
     // Tcp::ConnectionPool::Callbacks
     void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
                        Upstream::HostDescriptionConstSharedPtr host) override;
-    void onPoolReady(Tcp::ConnectionPool::ConnectionData& conn,
+    void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                      Upstream::HostDescriptionConstSharedPtr host) override;
 
     void onRequestComplete();
@@ -122,22 +138,20 @@ private:
 
     Router& parent_;
     Tcp::ConnectionPool::Instance& conn_pool_;
-    const std::string method_name_;
-    const MessageType msg_type_;
-    const int32_t seq_id_;
+    MessageMetadataSharedPtr metadata_;
 
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
-    Tcp::ConnectionPool::ConnectionData* conn_data_{};
+    Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
-    TransportPtr transport_;
-    ProtocolType proto_type_{ProtocolType::Auto};
+    TransportType transport_type_;
+    ProtocolType protocol_type_;
 
     bool request_complete_ : 1;
     bool response_started_ : 1;
     bool response_complete_ : 1;
   };
 
-  void convertMessageBegin(const std::string& name, MessageType msg_type, int32_t seq_id);
+  void convertMessageBegin(MessageMetadataSharedPtr metadata);
   void cleanup();
 
   Upstream::ClusterManager& cluster_manager_;

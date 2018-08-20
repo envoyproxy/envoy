@@ -10,19 +10,31 @@ static const std::string MessageField = "message";
 static const std::string TypeField = "type";
 static const std::string StopField = "";
 
-void AppException::encode(ThriftProxy::Protocol& proto, Buffer::Instance& buffer) {
-  proto.writeMessageBegin(buffer, method_name_, ThriftProxy::MessageType::Exception, seq_id_);
+void AppException::encode(MessageMetadata& metadata, ThriftProxy::Protocol& proto,
+                          Buffer::Instance& buffer) const {
+  // Handle cases where the exception occurs before the message name (e.g. some header transport
+  // errors).
+  if (!metadata.hasMethodName()) {
+    metadata.setMethodName("");
+  }
+  if (!metadata.hasSequenceId()) {
+    metadata.setSequenceId(0);
+  }
+
+  metadata.setMessageType(MessageType::Exception);
+
+  proto.writeMessageBegin(buffer, metadata);
   proto.writeStructBegin(buffer, TApplicationException);
 
-  proto.writeFieldBegin(buffer, MessageField, ThriftProxy::FieldType::String, 1);
-  proto.writeString(buffer, error_message_);
+  proto.writeFieldBegin(buffer, MessageField, FieldType::String, 1);
+  proto.writeString(buffer, std::string(what()));
   proto.writeFieldEnd(buffer);
 
-  proto.writeFieldBegin(buffer, TypeField, ThriftProxy::FieldType::I32, 2);
+  proto.writeFieldBegin(buffer, TypeField, FieldType::I32, 2);
   proto.writeInt32(buffer, static_cast<int32_t>(type_));
   proto.writeFieldEnd(buffer);
 
-  proto.writeFieldBegin(buffer, StopField, ThriftProxy::FieldType::Stop, 0);
+  proto.writeFieldBegin(buffer, StopField, FieldType::Stop, 0);
 
   proto.writeStructEnd(buffer);
   proto.writeMessageEnd(buffer);

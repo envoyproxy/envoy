@@ -24,10 +24,8 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
   ConfigSharedPtr ext_authz_config(new Config(proto_config, context.scope()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);
 
-  return [ grpc_service = proto_config.grpc_service(), &context, ext_authz_config,
-           timeout_ms ](Network::FilterManager & filter_manager)
-      ->void {
-
+  return [grpc_service = proto_config.grpc_service(), &context, ext_authz_config,
+          timeout_ms](Network::FilterManager& filter_manager) -> void {
     auto async_client_factory =
         context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
             grpc_service, context.scope(), true);

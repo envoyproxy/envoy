@@ -154,11 +154,30 @@ envoy_cc_test(
         "//source/common/upstream:load_stats_reporter_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
         "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
         "@envoy_api//envoy/api/v2/endpoint:load_report_cc",
+    ],
+)
+
+envoy_cc_test(
+    name = "hds_test",
+    srcs = ["hds_test.cc"],
+    deps = [
+        "//source/common/ssl:context_lib",
+        "//source/common/upstream:health_discovery_service_lib",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/endpoint:load_report_cc",
+        "@envoy_api//envoy/service/discovery/v2:hds_cc",
     ],
 )
 
@@ -338,6 +357,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
     ],
 )

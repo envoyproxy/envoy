@@ -4,8 +4,6 @@
 #include <memory>
 #include <string>
 
-#include "envoy/stats/stats.h"
-
 #include "common/common/block_memory_hash_set.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"

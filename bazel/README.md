@@ -27,15 +27,16 @@ up-to-date with the latest security patches. See
 for how to update or override dependencies.
 
 1. Install the latest version of [Bazel](https://bazel.build/versions/master/docs/install.html) in your environment.
-2. Install external dependencies libtool, cmake, ninja, and realpath libraries separately.
+2. Install external dependencies libtool, cmake, ninja, realpath and curl libraries separately.
 On Ubuntu, run the following commands:
 ```
  apt-get install libtool
  apt-get install cmake
  apt-get install realpath
- apt-get install clang-format-5.0
+ apt-get install clang-format-6.0
  apt-get install automake
  apt-get install ninja-build
+ apt-get install curl
 ```
 
 On Fedora (maybe also other red hat distros), run the following:
@@ -230,7 +231,7 @@ bazel test -c dbg --config=asan //test/...
 
 The ASAN failure stack traces include line numbers as a result of running ASAN with a `dbg` build above.
 
-If you have clang-5.0, additional checks are provided with:
+If you have clang-5.0 or newer, additional checks are provided with:
 
 ```
 bazel test -c dbg --config=clang-asan //test/...

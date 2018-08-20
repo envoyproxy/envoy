@@ -11,6 +11,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -210,7 +211,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   // Now setup ADS if needed, this might rely on a primary cluster.
   if (bootstrap.dynamic_resources().has_ads_config()) {
     ads_mux_.reset(new Config::GrpcMuxImpl(
-        bootstrap.node(),
+        local_info,
         Config::Utility::factoryForGrpcApiConfigSource(
             *async_client_manager_, bootstrap.dynamic_resources().ads_config(), stats)
             ->create(),
@@ -300,7 +301,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
     load_stats_reporter_.reset(
-        new LoadStatsReporter(bootstrap.node(), *this, stats,
+        new LoadStatsReporter(local_info, *this, stats,
                               Config::Utility::factoryForGrpcApiConfigSource(
                                   *async_client_manager_, load_stats_config, stats)
                                   ->create(),
@@ -500,6 +501,11 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
     cluster_entry->cluster_->initialize([this, cluster_name] {
       auto warming_it = warming_clusters_.find(cluster_name);
       auto& cluster_entry = *warming_it->second;
+
+      // If the cluster is being updated, we need to cancel any pending merged updates.
+      // Othewise, applyUpdates() will fire with a dangling cluster reference.
+      updates_map_.erase(cluster_name);
+
       active_clusters_[cluster_name] = std::move(warming_it->second);
       warming_clusters_.erase(warming_it);
 
@@ -515,28 +521,24 @@ bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& clust
 }
 
 void ClusterManagerImpl::createOrUpdateThreadLocalCluster(ClusterData& cluster) {
-  tls_->runOnAllThreads(
-      [
-        this, new_cluster = cluster.cluster_->info(),
-        thread_aware_lb_factory = cluster.loadBalancerFactory()
-      ]()
-          ->void {
-            ThreadLocalClusterManagerImpl& cluster_manager =
-                tls_->getTyped<ThreadLocalClusterManagerImpl>();
+  tls_->runOnAllThreads([this, new_cluster = cluster.cluster_->info(),
+                         thread_aware_lb_factory = cluster.loadBalancerFactory()]() -> void {
+    ThreadLocalClusterManagerImpl& cluster_manager =
+        tls_->getTyped<ThreadLocalClusterManagerImpl>();
 
-            if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
-              ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
-            } else {
-              ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
-            }
+    if (cluster_manager.thread_local_clusters_.count(new_cluster->name()) > 0) {
+      ENVOY_LOG(debug, "updating TLS cluster {}", new_cluster->name());
+    } else {
+      ENVOY_LOG(debug, "adding TLS cluster {}", new_cluster->name());
+    }
 
-            auto thread_local_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
-                cluster_manager, new_cluster, thread_aware_lb_factory);
-            cluster_manager.thread_local_clusters_[new_cluster->name()].reset(thread_local_cluster);
-            for (auto& cb : cluster_manager.update_callbacks_) {
-              cb->onClusterAddOrUpdate(*thread_local_cluster);
-            }
-          });
+    auto thread_local_cluster = new ThreadLocalClusterManagerImpl::ClusterEntry(
+        cluster_manager, new_cluster, thread_aware_lb_factory);
+    cluster_manager.thread_local_clusters_[new_cluster->name()].reset(thread_local_cluster);
+    for (auto& cb : cluster_manager.update_callbacks_) {
+      cb->onClusterAddOrUpdate(*thread_local_cluster);
+    }
+  });
 }
 
 bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
@@ -573,8 +575,7 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
   if (removed) {
     cm_stats_.cluster_removed_.inc();
     updateGauges();
-    // Did we ever deliver merged updates for this cluster?
-    // No need to manually disable timers, this should take care of it.
+    // Cancel any pending merged updates.
     updates_map_.erase(cluster_name);
   }
 
@@ -688,15 +689,14 @@ void ClusterManagerImpl::postThreadLocalClusterUpdate(const Cluster& cluster, ui
   HostsPerLocalityConstSharedPtr healthy_hosts_per_locality_copy =
       host_set->healthyHostsPerLocality().clone();
 
-  tls_->runOnAllThreads([
-    this, name = cluster.info()->name(), priority, hosts_copy, healthy_hosts_copy,
-    hosts_per_locality_copy, healthy_hosts_per_locality_copy,
-    locality_weights = host_set->localityWeights(), hosts_added, hosts_removed
-  ]() {
-    ThreadLocalClusterManagerImpl::updateClusterMembership(
-        name, priority, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
-        healthy_hosts_per_locality_copy, locality_weights, hosts_added, hosts_removed, *tls_);
-  });
+  tls_->runOnAllThreads(
+      [this, name = cluster.info()->name(), priority, hosts_copy, healthy_hosts_copy,
+       hosts_per_locality_copy, healthy_hosts_per_locality_copy,
+       locality_weights = host_set->localityWeights(), hosts_added, hosts_removed]() {
+        ThreadLocalClusterManagerImpl::updateClusterMembership(
+            name, priority, hosts_copy, healthy_hosts_copy, hosts_per_locality_copy,
+            healthy_hosts_per_locality_copy, locality_weights, hosts_added, hosts_removed, *tls_);
+      });
 }
 
 void ClusterManagerImpl::postThreadLocalHealthFailure(const HostSharedPtr& host) {
@@ -953,7 +953,7 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
   cluster_entry->priority_set_.getOrCreateHostSet(priority).updateHosts(
       std::move(hosts), std::move(healthy_hosts), std::move(hosts_per_locality),
       std::move(healthy_hosts_per_locality), std::move(locality_weights), hosts_added,
-      hosts_removed);
+      hosts_removed, absl::nullopt);
 
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (cluster_entry->lb_factory_ != nullptr) {

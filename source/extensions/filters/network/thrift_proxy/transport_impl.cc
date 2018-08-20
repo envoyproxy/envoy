@@ -8,6 +8,7 @@
 #include "extensions/filters/network/thrift_proxy/buffer_helper.h"
 #include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
 #include "extensions/filters/network/thrift_proxy/framed_transport_impl.h"
+#include "extensions/filters/network/thrift_proxy/header_transport_impl.h"
 #include "extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
 
 namespace Envoy {
@@ -15,7 +16,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer, absl::optional<uint32_t>& size) {
+bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMetadata& metadata) {
   if (transport_ == nullptr) {
     // Not enough data to select a transport.
     if (buffer.length() < 8) {
@@ -25,10 +26,18 @@ bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer, absl::optiona
     int32_t size = BufferHelper::peekI32(buffer);
     uint16_t proto_start = BufferHelper::peekU16(buffer, 4);
 
-    if (size > 0 && size <= FramedTransportImpl::MaxFrameSize) {
+    // Currently, transport detection depends on the following:
+    // 1. Protocol may only be binary or compact, which start with 0x8001 or 0x8201.
+    // 2. If unframed transport, size will appear negative due to leading protocol bytes.
+    // 3. If header transport, size is followed by 0x0FFF which is distinct from leading
+    //    protocol bytes.
+    // 4. For framed transport, size is followed by protocol bytes.
+    if (size > 0 && size <= HeaderTransportImpl::MaxFrameSize &&
+        HeaderTransportImpl::isMagic(proto_start)) {
+      setTransport(std::make_unique<HeaderTransportImpl>());
+    } else if (size > 0 && size <= FramedTransportImpl::MaxFrameSize) {
       // TODO(zuercher): Spec says max size is 16,384,000 (0xFA0000). Apache C++ TFramedTransport
-      // is configurable, but defaults to 256 MB (0x1000000). THeaderTransport will take up to ~1GB
-      // (0x3FFFFFFF) when it falls back to framed mode.
+      // is configurable, but defaults to 256 MB (0x1000000).
       if (BinaryProtocolImpl::isMagic(proto_start) || CompactProtocolImpl::isMagic(proto_start)) {
         setTransport(std::make_unique<FramedTransportImpl>());
       }
@@ -51,7 +60,7 @@ bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer, absl::optiona
     }
   }
 
-  return transport_->decodeFrameStart(buffer, size);
+  return transport_->decodeFrameStart(buffer, metadata);
 }
 
 bool AutoTransportImpl::decodeFrameEnd(Buffer::Instance& buffer) {
@@ -59,9 +68,10 @@ bool AutoTransportImpl::decodeFrameEnd(Buffer::Instance& buffer) {
   return transport_->decodeFrameEnd(buffer);
 }
 
-void AutoTransportImpl::encodeFrame(Buffer::Instance& buffer, Buffer::Instance& message) {
-  RELEASE_ASSERT(transport_ != nullptr, "");
-  transport_->encodeFrame(buffer, message);
+void AutoTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMetadata& metadata,
+                                    Buffer::Instance& message) {
+  RELEASE_ASSERT(transport_ != nullptr, "auto transport cannot encode before transport detection");
+  transport_->encodeFrame(buffer, metadata, message);
 }
 
 class AutoTransportConfigFactory : public TransportFactoryBase<AutoTransportImpl> {

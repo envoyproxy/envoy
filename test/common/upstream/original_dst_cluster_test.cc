@@ -4,6 +4,8 @@
 #include <tuple>
 #include <vector>
 
+#include "envoy/stats/scope.h"
+
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/original_dst_cluster.h"
@@ -23,12 +25,12 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Upstream {
@@ -65,10 +67,9 @@ public:
 
   void setup(const envoy::api::v2::Cluster& cluster_config) {
     NiceMock<MockClusterManager> cm;
-    Envoy::Stats::ScopePtr scope = stats_store_.createScope(
-        fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
-                                       ? cluster_config.name()
-                                       : std::string(cluster_config.alt_stat_name())));
+    Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
+        "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
+                                                              : cluster_config.alt_stat_name()));
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_);
     cluster_.reset(
@@ -455,7 +456,8 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
         const HostsPerLocalityConstSharedPtr empty_hosts_per_locality{new HostsPerLocalityImpl()};
 
         second.getOrCreateHostSet(0).updateHosts(new_hosts, healthy_hosts, empty_hosts_per_locality,
-                                                 empty_hosts_per_locality, {}, added, removed);
+                                                 empty_hosts_per_locality, {}, added, removed,
+                                                 absl::nullopt);
       });
 
   EXPECT_CALL(membership_updated_, ready());

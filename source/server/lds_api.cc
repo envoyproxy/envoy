@@ -4,6 +4,7 @@
 
 #include "envoy/api/v2/lds.pb.validate.h"
 #include "envoy/api/v2/listener/listener.pb.validate.h"
+#include "envoy/stats/scope.h"
 
 #include "common/common/cleanup.h"
 #include "common/config/resources.h"
@@ -24,7 +25,7 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm) {
   subscription_ =
       Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<envoy::api::v2::Listener>(
-          lds_config, local_info.node(), dispatcher, cm, random, *scope_,
+          lds_config, local_info, dispatcher, cm, random, *scope_,
           [this, &lds_config, &cm, &dispatcher, &random, &local_info,
            &scope]() -> Config::Subscription<envoy::api::v2::Listener>* {
             return new LdsSubscription(Config::Utility::generateStats(*scope_), lds_config, cm,

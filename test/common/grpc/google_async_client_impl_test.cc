@@ -1,4 +1,4 @@
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/grpc/google_async_client_impl.h"
@@ -11,8 +11,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Return;
 using testing::_;
+using testing::Return;
 
 namespace Envoy {
 namespace Grpc {

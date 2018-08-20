@@ -47,8 +47,8 @@ public:
   static FieldSharedPtr createNull() { return FieldSharedPtr{new Field(Type::Null)}; }
 
   bool isNull() const override { return type_ == Type::Null; }
-  bool isArray() const { return type_ == Type::Array; }
-  bool isObject() const { return type_ == Type::Object; }
+  bool isArray() const override { return type_ == Type::Array; }
+  bool isObject() const override { return type_ == Type::Object; }
 
   // Value factory.
   template <typename T> static FieldSharedPtr createValue(T value) {

@@ -16,6 +16,7 @@
 #include "envoy/server/hot_restart.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/options.h"
+#include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -388,13 +389,11 @@ Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& re
 Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& response_headers,
                                         Buffer::Instance& response, AdminStream&) const {
   envoy::admin::v2alpha::ConfigDump dump;
-  auto& config_dump_map = *(dump.mutable_configs());
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     RELEASE_ASSERT(message, "");
-    ProtobufWkt::Any any_message;
+    auto& any_message = *(dump.add_configs());
     any_message.PackFrom(*message);
-    config_dump_map[key_callback_pair.first] = any_message;
   }
 
   response_headers.insertContentType().value().setReference(
@@ -1013,7 +1012,25 @@ Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::HeaderMap& respo
 
   // Prefix order is used during searching, but for printing do them in alpha order.
   for (const UrlHandler* handler : sortedHandlers()) {
-    const std::string& url = handler->prefix_;
+    absl::string_view path = handler->prefix_;
+
+    if (path == "/") {
+      continue; // No need to print self-link to index page.
+    }
+
+    // Remove the leading slash from the link, so that the admin page can be
+    // rendered as part of another console, on a sub-path.
+    //
+    // E.g. consider a downstream dashboard that embeds the Envoy admin console.
+    // In that case, the "/stats" endpoint would be at
+    // https://DASHBOARD/envoy_admin/stats. If the links we present on the home
+    // page are absolute (e.g. "/stats") they won't work in the context of the
+    // dashboard. Removing the leading slash, they will work properly in both
+    // the raw admin console and when embedded in another page and URL
+    // hierarchy.
+    ASSERT(!path.empty());
+    ASSERT(path[0] == '/');
+    path = path.substr(1);
 
     // For handlers that mutate state, render the link as a button in a POST form,
     // rather than an anchor tag. This should discourage crawlers that find the /
@@ -1022,7 +1039,7 @@ Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::HeaderMap& respo
         handler->mutates_server_state_
             ? "<form action='{}' method='post' class='home-form'><button>{}</button></form>"
             : "<a href='{}'>{}</a>";
-    const std::string link = fmt::format(link_format, url, url);
+    const std::string link = fmt::format(link_format, path, path);
 
     // Handlers are all specified by statically above, and are thus trusted and do
     // not require escaping.
@@ -1040,6 +1057,9 @@ const Network::Address::Instance& AdminImpl::localAddress() {
 
 bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_text,
                            HandlerCb callback, bool removable, bool mutates_state) {
+  ASSERT(prefix.size() > 1);
+  ASSERT(prefix[0] == '/');
+
   // Sanitize prefix and help_text to ensure no XSS can be injected, as
   // we are injecting these strings into HTML that runs in a domain that
   // can mutate Envoy server state. Also rule out some characters that
@@ -1069,18 +1089,14 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
   return false;
 }
 
-Http::Code AdminImpl::request(absl::string_view path, const Http::Utility::QueryParams& params,
-                              absl::string_view method, Http::HeaderMap& response_headers,
-                              std::string& body) {
+Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
+                              Http::HeaderMap& response_headers, std::string& body) {
   AdminFilter filter(*this);
   Http::HeaderMapImpl request_headers;
   request_headers.insertMethod().value(method.data(), method.size());
   filter.decodeHeaders(request_headers, false);
-  std::string path_and_query = absl::StrCat(path, Http::Utility::queryParamsToString(params));
   Buffer::OwnedImpl response;
 
-  // TODO(jmarantz): rather than serializing params here and then re-parsing in the handler,
-  // change the callback signature to take the query-params separately.
   Http::Code code = runCallback(path_and_query, response_headers, response, filter);
   populateFallbackResponseHeaders(code, response_headers);
   body = response.toString();
