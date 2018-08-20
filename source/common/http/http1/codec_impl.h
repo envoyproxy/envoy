@@ -125,7 +125,7 @@ public:
   /**
    * Called when headers are encoded.
    */
-  virtual void onEncodeHeader(const HeaderMapImpl& headers, bool end_stream) PURE;
+  virtual void onEncodeHeaders(const HeaderMapImpl& headers) PURE;
 
   /**
    * Called when resetStream() has been called on an active stream. In HTTP/1.1 the only
@@ -307,7 +307,7 @@ private:
 
   // ConnectionImpl
   void onEncodeComplete() override;
-  void onEncodeHeader(const HeaderMapImpl&, bool) override {}
+  void onEncodeHeaders(const HeaderMapImpl&) override {}
   void onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;
@@ -345,7 +345,7 @@ private:
 
   // ConnectionImpl
   void onEncodeComplete() override {}
-  void onEncodeHeader(const HeaderMapImpl& headers, bool end_stream) override;
+  void onEncodeHeaders(const HeaderMapImpl& headers) override;
   void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;

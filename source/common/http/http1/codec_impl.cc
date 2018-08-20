@@ -247,7 +247,7 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
   if (method->value() == Headers::get().MethodValues.Head.c_str()) {
     head_request_ = true;
   }
-  connection_.onEncodeHeader(headers, end_stream);
+  connection_.onEncodeHeaders(headers);
   connection_.reserveBuffer(std::max(4096U, path->value().size() + 4096));
   connection_.copyToBuffer(method->value().c_str(), method->value().size());
   connection_.addCharToBuffer(' ');
@@ -684,8 +684,7 @@ StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) 
   return *request_encoder_;
 }
 
-void ClientConnectionImpl::onEncodeHeader(const HeaderMapImpl& headers, bool end_stream) {
-  UNREFERENCED_PARAMETER(end_stream);
+void ClientConnectionImpl::onEncodeHeaders(const HeaderMapImpl& headers) {
   if (headers.Method()->value() == Headers::get().MethodValues.Head.c_str()) {
     pending_responses_.back().head_request_ = true;
   }
