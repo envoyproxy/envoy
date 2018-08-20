@@ -684,7 +684,7 @@ StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) 
   return *request_encoder_;
 }
 
-void ClientConnectionImpl::onEncodeHeaders(const HeaderMapImpl& headers) {
+void ClientConnectionImpl::onEncodeHeaders(const HeaderMap& headers) {
   if (headers.Method()->value() == Headers::get().MethodValues.Head.c_str()) {
     pending_responses_.back().head_request_ = true;
   }
