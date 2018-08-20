@@ -618,8 +618,8 @@ route:
         value: "%START_TIME(%s.%3f)%"
       append: true
     - header:
-        key: "x-request-start"
-        value: "%START_TIME(%s.%3f)%  %START_TIME% %START_TIME(%s)%"
+        key: "x-request-start-multiple"
+        value: "%START_TIME(%s.%3f)% %START_TIME% %START_TIME(%s)%"
       append: true
     - header:
         key: "x-request-start-f"
@@ -648,10 +648,13 @@ route:
 
   resp_header_parser->evaluateHeaders(headerMap, request_info);
   EXPECT_TRUE(headerMap.has("x-client-ip"));
+  EXPECT_TRUE(headerMap.has("x-request-start-multiple"));
   EXPECT_TRUE(headerMap.has("x-safe"));
   EXPECT_FALSE(headerMap.has("x-nope"));
   EXPECT_TRUE(headerMap.has("x-request-start"));
   EXPECT_EQ("1522796769.123", headerMap.get_("x-request-start"));
+  EXPECT_EQ("1522796769.123 2018-04-03T23:06:09.123Z 1522796769",
+            headerMap.get_("x-request-start-multiple"));
   EXPECT_TRUE(headerMap.has("x-request-start-f"));
   EXPECT_EQ("f", headerMap.get_("x-request-start-f"));
   EXPECT_TRUE(headerMap.has("x-request-start-default"));
