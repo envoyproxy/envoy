@@ -28,19 +28,19 @@ import "validate/validate.proto";
 //
 // .. attention::
 //   In the absence of any header match specifier, match will default to :ref:`present_match
-//   <envoy_api_field_route.HeaderMatcher.present_match>`. i.e, a request that has the :ref:`name
-//   <envoy_api_field_route.HeaderMatcher.name>` header will match, regardless of the header's
-//   value.
+//   <envoy_api_field_type.matcher.HeaderMatcher.present_match>`. i.e, a request that has the
+//   :ref:`name <envoy_api_field_type.matcher.HeaderMatcher.name>` header will match, regardless of
+//   the header's value.
 //
 message HeaderMatcher {
   // Specifies the name of the header in the request.
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   reserved 2; // value deprecated by :ref:`exact_match
-              // <envoy_api_field_route.HeaderMatcher.exact_match>`
+              // <envoy_api_field_type.matcher.HeaderMatcher.exact_match>`
 
   reserved 3; // regex deprecated by :ref:`regex_match
-              // <envoy_api_field_route.HeaderMatcher.regex_match>`
+              // <envoy_api_field_type.matcher.HeaderMatcher.regex_match>`
 
   // Specifies how the header match will be performed to route the request.
   oneof header_match_specifier {

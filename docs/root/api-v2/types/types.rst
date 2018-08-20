@@ -12,3 +12,4 @@ Types
   ../type/matcher/number.proto
   ../type/matcher/string.proto
   ../type/matcher/value.proto
+  ../type/matcher/header.proto

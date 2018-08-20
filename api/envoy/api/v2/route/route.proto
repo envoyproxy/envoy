@@ -112,7 +112,7 @@ message VirtualHost {
 // .. attention::
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
-//   <envoy_api_msg_route.HeaderMatcher>`.
+//   <envoy_api_msg_type.matcher.HeaderMatcher>`.
 message Route {
   // Route matching parameters.
   RouteMatch match = 1 [(validate.rules).message.required = true, (gogoproto.nullable) = false];

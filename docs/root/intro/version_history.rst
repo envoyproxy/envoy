@@ -3,6 +3,7 @@ Version history
 
 1.8.0 (Pending)
 ===============
+* moved :ref:`HeaderMatcher <envoy_api_msg_type.matcher.HeaderMatcher>` to common matcher package
 * access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>`
   to filter based on the presence of Envoy response flags.
 * access log: added RESPONSE_DURATION and RESPONSE_TX_DURATION.
@@ -36,7 +37,7 @@ Version history
   <envoy_api_field_route.RouteAction.idle_timeout>`. This defaults to 5 minutes; if you have
   other timeouts (e.g. connection idle timeout, upstream response per-retry) that are longer than
   this in duration, you may want to consider setting a non-default per-stream idle timeout.
-* http: added generic :ref:`Upgrade support 
+* http: added generic :ref:`Upgrade support
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`.
 * http: better handling of HEAD requests. Now sending transfer-encoding: chunked rather than content-length: 0.
 * http: response filters not applied to early error paths such as http_parser generated 400s.
@@ -165,13 +166,13 @@ Version history
   timeout will be ignored and the response will continue to proxy up to the global request timeout.
 * router: changed the behavior of :ref:`source IP routing <envoy_api_field_route.RouteAction.HashPolicy.ConnectionProperties.source_ip>`
   to ignore the source port.
-* router: added an :ref:`prefix_match <envoy_api_field_route.HeaderMatcher.prefix_match>` match type
+* router: added an :ref:`prefix_match <envoy_api_field_type.matcher.HeaderMatcher.prefix_match>` match type
   to explicitly match based on the prefix of a header value.
-* router: added an :ref:`suffix_match <envoy_api_field_route.HeaderMatcher.suffix_match>` match type
+* router: added an :ref:`suffix_match <envoy_api_field_type.matcher.HeaderMatcher.suffix_match>` match type
   to explicitly match based on the suffix of a header value.
-* router: added an :ref:`present_match <envoy_api_field_route.HeaderMatcher.present_match>` match type
+* router: added an :ref:`present_match <envoy_api_field_type.matcher.HeaderMatcher.present_match>` match type
   to explicitly match based on a header's presence.
-* router: added an :ref:`invert_match <envoy_api_field_route.HeaderMatcher.invert_match>` config option
+* router: added an :ref:`invert_match <envoy_api_field_type.matcher.HeaderMatcher.invert_match>` config option
   which supports inverting all other match types to match based on headers which are not a desired value.
 * router: allow :ref:`cookie routing <envoy_api_msg_route.RouteAction.HashPolicy.Cookie>` to
   generate session cookies.
@@ -312,7 +313,7 @@ Version history
   :ref:`header manipulation <config_http_conn_man_headers_custom_request_headers>` in :ref:`weighted
   cluster <envoy_api_msg_route.WeightedCluster>`.
 * router: added support for :ref:`range based header matching
-  <envoy_api_field_route.HeaderMatcher.range_match>` for request routing.
+  <envoy_api_field_type.matcher.HeaderMatcher.range_match>` for request routing.
 * squash: added support for the :ref:`Squash microservices debugger <config_http_filters_squash>`.
   Allows debugging an incoming request to a microservice in the mesh.
 * stats: added metrics service API implementation.
