@@ -242,7 +242,7 @@ struct Http2Settings {
   // our default connection-level window also equals to our stream-level
   static const uint32_t DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE = 256 * 1024 * 1024;
   static const uint32_t MAX_INITIAL_CONNECTION_WINDOW_SIZE = (1U << 31) - 1;
-  // By default both nghttp2 and Envoy do now allow CONNECT over H2.
+  // By default both nghttp2 and Envoy do not allow CONNECT over H2.
   static const bool DEFAULT_ALLOW_CONNECT = false;
 };
 

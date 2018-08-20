@@ -23,10 +23,10 @@ data upstream.
 Handling H2 hops (implementation in progress)
 ---------------------------------------------
 
-One oft requested feature for Envoy was to allow WebSocket to traverse HTTP/2 hops, where there
-was a set-up such as
+Envoy currently has an alpha implementation of tunneling websockets over H2 streams for deployments
+that prefer a uniform H2 mesh throughout, for example, for a deployment of the form:
 
-Client ---- HTTP/1.1 ---- Frontline Envoy ---- HTTP/2 ---- Second tier Envoy ---- H1  ---- Upstream
+[Client] ---- HTTP/1.1 ---- [Front Envoy] ---- HTTP/2 ---- [Sidecar Envoy ---- H1  ---- App]
 
 In this case, if a client is for example using WebSocket, we want the Websocket to arive at the
 upstream server functionally intact, which means it needs to traverse the HTTP/2 hop.
@@ -34,7 +34,7 @@ upstream server functionally intact, which means it needs to traverse the HTTP/2
 TODO(alyssawilk) copy the warnings from the config here, or just land the docs when we unhide.
 
 This is accomplished via
-`extended CONNECT <https://tools.ietf.org/html/draft-mcmanus-httpbis-h2-websockets`_ support. The
+`extended CONNECT <https://tools.ietf.org/html/draft-mcmanus-httpbis-h2-websockets>`_ support. The
 WebSocket request will be transformed into an HTTP/2 CONNECT stream, with :protocol header
 indicating the original upgrade, traverse the HTTP/2 hop, and be downgraded back into an HTTP/1
 WebSocket Upgrade. This same Upgrade-CONNECT-Upgrade transformation will be performed on any

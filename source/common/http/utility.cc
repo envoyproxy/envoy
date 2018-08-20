@@ -408,22 +408,14 @@ void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
   headers.insertProtocol().value().setCopy(upgrade.c_str(), upgrade.size());
   headers.removeUpgrade();
   headers.removeConnection();
-  if (headers.ContentLength() == nullptr) {
-    headers.insertTransferEncoding().value().setReference(
-        Http::Headers::get().TransferEncodingValues.Chunked);
-  }
 }
 
 void Utility::transformUpgradeResponseFromH1toH2(HeaderMap& headers) {
   if (getResponseStatus(headers) == 101) {
-    headers.insertStatus().value().setCopy("200", 3);
+    headers.insertStatus().value().setInteger(200);
   }
   headers.removeUpgrade();
   headers.removeConnection();
-  if (headers.ContentLength() == nullptr) {
-    headers.insertTransferEncoding().value().setReference(
-        Http::Headers::get().TransferEncodingValues.Chunked);
-  }
 }
 
 void Utility::transformUpgradeRequestFromH2toH1(HeaderMap& headers) {
@@ -434,15 +426,22 @@ void Utility::transformUpgradeRequestFromH2toH1(HeaderMap& headers) {
   headers.insertUpgrade().value().setCopy(protocol.c_str(), protocol.size());
   headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
   headers.removeProtocol();
+  if (headers.ContentLength() == nullptr) {
+    headers.insertTransferEncoding().value().setReference(
+        Http::Headers::get().TransferEncodingValues.Chunked);
+  }
 }
 
 void Utility::transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade) {
   if (getResponseStatus(headers) == 200) {
-    headers.insertStatus().value().setCopy("101", 3);
+    headers.insertUpgrade().value().setCopy(upgrade.data(), upgrade.size());
+    headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
+    if (headers.ContentLength() == nullptr) {
+      headers.insertTransferEncoding().value().setReference(
+          Http::Headers::get().TransferEncodingValues.Chunked);
+    }
+    headers.insertStatus().value().setInteger(101);
   }
-  // TODO(alyssawilk) what should we do for websocket responses on the failure path?
-  headers.insertUpgrade().value().setCopy(upgrade.data(), upgrade.size());
-  headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
 }
 
 } // namespace Http

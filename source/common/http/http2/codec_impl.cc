@@ -17,7 +17,6 @@
 #include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/headers.h"
-#include "common/http/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -91,15 +90,11 @@ void ConnectionImpl::StreamImpl::encode100ContinueHeaders(const HeaderMap& heade
 void ConnectionImpl::StreamImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   std::vector<nghttp2_nv> final_headers;
 
+  Http::HeaderMapPtr modified_headers;
   if (Http::Utility::isUpgrade(headers)) {
-    HeaderMapImpl modified_headers(headers);
-    upgrade_type_ = headers.Upgrade()->value().c_str();
-    if (headers.Status()) {
-      Http::Utility::transformUpgradeResponseFromH1toH2(modified_headers);
-    } else {
-      Http::Utility::transformUpgradeRequestFromH1toH2(modified_headers);
-    }
-    buildHeaders(final_headers, modified_headers);
+    modified_headers = std::make_unique<Http::HeaderMapImpl>(headers);
+    transformUpgradeFromH1toH2(*modified_headers);
+    buildHeaders(final_headers, *modified_headers);
   } else {
     buildHeaders(final_headers, headers);
   }
@@ -164,11 +159,7 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
 }
 
 void ConnectionImpl::StreamImpl::decodeHeaders() {
-  if (Http::Utility::isH2UpgradeRequest(*headers_)) {
-    Http::Utility::transformUpgradeRequestFromH2toH1(*headers_);
-  } else if (!upgrade_type_.empty() && headers_->Status()) {
-    Http::Utility::transformUpgradeResponseFromH2toH1(*headers_, upgrade_type_);
-  }
+  maybeTransformUpgradeFromH2ToH1();
   decoder_->decodeHeaders(std::move(headers_), remote_end_stream_);
 }
 
