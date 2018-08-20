@@ -2,6 +2,7 @@
 
 #include "common/common/logger.h"
 #include "common/common/thread.h"
+#include "common/common/utility.h"
 #include "common/event/libevent.h"
 
 #include "test/test_common/environment.h"
@@ -10,6 +11,14 @@ namespace Envoy {
 namespace Fuzz {
 
 spdlog::level::level_enum Runner::log_level_;
+
+PerTestEnvironment::PerTestEnvironment() {
+  const std::string fuzz_path = TestEnvironment::temporaryPath("fuzz_XXXXXX");
+  char test_tmpdir[fuzz_path.size() + 1];
+  StringUtil::strlcpy(test_tmpdir, fuzz_path.data(), fuzz_path.size() + 1);
+  RELEASE_ASSERT(::mkdtemp(test_tmpdir) != nullptr, "");
+  test_tmpdir_ = std::string(test_tmpdir);
+}
 
 void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum default_log_level) {
   Event::Libevent::Global::initialize();
