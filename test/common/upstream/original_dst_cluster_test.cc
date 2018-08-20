@@ -36,7 +36,7 @@ namespace Envoy {
 namespace Upstream {
 namespace OriginalDstClusterTest {
 
-class TestLoadBalancerContext : public LoadBalancerContext {
+class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
   TestLoadBalancerContext(const Network::Connection* connection) : connection_(connection) {}
   TestLoadBalancerContext(const Network::Connection* connection, const std::string& key,
@@ -48,8 +48,8 @@ public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return 0; }
   const Network::Connection* downstreamConnection() const override { return connection_; }
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
   const Http::HeaderMap* downstreamHeaders() const override { return downstream_headers_.get(); }
+
   absl::optional<uint64_t> hash_key_;
   const Network::Connection* connection_;
   Http::HeaderMapPtr downstream_headers_;
