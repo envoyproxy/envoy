@@ -53,11 +53,27 @@ public:
 
   const std::string& methodName() const { return method_name_; }
 
-  // RoutEntryImplBase
+  // RouteEntryImplBase
   RouteConstSharedPtr matches(const MessageMetadata& metadata) const override;
 
 private:
   const std::string method_name_;
+  const bool invert_;
+};
+
+class ServiceNameRouteEntryImpl : public RouteEntryImplBase {
+public:
+  ServiceNameRouteEntryImpl(
+      const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route);
+
+  const std::string& serviceName() const { return service_name_; }
+
+  // RouteEntryImplBase
+  RouteConstSharedPtr matches(const MessageMetadata& metadata) const override;
+
+private:
+  std::string service_name_;
+  const bool invert_;
 };
 
 class RouteMatcher {
@@ -100,7 +116,8 @@ public:
 private:
   struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks {
     UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
-                    MessageMetadataSharedPtr& metadata);
+                    MessageMetadataSharedPtr& metadata, TransportType transport_type,
+                    ProtocolType protocol_type);
     ~UpstreamRequest();
 
     ThriftFilters::FilterStatus start();
@@ -124,8 +141,8 @@ private:
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
     Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
-    TransportPtr transport_;
-    ProtocolType proto_type_{ProtocolType::Auto};
+    TransportType transport_type_;
+    ProtocolType protocol_type_;
 
     bool request_complete_ : 1;
     bool response_started_ : 1;

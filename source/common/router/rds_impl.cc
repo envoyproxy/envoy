@@ -70,7 +70,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
 
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<
       envoy::api::v2::RouteConfiguration>(
-      rds.config_source(), factory_context.localInfo().node(), factory_context.dispatcher(),
+      rds.config_source(), factory_context.localInfo(), factory_context.dispatcher(),
       factory_context.clusterManager(), factory_context.random(), *scope_,
       [this, &rds,
        &factory_context]() -> Envoy::Config::Subscription<envoy::api::v2::RouteConfiguration>* {

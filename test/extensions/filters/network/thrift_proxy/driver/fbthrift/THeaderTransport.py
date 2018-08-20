@@ -658,5 +658,10 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
 # INFO:(zuercher): Added to simplify usage
 class THeaderTransportFactory:
+    def __init__(self, proto_id):
+        self.__proto_id = proto_id
+
     def getTransport(self, trans):
-        return THeaderTransport(trans, client_type=CLIENT_TYPE.HEADER)
+        header_trans = THeaderTransport(trans, client_type=CLIENT_TYPE.HEADER)
+        header_trans.set_protocol_id(self.__proto_id)
+        return header_trans

@@ -54,6 +54,7 @@ envoy_cc_library(
     hdrs = ["metric_impl.h"],
     deps = [
         "//include/envoy/stats:stats_interface",
+        "//source/common/common:assert_lib",
     ],
 )
 

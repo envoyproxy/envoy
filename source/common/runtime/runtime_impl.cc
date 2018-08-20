@@ -315,7 +315,7 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
 
 void LoaderImpl::loadNewSnapshot() {
   ThreadLocal::ThreadLocalObjectSharedPtr ptr = createNewSnapshot();
-  tls_->set([ptr = std::move(ptr)](Event::Dispatcher&)->ThreadLocal::ThreadLocalObjectSharedPtr {
+  tls_->set([ptr = std::move(ptr)](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return ptr;
   });
 }

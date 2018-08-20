@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Upstream {
 
-LoadStatsReporter::LoadStatsReporter(const envoy::api::v2::core::Node& node,
+LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
                                      Grpc::AsyncClientPtr async_client,
                                      Event::Dispatcher& dispatcher,
@@ -18,7 +18,7 @@ LoadStatsReporter::LoadStatsReporter(const envoy::api::v2::core::Node& node,
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")),
       time_source_(time_source) {
-  request_.mutable_node()->MergeFrom(node);
+  request_.mutable_node()->MergeFrom(local_info.node());
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
   establishNewStream();

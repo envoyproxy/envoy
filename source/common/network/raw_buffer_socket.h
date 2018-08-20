@@ -19,7 +19,6 @@ public:
   void onConnected() override;
   IoResult doRead(Buffer::Instance& buffer) override;
   IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
-  Ssl::Connection* ssl() override { return nullptr; }
   const Ssl::Connection* ssl() const override { return nullptr; }
 
 private:
