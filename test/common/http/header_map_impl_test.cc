@@ -427,8 +427,8 @@ TEST(HeaderMapImplTest, SetRemovesAllValues) {
 TEST(HeaderMapImplTest, DoubleInlineAdd) {
   HeaderMapImpl headers;
   headers.addReferenceKey(Headers::get().ContentLength, 5);
-  EXPECT_DEBUG_DEATH(headers.addReferenceKey(Headers::get().ContentLength, 6), "");
-  EXPECT_STREQ("5", headers.ContentLength()->value().c_str());
+  headers.addReferenceKey(Headers::get().ContentLength, 6);
+  EXPECT_STREQ("5,6", headers.ContentLength()->value().c_str());
   EXPECT_EQ(1UL, headers.size());
 }
 
