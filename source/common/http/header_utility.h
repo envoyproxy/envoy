@@ -44,6 +44,13 @@ public:
                            const std::vector<HeaderData>& config_headers);
 
   static bool matchHeaders(const Http::HeaderMap& request_headers, const HeaderData& config_header);
+
+  /**
+   * Add headers from one HeaderMap to another
+   * @param headers target where headers will be added
+   * @param headers_to_add supplies the headers to be added
+   */
+  static void addHeaders(Http::HeaderMap& headers, const Http::HeaderMap& headers_to_add);
 };
 } // namespace Http
 } // namespace Envoy

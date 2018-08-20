@@ -49,8 +49,8 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
                              AccessLog::AccessLogManager& log_manager) {
   HealthCheckEventLoggerPtr event_logger;
   if (!hc_config.event_log_path().empty()) {
-    event_logger =
-        std::make_unique<HealthCheckEventLoggerImpl>(log_manager, hc_config.event_log_path());
+    event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
+        log_manager, ProdSystemTimeSource::instance_, hc_config.event_log_path());
   }
   switch (hc_config.health_checker_case()) {
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kHttpHealthCheck:

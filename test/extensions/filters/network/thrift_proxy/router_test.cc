@@ -19,6 +19,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::ContainsRegex;
 using testing::Invoke;
 using testing::NiceMock;
@@ -28,7 +29,6 @@ using testing::ReturnRef;
 using testing::Test;
 using testing::TestWithParam;
 using testing::Values;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {

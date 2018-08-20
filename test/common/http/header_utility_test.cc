@@ -403,5 +403,21 @@ invert_match: true
   EXPECT_FALSE(HeaderUtility::matchHeaders(unmatching_headers, header_data));
 }
 
+TEST(HeaderAddTest, HeaderAdd) {
+  TestHeaderMapImpl headers{{"myheader1", "123value"}};
+  TestHeaderMapImpl headers_to_add{{"myheader2", "456value"}};
+
+  HeaderUtility::addHeaders(headers, headers_to_add);
+
+  headers_to_add.iterate(
+      [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
+        TestHeaderMapImpl* headers = static_cast<TestHeaderMapImpl*>(context);
+        Http::LowerCaseString lower_key{entry.key().c_str()};
+        EXPECT_STREQ(entry.value().c_str(), headers->get(lower_key)->value().c_str());
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      &headers);
+}
+
 } // namespace Http
 } // namespace Envoy
