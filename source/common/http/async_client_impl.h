@@ -155,6 +155,8 @@ private:
     const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
       return nullptr;
     }
+    Upstream::RetryPrioritySharedPtr retryPriority() override { return nullptr; }
+    Upstream::RetryHostPredicateSharedPtr retryHostPredicate() override { return nullptr; }
 
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullConfig route_configuration_;

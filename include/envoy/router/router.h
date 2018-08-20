@@ -16,6 +16,7 @@
 #include "envoy/http/websocket.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/resource_manager.h"
+#include "envoy/upstream/retry.h"
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -298,6 +299,20 @@ public:
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
     return dynamic_cast<const Derived*>(perFilterConfig(name));
   }
+
+  /**
+   * Returns a new RetryPriority to be used for this VirtualHost.
+   *
+   * @return pointer to a new RetryPriority, or nullptr if no filter is configured.
+   */
+  virtual Upstream::RetryPrioritySharedPtr retryPriority() PURE;
+
+  /**
+   * Returns a new RetryHostPredicate to be used for this VirtualHost.
+   *
+   * @return pointer to a new RetryHostPredicate, or nullptr if no filter is configured.
+   */
+  virtual Upstream::RetryHostPredicateSharedPtr retryHostPredicate() PURE;
 };
 
 /**

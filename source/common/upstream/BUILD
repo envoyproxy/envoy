@@ -187,15 +187,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "locality_lib",
-    hdrs = ["locality.h"],
-    deps = [
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
-    ],
-)
-
-envoy_cc_library(
     name = "logical_dns_cluster_lib",
     srcs = ["logical_dns_cluster.cc"],
     hdrs = ["logical_dns_cluster.h"],
@@ -287,12 +278,12 @@ envoy_cc_library(
     srcs = ["eds.cc"],
     hdrs = ["eds.h"],
     deps = [
-        ":locality_lib",
         ":sds_subscription_lib",
         ":upstream_includes",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/upstream:locality_lib",
         "//include/envoy/secret:secret_manager_interface",
         "//source/common/config:metadata_lib",
         "//source/common/config:subscription_factory_lib",
@@ -397,6 +388,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:health_checker_interface",
         "//include/envoy/upstream:load_balancer_interface",
+        "//include/envoy/upstream:locality_lib",
         "//include/envoy/upstream:upstream_interface",
         "//source/common/common:callback_impl_lib",
         "//source/common/common:enum_to_int",
@@ -405,7 +397,6 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
-        "//source/common/upstream:locality_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",
         "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
     ],

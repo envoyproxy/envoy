@@ -104,6 +104,28 @@ message VirtualHost {
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
   // for if and how it is utilized.
   map<string, google.protobuf.Struct> per_filter_config = 12;
+
+  message RetryPriority {
+    string name = 1;
+    google.protobuf.Struct config = 2;
+  }
+
+  // Specifies an implementation of a RetryPriority which is used to determine the
+  // priority load used for retries.
+  RetryPriority retry_priority = 13;
+
+  message RetryHostPredicate {
+    string name = 1;
+    google.protobuf.Struct config = 2;
+  }
+
+  // Specifies a collection of RetryHostPredicates that will be consulted when selecting a host for
+  // retries. If any of the predicates reject the host, host selection will be reattempted.
+  repeated RetryHostPredicate retry_host_predicate = 14;
+
+  // The maximum number of times host selection will be reattempted before giving up, at which point
+  // the host that was last selected will be routed to.
+  int64 host_selection_retry_max_attempts = 15;
 }
 
 // A route is both a specification of how to match a request as well as an indication of what to do
