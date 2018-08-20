@@ -199,6 +199,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
   if (isHealthCheckSucceeded()) {
     handleSuccess();
   } else {
+    host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNHEALTHY);
     handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::ACTIVE);
   }
 
@@ -214,6 +215,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
+  host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
   ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
 
@@ -295,6 +297,8 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
     if (!parent_.reuse_connection_) {
       client_->close(Network::ConnectionCloseType::NoFlush);
     }
+  } else {
+    host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNHEALTHY);
   }
 }
 
@@ -351,6 +355,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
+  host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
   client_->close(Network::ConnectionCloseType::NoFlush);
 }
 
