@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <shared_mutex>
 #include <string>
 
 #include "envoy/network/connection.h"
@@ -102,6 +103,9 @@ private:
   SslSocketFactoryStats stats_;
   ClientContextConfigPtr config_;
   ClientContextSharedPtr ssl_ctx_;
+  // Protects ssl_ctx_ from read access by multiple threads, and guarantees only
+  // one thread can write to ssl_ctx_.
+  mutable std::shared_timed_mutex ssl_ctx_mutex_;
 };
 
 class ServerSslSocketFactory : public Network::TransportSocketFactory,
@@ -124,6 +128,9 @@ private:
   ServerContextConfigPtr config_;
   const std::vector<std::string> server_names_;
   ServerContextSharedPtr ssl_ctx_;
+  // Protects ssl_ctx_ from read access by multiple threads, and guarantees only
+  // one thread can write to ssl_ctx_.
+  mutable std::shared_timed_mutex ssl_ctx_mutex_;
 };
 
 } // namespace Ssl
