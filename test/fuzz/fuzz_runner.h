@@ -21,7 +21,7 @@ public:
   std::string temporaryPath(const std::string& path) const { return test_tmpdir_ + "/" + path; }
 
 private:
-  std::string test_tmpdir_;
+  const std::string test_tmpdir_;
 };
 
 class Runner {

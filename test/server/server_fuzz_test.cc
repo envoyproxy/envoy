@@ -25,8 +25,7 @@ void makePortHermetic(envoy::api::v2::core::Address& address) {
 envoy::config::bootstrap::v2::Bootstrap
 makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
                           const envoy::config::bootstrap::v2::Bootstrap& input) {
-  envoy::config::bootstrap::v2::Bootstrap output;
-  output.MergeFrom(input);
+  envoy::config::bootstrap::v2::Bootstrap output(input);
   // This is not a complete list of places where we need to zero out ports or sanitize paths, so we
   // should adapt it as we go and encounter places that we need to stabilize server test flakes.
   // config_validation_fuzz_test doesn't need to do this sanitization, so should pickup the coverage
