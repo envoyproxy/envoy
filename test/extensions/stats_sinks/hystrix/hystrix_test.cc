@@ -455,16 +455,16 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
                                              buffer, admin_stream_mock), Http::Code::OK);
 
   // Check that response_headers has been set correctly
-  EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
-              testing::HasSubstr("text/event-stream"));
-  EXPECT_THAT(std::string(response_headers.CacheControl()->value().getStringView()),
-              testing::HasSubstr("no-cache"));
-  EXPECT_THAT(std::string(response_headers.Connection()->value().getStringView()),
-              testing::HasSubstr("close"));
+  EXPECT_EQ(std::string(response_headers.ContentType()->value().getStringView()),
+            "text/event-stream");
+  EXPECT_EQ(std::string(response_headers.CacheControl()->value().getStringView()),
+            "no-cache");
+  EXPECT_EQ(std::string(response_headers.Connection()->value().getStringView()),
+            "close");
+  EXPECT_EQ(std::string(response_headers.AccessControlAllowOrigin()->value().getStringView()),
+            "*");
   EXPECT_THAT(std::string(response_headers.AccessControlAllowHeaders()->value().getStringView()),
               testing::HasSubstr("Accept"));
-  EXPECT_THAT(std::string(response_headers.AccessControlAllowOrigin()->value().getStringView()),
-              testing::HasSubstr("*"));
 }
 
 } // namespace Hystrix
