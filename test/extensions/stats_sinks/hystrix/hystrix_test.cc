@@ -12,6 +12,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -454,8 +455,10 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   EXPECT_EQ(response_headers.CacheControl()->value(), "no-cache");
   EXPECT_EQ(response_headers.Connection()->value(), "close");
   EXPECT_EQ(response_headers.AccessControlAllowOrigin()->value(), "*");
-  EXPECT_THAT(std::string(response_headers.AccessControlAllowHeaders()->value().getStringView()),
-              testing::HasSubstr("Accept"));
+
+  std::string access_control_allow_headers =
+      std::string(response_headers.AccessControlAllowHeaders()->value().getStringView());
+  EXPECT_THAT(access_control_allow_headers, HasSubstr("Accept"));
 }
 
 } // namespace Hystrix
