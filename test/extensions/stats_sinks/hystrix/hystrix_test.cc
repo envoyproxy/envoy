@@ -19,6 +19,7 @@ using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::_;
+using Envoy::Server::Configuration::AdminStreamMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -224,14 +225,6 @@ public:
   std::unique_ptr<HystrixSink> sink_;
   NiceMock<Stats::MockSource> source_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
-};
-
-class AdminStreamMock : public Server::AdminStream {
-public:
-  MOCK_METHOD1(setEndStreamOnComplete, void(bool));
-  MOCK_METHOD1(addOnDestroyCallback, void(std::function<void()>));
-  MOCK_CONST_METHOD0(getRequestHeaders, Http::HeaderMap&());
-  MOCK_CONST_METHOD0(getDecoderFilterCallbacks, NiceMock<Http::MockStreamDecoderFilterCallbacks>&());
 };
 
 TEST_F(HystrixSinkTest, EmptyFlush) {
