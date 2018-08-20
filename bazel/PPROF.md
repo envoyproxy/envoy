@@ -14,22 +14,35 @@ inside
 
 ### Compiling a statically-linked Envoy
 
-Just compile Envoy as normal:
+Build the static binary using bazel:
 
     $ bazel build //source/exe:envoy-static
 
 ### Running a statically-linked Envoy with `pprof`
 
-And run the binary with a `HEAPPROFILE` env var, like so:
+And run the binary with a `HEAPPROFILE` environment variable, like so:
 
     $ HEAPPROFILE=/tmp/mybin.hprof bazel-bin/source/exe/envoy-static <args>
+
+`HEAPPROFILE` sets a location for the profiler output. A statically-linked
+binary must be run with this environment variable; a dynamically-linked binary
+will populate the working directory by default. (See *Methodology*.)
 
 ## Dynamic Linking
 
 ### Adding `tcmalloc_dep` to Envoy
 
-To add a `HeapProfiler` breakpoint yourself, add `tcmalloc` as a dependency
-under the `envoy_cc_library` rule: `source/exe/BUILD`
+A statically-linked Envoy will profile everything. In a dynamically-linked
+Envoy, you must add the HeapProfiler instructions yourself.
+`HeapProfilerStart()` will start recording allocations, `HeapProfilerStop()`
+will stop recording, and `HeapProfilerDump()` will dump an output to the
+specified directory. (See [Gperftools Heap
+Profiler](https://gperftools.github.io/gperftools/heapprofile.html).)
+
+To add a `HeapProfiler` breakpoint yourself, add `tcmalloc` as a
+dependency under the `envoy_cc_library` rule:
+
+`source/exe/BUILD`
 
 ```c++
     envoy_cc_library(
@@ -68,23 +81,16 @@ instantiation of `MainCommonBase::MainCommonBase`:
     }
 ```
 
-Once these changes have been implemented against head, it might make sense to
+Once these changes have been made in your working directory, it might make sense to
 save the diff as a patch (`git diff > file`), which can then be quickly
 applied/unapplied for testing and commiting. (`git apply`, `git apply -R`)
 
-### Compiling a dynamically-linked Envoy with `pprof`
+Build the binary using bazel, and run the binary without any environment variables:
 
-The binary must be explicitly built with `tcmalloc` like so:
-
-    $ bazel build //source/exe:envoy --copt='-ltcmalloc'
-
-### Running a dynamically-linked Envoy with `pprof`
-
-You can then run the binary without any env vars:
-
+    $ bazel build //source/exe:envoy
     $ bazel-bin/source/exe/envoy <args>
 
-This will output your `.heap` files to the working directory.
+This will dump your profiler output to the working directory.
 
 # Methodology
 
@@ -93,7 +99,7 @@ time across trials:
 
     $ timeout <num_seconds> bazel-bin/source/exe/envoy <options>
 
-During a run, the binary should print something like:
+Envoy will print to stdout something like:
 
     Starting tracking the heap
 
@@ -108,13 +114,15 @@ wherever `HEAPPROFILE` points to. Otherwise, they are in the current directory
 by default. They'll be named something like `main_common_base.0001.heap`,
 `main_common_base.0002.heap`, etc.
 
-*NB:* There is no reason this needs to be titled `main_common_base`: whatever
+*NB:* There is no reason this needs to be titled `main_common_base`. Whatever
 flag you supply `HeapProfilerStart` / `HeapProfilerDump` will become the
-filename. Multiple ranges could be tested at the same time with this method.
+filename. Multiple sections of code could be profiled simultaneously by setting
+multiple `HeapProfilerStart()` / `HeapProfilerStop()` breakpoints with unique
+identifiers.
 
 # Analyzing with `pprof`
 
-[pprof](https://github.com/google/pprof) can then read these heap files in a
+[pprof](https://github.com/google/pprof) can read these heap files in a
 number of ways. Most convenient for first-order inspection might be `pprof -top`
 or `pprof -text`:
 
