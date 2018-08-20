@@ -593,7 +593,7 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
     Buffer::OwnedImpl response;
     Http::HeaderMapImpl header_map;
     EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
-    std::string output = response.toString();
+    const std::string output = response.toString();
     EXPECT_EQ(expected_json, output);
   }
 }
