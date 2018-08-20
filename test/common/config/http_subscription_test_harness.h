@@ -10,6 +10,7 @@
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
@@ -33,12 +34,13 @@ public:
             "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints")),
         timer_(new Event::MockTimer()), http_request_(&cm_.async_client_) {
     node_.set_id("fo0");
+    EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
     }));
     subscription_.reset(new HttpEdsSubscriptionImpl(
-        node_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
+        local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
         std::chrono::milliseconds(1000), *method_descriptor_, stats_));
   }
 
@@ -150,6 +152,7 @@ public:
   Http::AsyncClient::Callbacks* http_callbacks_;
   Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
   std::unique_ptr<HttpEdsSubscriptionImpl> subscription_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 } // namespace Config
