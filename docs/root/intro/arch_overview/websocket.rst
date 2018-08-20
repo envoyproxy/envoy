@@ -43,8 +43,6 @@ Non-WebSocket upgrades are allowed to use any valid HTTP method (i.e. POST) and 
 upgrade/downgrade mechanism will drop the original method and transform the Upgrade request to
 a GET method on the final Envoy-Upstream hop.
 
-TODO(alyssawilk) link to the config changes required to enable upgrade upstream/downstream
-
 Old style WebSocket support
 ===========================
 
