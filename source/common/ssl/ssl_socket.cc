@@ -427,11 +427,9 @@ ClientSslSocketFactory::ClientSslSocketFactory(ClientContextConfigPtr config,
                                                Ssl::ContextManager& manager,
                                                Stats::Scope& stats_scope)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("client", stats_scope)),
-      config_(std::move(config)) {
+      config_(std::move(config)),
+      ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {
   config_->setSecretUpdateCallback(*this);
-
-  std::unique_lock<std::shared_timed_mutex> lock(ssl_ctx_mutex_);
-  ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
 }
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() const {
@@ -465,11 +463,9 @@ ServerSslSocketFactory::ServerSslSocketFactory(ServerContextConfigPtr config,
                                                Stats::Scope& stats_scope,
                                                const std::vector<std::string>& server_names)
     : manager_(manager), stats_scope_(stats_scope), stats_(generateStats("server", stats_scope)),
-      config_(std::move(config)), server_names_(server_names) {
+      config_(std::move(config)), server_names_(server_names),
+      ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_)) {
   config_->setSecretUpdateCallback(*this);
-
-  std::unique_lock<std::shared_timed_mutex> lock(ssl_ctx_mutex_);
-  ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
 }
 
 Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() const {
