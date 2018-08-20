@@ -40,6 +40,6 @@ void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum d
 } // namespace Envoy
 
 extern "C" int LLVMFuzzerInitialize(int* /*argc*/, char*** argv) {
-  Envoy::Fuzz::Runner::setupEnvironment(1, *argv, spdlog::level::off);
+  Envoy::Fuzz::Runner::setupEnvironment(1, *argv, spdlog::level::critical);
   return 0;
 }
