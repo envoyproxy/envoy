@@ -48,8 +48,10 @@ message ExtAuthz {
 //
 // A failed check will cause this filter to close the HTTP request normally with 403 (Forbidden),
 // unless a different status code has been indicated by the authorization server via response
-// headers. If other headers in the authorization response need to be sent to client, this can also
-// be done by specifying them in *allowed_authorization_headers*.
+// headers. Note that if any of the 5xx HTTP error codes or an error is originated during this
+// checking, the filter will also return a Forbidden response to the client and filures will be
+// visible in the logs. If other headers in the authorization response need to be sent to client,
+// this can also be done by specifying them in *allowed_authorization_headers*.
 message HttpService {
   // Sets the HTTP server URI which the authorization requests must be sent to.
   envoy.api.v2.core.HttpUri server_uri = 1;

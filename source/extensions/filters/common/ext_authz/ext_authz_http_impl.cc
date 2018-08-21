@@ -13,11 +13,29 @@ namespace Common {
 namespace ExtAuthz {
 
 namespace {
-
 const Http::HeaderMap* getZeroContentLengthHeader() {
   static const Http::HeaderMap* header_map =
       new Http::HeaderMapImpl{{Http::Headers::get().ContentLength, std::to_string(0)}};
   return header_map;
+}
+
+const Response* getErrorResponse() {
+  static const Response* response =
+      new Response{CheckStatus::Error, Http::HeaderVector{}, Http::HeaderVector{}, std::string{},
+                   Http::Code::Forbidden};
+  return response;
+}
+
+const Response* getDeniedResponse() {
+  static const Response* response =
+      new Response{CheckStatus::Denied, Http::HeaderVector{}, Http::HeaderVector{}, std::string{}};
+  return response;
+}
+
+const Response* getOkResponse() {
+  static const Response* response = new Response{
+      CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{}, std::string{}, Http::Code::OK};
+  return response;
 }
 } // namespace
 
@@ -65,16 +83,12 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
 }
 
 ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr& message) {
-  ResponsePtr response = std::make_unique<Response>(Response{});
-
   // Set an error status if parsing status code fails. A Forbidden response is sent to the client
   // if the filter has not been configured with failure_mode_allow.
   uint64_t status_code{};
   if (!StringUtil::atoul(message->headers().Status()->value().c_str(), status_code)) {
     ENVOY_LOG(warn, "ext_authz HTTP client failed to parse the HTTP status code.");
-    response->status = CheckStatus::Error;
-    response->status_code = Http::Code::Forbidden;
-    return response;
+    return std::make_unique<Response>(*getErrorResponse());
   }
 
   // Set an error status if the call to the authorization server returns any of the 5xx HTTP error
@@ -82,24 +96,18 @@ ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr& message) {
   // failure_mode_allow.
   if (Http::CodeUtility::is5xx(status_code)) {
     ENVOY_LOG(warn, "{} HTTP error code received from the authorization server.", status_code);
-    response->status = CheckStatus::Error;
-    response->status_code = Http::Code::Forbidden;
-    return response;
+    return std::make_unique<Response>(*getErrorResponse());
   }
 
-  // Set an accepted authorization response if status is OK.
+  ResponsePtr response;
+  // Set an accepted or a denied authorization response.
   if (status_code == enumToInt(Http::Code::OK)) {
-    response->status = CheckStatus::OK;
-    response->status_code = Http::Code::OK;
-    return response;
+    response = std::make_unique<Response>(*getOkResponse());
+  } else {
+    response = std::make_unique<Response>(*getDeniedResponse());
+    response->status_code = static_cast<Http::Code>(status_code);
+    response->body = message->bodyAsString();
   }
-
-  // Deny otherwise.
-  response->status = CheckStatus::Denied;
-  response->status_code = static_cast<Http::Code>(status_code);
-
-  // Copy the body message that should be in the response.
-  response->body = message->bodyAsString();
 
   // Copy all headers from the message that should be in the response.
   for (const auto& allowed_header : allowed_authorization_headers_) {
@@ -121,10 +129,7 @@ void RawHttpClientImpl::onSuccess(Http::MessagePtr&& response) {
 void RawHttpClientImpl::onFailure(Http::AsyncClient::FailureReason reason) {
   ENVOY_LOG(warn, "ext_authz HTTP client failed to call the authorization server.");
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
-  Response response{};
-  response.status = CheckStatus::Error;
-  response.status_code = Http::Code::Forbidden;
-  callbacks_->onComplete(std::make_unique<Response>(response));
+  callbacks_->onComplete(std::make_unique<Response>(*getErrorResponse()));
   callbacks_ = nullptr;
 }
 
