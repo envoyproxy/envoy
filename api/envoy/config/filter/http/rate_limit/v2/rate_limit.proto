@@ -4,7 +4,6 @@ package envoy.config.filter.http.rate_limit.v2;
 option go_package = "v2";
 
 import "google/protobuf/duration.proto";
-import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";

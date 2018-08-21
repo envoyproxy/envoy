@@ -26,7 +26,7 @@ following statistics:
   cx_closed, Counter, Total connections closed due to an over limit response from the rate limit service
   active, Gauge, Total active requests to the rate limit service
   failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
-  of :ref:`failure_mode_allow <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` set to true."
+  of :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` set to false."
 
 Runtime
 -------
