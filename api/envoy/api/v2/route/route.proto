@@ -338,7 +338,7 @@ message RouteAction {
 
     // Indicates the upstream cluster to which the request should be routed
     // to.
-    string cluster = 1;
+    string cluster = 1 [(validate.rules).string.min_bytes = 1];
 
     // Envoy will determine the cluster to route to by reading the value of the
     // HTTP header named by cluster_header from the request headers. If the
@@ -349,7 +349,7 @@ message RouteAction {
     //
     //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
     //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
-    string cluster_header = 2;
+    string cluster_header = 2 [(validate.rules).string.min_bytes = 1];
 
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
