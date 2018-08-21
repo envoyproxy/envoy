@@ -14,10 +14,15 @@ spdlog::level::level_enum Runner::log_level_;
 
 PerTestEnvironment::PerTestEnvironment()
     : test_tmpdir_([] {
-        const std::string fuzz_path = TestEnvironment::temporaryPath("fuzz_XXXXXX");
+        static uint32_t test_num;
+        const std::string fuzz_path =
+            TestEnvironment::temporaryPath(fmt::format("fuzz_{}.XXXXXX", test_num++));
         char test_tmpdir[fuzz_path.size() + 1];
         StringUtil::strlcpy(test_tmpdir, fuzz_path.data(), fuzz_path.size() + 1);
-        RELEASE_ASSERT(::mkdtemp(test_tmpdir) != nullptr, "");
+        if (::mkdtemp(test_tmpdir) == nullptr) {
+          ENVOY_LOG_MISC(critical, "Failed to create tmpdir {} {}", fuzz_path, strerror(errno));
+          RELEASE_ASSERT(false, "");
+        }
         return std::string(test_tmpdir);
       }()) {}
 
