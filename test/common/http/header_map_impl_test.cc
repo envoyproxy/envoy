@@ -427,8 +427,10 @@ TEST(HeaderMapImplTest, SetRemovesAllValues) {
 TEST(HeaderMapImplTest, DoubleInlineAdd) {
   {
     HeaderMapImpl headers;
-    headers.addReference(Headers::get().ContentLength, "foo");
-    headers.addReference(Headers::get().ContentLength, "bar");
+    const std::string foo("foo");
+    const std::string bar("bar");
+    headers.addReference(Headers::get().ContentLength, foo);
+    headers.addReference(Headers::get().ContentLength, bar);
     EXPECT_STREQ("foo,bar", headers.ContentLength()->value().c_str());
     EXPECT_EQ(1UL, headers.size());
   }
@@ -448,7 +450,8 @@ TEST(HeaderMapImplTest, DoubleInlineAdd) {
   }
   {
     HeaderMapImpl headers;
-    headers.addReference(Headers::get().ContentLength, "foo");
+    const std::string foo("foo");
+    headers.addReference(Headers::get().ContentLength, foo);
     headers.addReferenceKey(Headers::get().ContentLength, 6);
     EXPECT_STREQ("foo,6", headers.ContentLength()->value().c_str());
     EXPECT_EQ(1UL, headers.size());
