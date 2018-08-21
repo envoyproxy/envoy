@@ -1791,7 +1791,138 @@ TEST(RouteMatcherTest, ContentType) {
   }
 }
 
-TEST(RouteMatcherTest, Runtime) {
+TEST(RouteMatcherTest, FractionalRuntimeOnly) {
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    routes:
+      - match:
+          prefix: "/"
+          runtime_fraction:
+            default_value:
+              numerator: 50
+              denominator: TEN_THOUSAND
+            numerator_runtime_key: "bogus_num_key"
+            denominator_runtime_key: "bogus_den_key"
+        route:
+          cluster: "something_else"
+      - match:
+          prefix: "/"
+        route:
+          cluster: "www2"
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Runtime::MockSnapshot snapshot;
+  ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+  const std::string denominator_val = "TEN_THOUSAND";
+  EXPECT_CALL(snapshot, get("bogus_den_key")).WillOnce(ReturnRef(denominator_val));
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+
+  EXPECT_CALL(snapshot, featureEnabled("bogus_num_key", 50, 10, 10000)).WillOnce(Return(true));
+  EXPECT_EQ(
+      "something_else",
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 10)->routeEntry()->clusterName());
+
+  EXPECT_CALL(snapshot, featureEnabled("bogus_num_key", 50, 20, 10000)).WillOnce(Return(false));
+  EXPECT_EQ(
+      "www2",
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 20)->routeEntry()->clusterName());
+}
+
+TEST(RouteMatcherTest, FractionalRuntimeMixed) {
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    routes:
+      - match:
+          prefix: "/"
+          runtime_fraction:
+            default_value:
+              numerator: 50
+              denominator: TEN_THOUSAND
+            numerator_runtime_key: "bogus_num_key"
+            denominator_runtime_key: "bogus_den_key"
+          runtime:
+            default_value: 10
+            runtime_key: "shouldnt_see_key"
+        route:
+          cluster: "something_else"
+      - match:
+          prefix: "/"
+        route:
+          cluster: "www2"
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Runtime::MockSnapshot snapshot;
+  ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+  const std::string denominator_val = "TEN_THOUSAND";
+  EXPECT_CALL(snapshot, get("bogus_den_key")).WillOnce(ReturnRef(denominator_val));
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+
+  EXPECT_CALL(snapshot, featureEnabled("bogus_num_key", 50, 10, 10000)).WillOnce(Return(true));
+  EXPECT_EQ(
+      "something_else",
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 10)->routeEntry()->clusterName());
+
+  EXPECT_CALL(snapshot, featureEnabled("bogus_num_key", 50, 20, 10000)).WillOnce(Return(false));
+  EXPECT_EQ(
+      "www2",
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 20)->routeEntry()->clusterName());
+}
+
+TEST(RouteMatcherTest, FractionalRuntimeDefaultVal) {
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    routes:
+      - match:
+          prefix: "/"
+          runtime_fraction:
+            default_value:
+              numerator: 45
+              denominator: MILLION
+            numerator_runtime_key: "bogus_num_key"
+            denominator_runtime_key: "bogus_den_key"
+          runtime:
+            default_value: 10
+            runtime_key: "shouldnt_see_key"
+        route:
+          cluster: "something_else"
+      - match:
+          prefix: "/"
+        route:
+          cluster: "www2"
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Runtime::MockSnapshot snapshot;
+  ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+
+  // Return a blank denominator val so that we pick up the default value.
+  const std::string denominator_val = "";
+  EXPECT_CALL(snapshot, get("bogus_den_key")).WillOnce(ReturnRef(denominator_val));
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+
+  EXPECT_CALL(snapshot, featureEnabled("bogus_num_key", 45, 10, 1000000)).WillOnce(Return(true));
+  EXPECT_EQ(
+      "something_else",
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 10)->routeEntry()->clusterName());
+
+  EXPECT_CALL(snapshot, featureEnabled("bogus_num_key", 45, 20, 1000000)).WillOnce(Return(false));
+  EXPECT_EQ(
+      "www2",
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 20)->routeEntry()->clusterName());
+}
+
+TEST(RouteMatcherTest, RuntimeOnly) {
   std::string json = R"EOF(
 {
   "virtual_hosts": [
@@ -1824,11 +1955,11 @@ TEST(RouteMatcherTest, Runtime) {
 
   TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
-  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 10)).WillOnce(Return(true));
+  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 10, 100)).WillOnce(Return(true));
   EXPECT_EQ("something_else",
             config.route(genHeaders("www.lyft.com", "/", "GET"), 10)->routeEntry()->clusterName());
 
-  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 20)).WillOnce(Return(false));
+  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 20, 100)).WillOnce(Return(false));
   EXPECT_EQ("www2",
             config.route(genHeaders("www.lyft.com", "/", "GET"), 20)->routeEntry()->clusterName());
 }

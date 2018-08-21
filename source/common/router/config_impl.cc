@@ -260,7 +260,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), idle_timeout)),
       max_grpc_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), max_grpc_timeout)),
-      runtime_(loadRuntimeData(route.match())), loader_(factory_context.runtime()),
+      loader_(factory_context.runtime()), runtime_(loadRuntimeData(route.match())),
       host_redirect_(route.redirect().host_redirect()),
       path_redirect_(route.redirect().path_redirect()),
       https_redirect_(route.redirect().https_redirect()),
@@ -345,8 +345,9 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
   bool matches = true;
 
   if (runtime_) {
-    matches &= loader_.snapshot().featureEnabled(runtime_.value().key_, runtime_.value().default_,
-                                                 random_value);
+    matches &= loader_.snapshot().featureEnabled(runtime_.value().numerator_key_,
+                                                 runtime_.value().numerator_default_, random_value,
+                                                 runtime_.value().denominator_val_);
   }
 
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
@@ -404,14 +405,33 @@ void RouteEntryImplBase::finalizeResponseHeaders(
 absl::optional<RouteEntryImplBase::RuntimeData>
 RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& route_match) {
   absl::optional<RuntimeData> runtime;
-  if (route_match.has_runtime()) {
-    RuntimeData data;
-    data.key_ = route_match.runtime().runtime_key();
-    data.default_ = route_match.runtime().default_value();
-    runtime = data;
+  RuntimeData data;
+
+  if (route_match.has_runtime_fraction()) {
+    data.numerator_key_ = route_match.runtime_fraction().numerator_runtime_key();
+    data.numerator_default_ = route_match.runtime_fraction().default_value().numerator();
+
+    const std::string& d_key = route_match.runtime_fraction().denominator_runtime_key();
+    const std::string& d_data = loader_.snapshot().get(d_key);
+    using FractionalPercent = envoy::type::FractionalPercent;
+    FractionalPercent::DenominatorType d_type;
+    if (!FractionalPercent::DenominatorType_Parse(d_data, &d_type)) {
+      d_type = route_match.runtime_fraction().default_value().denominator();
+    }
+    data.denominator_val_ =
+        ProtobufPercentHelper::fractionalPercentDenominatorToInt(std::move(d_type));
+  } else if (route_match.has_runtime()) {
+    // For backwards compatibility, the deprecated 'runtime' field must be converted to a
+    // RuntimeData format with a variable denominator type. This field assumes a percentage (0-100),
+    // so the hard-coded denominator value reflects this.
+    data.numerator_key_ = route_match.runtime().runtime_key();
+    data.numerator_default_ = route_match.runtime().default_value();
+    data.denominator_val_ = 100;
+  } else {
+    return runtime;
   }
 
-  return runtime;
+  return data;
 }
 
 void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,

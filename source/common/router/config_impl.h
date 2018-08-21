@@ -362,8 +362,9 @@ protected:
 
 private:
   struct RuntimeData {
-    std::string key_{};
-    uint64_t default_{};
+    std::string numerator_key_{};
+    uint64_t numerator_default_{};
+    uint64_t denominator_val_{};
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {
@@ -494,8 +495,7 @@ private:
 
   typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
 
-  static absl::optional<RuntimeData>
-  loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
+  absl::optional<RuntimeData> loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
 
   static std::multimap<std::string, std::string>
   parseOpaqueConfig(const envoy::api::v2::route::Route& route);
@@ -516,8 +516,8 @@ private:
   const std::chrono::milliseconds timeout_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
-  const absl::optional<RuntimeData> runtime_;
   Runtime::Loader& loader_;
+  const absl::optional<RuntimeData> runtime_;
   const std::string host_redirect_;
   const std::string path_redirect_;
   const bool https_redirect_;

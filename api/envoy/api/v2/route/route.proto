@@ -5,6 +5,7 @@ option go_package = "route";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
+import "envoy/type/percent.proto";
 import "envoy/type/range.proto";
 
 import "google/protobuf/duration.proto";
@@ -283,7 +284,14 @@ message RouteMatch {
   // gradual manner without full code/config deploys. Refer to the
   // :ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting_shift>` docs
   // for additional documentation.
-  core.RuntimeUInt32 runtime = 5;
+  //
+  // .. attention::
+  //
+  //   **This field is deprecated**. Set the
+  //   :ref:`runtime_fraction<envoy_api_field_route.RouteMatch.runtime_fraction>` field instead.
+  //   This field is ignored if
+  //   :ref:`runtime_fraction<envoy_api_field_route.RouteMatch.runtime_fraction>` is set.
+  core.RuntimeUInt32 runtime = 5 [deprecated = true];
 
   // Specifies a set of headers that the route should match on. The router will
   // check the request’s headers against all the specified headers in the route
@@ -298,6 +306,16 @@ message RouteMatch {
   // query parameters is nonzero, they all must match the *path* header's
   // query string for a match to occur.
   repeated QueryParameterMatcher query_parameters = 7;
+
+  // Indicates that the route should additionally match on a runtime key. Every time the route is
+  // considered for a match, it must also fall under the percentage of matches indicated by this
+  // field. For some fraction N/D, a random number in the range [0,D) is selected. If the number is
+  // <= the value of the numberator N, or if the key is not present, the default value, the router
+  // continues to evaluate the remaining match criteria. A runtime_fraction route configuration can
+  // be used to roll out route changes in a gradual manner (with more granularity than the
+  // deprecated runtime field) without full code/config deploys. Refer to the :ref:`traffic shifting
+  // <config_http_conn_man_route_table_traffic_splitting_shift>` docs for additional documentation.
+  envoy.type.RuntimeFractionalPercent runtime_fraction = 8;
 }
 
 // [#comment:next free field: 9]
