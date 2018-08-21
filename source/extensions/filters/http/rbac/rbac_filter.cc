@@ -95,8 +95,10 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
       resp_code.set_string_value(shadow_resp_code);
       (*metrics.mutable_fields())[shadow_resp_code_field] = resp_code;
 
-      auto filter_meta = filter_metadata.at(HttpFilterNames::get().Rbac);
-      filter_meta.MergeFrom(metrics);
+      callbacks_->requestInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
+    } else {
+      ENVOY_LOG(debug, "No dynamic_metadata found for filter {}",
+                Extensions::HttpFilters::HttpFilterNames::get().Rbac);
     }
   }
 
