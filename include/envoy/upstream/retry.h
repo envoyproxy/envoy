@@ -9,25 +9,34 @@ namespace Upstream {
 typedef std::vector<uint32_t> PriorityLoad;
 
 /**
- * This class is used to optionally modify the Prioirtyload when selecting a priority for
+ * Used to optionally modify the Prioirtyload when selecting a priority for
  * a retry attempt.
+ *
+ * Each RetryPriority will live throughout the lifetime of a request and updated
+ * with attempted hosts through onHostAttempted.
  */
 class RetryPriority {
 public:
   virtual ~RetryPriority() {}
 
   /**
-   * Determines what PriorityLoad to use for a retry attempt.
+   * Determines what PriorityLoad to use.
    *
    * @param priority_state current state of cluster.
    * @param original_priority the unmodified PriorityLoad.
-   * @param attempted_hosts an ordered list of hosts that have been previously attempted.
    * @return a reference to the PriorityLoad to use. Return original_priority if no changes should
    * be made.
    */
   virtual PriorityLoad& determinePriorityLoad(const PriorityState& priority_state,
-                                              const PriorityLoad& original_priority,
-                                              const HostVector& attempted_hosts) PURE;
+                                              const PriorityLoad& original_priority) PURE;
+
+  /**
+   * Called after a host has been attempted but before host selection for the next attempt has
+   * begun.
+   *
+   * @param attempted_host the host that was previously attempted.
+   */
+  virtual void onHostAttempted(HostSharedPtr attempted_host) PURE;
 };
 
 typedef std::shared_ptr<RetryPriority> RetryPrioritySharedPtr;
@@ -36,20 +45,29 @@ typedef std::shared_ptr<RetryPriority> RetryPrioritySharedPtr;
  * Used to decide whether a selected host should be rejected during retries. Host selection will be
  * reattempted until either the host predicate accepts the host or a configured max number of
  * attempts is reached.
+ *
+ * Each RetryHostPredicate will live throughout the lifetime of a request and updated
+ * with attempted hosts through onHostAttempted.
  */
 class RetryHostPredicate {
 public:
   virtual ~RetryHostPredicate() {}
 
   /**
-   * Determines whether a host should be rejected during retries.
+   * Determines whether a host should be rejected during host selection.
    *
    * @param candidate_host the host to either reject or accept.
-   * @param attempted_hosts an ordered list of hosts that have been previously attempted.
    * @return whether the host should be rejected and host selection reattempted.
    */
-  virtual bool shouldSelectAnotherHost(const Host& candidate_host,
-                                       const HostVector& attempted_hosts) PURE;
+  virtual bool shouldSelectAnotherHost(const Host& candidate_host) PURE;
+
+  /**
+   * Called after a host has been attempted but before host selection for the next attempt has
+   * begun.
+   *
+   * @param attempted_host the host that was previously attempted.
+   */
+  virtual void onHostAttempted(HostSharedPtr attempted_host) PURE;
 };
 
 typedef std::shared_ptr<RetryHostPredicate> RetryHostPredicateSharedPtr;
