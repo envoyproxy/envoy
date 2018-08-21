@@ -11,7 +11,6 @@
 #include "test/mocks/network/mocks.h"
 
 using testing::_;
-using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -47,7 +46,6 @@ public:
   void SetUp() {
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
     EXPECT_CALL(callbacks_, requestInfo()).WillRepeatedly(ReturnRef(req_info_));
-    EXPECT_CALL(req_info_, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata_));
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
 
@@ -57,15 +55,11 @@ public:
   }
 
   void setMetadata() {
-    metadata_.mutable_filter_metadata()->insert(
-        Protobuf::MapPair<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>(
-            HttpFilterNames::get().Rbac, metrics_));
-
-    ON_CALL(req_info_, setDynamicMetadata(_, _))
-        .WillByDefault(Invoke([this](const std::string& name, const ProtobufWkt::Struct& obj) {
-          if (name == HttpFilterNames::get().Rbac) {
-            metrics_.MergeFrom(obj);
-          }
+    ON_CALL(req_info_, setDynamicMetadata(HttpFilterNames::get().Rbac, _))
+        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
+          req_info_.metadata_.mutable_filter_metadata()->insert(
+              Protobuf::MapPair<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>(
+                  HttpFilterNames::get().Rbac, obj));
         }));
   }
 
@@ -75,8 +69,6 @@ public:
   Stats::IsolatedStoreImpl store_;
   RoleBasedAccessControlFilterConfigSharedPtr config_;
 
-  ProtobufWkt::Struct metrics_;
-  envoy::api::v2::core::Metadata metadata_;
   RoleBasedAccessControlFilter filter_;
   Network::Address::InstanceConstSharedPtr address_;
   Http::TestHeaderMapImpl headers_;
@@ -110,8 +102,9 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(1U, config_->stats().shadow_allowed_.value());
 
-  EXPECT_EQ("200", (*metrics_.mutable_fields())["shadow_response_code"].string_value());
-  EXPECT_EQ("bar", (*metrics_.mutable_fields())["shadow_effective_policyID"].string_value());
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
+  EXPECT_EQ("200", filter_meta.fields().at("shadow_response_code").string_value());
+  EXPECT_EQ("bar", filter_meta.fields().at("shadow_effective_policyID").string_value());
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {

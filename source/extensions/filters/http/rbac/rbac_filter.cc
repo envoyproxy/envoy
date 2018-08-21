@@ -80,26 +80,19 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
       shadow_resp_code = resp_code_403;
     }
 
-    const auto& filter_metadata = callbacks_->requestInfo().dynamicMetadata().filter_metadata();
-    const auto filter_it = filter_metadata.find(HttpFilterNames::get().Rbac);
-    if (filter_it != filter_metadata.end()) {
-      ProtobufWkt::Struct metrics;
+    ProtobufWkt::Struct metrics;
 
-      if (!effective_policy_id.empty()) {
-        ProtobufWkt::Value policy_id;
-        policy_id.set_string_value(effective_policy_id);
-        (*metrics.mutable_fields())[shadow_policy_id_field] = policy_id;
-      }
-
-      ProtobufWkt::Value resp_code;
-      resp_code.set_string_value(shadow_resp_code);
-      (*metrics.mutable_fields())[shadow_resp_code_field] = resp_code;
-
-      callbacks_->requestInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
-    } else {
-      ENVOY_LOG(debug, "No dynamic_metadata found for filter {}",
-                Extensions::HttpFilters::HttpFilterNames::get().Rbac);
+    if (!effective_policy_id.empty()) {
+      ProtobufWkt::Value policy_id;
+      policy_id.set_string_value(effective_policy_id);
+      (*metrics.mutable_fields())[shadow_policy_id_field] = policy_id;
     }
+
+    ProtobufWkt::Value resp_code;
+    resp_code.set_string_value(shadow_resp_code);
+    (*metrics.mutable_fields())[shadow_resp_code_field] = resp_code;
+
+    callbacks_->requestInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
   }
 
   const auto& engine =
