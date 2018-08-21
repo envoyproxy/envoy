@@ -38,12 +38,13 @@ public:
   }
 
   void initialize() override {
-    if (failure_mode_allow_) {
-      config_helper_.addFilter(
-          "{ name: envoy.rate_limit, config: { domain: some_domain, timeout: 0.5s } }");
-    } else {
+    if (failure_mode_deny_) {
       config_helper_.addFilter("{ name: envoy.rate_limit, config: { domain: some_domain, "
                                "failure_mode_deny: true, timeout: 0.5s } }");
+
+    } else {
+      config_helper_.addFilter(
+          "{ name: envoy.rate_limit, config: { domain: some_domain, timeout: 0.5s } }");
     }
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -175,13 +176,13 @@ public:
 
   const uint64_t request_size_ = 1024;
   const uint64_t response_size_ = 512;
-  bool failure_mode_allow_ = true;
+  bool failure_mode_deny_ = false;
 };
 
 // Test that verifies failure mode cases.
 class RatelimitFailureModeIntegrationTest : public RatelimitIntegrationTest {
 public:
-  RatelimitFailureModeIntegrationTest() { failure_mode_allow_ = false; }
+  RatelimitFailureModeIntegrationTest() { failure_mode_deny_ = true; }
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, RatelimitIntegrationTest,
