@@ -166,8 +166,8 @@ public:
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
   MOCK_CONST_METHOD0(routeConfig, const Config&());
   MOCK_CONST_METHOD1(perFilterConfig, const RouteSpecificFilterConfig*(const std::string&));
-  MOCK_METHOD0(retryPriorityFilter, Upstream::RetryPriorityFilterSharedPtr());
-  MOCK_METHOD0(retryHostFilter, Upstream::RetryHostFilterSharedPtr());
+  MOCK_METHOD0(retryPriority, Upstream::RetryPrioritySharedPtr());
+  MOCK_METHOD0(retryHostPredicate, Upstream::RetryHostPredicateSharedPtr());
 
   std::string name_{"fake_vhost"};
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
