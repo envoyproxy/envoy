@@ -6,6 +6,7 @@
 #include <string>
 
 #include "common/common/assert.h"
+#include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -36,6 +37,21 @@ std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%
 // RequestInfoHeaderFormatter.
 HeaderFormatterPtr
 parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option) {
+  // We reject :path rewriting, there is already a well defined mechanism to
+  // perform this in the RouteAction, and doing this via request_headers_to_add
+  // will cause us to have to worry about interaction with other aspects of the
+  // RouteAction, e.g. prefix rewriting.
+  const std::string& key = header_value_option.header().key();
+  if (key == Http::Headers::get().Path.get()) {
+    throw EnvoyException(
+        ":path rewriting may not be done via header addition, use prefix_rewrite instead.");
+  }
+  // Same goes for host in the interest of economy of mechanism.
+  if (key == Http::Headers::get().Host.get()) {
+    throw EnvoyException(
+        ":authority rewriting may not be done via header addition, use host_rewrite instead.");
+  }
+
   const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
 
   absl::string_view format(header_value_option.header().value());

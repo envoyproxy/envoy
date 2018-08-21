@@ -915,6 +915,54 @@ response_headers_to_remove: ["x-global-remove"]
               ContainerEq(config.internalOnlyHeaders()));
 }
 
+// Validate that we can't add :path to request headers.
+TEST(RouteMatcherTest, TestRequestHeadersToAddNoPath) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: www2
+    domains: ["*"]
+    request_headers_to_add:
+      - header:
+          key: :path
+          value: vhost-www2
+        append: false
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+
+  envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(route_config, factory_context, true), EnvoyException,
+      ":path rewriting may not be done via header addition, use prefix_rewrite instead.");
+}
+
+// Validate that we can't add :authority to request headers.
+TEST(RouteMatcherTest, TestRequestHeadersToAddNoHost) {
+  std::string yaml = R"EOF(
+name: foo
+virtual_hosts:
+  - name: www2
+    domains: ["*"]
+    request_headers_to_add:
+      - header:
+          key: :authority
+          value: vhost-www2
+        append: false
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+
+  envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl config(route_config, factory_context, true), EnvoyException,
+      ":authority rewriting may not be done via header addition, use host_rewrite instead.");
+}
+
 TEST(RouteMatcherTest, Priority) {
   std::string json = R"EOF(
 {
