@@ -98,8 +98,8 @@ envoy_cc_library(
     hdrs = ["retry.h"],
     deps = [
         "//include/envoy/upstream:upstream_interface",
-        ],
-    )
+    ],
+)
 
 envoy_cc_library(
     name = "resource_manager_interface",
