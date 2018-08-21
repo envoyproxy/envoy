@@ -130,7 +130,8 @@ parseUpstreamMetadataField(absl::string_view params_str) {
 std::function<std::string(const Envoy::RequestInfo::RequestInfo&)>
 parseFilterStateField(absl::string_view param_str) {
   absl::string_view modified_param_str = StringUtil::trim(param_str);
-  if (modified_param_str.empty() || modified_param_str.front() != '(' || modified_param_str.back() != ')') {
+  if (modified_param_str.empty() || modified_param_str.front() != '(' ||
+      modified_param_str.back() != ')') {
     throw EnvoyException(formatFilterStateParseException(param_str));
   }
   modified_param_str = modified_param_str.substr(1, modified_param_str.size() - 2); // trim parens
