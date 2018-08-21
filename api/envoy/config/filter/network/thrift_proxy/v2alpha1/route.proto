@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.filter.network.thrift_proxy.v2alpha1;
 option go_package = "v2";
 
+import "envoy/api/v2/route/route.proto";
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
@@ -46,6 +47,8 @@ message RouteMatch {
   // Inverts whatever matching is done in match_specifier. Cannot be combined with wildcard matching
   // as that would result in routes never being matched.
   bool invert = 3;
+
+  repeated envoy.api.v2.route.HeaderMatcher headers = 4;
 }
 
 // [#comment:next free field: 2]
