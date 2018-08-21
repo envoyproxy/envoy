@@ -54,6 +54,13 @@ private:
     createConnection(Event::Dispatcher& dispatcher,
                      const Network::ConnectionSocket::OptionsSharedPtr& options) const override;
 
+    // Upstream::HostDescription
+    void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) override {
+      const auto& port_value = parent_.lbEndpoint().endpoint().health_check_config().port_value();
+      health_check_address_ =
+          port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);
+    }
+
     LogicalDnsCluster& parent_;
   };
 
