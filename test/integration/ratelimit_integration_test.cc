@@ -38,8 +38,14 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addFilter(
-        "{ name: envoy.rate_limit, config: { domain: some_domain, timeout: 0.5s } }");
+    if (failure_mode_deny_) {
+      config_helper_.addFilter("{ name: envoy.rate_limit, config: { domain: some_domain, "
+                               "failure_mode_deny: true, timeout: 0.5s } }");
+
+    } else {
+      config_helper_.addFilter(
+          "{ name: envoy.rate_limit, config: { domain: some_domain, timeout: 0.5s } }");
+    }
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -170,9 +176,18 @@ public:
 
   const uint64_t request_size_ = 1024;
   const uint64_t response_size_ = 512;
+  bool failure_mode_deny_ = false;
+};
+
+// Test that verifies failure mode cases.
+class RatelimitFailureModeIntegrationTest : public RatelimitIntegrationTest {
+public:
+  RatelimitFailureModeIntegrationTest() { failure_mode_deny_ = true; }
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersionsClientType, RatelimitIntegrationTest,
+                        RATELIMIT_GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_CASE_P(IpVersionsClientType, RatelimitFailureModeIntegrationTest,
                         RATELIMIT_GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(RatelimitIntegrationTest, Ok) {
@@ -262,6 +277,7 @@ TEST_P(RatelimitIntegrationTest, Error) {
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
   EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
   EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.error")->value());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.failure_mode_allowed")->value());
 }
 
 TEST_P(RatelimitIntegrationTest, Timeout) {
@@ -308,6 +324,20 @@ TEST_P(RatelimitIntegrationTest, FailedConnect) {
   // Rate limiter fails open
   waitForSuccessfulUpstreamResponse();
   cleanup();
+}
+
+TEST_P(RatelimitFailureModeIntegrationTest, ErrorWithFailureModeOff) {
+  initiateClientConnection();
+  waitForRatelimitRequest();
+  ratelimit_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, true);
+  // Rate limiter fail closed
+  waitForFailedUpstreamResponse(500);
+  cleanup();
+
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.ok"));
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.over_limit"));
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.ratelimit.error")->value());
+  EXPECT_EQ(nullptr, test_server_->counter("cluster.cluster_0.ratelimit.failure_mode_allowed"));
 }
 
 } // namespace

@@ -34,4 +34,10 @@ message RateLimit {
   // The timeout in milliseconds for the rate limit service RPC. If not
   // set, this defaults to 20ms.
   google.protobuf.Duration timeout = 4 [(gogoproto.stdduration) = true];
+
+  // The filter's behaviour in case the rate limiting service does
+  // not respond back. When it is set to true, Envoy will not allow traffic in case of
+  // communication failure between rate limiting service and the proxy.
+  // Defaults to false.
+  bool failure_mode_deny = 5;
 }
