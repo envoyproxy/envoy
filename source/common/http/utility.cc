@@ -240,8 +240,8 @@ Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& co
 }
 
 void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks,
-                             const bool& is_reset, Code response_code,
-                             const std::string& body_text) {
+                             const bool& is_reset, Code response_code, const std::string& body_text,
+                             bool is_head_request) {
   sendLocalReply(is_grpc,
                  [&](HeaderMapPtr&& headers, bool end_stream) -> void {
                    callbacks.encodeHeaders(std::move(headers), end_stream);
@@ -249,13 +249,13 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
                  [&](Buffer::Instance& data, bool end_stream) -> void {
                    callbacks.encodeData(data, end_stream);
                  },
-                 is_reset, response_code, body_text);
+                 is_reset, response_code, body_text, is_head_request);
 }
 
 void Utility::sendLocalReply(
     bool is_grpc, std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
-    Code response_code, const std::string& body_text) {
+    Code response_code, const std::string& body_text, bool is_head_request) {
   // encode_headers() may reset the stream, so the stream must not be reset before calling it.
   ASSERT(!is_reset);
   // Respond with a gRPC trailers-only response if the request is gRPC
@@ -265,7 +265,7 @@ void Utility::sendLocalReply(
         {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
         {Headers::get().GrpcStatus,
          std::to_string(enumToInt(Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
-    if (!body_text.empty()) {
+    if (!body_text.empty() && !is_head_request) {
       // TODO: GrpcMessage should be percent-encoded
       response_headers->insertGrpcMessage().value(body_text);
     }
@@ -279,6 +279,12 @@ void Utility::sendLocalReply(
     response_headers->insertContentLength().value(body_text.size());
     response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
   }
+
+  if (is_head_request) {
+    encode_headers(std::move(response_headers), true);
+    return;
+  }
+
   encode_headers(std::move(response_headers), body_text.empty());
   // encode_headers()) may have changed the referenced is_reset so we need to test it
   if (!body_text.empty() && !is_reset) {

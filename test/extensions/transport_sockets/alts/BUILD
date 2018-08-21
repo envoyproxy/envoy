@@ -45,3 +45,13 @@ envoy_extension_cc_test(
         "//test/mocks/network:network_mocks",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "noop_transport_socket_callbacks_test",
+    srcs = ["noop_transport_socket_callbacks_test.cc"],
+    extension_name = "envoy.transport_sockets.alts",
+    deps = [
+        "//source/extensions/transport_sockets/alts:noop_transport_socket_callbacks_lib",
+        "//test/mocks/network:network_mocks",
+    ],
+)

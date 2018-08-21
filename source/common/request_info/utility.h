@@ -34,6 +34,7 @@ private:
   const static std::string FAULT_INJECTED;
   const static std::string RATE_LIMITED;
   const static std::string UNAUTHORIZED_EXTERNAL_SERVICE;
+  const static std::string RATELIMIT_SERVICE_ERROR;
 };
 
 /**

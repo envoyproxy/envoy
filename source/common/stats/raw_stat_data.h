@@ -74,6 +74,11 @@ struct RawStatData {
    */
   absl::string_view key() const { return absl::string_view(name_); }
 
+  /**
+   * Returns the name as a std::string.
+   */
+  std::string name() const { return std::string(name_); }
+
   std::atomic<uint64_t> value_;
   std::atomic<uint64_t> pending_increment_;
   std::atomic<uint16_t> flags_;

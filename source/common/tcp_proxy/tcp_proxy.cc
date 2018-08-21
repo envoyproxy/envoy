@@ -466,17 +466,14 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
       // The idle_timer_ can be moved to a Drainer, so related callbacks call into
       // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
       // the call to either TcpProxy or to Drainer, depending on the current state.
-      idle_timer_ =
-          read_callbacks_->connection().dispatcher().createTimer([upstream_callbacks =
-                                                                      upstream_callbacks_]() {
-            upstream_callbacks->onIdleTimeout();
-          });
+      idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+          [upstream_callbacks = upstream_callbacks_]() { upstream_callbacks->onIdleTimeout(); });
       resetIdleTimer();
       read_callbacks_->connection().addBytesSentCallback([this](uint64_t) { resetIdleTimer(); });
-      upstream_conn_data_->connection().addBytesSentCallback([upstream_callbacks =
-                                                                  upstream_callbacks_](uint64_t) {
-        upstream_callbacks->onBytesSent();
-      });
+      upstream_conn_data_->connection().addBytesSentCallback(
+          [upstream_callbacks = upstream_callbacks_](uint64_t) {
+            upstream_callbacks->onBytesSent();
+          });
     }
   }
 }

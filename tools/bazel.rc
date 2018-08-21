@@ -30,6 +30,7 @@ build:clang-asan --test_tag_filters=-no_asan
 build:clang-asan --define signal_trace=disabled
 build:clang-asan --copt -DADDRESS_SANITIZER=1
 build:clang-asan --test_env=ASAN_SYMBOLIZER_PATH
+build:clang-asan --test_env=ASAN_OPTIONS=handle_abort=1
 
 # Clang 5.0 TSAN
 build:clang-tsan --define ENVOY_CONFIG_TSAN=1

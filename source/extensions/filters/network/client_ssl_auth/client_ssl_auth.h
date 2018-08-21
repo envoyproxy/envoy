@@ -128,7 +128,7 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
 };
 
-} // ClientSsl
+} // namespace ClientSslAuth
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

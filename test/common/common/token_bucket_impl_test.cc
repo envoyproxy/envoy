@@ -8,8 +8,8 @@
 #include "gtest/gtest.h"
 
 using ::testing::Mock;
-using ::testing::Return;
 using testing::NiceMock;
+using ::testing::Return;
 
 namespace Envoy {
 

@@ -12,12 +12,12 @@
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Return;
 using testing::ReturnRef;
 using testing::WithArg;
-using testing::_;
 
 namespace Envoy {
 namespace Server {

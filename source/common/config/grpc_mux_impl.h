@@ -24,7 +24,7 @@ class GrpcMuxImpl : public GrpcMux,
                     Grpc::TypedAsyncStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
                     Logger::Loggable<Logger::Id::upstream> {
 public:
-  GrpcMuxImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClientPtr async_client,
+  GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
               Runtime::RandomGenerator& random,
               MonotonicTimeSource& time_source = ProdMonotonicTimeSource::instance_);
@@ -95,7 +95,7 @@ private:
     TokenBucketPtr limit_log_;
   };
 
-  envoy::api::v2::core::Node node_;
+  const LocalInfo::LocalInfo& local_info_;
   Grpc::AsyncClientPtr async_client_;
   Grpc::AsyncStream* stream_{};
   const Protobuf::MethodDescriptor& service_method_;
