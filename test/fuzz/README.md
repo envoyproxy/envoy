@@ -122,3 +122,23 @@ source directory for the test, e.g. for `server_fuzz_test` this is
 //test/server:server_fuzz_test`. These crash cases can be added to the corpus in
 followup PRs to provide fuzzers some interesting starting points for invalid
 inputs.
+
+## Coverage reports
+
+Coverage reports, where individual lines are annotated with fuzzing hit counts,
+are a useful way to understand the scope and efficacy of the Envoy fuzzers. You
+can generate such reports from the ClusterFuzz corpus following the general
+ClusterFuzz [instructions for profiling
+setup](https://github.com/google/oss-fuzz/blob/master/docs/code_coverage.md).
+
+To filter out unrelated artifacts (e.g. Bazel cache, libfuzzer src), the
+following profile command can be used:
+
+```bash
+python infra/helper.py profile envoy -- \
+  -ignore-filename-regex='proc/self/cwd/bazel-out.*' \
+  -ignore-filename-regex='proc/self/cwd/external.*' \
+  -ignore-filename-regex='proc/self/cwd/test.*' \
+  -ignore-filename-regex='.*\.cache.*' \
+  -ignore-filename-regex='src/libfuzzer.*'
+```

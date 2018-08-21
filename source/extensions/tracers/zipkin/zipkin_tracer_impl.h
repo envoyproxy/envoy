@@ -204,7 +204,7 @@ private:
   SpanBuffer span_buffer_;
   const std::string collector_endpoint_;
 };
-}
+} // namespace Zipkin
 } // namespace Tracers
 } // namespace Extensions
 } // namespace Envoy

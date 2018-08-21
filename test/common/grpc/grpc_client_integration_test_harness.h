@@ -19,12 +19,12 @@
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/environment.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Grpc {

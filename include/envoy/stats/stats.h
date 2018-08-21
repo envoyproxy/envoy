@@ -23,7 +23,7 @@ public:
   /**
    * Returns the full name of the Metric.
    */
-  virtual const std::string& name() const PURE;
+  virtual const std::string name() const PURE;
 
   /**
    * Returns a vector of configurable tags to identify this Metric.

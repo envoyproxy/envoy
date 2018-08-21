@@ -7,9 +7,9 @@
 
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::NiceMock;
 using testing::Property;
-using testing::_;
 
 namespace Envoy {
 namespace Http {

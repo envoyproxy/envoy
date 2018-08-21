@@ -62,7 +62,11 @@ std::string getTemporaryDirectory() {
   if (::getenv("TMPDIR")) {
     return TestEnvironment::getCheckedEnvVar("TMPDIR");
   }
-  return "/tmp";
+  // In environments outside of Bazel, we still don't want to use deterministic paths, as we may
+  // have multiple instances conflict, e.g. when running under a fuzzer.
+  char test_tmpdir[] = "/tmp/envoy_test_tmp.XXXXXX";
+  RELEASE_ASSERT(::mkdtemp(test_tmpdir) != nullptr, "");
+  return std::string(test_tmpdir);
 }
 
 // Allow initializeOptions() to remember CLI args for getOptions().

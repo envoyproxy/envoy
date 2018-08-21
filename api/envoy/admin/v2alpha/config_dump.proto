@@ -17,17 +17,17 @@ import "gogoproto/gogo.proto";
 // The :ref:`/config_dump <operations_admin_interface_config_dump>` admin endpoint uses this wrapper
 // message to maintain and serve arbitrary configuration information from any component in Envoy.
 message ConfigDump {
-  // This map is serialized and dumped in its entirety at the
+  // This list is serialized and dumped in its entirety at the
   // :ref:`/config_dump <operations_admin_interface_config_dump>` endpoint.
   //
-  // Keys are a short descriptor of the config object they map to. The following keys (and the
-  // messages they map to) are currently supported:
+  // The following configurations are currently supported and will be dumped in the order given
+  // below:
   //
   // * *bootstrap*: :ref:`BootstrapConfigDump <envoy_api_msg_admin.v2alpha.BootstrapConfigDump>`
-  // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v2alpha.ListenersConfigDump>`
   // * *clusters*: :ref:`ClustersConfigDump <envoy_api_msg_admin.v2alpha.ClustersConfigDump>`
+  // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v2alpha.ListenersConfigDump>`
   // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v2alpha.RoutesConfigDump>`
-  map<string, google.protobuf.Any> configs = 1 [(gogoproto.nullable) = false];
+  repeated google.protobuf.Any configs = 1 [(gogoproto.nullable) = false];
 }
 
 // This message describes the bootstrap configuration that Envoy was started with. This includes

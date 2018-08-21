@@ -402,7 +402,7 @@ class LuaException : public EnvoyException {
 public:
   using EnvoyException::EnvoyException;
 };
-}
+} // namespace Lua
 } // namespace Common
 } // namespace Filters
 } // namespace Extensions

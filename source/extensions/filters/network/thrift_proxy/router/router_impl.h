@@ -9,6 +9,7 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "common/common/logger.h"
+#include "common/upstream/load_balancer_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
@@ -52,11 +53,27 @@ public:
 
   const std::string& methodName() const { return method_name_; }
 
-  // RoutEntryImplBase
+  // RouteEntryImplBase
   RouteConstSharedPtr matches(const MessageMetadata& metadata) const override;
 
 private:
   const std::string method_name_;
+  const bool invert_;
+};
+
+class ServiceNameRouteEntryImpl : public RouteEntryImplBase {
+public:
+  ServiceNameRouteEntryImpl(
+      const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route);
+
+  const std::string& serviceName() const { return service_name_; }
+
+  // RouteEntryImplBase
+  RouteConstSharedPtr matches(const MessageMetadata& metadata) const override;
+
+private:
+  std::string service_name_;
+  const bool invert_;
 };
 
 class RouteMatcher {
@@ -70,7 +87,7 @@ private:
 };
 
 class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
-               public Upstream::LoadBalancerContext,
+               public Upstream::LoadBalancerContextBase,
                public ProtocolConverter,
                Logger::Loggable<Logger::Id::thrift> {
 public:
@@ -88,10 +105,7 @@ public:
   ThriftFilters::FilterStatus messageEnd() override;
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return {}; }
-  const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
   const Network::Connection* downstreamConnection() const override;
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
   // Tcp::ConnectionPool::UpstreamCallbacks
   void onUpstreamData(Buffer::Instance& data, bool end_stream) override;
@@ -102,7 +116,8 @@ public:
 private:
   struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks {
     UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
-                    MessageMetadataSharedPtr& metadata);
+                    MessageMetadataSharedPtr& metadata, TransportType transport_type,
+                    ProtocolType protocol_type);
     ~UpstreamRequest();
 
     ThriftFilters::FilterStatus start();
@@ -126,8 +141,8 @@ private:
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
     Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
-    TransportPtr transport_;
-    ProtocolType proto_type_{ProtocolType::Auto};
+    TransportType transport_type_;
+    ProtocolType protocol_type_;
 
     bool request_complete_ : 1;
     bool response_started_ : 1;
