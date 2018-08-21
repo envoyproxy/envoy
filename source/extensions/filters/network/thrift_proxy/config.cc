@@ -41,6 +41,8 @@ static const TransportTypeMap& transportTypeMap() {
           {envoy::config::filter::network::thrift_proxy::v2alpha1::
                ThriftProxy_TransportType_UNFRAMED,
            TransportType::Unframed},
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_TransportType_HEADER,
+           TransportType::Header},
       });
 }
 
@@ -92,6 +94,20 @@ ConfigImpl::ConfigImpl(
       transport_(config.transport()), proto_(config.protocol()),
       route_matcher_(new Router::RouteMatcher(config.route_config())) {
 
+  if (transportTypeMap().find(transport_) == transportTypeMap().end()) {
+    throw EnvoyException(fmt::format(
+        "unknown transport {}",
+        envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_TransportType_Name(
+            transport_)));
+  }
+
+  if (protocolTypeMap().find(proto_) == protocolTypeMap().end()) {
+    throw EnvoyException(fmt::format(
+        "unknown protocol {}",
+        envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_ProtocolType_Name(
+            proto_)));
+  }
+
   // Construct the only Thrift DecoderFilter: the Router
   auto& factory =
       Envoy::Config::Utility::getAndCheckFactory<ThriftFilters::NamedThriftFilterConfigFactory>(
@@ -115,14 +131,14 @@ DecoderPtr ConfigImpl::createDecoder(DecoderCallbacks& callbacks) {
 
 TransportPtr ConfigImpl::createTransport() {
   TransportTypeMap::const_iterator i = transportTypeMap().find(transport_);
-  RELEASE_ASSERT(i != transportTypeMap().end(), "invalid transport type");
+  ASSERT(i != transportTypeMap().end());
 
   return NamedTransportConfigFactory::getFactory(i->second).createTransport();
 }
 
 ProtocolPtr ConfigImpl::createProtocol() {
   ProtocolTypeMap::const_iterator i = protocolTypeMap().find(proto_);
-  RELEASE_ASSERT(i != protocolTypeMap().end(), "invalid protocol type");
+  ASSERT(i != protocolTypeMap().end());
   return NamedProtocolConfigFactory::getFactory(i->second).createProtocol();
 }
 

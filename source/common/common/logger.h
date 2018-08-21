@@ -240,7 +240,7 @@ protected:
   }
 };
 
-} // Logger
+} // namespace Logger
 
 // Convert the line macro to a string literal for concatenation in log macros.
 #define DO_STRINGIZE(x) STRINGIZE(x)

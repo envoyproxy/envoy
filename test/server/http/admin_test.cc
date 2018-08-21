@@ -26,6 +26,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
@@ -34,7 +35,6 @@ using testing::Ref;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Server {

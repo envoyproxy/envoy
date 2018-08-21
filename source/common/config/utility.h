@@ -280,14 +280,13 @@ public:
    * @return ProtobufTypes::MessagePtr the translated config
    * @throws EnvoyException if the factory does not support protocol options
    */
-  static ProtobufTypes::MessagePtr translateToFactoryProtocolOptionsConfig(
-      const Protobuf::Message& source,
-      Server::Configuration::NamedNetworkFilterConfigFactory& factory) {
+  static ProtobufTypes::MessagePtr
+  translateToFactoryProtocolOptionsConfig(const Protobuf::Message& source, const std::string& name,
+                                          Server::Configuration::ProtocolOptionsFactory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyProtocolOptionsProto();
 
     if (config == nullptr) {
-      throw EnvoyException(
-          fmt::format("filter {} does not support protocol options", factory.name()));
+      throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
     }
 
     MessageUtil::jsonConvert(source, *config);

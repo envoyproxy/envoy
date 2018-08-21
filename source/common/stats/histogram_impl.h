@@ -46,7 +46,10 @@ class HistogramImpl : public Histogram, public MetricImpl {
 public:
   HistogramImpl(const std::string& name, Store& parent, std::string&& tag_extracted_name,
                 std::vector<Tag>&& tags)
-      : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent) {}
+      : MetricImpl(std::move(tag_extracted_name), std::move(tags)), parent_(parent), name_(name) {}
+
+  // Stats:;Metric
+  const std::string name() const override { return name_; }
 
   // Stats::Histogram
   void recordValue(uint64_t value) override { parent_.deliverHistogramToSinks(*this, value); }
@@ -56,6 +59,8 @@ public:
 private:
   // This is used for delivering the histogram data to sinks.
   Store& parent_;
+
+  const std::string name_;
 };
 
 } // namespace Stats

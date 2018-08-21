@@ -4,9 +4,9 @@
 
 using testing::ReturnRef;
 
+using testing::_;
 using testing::Invoke;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Tcp {

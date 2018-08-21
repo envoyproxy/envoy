@@ -222,14 +222,14 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     direct_response->rewritePathHeader(headers, !config_.suppress_envoy_headers_);
     callbacks_->sendLocalReply(
         direct_response->responseCode(), direct_response->responseBody(),
-        [ this, direct_response, &request_headers = headers ](Http::HeaderMap & response_headers)
-            ->void {
-              const auto new_path = direct_response->newPath(request_headers);
-              if (!new_path.empty()) {
-                response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
-              }
-              direct_response->finalizeResponseHeaders(response_headers, callbacks_->requestInfo());
-            });
+        [this, direct_response,
+         &request_headers = headers](Http::HeaderMap& response_headers) -> void {
+          const auto new_path = direct_response->newPath(request_headers);
+          if (!new_path.empty()) {
+            response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
+          }
+          direct_response->finalizeResponseHeaders(response_headers, callbacks_->requestInfo());
+        });
     return Http::FilterHeadersStatus::StopIteration;
   }
 

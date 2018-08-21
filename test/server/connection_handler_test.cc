@@ -14,13 +14,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::ByRef;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Server {
@@ -90,7 +90,6 @@ TEST_F(ConnectionHandlerTest, RemoveListener) {
           [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
             listener_callbacks = &cb;
             return listener;
-
           }));
   TestListener* test_listener = addListener(1, true, false, "test_listener");
   EXPECT_CALL(test_listener->socket_, localAddress());
@@ -127,7 +126,6 @@ TEST_F(ConnectionHandlerTest, DestroyCloseConnections) {
           [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
             listener_callbacks = &cb;
             return listener;
-
           }));
   TestListener* test_listener = addListener(1, true, false, "test_listener");
   EXPECT_CALL(test_listener->socket_, localAddress());
@@ -153,7 +151,6 @@ TEST_F(ConnectionHandlerTest, CloseDuringFilterChainCreate) {
           [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
             listener_callbacks = &cb;
             return listener;
-
           }));
   TestListener* test_listener = addListener(1, true, false, "test_listener");
   EXPECT_CALL(test_listener->socket_, localAddress());
@@ -182,7 +179,6 @@ TEST_F(ConnectionHandlerTest, CloseConnectionOnEmptyFilterChain) {
           [&](Network::Socket&, Network::ListenerCallbacks& cb, bool, bool) -> Network::Listener* {
             listener_callbacks = &cb;
             return listener;
-
           }));
   TestListener* test_listener = addListener(1, true, false, "test_listener");
   EXPECT_CALL(test_listener->socket_, localAddress());
