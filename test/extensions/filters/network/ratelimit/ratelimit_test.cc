@@ -85,7 +85,7 @@ descriptors:
    - key: foo2
      value: bar2
 stat_prefix: name
-failure_mode_allow: false
+failure_mode_deny: true
 )EOF";
 
   Stats::IsolatedStoreImpl stats_store_;

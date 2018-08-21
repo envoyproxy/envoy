@@ -66,7 +66,7 @@ public:
 
   const std::string fail_close_config_ = R"EOF(
   domain: foo
-  failure_mode_allow: false
+  failure_mode_deny: true
   )EOF";
 
   const std::string filter_config_ = R"EOF(

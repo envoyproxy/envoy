@@ -43,7 +43,7 @@ public:
           "{ name: envoy.rate_limit, config: { domain: some_domain, timeout: 0.5s } }");
     } else {
       config_helper_.addFilter("{ name: envoy.rate_limit, config: { domain: some_domain, "
-                               "failure_mode_allow: false, timeout: 0.5s } }");
+                               "failure_mode_deny: true, timeout: 0.5s } }");
     }
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();

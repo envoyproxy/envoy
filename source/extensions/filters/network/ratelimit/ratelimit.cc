@@ -16,8 +16,7 @@ namespace RateLimitFilter {
 Config::Config(const envoy::config::filter::network::rate_limit::v2::RateLimit& config,
                Stats::Scope& scope, Runtime::Loader& runtime)
     : domain_(config.domain()), stats_(generateStats(config.stat_prefix(), scope)),
-      runtime_(runtime),
-      failure_mode_allow_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, failure_mode_allow, true)) {
+      runtime_(runtime), failure_mode_deny_(config.failure_mode_deny()) {
   for (const auto& descriptor : config.descriptors()) {
     RateLimit::Descriptor new_descriptor;
     for (const auto& entry : descriptor.entries()) {
