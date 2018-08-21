@@ -269,6 +269,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA([\"ns\", \n \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
+      {"%START_TIME(\"testing\")%", {"testing"}, {}},
 
       // Unescaped %
       {"%", {}, {"Invalid header configuration. Un-escaped % at position 0"}},
@@ -297,6 +298,12 @@ TEST(HeaderParserTest, TestParseInternal) {
        {},
        {"Invalid header configuration. Un-terminated variable expression 'VAR after'"}},
       {"% ", {}, {"Invalid header configuration. Un-terminated variable expression ' '"}},
+
+      // Mismatched array beginning and termination.
+      {"%UPSTREAM_METADATA([\"testing)%",
+       {},
+       {"Invalid header configuration. Un-terminated variable expression "
+        "'UPSTREAM_METADATA([\"testing)%'"}},
 
       // TODO(dio): Un-terminated variable expressions with arguments and argument errors for
       // generic %VAR are not checked anymore. Find a way to get the same granularity as before for

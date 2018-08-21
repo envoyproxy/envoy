@@ -366,6 +366,26 @@ TEST(AccessLogFormatterTest, startTimeFormatter) {
   }
 }
 
+// Test that a quoted START_TIME format is handled correctly by the parser.
+TEST(AccessLogFormatterTest, parsedStartTimeDelimited) {
+  NiceMock<RequestInfo::MockRequestInfo> request_info;
+  Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
+  Http::TestHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
+  Http::TestHeaderMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
+
+  {
+    const std::string format = "%START_TIME(\"%Y/%m/%d\")%";
+
+    FormatterImpl formatter(format);
+
+    time_t test_epoch = 1522280158;
+    SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(request_info, startTime()).WillOnce(Return(time));
+    EXPECT_EQ("2018/03/28",
+              formatter.format(request_header, response_header, response_trailer, request_info));
+  }
+}
+
 TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   RequestInfo::MockRequestInfo request_info;
   Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
@@ -493,6 +513,7 @@ TEST(AccessLogFormatterTest, ParserFailures) {
       "%TRAILER(TEST):23u1%",
       "%TRAILER(X?Y?Z)%",
       "%TRAILER(:TEST):10",
+      "%START_TIME(\"%Y/%m/%d)"
       "%DYNAMIC_METADATA(TEST"};
 
   for (const std::string& test_case : test_cases) {
