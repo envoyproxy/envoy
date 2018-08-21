@@ -38,8 +38,8 @@ public:
   virtual void sanitizePayloadHeaders(Http::HeaderMap& headers) const PURE;
 
   // Authenticator factory function.
-  static AuthenticatorPtr create(FilterConfigSharedPtr config,
-                                 const std::vector<std::string>& audiences = {});
+  static AuthenticatorPtr create(const std::vector<std::string>& audiences,
+                                 FilterConfigSharedPtr config);
 };
 
 } // namespace JwtAuthn

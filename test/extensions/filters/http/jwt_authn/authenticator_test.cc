@@ -31,7 +31,7 @@ public:
 
   void CreateAuthenticator() {
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
-    auth_ = Authenticator::create(filter_config_);
+    auth_ = Authenticator::create({}, filter_config_);
   }
 
   JwtAuthentication proto_config_;

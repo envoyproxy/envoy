@@ -19,16 +19,21 @@ namespace JwtAuthn {
  */
 class HeaderMatcher : public Matcher, public Logger::Loggable<Logger::Id::filter> {
 public:
-  HeaderMatcher(const ::envoy::api::v2::route::RouteMatch& route);
+  HeaderMatcher(const ::envoy::config::filter::http::jwt_authn::v2alpha::RequirementRule& rule,
+                const Protobuf::Map<ProtobufTypes::String,
+                                    ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider>&
+                    providers,
+                const AuthFactory& factory);
   bool matchRoute(const Http::HeaderMap& headers) const;
+  const VerifierPtr& verifier() const override;
 
 protected:
   const bool case_sensitive_;
-  // const MatcherConstSharedPtr requires_matcher_;
 
 private:
   std::vector<Http::HeaderUtility::HeaderData> config_headers_;
   std::vector<Router::ConfigUtility::QueryParameterMatcher> config_query_parameters_;
+  VerifierPtr verifier_;
 };
 
 /**
@@ -36,8 +41,12 @@ private:
  */
 class PrefixMatcher : public HeaderMatcher {
 public:
-  PrefixMatcher(const ::envoy::api::v2::route::RouteMatch& route)
-      : HeaderMatcher(route), prefix_(route.prefix()) {}
+  PrefixMatcher(const ::envoy::config::filter::http::jwt_authn::v2alpha::RequirementRule& rule,
+                const Protobuf::Map<ProtobufTypes::String,
+                                    ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider>&
+                    providers,
+                const AuthFactory& factory)
+      : HeaderMatcher(rule, providers, factory), prefix_(rule.match().prefix()) {}
 
   bool matches(const Http::HeaderMap& headers) const override;
 
@@ -51,8 +60,12 @@ private:
  */
 class PathMatcher : public HeaderMatcher {
 public:
-  PathMatcher(const ::envoy::api::v2::route::RouteMatch& route)
-      : HeaderMatcher(route), path_(route.path()) {}
+  PathMatcher(const ::envoy::config::filter::http::jwt_authn::v2alpha::RequirementRule& rule,
+              const Protobuf::Map<ProtobufTypes::String,
+                                  ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider>&
+                  providers,
+              const AuthFactory& factory)
+      : HeaderMatcher(rule, providers, factory), path_(rule.match().path()) {}
 
   bool matches(const Http::HeaderMap& headers) const override;
 
@@ -66,9 +79,13 @@ private:
  */
 class RegexMatcher : public HeaderMatcher {
 public:
-  RegexMatcher(const ::envoy::api::v2::route::RouteMatch& route)
-      : HeaderMatcher(route), regex_(RegexUtil::parseRegex(route.regex())),
-        regex_str_(route.regex()) {}
+  RegexMatcher(const ::envoy::config::filter::http::jwt_authn::v2alpha::RequirementRule& rule,
+               const Protobuf::Map<ProtobufTypes::String,
+                                   ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider>&
+                   providers,
+               const AuthFactory& factory)
+      : HeaderMatcher(rule, providers, factory),
+        regex_(RegexUtil::parseRegex(rule.match().regex())), regex_str_(rule.match().regex()) {}
 
   bool matches(const Http::HeaderMap& headers) const override;
 

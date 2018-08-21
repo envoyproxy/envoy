@@ -107,9 +107,20 @@ envoy_extension_cc_test(
     srcs = ["matcher_test.cc"],
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
-        ":mock_lib",
         ":test_common_lib",
         "//source/extensions/filters/http/jwt_authn:matchers_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "verifier_test",
+    srcs = ["verifier_test.cc"],
+    extension_name = "envoy.filters.http.jwt_authn",
+    deps = [
+        ":mock_lib",
+        ":test_common_lib",
+        "//source/extensions/filters/http/jwt_authn:verifier_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
     ],

@@ -1,8 +1,7 @@
 #include "extensions/filters/http/jwt_authn/header_matchers.h"
 
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
-
-using ::envoy::api::v2::route::RouteMatch;
+using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
+using ::envoy::config::filter::http::jwt_authn::v2alpha::RequirementRule;
 using Envoy::Router::ConfigUtility;
 
 namespace Envoy {
@@ -10,15 +9,20 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-HeaderMatcher::HeaderMatcher(const RouteMatch& route)
-    : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route, case_sensitive, true)) {
-  for (const auto& header_map : route.headers()) {
+HeaderMatcher::HeaderMatcher(const RequirementRule& rule,
+                             const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
+                             const AuthFactory& factory)
+    : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(rule.match(), case_sensitive, true)) {
+
+  for (const auto& header_map : rule.match().headers()) {
     config_headers_.push_back(header_map);
   }
 
-  for (const auto& query_parameter : route.query_parameters()) {
+  for (const auto& query_parameter : rule.match().query_parameters()) {
     config_query_parameters_.push_back(query_parameter);
   }
+
+  verifier_ = Verifier::create(rule.requires(), providers, factory);
 }
 
 bool HeaderMatcher::matchRoute(const Http::HeaderMap& headers) const {
@@ -33,6 +37,8 @@ bool HeaderMatcher::matchRoute(const Http::HeaderMap& headers) const {
   }
   return matches;
 }
+
+const VerifierPtr& HeaderMatcher::verifier() const { return verifier_; }
 
 bool PrefixMatcher::matches(const Http::HeaderMap& headers) const {
   if (HeaderMatcher::matchRoute(headers) &&

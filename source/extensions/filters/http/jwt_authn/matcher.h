@@ -1,11 +1,8 @@
 #pragma once
 
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "extensions/filters/http/jwt_authn/filter_config.h"
-
-#include "jwt_verify_lib/verify.h"
+#include "extensions/filters/http/jwt_authn/verifier.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,9 +11,6 @@ namespace JwtAuthn {
 
 class Matcher;
 typedef std::shared_ptr<const Matcher> MatcherConstSharedPtr;
-
-class AsyncMatcher;
-typedef std::shared_ptr<AsyncMatcher> AsyncMatcherSharedPtr;
 
 /**
  * Supports matching a HTTP requests with JWT requirements.
@@ -35,34 +29,26 @@ public:
   virtual bool matches(const Http::HeaderMap& headers) const PURE;
 
   /**
+   * Returns the configured verifier for this route.
+   *
+   * @return reference to verifier pointer.
+   */
+  virtual const VerifierPtr& verifier() const PURE;
+
+  /**
    * Factory method to create a shared instance of a matcher based on the rule defined.
    *
-   * @param route  the proto route match message.
+   * @param rule  the proto rule match message.
+   * @param providers  the provider name to config map
+   * @param factory  the Authenticator factory
    * @return the matcher instance.
    */
-  static MatcherConstSharedPtr create(const ::envoy::api::v2::route::RouteMatch& route);
-};
-
-class AsyncMatcher {
-public:
-  virtual ~AsyncMatcher() {}
-
-  class Callbacks {
-  public:
-    virtual ~Callbacks() {}
-    virtual void onComplete(const ::google::jwt_verify::Status& status) PURE;
-  };
-
-  virtual void matches(Http::HeaderMap& headers, Callbacks& callback) PURE;
-  virtual void close() PURE;
-
-  static AsyncMatcherSharedPtr
-  create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirement& requirement,
-         FilterConfigSharedPtr config);
-
-  static AsyncMatcherSharedPtr
+  static MatcherConstSharedPtr
   create(const ::envoy::config::filter::http::jwt_authn::v2alpha::RequirementRule& rule,
-         FilterConfigSharedPtr config);
+         const Protobuf::Map<ProtobufTypes::String,
+                             ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider>&
+             providers,
+         const AuthFactory& factory);
 };
 
 } // namespace JwtAuthn

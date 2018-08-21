@@ -276,8 +276,8 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 
 } // namespace
 
-AuthenticatorPtr Authenticator::create(FilterConfigSharedPtr config,
-                                       const std::vector<std::string>& audiences) {
+AuthenticatorPtr Authenticator::create(const std::vector<std::string>& audiences,
+                                       FilterConfigSharedPtr config) {
   return std::make_unique<AuthenticatorImpl>(audiences, config);
 }
 
