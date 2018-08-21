@@ -2,8 +2,10 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
+    "envoy_proto_library",
 )
 
 envoy_package()
@@ -12,6 +14,7 @@ envoy_cc_test(
     name = "config_impl_test",
     srcs = ["config_impl_test.cc"],
     deps = [
+        ":route_fuzz_proto",
         "//source/common/config:metadata_lib",
         "//source/common/config:rds_json_lib",
         "//source/common/http:header_map_lib",
@@ -19,10 +22,33 @@ envoy_cc_test(
         "//source/common/json:json_loader_lib",
         "//source/common/router:config_lib",
         "//source/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//test/fuzz:utility_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "header_parser_fuzz_proto",
+    srcs = ["header_parser_fuzz.proto"],
+    generate_python = 0,
+    deps = [
+        "//test/fuzz:common_proto",
+        "@envoy_api//envoy/api/v2/core:base_cc_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "header_parser_fuzz_test",
+    srcs = ["header_parser_fuzz_test.cc"],
+    corpus = "header_parser_corpus",
+    deps = [
+        ":header_parser_fuzz_proto",
+        "//source/common/http:header_map_lib",
+        "//source/common/router:header_parser_lib",
+        "//test/fuzz:utility_lib",
     ],
 )
 
@@ -56,6 +82,28 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_proto_library(
+    name = "route_fuzz_proto",
+    srcs = ["route_fuzz.proto"],
+    generate_python = 0,
+    deps = [
+        "//test/fuzz:common_proto",
+        "@envoy_api//envoy/api/v2:rds_cc_proto",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "route_fuzz_test",
+    srcs = ["route_fuzz_test.cc"],
+    corpus = "route_corpus",
+    deps = [
+        ":route_fuzz_proto",
+        "//source/common/router:config_lib",
+        "//test/fuzz:utility_lib",
+        "//test/mocks/server:server_mocks",
     ],
 )
 

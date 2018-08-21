@@ -1,6 +1,8 @@
 #pragma once
 
+#include "envoy/stats/source.h"
 #include "envoy/stats/stats.h"
+#include "envoy/stats/store.h"
 
 #include "absl/types/optional.h"
 

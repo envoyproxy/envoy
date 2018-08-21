@@ -7,7 +7,7 @@
 #include "envoy/ssl/context.h"
 #include "envoy/ssl/context_config.h"
 #include "envoy/ssl/context_manager.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "test/mocks/secret/mocks.h"
 
@@ -36,15 +36,15 @@ public:
   ~MockConnection();
 
   MOCK_CONST_METHOD0(peerCertificatePresented, bool());
-  MOCK_METHOD0(uriSanLocalCertificate, std::string());
+  MOCK_CONST_METHOD0(uriSanLocalCertificate, std::string());
   MOCK_CONST_METHOD0(sha256PeerCertificateDigest, std::string&());
   MOCK_CONST_METHOD0(serialNumberPeerCertificate, std::string());
   MOCK_CONST_METHOD0(subjectPeerCertificate, std::string());
   MOCK_CONST_METHOD0(uriSanPeerCertificate, std::string());
   MOCK_CONST_METHOD0(subjectLocalCertificate, std::string());
   MOCK_CONST_METHOD0(urlEncodedPemEncodedPeerCertificate, std::string&());
-  MOCK_METHOD0(dnsSansPeerCertificate, std::vector<std::string>());
-  MOCK_METHOD0(dnsSansLocalCertificate, std::vector<std::string>());
+  MOCK_CONST_METHOD0(dnsSansPeerCertificate, std::vector<std::string>());
+  MOCK_CONST_METHOD0(dnsSansLocalCertificate, std::vector<std::string>());
 };
 
 class MockClientContext : public ClientContext {

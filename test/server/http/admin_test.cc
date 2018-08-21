@@ -26,6 +26,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
@@ -34,7 +35,6 @@ using testing::Ref;
 using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Server {
@@ -517,8 +517,8 @@ TEST_P(AdminInstanceTest, HelpUsesFormForMutations) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
-  const std::string logging_action = "<form action='/logging' method='post'";
-  const std::string stats_href = "<a href='/stats'";
+  const std::string logging_action = "<form action='logging' method='post'";
+  const std::string stats_href = "<a href='stats'";
   EXPECT_NE(-1, response.search(logging_action.data(), logging_action.size(), 0));
   EXPECT_NE(-1, response.search(stats_href.data(), stats_href.size(), 0));
 }
@@ -532,17 +532,70 @@ TEST_P(AdminInstanceTest, ConfigDump) {
     return msg;
   });
   const std::string expected_json = R"EOF({
- "configs": {
-  "foo": {
+ "configs": [
+  {
    "@type": "type.googleapis.com/google.protobuf.StringValue",
    "value": "bar"
   }
- }
+ ]
 }
 )EOF";
   EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
   std::string output = response.toString();
   EXPECT_EQ(expected_json, output);
+}
+
+TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
+  // Add configs in random order and validate config_dump dumps in the order.
+  auto bootstrap_entry = admin_.getConfigTracker().add("bootstrap", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("bootstrap_config");
+    return msg;
+  });
+  auto route_entry = admin_.getConfigTracker().add("routes", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("routes_config");
+    return msg;
+  });
+  auto listener_entry = admin_.getConfigTracker().add("listeners", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("listeners_config");
+    return msg;
+  });
+  auto cluster_entry = admin_.getConfigTracker().add("clusters", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("clusters_config");
+    return msg;
+  });
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "bootstrap_config"
+  },
+  {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "clusters_config"
+  },
+  {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "listeners_config"
+  },
+  {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "routes_config"
+  }
+ ]
+}
+)EOF";
+  // Run it multiple times and validate that order is preserved.
+  for (size_t i = 0; i < 5; i++) {
+    Buffer::OwnedImpl response;
+    Http::HeaderMapImpl header_map;
+    EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
+    const std::string output = response.toString();
+    EXPECT_EQ(expected_json, output);
+  }
 }
 
 TEST_P(AdminInstanceTest, Runtime) {
@@ -750,8 +803,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 TEST_P(AdminInstanceTest, GetRequest) {
   Http::HeaderMapImpl response_headers;
   std::string body;
-  EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", Http::Utility::QueryParams(), "GET",
-                                           response_headers, body));
+  EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
   EXPECT_TRUE(absl::StartsWith(body, "envoy ")) << body;
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
               HasSubstr("text/plain"));
@@ -760,9 +812,7 @@ TEST_P(AdminInstanceTest, GetRequest) {
 TEST_P(AdminInstanceTest, GetRequestJson) {
   Http::HeaderMapImpl response_headers;
   std::string body;
-  EXPECT_EQ(Http::Code::OK,
-            admin_.request("/stats", Http::Utility::QueryParams({{"format", "json"}}), "GET",
-                           response_headers, body));
+  EXPECT_EQ(Http::Code::OK, admin_.request("/stats?format=json", "GET", response_headers, body));
   EXPECT_THAT(body, HasSubstr("{\"stats\":["));
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
               HasSubstr("application/json"));
@@ -771,9 +821,8 @@ TEST_P(AdminInstanceTest, GetRequestJson) {
 TEST_P(AdminInstanceTest, PostRequest) {
   Http::HeaderMapImpl response_headers;
   std::string body;
-  EXPECT_NO_LOGS(
-      EXPECT_EQ(Http::Code::OK, admin_.request("/healthcheck/fail", Http::Utility::QueryParams(),
-                                               "POST", response_headers, body)));
+  EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::OK,
+                           admin_.request("/healthcheck/fail", "POST", response_headers, body)));
   EXPECT_EQ(body, "OK\n");
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
               HasSubstr("text/plain"));

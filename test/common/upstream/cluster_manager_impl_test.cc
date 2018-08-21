@@ -3,7 +3,6 @@
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/network/listen_socket.h"
-#include "envoy/stats/stats.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/config/bootstrap_json.h"
@@ -31,6 +30,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Mock;
@@ -40,7 +40,6 @@ using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Upstream {
@@ -122,7 +121,7 @@ public:
   Ssl::ContextManagerImpl ssl_context_manager_{runtime_};
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Secret::MockSecretManager secret_manager_;
+  NiceMock<Secret::MockSecretManager> secret_manager_;
 };
 
 // Helper to intercept calls to postThreadLocalClusterUpdate.
@@ -1770,18 +1769,21 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
 
   // The first update should be applied immediately, since it's not mergeable.
   hosts_removed.push_back((*hosts)[0]);
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
+                                                              hosts_per_locality, {}, hosts_added,
+                                                              hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
 
-  // This calls should be merged, since there are not added/removed hosts.
+  // These calls should be merged, since there are no added/removed hosts.
   hosts_removed.clear();
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
+                                                              hosts_per_locality, {}, hosts_added,
+                                                              hosts_removed, absl::nullopt);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
+                                                              hosts_per_locality, {}, hosts_added,
+                                                              hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
@@ -1795,8 +1797,9 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   // Add the host back, the update should be immediately applied.
   hosts_removed.clear();
   hosts_added.push_back((*hosts)[0]);
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
+                                                              hosts_per_locality, {}, hosts_added,
+                                                              hosts_removed, absl::nullopt);
   EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
@@ -1805,16 +1808,19 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
   hosts_added.clear();
 
   (*hosts)[0]->metadata(buildMetadata("v1"));
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
+                                                              hosts_per_locality, {}, hosts_added,
+                                                              hosts_removed, absl::nullopt);
 
   (*hosts)[0]->healthFlagSet(Host::HealthFlag::FAILED_EDS_HEALTH);
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
+                                                              hosts_per_locality, {}, hosts_added,
+                                                              hosts_removed, absl::nullopt);
 
   (*hosts)[0]->weight(100);
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
+                                                              hosts_per_locality, {}, hosts_added,
+                                                              hosts_removed, absl::nullopt);
 
   // Updates not delivered yet.
   EXPECT_EQ(2, factory_.stats_.counter("cluster_manager.cluster_updated").value());
@@ -1823,8 +1829,9 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
 
   // Remove the host again, should cancel the scheduled update and be delivered immediately.
   hosts_removed.push_back((*hosts)[0]);
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
+                                                              hosts_per_locality, {}, hosts_added,
+                                                              hosts_removed, absl::nullopt);
 
   EXPECT_EQ(3, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
@@ -1854,8 +1861,9 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
 
   // The first update should be applied immediately, because even though it's mergeable
   // it's outside a merge window.
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
+                                                              hosts_per_locality, {}, hosts_added,
+                                                              hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
@@ -1886,12 +1894,118 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindowDisabled) {
 
   // The first update should be applied immediately, because even though it's mergeable
   // and outside a merge window, merging is disabled.
-  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(
-      hosts, hosts, hosts_per_locality, hosts_per_locality, {}, hosts_added, hosts_removed);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
+                                                              hosts_per_locality, {}, hosts_added,
+                                                              hosts_removed, absl::nullopt);
   EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_out_of_merge_window").value());
   EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
+}
+
+TEST_F(ClusterManagerImplTest, MergedUpdatesDestroyedOnUpdate) {
+  // We create the default cluster, although for this test we won't use it since
+  // we can only update dynamic clusters.
+  createWithLocalClusterUpdate();
+
+  // Ensure we see the right set of added/removed hosts on every call, for the
+  // dynamically added/updated cluster.
+  EXPECT_CALL(local_cluster_update_, post(_, _, _))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // 1st add, when the cluster is added.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(1, hosts_added.size());
+        EXPECT_EQ(0, hosts_removed.size());
+      }))
+      .WillOnce(Invoke([](uint32_t priority, const HostVector& hosts_added,
+                          const HostVector& hosts_removed) -> void {
+        // 1st removal.
+        EXPECT_EQ(0, priority);
+        EXPECT_EQ(0, hosts_added.size());
+        EXPECT_EQ(1, hosts_removed.size());
+      }));
+
+  Event::MockTimer* timer = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
+
+  // We can't used the bootstrap cluster, so add one dynamically.
+  const std::string yaml = R"EOF(
+  name: new_cluster
+  connect_timeout: 0.250s
+  type: STATIC
+  lb_policy: ROUND_ROBIN
+  hosts:
+    - socket_address:
+        address: 127.0.0.1
+        port_value: 12001
+  common_lb_config:
+    update_merge_window: 3s
+  )EOF";
+  EXPECT_TRUE(cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml), "version1"));
+
+  const Cluster& cluster = cluster_manager_->clusters().find("new_cluster")->second;
+  HostVectorSharedPtr hosts(
+      new HostVector(cluster.prioritySet().hostSetsPerPriority()[0]->hosts()));
+  HostsPerLocalitySharedPtr hosts_per_locality = std::make_shared<HostsPerLocalityImpl>();
+  HostVector hosts_added;
+  HostVector hosts_removed;
+
+  // The first update should be applied immediately, since it's not mergeable.
+  hosts_removed.push_back((*hosts)[0]);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
+                                                              hosts_per_locality, {}, hosts_added,
+                                                              hosts_removed, absl::nullopt);
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
+
+  // These calls should be merged, since there are no added/removed hosts.
+  hosts_removed.clear();
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
+                                                              hosts_per_locality, {}, hosts_added,
+                                                              hosts_removed, absl::nullopt);
+  cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
+                                                              hosts_per_locality, {}, hosts_added,
+                                                              hosts_removed, absl::nullopt);
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_updated").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_updated_via_merge").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.update_merge_cancelled").value());
+
+  // Update the cluster, which should cancel the pending updates.
+  std::shared_ptr<MockCluster> updated(new NiceMock<MockCluster>());
+  updated->info_->name_ = "new_cluster";
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _, true)).WillOnce(Return(updated));
+
+  const std::string yaml_updated = R"EOF(
+  name: new_cluster
+  connect_timeout: 0.250s
+  type: STATIC
+  lb_policy: ROUND_ROBIN
+  hosts:
+    - socket_address:
+        address: 127.0.0.1
+        port_value: 12001
+  common_lb_config:
+    update_merge_window: 4s
+  )EOF";
+
+  // Add the updated cluster.
+  EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
+  EXPECT_EQ(0, factory_.stats_.counter("cluster_manager.cluster_modified").value());
+  EXPECT_EQ(0, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
+  EXPECT_TRUE(
+      cluster_manager_->addOrUpdateCluster(parseClusterFromV2Yaml(yaml_updated), "version2"));
+  EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
+  EXPECT_EQ(1, factory_.stats_.counter("cluster_manager.cluster_modified").value());
+  EXPECT_EQ(1, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
+
+  // Promote the updated cluster from warming to active & assert the old timer was disabled
+  // and it won't be called on version1 of new_cluster.
+  EXPECT_CALL(*timer, disableTimer());
+  updated->initialize_callback_();
+
+  EXPECT_EQ(2, factory_.stats_.gauge("cluster_manager.active_clusters").value());
+  EXPECT_EQ(0, factory_.stats_.gauge("cluster_manager.warming_clusters").value());
 }
 
 class ClusterManagerInitHelperTest : public testing::Test {

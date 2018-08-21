@@ -5,6 +5,7 @@
 #include <functional>
 #include <string>
 
+#include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/empty_string.h"

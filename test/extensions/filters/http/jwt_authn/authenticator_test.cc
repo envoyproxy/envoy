@@ -13,9 +13,9 @@
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
 using ::google::jwt_verify::Status;
+using ::testing::_;
 using ::testing::Invoke;
 using ::testing::NiceMock;
-using ::testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -161,6 +161,19 @@ TEST_F(AuthenticatorTest, TestInvalidPrefix) {
   }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer-invalid"}};
+  auth_->verify(headers, &mock_cb_);
+}
+
+// This test verifies when a JWT is non-expiring without audience specified, JwtAudienceNotAllowed
+// is returned.
+TEST_F(AuthenticatorTest, TestNonExpiringJWT) {
+  EXPECT_CALL(mock_factory_ctx_.cluster_manager_, httpAsyncClientForCluster(_)).Times(0);
+  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
+    ASSERT_EQ(status, Status::JwtAudienceNotAllowed);
+  }));
+
+  auto headers =
+      Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(NonExpiringToken)}};
   auth_->verify(headers, &mock_cb_);
 }
 

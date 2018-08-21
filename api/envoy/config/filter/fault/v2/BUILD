@@ -9,4 +9,5 @@ api_proto_library_internal(
         "//envoy/config/filter/http/fault/v2:__pkg__",
         "//envoy/config/filter/network/mongo_proxy/v2:__pkg__",
     ],
+    deps = ["//envoy/type:percent"],
 )

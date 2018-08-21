@@ -1,5 +1,6 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/access_log_config.h"
+#include "envoy/stats/scope.h"
 
 #include "extensions/access_loggers/http_grpc/grpc_access_log_impl.h"
 #include "extensions/access_loggers/well_known_names.h"
@@ -9,9 +10,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {

@@ -210,7 +210,7 @@ public:
           encodeHeaders(std::move(headers), end_stream);
         },
         [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
-        stream_destroyed_, code, body);
+        stream_destroyed_, code, body, is_head_request_);
   }
   void encode100ContinueHeaders(HeaderMapPtr&& headers) override {
     encode100ContinueHeaders_(*headers);
@@ -222,6 +222,7 @@ public:
 
   MOCK_METHOD0(continueDecoding, void());
   MOCK_METHOD2(addDecodedData, void(Buffer::Instance& data, bool streaming));
+  MOCK_METHOD0(addDecodedTrailers, HeaderMap&());
   MOCK_METHOD0(decodingBuffer, const Buffer::Instance*());
   MOCK_METHOD1(encode100ContinueHeaders_, void(HeaderMap& headers));
   MOCK_METHOD2(encodeHeaders_, void(HeaderMap& headers, bool end_stream));
@@ -233,6 +234,7 @@ public:
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
   bool is_grpc_request_{};
+  bool is_head_request_{false};
   bool stream_destroyed_{};
 };
 
@@ -259,6 +261,7 @@ public:
 
   // Http::StreamEncoderFilterCallbacks
   MOCK_METHOD2(addEncodedData, void(Buffer::Instance& data, bool streaming));
+  MOCK_METHOD0(addEncodedTrailers, HeaderMap&());
   MOCK_METHOD0(continueEncoding, void());
   MOCK_METHOD0(encodingBuffer, const Buffer::Instance*());
 

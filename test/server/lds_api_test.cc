@@ -11,11 +11,11 @@
 
 #include "gmock/gmock.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::Return;
 using testing::Throw;
-using testing::_;
 
 namespace Envoy {
 namespace Server {
@@ -82,12 +82,16 @@ public:
         .WillOnce(Invoke(
             [&](Http::MessagePtr& request, Http::AsyncClient::Callbacks& callbacks,
                 const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
-              EXPECT_EQ((Http::TestHeaderMapImpl{
-                            {":method", v2_rest_ ? "POST" : "GET"},
-                            {":path", v2_rest_ ? "/v2/discovery:listeners"
-                                               : "/v1/listeners/cluster_name/node_name"},
-                            {":authority", "foo_cluster"}}),
-                        request->headers());
+              EXPECT_EQ(
+                  (Http::TestHeaderMapImpl{
+                      {":method", v2_rest_ ? "POST" : "GET"},
+                      {":path", v2_rest_ ? "/v2/discovery:listeners"
+                                         : "/v1/listeners/cluster_name/node_name"},
+                      {":authority", "foo_cluster"},
+                      {"content-type", "application/json"},
+                      {"content-length",
+                       request->body() ? fmt::FormatInt(request->body()->length()).str() : "0"}}),
+                  request->headers());
               callbacks_ = &callbacks;
               return &request_;
             }));
@@ -220,10 +224,12 @@ TEST_F(LdsApiTest, BadLocalInfo) {
   EXPECT_CALL(*cluster.info_, addedViaApi());
   EXPECT_CALL(*cluster.info_, type());
   ON_CALL(local_info_, clusterName()).WillByDefault(Return(std::string()));
-  EXPECT_THROW_WITH_MESSAGE(LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_,
-                                       local_info_, store_, listener_manager_),
-                            EnvoyException,
-                            "lds: setting --service-cluster and --service-node is required");
+  EXPECT_THROW_WITH_MESSAGE(
+      LdsApiImpl(lds_config, cluster_manager_, dispatcher_, random_, init_, local_info_, store_,
+                 listener_manager_),
+      EnvoyException,
+      "lds: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
+      "--service-node and --service-cluster options.");
 }
 
 TEST_F(LdsApiTest, Basic) {

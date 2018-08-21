@@ -49,8 +49,8 @@ HealthCheckerFactory::create(const envoy::api::v2::core::HealthCheck& hc_config,
                              AccessLog::AccessLogManager& log_manager) {
   HealthCheckEventLoggerPtr event_logger;
   if (!hc_config.event_log_path().empty()) {
-    event_logger =
-        std::make_unique<HealthCheckEventLoggerImpl>(log_manager, hc_config.event_log_path());
+    event_logger = std::make_unique<HealthCheckEventLoggerImpl>(
+        log_manager, ProdSystemTimeSource::instance_, hc_config.event_log_path());
   }
   switch (hc_config.health_checker_case()) {
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kHttpHealthCheck:
@@ -134,6 +134,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
   }
 }
 
+// TODO(lilika) : Support connection pooling
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn =
@@ -198,6 +199,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
   if (isHealthCheckSucceeded()) {
     handleSuccess();
   } else {
+    host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNHEALTHY);
     handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::ACTIVE);
   }
 
@@ -213,6 +215,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
+  host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
   ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
                  HostUtility::healthFlagsToString(*host_));
 
@@ -294,6 +297,8 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onData(Buffer::Instance&
     if (!parent_.reuse_connection_) {
       client_->close(Network::ConnectionCloseType::NoFlush);
     }
+  } else {
+    host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNHEALTHY);
   }
 }
 
@@ -327,6 +332,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
   }
 }
 
+// TODO(lilika) : Support connection pooling
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
   if (!client_) {
     client_ = host_->createHealthCheckConnection(parent_.dispatcher_).connection_;
@@ -349,6 +355,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
 }
 
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onTimeout() {
+  host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
   client_->close(Network::ConnectionCloseType::NoFlush);
 }
 

@@ -9,6 +9,8 @@
 
 #include <unistd.h>
 
+#include "common/common/lock_guard.h"
+#include "common/common/thread.h"
 #include "common/runtime/runtime_impl.h"
 
 #include "exe/main_common.h"
@@ -24,6 +26,11 @@
 #include "exe/signal_action.h"
 #endif
 
+#include "absl/synchronization/notification.h"
+
+using testing::HasSubstr;
+using testing::IsEmpty;
+
 namespace Envoy {
 
 /**
@@ -36,7 +43,7 @@ namespace Envoy {
  * https://github.com/envoyproxy/envoy/issues/2649
  */
 class MainCommonTest : public testing::Test {
-public:
+protected:
   MainCommonTest()
       : config_file_(Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
                      "/test/config/integration/google_com_proxy_port_0.v2.yaml"),
@@ -76,6 +83,12 @@ public:
     argv_.push_back(nullptr);
   }
 
+  // Adds options to make Envoy exit immediately after initializtion.
+  void initOnly() {
+    addArg("--mode");
+    addArg("init_only");
+  }
+
   std::string config_file_;
   std::string random_string_;
   std::vector<const char*> argv_;
@@ -104,8 +117,7 @@ TEST_F(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
     return;
   }
   addArg("--disable-hot-restart");
-  addArg("--mode");
-  addArg("init_only");
+  initOnly();
   MainCommon main_common(argc(), argv());
   EXPECT_TRUE(main_common.run());
 }
@@ -124,9 +136,7 @@ TEST_F(MainCommonTest, LegacyMain) {
   std::unique_ptr<Envoy::OptionsImpl> options;
   int return_code = -1;
   try {
-    // Set the mode to init-only so main_common doesn't initiate a server-loop.
-    addArg("--mode");
-    addArg("init_only");
+    initOnly();
     options = std::make_unique<Envoy::OptionsImpl>(argc(), argv(), &MainCommon::hotRestartVersion,
                                                    spdlog::level::info);
   } catch (const Envoy::NoServingException& e) {
@@ -138,6 +148,192 @@ TEST_F(MainCommonTest, LegacyMain) {
     return_code = Envoy::main_common(*options);
   }
   EXPECT_EQ(EXIT_SUCCESS, return_code);
+}
+
+class AdminRequestTest : public MainCommonTest {
+protected:
+  AdminRequestTest()
+      : envoy_return_(false), envoy_started_(false), envoy_finished_(false),
+        pause_before_run_(false), pause_after_run_(false) {
+    addArg("--disable-hot-restart");
+  }
+
+  // Runs an admin request specified in path, blocking until completion, and
+  // returning the response body.
+  std::string adminRequest(absl::string_view path, absl::string_view method) {
+    absl::Notification done;
+    std::string out;
+    main_common_->adminRequest(
+        path, method,
+        [&done, &out](const Http::HeaderMap& /*response_headers*/, absl::string_view body) {
+          out = std::string(body);
+          done.Notify();
+        });
+    done.WaitForNotification();
+    return out;
+  }
+
+  // Initiates Envoy running in its own thread.
+  void startEnvoy() {
+    envoy_thread_ = std::make_unique<Thread::Thread>([this]() {
+      // Note: main_common_ is accesesed in the testing thread, but
+      // is race-free, as MainCommon::run() does not return until
+      // triggered with an adminRequest POST to /quitquitquit, which
+      // is done in the testing thread.
+      main_common_ = std::make_unique<MainCommon>(argc(), argv());
+      envoy_started_ = true;
+      started_.Notify();
+      pauseResumeInterlock(pause_before_run_);
+      bool status = main_common_->run();
+      pauseResumeInterlock(pause_after_run_);
+      main_common_.reset();
+      envoy_finished_ = true;
+      envoy_return_ = status;
+      finished_.Notify();
+    });
+  }
+
+  // Conditionally pauses at a critical point in the Envoy thread, waiting for
+  // the test thread to trigger something at that exact line. The test thread
+  // can then call resume_.Notify() to allow the Envoy thread to resume.
+  void pauseResumeInterlock(bool enable) {
+    if (enable) {
+      pause_point_.Notify();
+      resume_.WaitForNotification();
+    }
+  }
+
+  // Having triggered Envoy to quit (via signal or /quitquitquit), this blocks until Envoy exits.
+  bool waitForEnvoyToExit() {
+    finished_.WaitForNotification();
+    envoy_thread_->join();
+    return envoy_return_;
+  }
+
+  std::unique_ptr<Thread::Thread> envoy_thread_;
+  std::unique_ptr<MainCommon> main_common_;
+  absl::Notification started_;
+  absl::Notification finished_;
+  absl::Notification resume_;
+  absl::Notification pause_point_;
+  bool envoy_return_;
+  bool envoy_started_;
+  bool envoy_finished_;
+  bool pause_before_run_;
+  bool pause_after_run_;
+};
+
+TEST_F(AdminRequestTest, AdminRequestGetStatsAndQuit) {
+  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
+    return;
+  }
+  startEnvoy();
+  started_.WaitForNotification();
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  adminRequest("/quitquitquit", "POST");
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+// This test is identical to the above one, except that instead of using an admin /quitquitquit,
+// we send ourselves a SIGTERM, which should have the same effect.
+TEST_F(AdminRequestTest, AdminRequestGetStatsAndKill) {
+  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
+    return;
+  }
+  startEnvoy();
+  started_.WaitForNotification();
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
+  kill(getpid(), SIGTERM);
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_F(AdminRequestTest, AdminRequestBeforeRun) {
+  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
+    return;
+  }
+  // Induce the situation where the Envoy thread is active, and main_common_ is constructed,
+  // but run() hasn't been issued yet. AdminRequests will not finish immediately, but will
+  // do so at some point after run() is allowed to start.
+  pause_before_run_ = true;
+  startEnvoy();
+  pause_point_.WaitForNotification();
+
+  bool admin_handler_was_called = false;
+  std::string out;
+  main_common_->adminRequest(
+      "/stats", "GET",
+      [&admin_handler_was_called, &out](const Http::HeaderMap& /*response_headers*/,
+                                        absl::string_view body) {
+        admin_handler_was_called = true;
+        out = std::string(body);
+      });
+
+  // The admin handler can't be called until after we let run() go.
+  EXPECT_FALSE(admin_handler_was_called);
+  EXPECT_THAT(out, IsEmpty());
+
+  // Now unblock the envoy thread so it can wake up and process outstanding posts.
+  resume_.Notify();
+
+  // We don't get a notification when run(), so it's not safe to check whether the
+  // admin handler is called until after we quit.
+  adminRequest("/quitquitquit", "POST");
+  EXPECT_TRUE(waitForEnvoyToExit());
+  EXPECT_TRUE(admin_handler_was_called);
+
+  // This just checks that some stat output was reported. We could pick any stat.
+  EXPECT_THAT(out, HasSubstr("filesystem.reopen_failed"));
+}
+
+// Class to track whether an object has been destroyed, which it does by bumping an atomic.
+class DestroyCounter {
+public:
+  // Note: destroy_count is captured by reference, so the variable must last longer than
+  // the DestroyCounter.
+  explicit DestroyCounter(std::atomic<uint64_t>& destroy_count) : destroy_count_(destroy_count) {}
+  ~DestroyCounter() { ++destroy_count_; }
+
+private:
+  std::atomic<uint64_t>& destroy_count_;
+};
+
+TEST_F(AdminRequestTest, AdminRequestAfterRun) {
+  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
+    return;
+  }
+  startEnvoy();
+  started_.WaitForNotification();
+  // Induce the situation where Envoy is no longer in run(), but hasn't been
+  // destroyed yet. AdminRequests will never finish, but they won't crash.
+  pause_after_run_ = true;
+  adminRequest("/quitquitquit", "POST");
+  pause_point_.WaitForNotification(); // run() finished, but main_common_ still exists.
+
+  // Admin requests will not work, but will never complete. The lambda itself will be
+  // destroyed on thread exit, which we'll track with an object that counts destructor calls.
+
+  std::atomic<uint64_t> lambda_destroy_count(0);
+  bool admin_handler_was_called = false;
+  {
+    // Ownership of the tracker will be passed to the lambda.
+    auto tracker = std::make_shared<DestroyCounter>(lambda_destroy_count);
+    main_common_->adminRequest(
+        "/stats", "GET",
+        [&admin_handler_was_called, tracker](const Http::HeaderMap& /*response_headers*/,
+                                             absl::string_view /*body*/) {
+          admin_handler_was_called = true;
+          UNREFERENCED_PARAMETER(tracker);
+        });
+  }
+  EXPECT_EQ(0, lambda_destroy_count); // The lambda won't be destroyed till envoy thread exit.
+
+  // Now unblock the envoy thread so it can destroy the object, along with our unfinished
+  // admin request.
+  resume_.Notify();
+
+  EXPECT_TRUE(waitForEnvoyToExit());
+  EXPECT_FALSE(admin_handler_was_called);
+  EXPECT_EQ(1, lambda_destroy_count);
 }
 
 } // namespace Envoy

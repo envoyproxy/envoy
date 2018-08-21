@@ -1,5 +1,3 @@
-#include "envoy/stats/stats.h"
-
 #include "common/network/address_impl.h"
 #include "common/network/listener_impl.h"
 #include "common/network/utility.h"
@@ -13,9 +11,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Network {

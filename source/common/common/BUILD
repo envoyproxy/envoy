@@ -136,6 +136,7 @@ envoy_cc_library(
         "@envoy_api//envoy/type/matcher:metadata_cc",
         "@envoy_api//envoy/type/matcher:number_cc",
         "@envoy_api//envoy/type/matcher:string_cc",
+        "@envoy_api//envoy/type/matcher:value_cc",
     ],
 )
 

@@ -1,6 +1,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/stats/scope.h"
+
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
@@ -86,7 +88,7 @@ public:
 private:
   Runtime::MockLoader runtime_;
   Ssl::ContextManagerImpl context_manager_{runtime_};
-  Secret::MockSecretManager secret_manager_;
+  NiceMock<Secret::MockSecretManager> secret_manager_;
 
   Network::TransportSocketFactoryPtr client_ssl_ctx_;
 };
@@ -176,7 +178,7 @@ public:
 private:
   Runtime::MockLoader runtime_;
   Ssl::ContextManagerImpl context_manager_{runtime_};
-  Secret::MockSecretManager secret_manager_;
+  NiceMock<Secret::MockSecretManager> secret_manager_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, SdsStaticUpstreamIntegrationTest,

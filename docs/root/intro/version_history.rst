@@ -12,11 +12,16 @@ Version history
   `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
 * cluster: added :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>` to merge
   health check/weight/metadata updates within the given duration.
+* config: regex validation added to limit to a maximum of 1024 characters.
 * config: v1 disabled by default. v1 support remains available until October via flipping --v2-config-only=false.
 * config: v1 disabled by default. v1 support remains available until October via setting :option:`--allow-deprecated-v1-api`.
+* fault: added support for fractional percentages in :ref:`FaultDelay <envoy_api_field_config.filter.fault.v2.FaultDelay.percentage>`
+  and in :ref:`FaultAbort <envoy_api_field_config.filter.http.fault.v2.FaultAbort.percentage>`.
 * health check: added support for :ref:`custom health check <envoy_api_field_core.HealthCheck.custom_health_check>`.
 * health check: added support for :ref:`specifying jitter as a percentage <envoy_api_field_core.HealthCheck.interval_jitter_percent>`.
 * health_check: added support for :ref:`health check event logging <arch_overview_health_check_logging>`.
+* health_check: added :ref:`timestamp <envoy_api_field_data.core.v2alpha.HealthCheckEvent.timestamp>`
+  to the :ref:`health check event <envoy_api_msg_data.core.v2alpha.HealthCheckEvent>` definition.
 * health_check: added support for specifying :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`
   to HTTP health checker requests.
 * http: added support for a per-stream idle timeout. This applies at both :ref:`connection manager
@@ -25,6 +30,8 @@ Version history
   defaults to 5 minutes; if you have other timeouts (e.g. connection idle timeout, upstream
   response per-retry) that are longer than this in duration, you may want to consider setting a
   non-default per-stream idle timeout.
+* http: added upstream_rq_completed counter for :ref:`total requests completed <config_cluster_manager_cluster_stats_dynamic_http>` to dynamic HTTP counters.
+* http: added downstream_rq_completed counter for :ref:`total requests completed <config_http_conn_man_stats>`, including on a :ref:`per-listener basis <config_http_conn_man_stats_per_listener>`.
 * http: added support for a :ref:`per-stream idle timeout
   <envoy_api_field_route.RouteAction.idle_timeout>`. This defaults to 5 minutes; if you have
   other timeouts (e.g. connection idle timeout, upstream response per-retry) that are longer than
@@ -48,6 +55,7 @@ Version history
   :ref:`use_data_plane_proto<envoy_api_field_config.ratelimit.v2.RateLimitServiceConfig.use_data_plane_proto>`
   boolean flag in the ratelimit configuration.
   Support for the legacy proto :repo:`source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
+* rbac network filter: a :ref:`role-based access control network filter <config_network_filters_rbac>` has been added.
 * rest-api: added ability to set the :ref:`request timeout <envoy_api_field_core.ApiConfigSource.request_timeout>` for REST API requests.
 * router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
 * tracing: added support for configuration of :ref:`tracing sampling

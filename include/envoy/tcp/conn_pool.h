@@ -57,8 +57,25 @@ public:
   virtual void onUpstreamData(Buffer::Instance& data, bool end_stream) PURE;
 };
 
+/**
+ * ConnectionState is a base class for connection state maintained across requests. For example, a
+ * protocol may maintain a connection-specific request sequence number or negotiate options that
+ * affect the behavior of requests for the duration of the connection. A ConnectionState subclass
+ * is assigned to the ConnectionData to track this state when the connection is returned to the
+ * pool so that the state is available when the connection is re-used for a subsequent request.
+ * The ConnectionState assigned to a connection is automatically destroyed when the connection is
+ * closed.
+ */
+class ConnectionState {
+public:
+  virtual ~ConnectionState() {}
+};
+
+typedef std::unique_ptr<ConnectionState> ConnectionStatePtr;
+
 /*
- * ConnectionData wraps a ClientConnection allocated to a caller.
+ * ConnectionData wraps a ClientConnection allocated to a caller. Open ClientConnections are
+ * released back to the pool for re-use when their containing ConnectionData is destroyed.
  */
 class ConnectionData {
 public:
@@ -70,6 +87,18 @@ public:
   virtual Network::ClientConnection& connection() PURE;
 
   /**
+   * Sets the ConnectionState for this connection. Any existing ConnectionState is destroyed.
+   * @param ConnectionStatePtr&& new ConnectionState for this connection.
+   */
+  virtual void setConnectionState(ConnectionStatePtr&& state) PURE;
+
+  /**
+   * @return T* the current ConnectionState or nullptr if no state is set or if the state's type
+   *            is not T.
+   */
+  template <class T> T* connectionStateTyped() { return dynamic_cast<T*>(connectionState()); }
+
+  /**
    * Sets the ConnectionPool::UpstreamCallbacks for the connection. If no callback is attached,
    * data from the upstream will cause the connection to be closed. Callbacks cease when the
    * connection is released.
@@ -77,12 +106,14 @@ public:
    */
   virtual void addUpstreamCallbacks(ConnectionPool::UpstreamCallbacks& callback) PURE;
 
+protected:
   /**
-   * Release the connection after use. The connection should be closed first only if it is
-   * not viable for future use.
+   * @return ConnectionState* pointer to the current ConnectionState or nullptr if not set
    */
-  virtual void release() PURE;
+  virtual ConnectionState* connectionState() PURE;
 };
+
+typedef std::unique_ptr<ConnectionData> ConnectionDataPtr;
 
 /**
  * Pool callbacks invoked in the context of a newConnection() call, either synchronously or
@@ -102,14 +133,17 @@ public:
                              Upstream::HostDescriptionConstSharedPtr host) PURE;
 
   /**
-   * Called when a connection is available to process a request/response. Recipients of connections
-   * must release the connection after use. They should only close the underlying ClientConnection
-   * if it is no longer viable for future requests.
+   * Called when a connection is available to process a request/response. Connections may be
+   * released back to the pool for re-use by resetting the ConnectionDataPtr. If the connection is
+   * no longer viable for reuse (e.g. due to some kind of protocol error), the underlying
+   * ClientConnection should be closed to prevent its reuse.
+   *
    * @param conn supplies the connection data to use.
    * @param host supplies the description of the host that will carry the request. For logical
    *             connection pools the description may be different each time this is called.
    */
-  virtual void onPoolReady(ConnectionData& conn, Upstream::HostDescriptionConstSharedPtr host) PURE;
+  virtual void onPoolReady(ConnectionDataPtr&& conn,
+                           Upstream::HostDescriptionConstSharedPtr host) PURE;
 };
 
 /**

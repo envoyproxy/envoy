@@ -7,6 +7,7 @@
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v2/ads.pb.h"
+#include "envoy/stats/scope.h"
 
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
@@ -130,6 +131,10 @@ public:
                           const std::string& expected_error_message = "") {
     envoy::api::v2::DiscoveryRequest discovery_request;
     VERIFY_ASSERTION(ads_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
+
+    EXPECT_TRUE(discovery_request.has_node());
+    EXPECT_FALSE(discovery_request.node().id().empty());
+    EXPECT_FALSE(discovery_request.node().cluster().empty());
 
     // TODO(PiotrSikora): Remove this hack once fixed internally.
     if (!(expected_type_url == discovery_request.type_url())) {
@@ -294,7 +299,7 @@ public:
     return dynamic_cast<const envoy::admin::v2alpha::RoutesConfigDump&>(*message_ptr);
   }
 
-  Secret::MockSecretManager secret_manager_;
+  testing::NiceMock<Secret::MockSecretManager> secret_manager_;
   Runtime::MockLoader runtime_;
   Ssl::ContextManagerImpl context_manager_{runtime_};
   FakeStreamPtr ads_stream_;

@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.service.ratelimit.v2;
 option go_package = "v2";
 
+import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/ratelimit/ratelimit.proto";
 
 import "validate/validate.proto";
@@ -75,4 +76,6 @@ message RateLimitResponse {
   // in the RateLimitRequest. This can be used by the caller to determine which individual
   // descriptors failed and/or what the currently configured limits are for all of them.
   repeated DescriptorStatus statuses = 2;
+  // A list of headers to add to the response
+  repeated envoy.api.v2.core.HeaderValue headers = 3;
 }

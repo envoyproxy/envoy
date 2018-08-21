@@ -2,7 +2,7 @@
 #include <string>
 
 #include "envoy/http/codec.h"
-#include "envoy/stats/stats.h"
+#include "envoy/stats/scope.h"
 
 #include "common/http/exception.h"
 #include "common/http/header_map_impl.h"
@@ -17,6 +17,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::InSequence;
@@ -24,7 +25,6 @@ using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Http {

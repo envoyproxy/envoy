@@ -288,6 +288,7 @@ def envoy_dependencies(path = "@envoy_deps//", skip_targets = []):
     _com_lightstep_tracer_cpp()
     _com_github_grpc_grpc()
     _com_github_google_jwt_verify()
+    _com_github_nanopb_nanopb()
     _com_github_nodejs_http_parser()
     _com_github_tencent_rapidjson()
     _com_google_googletest()
@@ -506,6 +507,17 @@ def _com_github_grpc_grpc():
     native.bind(
         name = "grpc_health_proto",
         actual = "@envoy//bazel:grpc_health_proto",
+    )
+
+def _com_github_nanopb_nanopb():
+    _repository_impl(
+        name = "com_github_nanopb_nanopb",
+        build_file = "@com_github_grpc_grpc//third_party:nanopb.BUILD",
+    )
+
+    native.bind(
+        name = "nanopb",
+        actual = "@com_github_nanopb_nanopb//:nanopb",
     )
 
 def _com_github_google_jwt_verify():

@@ -133,7 +133,7 @@ message TagSpecifier {
     // ``http.user_agent.downstream_cx_total`` as the tag extracted name. The tag
     // ``envoy.http_conn_manager_prefix`` will be added with the tag value
     // ``connection_manager_1``.
-    string regex = 2;
+    string regex = 2 [(validate.rules).string.max_bytes = 1024];
 
     // Specifies a fixed tag value for the ``tag_name``.
     string fixed_value = 3;

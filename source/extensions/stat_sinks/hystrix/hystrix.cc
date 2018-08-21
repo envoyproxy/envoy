@@ -5,6 +5,8 @@
 #include <iostream>
 #include <sstream>
 
+#include "envoy/stats/scope.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
 #include "common/http/headers.h"

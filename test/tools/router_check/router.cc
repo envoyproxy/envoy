@@ -5,8 +5,6 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/stats/stats.h"
-
 #include "common/network/utility.h"
 #include "common/request_info/request_info_impl.h"
 

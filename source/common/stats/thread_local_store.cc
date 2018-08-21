@@ -7,6 +7,12 @@
 #include <string>
 #include <unordered_set>
 
+#include "envoy/stats/histogram.h"
+#include "envoy/stats/sink.h"
+#include "envoy/stats/stat_data_allocator.h"
+#include "envoy/stats/stats.h"
+#include "envoy/stats/stats_options.h"
+
 #include "common/common/lock_guard.h"
 #include "common/stats/tag_producer_impl.h"
 
@@ -15,7 +21,7 @@
 namespace Envoy {
 namespace Stats {
 
-ThreadLocalStoreImpl::ThreadLocalStoreImpl(const Stats::StatsOptions& stats_options,
+ThreadLocalStoreImpl::ThreadLocalStoreImpl(const StatsOptions& stats_options,
                                            StatDataAllocator& alloc)
     : stats_options_(stats_options), alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
@@ -138,7 +144,7 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
     main_thread_dispatcher_->post(
-        [ this, scope_id = scope->scope_id_ ]()->void { clearScopeFromCaches(scope_id); });
+        [this, scope_id = scope->scope_id_]() -> void { clearScopeFromCaches(scope_id); });
   }
 }
 
@@ -341,8 +347,8 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
 ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(const std::string& name,
                                                    std::string&& tag_extracted_name,
                                                    std::vector<Tag>&& tags)
-    : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), current_active_(0),
-      flags_(0), created_thread_id_(std::this_thread::get_id()) {
+    : MetricImpl(std::move(tag_extracted_name), std::move(tags)), current_active_(0), flags_(0),
+      created_thread_id_(std::this_thread::get_id()), name_(name) {
   histograms_[0] = hist_alloc();
   histograms_[1] = hist_alloc();
 }
@@ -367,10 +373,10 @@ void ThreadLocalHistogramImpl::merge(histogram_t* target) {
 ParentHistogramImpl::ParentHistogramImpl(const std::string& name, Store& parent,
                                          TlsScope& tls_scope, std::string&& tag_extracted_name,
                                          std::vector<Tag>&& tags)
-    : MetricImpl(name, std::move(tag_extracted_name), std::move(tags)), parent_(parent),
+    : MetricImpl(std::move(tag_extracted_name), std::move(tags)), parent_(parent),
       tls_scope_(tls_scope), interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_), cumulative_statistics_(cumulative_histogram_),
-      merged_(false) {}
+      merged_(false), name_(name) {}
 
 ParentHistogramImpl::~ParentHistogramImpl() {
   hist_free(interval_histogram_);

@@ -1,8 +1,6 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/stats/stats.h"
-
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
@@ -19,6 +17,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
@@ -26,7 +25,6 @@ using testing::Return;
 using testing::SaveArg;
 using testing::Sequence;
 using testing::Throw;
-using testing::_;
 
 namespace Envoy {
 

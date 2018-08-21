@@ -89,7 +89,6 @@ const std::string ConfigHelper::DEFAULT_HEALTH_CHECK_FILTER =
 name: envoy.health_check
 config:
     pass_through_mode: false
-    endpoint: /healthcheck
 )EOF";
 
 const std::string ConfigHelper::DEFAULT_SQUASH_FILTER =

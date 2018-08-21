@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/stats/scope.h"
+
 #include "common/common/fmt.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -67,7 +69,7 @@ void Filter::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void Filter::complete(RateLimit::LimitStatus status) {
+void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&&) {
   status_ = Status::Complete;
   config_->stats().active_.dec();
 
