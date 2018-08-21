@@ -269,7 +269,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA([\"ns\", \n \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
-      {"%START_TIME(\"testing\")%", {"\"testing\""}, {}},
+      {"%START_TIME(\"testing\")%", {"testing"}, {}},
 
       // Unescaped %
       {"%", {}, {"Invalid header configuration. Un-escaped % at position 0"}},
