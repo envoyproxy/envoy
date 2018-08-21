@@ -125,7 +125,7 @@ parseUpstreamMetadataField(absl::string_view params_str) {
 
 // Parses the parameters for PER_REQUEST_STATE and returns a function suitable for accessing the
 // specified metadata from an RequestInfo::RequestInfo. Expects a string formatted as:
-//   ("<state_name>")
+//   (<state_name>)
 // The state name is expected to be in reverse DNS format, though this is not enforced by
 // this function.
 std::function<std::string(const Envoy::RequestInfo::RequestInfo&)>
