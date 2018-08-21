@@ -35,7 +35,7 @@ std::string formatUpstreamMetadataParseException(absl::string_view params,
 
 std::string formatFilterStateParseException(absl::string_view params) {
   return fmt::format("Invalid header configuration. Expected format "
-                     "PER_REQUEST_STATE(\"<data_name>\"), actual format "
+                     "PER_REQUEST_STATE(<data_name>), actual format "
                      "PER_REQUEST_STATE{}",
                      params);
 }
@@ -129,18 +129,16 @@ parseUpstreamMetadataField(absl::string_view params_str) {
 // this function.
 std::function<std::string(const Envoy::RequestInfo::RequestInfo&)>
 parseFilterStateField(absl::string_view param_str) {
-  param_str = StringUtil::trim(param_str);
-  if (param_str.empty() || param_str.front() != '(' || param_str.back() != ')') {
+  absl::string_view modified_param_str = StringUtil::trim(param_str);
+  if (modified_param_str.empty() || modified_param_str.front() != '(' || modified_param_str.back() != ')') {
     throw EnvoyException(formatFilterStateParseException(param_str));
   }
-  absl::string_view param_str2 = param_str.substr(1, param_str.size() - 2); // trim parens
-
-  if (param_str2.empty() || param_str2.front() != '"' || param_str2.back() != '"') {
+  modified_param_str = modified_param_str.substr(1, modified_param_str.size() - 2); // trim parens
+  if (modified_param_str.size() == 0) {
     throw EnvoyException(formatFilterStateParseException(param_str));
   }
-  std::string param =
-      static_cast<std::string>(param_str2.substr(1, param_str2.size() - 2)); // trim quotes
 
+  std::string param(modified_param_str);
   return [param](const Envoy::RequestInfo::RequestInfo& request_info) -> std::string {
     const Envoy::RequestInfo::FilterState& dynamic_metadata = request_info.perRequestState();
 

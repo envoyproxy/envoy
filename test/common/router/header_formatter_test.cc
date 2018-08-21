@@ -178,8 +178,8 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDynamicMetadataVariable) {
   ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
   ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
 
-  testFormatting(request_info, "PER_REQUEST_STATE(\"testing\")", "test_value");
-  testFormatting(request_info, "PER_REQUEST_STATE(\"testing2\")", "");
+  testFormatting(request_info, "PER_REQUEST_STATE(testing)", "test_value");
+  testFormatting(request_info, "PER_REQUEST_STATE(testing2)", "");
   EXPECT_EQ("test_value", dynamic_metadata.getData<StringAccessor>("testing").asString());
 }
 
@@ -207,48 +207,30 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithNonStringDynamicMetadataVar
   ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
 
   EXPECT_THROW_WITH_MESSAGE(
-      testFormatting(request_info, "PER_REQUEST_STATE(\"testing\")", ""), EnvoyException,
+      testFormatting(request_info, "PER_REQUEST_STATE(testing)", ""), EnvoyException,
       "Invalid header information: PER_REQUEST_STATE value \"testing\" exists "
       "but is not string accessible");
 }
 
 TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnDynamicMetadataVariable) {
-  // No quotes
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE(testing)", false),
-                            EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "PER_REQUEST_STATE(\"<data_name>\"), actual format "
-                            "PER_REQUEST_STATE(testing)");
   // No parameters
   EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE()", false),
                             EnvoyException,
                             "Invalid header configuration. Expected format "
-                            "PER_REQUEST_STATE(\"<data_name>\"), actual format "
+                            "PER_REQUEST_STATE(<data_name>), actual format "
                             "PER_REQUEST_STATE()");
 
   // Missing single parens
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE(\"testing\"", false),
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE(testing", false),
                             EnvoyException,
                             "Invalid header configuration. Expected format "
-                            "PER_REQUEST_STATE(\"<data_name>\"), actual format "
-                            "PER_REQUEST_STATE(\"testing\"");
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE\"testing\")", false),
+                            "PER_REQUEST_STATE(<data_name>), actual format "
+                            "PER_REQUEST_STATE(testing");
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE testing)", false),
                             EnvoyException,
                             "Invalid header configuration. Expected format "
-                            "PER_REQUEST_STATE(\"<data_name>\"), actual format "
-                            "PER_REQUEST_STATE\"testing\")");
-
-  // Missing single quotes
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE(\"testing)", false),
-                            EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "PER_REQUEST_STATE(\"<data_name>\"), actual format "
-                            "PER_REQUEST_STATE(\"testing)");
-  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE(testing\")", false),
-                            EnvoyException,
-                            "Invalid header configuration. Expected format "
-                            "PER_REQUEST_STATE(\"<data_name>\"), actual format "
-                            "PER_REQUEST_STATE(testing\")");
+                            "PER_REQUEST_STATE(<data_name>), actual format "
+                            "PER_REQUEST_STATE testing)");
 }
 
 TEST_F(RequestInfoHeaderFormatterTest, UnknownVariable) { testInvalidFormat("INVALID_VARIABLE"); }
@@ -352,7 +334,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA([\"ns\", \t \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \n \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
-      {"%PER_REQUEST_STATE(\"testing\")%", {"test_value"}, {}},
+      {"%PER_REQUEST_STATE(testing)%", {"test_value"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
 
       // Unescaped %
@@ -397,20 +379,10 @@ TEST(HeaderParserTest, TestParseInternal) {
         "...]), actual format UPSTREAM_METADATA( no array), because JSON supplied is not valid. "
         "Error(offset 2, line 1): Invalid value.\n"}},
 
-      {"%PER_REQUEST_STATE(no quotes)%",
+      {"%PER_REQUEST_STATE no parens%",
        {},
-       {"Invalid header configuration. Expected format PER_REQUEST_STATE(\"<data_name>\"), "
-        "actual format PER_REQUEST_STATE(no quotes)"}},
-
-      {"%PER_REQUEST_STATE\"no parens\"%",
-       {},
-       {"Invalid header configuration. Expected format PER_REQUEST_STATE(\"<data_name>\"), "
-        "actual format PER_REQUEST_STATE\"no parens\""}},
-
-      {"%PER_REQUEST_STATE( \"extra space\")%",
-       {},
-       {"Invalid header configuration. Expected format PER_REQUEST_STATE(\"<data_name>\"), "
-        "actual format PER_REQUEST_STATE( \"extra space\")"}},
+       {"Invalid header configuration. Expected format PER_REQUEST_STATE(<data_name>), "
+        "actual format PER_REQUEST_STATE no parens"}},
 
       // Invalid arguments
       {"%UPSTREAM_METADATA%",
@@ -579,8 +551,8 @@ route:
         key: "x-metadata"
         value: "%UPSTREAM_METADATA([\"namespace\", \"%key%\"])%"
     - header:
-        key: "x-dynamic"
-        value: "%PER_REQUEST_STATE(\"testing\")%"
+        key: "x-per-request"
+        value: "%PER_REQUEST_STATE(testing)%"
   )EOF";
 
   HeaderParserPtr req_header_parser =
@@ -604,10 +576,10 @@ route:
       )EOF"));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
-  Envoy::RequestInfo::FilterStateImpl dynamic_metadata;
-  dynamic_metadata.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
-  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
-  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
+  Envoy::RequestInfo::FilterStateImpl per_request_state;
+  per_request_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
 
   req_header_parser->evaluateHeaders(headerMap, request_info);
 
@@ -635,8 +607,8 @@ route:
   EXPECT_TRUE(headerMap.has("x-metadata"));
   EXPECT_EQ("value", headerMap.get_("x-metadata"));
 
-  EXPECT_TRUE(headerMap.has("x-dynamic"));
-  EXPECT_EQ("test_value", headerMap.get_("x-dynamic"));
+  EXPECT_TRUE(headerMap.has("x-per-request"));
+  EXPECT_EQ("test_value", headerMap.get_("x-per-request"));
 }
 
 TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
