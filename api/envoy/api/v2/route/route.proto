@@ -267,7 +267,7 @@ message RouteMatch {
     // * The regex */b[io]t* matches the path */bot*
     // * The regex */b[io]t* does not match the path */bite*
     // * The regex */b[io]t* does not match the path */bit/bot*
-    string regex = 3;
+    string regex = 3 [(validate.rules).string.max_bytes = 1024];
   }
 
   // Indicates that prefix/path matching should be case insensitive. The default
@@ -763,7 +763,7 @@ message VirtualCluster {
   // * The regex */rides/\d+* matches the path */rides/0*
   // * The regex */rides/\d+* matches the path */rides/123*
   // * The regex */rides/\d+* does not match the path */rides/123/456*
-  string pattern = 1 [(validate.rules).string.min_bytes = 1];
+  string pattern = 1 [(validate.rules).string = {min_bytes: 1, max_bytes: 1024}];
 
   //  Specifies the name of the virtual cluster. The virtual cluster name as well
   // as the virtual host name are used when emitting statistics. The statistics are emitted by the
@@ -959,7 +959,7 @@ message HeaderMatcher {
     // * The regex *\d{3}* matches the value *123*
     // * The regex *\d{3}* does not match the value *1234*
     // * The regex *\d{3}* does not match the value *123.456*
-    string regex_match = 5;
+    string regex_match = 5 [(validate.rules).string.max_bytes = 1024];
 
     // If specified, header match will be performed based on range.
     // The rule will match if the request header value is within this range.
@@ -1009,7 +1009,7 @@ message HeaderMatcher {
 message QueryParameterMatcher {
   // Specifies the name of a key that must be present in the requested
   // *path*'s query string.
-  string name = 1 [(validate.rules).string.min_bytes = 1];
+  string name = 1 [(validate.rules).string = {min_bytes: 1, max_bytes: 1024}];
 
   // Specifies the value of the key. If the value is absent, a request
   // that contains the key in its query string will match, whether the

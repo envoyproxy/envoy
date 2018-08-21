@@ -2,6 +2,10 @@ actions {
   new_stream {
     request_headers {
       headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
         key: "foo"
         value: "bar"
       }

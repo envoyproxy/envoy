@@ -11,6 +11,19 @@
 namespace Envoy {
 namespace Fuzz {
 
+// Each test may need a sub-environment of that provided by //test/test_common:environment_lib,
+// since each fuzz invocation runs in the same process, but might want a distinct tmp sandbox for
+// example.
+class PerTestEnvironment {
+public:
+  PerTestEnvironment();
+
+  std::string temporaryPath(const std::string& path) const { return test_tmpdir_ + "/" + path; }
+
+private:
+  const std::string test_tmpdir_;
+};
+
 class Runner {
 public:
   /**

@@ -23,7 +23,7 @@ public:
   /**
    * Subscription factory.
    * @param config envoy::api::v2::core::ConfigSource to construct from.
-   * @param node envoy::api::v2::core::Node identifier.
+   * @param local_info LocalInfo::LocalInfo local info.
    * @param dispatcher event dispatcher.
    * @param cm cluster manager for async clients (when REST/gRPC).
    * @param random random generator for jittering polling delays (when REST).
@@ -37,7 +37,7 @@ public:
    */
   template <class ResourceType>
   static std::unique_ptr<Subscription<ResourceType>> subscriptionFromConfigSource(
-      const envoy::api::v2::core::ConfigSource& config, const envoy::api::v2::core::Node& node,
+      const envoy::api::v2::core::ConfigSource& config, const LocalInfo::LocalInfo& local_info,
       Event::Dispatcher& dispatcher, Upstream::ClusterManager& cm, Runtime::RandomGenerator& random,
       Stats::Scope& scope, std::function<Subscription<ResourceType>*()> rest_legacy_constructor,
       const std::string& rest_method, const std::string& grpc_method) {
@@ -59,14 +59,14 @@ public:
         break;
       case envoy::api::v2::core::ApiConfigSource::REST:
         result.reset(new HttpSubscriptionImpl<ResourceType>(
-            node, cm, api_config_source.cluster_names()[0], dispatcher, random,
+            local_info, cm, api_config_source.cluster_names()[0], dispatcher, random,
             Utility::apiConfigSourceRefreshDelay(api_config_source),
             Utility::apiConfigSourceRequestTimeout(api_config_source),
             *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(rest_method), stats));
         break;
       case envoy::api::v2::core::ApiConfigSource::GRPC: {
         result.reset(new GrpcSubscriptionImpl<ResourceType>(
-            node,
+            local_info,
             Config::Utility::factoryForGrpcApiConfigSource(cm.grpcAsyncClientManager(),
                                                            config.api_config_source(), scope)
                 ->create(),

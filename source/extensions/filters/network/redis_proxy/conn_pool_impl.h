@@ -15,6 +15,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/upstream/load_balancer_impl.h"
 
 #include "extensions/filters/network/redis_proxy/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/conn_pool.h"
@@ -161,14 +162,11 @@ private:
     Envoy::Common::CallbackHandle* local_host_set_member_update_cb_handle_;
   };
 
-  struct LbContextImpl : public Upstream::LoadBalancerContext {
+  struct LbContextImpl : public Upstream::LoadBalancerContextBase {
     LbContextImpl(const std::string& hash_key) : hash_key_(std::hash<std::string>()(hash_key)) {}
     // TODO(danielhochman): convert to HashUtil::xxHash64 when we have a migration strategy.
     // Upstream::LoadBalancerContext
     absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
-    const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
-    const Network::Connection* downstreamConnection() const override { return nullptr; }
-    const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
     const absl::optional<uint64_t> hash_key_;
   };
