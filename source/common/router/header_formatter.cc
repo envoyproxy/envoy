@@ -151,12 +151,14 @@ parseFilterStateField(absl::string_view param_str) {
 
     // Value exists but isn't string accessible is a contract violation; throw an error.
     if (!dynamic_metadata.hasData<StringAccessor>(param)) {
-      throw EnvoyException(fmt::format("Invalid header information: PER_REQUEST_STATE value \"{}\" "
-                                       "exists but is not string accessible",
-                                       param));
+      ENVOY_LOG_MISC(debug,
+                     "Invalid header information: PER_REQUEST_STATE value \"{}\" "
+                     "exists but is not string accessible",
+                     param);
+      return std::string();
     }
 
-    return static_cast<std::string>(dynamic_metadata.getData<StringAccessor>(param).asString());
+    return std::string(dynamic_metadata.getData<StringAccessor>(param).asString());
   };
 }
 

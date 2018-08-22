@@ -13,7 +13,7 @@ namespace Router {
  * allows lazy evaluation if needed. All values meant to be accessible to the
  * custom request/response header mechanism must use this type.
  */
-class StringAccessor : public ::Envoy::RequestInfo::FilterState::Object {
+class StringAccessor : public RequestInfo::FilterState::Object {
 public:
   /**
    * @return the string the accessor represents.

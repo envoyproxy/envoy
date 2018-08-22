@@ -185,7 +185,7 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDynamicMetadataVariable) {
 
 namespace {
 
-class IntAccessor : public ::Envoy::RequestInfo::FilterState::Object {
+class IntAccessor : public RequestInfo::FilterState::Object {
 public:
   IntAccessor(int value) : value_(value) {}
 
@@ -206,10 +206,7 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithNonStringDynamicMetadataVar
   ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
   ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
 
-  EXPECT_THROW_WITH_MESSAGE(
-      testFormatting(request_info, "PER_REQUEST_STATE(testing)", ""), EnvoyException,
-      "Invalid header information: PER_REQUEST_STATE value \"testing\" exists "
-      "but is not string accessible");
+  testFormatting(request_info, "PER_REQUEST_STATE(testing)", "");
 }
 
 TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnDynamicMetadataVariable) {
