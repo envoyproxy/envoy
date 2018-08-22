@@ -64,6 +64,7 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
+        ":noop_transport_socket_callbacks_lib",
         ":tsi_frame_protector",
         ":tsi_handshaker",
         "//include/envoy/network:transport_socket_interface",

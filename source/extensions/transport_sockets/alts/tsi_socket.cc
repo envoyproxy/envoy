@@ -11,9 +11,7 @@ namespace Alts {
 TsiSocket::TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator,
                      Network::TransportSocketPtr&& raw_socket)
     : handshaker_factory_(handshaker_factory), handshake_validator_(handshake_validator),
-      raw_buffer_callbacks_(*this), raw_buffer_socket_(std::move(raw_socket)) {
-  raw_buffer_socket_->setTransportSocketCallbacks(raw_buffer_callbacks_);
-}
+      raw_buffer_socket_(std::move(raw_socket)) {}
 
 TsiSocket::TsiSocket(HandshakerFactory handshaker_factory, HandshakeValidator handshake_validator)
     : TsiSocket(handshaker_factory, handshake_validator,
@@ -24,8 +22,8 @@ TsiSocket::~TsiSocket() { ASSERT(!handshaker_); }
 void TsiSocket::setTransportSocketCallbacks(Envoy::Network::TransportSocketCallbacks& callbacks) {
   callbacks_ = &callbacks;
 
-  handshaker_ = handshaker_factory_(callbacks.connection().dispatcher());
-  handshaker_->setHandshakerCallbacks(*this);
+  noop_callbacks_ = std::make_unique<NoOpTransportSocketCallbacks>(callbacks);
+  raw_buffer_socket_->setTransportSocketCallbacks(*noop_callbacks_);
 }
 
 std::string TsiSocket::protocol() const { return ""; }
@@ -33,6 +31,13 @@ std::string TsiSocket::protocol() const { return ""; }
 Network::PostIoAction TsiSocket::doHandshake() {
   ASSERT(!handshake_complete_);
   ENVOY_CONN_LOG(debug, "TSI: doHandshake", callbacks_->connection());
+
+  if (!handshaker_) {
+    handshaker_ = handshaker_factory_(callbacks_->connection().dispatcher(),
+                                      callbacks_->connection().localAddress(),
+                                      callbacks_->connection().remoteAddress());
+    handshaker_->setHandshakerCallbacks(*this);
+  }
 
   if (!handshaker_next_calling_) {
     doHandshakeNext();
@@ -80,14 +85,14 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
       std::string err;
       bool peer_validated = handshake_validator_(peer, err);
       if (peer_validated) {
-        ENVOY_CONN_LOG(info, "TSI: Handshake validation succeeded.", callbacks_->connection());
+        ENVOY_CONN_LOG(debug, "TSI: Handshake validation succeeded.", callbacks_->connection());
       } else {
-        ENVOY_CONN_LOG(warn, "TSI: Handshake validation failed: {}", callbacks_->connection(), err);
+        ENVOY_CONN_LOG(info, "TSI: Handshake validation failed: {}", callbacks_->connection(), err);
         tsi_peer_destruct(&peer);
         return Network::PostIoAction::Close;
       }
     } else {
-      ENVOY_CONN_LOG(info, "TSI: Handshake validation skipped.", callbacks_->connection());
+      ENVOY_CONN_LOG(debug, "TSI: Handshake validation skipped.", callbacks_->connection());
     }
     tsi_peer_destruct(&peer);
 
@@ -184,7 +189,11 @@ Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
   return {Network::PostIoAction::KeepOpen, 0, false};
 }
 
-void TsiSocket::closeSocket(Network::ConnectionEvent) { handshaker_.release()->deferredDelete(); }
+void TsiSocket::closeSocket(Network::ConnectionEvent) {
+  if (handshaker_) {
+    handshaker_.release()->deferredDelete();
+  }
+}
 
 void TsiSocket::onConnected() { ASSERT(!handshake_complete_); }
 

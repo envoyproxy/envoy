@@ -5,6 +5,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/network/raw_buffer_socket.h"
 
+#include "extensions/transport_sockets/alts/noop_transport_socket_callbacks.h"
 #include "extensions/transport_sockets/alts/tsi_frame_protector.h"
 #include "extensions/transport_sockets/alts/tsi_handshaker.h"
 
@@ -13,7 +14,16 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 
-typedef std::function<TsiHandshakerPtr(Event::Dispatcher&)> HandshakerFactory;
+/**
+ * A factory function to create TsiHandshaker
+ * @param dispatcher the dispatcher for the thread where the socket is running on.
+ * @param local_address the local address of the connection.
+ * @param remote_address the remote address of the connection.
+ */
+typedef std::function<TsiHandshakerPtr(
+    Event::Dispatcher& dispatcher, const Network::Address::InstanceConstSharedPtr& local_address,
+    const Network::Address::InstanceConstSharedPtr& remote_address)>
+    HandshakerFactory;
 
 /**
  * A function to validate the peer of the connection.
@@ -58,25 +68,6 @@ public:
   void onNextDone(NextResultPtr&& result) override;
 
 private:
-  /**
-   * Callbacks for underlying RawBufferSocket, it proxies fd() and connection()
-   * but not raising event or flow control since they have to be handled in
-   * TsiSocket.
-   */
-  class RawBufferCallbacks : public Network::TransportSocketCallbacks {
-  public:
-    explicit RawBufferCallbacks(TsiSocket& parent) : parent_(parent) {}
-
-    int fd() const override { return parent_.callbacks_->fd(); }
-    Network::Connection& connection() override { return parent_.callbacks_->connection(); }
-    bool shouldDrainReadBuffer() override { return false; }
-    void setReadBufferReady() override {}
-    void raiseEvent(Network::ConnectionEvent) override {}
-
-  private:
-    TsiSocket& parent_;
-  };
-
   Network::PostIoAction doHandshake();
   void doHandshakeNext();
   Network::PostIoAction doHandshakeNextDone(NextResultPtr&& next_result);
@@ -89,7 +80,7 @@ private:
   TsiFrameProtectorPtr frame_protector_;
 
   Envoy::Network::TransportSocketCallbacks* callbacks_{};
-  RawBufferCallbacks raw_buffer_callbacks_;
+  NoOpTransportSocketCallbacksPtr noop_callbacks_;
   Network::TransportSocketPtr raw_buffer_socket_;
 
   Envoy::Buffer::OwnedImpl raw_read_buffer_;
