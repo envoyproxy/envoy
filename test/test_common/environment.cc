@@ -29,19 +29,6 @@
 namespace Envoy {
 namespace {
 
-// Create the parent directory of a given filesystem path.
-void createParentPath(const std::string& path) {
-#ifdef __APPLE__
-  // No support in Clang OS X libc++ today for std::filesystem.
-  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + path + ")").c_str()) == 0, "");
-#else
-  // We don't want to rely on mkdir etc. if we can avoid it, since it might not
-  // exist in some environments such as ClusterFuzz.
-  std::experimental::filesystem::create_directories(
-      std::experimental::filesystem::path(path).parent_path());
-#endif
-}
-
 std::string getOrCreateUnixDomainSocketDirectory() {
   const char* path = ::getenv("TEST_UDSDIR");
   if (path != nullptr) {
@@ -62,7 +49,10 @@ std::string getTemporaryDirectory() {
   if (::getenv("TMPDIR")) {
     return TestEnvironment::getCheckedEnvVar("TMPDIR");
   }
-  return "/tmp";
+  char test_tmpdir[] = "/tmp/envoy_test_tmp.XXXXXX";
+  RELEASE_ASSERT(::mkdtemp(test_tmpdir) != nullptr,
+                 fmt::format("Failed to create tmpdir {} {}", test_tmpdir, strerror(errno)));
+  return std::string(test_tmpdir);
 }
 
 // Allow initializeOptions() to remember CLI args for getOptions().
@@ -71,6 +61,28 @@ char** argv_;
 
 } // namespace
 
+void TestEnvironment::createPath(const std::string& path) {
+#ifdef __APPLE__
+  // No support in Clang OS X libc++ today for std::filesystem.
+  RELEASE_ASSERT(::system(("mkdir -p " + path).c_str()) == 0, "");
+#else
+  // We don't want to rely on mkdir etc. if we can avoid it, since it might not
+  // exist in some environments such as ClusterFuzz.
+  std::experimental::filesystem::create_directories(std::experimental::filesystem::path(path));
+#endif
+}
+
+void TestEnvironment::createParentPath(const std::string& path) {
+#ifdef __APPLE__
+  // No support in Clang OS X libc++ today for std::filesystem.
+  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + path + ")").c_str()) == 0, "");
+#else
+  // We don't want to rely on mkdir etc. if we can avoid it, since it might not
+  // exist in some environments such as ClusterFuzz.
+  std::experimental::filesystem::create_directories(
+      std::experimental::filesystem::path(path).parent_path());
+#endif
+}
 absl::optional<std::string> TestEnvironment::getOptionalEnvVar(const std::string& var) {
   const char* path = ::getenv(var.c_str());
   if (path == nullptr) {
