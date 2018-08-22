@@ -1,5 +1,4 @@
 load("@com_google_protobuf//:protobuf.bzl", "cc_proto_library", "py_proto_library")
-load("@com_lyft_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
 load("@envoy_api//bazel:api_build_system.bzl", "api_proto_library")
 
 def envoy_package():
