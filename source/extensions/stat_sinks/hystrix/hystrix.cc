@@ -290,6 +290,7 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
     // Unregister the callbacks from the sink so data is no longer encoded through them.
     unregisterConnection(&stream_decoder_filter_callbacks);
   };
+
   // Add the callback to the admin_filter list of callbacks
   admin_stream.addOnDestroyCallback(std::move(on_destroy_callback));
 
