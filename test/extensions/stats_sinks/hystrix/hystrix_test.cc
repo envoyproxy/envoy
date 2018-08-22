@@ -4,10 +4,10 @@
 
 #include "extensions/stat_sinks/hystrix/hystrix.h"
 
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
-#include "test/mocks/network/mocks.h"
 
 #include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
@@ -446,8 +446,7 @@ TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
   NiceMock<Server::Configuration::MockAdminStream> admin_stream_mock;
   NiceMock<Network::MockConnection> connection_mock;
 
-  auto addr_instance_ =
-        Envoy::Network::Utility::parseInternetAddress("2.3.4.5", 123, false);
+  auto addr_instance_ = Envoy::Network::Utility::parseInternetAddress("2.3.4.5", 123, false);
 
   ON_CALL(admin_stream_mock, getDecoderFilterCallbacks()).WillByDefault(ReturnRef(callbacks_));
   ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_mock));
