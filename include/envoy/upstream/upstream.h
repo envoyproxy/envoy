@@ -45,6 +45,15 @@ public:
     FAILED_EDS_HEALTH = 0x04,
   };
 
+  enum class ActiveHealthFailureType {
+    // The failure type is unknown, all hosts' failure types are initialized as UNKNOWN
+    UNKNOWN,
+    // The host is actively responding it's unhealthy
+    UNHEALTHY,
+    // The host is timing out
+    TIMEOUT,
+  };
+
   /**
    * @return host specific counters.
    */
@@ -97,6 +106,17 @@ public:
    *         information may be considered.
    */
   virtual bool healthy() const PURE;
+
+  /**
+   * Returns the host's ActiveHealthFailureType. Types are specified in ActiveHealthFailureType.
+   */
+  virtual ActiveHealthFailureType getActiveHealthFailureType() const PURE;
+
+  /**
+   * Set the most recent health failure type for a host. Types are specified in
+   * ActiveHealthFailureType.
+   */
+  virtual void setActiveHealthFailureType(ActiveHealthFailureType flag) PURE;
 
   /**
    * Set the host's health checker monitor. Monitors are assumed to be thread safe, however
@@ -237,17 +257,24 @@ public:
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
+   * @param overprovisioning_factor if presents, overwrites the current overprovisioning_factor.
    */
   virtual void updateHosts(HostVectorConstSharedPtr hosts, HostVectorConstSharedPtr healthy_hosts,
                            HostsPerLocalityConstSharedPtr hosts_per_locality,
                            HostsPerLocalityConstSharedPtr healthy_hosts_per_locality,
                            LocalityWeightsConstSharedPtr locality_weights,
-                           const HostVector& hosts_added, const HostVector& hosts_removed) PURE;
+                           const HostVector& hosts_added, const HostVector& hosts_removed,
+                           absl::optional<uint32_t> overprovisioning_factor) PURE;
 
   /**
    * @return uint32_t the priority of this host set.
    */
   virtual uint32_t priority() const PURE;
+
+  /**
+   * @return uint32_t the overprovisioning factor of this host set.
+   */
+  virtual uint32_t overprovisioning_factor() const PURE;
 };
 
 typedef std::unique_ptr<HostSet> HostSetPtr;

@@ -25,7 +25,6 @@ public:
   Network::IoResult doRead(Buffer::Instance& buffer) override;
   Network::IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   void onConnected() override;
-  Ssl::Connection* ssl() override;
   const Ssl::Connection* ssl() const override;
 
 private:

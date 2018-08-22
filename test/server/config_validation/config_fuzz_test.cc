@@ -16,12 +16,14 @@ namespace Server {
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
   testing::NiceMock<MockOptions> options;
   TestComponentFactory component_factory;
+  Fuzz::PerTestEnvironment test_env;
 
-  const std::string bootstrap_path = TestEnvironment::temporaryPath("bootstrap.pb_text");
+  const std::string bootstrap_path = test_env.temporaryPath("bootstrap.pb_text");
   std::ofstream bootstrap_file(bootstrap_path);
   bootstrap_file << input.DebugString();
   options.config_path_ = bootstrap_path;
   options.v2_config_only_ = true;
+  options.log_level_ = Fuzz::Runner::logLevel();
 
   try {
     validateConfig(options, Network::Address::InstanceConstSharedPtr(), component_factory);

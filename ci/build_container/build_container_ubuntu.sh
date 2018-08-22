@@ -7,12 +7,12 @@ apt-get update
 export DEBIAN_FRONTEND=noninteractive
 apt-get install -y wget software-properties-common make cmake git python python-pip \
   bc libtool ninja-build automake zip time golang g++ gdb strace wireshark tshark
-# clang head (currently 5.0)
+# clang 6.0.
 wget -O - http://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
-apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-5.0 main"
+apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-6.0 main"
 apt-get update
-apt-get install -y clang-5.0 clang-format-5.0
-# Bazel 0.10.0 and related dependencies.
+apt-get install -y clang-6.0 clang-format-6.0
+# Bazel and related dependencies.
 apt-get install -y openjdk-8-jdk curl
 echo "deb [arch=amd64] http://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
 curl https://bazel.build/bazel-release.pub.gpg | apt-key add -

@@ -10,12 +10,12 @@ namespace ThriftProxy {
 
 enum class TransportType {
   Framed,
+  Header,
   Unframed,
   Auto,
 
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST TRANSPORT TYPE
   LastTransportType = Auto,
-
 };
 
 /**
@@ -25,6 +25,9 @@ class TransportNameValues {
 public:
   // Framed transport
   const std::string FRAMED = "framed";
+
+  // Header transport
+  const std::string HEADER = "header";
 
   // Unframed transport
   const std::string UNFRAMED = "unframed";
@@ -36,6 +39,8 @@ public:
     switch (type) {
     case TransportType::Framed:
       return FRAMED;
+    case TransportType::Header:
+      return HEADER;
     case TransportType::Unframed:
       return UNFRAMED;
     case TransportType::Auto:

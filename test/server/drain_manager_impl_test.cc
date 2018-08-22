@@ -7,10 +7,10 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Return;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Server {

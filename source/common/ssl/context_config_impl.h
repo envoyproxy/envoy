@@ -35,24 +35,8 @@ public:
                ? INLINE_STRING
                : certificate_revocation_list_path_;
   }
-  const std::string& certChain() const override {
-    return tls_certficate_provider_ == nullptr
-               ? EMPTY_STRING
-               : tls_certficate_provider_->secret()->certificateChain();
-  }
-  const std::string& certChainPath() const override {
-    return tls_certficate_provider_ == nullptr
-               ? EMPTY_STRING
-               : tls_certficate_provider_->secret()->certificateChainPath();
-  }
-  const std::string& privateKey() const override {
-    return tls_certficate_provider_ == nullptr ? EMPTY_STRING
-                                               : tls_certficate_provider_->secret()->privateKey();
-  }
-  const std::string& privateKeyPath() const override {
-    return tls_certficate_provider_ == nullptr
-               ? EMPTY_STRING
-               : tls_certficate_provider_->secret()->privateKeyPath();
+  const TlsCertificateConfig* tlsCertificate() const override {
+    return tls_certficate_provider_ == nullptr ? nullptr : tls_certficate_provider_->secret();
   }
   const std::vector<std::string>& verifySubjectAltNameList() const override {
     return verify_subject_alt_name_list_;

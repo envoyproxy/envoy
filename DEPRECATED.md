@@ -23,6 +23,9 @@ A logged warning is expected for each deprecated item that is in deprecation win
   is deprecated. Please use the new `upgrade_configs` in the
   [HttpConnectionManager](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto)
   instead.
+* Use of the integer `percent` field in [FaultDelay](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/fault/v2/fault.proto)
+  and in [FaultAbort](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/filter/http/fault/v2/fault.proto) is deprecated in favor
+  of the new `FractionalPercent` based `percentage` field.
 * Setting hosts via `hosts` field in `Cluster` is deprecated. Use `load_assignment` instead.
 * Use of `response_headers_to_*` and `request_headers_to_add` are deprecated at the `RouteAction`
   level. Please use the configuration options at the `Route` level.

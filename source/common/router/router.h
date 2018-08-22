@@ -138,7 +138,7 @@ typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
  */
 class Filter : Logger::Loggable<Logger::Id::router>,
                public Http::StreamDecoderFilter,
-               public Upstream::LoadBalancerContext {
+               public Upstream::LoadBalancerContextBase {
 public:
   Filter(FilterConfig& config)
       : config_(config), downstream_response_started_(false), downstream_end_stream_(false),

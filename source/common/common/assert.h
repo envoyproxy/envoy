@@ -66,4 +66,4 @@ namespace Envoy {
 // after a switch (some_enum) with all enum values included in the cases. The macro name includes
 // "GCOVR_EXCL_LINE" to exclude the macro's usage from code coverage reports.
 #define NOT_REACHED_GCOVR_EXCL_LINE PANIC("not reached")
-} // Envoy
+} // namespace Envoy

@@ -20,13 +20,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -75,7 +75,7 @@ public:
 
   void initializeFilter() {
     filter_.reset(new TestProxyFilter("test.", store_, runtime_, access_log_, fault_config_,
-                                      drain_decision_));
+                                      drain_decision_, generator_));
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
@@ -86,13 +86,15 @@ public:
 
   void setupDelayFault(bool enable_fault) {
     envoy::config::filter::fault::v2::FaultDelay fault{};
-    fault.set_percent(50);
+    fault.set_percent(100);
+    fault.mutable_percentage()->set_numerator(50);
+    fault.mutable_percentage()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
     fault.mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
 
     fault_config_.reset(new FaultConfig(fault));
 
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled(_, _)).Times(AnyNumber());
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("mongo.fault.fixed_delay.percent", 50))
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled(_, _, _, 100)).Times(AnyNumber());
+    EXPECT_CALL(runtime_.snapshot_, featureEnabled("mongo.fault.fixed_delay.percent", 50, _, 100))
         .WillOnce(Return(enable_fault));
 
     if (enable_fault) {
@@ -112,6 +114,7 @@ public:
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
   Envoy::AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Network::MockDrainDecision> drain_decision_;
+  NiceMock<Runtime::MockRandomGenerator> generator_;
 };
 
 TEST_F(MongoProxyFilterTest, DelayFaults) {
@@ -218,7 +221,6 @@ TEST_F(MongoProxyFilterTest, Stats) {
     message->cursorId(1);
     message->documents().push_back(Bson::DocumentImpl::create()->addString("hello", "world"));
     filter_->callbacks_->decodeReply(std::move(message));
-
   }));
   filter_->onWrite(fake_data_, false);
 
@@ -375,7 +377,6 @@ TEST_F(MongoProxyFilterTest, CallingFunctionStats) {
     message->cursorId(1);
     message->documents().push_back(Bson::DocumentImpl::create()->addString("hello", "world"));
     filter_->callbacks_->decodeReply(std::move(message));
-
   }));
   filter_->onWrite(fake_data_, false);
 }

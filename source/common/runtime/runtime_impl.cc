@@ -258,8 +258,8 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
     }
 
     struct stat stat_result;
-    int rc = os_sys_calls_.stat(full_path.c_str(), &stat_result);
-    if (rc != 0) {
+    const Api::SysCallIntResult result = os_sys_calls_.stat(full_path.c_str(), &stat_result);
+    if (result.rc_ != 0) {
       throw EnvoyException(fmt::format("unable to stat file: '{}'", full_path));
     }
 
@@ -315,7 +315,7 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
 
 void LoaderImpl::loadNewSnapshot() {
   ThreadLocal::ThreadLocalObjectSharedPtr ptr = createNewSnapshot();
-  tls_->set([ptr = std::move(ptr)](Event::Dispatcher&)->ThreadLocal::ThreadLocalObjectSharedPtr {
+  tls_->set([ptr = std::move(ptr)](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return ptr;
   });
 }

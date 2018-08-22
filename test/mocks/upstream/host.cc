@@ -2,10 +2,10 @@
 
 #include "common/network/utility.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
-using testing::_;
 
 namespace Envoy {
 namespace Upstream {

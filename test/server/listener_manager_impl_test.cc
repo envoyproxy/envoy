@@ -26,13 +26,13 @@
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::Throw;
-using testing::_;
 
 namespace Envoy {
 namespace Server {
@@ -426,8 +426,8 @@ TEST_F(ListenerManagerImplTest, AddListenerOnIpv4OnlySetups) {
 
   ListenerHandle* listener_foo = expectListenerCreate(false);
 
-  EXPECT_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillOnce(Return(5));
-  EXPECT_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillOnce(Return(-1));
+  EXPECT_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillOnce(Return(Api::SysCallIntResult{5, 0}));
+  EXPECT_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
 
@@ -456,8 +456,8 @@ TEST_F(ListenerManagerImplTest, AddListenerOnIpv6OnlySetups) {
 
   ListenerHandle* listener_foo = expectListenerCreate(false);
 
-  EXPECT_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillOnce(Return(-1));
-  EXPECT_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillOnce(Return(5));
+  EXPECT_CALL(os_sys_calls, socket(AF_INET, _, 0)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_CALL(os_sys_calls, socket(AF_INET6, _, 0)).WillOnce(Return(Api::SysCallIntResult{5, 0}));
 
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, true));
 

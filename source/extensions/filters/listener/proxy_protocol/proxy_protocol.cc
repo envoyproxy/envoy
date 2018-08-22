@@ -240,7 +240,7 @@ bool Filter::parseExtensions(int fd) {
     // buf_ is no longer in use so we re-use it to read/discard
     int bytes_avail;
     auto& os_syscalls = Api::OsSysCallsSingleton::get();
-    if (os_syscalls.ioctl(fd, FIONREAD, &bytes_avail) < 0) {
+    if (os_syscalls.ioctl(fd, FIONREAD, &bytes_avail).rc_ < 0) {
       throw EnvoyException("failed to read proxy protocol (no bytes avail)");
     }
     if (bytes_avail == 0) {
@@ -248,11 +248,11 @@ bool Filter::parseExtensions(int fd) {
     }
     bytes_avail = std::min(size_t(bytes_avail), sizeof(buf_));
     bytes_avail = std::min(size_t(bytes_avail), proxy_protocol_header_.value().extensions_length_);
-    ssize_t nread = os_syscalls.recv(fd, buf_, bytes_avail, 0);
-    if (nread != bytes_avail) {
+    const Api::SysCallSizeResult recv_result = os_syscalls.recv(fd, buf_, bytes_avail, 0);
+    if (recv_result.rc_ != bytes_avail) {
       throw EnvoyException("failed to read proxy protocol extension");
     }
-    proxy_protocol_header_.value().extensions_length_ -= nread;
+    proxy_protocol_header_.value().extensions_length_ -= recv_result.rc_;
   }
   return true;
 }
@@ -262,7 +262,7 @@ bool Filter::readProxyHeader(int fd) {
     int bytes_avail;
     auto& os_syscalls = Api::OsSysCallsSingleton::get();
 
-    if (os_syscalls.ioctl(fd, FIONREAD, &bytes_avail) < 0) {
+    if (os_syscalls.ioctl(fd, FIONREAD, &bytes_avail).rc_ < 0) {
       throw EnvoyException("failed to read proxy protocol (no bytes avail)");
     }
 
@@ -272,7 +272,9 @@ bool Filter::readProxyHeader(int fd) {
 
     bytes_avail = std::min(size_t(bytes_avail), MAX_PROXY_PROTO_LEN_V2 - buf_off_);
 
-    ssize_t nread = os_syscalls.recv(fd, buf_ + buf_off_, bytes_avail, MSG_PEEK);
+    const Api::SysCallSizeResult result =
+        os_syscalls.recv(fd, buf_ + buf_off_, bytes_avail, MSG_PEEK);
+    ssize_t nread = result.rc_;
 
     if (nread < 1) {
       throw EnvoyException("failed to read proxy protocol (no bytes read)");
@@ -294,14 +296,13 @@ bool Filter::readProxyHeader(int fd) {
         throw EnvoyException("Unsupported V2 proxy protocol version");
       }
       if (buf_off_ < PROXY_PROTO_V2_HEADER_LEN) {
-        ssize_t lread;
         ssize_t exp = PROXY_PROTO_V2_HEADER_LEN - buf_off_;
-        lread = os_syscalls.recv(fd, buf_ + buf_off_, exp, 0);
-        if (lread != exp) {
+        const Api::SysCallSizeResult read_result = os_syscalls.recv(fd, buf_ + buf_off_, exp, 0);
+        if (read_result.rc_ != exp) {
           throw EnvoyException("failed to read proxy protocol (remote closed)");
         }
-        buf_off_ += lread;
-        nread -= lread;
+        buf_off_ += read_result.rc_;
+        nread -= read_result.rc_;
       }
       ssize_t addr_len = lenV2Address(buf_);
       uint8_t upper_byte = buf_[PROXY_PROTO_V2_HEADER_LEN - 2];
@@ -311,19 +312,20 @@ bool Filter::readProxyHeader(int fd) {
         throw EnvoyException("failed to read proxy protocol (insufficient data)");
       }
       if (ssize_t(buf_off_) + nread >= PROXY_PROTO_V2_HEADER_LEN + addr_len) {
-        ssize_t lread;
         ssize_t missing = (PROXY_PROTO_V2_HEADER_LEN + addr_len) - buf_off_;
-        lread = os_syscalls.recv(fd, buf_ + buf_off_, missing, 0);
-        if (lread != missing) {
+        const Api::SysCallSizeResult read_result =
+            os_syscalls.recv(fd, buf_ + buf_off_, missing, 0);
+        if (read_result.rc_ != missing) {
           throw EnvoyException("failed to read proxy protocol (remote closed)");
         }
-        buf_off_ += lread;
+        buf_off_ += read_result.rc_;
         parseV2Header(buf_);
         // The TLV remain, they are read/discard in parseExtensions() which is called from the
         // parent (if needed).
         return true;
       } else {
-        nread = os_syscalls.recv(fd, buf_ + buf_off_, nread, 0);
+        const Api::SysCallSizeResult result = os_syscalls.recv(fd, buf_ + buf_off_, nread, 0);
+        nread = result.rc_;
         if (nread < 0) {
           throw EnvoyException("failed to read proxy protocol (remote closed)");
         }
@@ -355,7 +357,8 @@ bool Filter::readProxyHeader(int fd) {
         ntoread = search_index_ - buf_off_;
       }
 
-      nread = os_syscalls.recv(fd, buf_ + buf_off_, ntoread, 0);
+      const Api::SysCallSizeResult result = os_syscalls.recv(fd, buf_ + buf_off_, ntoread, 0);
+      nread = result.rc_;
       ASSERT(size_t(nread) == ntoread);
 
       buf_off_ += nread;

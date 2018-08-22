@@ -1,12 +1,5 @@
-#include <stdio.h>
-
-#include <fstream>
-
-#include "extensions/filters/network/thrift_proxy/protocol.h"
-#include "extensions/filters/network/thrift_proxy/transport.h"
-
-#include "test/integration/integration.h"
-#include "test/test_common/environment.h"
+#include "test/extensions/filters/network/thrift_proxy/integration.h"
+#include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/network_utility.h"
 
 #include "gtest/gtest.h"
@@ -21,23 +14,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-std::string thrift_config;
-
-enum class CallResult {
-  Success,
-  IDLException,
-  Exception,
-};
-
 class ThriftConnManagerIntegrationTest
-    : public BaseIntegrationTest,
-      public TestWithParam<std::tuple<std::string, std::string, bool>> {
+    : public BaseThriftIntegrationTest,
+      public TestWithParam<std::tuple<TransportType, ProtocolType, bool>> {
 public:
-  ThriftConnManagerIntegrationTest()
-      : BaseIntegrationTest(Network::Address::IpVersion::v4, thrift_config) {}
-
   static void SetUpTestCase() {
-    thrift_config = ConfigHelper::BASE_CONFIG + R"EOF(
+    thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
         - name: envoy.filters.network.thrift_proxy
@@ -46,73 +28,67 @@ public:
             route_config:
               name: "routes"
               routes:
-                - match: {}
+                - match:
+                    service_name: "svcname"
                   route:
                     cluster: "cluster_0"
+                - match:
+                    method_name: "execute"
+                  route:
+                    cluster: "cluster_1"
+                - match:
+                    method_name: "poke"
+                  route:
+                    cluster: "cluster_2"
       )EOF";
   }
 
-  void initializeCall(CallResult result) {
+  void initializeCall(DriverMode mode) {
     std::tie(transport_, protocol_, multiplexed_) = GetParam();
 
-    std::string result_mode;
-    switch (result) {
-    case CallResult::Success:
-      result_mode = "success";
-      break;
-    case CallResult::IDLException:
-      result_mode = "idl-exception";
-      break;
-    case CallResult::Exception:
-      result_mode = "exception";
-      break;
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
+    absl::optional<std::string> service_name;
+    if (multiplexed_) {
+      service_name = "svcname";
     }
 
-    preparePayloads(result_mode, "execute");
+    PayloadOptions options(transport_, protocol_, mode, service_name, "execute");
+    preparePayloads(options, request_bytes_, response_bytes_);
     ASSERT(request_bytes_.length() > 0);
     ASSERT(response_bytes_.length() > 0);
-
-    BaseIntegrationTest::initialize();
+    initializeCommon();
   }
 
   void initializeOneway() {
     std::tie(transport_, protocol_, multiplexed_) = GetParam();
 
-    preparePayloads("success", "poke");
+    absl::optional<std::string> service_name;
+    if (multiplexed_) {
+      service_name = "svcname";
+    }
+
+    PayloadOptions options(transport_, protocol_, DriverMode::Success, service_name, "poke");
+    preparePayloads(options, request_bytes_, response_bytes_);
     ASSERT(request_bytes_.length() > 0);
     ASSERT(response_bytes_.length() == 0);
-
-    BaseIntegrationTest::initialize();
+    initializeCommon();
   }
 
-  void preparePayloads(std::string result_mode, std::string method) {
-    std::vector<std::string> args = {
-        TestEnvironment::runfilesPath(
-            "test/extensions/filters/network/thrift_proxy/driver/generate_fixture.sh"),
-        result_mode,
-        transport_,
-        protocol_,
-    };
+  // We allocate as many upstreams as there are clusters, with each upstream being allocated
+  // to clusters in the order they're defined in the bootstrap config.
+  void initializeCommon() {
+    setUpstreamCount(3);
 
-    if (multiplexed_) {
-      args.push_back("svcname");
-    }
-    args.push_back("--");
-    args.push_back(method);
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      auto* c1 = bootstrap.mutable_static_resources()->add_clusters();
+      c1->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      c1->set_name("cluster_1");
 
-    TestEnvironment::exec(args);
+      auto* c2 = bootstrap.mutable_static_resources()->add_clusters();
+      c2->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      c2->set_name("cluster_2");
+    });
 
-    std::stringstream file_base;
-    file_base << "{{ test_tmpdir }}/" << transport_ << "-" << protocol_ << "-";
-    if (multiplexed_) {
-      file_base << "svcname-";
-    }
-    file_base << result_mode;
-
-    readAll(file_base.str() + ".request", request_bytes_);
-    readAll(file_base.str() + ".response", response_bytes_);
+    BaseThriftIntegrationTest::initialize();
   }
 
   void TearDown() override {
@@ -121,27 +97,22 @@ public:
   }
 
 protected:
-  void readAll(std::string file, Buffer::OwnedImpl& buffer) {
-    file = TestEnvironment::substitute(file, version_);
-
-    std::ifstream is(file, std::ios::binary | std::ios::ate);
-    RELEASE_ASSERT(!is.fail(), "");
-
-    std::ifstream::pos_type len = is.tellg();
-    if (len > 0) {
-      std::vector<char> bytes(len, 0);
-      is.seekg(0, std::ios::beg);
-      RELEASE_ASSERT(!is.fail(), "");
-
-      is.read(bytes.data(), len);
-      RELEASE_ASSERT(!is.fail(), "");
-
-      buffer.add(bytes.data(), len);
+  // Multiplexed requests are handled by the service name route match,
+  // while oneway's are handled by the "poke" method. All other requests
+  // are handled by "execute".
+  FakeUpstream* getExpectedUpstream(bool oneway) {
+    int upstreamIdx = 1;
+    if (multiplexed_) {
+      upstreamIdx = 0;
+    } else if (oneway) {
+      upstreamIdx = 2;
     }
+
+    return fake_upstreams_[upstreamIdx].get();
   }
 
-  std::string transport_;
-  std::string protocol_;
+  TransportType transport_;
+  ProtocolType protocol_;
   bool multiplexed_;
 
   std::string result_;
@@ -151,32 +122,36 @@ protected:
 };
 
 static std::string
-paramToString(const TestParamInfo<std::tuple<std::string, std::string, bool>>& params) {
-  std::string transport, protocol;
+paramToString(const TestParamInfo<std::tuple<TransportType, ProtocolType, bool>>& params) {
+  TransportType transport;
+  ProtocolType protocol;
   bool multiplexed;
   std::tie(transport, protocol, multiplexed) = params.param;
-  transport = StringUtil::toUpper(absl::string_view(transport).substr(0, 1)) + transport.substr(1);
-  protocol = StringUtil::toUpper(absl::string_view(protocol).substr(0, 1)) + protocol.substr(1);
+
+  std::string transport_name = transportNameForTest(transport);
+  std::string protocol_name = protocolNameForTest(protocol);
+
   if (multiplexed) {
-    return fmt::format("{}{}Multiplexed", transport, protocol);
+    return fmt::format("{}{}Multiplexed", transport_name, protocol_name);
   }
-  return fmt::format("{}{}", transport, protocol);
+  return fmt::format("{}{}", transport_name, protocol_name);
 }
 
 INSTANTIATE_TEST_CASE_P(
     TransportAndProtocol, ThriftConnManagerIntegrationTest,
-    Combine(Values(TransportNames::get().FRAMED, TransportNames::get().UNFRAMED),
-            Values(ProtocolNames::get().BINARY, ProtocolNames::get().COMPACT), Values(false, true)),
+    Combine(Values(TransportType::Framed, TransportType::Unframed, TransportType::Header),
+            Values(ProtocolType::Binary, ProtocolType::Compact), Values(false, true)),
     paramToString);
 
 TEST_P(ThriftConnManagerIntegrationTest, Success) {
-  initializeCall(CallResult::Success);
+  initializeCall(DriverMode::Success);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(request_bytes_.toString());
 
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  FakeUpstream* expected_upstream = getExpectedUpstream(false);
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
   Buffer::OwnedImpl upstream_request(data);
@@ -196,13 +171,14 @@ TEST_P(ThriftConnManagerIntegrationTest, Success) {
 }
 
 TEST_P(ThriftConnManagerIntegrationTest, IDLException) {
-  initializeCall(CallResult::IDLException);
+  initializeCall(DriverMode::IDLException);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(request_bytes_.toString());
 
+  FakeUpstream* expected_upstream = getExpectedUpstream(false);
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
   Buffer::OwnedImpl upstream_request(data);
@@ -222,13 +198,14 @@ TEST_P(ThriftConnManagerIntegrationTest, IDLException) {
 }
 
 TEST_P(ThriftConnManagerIntegrationTest, Exception) {
-  initializeCall(CallResult::Exception);
+  initializeCall(DriverMode::Exception);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(request_bytes_.toString());
 
+  FakeUpstream* expected_upstream = getExpectedUpstream(false);
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
   Buffer::OwnedImpl upstream_request(data);
@@ -253,8 +230,9 @@ TEST_P(ThriftConnManagerIntegrationTest, Oneway) {
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(request_bytes_.toString());
 
+  FakeUpstream* expected_upstream = getExpectedUpstream(true);
   FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
   std::string data;
   ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
   Buffer::OwnedImpl upstream_request(data);
@@ -262,6 +240,25 @@ TEST_P(ThriftConnManagerIntegrationTest, Oneway) {
   EXPECT_EQ(request_bytes_.toString(), upstream_request.toString());
 
   tcp_client->close();
+
+  Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_oneway");
+  EXPECT_EQ(1U, counter->value());
+}
+
+TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClose) {
+  initializeOneway();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->write(request_bytes_.toString());
+  tcp_client->close();
+
+  FakeUpstream* expected_upstream = getExpectedUpstream(true);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
+  Buffer::OwnedImpl upstream_request(data);
+  EXPECT_EQ(request_bytes_.toString(), upstream_request.toString());
 
   Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_oneway");
   EXPECT_EQ(1U, counter->value());

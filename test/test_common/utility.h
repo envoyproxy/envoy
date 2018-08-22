@@ -25,11 +25,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::AssertionFailure;
 using testing::AssertionResult;
 using testing::AssertionSuccess;
 using testing::Invoke;
-using testing::_;
 
 namespace Envoy {
 #define EXPECT_THROW_WITH_MESSAGE(statement, expected_exception, message)                          \
@@ -322,6 +322,12 @@ public:
   TestHeaderMapImpl();
   TestHeaderMapImpl(const std::initializer_list<std::pair<std::string, std::string>>& values);
   TestHeaderMapImpl(const HeaderMap& rhs);
+
+  // The above constructor for TestHeaderMap is not an actual copy constructor.
+  TestHeaderMapImpl(const TestHeaderMapImpl& rhs);
+  TestHeaderMapImpl& operator=(const TestHeaderMapImpl& rhs);
+
+  bool operator==(const TestHeaderMapImpl& rhs) const { return HeaderMapImpl::operator==(rhs); }
 
   friend std::ostream& operator<<(std::ostream& os, const TestHeaderMapImpl& p) {
     p.iterate(
