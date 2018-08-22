@@ -1,0 +1,46 @@
+virtual_hosts:
+- name: local_service
+  domains:
+  - '*'
+  routes:
+  - match:
+      prefix: /
+      headers:
+      - name: test_header
+        exact_match: test
+    route:
+      cluster: local_service_with_headers
+  - match:
+      prefix: /
+      headers:
+      - name: test_header_multiple1
+        exact_match: test1
+      - name: test_header_multiple2
+        exact_match: test2
+    route:
+      cluster: local_service_with_multiple_headers
+
+  - match:
+      prefix: /
+      headers:
+      - name: test_header_presence
+    route:
+      cluster: local_service_with_empty_headers
+  - match:
+      prefix: /
+      headers:
+      - name: test_header_pattern
+        regex_match: ^user=test-\d+$
+    route:
+      cluster: local_service_with_header_pattern_set_regex
+  - match:
+      prefix: /
+      headers:
+      - name: test_header_pattern
+        exact_match: ^customer=test-\d+$
+    route:
+      cluster: local_service_with_header_pattern_unset_regex
+  - match:
+      prefix: /
+    route:
+      cluster: local_service_without_headers
