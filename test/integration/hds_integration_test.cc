@@ -194,6 +194,14 @@ public:
     EXPECT_EQ(failures, test_server_->counter("cluster.anna.health_check.failure")->value());
   }
 
+  void waitForEndpointHealthResponse(envoy::api::v2::core::HealthStatus healthy) {
+    ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
+    while (!checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
+                                        healthy, host_upstream_->localAddress())) {
+      ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
+    }
+  }
+
   static constexpr uint32_t upstream_endpoints_ = 0;
 
   FakeHttpConnectionPtr hds_fake_connection_;
@@ -243,12 +251,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyHttp) {
   host_stream_->encodeData(1024, true);
 
   // Receive updates until the one we expect arrives
-  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  while (!checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
-                                      envoy::api::v2::core::HealthStatus::HEALTHY,
-                                      host_upstream_->localAddress())) {
-    ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  }
+  waitForEndpointHealthResponse(envoy::api::v2::core::HealthStatus::HEALTHY);
 
   checkCounters(1, 2, 1, 0);
 
@@ -287,12 +290,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
   // Endpoint doesn't repond to the health check
 
   // Receive updates until the one we expect arrives
-  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  while (!checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
-                                      envoy::api::v2::core::HealthStatus::TIMEOUT,
-                                      host_upstream_->localAddress())) {
-    ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  }
+  waitForEndpointHealthResponse(envoy::api::v2::core::HealthStatus::TIMEOUT);
 
   checkCounters(1, 2, 0, 1);
 
@@ -324,12 +322,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyHttp) {
   host_stream_->encodeData(1024, true);
 
   // Receive updates until the one we expect arrives
-  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  while (!checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
-                                      envoy::api::v2::core::HealthStatus::UNHEALTHY,
-                                      host_upstream_->localAddress())) {
-    ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  }
+  waitForEndpointHealthResponse(envoy::api::v2::core::HealthStatus::UNHEALTHY);
 
   checkCounters(1, 2, 0, 1);
 
@@ -373,12 +366,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
   // No response from the endpoint
 
   // Receive updates until the one we expect arrives
-  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  while (!checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
-                                      envoy::api::v2::core::HealthStatus::TIMEOUT,
-                                      host_upstream_->localAddress())) {
-    ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  }
+  waitForEndpointHealthResponse(envoy::api::v2::core::HealthStatus::TIMEOUT);
 
   // Clean up connections
   cleanupHostConnections();
@@ -409,12 +397,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointHealthyTcp) {
   host_upstream_->set_allow_unexpected_disconnects(true);
 
   // Receive updates until the one we expect arrives
-  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  while (!checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
-                                      envoy::api::v2::core::HealthStatus::HEALTHY,
-                                      host_upstream_->localAddress())) {
-    ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  }
+  waitForEndpointHealthResponse(envoy::api::v2::core::HealthStatus::HEALTHY);
 
   // Clean up connections
   cleanupHostConnections();
@@ -449,12 +432,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTcp) {
   host_upstream_->set_allow_unexpected_disconnects(true);
 
   // Receive updates until the one we expect arrives
-  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  while (!checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
-                                      envoy::api::v2::core::HealthStatus::UNHEALTHY,
-                                      host_upstream_->localAddress())) {
-    ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  }
+  waitForEndpointHealthResponse(envoy::api::v2::core::HealthStatus::UNHEALTHY);
 
   // Clean up connections
   cleanupHostConnections();
@@ -494,7 +472,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsSameLocality) {
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
   while (!(checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
                                        envoy::api::v2::core::HealthStatus::UNHEALTHY,
-                                       host_upstream_->localAddress()) &
+                                       host_upstream_->localAddress()) &&
            checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(1),
                                        envoy::api::v2::core::HealthStatus::HEALTHY,
                                        host2_upstream_->localAddress()))) {
@@ -546,7 +524,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentLocality) {
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
   while (!(checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
                                        envoy::api::v2::core::HealthStatus::UNHEALTHY,
-                                       host_upstream_->localAddress()) &
+                                       host_upstream_->localAddress()) &&
            checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(1),
                                        envoy::api::v2::core::HealthStatus::HEALTHY,
                                        host2_upstream_->localAddress()))) {
@@ -607,7 +585,7 @@ TEST_P(HdsIntegrationTest, TwoEndpointsDifferentClusters) {
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
   while (!(checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
                                        envoy::api::v2::core::HealthStatus::UNHEALTHY,
-                                       host_upstream_->localAddress()) &
+                                       host_upstream_->localAddress()) &&
            checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(1),
                                        envoy::api::v2::core::HealthStatus::HEALTHY,
                                        host2_upstream_->localAddress()))) {
@@ -646,12 +624,7 @@ TEST_P(HdsIntegrationTest, TestUpdateMessage) {
   host_stream_->encodeData(1024, true);
 
   // Receive updates until the one we expect arrives
-  ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  while (!checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
-                                      envoy::api::v2::core::HealthStatus::HEALTHY,
-                                      host_upstream_->localAddress())) {
-    ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
-  }
+  waitForEndpointHealthResponse(envoy::api::v2::core::HealthStatus::HEALTHY);
 
   checkCounters(1, 2, 1, 0);
 
