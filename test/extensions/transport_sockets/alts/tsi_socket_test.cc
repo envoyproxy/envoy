@@ -20,7 +20,23 @@ using testing::StrictMock;
 
 class TsiSocketTest : public testing::Test {
 protected:
-  TsiSocketTest() {}
+  TsiSocketTest() {
+    server_.handshaker_factory_ = [](Event::Dispatcher& dispatcher,
+                                     const Network::Address::InstanceConstSharedPtr&,
+                                     const Network::Address::InstanceConstSharedPtr&) {
+      CHandshakerPtr handshaker{tsi_create_fake_handshaker(/*is_client=*/0)};
+
+      return std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
+    };
+
+    client_.handshaker_factory_ = [](Event::Dispatcher& dispatcher,
+                                     const Network::Address::InstanceConstSharedPtr&,
+                                     const Network::Address::InstanceConstSharedPtr&) {
+      CHandshakerPtr handshaker{tsi_create_fake_handshaker(/*is_client=*/1)};
+
+      return std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
+    };
+  }
 
   void TearDown() override {
     client_.tsi_socket_->closeSocket(Network::ConnectionEvent::LocalClose);
@@ -28,32 +44,16 @@ protected:
   }
 
   void initialize(HandshakeValidator server_validator, HandshakeValidator client_validator) {
-    auto server_handshaker_factory = [](Event::Dispatcher& dispatcher,
-                                        const Network::Address::InstanceConstSharedPtr&,
-                                        const Network::Address::InstanceConstSharedPtr&) {
-      CHandshakerPtr handshaker{tsi_create_fake_handshaker(/*is_client=*/0)};
-
-      return std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
-    };
-
     server_.raw_socket_ = new NiceMock<Network::MockTransportSocket>();
 
     server_.tsi_socket_ =
-        std::make_unique<TsiSocket>(server_handshaker_factory, server_validator,
+        std::make_unique<TsiSocket>(server_.handshaker_factory_, server_validator,
                                     Network::TransportSocketPtr{server_.raw_socket_});
-
-    auto client_handshaker_factory = [](Event::Dispatcher& dispatcher,
-                                        const Network::Address::InstanceConstSharedPtr&,
-                                        const Network::Address::InstanceConstSharedPtr&) {
-      CHandshakerPtr handshaker{tsi_create_fake_handshaker(/*is_client=*/1)};
-
-      return std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
-    };
 
     client_.raw_socket_ = new NiceMock<Network::MockTransportSocket>();
 
     client_.tsi_socket_ =
-        std::make_unique<TsiSocket>(client_handshaker_factory, client_validator,
+        std::make_unique<TsiSocket>(client_.handshaker_factory_, client_validator,
                                     Network::TransportSocketPtr{client_.raw_socket_});
 
     ON_CALL(client_.callbacks_.connection_, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
@@ -173,6 +173,7 @@ protected:
   }
 
   struct SocketForTest {
+    HandshakerFactory handshaker_factory_;
     std::unique_ptr<TsiSocket> tsi_socket_;
     NiceMock<Network::MockTransportSocket>* raw_socket_{};
     NiceMock<Network::MockTransportSocketCallbacks> callbacks_;
@@ -240,6 +241,61 @@ TEST_F(TsiSocketTest, HandshakeValidationFail) {
   expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
                  server_.tsi_socket_->doRead(server_.read_buffer_));
   EXPECT_EQ(0, server_to_client_.length());
+}
+
+TEST_F(TsiSocketTest, HandshakeWithUnusedData) {
+  initialize(nullptr, nullptr);
+
+  doFakeInitHandshake();
+  EXPECT_CALL(*client_.raw_socket_, doRead(_));
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 client_.tsi_socket_->doRead(client_.read_buffer_));
+  EXPECT_EQ(makeFakeTsiFrame("CLIENT_FINISHED"), client_to_server_.toString());
+  EXPECT_EQ(0L, client_.read_buffer_.length());
+
+  // Inject unused data
+  client_to_server_.add(makeFakeTsiFrame(ClientToServerData));
+
+  EXPECT_CALL(*server_.raw_socket_, doRead(_));
+  EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, false},
+                 server_.tsi_socket_->doRead(server_.read_buffer_));
+  EXPECT_EQ(makeFakeTsiFrame("SERVER_FINISHED"), server_to_client_.toString());
+  EXPECT_EQ(ClientToServerData, server_.read_buffer_.toString());
+
+  EXPECT_CALL(*client_.raw_socket_, doRead(_));
+  EXPECT_CALL(client_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 client_.tsi_socket_->doRead(client_.read_buffer_));
+}
+
+TEST_F(TsiSocketTest, HandshakeWithInternalError) {
+  auto raw_handshaker = tsi_create_fake_handshaker(/* is_client= */ 1);
+  const tsi_handshaker_vtable* vtable = raw_handshaker->vtable;
+  tsi_handshaker_vtable mock_vtable = *vtable;
+  mock_vtable.next = [](tsi_handshaker*, const unsigned char*, size_t, const unsigned char**,
+                        size_t*, tsi_handshaker_result**, tsi_handshaker_on_next_done_cb,
+                        void*) { return TSI_INTERNAL_ERROR; };
+  raw_handshaker->vtable = &mock_vtable;
+
+  client_.handshaker_factory_ = [&](Event::Dispatcher& dispatcher,
+                                    const Network::Address::InstanceConstSharedPtr&,
+                                    const Network::Address::InstanceConstSharedPtr&) {
+    CHandshakerPtr handshaker{raw_handshaker};
+
+    return std::make_unique<TsiHandshaker>(std::move(handshaker), dispatcher);
+  };
+
+  initialize(nullptr, nullptr);
+
+  EXPECT_CALL(client_.callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  // doWrite won't immediately fail, but it will result connection close.
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 client_.tsi_socket_->doWrite(client_.write_buffer_, false));
+
+  raw_handshaker->vtable = vtable;
 }
 
 class TsiSocketFactoryTest : public testing::Test {
