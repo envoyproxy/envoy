@@ -1,10 +1,10 @@
 #include "common/common/matchers.h"
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/http/header_map.h"
 
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
-#include "common/http/header_map_impl.h"
 
 #include "absl/strings/match.h"
 
@@ -222,11 +222,8 @@ bool HeaderUtility::matchHeaders(const Http::HeaderMap& request_headers,
 void HeaderUtility::addHeaders(Http::HeaderMap& headers, const Http::HeaderMap& headers_to_add) {
   headers_to_add.iterate(
       [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
-        Http::HeaderString k;
-        k.setCopy(header.key().c_str(), header.key().size());
-        Http::HeaderString v;
-        v.setCopy(header.value().c_str(), header.value().size());
-        static_cast<Http::HeaderMapImpl*>(context)->addViaMove(std::move(k), std::move(v));
+        const Http::LowerCaseString& k = Http::LowerCaseString(header.key().c_str());
+        static_cast<Http::HeaderMap*>(context)->addCopy(k, header.value().getStringView());
         return Http::HeaderMap::Iterate::Continue;
       },
       &headers);

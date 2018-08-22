@@ -135,7 +135,6 @@ envoy_cc_library(
         "//include/envoy/json:json_object_interface",
         "//source/common/config:metadata_lib",
         "//source/common/config:rds_json_lib",
-        "//source/common/http:header_map_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/type/matcher:header_cc",
         "@envoy_api//envoy/type/matcher:metadata_cc",
