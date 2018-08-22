@@ -126,14 +126,26 @@ def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], de
         deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps],
         external_deps = [
             "@com_google_protobuf//:cc_wkt_protos",
+            "@googleapis//:api_httpbody_protos",
             "@googleapis//:http_api_protos",
             "@googleapis//:rpc_status_protos",
             "@com_github_gogo_protobuf//:gogo_proto_cc",
         ],
         visibility = ["//visibility:public"],
     )
+    py_export_suffixes = []
     if (require_py == 1):
         api_py_proto_library(name, srcs, deps, has_services)
+        py_export_suffixes = ["_py", "_py_genproto"]
+
+    # Allow unlimited visibility for consumers
+    export_suffixes = ["", "_cc", "_cc_validate", "_cc_proto", "_cc_proto_genproto"] + py_export_suffixes
+    for s in export_suffixes:
+        native.alias(
+            name = name + "_export" + s,
+            actual = name + s,
+            visibility = ["//visibility:public"],
+        )
 
 def api_cc_test(name, srcs, proto_deps):
     native.cc_test(
