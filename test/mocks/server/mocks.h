@@ -83,6 +83,8 @@ public:
   spdlog::level::level_enum log_level_{spdlog::level::trace};
   std::string log_path_;
   Stats::StatsOptionsImpl stats_options_;
+  uint32_t concurrency_{1};
+  uint64_t hot_restart_epoch_{};
   bool hot_restart_disabled_{};
 };
 
