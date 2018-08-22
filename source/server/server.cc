@@ -78,7 +78,14 @@ InstanceImpl::InstanceImpl(Options& options, TimeSource& time_source,
   } catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
-
+    terminate();
+    throw;
+  } catch (const std::exception& e) {
+    ENVOY_LOG(critical, "error initializing due to unexpected exception: {}", e.what());
+    terminate();
+    throw;
+  } catch (...) {
+    ENVOY_LOG(critical, "error initializing due to unknown exception");
     terminate();
     throw;
   }

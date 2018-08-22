@@ -26,13 +26,13 @@
 #include "absl/strings/match.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::Throw;
-using testing::_;
 
 namespace Envoy {
 namespace Server {

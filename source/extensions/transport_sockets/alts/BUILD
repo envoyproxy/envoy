@@ -53,3 +53,9 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "noop_transport_socket_callbacks_lib",
+    hdrs = ["noop_transport_socket_callbacks.h"],
+    deps = ["//include/envoy/network:transport_socket_interface"],
+)

@@ -25,18 +25,18 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
-using testing::_;
 
 namespace Envoy {
 namespace Upstream {
 namespace OriginalDstClusterTest {
 
-class TestLoadBalancerContext : public LoadBalancerContext {
+class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
   TestLoadBalancerContext(const Network::Connection* connection) : connection_(connection) {}
   TestLoadBalancerContext(const Network::Connection* connection, const std::string& key,
@@ -48,8 +48,8 @@ public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return 0; }
   const Network::Connection* downstreamConnection() const override { return connection_; }
-  const Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
   const Http::HeaderMap* downstreamHeaders() const override { return downstream_headers_.get(); }
+
   absl::optional<uint64_t> hash_key_;
   const Network::Connection* connection_;
   Http::HeaderMapPtr downstream_headers_;
@@ -456,7 +456,8 @@ TEST_F(OriginalDstClusterTest, MultipleClusters) {
         const HostsPerLocalityConstSharedPtr empty_hosts_per_locality{new HostsPerLocalityImpl()};
 
         second.getOrCreateHostSet(0).updateHosts(new_hosts, healthy_hosts, empty_hosts_per_locality,
-                                                 empty_hosts_per_locality, {}, added, removed);
+                                                 empty_hosts_per_locality, {}, added, removed,
+                                                 absl::nullopt);
       });
 
   EXPECT_CALL(membership_updated_, ready());

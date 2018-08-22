@@ -23,7 +23,7 @@ PROTO_SUFFIX = (".proto")
 GOOGLE_PROTOBUF_WHITELIST = ("ci/prebuilt", "source/common/protobuf", "api/test")
 REPOSITORIES_BZL = "bazel/repositories.bzl"
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-5.0")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-6.0")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")

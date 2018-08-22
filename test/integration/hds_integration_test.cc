@@ -279,9 +279,8 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutHttp) {
   ASSERT_TRUE(hds_stream_->waitForGrpcMessage(*dispatcher_, response_));
 
   // Check that the response is correct
-  // TODO(lilika): Ideally this would be envoy::api::v2::core::HealthStatus::TIMEOUT
   checkEndpointHealthResponse(response_.endpoint_health_response().endpoints_health(0),
-                              envoy::api::v2::core::HealthStatus::UNHEALTHY,
+                              envoy::api::v2::core::HealthStatus::TIMEOUT,
                               host_upstream_->localAddress());
   checkCounters(1, 2, 0, 1);
 
@@ -364,7 +363,7 @@ TEST_P(HdsIntegrationTest, SingleEndpointTimeoutTcp) {
 
   // Check that the response is correct
   auto endpoint = response_.endpoint_health_response().endpoints_health(0);
-  EXPECT_EQ(envoy::api::v2::core::HealthStatus::UNHEALTHY, endpoint.health_status());
+  EXPECT_EQ(envoy::api::v2::core::HealthStatus::TIMEOUT, endpoint.health_status());
   EXPECT_EQ(host_upstream_->localAddress()->ip()->port(),
             endpoint.endpoint().address().socket_address().port_value());
 
@@ -421,6 +420,10 @@ TEST_P(HdsIntegrationTest, SingleEndpointUnhealthyTcp) {
 
   // Server asks for health checking
   server_health_check_specifier_ = makeTcpHealthCheckSpecifier();
+  server_health_check_specifier_.mutable_cluster_health_checks(0)
+      ->mutable_health_checks(0)
+      ->mutable_timeout()
+      ->set_seconds(2);
   hds_stream_->startGrpcStream();
   hds_stream_->sendGrpcMessage(server_health_check_specifier_);
   test_server_->waitForCounterGe("hds_delegate.requests", ++hds_requests_);

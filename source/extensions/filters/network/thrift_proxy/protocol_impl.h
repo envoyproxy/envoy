@@ -30,6 +30,7 @@ public:
     }
     return ProtocolType::Auto;
   }
+  void setType(ProtocolType type) override;
 
   bool readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) override;
   bool readMessageEnd(Buffer::Instance& buffer) override;

@@ -170,7 +170,8 @@ private:
     }
     void sendLocalReply(Code code, const std::string& body,
                         std::function<void(HeaderMap& headers)> modify_headers) override {
-      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers);
+      parent_.sendLocalReply(is_grpc_request_, code, body, modify_headers,
+                             parent_.is_head_request_);
     }
     void encode100ContinueHeaders(HeaderMapPtr&& headers) override;
     void encodeHeaders(HeaderMapPtr&& headers, bool end_stream) override;
@@ -278,7 +279,8 @@ private:
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addEncodedTrailers();
     void sendLocalReply(bool is_grpc_request, Code code, const std::string& body,
-                        std::function<void(HeaderMap& headers)> modify_headers);
+                        std::function<void(HeaderMap& headers)> modify_headers,
+                        bool is_head_request);
     void encode100ContinueHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers);
     void encodeHeaders(ActiveStreamEncoderFilter* filter, HeaderMap& headers, bool end_stream);
     void encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instance& data, bool end_stream);
@@ -404,6 +406,7 @@ private:
     // By default, we will assume there are no 100-Continue headers. If encode100ContinueHeaders
     // is ever called, this is set to true so commonContinue resumes processing the 100-Continue.
     bool has_continue_headers_{};
+    bool is_head_request_{false};
   };
 
   typedef std::unique_ptr<ActiveStream> ActiveStreamPtr;

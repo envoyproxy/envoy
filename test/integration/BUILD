@@ -68,6 +68,7 @@ envoy_cc_test(
     srcs = ["eds_integration_test.cc"],
     deps = [
         ":http_integration_lib",
+        "//source/common/upstream:load_balancer_lib",
         "//test/config:utility_lib",
         "//test/test_common:network_utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",

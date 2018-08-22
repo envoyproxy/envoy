@@ -80,6 +80,7 @@ public:
   std::string service_cluster_name_;
   std::string service_node_name_;
   std::string service_zone_name_;
+  spdlog::level::level_enum log_level_{spdlog::level::trace};
   std::string log_path_;
   Stats::StatsOptionsImpl stats_options_;
   bool hot_restart_disabled_{};
@@ -434,7 +435,7 @@ public:
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(secretManager, Secret::SecretManager&());
-  MOCK_METHOD0(local_info, const LocalInfo::LocalInfo&());
+  MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
   MOCK_METHOD0(stats, Stats::Store&());

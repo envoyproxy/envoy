@@ -63,9 +63,11 @@ template <class StatData> class CounterImpl : public Counter, public MetricImpl 
 public:
   CounterImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
               std::string&& tag_extracted_name, std::vector<Tag>&& tags)
-      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
-        alloc_(alloc) {}
+      : MetricImpl(std::move(tag_extracted_name), std::move(tags)), data_(data), alloc_(alloc) {}
   ~CounterImpl() { alloc_.free(data_); }
+
+  // Stats::Metric
+  const std::string name() const override { return data_.name(); }
 
   // Stats::Counter
   void add(uint64_t amount) override {
@@ -92,9 +94,11 @@ template <class StatData> class GaugeImpl : public Gauge, public MetricImpl {
 public:
   GaugeImpl(StatData& data, StatDataAllocatorImpl<StatData>& alloc,
             std::string&& tag_extracted_name, std::vector<Tag>&& tags)
-      : MetricImpl(data.name_, std::move(tag_extracted_name), std::move(tags)), data_(data),
-        alloc_(alloc) {}
+      : MetricImpl(std::move(tag_extracted_name), std::move(tags)), data_(data), alloc_(alloc) {}
   ~GaugeImpl() { alloc_.free(data_); }
+
+  // Stats::Metric
+  const std::string name() const override { return data_.name(); }
 
   // Stats::Gauge
   virtual void add(uint64_t amount) override {

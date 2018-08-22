@@ -132,6 +132,10 @@ public:
     envoy::api::v2::DiscoveryRequest discovery_request;
     VERIFY_ASSERTION(ads_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
 
+    EXPECT_TRUE(discovery_request.has_node());
+    EXPECT_FALSE(discovery_request.node().id().empty());
+    EXPECT_FALSE(discovery_request.node().cluster().empty());
+
     // TODO(PiotrSikora): Remove this hack once fixed internally.
     if (!(expected_type_url == discovery_request.type_url())) {
       return AssertionFailure() << fmt::format("type_url {} does not match expected {}",

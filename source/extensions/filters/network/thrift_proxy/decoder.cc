@@ -385,6 +385,25 @@ ThriftFilters::FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer
     }
     ENVOY_LOG(debug, "thrift: {} transport started", transport_->name());
 
+    if (metadata_->hasProtocol()) {
+      if (protocol_->type() == ProtocolType::Auto) {
+        protocol_->setType(metadata_->protocol());
+        ENVOY_LOG(debug, "thrift: {} transport forced {} protocol", transport_->name(),
+                  protocol_->name());
+      } else if (metadata_->protocol() != protocol_->type()) {
+        throw EnvoyException(fmt::format("transport reports protocol {}, but configured for {}",
+                                         ProtocolNames::get().fromType(metadata_->protocol()),
+                                         ProtocolNames::get().fromType(protocol_->type())));
+      }
+    }
+    if (metadata_->hasAppException()) {
+      AppExceptionType ex_type = metadata_->appExceptionType();
+      std::string ex_msg = metadata_->appExceptionMessage();
+      // Force new metadata if we get called again.
+      metadata_.reset();
+      throw AppException(ex_type, ex_msg);
+    }
+
     request_ = std::make_unique<ActiveRequest>(callbacks_.newDecoderFilter());
     frame_started_ = true;
     state_machine_ =

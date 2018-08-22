@@ -9,12 +9,13 @@
 namespace Envoy {
 namespace Config {
 
-GrpcMuxImpl::GrpcMuxImpl(const envoy::api::v2::core::Node& node, Grpc::AsyncClientPtr async_client,
+GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
                          Runtime::RandomGenerator& random)
-    : node_(node), async_client_(std::move(async_client)), service_method_(service_method),
-      random_(random), time_source_(dispatcher.timeSource()) {
+    : local_info_(local_info), async_client_(std::move(async_client)),
+      service_method_(service_method), random_(random), time_source_(dispatcher.timeSource()) {
+  Config::Utility::checkLocalInfo("ads", local_info);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
                                                                 RETRY_MAX_DELAY_MS, random_);
@@ -116,7 +117,7 @@ GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
     api_state_[type_url].limit_log_ =
         std::make_unique<TokenBucketImpl>(1, time_source_.monotonic(), 0.2);
     api_state_[type_url].request_.set_type_url(type_url);
-    api_state_[type_url].request_.mutable_node()->MergeFrom(node_);
+    api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
     api_state_[type_url].subscribed_ = true;
     subscriptions_.emplace_back(type_url);
   }

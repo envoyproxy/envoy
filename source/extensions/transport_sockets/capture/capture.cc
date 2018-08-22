@@ -89,8 +89,6 @@ Network::IoResult CaptureSocket::doWrite(Buffer::Instance& buffer, bool end_stre
 
 void CaptureSocket::onConnected() { transport_socket_->onConnected(); }
 
-Ssl::Connection* CaptureSocket::ssl() { return transport_socket_->ssl(); }
-
 const Ssl::Connection* CaptureSocket::ssl() const { return transport_socket_->ssl(); }
 
 CaptureSocketFactory::CaptureSocketFactory(

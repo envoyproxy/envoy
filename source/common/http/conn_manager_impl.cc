@@ -425,7 +425,7 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
   } else {
     sendLocalReply(request_headers_ != nullptr &&
                        Grpc::Common::hasGrpcContentType(*request_headers_),
-                   Http::Code::RequestTimeout, "stream timeout", nullptr);
+                   Http::Code::RequestTimeout, "stream timeout", nullptr, is_head_request_);
   }
 }
 
@@ -482,6 +482,10 @@ const Network::Connection* ConnectionManagerImpl::ActiveStream::connection() {
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, bool end_stream) {
   request_headers_ = std::move(headers);
+  if (Http::Headers::get().MethodValues.Head == request_headers_->Method()->value().c_str()) {
+    is_head_request_ = true;
+  }
+
   const bool upgrade_rejected = createFilterChain() == false;
 
   maybeEndDecode(end_stream);
@@ -513,7 +517,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     request_info_.protocol(protocol);
     if (!connection_manager_.config_.http1Settings().accept_http_10_) {
       // Send "Upgrade Required" if HTTP/1.0 support is not explictly configured on.
-      sendLocalReply(false, Code::UpgradeRequired, "", nullptr);
+      sendLocalReply(false, Code::UpgradeRequired, "", nullptr, is_head_request_);
       return;
     } else {
       // HTTP/1.0 defaults to single-use connections. Make sure the connection
@@ -537,7 +541,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     } else {
       // Require host header. For HTTP/1.1 Host has already been translated to :authority.
       sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
-                     nullptr);
+                     nullptr, is_head_request_);
       return;
     }
   }
@@ -551,7 +555,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // envoy users who do not wish to proxy large headers.
   if (request_headers_->byteSize() > (60 * 1024)) {
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
-                   Code::RequestHeaderFieldsTooLarge, "", nullptr);
+                   Code::RequestHeaderFieldsTooLarge, "", nullptr, is_head_request_);
     return;
   }
 
@@ -562,8 +566,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   // don't support that currently.
   if (!request_headers_->Path() || request_headers_->Path()->value().c_str()[0] != '/') {
     connection_manager_.stats_.named_.downstream_rq_non_relative_path_.inc();
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "",
-                   nullptr);
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::NotFound, "", nullptr,
+                   is_head_request_);
     return;
   }
 
@@ -608,7 +612,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       // Do not allow WebSocket upgrades if the route does not support it.
       connection_manager_.stats_.named_.downstream_rq_ws_on_non_ws_route_.inc();
       sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::Forbidden, "",
-                     nullptr);
+                     nullptr, is_head_request_);
       return;
     }
     // Allow non websocket requests to go through websocket enabled routes.
@@ -924,7 +928,7 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     bool is_grpc_request, Code code, const std::string& body,
-    std::function<void(HeaderMap& headers)> modify_headers) {
+    std::function<void(HeaderMap& headers)> modify_headers, bool is_head_request) {
   Utility::sendLocalReply(is_grpc_request,
                           [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
                             if (modify_headers != nullptr) {
@@ -940,7 +944,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
                             // request instead.
                             encodeData(nullptr, data, end_stream);
                           },
-                          state_.destroyed_, code, body);
+                          state_.destroyed_, code, body, is_head_request);
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
@@ -1586,19 +1590,19 @@ void ConnectionManagerImpl::ActiveStreamEncoderFilter::responseDataTooLarge() {
       parent_.state_.encoder_filters_streaming_ = true;
       stopped_ = false;
 
-      Http::Utility::sendLocalReply(Grpc::Common::hasGrpcContentType(*parent_.request_headers_),
-                                    [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
-                                      parent_.response_headers_ = std::move(response_headers);
-                                      parent_.response_encoder_->encodeHeaders(
-                                          *parent_.response_headers_, end_stream);
-                                      parent_.state_.local_complete_ = end_stream;
-                                    },
-                                    [&](Buffer::Instance& data, bool end_stream) -> void {
-                                      parent_.response_encoder_->encodeData(data, end_stream);
-                                      parent_.state_.local_complete_ = end_stream;
-                                    },
-                                    parent_.state_.destroyed_, Http::Code::InternalServerError,
-                                    CodeUtility::toString(Http::Code::InternalServerError));
+      Http::Utility::sendLocalReply(
+          Grpc::Common::hasGrpcContentType(*parent_.request_headers_),
+          [&](HeaderMapPtr&& response_headers, bool end_stream) -> void {
+            parent_.response_headers_ = std::move(response_headers);
+            parent_.response_encoder_->encodeHeaders(*parent_.response_headers_, end_stream);
+            parent_.state_.local_complete_ = end_stream;
+          },
+          [&](Buffer::Instance& data, bool end_stream) -> void {
+            parent_.response_encoder_->encodeData(data, end_stream);
+            parent_.state_.local_complete_ = end_stream;
+          },
+          parent_.state_.destroyed_, Http::Code::InternalServerError,
+          CodeUtility::toString(Http::Code::InternalServerError), parent_.is_head_request_);
       parent_.maybeEndEncode(parent_.state_.local_complete_);
     } else {
       resetStream();

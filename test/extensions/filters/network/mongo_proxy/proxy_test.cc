@@ -20,13 +20,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
-using testing::_;
 
 namespace Envoy {
 namespace Extensions {
@@ -221,7 +221,6 @@ TEST_F(MongoProxyFilterTest, Stats) {
     message->cursorId(1);
     message->documents().push_back(Bson::DocumentImpl::create()->addString("hello", "world"));
     filter_->callbacks_->decodeReply(std::move(message));
-
   }));
   filter_->onWrite(fake_data_, false);
 
@@ -378,7 +377,6 @@ TEST_F(MongoProxyFilterTest, CallingFunctionStats) {
     message->cursorId(1);
     message->documents().push_back(Bson::DocumentImpl::create()->addString("hello", "world"));
     filter_->callbacks_->decodeReply(std::move(message));
-
   }));
   filter_->onWrite(fake_data_, false);
 }
