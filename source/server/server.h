@@ -41,6 +41,7 @@ namespace Server {
 // clang-format off
 #define ALL_SERVER_STATS(GAUGE)                                                                    \
   GAUGE(uptime)                                                                                    \
+  GAUGE(concurrency)                                                                               \
   GAUGE(memory_allocated)                                                                          \
   GAUGE(memory_heap_size)                                                                          \
   GAUGE(live)                                                                                      \
