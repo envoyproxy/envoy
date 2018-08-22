@@ -433,9 +433,6 @@ ClientSslSocketFactory::ClientSslSocketFactory(ClientContextConfigPtr config,
 }
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() const {
-  // SDS would update ssl_ctx_ when Envoy is running.
-  // Need a read lock to let multiple threads gain read access to ssl_ctx_.
-  std::shared_lock<std::shared_timed_mutex> lock(ssl_ctx_mutex_);
   if (ssl_ctx_) {
     return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Client);
   } else {
@@ -448,11 +445,6 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() cons
 bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
 void ClientSslSocketFactory::onAddOrUpdateSecret() {
-  // SSL context update happens when Envoy is running and SDS is updating SSL
-  // context, need a write lock to make sure only main thread could have write access
-  // to ssl_ctx_.
-  std::unique_lock<std::shared_timed_mutex> lock(ssl_ctx_mutex_);
-
   ENVOY_LOG(debug, "Secret is updated.");
   ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
   stats_.ssl_context_update_by_sds_.inc();
@@ -469,9 +461,6 @@ ServerSslSocketFactory::ServerSslSocketFactory(ServerContextConfigPtr config,
 }
 
 Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() const {
-  // SDS would update ssl_ctx_ when Envoy is running.
-  // Need a read lock to let multiple threads gain read access to ssl_ctx_.
-  std::shared_lock<std::shared_timed_mutex> lock(ssl_ctx_mutex_);
   if (ssl_ctx_) {
     return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Server);
   } else {
@@ -484,11 +473,6 @@ Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() cons
 bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
 
 void ServerSslSocketFactory::onAddOrUpdateSecret() {
-  // SSL context update happens when Envoy is running and SDS is updating SSL
-  // context, need a write lock to make sure only main thread could have write access
-  // to ssl_ctx_.
-  std::unique_lock<std::shared_timed_mutex> lock(ssl_ctx_mutex_);
-
   ENVOY_LOG(debug, "Secret is updated.");
   ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
   stats_.ssl_context_update_by_sds_.inc();
