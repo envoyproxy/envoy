@@ -183,6 +183,9 @@ MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
 
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() {}
 
+MockAdminStream::MockAdminStream() {}
+MockAdminStream::~MockAdminStream() {}
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

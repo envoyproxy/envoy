@@ -474,6 +474,18 @@ public:
   testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>* event_logger_{};
 };
 
+class MockAdminStream : public AdminStream {
+public:
+  MockAdminStream();
+  ~MockAdminStream();
+
+  MOCK_METHOD1(setEndStreamOnComplete, void(bool));
+  MOCK_METHOD1(addOnDestroyCallback, void(std::function<void()>));
+  MOCK_CONST_METHOD0(getRequestHeaders, Http::HeaderMap&());
+  MOCK_CONST_METHOD0(getDecoderFilterCallbacks,
+                     NiceMock<Http::MockStreamDecoderFilterCallbacks>&());
+};
+
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy
