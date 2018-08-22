@@ -6,8 +6,8 @@
 #include <vector>
 
 #include "common/common/assert.h"
-#include "common/common/utility.h"
 #include "common/common/logger.h"
+#include "common/common/utility.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/headers.h"
