@@ -11,6 +11,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/backoff_strategy.h"
+#include "common/common/logger.h"
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
@@ -21,7 +22,7 @@ namespace Router {
 /**
  * Wraps retry state for the router.
  */
-class RetryStateImpl : public RetryState {
+class RetryStateImpl : Logger::Loggable<Logger::Id::router>, public RetryState {
 public:
   static RetryStatePtr create(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
                               const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,

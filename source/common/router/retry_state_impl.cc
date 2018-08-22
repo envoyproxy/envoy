@@ -7,6 +7,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/utility.h"
+#include "common/common/logger.h"
 #include "common/grpc/common.h"
 #include "common/http/codes.h"
 #include "common/http/headers.h"
@@ -74,6 +75,9 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
   const uint32_t base = runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25);
   // Cap the max interval to 10 times the base interval to ensure reasonable backoff intervals.
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(base, base * 10, random_);
+
+  ENVOY_LOG(debug, "using retry policy {} for URL '{}'", retry_on_,
+            request_headers.Path()->value().c_str());
 }
 
 RetryStateImpl::~RetryStateImpl() { resetRetry(); }
