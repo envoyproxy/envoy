@@ -169,18 +169,18 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMis
   testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "");
 }
 
-TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithDynamicMetadataVariable) {
-  Envoy::RequestInfo::FilterStateImpl dynamic_metadata;
-  dynamic_metadata.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
-  EXPECT_EQ("test_value", dynamic_metadata.getData<StringAccessor>("testing").asString());
+TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
+  Envoy::RequestInfo::FilterStateImpl per_request_state;
+  per_request_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  EXPECT_EQ("test_value", per_request_state.getData<StringAccessor>("testing").asString());
 
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
-  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
+  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
 
   testFormatting(request_info, "PER_REQUEST_STATE(testing)", "test_value");
   testFormatting(request_info, "PER_REQUEST_STATE(testing2)", "");
-  EXPECT_EQ("test_value", dynamic_metadata.getData<StringAccessor>("testing").asString());
+  EXPECT_EQ("test_value", per_request_state.getData<StringAccessor>("testing").asString());
 }
 
 namespace {
@@ -197,19 +197,19 @@ private:
 
 } // namespace
 
-TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithNonStringDynamicMetadataVariable) {
-  Envoy::RequestInfo::FilterStateImpl dynamic_metadata;
-  dynamic_metadata.setData("testing", std::make_unique<IntAccessor>(1));
-  EXPECT_EQ(1, dynamic_metadata.getData<IntAccessor>("testing").access());
+TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
+  Envoy::RequestInfo::FilterStateImpl per_request_state;
+  per_request_state.setData("testing", std::make_unique<IntAccessor>(1));
+  EXPECT_EQ(1, per_request_state.getData<IntAccessor>("testing").access());
 
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
-  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
+  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
 
   testFormatting(request_info, "PER_REQUEST_STATE(testing)", "");
 }
 
-TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnDynamicMetadataVariable) {
+TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnPerRequestStateVariable) {
   // No parameters
   EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE()", false),
                             EnvoyException,
@@ -414,10 +414,10 @@ TEST(HeaderParserTest, TestParseInternal) {
   const SystemTime start_time(std::chrono::milliseconds(1522796769123));
   ON_CALL(request_info, startTime()).WillByDefault(Return(start_time));
 
-  Envoy::RequestInfo::FilterStateImpl dynamic_metadata;
-  dynamic_metadata.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
-  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
-  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(dynamic_metadata));
+  Envoy::RequestInfo::FilterStateImpl per_request_state;
+  per_request_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
 
   for (const auto& test_case : test_cases) {
     Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;

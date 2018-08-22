@@ -34,7 +34,7 @@ std::string formatUpstreamMetadataParseException(absl::string_view params,
                      params, reason);
 }
 
-std::string formatFilterStateParseException(absl::string_view params) {
+std::string formatPerRequestStateParseException(absl::string_view params) {
   return fmt::format("Invalid header configuration. Expected format "
                      "PER_REQUEST_STATE(<data_name>), actual format "
                      "PER_REQUEST_STATE{}",
@@ -129,28 +129,28 @@ parseUpstreamMetadataField(absl::string_view params_str) {
 // The state name is expected to be in reverse DNS format, though this is not enforced by
 // this function.
 std::function<std::string(const Envoy::RequestInfo::RequestInfo&)>
-parseFilterStateField(absl::string_view param_str) {
+parsePerRequestStateField(absl::string_view param_str) {
   absl::string_view modified_param_str = StringUtil::trim(param_str);
   if (modified_param_str.empty() || modified_param_str.front() != '(' ||
       modified_param_str.back() != ')') {
-    throw EnvoyException(formatFilterStateParseException(param_str));
+    throw EnvoyException(formatPerRequestStateParseException(param_str));
   }
   modified_param_str = modified_param_str.substr(1, modified_param_str.size() - 2); // trim parens
   if (modified_param_str.size() == 0) {
-    throw EnvoyException(formatFilterStateParseException(param_str));
+    throw EnvoyException(formatPerRequestStateParseException(param_str));
   }
 
   std::string param(modified_param_str);
   return [param](const Envoy::RequestInfo::RequestInfo& request_info) -> std::string {
-    const Envoy::RequestInfo::FilterState& dynamic_metadata = request_info.perRequestState();
+    const Envoy::RequestInfo::FilterState& per_request_state = request_info.perRequestState();
 
     // No such value means don't output anything.
-    if (!dynamic_metadata.hasDataWithName(param)) {
+    if (!per_request_state.hasDataWithName(param)) {
       return std::string();
     }
 
     // Value exists but isn't string accessible is a contract violation; throw an error.
-    if (!dynamic_metadata.hasData<StringAccessor>(param)) {
+    if (!per_request_state.hasData<StringAccessor>(param)) {
       ENVOY_LOG_MISC(debug,
                      "Invalid header information: PER_REQUEST_STATE value \"{}\" "
                      "exists but is not string accessible",
@@ -158,7 +158,7 @@ parseFilterStateField(absl::string_view param_str) {
       return std::string();
     }
 
-    return std::string(dynamic_metadata.getData<StringAccessor>(param).asString());
+    return std::string(per_request_state.getData<StringAccessor>(param).asString());
   };
 }
 
@@ -204,7 +204,8 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
     field_extractor_ =
         parseUpstreamMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));
   } else if (field_name.find("PER_REQUEST_STATE") == 0) {
-    field_extractor_ = parseFilterStateField(field_name.substr(STATIC_STRLEN("PER_REQUEST_STATE")));
+    field_extractor_ =
+        parsePerRequestStateField(field_name.substr(STATIC_STRLEN("PER_REQUEST_STATE")));
   } else {
     throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }

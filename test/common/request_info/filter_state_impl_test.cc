@@ -45,13 +45,13 @@ private:
 
 class FilterStateImplTest : public testing::Test {
 public:
-  FilterStateImplTest() { resetDynamicMetadata(); }
+  FilterStateImplTest() { resetFilterState(); }
 
-  void resetDynamicMetadata() { dynamic_metadata_ = std::make_unique<FilterStateImpl>(); }
-  FilterState& dynamic_metadata() { return *dynamic_metadata_; }
+  void resetFilterState() { filter_state_ = std::make_unique<FilterStateImpl>(); }
+  FilterState& filter_state() { return *filter_state_; }
 
 private:
-  std::unique_ptr<FilterStateImpl> dynamic_metadata_;
+  std::unique_ptr<FilterStateImpl> filter_state_;
 };
 
 } // namespace
@@ -59,16 +59,16 @@ private:
 TEST_F(FilterStateImplTest, Simple) {
   size_t access_count = 0u;
   size_t destruction_count = 0u;
-  dynamic_metadata().setData(
+  filter_state().setData(
       "test_name", std::make_unique<TestStoredTypeTracking>(5, &access_count, &destruction_count));
   EXPECT_EQ(0u, access_count);
   EXPECT_EQ(0u, destruction_count);
 
-  EXPECT_EQ(5, dynamic_metadata().getData<TestStoredTypeTracking>("test_name").access());
+  EXPECT_EQ(5, filter_state().getData<TestStoredTypeTracking>("test_name").access());
   EXPECT_EQ(1u, access_count);
   EXPECT_EQ(0u, destruction_count);
 
-  resetDynamicMetadata();
+  resetFilterState();
   EXPECT_EQ(1u, access_count);
   EXPECT_EQ(1u, destruction_count);
 }
@@ -80,57 +80,57 @@ TEST_F(FilterStateImplTest, SameTypes) {
   static const int ValueOne = 5;
   static const int ValueTwo = 6;
 
-  dynamic_metadata().setData("test_1", std::make_unique<TestStoredTypeTracking>(
-                                           ValueOne, &access_count_1, &destruction_count));
-  dynamic_metadata().setData("test_2", std::make_unique<TestStoredTypeTracking>(
-                                           ValueTwo, &access_count_2, &destruction_count));
+  filter_state().setData("test_1", std::make_unique<TestStoredTypeTracking>(
+                                       ValueOne, &access_count_1, &destruction_count));
+  filter_state().setData("test_2", std::make_unique<TestStoredTypeTracking>(
+                                       ValueTwo, &access_count_2, &destruction_count));
   EXPECT_EQ(0u, access_count_1);
   EXPECT_EQ(0u, access_count_2);
   EXPECT_EQ(0u, destruction_count);
 
-  EXPECT_EQ(ValueOne, dynamic_metadata().getData<TestStoredTypeTracking>("test_1").access());
+  EXPECT_EQ(ValueOne, filter_state().getData<TestStoredTypeTracking>("test_1").access());
   EXPECT_EQ(1u, access_count_1);
   EXPECT_EQ(0u, access_count_2);
-  EXPECT_EQ(ValueTwo, dynamic_metadata().getData<TestStoredTypeTracking>("test_2").access());
+  EXPECT_EQ(ValueTwo, filter_state().getData<TestStoredTypeTracking>("test_2").access());
   EXPECT_EQ(1u, access_count_1);
   EXPECT_EQ(1u, access_count_2);
-  resetDynamicMetadata();
+  resetFilterState();
   EXPECT_EQ(2u, destruction_count);
 }
 
 TEST_F(FilterStateImplTest, SimpleType) {
-  dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(1));
-  dynamic_metadata().setData("test_2", std::make_unique<SimpleType>(2));
+  filter_state().setData("test_1", std::make_unique<SimpleType>(1));
+  filter_state().setData("test_2", std::make_unique<SimpleType>(2));
 
-  EXPECT_EQ(1, dynamic_metadata().getData<SimpleType>("test_1").access());
-  EXPECT_EQ(2, dynamic_metadata().getData<SimpleType>("test_2").access());
+  EXPECT_EQ(1, filter_state().getData<SimpleType>("test_1").access());
+  EXPECT_EQ(2, filter_state().getData<SimpleType>("test_2").access());
 }
 
 TEST_F(FilterStateImplTest, NameConflict) {
-  dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(1));
-  EXPECT_THROW_WITH_MESSAGE(dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(2)),
+  filter_state().setData("test_1", std::make_unique<SimpleType>(1));
+  EXPECT_THROW_WITH_MESSAGE(filter_state().setData("test_1", std::make_unique<SimpleType>(2)),
                             EnvoyException, "FilterState::setData<T> called twice with same name.");
-  EXPECT_EQ(1, dynamic_metadata().getData<SimpleType>("test_1").access());
+  EXPECT_EQ(1, filter_state().getData<SimpleType>("test_1").access());
 }
 
 TEST_F(FilterStateImplTest, NameConflictDifferentTypes) {
-  dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(1));
+  filter_state().setData("test_1", std::make_unique<SimpleType>(1));
   EXPECT_THROW_WITH_MESSAGE(
-      dynamic_metadata().setData("test_1",
-                                 std::make_unique<TestStoredTypeTracking>(2, nullptr, nullptr)),
+      filter_state().setData("test_1",
+                             std::make_unique<TestStoredTypeTracking>(2, nullptr, nullptr)),
       EnvoyException, "FilterState::setData<T> called twice with same name.");
 }
 
 TEST_F(FilterStateImplTest, UnknownName) {
-  EXPECT_THROW_WITH_MESSAGE(dynamic_metadata().getData<SimpleType>("test_1"), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(filter_state().getData<SimpleType>("test_1"), EnvoyException,
                             "FilterState::getData<T> called for unknown data name.");
 }
 
 TEST_F(FilterStateImplTest, WrongTypeGet) {
-  dynamic_metadata().setData("test_name",
-                             std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr));
-  EXPECT_EQ(5, dynamic_metadata().getData<TestStoredTypeTracking>("test_name").access());
-  EXPECT_THROW_WITH_MESSAGE(dynamic_metadata().getData<SimpleType>("test_name"), EnvoyException,
+  filter_state().setData("test_name",
+                         std::make_unique<TestStoredTypeTracking>(5, nullptr, nullptr));
+  EXPECT_EQ(5, filter_state().getData<TestStoredTypeTracking>("test_name").access());
+  EXPECT_THROW_WITH_MESSAGE(filter_state().getData<SimpleType>("test_name"), EnvoyException,
                             "Data stored under test_name cannot be coerced to specified type");
 }
 
@@ -145,25 +145,25 @@ class C : public B {};
 } // namespace
 
 TEST_F(FilterStateImplTest, FungibleInheritance) {
-  dynamic_metadata().setData("testB", std::make_unique<B>());
-  EXPECT_TRUE(dynamic_metadata().hasData<B>("testB"));
-  EXPECT_TRUE(dynamic_metadata().hasData<A>("testB"));
-  EXPECT_FALSE(dynamic_metadata().hasData<C>("testB"));
+  filter_state().setData("testB", std::make_unique<B>());
+  EXPECT_TRUE(filter_state().hasData<B>("testB"));
+  EXPECT_TRUE(filter_state().hasData<A>("testB"));
+  EXPECT_FALSE(filter_state().hasData<C>("testB"));
 
-  dynamic_metadata().setData("testC", std::make_unique<C>());
-  EXPECT_TRUE(dynamic_metadata().hasData<B>("testC"));
-  EXPECT_TRUE(dynamic_metadata().hasData<A>("testC"));
-  EXPECT_TRUE(dynamic_metadata().hasData<C>("testC"));
+  filter_state().setData("testC", std::make_unique<C>());
+  EXPECT_TRUE(filter_state().hasData<B>("testC"));
+  EXPECT_TRUE(filter_state().hasData<A>("testC"));
+  EXPECT_TRUE(filter_state().hasData<C>("testC"));
 }
 
 TEST_F(FilterStateImplTest, HasData) {
-  dynamic_metadata().setData("test_1", std::make_unique<SimpleType>(1));
-  EXPECT_TRUE(dynamic_metadata().hasData<SimpleType>("test_1"));
-  EXPECT_FALSE(dynamic_metadata().hasData<SimpleType>("test_2"));
-  EXPECT_FALSE(dynamic_metadata().hasData<TestStoredTypeTracking>("test_1"));
-  EXPECT_FALSE(dynamic_metadata().hasData<TestStoredTypeTracking>("test_2"));
-  EXPECT_TRUE(dynamic_metadata().hasDataWithName("test_1"));
-  EXPECT_FALSE(dynamic_metadata().hasDataWithName("test_2"));
+  filter_state().setData("test_1", std::make_unique<SimpleType>(1));
+  EXPECT_TRUE(filter_state().hasData<SimpleType>("test_1"));
+  EXPECT_FALSE(filter_state().hasData<SimpleType>("test_2"));
+  EXPECT_FALSE(filter_state().hasData<TestStoredTypeTracking>("test_1"));
+  EXPECT_FALSE(filter_state().hasData<TestStoredTypeTracking>("test_2"));
+  EXPECT_TRUE(filter_state().hasDataWithName("test_1"));
+  EXPECT_FALSE(filter_state().hasDataWithName("test_2"));
 }
 
 } // namespace RequestInfo
