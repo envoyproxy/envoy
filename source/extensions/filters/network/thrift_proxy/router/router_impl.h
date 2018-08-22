@@ -9,6 +9,7 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "common/common/logger.h"
+#include "common/http/header_utility.h"
 #include "common/upstream/load_balancer_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
@@ -39,9 +40,11 @@ public:
 
 protected:
   RouteConstSharedPtr clusterEntry() const;
+  bool headersMatch(const Http::HeaderMap& headers) const;
 
 private:
   const std::string cluster_name_;
+  std::vector<Http::HeaderUtility::HeaderData> config_headers_;
 };
 
 typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
