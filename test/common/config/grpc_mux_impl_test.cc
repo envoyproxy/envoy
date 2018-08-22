@@ -74,8 +74,8 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   Runtime::MockRandomGenerator random_;
   Grpc::MockAsyncClient* async_client_;
-  Event::MockTimer* timer_;  // Only used by ResetStream
-  Event::TimerCb timer_cb_;  // Only used by ResetStream
+  Event::MockTimer* timer_; // Only used by ResetStream
+  Event::TimerCb timer_cb_; // Only used by ResetStream
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcMuxImpl> grpc_mux_;
   NiceMock<MockGrpcMuxCallbacks> callbacks_;
@@ -124,7 +124,7 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   grpc_mux_->start();
 
   EXPECT_CALL(random_, random());
-  ASSERT_TRUE(timer_ != nullptr);  // timer_ initialized from dispatcher mock.
+  ASSERT_TRUE(timer_ != nullptr); // timer_ initialized from dispatcher mock.
   EXPECT_CALL(*timer_, enableTimer(_));
   grpc_mux_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
