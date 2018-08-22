@@ -40,9 +40,8 @@ Version history
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`.
 * http: better handling of HEAD requests. Now sending transfer-encoding: chunked rather than content-length: 0.
 * http: response filters not applied to early error paths such as http_parser generated 400s.
-* http: restrictions added to reject *:path* and *:authority* headers in
-  :ref:`custom request headers
-  <config_http_conn_man_headers_custom_request_headers>`.
+* http: restrictions added to reject *:*-prefixed pseudo-headers in :ref:`custom
+  request headers <config_http_conn_man_headers_custom_request_headers>`.
 * http: :ref:`hpack_table_size <envoy_api_field_core.Http2ProtocolOptions.hpack_table_size>` now controls
   dynamic table size of both: encoder and decoder.
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
