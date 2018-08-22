@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <shared_mutex>
 #include <string>
 
 #include "envoy/network/connection.h"
