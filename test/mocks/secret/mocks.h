@@ -22,5 +22,12 @@ public:
                    const envoy::api::v2::auth::TlsCertificate& tls_certificate));
 };
 
+class MockSecretCallbacks : public SecretCallbacks {
+public:
+  MockSecretCallbacks();
+  ~MockSecretCallbacks();
+  MOCK_METHOD0(onAddOrUpdateSecret, void());
+};
+
 } // namespace Secret
 } // namespace Envoy
