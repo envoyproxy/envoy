@@ -24,7 +24,7 @@ public:
 
   /**
    * Add secret update callback into secret provider.
-   * It is safe to call this method by main thread and is safe to be invoked
+   * It is safe to call this method by main thread and callback is safe to be invoked
    * on main thread.
    * @param callback callback that is executed by secret provider.
    * @return CallbackHandle the handle which can remove that update callback.
