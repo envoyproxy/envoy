@@ -53,7 +53,7 @@ void SdsApi::onConfigUpdate(const ResourceVector& resources, const std::string&)
   }
   const auto& secret = resources[0];
   MessageUtil::validate(secret);
-  if (!(secret.name() == sds_config_name_)) {
+  if (secret.name() != sds_config_name_) {
     throw EnvoyException(
         fmt::format("Unexpected SDS secret (expecting {}): {}", sds_config_name_, secret.name()));
   }

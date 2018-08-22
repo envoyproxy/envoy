@@ -21,6 +21,8 @@ public:
 
   /**
    * Add secret callback into secret provider.
+   * It is safe to call this method by main thread and is safe to be invoked
+   * on main thread.
    * @param callback callback that is executed by secret provider.
    */
   virtual void addUpdateCallback(SecretCallbacks& callback) PURE;
