@@ -18,7 +18,7 @@ namespace Envoy {
 namespace Ssl {
 
 namespace {
- // This SslSocket will be used when SSL secret is not fetched from SDS server.
+// This SslSocket will be used when SSL secret is not fetched from SDS server.
 class NotReadySslSocket : public Network::TransportSocket, public Connection {
 public:
   // Ssl::Connection
@@ -32,7 +32,7 @@ public:
   const std::string& urlEncodedPemEncodedPeerCertificate() const override { return EMPTY_STRING; }
   std::vector<std::string> dnsSansPeerCertificate() const override { return {}; }
   std::vector<std::string> dnsSansLocalCertificate() const override { return {}; }
-   // Network::TransportSocket
+  // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks&) override {}
   std::string protocol() const override { return EMPTY_STRING; }
   bool canFlushClose() override { return true; }

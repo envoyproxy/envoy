@@ -5,14 +5,14 @@
 namespace Envoy {
 namespace Secret {
 
- /**
+/**
  * Callbacks invoked by a dynamic secret provider.
  */
 class SecretCallbacks {
- public:
+public:
   virtual ~SecretCallbacks() {}
   virtual void onAddOrUpdateSecret() PURE;
 };
 
 } // namespace Secret
-} // namespace Envoy 
+} // namespace Envoy

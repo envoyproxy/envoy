@@ -41,7 +41,7 @@ TEST_F(SdsApiTest, BasicTest) {
   google_grpc->set_target_uri("fake_address");
   google_grpc->set_stat_prefix("test");
   Secret::SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                 server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+                         server.clusterManager(), init_manager, config_source, "abc.com", []() {});
 
   NiceMock<Grpc::MockAsyncClient>* grpc_client{new NiceMock<Grpc::MockAsyncClient>()};
   NiceMock<Grpc::MockAsyncClientFactory>* factory{new NiceMock<Grpc::MockAsyncClientFactory>()};
