@@ -16,6 +16,9 @@ apply to a request. Each configuration results in a descriptor being sent to the
 If the rate limit service is called, and the response for any of the descriptors is over limit, a
 429 response is returned.
 
+If there is an error in calling rate limit service or rate limit service returns an error and :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` is 
+set to true, a 500 response is returned.
+
 .. _config_http_filters_rate_limit_composing_actions:
 
 Composing Actions
@@ -108,6 +111,8 @@ The buffer filter outputs statistics in the *cluster.<route target cluster>.rate
   ok, Counter, Total under limit responses from the rate limit service
   error, Counter, Total errors contacting the rate limit service
   over_limit, Counter, total over limit responses from the rate limit service
+  failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
+  of :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` set to false."
 
 Runtime
 -------

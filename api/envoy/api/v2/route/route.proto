@@ -310,7 +310,7 @@ message CorsPolicy {
   // Specifies regex patterns that match allowed origins.
   //
   // An origin is allowed if either allow_origin or allow_origin_regex match.
-  repeated string allow_origin_regex = 8;
+  repeated string allow_origin_regex = 8 [(validate.rules).repeated .items.string.max_bytes = 1024];
 
   // Specifies the content for the *access-control-allow-methods* header.
   string allow_methods = 2;

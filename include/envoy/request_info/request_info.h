@@ -48,8 +48,10 @@ enum ResponseFlag {
   RateLimited = 0x800,
   // Request was unauthorized by external authorization service.
   UnauthorizedExternalService = 0x1000,
+  // Unable to call Ratelimit service.
+  RateLimitServiceError = 0x2000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = UnauthorizedExternalService
+  LastFlag = RateLimitServiceError
 };
 
 /**
