@@ -68,6 +68,7 @@ Version history
   load balancing policy.
 * ratelimit: added :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in 
   case of rate limit service error.
+* route checker: Added v2 config support and removed support for v1 configs.
 
 1.7.0
 ===============
