@@ -141,7 +141,7 @@ private:
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
 
     Router::ConfigConstSharedPtr config_;
-    TimeSource time_source_;
+    TimeSource& time_source_;
   };
 
   friend class AdminStatsTest;
