@@ -132,3 +132,67 @@ public:
 
   // Destructor for individual tests.
   void TearDown() override {
+    test_server_.reset();
+    fake_upstreams_.clear();
+  }
+
+private:
+  TestFilterConfigFactory config_factory_;
+  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> filter_resolver_;
+};
+
+INSTANTIATE_TEST_CASE_P(IpVersions, TcpConnPoolIntegrationTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
+TEST_P(TcpConnPoolIntegrationTest, SingleRequest) {
+  std::string request("request");
+  std::string response("response");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->write(request);
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
+  ASSERT_TRUE(fake_upstream_connection->waitForData(request.size()));
+  ASSERT_TRUE(fake_upstream_connection->write(response));
+
+  tcp_client->waitForData(response);
+  tcp_client->close();
+}
+
+TEST_P(TcpConnPoolIntegrationTest, MultipleRequests) {
+  std::string request1("request1");
+  std::string request2("request2");
+  std::string response1("response1");
+  std::string response2("response2");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+
+  // send request 1
+  tcp_client->write(request1);
+  FakeRawConnectionPtr fake_upstream_connection1;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection1));
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection1->waitForData(request1.size(), &data));
+  EXPECT_EQ(request1, data);
+
+  // send request 2
+  tcp_client->write(request2);
+  FakeRawConnectionPtr fake_upstream_connection2;
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection2));
+  ASSERT_TRUE(fake_upstream_connection2->waitForData(request2.size(), &data));
+  EXPECT_EQ(request2, data);
+
+  // send response 2
+  ASSERT_TRUE(fake_upstream_connection2->write(response2));
+  tcp_client->waitForData(response2);
+
+  // send response 1
+  ASSERT_TRUE(fake_upstream_connection1->write(response1));
+  tcp_client->waitForData(response1, false);
+
+  tcp_client->close();
+}
+
+} // namespace Envoy
