@@ -26,6 +26,7 @@ public:
    * @param callback callback that is executed by secret provider.
    */
   virtual void addUpdateCallback(SecretCallbacks& callback) PURE;
+
   /**
    * Remove secret callback from secret provider.
    * @param callback callback that is executed by secret provider.

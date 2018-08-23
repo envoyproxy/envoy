@@ -26,6 +26,7 @@ namespace {
 
 class SdsApiTest : public testing::Test {};
 
+// Validate that SdsApi object is created and initialized successfully.
 TEST_F(SdsApiTest, BasicTest) {
   ::testing::InSequence s;
   const envoy::service::discovery::v2::SdsDummy dummy;
@@ -40,8 +41,8 @@ TEST_F(SdsApiTest, BasicTest) {
   auto google_grpc = grpc_service->mutable_google_grpc();
   google_grpc->set_target_uri("fake_address");
   google_grpc->set_stat_prefix("test");
-  Secret::SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                         server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+  SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
+                 server.clusterManager(), init_manager, config_source, "abc.com");
 
   NiceMock<Grpc::MockAsyncClient>* grpc_client{new NiceMock<Grpc::MockAsyncClient>()};
   NiceMock<Grpc::MockAsyncClientFactory>* factory{new NiceMock<Grpc::MockAsyncClientFactory>()};
@@ -56,12 +57,13 @@ TEST_F(SdsApiTest, BasicTest) {
   init_manager.initialize();
 }
 
+// Validate that SdsApi updates secrets successfully if a good secret is passed to onConfigUpdate().
 TEST_F(SdsApiTest, SecretUpdateSuccess) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
   SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                 server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+                 server.clusterManager(), init_manager, config_source, "abc.com");
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   sds_api.addUpdateCallback(secret_callback);
@@ -93,12 +95,13 @@ TEST_F(SdsApiTest, SecretUpdateSuccess) {
   sds_api.removeUpdateCallback(secret_callback);
 }
 
+// Validate that SdsApi throws exception if an empty secret is passed to onConfigUpdate().
 TEST_F(SdsApiTest, EmptyResource) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
   SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                 server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+                 server.clusterManager(), init_manager, config_source, "abc.com");
 
   Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
 
@@ -106,12 +109,13 @@ TEST_F(SdsApiTest, EmptyResource) {
                             "Missing SDS resources for abc.com in onConfigUpdate()");
 }
 
+// Validate that SdsApi throws exception if multiple secrets are passed to onConfigUpdate().
 TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
   SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                 server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+                 server.clusterManager(), init_manager, config_source, "abc.com");
 
   std::string yaml =
       R"EOF(
@@ -133,12 +137,14 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
                             "Unexpected SDS secrets length: 2");
 }
 
+// Validate that SdsApi throws exception if secret name passed to onConfigUpdate()
+// does not match configured name.
 TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
   SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                 server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+                 server.clusterManager(), init_manager, config_source, "abc.com");
 
   std::string yaml =
       R"EOF(
