@@ -83,6 +83,8 @@ public:
   spdlog::level::level_enum log_level_{spdlog::level::trace};
   std::string log_path_;
   Stats::StatsOptionsImpl stats_options_;
+  uint32_t concurrency_{1};
+  uint64_t hot_restart_epoch_{};
   bool hot_restart_disabled_{};
 };
 
@@ -476,6 +478,18 @@ public:
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
   testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>* event_logger_{};
+};
+
+class MockAdminStream : public AdminStream {
+public:
+  MockAdminStream();
+  ~MockAdminStream();
+
+  MOCK_METHOD1(setEndStreamOnComplete, void(bool));
+  MOCK_METHOD1(addOnDestroyCallback, void(std::function<void()>));
+  MOCK_CONST_METHOD0(getRequestHeaders, Http::HeaderMap&());
+  MOCK_CONST_METHOD0(getDecoderFilterCallbacks,
+                     NiceMock<Http::MockStreamDecoderFilterCallbacks>&());
 };
 
 } // namespace Configuration
