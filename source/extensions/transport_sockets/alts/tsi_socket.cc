@@ -103,7 +103,8 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
         tsi_handshaker_result_get_unused_bytes(handshaker_result, &unused_bytes, &unused_byte_size);
     ASSERT(status == TSI_OK);
     if (unused_byte_size > 0) {
-      raw_read_buffer_.add(unused_bytes, unused_byte_size);
+      raw_read_buffer_.prepend(
+          absl::string_view{reinterpret_cast<const char*>(unused_bytes), unused_byte_size});
     }
     ENVOY_CONN_LOG(debug, "TSI: Handshake successful: unused_bytes: {}", callbacks_->connection(),
                    unused_byte_size);
