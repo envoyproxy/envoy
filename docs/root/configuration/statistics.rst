@@ -21,6 +21,7 @@ Server related statistics are rooted at *server.* with following statistics:
   :widths: 1, 1, 2
 
   uptime, Gauge, Current server uptime in seconds
+  concurrency, Gauge, Number of worker threads
   memory_allocated, Gauge, Current amount of allocated memory in bytes. Total of both new and old Envoy processes on hot restart. 
   memory_heap_size, Gauge, Current reserved heap size in bytes. New Envoy process heap size on hot restart. 
   live, Gauge, "1 if the server is not currently draining, 0 otherwise"

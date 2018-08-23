@@ -37,12 +37,6 @@ public:
   GrpcMuxImplTest() : async_client_(new Grpc::MockAsyncClient()), time_source_{} {}
 
   void setup() {
-    EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
-      timer_cb_ = timer_cb;
-      timer_ = new Event::MockTimer();
-      return timer_;
-    }));
-
     grpc_mux_.reset(new GrpcMuxImpl(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
@@ -76,8 +70,6 @@ public:
   NiceMock<Event::MockDispatcher> dispatcher_;
   Runtime::MockRandomGenerator random_;
   Grpc::MockAsyncClient* async_client_;
-  Event::MockTimer* timer_;
-  Event::TimerCb timer_cb_;
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcMuxImpl> grpc_mux_;
   NiceMock<MockGrpcMuxCallbacks> callbacks_;
@@ -107,6 +99,14 @@ TEST_F(GrpcMuxImplTest, MultipleTypeUrlStreams) {
 
 // Validate behavior when multiple type URL watches are maintained and the stream is reset.
 TEST_F(GrpcMuxImplTest, ResetStream) {
+  Event::MockTimer* timer = nullptr;
+  Event::TimerCb timer_cb;
+  EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([&timer, &timer_cb](Event::TimerCb cb) {
+    timer_cb = cb;
+    EXPECT_EQ(nullptr, timer);
+    timer = new Event::MockTimer();
+    return timer;
+  }));
   setup();
   InSequence s;
   auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
@@ -119,13 +119,14 @@ TEST_F(GrpcMuxImplTest, ResetStream) {
   grpc_mux_->start();
 
   EXPECT_CALL(random_, random());
-  EXPECT_CALL(*timer_, enableTimer(_));
+  ASSERT_TRUE(timer != nullptr); // initialized from dispatcher mock.
+  EXPECT_CALL(*timer, enableTimer(_));
   grpc_mux_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   expectSendMessage("foo", {"x", "y"}, "");
   expectSendMessage("bar", {}, "");
   expectSendMessage("baz", {"z"}, "");
-  timer_cb_();
+  timer_cb();
 
   expectSendMessage("baz", {}, "");
   expectSendMessage("foo", {}, "");
