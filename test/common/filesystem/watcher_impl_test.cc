@@ -18,7 +18,7 @@ class WatcherImplTest : public testing::Test {
 protected:
   WatcherImplTest() : dispatcher_(test_time_.timeSource()) {}
 
-  TestTime test_time_;
+  RealTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
 };
 

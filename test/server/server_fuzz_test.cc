@@ -57,7 +57,7 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
   Thread::MutexBasicLockable fakelock;
   TestComponentFactory component_factory;
   ThreadLocal::InstanceImpl thread_local_instance;
-  TestTime test_time;
+  RealTestTime test_time;
   Fuzz::PerTestEnvironment test_env;
 
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");

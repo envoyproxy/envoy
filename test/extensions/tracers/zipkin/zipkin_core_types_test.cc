@@ -88,7 +88,7 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   EXPECT_EQ("", ann.value());
   EXPECT_FALSE(ann.isSetEndpoint());
 
-  TestTime test_time;
+  RealTestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                            test_time.timeSource().systemTime().time_since_epoch())
                            .count();
@@ -147,7 +147,7 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
-  TestTime test_time;
+  RealTestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                            test_time.timeSource().systemTime().time_since_epoch())
                            .count();
@@ -172,7 +172,7 @@ TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
-  TestTime test_time;
+  RealTestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                            test_time.timeSource().systemTime().time_since_epoch())
                            .count();
@@ -190,7 +190,7 @@ TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
-  TestTime test_time;
+  RealTestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                            test_time.timeSource().systemTime().time_since_epoch())
                            .count();
@@ -289,7 +289,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, assignmentOperator) {
 }
 
 TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
-  TestTime test_time;
+  RealTestTime test_time;
   Span span(test_time.timeSource());
 
   EXPECT_EQ(0ULL, span.id());
@@ -490,7 +490,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
 }
 
 TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
-  TestTime test_time;
+  RealTestTime test_time;
   Span span(test_time.timeSource());
 
   uint64_t id = Util::generateRandom64(test_time.timeSource());
@@ -527,7 +527,7 @@ TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
 }
 
 TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
-  TestTime test_time;
+  RealTestTime test_time;
   Span span(test_time.timeSource());
 
   uint64_t id = Util::generateRandom64(test_time.timeSource());
@@ -564,7 +564,7 @@ TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
 }
 
 TEST(ZipkinCoreTypesSpanTest, setTag) {
-  TestTime test_time;
+  RealTestTime test_time;
   Span span(test_time.timeSource());
 
   span.setTag("key1", "value1");

@@ -302,7 +302,7 @@ private:
   Thread::CondVar listeners_cv_;
   Thread::MutexBasicLockable listeners_mutex_;
   uint64_t pending_listeners_;
-  TestTime test_time_;
+  RealTestTime test_time_;
   ConditionalInitializer server_set_;
   std::unique_ptr<Server::InstanceImpl> server_;
   Server::TestDrainManager* drain_manager_{};

@@ -581,7 +581,7 @@ private:
   Thread::ThreadPtr thread_;
   Thread::CondVar new_connection_event_;
   Api::ApiPtr api_;
-  TestTime test_time_;
+  RealTestTime test_time_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
   std::list<QueuedConnectionWrapperPtr> new_connections_ GUARDED_BY(lock_);

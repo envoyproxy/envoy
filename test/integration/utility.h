@@ -127,7 +127,7 @@ public:
                     const std::string& content_type = "");
 
   // TODO(jmarantz): this should be injectable.
-  static TestTime evil_singleton_test_time_;
+  static RealTestTime evil_singleton_test_time_;
 };
 
 // A set of connection callbacks which tracks connection state.

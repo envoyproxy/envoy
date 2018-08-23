@@ -26,7 +26,7 @@ public:
     dispatcher_ = validation_->allocateDispatcher(test_time_.timeSource());
   }
 
-  TestTime test_time_;
+  RealTestTime test_time_;
   Event::DispatcherPtr dispatcher_;
 
 private:

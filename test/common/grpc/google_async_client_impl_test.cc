@@ -56,7 +56,7 @@ public:
                                                            stats_store_, config);
   }
 
-  TestTime test_time_;
+  RealTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   std::unique_ptr<GoogleAsyncClientThreadLocal> tls_;
   MockStubFactory stub_factory_;

@@ -161,7 +161,7 @@ public:
                            const std::vector<std::string>& port_names);
 
   Api::ApiPtr api_;
-  TestTime test_time_;
+  RealTestTime test_time_;
 
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
   Event::DispatcherPtr dispatcher_;

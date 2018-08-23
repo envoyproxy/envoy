@@ -33,7 +33,7 @@ public:
 
 protected:
   int fds_[2];
-  TestTime test_time_;
+  RealTestTime test_time_;
   DispatcherImpl dispatcher_;
 };
 
@@ -52,7 +52,7 @@ TEST_P(FileEventImplActivateTest, Activate) {
   }
   ASSERT_NE(-1, fd);
 
-  TestTime test_time;
+  RealTestTime test_time;
   DispatcherImpl dispatcher(test_time.timeSource());
   ReadyWatcher read_event;
   EXPECT_CALL(read_event, ready()).Times(1);
