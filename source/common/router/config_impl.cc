@@ -351,8 +351,9 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
   if (!config_query_parameters_.empty()) {
-    Http::Utility::QueryParams query_parameters =
-        Http::Utility::parseQueryString(headers.Path()->value().c_str());
+    Http::Utility::QueryParamsImpl query_params_impl;
+    Http::Utility::QueryParamsMap query_parameters =
+        query_params_impl.parseQueryString(headers.Path()->value().c_str());
     matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
   }
 

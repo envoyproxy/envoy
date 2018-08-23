@@ -22,17 +22,18 @@ namespace Envoy {
 namespace Http {
 
 TEST(HttpUtility, parseQueryString) {
-  EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello"));
-  EXPECT_EQ(Utility::QueryParams(), Utility::parseQueryString("/hello?"));
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello"));
-  EXPECT_EQ(Utility::QueryParams({{"hello", "world"}}),
-            Utility::parseQueryString("/hello?hello=world"));
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello="));
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}}), Utility::parseQueryString("/hello?hello=&"));
-  EXPECT_EQ(Utility::QueryParams({{"hello", ""}, {"hello2", "world2"}}),
-            Utility::parseQueryString("/hello?hello=&hello2=world2"));
-  EXPECT_EQ(Utility::QueryParams({{"name", "admin"}, {"level", "trace"}}),
-            Utility::parseQueryString("/logging?name=admin&level=trace"));
+  Utility::QueryParamsImpl query_params_impl;
+  EXPECT_EQ(Utility::QueryParamsMap(), query_params_impl.parseQueryString("/hello"));
+  EXPECT_EQ(Utility::QueryParamsMap(), query_params_impl.parseQueryString("/hello?"));
+  EXPECT_EQ(Utility::QueryParamsMap({{"hello", ""}}), query_params_impl.parseQueryString("/hello?hello"));
+  EXPECT_EQ(Utility::QueryParamsMap({{"hello", "world"}}),
+            query_params_impl.parseQueryString("/hello?hello=world"));
+  EXPECT_EQ(Utility::QueryParamsMap({{"hello", ""}}), query_params_impl.parseQueryString("/hello?hello="));
+  EXPECT_EQ(Utility::QueryParamsMap({{"hello", ""}}), query_params_impl.parseQueryString("/hello?hello=&"));
+  EXPECT_EQ(Utility::QueryParamsMap({{"hello", ""}, {"hello2", "world2"}}),
+            query_params_impl.parseQueryString("/hello?hello=&hello2=world2"));
+  EXPECT_EQ(Utility::QueryParamsMap({{"name", "admin"}, {"level", "trace"}}),
+            query_params_impl.parseQueryString("/logging?name=admin&level=trace"));
 }
 
 TEST(HttpUtility, getResponseStatus) {
@@ -421,10 +422,11 @@ TEST(HttpUtility, TestPrepareHeaders) {
 }
 
 TEST(HttpUtility, QueryParamsToString) {
-  EXPECT_EQ("", Utility::queryParamsToString(Utility::QueryParams({})));
-  EXPECT_EQ("?a=1", Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}})));
+  Utility::QueryParamsImpl query_params_impl;
+  EXPECT_EQ("", query_params_impl.queryParamsToString(Utility::QueryParamsMap({})));
+  EXPECT_EQ("?a=1", query_params_impl.queryParamsToString(Utility::QueryParamsMap({{"a", "1"}})));
   EXPECT_EQ("?a=1&b=2",
-            Utility::queryParamsToString(Utility::QueryParams({{"a", "1"}, {"b", "2"}})));
+            query_params_impl.queryParamsToString(Utility::QueryParamsMap({{"a", "1"}, {"b", "2"}})));
 }
 
 } // namespace Http
