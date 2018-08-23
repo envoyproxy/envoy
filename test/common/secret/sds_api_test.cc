@@ -66,7 +66,8 @@ TEST_F(SdsApiTest, SecretUpdateSuccess) {
                  server.clusterManager(), init_manager, config_source, "abc.com", []() {});
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
-  sds_api.addUpdateCallback(secret_callback);
+  auto handle =
+      sds_api.addUpdateCallback([&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
 
   std::string yaml =
       R"EOF(
@@ -92,7 +93,7 @@ TEST_F(SdsApiTest, SecretUpdateSuccess) {
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             sds_api.secret()->privateKey());
 
-  sds_api.removeUpdateCallback(secret_callback);
+  handle->remove();
 }
 
 // Validate that SdsApi throws exception if an empty secret is passed to onConfigUpdate().

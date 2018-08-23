@@ -14,6 +14,7 @@
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/callback_impl.h"
 #include "common/common/cleanup.h"
 
 namespace Envoy {
@@ -47,11 +48,8 @@ public:
     return tls_certificate_secrets_.get();
   }
 
-  void addUpdateCallback(SecretCallbacks& callback) override {
-    update_callbacks_.push_back(&callback);
-  }
-  void removeUpdateCallback(SecretCallbacks& callback) override {
-    update_callbacks_.remove(&callback);
+  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
+    return update_callback_manager_.add(callback);
   }
 
 private:
@@ -71,7 +69,7 @@ private:
   uint64_t secret_hash_;
   Cleanup clean_up_;
   Ssl::TlsCertificateConfigPtr tls_certificate_secrets_;
-  std::list<SecretCallbacks*> update_callbacks_;
+  Common::CallbackManager<> update_callback_manager_;
 };
 
 typedef std::unique_ptr<SdsApi> SdsApiPtr;

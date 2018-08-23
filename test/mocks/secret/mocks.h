@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/secret/secret_callbacks.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/tls_certificate_config.h"
 

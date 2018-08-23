@@ -63,9 +63,7 @@ void SdsApi::onConfigUpdate(const ResourceVector& resources, const std::string&)
     tls_certificate_secrets_ =
         std::make_unique<Ssl::TlsCertificateConfigImpl>(secret.tls_certificate());
 
-    for (auto cb : update_callbacks_) {
-      cb->onAddOrUpdateSecret();
-    }
+    update_callback_manager_.runCallbacks();
   }
 
   runInitializeCallbackIfAny();
