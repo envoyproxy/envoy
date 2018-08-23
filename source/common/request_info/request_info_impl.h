@@ -203,7 +203,6 @@ struct RequestInfoImpl : public RequestInfo {
   bool hc_request_{};
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
-  //  absl::string_view requestedServerName_;
 
 private:
   uint64_t bytes_received_{};
