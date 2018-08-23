@@ -43,6 +43,7 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/secret:secret_provider_interface",
         "//include/envoy/stats:stats_interface",
+        "//source/common/common:cleanup_lib",
         "//source/common/config:resources_lib",
         "//source/common/config:subscription_factory_lib",
         "//source/common/protobuf:utility_lib",

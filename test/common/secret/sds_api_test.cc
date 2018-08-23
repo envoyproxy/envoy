@@ -42,7 +42,7 @@ TEST_F(SdsApiTest, BasicTest) {
   google_grpc->set_target_uri("fake_address");
   google_grpc->set_stat_prefix("test");
   SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                 server.clusterManager(), init_manager, config_source, "abc.com");
+                 server.clusterManager(), init_manager, config_source, "abc.com", []() {});
 
   NiceMock<Grpc::MockAsyncClient>* grpc_client{new NiceMock<Grpc::MockAsyncClient>()};
   NiceMock<Grpc::MockAsyncClientFactory>* factory{new NiceMock<Grpc::MockAsyncClientFactory>()};
@@ -63,7 +63,7 @@ TEST_F(SdsApiTest, SecretUpdateSuccess) {
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
   SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                 server.clusterManager(), init_manager, config_source, "abc.com");
+                 server.clusterManager(), init_manager, config_source, "abc.com", []() {});
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   sds_api.addUpdateCallback(secret_callback);
@@ -101,7 +101,7 @@ TEST_F(SdsApiTest, EmptyResource) {
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
   SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                 server.clusterManager(), init_manager, config_source, "abc.com");
+                 server.clusterManager(), init_manager, config_source, "abc.com", []() {});
 
   Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
 
@@ -115,7 +115,7 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
   SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                 server.clusterManager(), init_manager, config_source, "abc.com");
+                 server.clusterManager(), init_manager, config_source, "abc.com", []() {});
 
   std::string yaml =
       R"EOF(
@@ -144,7 +144,7 @@ TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
   SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                 server.clusterManager(), init_manager, config_source, "abc.com");
+                 server.clusterManager(), init_manager, config_source, "abc.com", []() {});
 
   std::string yaml =
       R"EOF(

@@ -14,6 +14,8 @@
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/cleanup.h"
+
 namespace Envoy {
 namespace Secret {
 
@@ -27,7 +29,8 @@ public:
   SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
          Runtime::RandomGenerator& random, Stats::Store& stats,
          Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
-         const envoy::api::v2::core::ConfigSource& sds_config, std::string sds_config_name);
+         const envoy::api::v2::core::ConfigSource& sds_config, std::string sds_config_name,
+         std::function<void()> destructor_cb);
 
   // Init::Target
   void initialize(std::function<void()> callback) override;
@@ -66,6 +69,7 @@ private:
   const std::string sds_config_name_;
 
   uint64_t secret_hash_;
+  Cleanup clean_up_;
   Ssl::TlsCertificateConfigPtr tls_certificate_secrets_;
   std::list<SecretCallbacks*> update_callbacks_;
 };
