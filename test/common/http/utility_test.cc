@@ -21,21 +21,6 @@ using testing::InvokeWithoutArgs;
 namespace Envoy {
 namespace Http {
 
-TEST(HttpUtility, parseQueryString) {
-  Utility::QueryParamsImpl query_params_impl;
-  EXPECT_EQ(Utility::QueryParamsMap(), query_params_impl.parseQueryString("/hello"));
-  EXPECT_EQ(Utility::QueryParamsMap(), query_params_impl.parseQueryString("/hello?"));
-  EXPECT_EQ(Utility::QueryParamsMap({{"hello", ""}}), query_params_impl.parseQueryString("/hello?hello"));
-  EXPECT_EQ(Utility::QueryParamsMap({{"hello", "world"}}),
-            query_params_impl.parseQueryString("/hello?hello=world"));
-  EXPECT_EQ(Utility::QueryParamsMap({{"hello", ""}}), query_params_impl.parseQueryString("/hello?hello="));
-  EXPECT_EQ(Utility::QueryParamsMap({{"hello", ""}}), query_params_impl.parseQueryString("/hello?hello=&"));
-  EXPECT_EQ(Utility::QueryParamsMap({{"hello", ""}, {"hello2", "world2"}}),
-            query_params_impl.parseQueryString("/hello?hello=&hello2=world2"));
-  EXPECT_EQ(Utility::QueryParamsMap({{"name", "admin"}, {"level", "trace"}}),
-            query_params_impl.parseQueryString("/logging?name=admin&level=trace"));
-}
-
 TEST(HttpUtility, getResponseStatus) {
   EXPECT_THROW(Utility::getResponseStatus(TestHeaderMapImpl{}), CodecClientException);
   EXPECT_EQ(200U, Utility::getResponseStatus(TestHeaderMapImpl{{":status", "200"}}));
@@ -419,14 +404,6 @@ TEST(HttpUtility, TestPrepareHeaders) {
 
   EXPECT_STREQ("/x/y/z", message->headers().Path()->value().c_str());
   EXPECT_STREQ("dns.name", message->headers().Host()->value().c_str());
-}
-
-TEST(HttpUtility, QueryParamsToString) {
-  Utility::QueryParamsImpl query_params_impl;
-  EXPECT_EQ("", query_params_impl.queryParamsToString(Utility::QueryParamsMap({})));
-  EXPECT_EQ("?a=1", query_params_impl.queryParamsToString(Utility::QueryParamsMap({{"a", "1"}})));
-  EXPECT_EQ("?a=1&b=2",
-            query_params_impl.queryParamsToString(Utility::QueryParamsMap({{"a", "1"}, {"b", "2"}})));
 }
 
 } // namespace Http
