@@ -40,7 +40,7 @@ public:
   MockSystemTimeSource();
   ~MockSystemTimeSource();
 
-  MOCK_METHOD0(currentTime, SystemTime());
+  MOCK_CONST_METHOD0(currentTime, SystemTime());
 };
 
 class MockMonotonicTimeSource : public MonotonicTimeSource {
@@ -48,7 +48,7 @@ public:
   MockMonotonicTimeSource();
   ~MockMonotonicTimeSource();
 
-  MOCK_METHOD0(currentTime, MonotonicTime());
+  MOCK_CONST_METHOD0(currentTime, MonotonicTime());
 };
 
 class MockTokenBucket : public TokenBucket {

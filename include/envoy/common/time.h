@@ -26,7 +26,7 @@ public:
   /**
    * @return the current system time.
    */
-  virtual SystemTime currentTime() PURE;
+  virtual SystemTime currentTime() const PURE;
 };
 
 /**
@@ -42,7 +42,7 @@ public:
   /**
    * @return the current monotonic time.
    */
-  virtual MonotonicTime currentTime() PURE;
+  virtual MonotonicTime currentTime() const PURE;
 };
 
 /**
@@ -51,7 +51,7 @@ public:
  *
  * TODO(#4160): currently this is just a container for SystemTimeSource and
  * MonotonicTimeSource but we should clean that up and just have this as the
- * base class. Once that's done, TimeSource will be a pure interface.
+ * base class.
  */
 class TimeSource {
 public:
@@ -69,12 +69,12 @@ public:
   /**
    * @return the current system time; not guaranteed to be monotonically increasing.
    */
-  SystemTime systemTime() { return system_->currentTime(); }
+  SystemTime systemTime() const { return system_->currentTime(); }
 
   /**
    * @return the current monotonic time.
    */
-  MonotonicTime monotonicTime() { return monotonic_->currentTime(); }
+  MonotonicTime monotonicTime() const { return monotonic_->currentTime(); }
 
   /**
    * Compares two time-sources for equality; this is needed for mocks.
@@ -89,7 +89,6 @@ public:
   MonotonicTimeSource& monotonic() { return *monotonic_; }
 
 private:
-  // These are pointers rather than references in order to support assignment.
   SystemTimeSource* system_;
   MonotonicTimeSource* monotonic_;
 };
