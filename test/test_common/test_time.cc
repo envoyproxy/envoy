@@ -4,6 +4,6 @@
 
 namespace Envoy {
 
-TestTime::TestTime() : time_source_(system_time_, monotonic_time_) {}
+RealTestTime::RealTestTime() : time_source_(system_time_, monotonic_time_) {}
 
 } // namespace Envoy

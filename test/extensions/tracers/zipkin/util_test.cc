@@ -10,7 +10,7 @@ namespace Tracers {
 namespace Zipkin {
 
 TEST(ZipkinUtilTest, utilTests) {
-  TestTime time;
+  RealTestTime time;
   EXPECT_EQ(typeid(uint64_t).name(), typeid(Util::generateRandom64(time.timeSource())).name());
 
   // Test JSON merging

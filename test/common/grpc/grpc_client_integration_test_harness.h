@@ -395,7 +395,7 @@ public:
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  TestTime test_time_;
+  RealTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   DispatcherHelper dispatcher_helper_{dispatcher_};
   Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();

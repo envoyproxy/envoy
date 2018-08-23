@@ -30,7 +30,7 @@ public:
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
-  TestTime test_time;
+  RealTestTime test_time;
   Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(test_time.timeSource());
   Network::MockConnectionHandler* handler_ = new Network::MockConnectionHandler();
   NiceMock<MockGuardDog> guard_dog_;

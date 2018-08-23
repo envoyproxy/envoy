@@ -95,7 +95,7 @@ public:
 
   const std::string path_;
   std::string version_;
-  TestTime test_time_;
+  RealTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
   FilesystemEdsSubscriptionImpl subscription_;

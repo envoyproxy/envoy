@@ -102,7 +102,7 @@ public:
 
   MOCK_METHOD0(onClientDestroy, void());
 
-  TestTime test_time_;
+  RealTestTime test_time_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};

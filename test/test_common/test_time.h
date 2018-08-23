@@ -4,12 +4,18 @@
 
 namespace Envoy {
 
-class TestTime {
+// Instantiates real-time sources for testing purposes. In general, this is a
+// bad idea, and tests should use simulated or mock time.
+//
+// TODO(#4160): change all references to this class to instantiate instead to
+// some kind of mock or simulated-time source.
+class RealTestTime {
 public:
-  TestTime();
+  RealTestTime();
 
   TimeSource& timeSource() { return time_source_; }
 
+private:
   // TODO(#4160): Add a 'mode' enum arg to the constructor, which
   // instantiates mock or perhaps fake time here rather than real-time, which is
   // makes testing non-deterministic and hard to debug. It should be easy, on
