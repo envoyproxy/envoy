@@ -82,15 +82,12 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
 
     ProtobufWkt::Struct metrics;
 
+    auto& fields = *metrics.mutable_fields();
     if (!effective_policy_id.empty()) {
-      ProtobufWkt::Value policy_id;
-      policy_id.set_string_value(effective_policy_id);
-      (*metrics.mutable_fields())[shadow_policy_id_field] = policy_id;
+      *fields[shadow_policy_id_field].mutable_string_value() = effective_policy_id;
     }
 
-    ProtobufWkt::Value resp_code;
-    resp_code.set_string_value(shadow_resp_code);
-    (*metrics.mutable_fields())[shadow_resp_code_field] = resp_code;
+    *fields[shadow_resp_code_field].mutable_string_value() = shadow_resp_code;
 
     callbacks_->requestInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
   }
