@@ -213,7 +213,7 @@ public:
   }
 
   histogram_t* makeHistogram(const std::vector<uint64_t>& values) {
-    histogram_t* histogram = hist_alloc();
+    histogram_t* histogram = hist_alloc(); // The histogram needs to be freed later
     for (uint64_t value : values) {
       hist_insert_intscale(histogram, value, 0, 1);
     }
