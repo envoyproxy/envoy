@@ -24,14 +24,24 @@ public:
   absl::string_view queryParamsToString(const QueryParamsMap&) override;
 
   /**
-   * Applys std::map::find()
+   * Applies std::map::find()
    */
   const QueryParamsMap::const_iterator find(const std::string key) const override;
 
   /**
-   * Applys std::map::end()
+   * Applies std::map::begin()
+   */
+  const QueryParamsMap::const_iterator begin() const override;
+  /**
+   * Applies std::map::end()
    */
   const QueryParamsMap::const_iterator end() const override;
+
+  /**
+   * Applies std::map::size()
+   */
+  int size() override;
+
 };
 
 } // namespace Utility

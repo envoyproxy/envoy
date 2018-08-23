@@ -31,9 +31,11 @@ public:
    * @return QueryParamsMap serialized into a string.
    */
   virtual absl::string_view queryParamsToString(const QueryParamsMap&) PURE;
-  
+
   virtual const QueryParamsMap::const_iterator find(const std::string key) const PURE;
+  virtual const QueryParamsMap::const_iterator begin() const PURE;
   virtual const QueryParamsMap::const_iterator end() const PURE;
+  virtual int size() PURE;
 };
 
 } // namespace Utility

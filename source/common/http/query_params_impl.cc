@@ -51,7 +51,9 @@ absl::string_view QueryParamsImpl::queryParamsToString(const QueryParamsMap& par
 }
 
 const QueryParamsMap::const_iterator QueryParamsImpl::find(const std::string key) const { return this->find(key); }
+const QueryParamsMap::const_iterator QueryParamsImpl::begin() const { return this->begin(); }
 const QueryParamsMap::const_iterator QueryParamsImpl::end() const { return this->end(); }
+int QueryParamsImpl::size() { return this->size(); }
 
 } // namespace Utility
 } // namespace Http

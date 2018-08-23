@@ -191,7 +191,7 @@ const Http::HeaderMap& AdminFilter::getRequestHeaders() const {
   return *request_headers_;
 }
 
-bool AdminImpl::changeLogLevel(const Http::Utility::QueryParams& params) {
+bool AdminImpl::changeLogLevel(const Http::Utility::QueryParamsMap& params) {
   if (params.size() != 1) {
     return false;
   }
@@ -371,7 +371,7 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
 
 Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& response_headers,
                                       Buffer::Instance& response, AdminStream&) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  Http::Utility::QueryParamsMap query_params = query_params_.parseQueryString(url);
   auto it = query_params.find("format");
 
   if (it != query_params.end() && it->second == "json") {
@@ -404,7 +404,7 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& resp
 
 Http::Code AdminImpl::handlerCpuProfiler(absl::string_view url, Http::HeaderMap&,
                                          Buffer::Instance& response, AdminStream&) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  Http::Utility::QueryParamsMap query_params = query_params_.parseQueryString(url);
   if (query_params.size() != 1 || query_params.begin()->first != "enable" ||
       (query_params.begin()->second != "y" && query_params.begin()->second != "n")) {
     response.add("?enable=<y|n>\n");
@@ -448,7 +448,7 @@ Http::Code AdminImpl::handlerHotRestartVersion(absl::string_view, Http::HeaderMa
 
 Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
                                      Buffer::Instance& response, AdminStream&) {
-  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  Http::Utility::QueryParamsMap query_params = query_params_.parseQueryString(url);
 
   Http::Code rc = Http::Code::OK;
   if (!changeLogLevel(query_params)) {
@@ -496,7 +496,7 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap&,
 Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& response_headers,
                                    Buffer::Instance& response, AdminStream& admin_stream) {
   Http::Code rc = Http::Code::OK;
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  const Http::Utility::QueryParamsMap params = query_params_.parseQueryString(url);
 
   const bool show_all = params.find("usedonly") == params.end();
   const bool has_format = !(params.find("format") == params.end());
@@ -733,7 +733,7 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap&, Buffer::
 
 Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& response_headers,
                                      Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  const Http::Utility::QueryParamsMap params = query_params_.parseQueryString(url);
   response_headers.insertContentType().value().setReference(
       Http::Headers::get().ContentTypeValues.Json);
 
@@ -821,7 +821,7 @@ std::string AdminImpl::runtimeAsJson(
 
 Http::Code AdminImpl::handlerRuntimeModify(absl::string_view url, Http::HeaderMap&,
                                            Buffer::Instance& response, AdminStream&) {
-  const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
+  const Http::Utility::QueryParamsMap params = query_params_.parseQueryString(url);
   if (params.empty()) {
     response.add("usage: /runtime_modify?key1=value1&key2=value2&keyN=valueN\n");
     response.add("use an empty value to remove a previously added override");
