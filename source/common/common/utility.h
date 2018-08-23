@@ -101,7 +101,7 @@ public:
 class ProdSystemTimeSource : public SystemTimeSource {
 public:
   // SystemTimeSource
-  SystemTime currentTime() const override { return std::chrono::system_clock::now(); }
+  SystemTime currentTime() override { return std::chrono::system_clock::now(); }
 };
 
 /**
@@ -110,7 +110,7 @@ public:
 class ProdMonotonicTimeSource : public MonotonicTimeSource {
 public:
   // MonotonicTimeSource
-  MonotonicTime currentTime() const override { return std::chrono::steady_clock::now(); }
+  MonotonicTime currentTime() override { return std::chrono::steady_clock::now(); }
 };
 
 /**
