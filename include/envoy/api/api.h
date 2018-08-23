@@ -21,6 +21,7 @@ public:
 
   /**
    * Allocate a dispatcher.
+   * @param time_source the time source.
    * @return Event::DispatcherPtr which is owned by the caller.
    */
   virtual Event::DispatcherPtr allocateDispatcher(TimeSource& time_source) PURE;
