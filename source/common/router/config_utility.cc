@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Router {
 
 bool ConfigUtility::QueryParameterMatcher::matches(
-    const Http::Utility::QueryParams& request_query_params) const {
+    const Http::Utility::QueryParamsMap& request_query_params) const {
   auto query_param = request_query_params.find(name_);
   if (query_param == request_query_params.end()) {
     return false;
@@ -37,7 +37,7 @@ ConfigUtility::parsePriority(const envoy::api::v2::core::RoutingPriority& priori
 }
 
 bool ConfigUtility::matchQueryParams(
-    const Http::Utility::QueryParams& query_params,
+    const Http::Utility::QueryParamsMap& query_params,
     const std::vector<QueryParameterMatcher>& config_query_params) {
   for (const auto& config_query_param : config_query_params) {
     if (!config_query_param.matches(query_params)) {

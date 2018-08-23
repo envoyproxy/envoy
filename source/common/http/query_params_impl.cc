@@ -9,10 +9,13 @@ namespace Envoy {
 namespace Http {
 namespace Utility {
 
+QueryParamsImpl::QueryParamsImpl() {}
+
 QueryParamsMap QueryParamsImpl::parseQueryString(absl::string_view url) {
+  QueryParamsMap params;
   size_t start = url.find('?');
   if (start == std::string::npos) {
-    return query_params_;
+    return params;
   }
 
   start++;
@@ -25,22 +28,17 @@ QueryParamsMap QueryParamsImpl::parseQueryString(absl::string_view url) {
 
     const size_t equal = param.find('=');
     if (equal != std::string::npos) {
-      query_params_.emplace(StringUtil::subspan(url, start, start + equal),
+      params.emplace(StringUtil::subspan(url, start, start + equal),
                             StringUtil::subspan(url, start + equal + 1, end));
     } else {
-      query_params_.emplace(StringUtil::subspan(url, start, end), "");
+      params.emplace(StringUtil::subspan(url, start, end), "");
     }
 
     start = end + 1;
   }
 
-  return query_params_;
+  return params;
 }
-
-QueryParamsImpl::QueryParamsImpl() {}
-QueryParamsImpl::QueryParamsImpl(absl::string_view url) : url_(url) { parseQueryString(url); }
-
-QueryParamsMap QueryParamsImpl::getQueryParams() { return query_params_; }
 
 absl::string_view QueryParamsImpl::queryParamsToString(const QueryParamsMap& params) {
   std::string out;
@@ -52,10 +50,8 @@ absl::string_view QueryParamsImpl::queryParamsToString(const QueryParamsMap& par
   return out;
 }
 
-absl::string_view QueryParamsImpl::getURL() { return url_; }
-
-const QueryParamsMap::const_iterator QueryParamsImpl::find(const std::string key) const { return query_params_.find(key); }
-const QueryParamsMap::const_iterator QueryParamsImpl::end() const { return query_params_.end(); }
+const QueryParamsMap::const_iterator QueryParamsImpl::find(const std::string key) const { return this->find(key); }
+const QueryParamsMap::const_iterator QueryParamsImpl::end() const { return this->end(); }
 
 } // namespace Utility
 } // namespace Http

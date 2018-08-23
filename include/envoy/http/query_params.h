@@ -18,25 +18,23 @@ typedef std::map<std::string, std::string> QueryParamsMap;
 
 class QueryParams {
 public:
-  // QueryParams(absl::string_view url);
-  virtual ~QueryParams();
+  virtual ~QueryParams() {};
 
+  /**
+   * @param url supplies the url to parse.
+   * @return QueryParamsMap of the parsed parameters, if any.
+   */
   virtual QueryParamsMap parseQueryString(absl::string_view) PURE;
+
+  /**
+   * @param QueryParamsMap of desired string.
+   * @return QueryParamsMap serialized into a string.
+   */
   virtual absl::string_view queryParamsToString(const QueryParamsMap&) PURE;
-  virtual QueryParamsMap getQueryParams() PURE;
-  virtual absl::string_view getURL() PURE;
+  
   virtual const QueryParamsMap::const_iterator find(const std::string key) const PURE;
   virtual const QueryParamsMap::const_iterator end() const PURE;
 };
-
-/*
-Utility::parseQueryString will call constructor to this class (?)
-
-Probably need to rewrite queryParamsToString in here
-  {{}} -> ""
-  {{"a", "1"}} -> "?a=1"
-  {{"a", "1"}, {"b", "2"}} -> "?a=1&b=2"
-*/
 
 } // namespace Utility
 } // namespace Http
