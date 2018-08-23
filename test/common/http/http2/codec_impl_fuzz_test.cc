@@ -273,9 +273,14 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::CodecImplFuzzTestCase& inpu
   // the response encoder and can complete Stream initialization.
   std::list<StreamPtr> pending_streams;
   std::list<StreamPtr> streams;
+  // For new streams when we aren't expecting one (e.g. as a result of a mutation).
+  NiceMock<MockStreamDecoder> orphan_request_decoder;
 
   ON_CALL(server_callbacks, newStream(_))
       .WillByDefault(Invoke([&](StreamEncoder& encoder) -> StreamDecoder& {
+        if (pending_streams.empty()) {
+          return orphan_request_decoder;
+        }
         auto stream_ptr = pending_streams.front()->removeFromList(pending_streams);
         Stream* const stream = stream_ptr.get();
         stream_ptr->moveIntoListBack(std::move(stream_ptr), streams);

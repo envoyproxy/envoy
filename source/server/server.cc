@@ -137,7 +137,6 @@ void InstanceImpl::flushStats() {
     server_stats_->total_connections_.set(numConnections() + info.num_connections_);
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
-    server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
     InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_.source());
     // TODO(ramaraochavali): consider adding different flush interval for histograms.
     if (stat_flush_timer_ != nullptr) {
@@ -222,6 +221,9 @@ void InstanceImpl::initialize(Options& options,
 
   server_stats_.reset(
       new ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});
+
+  server_stats_->concurrency_.set(options_.concurrency());
+  server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
 
   failHealthcheck(false);
 

@@ -346,7 +346,10 @@ void HystrixSink::flush(Stats::Source& source) {
         // binary-search here is likely not worth it, as hystrix_quantiles has <10 elements.
         if (std::find(hystrix_quantiles.begin(), hystrix_quantiles.end(), supported_quantiles[i]) !=
             hystrix_quantiles.end()) {
-          hist_map[supported_quantiles[i]] = histogram->intervalStatistics().computedQuantiles()[i];
+          double value = histogram->intervalStatistics().computedQuantiles()[i];
+          if (!std::isnan(value)) {
+            hist_map[supported_quantiles[i]] = value;
+          }
         }
       }
     }
