@@ -63,9 +63,26 @@ void BaseThriftIntegrationTest::preparePayloads(const PayloadOptions& options,
   };
 
   if (options.service_name_) {
+    args.push_back("-s");
     args.push_back(*options.service_name_);
   }
-  args.push_back("--");
+
+  if (options.headers_.size() > 0) {
+    args.push_back("-H");
+
+    std::stringstream ss;
+    size_t sz = options.headers_.size();
+    for (size_t i = 0; i < sz; i++) {
+      std::pair<std::string, std::string> p = options.headers_.at(i);
+      ss << p.first << "=" << p.second;
+      if (i < sz - 1) {
+        ss << ",";
+      }
+    }
+
+    args.push_back(ss.str());
+  }
+
   args.push_back(options.method_name_);
   std::copy(options.method_args_.begin(), options.method_args_.end(), std::back_inserter(args));
 

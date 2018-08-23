@@ -45,7 +45,7 @@ MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
 RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
   if (RouteEntryImplBase::headersMatch(metadata.headers())) {
     bool matches =
-      method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
+        method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
 
     if (matches ^ invert_) {
       return clusterEntry();
@@ -74,7 +74,7 @@ RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& me
   if (RouteEntryImplBase::headersMatch(metadata.headers())) {
     bool matches = service_name_.empty() ||
                    (metadata.hasMethodName() &&
-                   StringUtil::startsWith(metadata.methodName().c_str(), service_name_));
+                    StringUtil::startsWith(metadata.methodName().c_str(), service_name_));
 
     if (matches ^ invert_) {
       return clusterEntry();
