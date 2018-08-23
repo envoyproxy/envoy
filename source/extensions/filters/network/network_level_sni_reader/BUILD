@@ -9,9 +9,9 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "inner_sni_reader",
-    srcs = ["inner_sni_reader.cc"],
-    hdrs = ["inner_sni_reader.h"],
+    name = "network_level_sni_reader",
+    srcs = ["network_level_sni_reader.cc"],
+    hdrs = ["network_level_sni_reader.h"],
     external_deps = ["ssl"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
@@ -26,7 +26,7 @@ envoy_cc_library(
     name = "config",
     srcs = ["config.cc"],
     deps = [
-        ":inner_sni_reader",
+        ":network_level_sni_reader",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/network:well_known_names",

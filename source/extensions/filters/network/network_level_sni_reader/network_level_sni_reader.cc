@@ -1,4 +1,4 @@
-#include "extensions/filters/network/inner_sni_reader/inner_sni_reader.h"
+#include "extensions/filters/network/network_level_sni_reader/network_level_sni_reader.h"
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
@@ -13,10 +13,10 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace InnerSniReader {
+namespace NetworkLevelSniReader {
 
 Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
-    : stats_{ALL_INNER_SNI_READER_STATS(POOL_COUNTER_PREFIX(scope, "inner_sni_reader."))},
+    : stats_{ALL_NETWORK_LEVEL_SNI_READER_STATS(POOL_COUNTER_PREFIX(scope, "network_levelsni_reader."))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
       max_client_hello_size_(max_client_hello_size) {
 
@@ -34,7 +34,7 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
 //        size_t len;
 //        if (SSL_early_callback_ctx_extension_get(
 //                client_hello, TLSEXT_TYPE_application_layer_protocol_negotiation, &data, &len)) {
-//          InnerSniReaderFilter* filter = static_cast<InnerSniReaderFilter*>(SSL_get_app_data(client_hello->ssl));
+//          NetworkLevelSniReaderFilter* filter = static_cast<NetworkLevelSniReaderFilter*>(SSL_get_app_data(client_hello->ssl));
 ////          filter->onALPN(data, len);
 //          if (filter != nullptr) {}
 //
@@ -43,7 +43,7 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
 //      });
   SSL_CTX_set_tlsext_servername_callback(
       ssl_ctx_.get(), [](SSL* ssl, int* out_alert, void*) -> int {
-        InnerSniReaderFilter* filter = static_cast<InnerSniReaderFilter*>(SSL_get_app_data(ssl));
+        NetworkLevelSniReaderFilter* filter = static_cast<NetworkLevelSniReaderFilter*>(SSL_get_app_data(ssl));
         filter->onServername(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name));
           if (filter != nullptr) {}
 
@@ -55,17 +55,17 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
 
 bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_ctx_.get())}; }
 
-thread_local uint8_t InnerSniReaderFilter::buf_[Config::TLS_MAX_CLIENT_HELLO];
+thread_local uint8_t NetworkLevelSniReaderFilter::buf_[Config::TLS_MAX_CLIENT_HELLO];
 
-InnerSniReaderFilter::InnerSniReaderFilter(const ConfigSharedPtr config) : config_(config), ssl_(config_->newSsl()) {
+NetworkLevelSniReaderFilter::NetworkLevelSniReaderFilter(const ConfigSharedPtr config) : config_(config), ssl_(config_->newSsl()) {
   RELEASE_ASSERT(sizeof(buf_) >= config_->maxClientHelloSize(), "");
 
   SSL_set_app_data(ssl_.get(), this);
   SSL_set_accept_state(ssl_.get());
 }
 
-Network::FilterStatus InnerSniReaderFilter::onData(Buffer::Instance& data, bool) {
-  ENVOY_CONN_LOG(trace, "InnerSniReader: got {} bytes", read_callbacks_->connection(), data.length());
+Network::FilterStatus NetworkLevelSniReaderFilter::onData(Buffer::Instance& data, bool) {
+  ENVOY_CONN_LOG(trace, "NetworkLevelSniReader: got {} bytes", read_callbacks_->connection(), data.length());
 
   // TODO: append data to the buffer instead of overwriting it.
   size_t len = (data.length() < Config::TLS_MAX_CLIENT_HELLO) ? data.length() : Config::TLS_MAX_CLIENT_HELLO ;
@@ -76,8 +76,8 @@ Network::FilterStatus InnerSniReaderFilter::onData(Buffer::Instance& data, bool)
   return Network::FilterStatus::Continue;
 }
 
-void InnerSniReaderFilter::onServername(absl::string_view name) {
-  ENVOY_CONN_LOG(debug, "inner sni reader: servername: {}", read_callbacks_->connection(), name);
+void NetworkLevelSniReaderFilter::onServername(absl::string_view name) {
+  ENVOY_CONN_LOG(debug, "network level sni reader: servername: {}", read_callbacks_->connection(), name);
   if (!name.empty()) {
     config_->stats().sni_found_.inc();
     read_callbacks_->networkLevelRequestedServerName(name);
@@ -87,7 +87,7 @@ void InnerSniReaderFilter::onServername(absl::string_view name) {
   clienthello_success_ = true;
 }
 
-void InnerSniReaderFilter::parseClientHello(const void* data, size_t len) {
+void NetworkLevelSniReaderFilter::parseClientHello(const void* data, size_t len) {
   // Ownership is passed to ssl_ in SSL_set_bio()
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(data, len));
 
@@ -119,7 +119,6 @@ void InnerSniReaderFilter::parseClientHello(const void* data, size_t len) {
       } else {
         config_->stats().alpn_not_found_.inc();
       }
-//      cb_->socket().setDetectedTransportProtocol(TransportSockets::TransportSocketNames::get().Tls);
     } else {
       config_->stats().tls_not_found_.inc();
     }
@@ -131,12 +130,12 @@ void InnerSniReaderFilter::parseClientHello(const void* data, size_t len) {
   }
 }
 
-void InnerSniReaderFilter::done(bool success) {
-  ENVOY_LOG(trace, "inner sni reader: done: {}", success);
+void NetworkLevelSniReaderFilter::done(bool success) {
+  ENVOY_LOG(trace, "network level sni reader: done: {}", success);
   read_callbacks_->continueReading();
 }
 
-} // namespace InnerSniReader
+} // namespace NetworkLevelSniReader
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy

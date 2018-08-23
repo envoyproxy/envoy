@@ -12,13 +12,13 @@
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
-namespace InnerSniReader {
+namespace NetworkLevelSniReader {
 
 /**
- * All stats for the inner SNI reader. @see stats_macros.h
+ * All stats for the network level SNI reader. @see stats_macros.h
  */
 // TODO: Remove unnecessary stats
-#define ALL_INNER_SNI_READER_STATS(COUNTER)                                                        \
+#define ALL_NETWORK_LEVEL_SNI_READER_STATS(COUNTER)                                                        \
   COUNTER(connection_closed)                                                                       \
   COUNTER(client_hello_too_large)                                                                  \
   COUNTER(read_error)                                                                              \
@@ -31,36 +31,36 @@ namespace InnerSniReader {
   COUNTER(sni_not_found)
 
 /**
- * Definition of all stats for the inner SNI reader. @see stats_macros.h
+ * Definition of all stats for the network level SNI reader. @see stats_macros.h
  */
-struct InnerSniReaderStats {
-  ALL_INNER_SNI_READER_STATS(GENERATE_COUNTER_STRUCT)
+struct NetworkLevelSniReaderStats {
+  ALL_NETWORK_LEVEL_SNI_READER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 /**
- * Global configuration for inner SNI reader.
+ * Global configuration for network level SNI reader.
  */
 class Config {
 public:
   Config(Stats::Scope& scope, uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
 
-  const InnerSniReaderStats& stats() const { return stats_; }
+  const NetworkLevelSniReaderStats& stats() const { return stats_; }
   bssl::UniquePtr<SSL> newSsl();
   uint32_t maxClientHelloSize() const { return max_client_hello_size_; }
 
   static constexpr size_t TLS_MAX_CLIENT_HELLO = 64 * 1024;
 
 private:
-  InnerSniReaderStats stats_;
+  NetworkLevelSniReaderStats stats_;
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   const uint32_t max_client_hello_size_;
 };
 
 typedef std::shared_ptr<Config> ConfigSharedPtr;
 
-class InnerSniReaderFilter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
+class NetworkLevelSniReaderFilter : public Network::ReadFilter, Logger::Loggable<Logger::Id::filter> {
 public:
-  InnerSniReaderFilter(const ConfigSharedPtr config);
+  NetworkLevelSniReaderFilter(const ConfigSharedPtr config);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -88,7 +88,7 @@ private:
   friend class Config;
 };
 
-} // namespace InnerSniReader
+} // namespace NetworkLevelSniReader
 } // namespace NetworkFilters
 } // namespace Extensions
 } // namespace Envoy
