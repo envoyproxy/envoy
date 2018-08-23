@@ -76,6 +76,16 @@ public:
    * Set the currently selected upstream host for the connection.
    */
   virtual void upstreamHost(Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * Return the requested server name (e.g. SNI in TLS) of the network level, if any.
+   */
+  virtual absl::string_view networkLevelRequestedServerName() PURE;
+
+  /**
+   * Set the requested server name (e.g. SNI in TLS) of the network level, if any.
+   */
+  virtual void networkLevelRequestedServerName(absl::string_view name) PURE;
 };
 
 /**

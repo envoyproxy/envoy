@@ -61,6 +61,12 @@ private:
     void upstreamHost(Upstream::HostDescriptionConstSharedPtr host) override {
       parent_.host_description_ = host;
     }
+    absl::string_view networkLevelRequestedServerName() override {
+      return parent_.network_level_requested_server_name_;
+    }
+    void networkLevelRequestedServerName(absl::string_view name) override {
+      parent_.network_level_requested_server_name_ = name;
+    }
 
     FilterManagerImpl& parent_;
     ReadFilterSharedPtr filter_;
@@ -73,6 +79,7 @@ private:
 
   Connection& connection_;
   BufferSource& buffer_source_;
+  absl::string_view network_level_requested_server_name_;
   Upstream::HostDescriptionConstSharedPtr host_description_;
   std::list<ActiveReadFilterPtr> upstream_filters_;
   std::list<WriteFilterSharedPtr> downstream_filters_;
