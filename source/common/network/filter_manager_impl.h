@@ -62,6 +62,8 @@ private:
       parent_.host_description_ = host;
     }
     absl::string_view networkLevelRequestedServerName() override {
+      // TODO: return an empty string and write a warning to log when inner SNI reader is not
+      // configured.
       return parent_.network_level_requested_server_name_;
     }
     void networkLevelRequestedServerName(absl::string_view name) override {

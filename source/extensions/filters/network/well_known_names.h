@@ -18,6 +18,8 @@ public:
   const std::string Echo = "envoy.echo";
   // HTTP connection manager filter
   const std::string HttpConnectionManager = "envoy.http_connection_manager";
+  // HTTP connection manager filter
+  const std::string InnerSniReader = "envoy.inner_sni_reader";
   // Mongo proxy filter
   const std::string MongoProxy = "envoy.mongo_proxy";
   // Rate limit filter
