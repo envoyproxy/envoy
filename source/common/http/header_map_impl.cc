@@ -67,13 +67,15 @@ void HeaderString::freeDynamic() {
 void HeaderString::append(const char* data, uint32_t size) {
   switch (type_) {
   case Type::Reference: {
-    // Switch back to inline and fall through. We do not actually append to the static string
-    // currently which would require a copy.
-    type_ = Type::Inline;
-    buffer_.dynamic_ = inline_buffer_;
-    string_length_ = 0;
-
-    FALLTHRU;
+    // Rather than be too clever and optimize this uncommon case, we dynamically
+    // allocate and copy.
+    type_ = Type::Dynamic;
+    dynamic_capacity_ = (string_length_ + size) * 2;
+    char* buf = static_cast<char*>(malloc(dynamic_capacity_));
+    RELEASE_ASSERT(buf != nullptr, "");
+    memcpy(buf, buffer_.ref_, string_length_);
+    buffer_.dynamic_ = buf;
+    break;
   }
 
   case Type::Inline: {
@@ -94,6 +96,7 @@ void HeaderString::append(const char* data, uint32_t size) {
       RELEASE_ASSERT(new_capacity <= std::numeric_limits<uint32_t>::max(), "");
       buffer_.dynamic_ = static_cast<char*>(malloc(new_capacity));
       memcpy(buffer_.dynamic_, inline_buffer_, string_length_);
+      RELEASE_ASSERT(buffer_.dynamic_ != nullptr, "");
       dynamic_capacity_ = new_capacity;
       type_ = Type::Dynamic;
     } else {
@@ -101,6 +104,7 @@ void HeaderString::append(const char* data, uint32_t size) {
         // Need to reallocate.
         dynamic_capacity_ = (string_length_ + size) * 2;
         buffer_.dynamic_ = static_cast<char*>(realloc(buffer_.dynamic_, dynamic_capacity_));
+        RELEASE_ASSERT(buffer_.dynamic_ != nullptr, "");
       }
     }
   }
@@ -323,8 +327,12 @@ void HeaderMapImpl::insertByKey(HeaderString&& key, HeaderString&& value) {
   if (cb) {
     key.clear();
     StaticLookupResponse ref_lookup_response = cb(*this);
-    ASSERT(*ref_lookup_response.entry_ == nullptr); // This function doesn't handle append.
-    maybeCreateInline(ref_lookup_response.entry_, *ref_lookup_response.key_, std::move(value));
+    if (*ref_lookup_response.entry_ == nullptr) {
+      maybeCreateInline(ref_lookup_response.entry_, *ref_lookup_response.key_, std::move(value));
+    } else {
+      appendToHeader((*ref_lookup_response.entry_)->value(), value.c_str());
+      value.clear();
+    }
   } else {
     std::list<HeaderEntryImpl>::iterator i = headers_.insert(std::move(key), std::move(value));
     i->entry_ = i;
