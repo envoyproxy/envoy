@@ -13,6 +13,10 @@ public:
 
   const Ssl::TlsCertificateConfig* secret() const override { return tls_certificate_.get(); }
 
+  void addUpdateCallback(SecretCallbacks&) override {}
+
+  void removeUpdateCallback(SecretCallbacks&) override {}
+
 private:
   Ssl::TlsCertificateConfigPtr tls_certificate_;
 };

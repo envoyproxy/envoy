@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
+#include "common/secret/sds_api.h"
 #include "common/secret/secret_provider_impl.h"
 #include "common/ssl/tls_certificate_config_impl.h"
 
@@ -35,6 +36,38 @@ SecretManagerImpl::findStaticTlsCertificateProvider(const std::string& name) con
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::createInlineTlsCertificateProvider(
     const envoy::api::v2::auth::TlsCertificate& tls_certificate) {
   return std::make_shared<TlsCertificateConfigProviderImpl>(tls_certificate);
+}
+
+void SecretManagerImpl::removeDynamicSecretProvider(const std::string& map_key) {
+  ENVOY_LOG(debug, "Unregister secret provider. hash key: {}", map_key);
+
+  RELEASE_ASSERT(dynamic_secret_providers_.erase(map_key) == 1, "");
+}
+
+TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateDynamicSecretProvider(
+    const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+  const std::string map_key = std::to_string(MessageUtil::hash(sds_config_source)) + config_name;
+
+  auto secret_provider = dynamic_secret_providers_[map_key].lock();
+  if (!secret_provider) {
+    ASSERT(secret_provider_context.initManager() != nullptr);
+
+    // SdsApi is owned by ListenerImpl and ClusterInfo which are destroyed before
+    // SecretManagerImpl. It is safe to invoke this callback at the destructor of SdsApi.
+    std::function<void()> unregister_secret_provider = [map_key, this]() {
+      removeDynamicSecretProvider(map_key);
+    };
+
+    secret_provider = std::make_shared<SdsApi>(
+        secret_provider_context.localInfo(), secret_provider_context.dispatcher(),
+        secret_provider_context.random(), secret_provider_context.stats(),
+        secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
+        sds_config_source, config_name, unregister_secret_provider);
+    dynamic_secret_providers_[map_key] = secret_provider;
+  }
+
+  return secret_provider;
 }
 
 } // namespace Secret

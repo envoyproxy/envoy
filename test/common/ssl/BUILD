@@ -36,7 +36,6 @@ envoy_cc_test(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/secret:secret_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:environment_lib",
@@ -57,13 +56,13 @@ envoy_cc_test(
     ],
     deps = [
         "//source/common/json:json_loader_lib",
-        "//source/common/secret:secret_manager_impl_lib",
         "//source/common/ssl:context_config_lib",
         "//source/common/ssl:context_lib",
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
     ],
 )

@@ -5,7 +5,8 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/ssl/tls_certificate_config.h"
+#include "envoy/secret/secret_callbacks.h"
+#include "envoy/secret/secret_provider.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -95,6 +96,19 @@ public:
    * @return The maximum TLS protocol version to negotiate.
    */
   virtual unsigned maxProtocolVersion() const PURE;
+
+  /**
+   * @return true if the ContextConfig is able to provide secrets to create SSL context,
+   * and false if dynamic secrets are expected but are not downloaded from SDS server yet.
+   */
+  virtual bool isReady() const PURE;
+
+  /**
+   * Add secret callback into context config. When dynamic secrets are in use and new secrets
+   * are downloaded from SDS server, this callback is invoked to update SSL context.
+   * @param callback callback that is executed by context config.
+   */
+  virtual void setSecretUpdateCallback(Secret::SecretCallbacks& callback) PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {
