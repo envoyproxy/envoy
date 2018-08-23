@@ -1803,8 +1803,8 @@ virtual_hosts:
             default_value:
               numerator: 50
               denominator: TEN_THOUSAND
-            numerator_runtime_key: "bogus_num_key"
-            denominator_runtime_key: "bogus_den_key"
+            numerator_key: "bogus_num_key"
+            denominator_key: "bogus_den_key"
         route:
           cluster: "something_else"
       - match:
@@ -1844,8 +1844,8 @@ virtual_hosts:
             default_value:
               numerator: 50
               denominator: TEN_THOUSAND
-            numerator_runtime_key: "bogus_num_key"
-            denominator_runtime_key: "bogus_den_key"
+            numerator_key: "bogus_num_key"
+            denominator_key: "bogus_den_key"
           runtime:
             default_value: 10
             runtime_key: "shouldnt_see_key"
@@ -1888,8 +1888,8 @@ virtual_hosts:
             default_value:
               numerator: 45
               denominator: MILLION
-            numerator_runtime_key: "bogus_num_key"
-            denominator_runtime_key: "bogus_den_key"
+            numerator_key: "bogus_num_key"
+            denominator_key: "bogus_den_key"
           runtime:
             default_value: 10
             runtime_key: "shouldnt_see_key"

@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package envoy.type;
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+import "envoy/type/percent.proto";
+
+option (gogoproto.equal_all) = true;
+
+// [#protodoc-title: RuntimePercent]
+
+// Runtime derived FractionalPercent with defaults for when the numerator or denominator is not
+// specified via a runtime key.
+message RuntimeFractionalPercent {
+  // Default value if the runtime value's for the numerator/denominator keys are not available.
+  envoy.type.FractionalPercent default_value = 1 [(validate.rules).message.required = true];
+
+  // Runtime key to get numerator value for comparison. This value is used if defined.
+  string numerator_key = 2;
+
+  // Runtime key to get denominator type for comparison. This value is used if defined. Valid field
+  // value strings must match valid :ref:`denominator
+  // types<envoy_api_enum_type.FractionalPercent.DenominatorType>`.
+  string denominator_key = 3;
+}

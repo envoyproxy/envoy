@@ -114,6 +114,7 @@ PROTO_RST="
   /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/external_auth.proto.rst
   /envoy/type/http_status/envoy/type/http_status.proto.rst
   /envoy/type/percent/envoy/type/percent.proto.rst
+  /envoy/type/percent/envoy/type/runtime_percent.proto.rst
   /envoy/type/range/envoy/type/range.proto.rst
   /envoy/type/matcher/metadata/envoy/type/matcher/metadata.proto.rst
   /envoy/type/matcher/value/envoy/type/matcher/value.proto.rst

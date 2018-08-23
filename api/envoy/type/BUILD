@@ -14,6 +14,18 @@ api_go_proto_library(
 )
 
 api_proto_library_internal(
+    name = "runtime_percent",
+    srcs = ["runtime_percent.proto"],
+    visibility = ["//visibility:public"],
+    deps = [":percent"],
+)
+
+api_go_proto_library(
+    name = "runtime_percent",
+    proto = ":runtime_percent",
+)
+
+api_proto_library_internal(
     name = "percent",
     srcs = ["percent.proto"],
     visibility = ["//visibility:public"],

@@ -8,8 +8,8 @@ api_proto_library_internal(
     visibility = ["//envoy/api/v2:friends"],
     deps = [
         "//envoy/api/v2/core:base",
-        "//envoy/type:percent",
         "//envoy/type:range",
+        "//envoy/type:runtime_percent",
     ],
 )
 
@@ -18,7 +18,7 @@ api_go_proto_library(
     proto = ":route",
     deps = [
         "//envoy/api/v2/core:base_go_proto",
-        "//envoy/type:percent",
         "//envoy/type:range_go_proto",
+        "//envoy/type:runtime_percent",
     ],
 )

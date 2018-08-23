@@ -408,18 +408,18 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
   RuntimeData data;
 
   if (route_match.has_runtime_fraction()) {
-    data.numerator_key_ = route_match.runtime_fraction().numerator_runtime_key();
+    data.numerator_key_ = route_match.runtime_fraction().numerator_key();
     data.numerator_default_ = route_match.runtime_fraction().default_value().numerator();
 
-    const std::string& d_key = route_match.runtime_fraction().denominator_runtime_key();
-    const std::string& d_data = loader_.snapshot().get(d_key);
+    const std::string& denominator_key = route_match.runtime_fraction().denominator_key();
+    const std::string& denominator_data = loader_.snapshot().get(denominator_key);
     using FractionalPercent = envoy::type::FractionalPercent;
-    FractionalPercent::DenominatorType d_type;
-    if (!FractionalPercent::DenominatorType_Parse(d_data, &d_type)) {
-      d_type = route_match.runtime_fraction().default_value().denominator();
+    FractionalPercent::DenominatorType denominator_type;
+    if (!FractionalPercent::DenominatorType_Parse(denominator_data, &denominator_type)) {
+      denominator_type = route_match.runtime_fraction().default_value().denominator();
     }
     data.denominator_val_ =
-        ProtobufPercentHelper::fractionalPercentDenominatorToInt(std::move(d_type));
+        ProtobufPercentHelper::fractionalPercentDenominatorToInt(std::move(denominator_type));
   } else if (route_match.has_runtime()) {
     // For backwards compatibility, the deprecated 'runtime' field must be converted to a
     // RuntimeData format with a variable denominator type. This field assumes a percentage (0-100),

@@ -5,8 +5,8 @@ option go_package = "route";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
-import "envoy/type/percent.proto";
 import "envoy/type/range.proto";
+import "envoy/type/runtime_percent.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
