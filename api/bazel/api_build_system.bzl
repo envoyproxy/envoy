@@ -130,6 +130,9 @@ def api_proto_library(
     pgv_cc_proto_library(
         name = _Suffix(name, _CC_SUFFIX),
         srcs = srcs,
+        # Avoid generating .so, we don't need it, can interfere with builds
+        # such as OSS-Fuzz.
+        linkstatic = 1,
         deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps],
         external_deps = external_cc_proto_deps + [
             "@com_google_protobuf//:cc_wkt_protos",
