@@ -96,6 +96,7 @@ def api_proto_library(
         external_proto_deps = [],
         external_cc_proto_deps = [],
         has_services = 0,
+        linkstatic = None,
         require_py = 1):
     # This is now vestigial, since there are no direct consumers in
     # the data plane API. However, we want to maintain native proto_library support
@@ -130,9 +131,7 @@ def api_proto_library(
     pgv_cc_proto_library(
         name = _Suffix(name, _CC_SUFFIX),
         srcs = srcs,
-        # Avoid generating .so, we don't need it, can interfere with builds
-        # such as OSS-Fuzz.
-        linkstatic = 1,
+        linkstatic = linkstatic,
         deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps],
         external_deps = external_cc_proto_deps + [
             "@com_google_protobuf//:cc_wkt_protos",

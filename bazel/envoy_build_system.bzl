@@ -409,6 +409,9 @@ def envoy_proto_library(name, external_deps = [], **kwargs):
         name,
         external_cc_proto_deps = external_cc_proto_deps,
         external_proto_deps = external_proto_deps,
+        # Avoid generating .so, we don't need it, can interfere with builds
+        # such as OSS-Fuzz.
+        linkstatic = 1,
         visibility = ["//visibility:public"],
         **kwargs
     )
