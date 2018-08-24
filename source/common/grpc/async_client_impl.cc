@@ -207,7 +207,7 @@ AsyncRequestImpl::AsyncRequestImpl(AsyncClientImpl& parent,
 
   current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
                                          "async " + parent.remote_cluster_name_ + " egress",
-                                         ProdSystemTimeSource::instance_.currentTime());
+                                         parent.timeSource().systemTime());
   current_span_->setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, parent.remote_cluster_name_);
   current_span_->setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY);
 }

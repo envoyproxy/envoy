@@ -59,9 +59,11 @@ public:
    * @param trace_id_128bit Whether 128bit ids should be used.
    */
   Tracer(const std::string& service_name, Network::Address::InstanceConstSharedPtr address,
-         Runtime::RandomGenerator& random_generator, const bool trace_id_128bit)
+         Runtime::RandomGenerator& random_generator, const bool trace_id_128bit,
+         TimeSource& time_source)
       : service_name_(service_name), address_(address), reporter_(nullptr),
-        random_generator_(random_generator), trace_id_128bit_(trace_id_128bit) {}
+        random_generator_(random_generator), trace_id_128bit_(trace_id_128bit),
+        time_source_(time_source) {}
 
   /**
    * Creates a "root" Zipkin span.
@@ -114,6 +116,7 @@ private:
   ReporterPtr reporter_;
   Runtime::RandomGenerator& random_generator_;
   const bool trace_id_128bit_;
+  TimeSource time_source_;
 };
 
 typedef std::unique_ptr<Tracer> TracerPtr;

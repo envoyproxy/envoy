@@ -86,6 +86,9 @@ public:
   void record(std::chrono::nanoseconds duration, absl::string_view category,
               absl::string_view description);
 
+  /** @return MonotonicTime the current time */
+  MonotonicTime currentTime() { return time_source_.currentTime(); }
+
   /**
    * Renders the aggregated statistics as a string.
    * @return std::string the performance data as a formatted string.
@@ -138,6 +141,7 @@ private:
 #else
   DurationStatsMap duration_stats_map_;
 #endif
+  ProdMonotonicTimeSource time_source_;
 };
 
 /**
@@ -162,8 +166,8 @@ public:
   void record(absl::string_view category, absl::string_view description);
 
 private:
-  MonotonicTime start_time_;
   PerfAnnotationContext* context_;
+  MonotonicTime start_time_;
 };
 
 } // namespace Envoy

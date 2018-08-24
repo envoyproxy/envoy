@@ -14,6 +14,7 @@
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/fmt.h"
+#include "common/http/headers.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"

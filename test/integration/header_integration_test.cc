@@ -120,6 +120,26 @@ route_config:
               - header:
                   key: "x-real-ip"
                   value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+    - name: append-same-headers
+      domains: ["append-same-headers.com"]
+      request_headers_to_add:
+        - header:
+            key: "x-foo"
+            value: "value1"
+        - header:
+            key: "authorization"
+            value: "token1"
+      routes:
+        - match: { prefix: "/test" }
+          route:
+            cluster: cluster_0
+            request_headers_to_add:
+              - header:
+                  key: "x-foo"
+                  value: "value2"
+              - header:
+                  key: "authorization"
+                  value: "token2"
 )EOF";
 
 } // namespace
@@ -901,6 +921,41 @@ TEST_P(HeaderIntegrationTest, TestXFFParsing) {
           {"x-real-ip", "5.6.7.8"},
           {":path", "/test"},
           {":method", "GET"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-unmodified", "response"},
+      },
+      Http::TestHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-unmodified", "response"},
+          {":status", "200"},
+      });
+}
+
+// Validates behavior around same header appending (both predefined headers and
+// other).
+TEST_P(HeaderIntegrationTest, TestAppendSameHeaders) {
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/test"},
+          {":scheme", "http"},
+          {":authority", "append-same-headers.com"},
+          {"authorization", "token3"},
+          {"x-foo", "value3"},
+      },
+      Http::TestHeaderMapImpl{
+          {":authority", "append-same-headers.com"},
+          {":path", "/test"},
+          {":method", "GET"},
+          {"authorization", "token3,token2,token1"},
+          {"x-foo", "value3"},
+          {"x-foo", "value2"},
+          {"x-foo", "value1"},
       },
       Http::TestHeaderMapImpl{
           {"server", "envoy"},

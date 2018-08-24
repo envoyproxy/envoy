@@ -66,7 +66,7 @@ message RequestAction {
 // TODO(htuch): Model and fuzz encoder filter buffering/resumption and different status returns.
 message ResponseAction {
   oneof response_action_selector {
-    test.fuzz.Headers continue_100_headers = 1;
+    test.fuzz.Headers continue_headers = 1;
     test.fuzz.Headers headers = 2;
     uint32 data = 3;
     test.fuzz.Headers trailers = 4;

@@ -107,6 +107,7 @@ std::chrono::milliseconds HealthCheckerImplBase::interval(HealthState state,
 void HealthCheckerImplBase::addHosts(const HostVector& hosts) {
   for (const HostSharedPtr& host : hosts) {
     active_sessions_[host] = makeSession(host);
+    host->setActiveHealthFailureType(Host::ActiveHealthFailureType::UNKNOWN);
     host->setHealthChecker(
         HealthCheckHostMonitorPtr{new HealthCheckHostMonitorImpl(shared_from_this(), host)});
     active_sessions_[host]->start();

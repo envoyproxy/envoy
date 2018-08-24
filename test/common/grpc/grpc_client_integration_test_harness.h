@@ -18,6 +18,7 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_time.h"
 
 using testing::_;
 using testing::Invoke;
@@ -202,7 +203,8 @@ public:
 class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
-      : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {}
+      : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
+        dispatcher_(test_time_.timeSource()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
@@ -393,6 +395,7 @@ public:
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   DispatcherHelper dispatcher_helper_{dispatcher_};
   Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();

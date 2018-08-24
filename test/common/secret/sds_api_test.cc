@@ -26,6 +26,7 @@ namespace {
 
 class SdsApiTest : public testing::Test {};
 
+// Validate that SdsApi object is created and initialized successfully.
 TEST_F(SdsApiTest, BasicTest) {
   ::testing::InSequence s;
   const envoy::service::discovery::v2::SdsDummy dummy;
@@ -56,6 +57,7 @@ TEST_F(SdsApiTest, BasicTest) {
   init_manager.initialize();
 }
 
+// Validate that SdsApi updates secrets successfully if a good secret is passed to onConfigUpdate().
 TEST_F(SdsApiTest, SecretUpdateSuccess) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
@@ -64,7 +66,8 @@ TEST_F(SdsApiTest, SecretUpdateSuccess) {
                  server.clusterManager(), init_manager, config_source, "abc.com", []() {});
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
-  sds_api.addUpdateCallback(secret_callback);
+  auto handle =
+      sds_api.addUpdateCallback([&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
 
   std::string yaml =
       R"EOF(
@@ -90,9 +93,10 @@ TEST_F(SdsApiTest, SecretUpdateSuccess) {
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             sds_api.secret()->privateKey());
 
-  sds_api.removeUpdateCallback(secret_callback);
+  handle->remove();
 }
 
+// Validate that SdsApi throws exception if an empty secret is passed to onConfigUpdate().
 TEST_F(SdsApiTest, EmptyResource) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
@@ -106,6 +110,7 @@ TEST_F(SdsApiTest, EmptyResource) {
                             "Missing SDS resources for abc.com in onConfigUpdate()");
 }
 
+// Validate that SdsApi throws exception if multiple secrets are passed to onConfigUpdate().
 TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
@@ -133,6 +138,8 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
                             "Unexpected SDS secrets length: 2");
 }
 
+// Validate that SdsApi throws exception if secret name passed to onConfigUpdate()
+// does not match configured name.
 TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;

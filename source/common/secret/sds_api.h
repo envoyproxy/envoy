@@ -10,10 +10,12 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_callbacks.h"
-#include "envoy/secret/secret_manager.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
+
+#include "common/common/callback_impl.h"
+#include "common/common/cleanup.h"
 
 namespace Envoy {
 namespace Secret {
@@ -29,9 +31,7 @@ public:
          Runtime::RandomGenerator& random, Stats::Store& stats,
          Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
          const envoy::api::v2::core::ConfigSource& sds_config, std::string sds_config_name,
-         std::function<void()> unregister_secret_provider);
-
-  ~SdsApi() override;
+         std::function<void()> destructor_cb);
 
   // Init::Target
   void initialize(std::function<void()> callback) override;
@@ -48,11 +48,8 @@ public:
     return tls_certificate_secrets_.get();
   }
 
-  void addUpdateCallback(SecretCallbacks& callback) override {
-    update_callbacks_.push_back(&callback);
-  }
-  void removeUpdateCallback(SecretCallbacks& callback) override {
-    update_callbacks_.remove(&callback);
+  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
+    return update_callback_manager_.add(callback);
   }
 
 private:
@@ -70,9 +67,9 @@ private:
   const std::string sds_config_name_;
 
   uint64_t secret_hash_;
-  std::function<void()> unregister_secret_provider_cb_;
+  Cleanup clean_up_;
   Ssl::TlsCertificateConfigPtr tls_certificate_secrets_;
-  std::list<SecretCallbacks*> update_callbacks_;
+  Common::CallbackManager<> update_callback_manager_;
 };
 
 typedef std::unique_ptr<SdsApi> SdsApiPtr;

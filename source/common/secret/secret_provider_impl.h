@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/ssl/tls_certificate_config.h"
@@ -13,9 +15,7 @@ public:
 
   const Ssl::TlsCertificateConfig* secret() const override { return tls_certificate_.get(); }
 
-  void addUpdateCallback(SecretCallbacks&) override {}
-
-  void removeUpdateCallback(SecretCallbacks&) override {}
+  Common::CallbackHandle* addUpdateCallback(std::function<void()>) override { return nullptr; }
 
 private:
   Ssl::TlsCertificateConfigPtr tls_certificate_;

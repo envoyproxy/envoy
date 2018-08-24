@@ -18,6 +18,7 @@ envoy_cc_library(
     hdrs = ["secret_provider.h"],
     deps = [
         ":secret_callbacks_interface",
+        "//include/envoy/common:callback",
         "//include/envoy/ssl:tls_certificate_config_interface",
     ],
 )
