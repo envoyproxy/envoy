@@ -154,13 +154,17 @@ public:
   bool operator!=(const char* rhs) const { return 0 != strcmp(c_str(), rhs); }
 
 private:
-  union {
+  union Buffer {
+    // This should reference inline_buffer_ for Type::Inline.
     char* dynamic_;
     const char* ref_;
   } buffer_;
 
+  // Capacity in both Type::Inline and Type::Dynamic cases must be at least MinDynamicCapacity in
+  // header_map_impl.cc.
   union {
     char inline_buffer_[128];
+    // Since this is a union, this is only valid for type_ == Type::Dynamic.
     uint32_t dynamic_capacity_;
   };
 
@@ -321,10 +325,12 @@ public:
   /**
    * Add a reference header to the map. Both key and value MUST point to data that will live beyond
    * the lifetime of any request/response using the string (since a codec may optimize for zero
-   * copy). Nothing will be copied.
+   * copy). The key will not be copied and a best effort will be made not to
+   * copy the value (but this may happen when comma concatenating, see below).
    *
-   * Calling addReference multiple times for the same header will result in multiple headers being
-   * present in the HeaderMap.
+   * Calling addReference multiple times for the same header will result in:
+   * - Comma concatenation for predefined inline headers.
+   * - Multiple headers being present in the HeaderMap for other headers.
    *
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL NOT be copied.
@@ -336,8 +342,9 @@ public:
    * the lifetime of any request/response using the string (since a codec may optimize for zero
    * copy). The value will be copied.
    *
-   * Calling addReferenceKey multiple times for the same header will result in multiple headers
-   * being present in the HeaderMap.
+   * Calling addReference multiple times for the same header will result in:
+   * - Comma concatenation for predefined inline headers.
+   * - Multiple headers being present in the HeaderMap for other headers.
    *
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL be copied.
@@ -349,8 +356,9 @@ public:
    * live beyond the lifetime of any request/response using the string (since a codec may optimize
    * for zero copy). The value will be copied.
    *
-   * Calling addReferenceKey multiple times for the same header will result in multiple headers
-   * being present in the HeaderMap.
+   * Calling addReference multiple times for the same header will result in:
+   * - Comma concatenation for predefined inline headers.
+   * - Multiple headers being present in the HeaderMap for other headers.
    *
    * @param key specifies the name of the header to add; it WILL NOT be copied.
    * @param value specifies the value of the header to add; it WILL be copied.
@@ -360,8 +368,9 @@ public:
   /**
    * Add a header by copying both the header key and the value.
    *
-   * Calling addCopy multiple times for the same header will result in multiple headers being
-   * present in the HeaderMap.
+   * Calling addCopy multiple times for the same header will result in:
+   * - Comma concatenation for predefined inline headers.
+   * - Multiple headers being present in the HeaderMap for other headers.
    *
    * @param key specifies the name of the header to add; it WILL be copied.
    * @param value specifies the value of the header to add; it WILL be copied.
@@ -371,8 +380,9 @@ public:
   /**
    * Add a header by copying both the header key and the value.
    *
-   * Calling addCopy multiple times for the same header will result in multiple headers being
-   * present in the HeaderMap.
+   * Calling addCopy multiple times for the same header will result in:
+   * - Comma concatenation for predefined inline headers.
+   * - Multiple headers being present in the HeaderMap for other headers.
    *
    * @param key specifies the name of the header to add; it WILL be copied.
    * @param value specifies the value of the header to add; it WILL be copied.

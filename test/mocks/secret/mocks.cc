@@ -17,5 +17,9 @@ MockSecretManager::MockSecretManager() {
 
 MockSecretManager::~MockSecretManager() {}
 
+MockSecretCallbacks::MockSecretCallbacks() {}
+
+MockSecretCallbacks::~MockSecretCallbacks() {}
+
 } // namespace Secret
 } // namespace Envoy

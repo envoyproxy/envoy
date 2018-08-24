@@ -3,6 +3,8 @@
 namespace Envoy {
 namespace Http {
 
+ValidationAsyncClient::ValidationAsyncClient(TimeSource& time_source) : dispatcher_(time_source) {}
+
 AsyncClient::Request*
 ValidationAsyncClient::send(MessagePtr&&, Callbacks&,
                             const absl::optional<std::chrono::milliseconds>&) {

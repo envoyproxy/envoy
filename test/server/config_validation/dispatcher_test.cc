@@ -9,6 +9,7 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -22,9 +23,10 @@ public:
     Event::Libevent::Global::initialize();
 
     validation_ = std::make_unique<Api::ValidationImpl>(std::chrono::milliseconds(1000));
-    dispatcher_ = validation_->allocateDispatcher();
+    dispatcher_ = validation_->allocateDispatcher(test_time_.timeSource());
   }
 
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherPtr dispatcher_;
 
 private:

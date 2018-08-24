@@ -19,6 +19,8 @@ namespace Http {
  */
 class ValidationAsyncClient : public AsyncClient {
 public:
+  ValidationAsyncClient(TimeSource& time_source);
+
   // Http::AsyncClient
   AsyncClient::Request* send(MessagePtr&& request, Callbacks& callbacks,
                              const absl::optional<std::chrono::milliseconds>& timeout) override;

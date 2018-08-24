@@ -24,7 +24,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/grpc_json_transcoder:json_transcoder_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "//test/proto:bookstore_proto",
+        "//test/proto:bookstore_proto_cc",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
@@ -54,7 +54,7 @@ envoy_extension_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/grpc_json_transcoder:config",
         "//test/integration:http_integration_lib",
-        "//test/proto:bookstore_proto",
+        "//test/proto:bookstore_proto_cc",
         "//test/test_common:utility_lib",
     ],
 )

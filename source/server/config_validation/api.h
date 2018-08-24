@@ -16,7 +16,7 @@ class ValidationImpl : public Impl {
 public:
   ValidationImpl(std::chrono::milliseconds file_flush_interval_msec);
 
-  Event::DispatcherPtr allocateDispatcher() override;
+  Event::DispatcherPtr allocateDispatcher(TimeSource&) override;
 };
 
 } // namespace Api

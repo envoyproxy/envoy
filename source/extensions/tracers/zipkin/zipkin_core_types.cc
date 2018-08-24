@@ -141,7 +141,7 @@ const std::string BinaryAnnotation::toJson() {
 
 const std::string Span::EMPTY_HEX_STRING_ = "0000000000000000";
 
-Span::Span(const Span& span) {
+Span::Span(const Span& span) : time_source_(span.time_source_) {
   trace_id_ = span.traceId();
   if (span.isSetTraceIdHigh()) {
     trace_id_high_ = span.traceIdHigh();
@@ -227,25 +227,23 @@ void Span::finish() {
     Annotation ss;
     ss.setEndpoint(annotations_[0].endpoint());
     ss.setTimestamp(std::chrono::duration_cast<std::chrono::microseconds>(
-                        ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
+                        time_source_.systemTime().time_since_epoch())
                         .count());
     ss.setValue(ZipkinCoreConstants::get().SERVER_SEND);
     annotations_.push_back(std::move(ss));
   } else if (annotations_[0].value() == ZipkinCoreConstants::get().CLIENT_SEND) {
     // Need to set the CR annotation
     Annotation cr;
-    const uint64_t stop_timestamp =
-        std::chrono::duration_cast<std::chrono::microseconds>(
-            ProdSystemTimeSource::instance_.currentTime().time_since_epoch())
-            .count();
+    const uint64_t stop_timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+                                        time_source_.systemTime().time_since_epoch())
+                                        .count();
     cr.setEndpoint(annotations_[0].endpoint());
     cr.setTimestamp(stop_timestamp);
     cr.setValue(ZipkinCoreConstants::get().CLIENT_RECV);
     annotations_.push_back(std::move(cr));
-    const int64_t monotonic_stop_time =
-        std::chrono::duration_cast<std::chrono::microseconds>(
-            ProdMonotonicTimeSource::instance_.currentTime().time_since_epoch())
-            .count();
+    const int64_t monotonic_stop_time = std::chrono::duration_cast<std::chrono::microseconds>(
+                                            time_source_.monotonicTime().time_since_epoch())
+                                            .count();
     setDuration(monotonic_stop_time - monotonic_start_time_);
   }
 

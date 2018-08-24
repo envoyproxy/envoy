@@ -28,6 +28,7 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -580,6 +581,7 @@ private:
   Thread::ThreadPtr thread_;
   Thread::CondVar new_connection_event_;
   Api::ApiPtr api_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
   std::list<QueuedConnectionWrapperPtr> new_connections_ GUARDED_BY(lock_);

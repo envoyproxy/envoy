@@ -39,6 +39,14 @@ Version history
 * http: added generic :ref:`Upgrade support 
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`.
 * http: better handling of HEAD requests. Now sending transfer-encoding: chunked rather than content-length: 0.
+* http: fixed missing support for appending to predefined inline headers, e.g.
+  *authorization*, in features that interact with request and response headers,
+  e.g. :ref:`request_headers_to_add
+  <envoy_api_field_route.Route.request_headers_to_add>`. For example, a
+  request header *authorization: token1* will appear as *authorization:
+  token1,token2*, after having :ref:`request_headers_to_add
+  <envoy_api_field_route.Route.request_headers_to_add>` with *authorization:
+  token2* applied.
 * http: response filters not applied to early error paths such as http_parser generated 400s.
 * http: restrictions added to reject *:*-prefixed pseudo-headers in :ref:`custom
   request headers <config_http_conn_man_headers_custom_request_headers>`.
@@ -70,6 +78,7 @@ Version history
   load balancing policy.
 * ratelimit: added :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in 
   case of rate limit service error.
+* route checker: Added v2 config support and removed support for v1 configs.
 
 1.7.0
 ===============

@@ -14,12 +14,12 @@ class TokenBucketImpl : public TokenBucket {
 public:
   /**
    * @param max_tokens supplies the maximun number of tokens in the bucket.
+   * @param time_source supplies the time source.
    * @param fill_rate supplies the number of tokens that will return to the bucket on each second.
    * The default is 1.
-   * @param time_source supplies the time source. The default is ProdMonotonicTimeSource.
    */
-  explicit TokenBucketImpl(uint64_t max_tokens, double fill_rate = 1,
-                           MonotonicTimeSource& time_source = ProdMonotonicTimeSource::instance_);
+  explicit TokenBucketImpl(uint64_t max_tokens, MonotonicTimeSource& time_source,
+                           double fill_rate = 1);
 
   bool consume(uint64_t tokens = 1) override;
 
@@ -28,7 +28,7 @@ private:
   const double fill_rate_;
   double tokens_;
   MonotonicTime last_fill_;
-  MonotonicTimeSource& time_source_;
+  MonotonicTimeSource& monotonic_time_source_;
 };
 
 } // namespace Envoy

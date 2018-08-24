@@ -38,6 +38,8 @@ namespace Zipkin {
 
 class ZipkinDriverTest : public Test {
 public:
+  ZipkinDriverTest() : time_source_(test_time_.timeSource()) {}
+
   void setup(Json::Object& config, bool init_timer) {
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
         .WillByDefault(ReturnRef(cm_.async_client_));
@@ -64,6 +66,12 @@ public:
     setup(*loader, true);
   }
 
+  // TODO(#4160): Currently time_source_ is initialized from DangerousDeprecatedTestTime, which uses
+  // real time, not mock-time. When that is switched to use mock-time intead, I think
+  // generateRandom64() may not be as random as we want, and we'll need to inject entropy
+  // appropriate for the test.
+  uint64_t generateRandom64() { return Util::generateRandom64(time_source_); }
+
   const std::string operation_name_{"test"};
   Http::TestHeaderMapImpl request_headers_{
       {":authority", "api.lyft.com"}, {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
@@ -80,6 +88,8 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
 
   NiceMock<Tracing::MockConfig> config_;
+  DangerousDeprecatedTestTime test_time_;
+  TimeSource& time_source_;
 };
 
 TEST_F(ZipkinDriverTest, InitializeDriver) {
@@ -277,8 +287,8 @@ TEST_F(ZipkinDriverTest, NoB3ContextSampledFalse) {
 TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleTrue) {
   setupValidDriver();
 
-  request_headers_.insertXB3TraceId().value(Hex::uint64ToHex(Util::generateRandom64()));
-  request_headers_.insertXB3SpanId().value(Hex::uint64ToHex(Util::generateRandom64()));
+  request_headers_.insertXB3TraceId().value(Hex::uint64ToHex(generateRandom64()));
+  request_headers_.insertXB3SpanId().value(Hex::uint64ToHex(generateRandom64()));
   EXPECT_EQ(nullptr, request_headers_.XB3Sampled());
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
@@ -291,8 +301,8 @@ TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleTrue) {
 TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleFalse) {
   setupValidDriver();
 
-  request_headers_.insertXB3TraceId().value(Hex::uint64ToHex(Util::generateRandom64()));
-  request_headers_.insertXB3SpanId().value(Hex::uint64ToHex(Util::generateRandom64()));
+  request_headers_.insertXB3TraceId().value(Hex::uint64ToHex(generateRandom64()));
+  request_headers_.insertXB3SpanId().value(Hex::uint64ToHex(generateRandom64()));
   EXPECT_EQ(nullptr, request_headers_.XB3Sampled());
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
@@ -369,8 +379,8 @@ TEST_F(ZipkinDriverTest, PropagateB3SampledWithTrue) {
 TEST_F(ZipkinDriverTest, PropagateB3SampleFalse) {
   setupValidDriver();
 
-  request_headers_.insertXB3TraceId().value(Hex::uint64ToHex(Util::generateRandom64()));
-  request_headers_.insertXB3SpanId().value(Hex::uint64ToHex(Util::generateRandom64()));
+  request_headers_.insertXB3TraceId().value(Hex::uint64ToHex(generateRandom64()));
+  request_headers_.insertXB3SpanId().value(Hex::uint64ToHex(generateRandom64()));
   request_headers_.insertXB3Sampled().value(ZipkinCoreConstants::get().NOT_SAMPLED);
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
@@ -405,9 +415,9 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   // Test setTag() with SR annotated span
   // ====
 
-  const std::string trace_id = Hex::uint64ToHex(Util::generateRandom64());
-  const std::string span_id = Hex::uint64ToHex(Util::generateRandom64());
-  const std::string parent_id = Hex::uint64ToHex(Util::generateRandom64());
+  const std::string trace_id = Hex::uint64ToHex(generateRandom64());
+  const std::string span_id = Hex::uint64ToHex(generateRandom64());
+  const std::string parent_id = Hex::uint64ToHex(generateRandom64());
   const std::string context =
       trace_id + ";" + span_id + ";" + parent_id + ";" + ZipkinCoreConstants::get().CLIENT_SEND;
 
@@ -445,9 +455,9 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
   setupValidDriver();
 
-  const std::string trace_id = Hex::uint64ToHex(Util::generateRandom64());
-  const std::string span_id = Hex::uint64ToHex(Util::generateRandom64());
-  const std::string parent_id = Hex::uint64ToHex(Util::generateRandom64());
+  const std::string trace_id = Hex::uint64ToHex(generateRandom64());
+  const std::string span_id = Hex::uint64ToHex(generateRandom64());
+  const std::string parent_id = Hex::uint64ToHex(generateRandom64());
 
   request_headers_.insertXB3TraceId().value(trace_id);
   request_headers_.insertXB3SpanId().value(span_id);
@@ -469,11 +479,11 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
   setupValidDriver();
 
-  const uint64_t trace_id_high = Util::generateRandom64();
-  const uint64_t trace_id_low = Util::generateRandom64();
+  const uint64_t trace_id_high = generateRandom64();
+  const uint64_t trace_id_low = generateRandom64();
   const std::string trace_id = Hex::uint64ToHex(trace_id_high) + Hex::uint64ToHex(trace_id_low);
-  const std::string span_id = Hex::uint64ToHex(Util::generateRandom64());
-  const std::string parent_id = Hex::uint64ToHex(Util::generateRandom64());
+  const std::string span_id = Hex::uint64ToHex(generateRandom64());
+  const std::string parent_id = Hex::uint64ToHex(generateRandom64());
 
   request_headers_.insertXB3TraceId().value(trace_id);
   request_headers_.insertXB3SpanId().value(span_id);
@@ -498,8 +508,8 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {
   setupValidDriver();
 
   request_headers_.insertXB3TraceId().value(std::string("xyz"));
-  request_headers_.insertXB3SpanId().value(Hex::uint64ToHex(Util::generateRandom64()));
-  request_headers_.insertXB3ParentSpanId().value(Hex::uint64ToHex(Util::generateRandom64()));
+  request_headers_.insertXB3SpanId().value(Hex::uint64ToHex(generateRandom64()));
+  request_headers_.insertXB3ParentSpanId().value(Hex::uint64ToHex(generateRandom64()));
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
@@ -509,9 +519,9 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidTraceIdB3HeadersTest) {
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidSpanIdB3HeadersTest) {
   setupValidDriver();
 
-  request_headers_.insertXB3TraceId().value(Hex::uint64ToHex(Util::generateRandom64()));
+  request_headers_.insertXB3TraceId().value(Hex::uint64ToHex(generateRandom64()));
   request_headers_.insertXB3SpanId().value(std::string("xyz"));
-  request_headers_.insertXB3ParentSpanId().value(Hex::uint64ToHex(Util::generateRandom64()));
+  request_headers_.insertXB3ParentSpanId().value(Hex::uint64ToHex(generateRandom64()));
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
@@ -521,8 +531,8 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidSpanIdB3HeadersTest) {
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromInvalidParentIdB3HeadersTest) {
   setupValidDriver();
 
-  request_headers_.insertXB3TraceId().value(Hex::uint64ToHex(Util::generateRandom64()));
-  request_headers_.insertXB3SpanId().value(Hex::uint64ToHex(Util::generateRandom64()));
+  request_headers_.insertXB3TraceId().value(Hex::uint64ToHex(generateRandom64()));
+  request_headers_.insertXB3SpanId().value(Hex::uint64ToHex(generateRandom64()));
   request_headers_.insertXB3ParentSpanId().value(std::string("xyz"));
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,

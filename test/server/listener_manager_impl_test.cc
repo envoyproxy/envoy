@@ -51,10 +51,10 @@ public:
 
 class ListenerManagerImplTest : public testing::Test {
 public:
-  ListenerManagerImplTest() {
+  ListenerManagerImplTest() : time_source_(system_time_source_, monotonic_time_source_) {
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
     manager_.reset(
-        new ListenerManagerImpl(server_, listener_factory_, worker_factory_, system_time_source_));
+        new ListenerManagerImpl(server_, listener_factory_, worker_factory_, time_source_));
   }
 
   /**
@@ -116,6 +116,8 @@ public:
   std::unique_ptr<ListenerManagerImpl> manager_;
   NiceMock<MockGuardDog> guard_dog_;
   NiceMock<MockSystemTimeSource> system_time_source_;
+  ProdMonotonicTimeSource monotonic_time_source_;
+  TimeSource time_source_;
 };
 
 class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {

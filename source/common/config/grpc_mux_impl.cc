@@ -12,9 +12,9 @@ namespace Config {
 GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
-                         Runtime::RandomGenerator& random, MonotonicTimeSource& time_source)
+                         Runtime::RandomGenerator& random)
     : local_info_(local_info), async_client_(std::move(async_client)),
-      service_method_(service_method), random_(random), time_source_(time_source) {
+      service_method_(service_method), random_(random), time_source_(dispatcher.timeSource()) {
   Config::Utility::checkLocalInfo("ads", local_info);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
@@ -111,9 +111,11 @@ GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
   // TODO(gsagula): move TokenBucketImpl params to a config.
   if (!api_state_[type_url].subscribed_) {
     // Bucket contains 100 tokens maximum and refills at 5 tokens/sec.
-    api_state_[type_url].limit_request_ = std::make_unique<TokenBucketImpl>(100, 5, time_source_);
+    api_state_[type_url].limit_request_ =
+        std::make_unique<TokenBucketImpl>(100, time_source_.monotonic(), 5);
     // Bucket contains 1 token maximum and refills 1 token on every ~5 seconds.
-    api_state_[type_url].limit_log_ = std::make_unique<TokenBucketImpl>(1, 0.2, time_source_);
+    api_state_[type_url].limit_log_ =
+        std::make_unique<TokenBucketImpl>(1, time_source_.monotonic(), 0.2);
     api_state_[type_url].request_.set_type_url(type_url);
     api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
     api_state_[type_url].subscribed_ = true;
