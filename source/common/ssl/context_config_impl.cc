@@ -79,8 +79,8 @@ ContextConfigImpl::ContextConfigImpl(
           Config::DataSource::read(config.validation_context().crl(), true)),
       certificate_revocation_list_path_(
           Config::DataSource::getPath(config.validation_context().crl()).value_or(EMPTY_STRING)),
-      secret_callback_(nullptr),
       tls_certficate_provider_(getTlsCertificateConfigProvider(config, factory_context)),
+      secret_update_callback_handle_(nullptr),
       verify_subject_alt_name_list_(config.validation_context().verify_subject_alt_name().begin(),
                                     config.validation_context().verify_subject_alt_name().end()),
       verify_certificate_hash_list_(config.validation_context().verify_certificate_hash().begin(),
@@ -110,8 +110,8 @@ ContextConfigImpl::ContextConfigImpl(
 }
 
 ContextConfigImpl::~ContextConfigImpl() {
-  if (tls_certficate_provider_.get() != nullptr && secret_callback_ != nullptr) {
-    tls_certficate_provider_->removeUpdateCallback(*secret_callback_);
+  if (secret_update_callback_handle_) {
+    secret_update_callback_handle_->remove();
   }
 }
 

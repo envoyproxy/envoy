@@ -108,7 +108,7 @@ public:
    * are downloaded from SDS server, this callback is invoked to update SSL context.
    * @param callback callback that is executed by context config.
    */
-  virtual void setSecretUpdateCallback(Secret::SecretCallbacks& callback) PURE;
+  virtual void setSecretUpdateCallback(std::function<void()> callback) PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {

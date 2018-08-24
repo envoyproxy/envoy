@@ -35,12 +35,5 @@ public:
   MOCK_METHOD0(onAddOrUpdateSecret, void());
 };
 
-class MockSecretCallbacks : public SecretCallbacks {
-public:
-  MockSecretCallbacks();
-  ~MockSecretCallbacks();
-  MOCK_METHOD0(onAddOrUpdateSecret, void());
-};
-
 } // namespace Secret
 } // namespace Envoy

@@ -60,14 +60,11 @@ public:
     return !tls_certficate_provider_ || tls_certficate_provider_->secret();
   }
 
-  void setSecretUpdateCallback(Secret::SecretCallbacks& callback) override {
-    if (tls_certficate_provider_) {
-      if (secret_callback_) {
-        tls_certficate_provider_->removeUpdateCallback(*secret_callback_);
-      }
-      secret_callback_ = &callback;
-      tls_certficate_provider_->addUpdateCallback(callback);
+  void setSecretUpdateCallback(std::function<void()> callback) override {
+    if (secret_update_callback_handle_) {
+      secret_update_callback_handle_->remove();
     }
+    secret_update_callback_handle_ = tls_certficate_provider_->addUpdateCallback(callback);
   }
 
 protected:
@@ -90,8 +87,8 @@ private:
   const std::string ca_cert_path_;
   const std::string certificate_revocation_list_;
   const std::string certificate_revocation_list_path_;
-  Secret::SecretCallbacks* secret_callback_;
   Secret::TlsCertificateConfigProviderSharedPtr tls_certficate_provider_;
+  Common::CallbackHandle* secret_update_callback_handle_;
   const std::vector<std::string> verify_subject_alt_name_list_;
   const std::vector<std::string> verify_certificate_hash_list_;
   const std::vector<std::string> verify_certificate_spki_list_;
