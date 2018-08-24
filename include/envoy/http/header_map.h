@@ -154,7 +154,7 @@ public:
   bool operator!=(const char* rhs) const { return 0 != strcmp(c_str(), rhs); }
 
 private:
-  union {
+  union Buffer {
     // This should reference inline_buffer_ for Type::Inline.
     char* dynamic_;
     const char* ref_;
