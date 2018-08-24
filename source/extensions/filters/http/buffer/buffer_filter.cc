@@ -81,8 +81,8 @@ Http::FilterHeadersStatus BufferFilter::decodeHeaders(Http::HeaderMap&, bool end
   }
 
   callbacks_->setDecoderBufferLimit(settings_->maxRequestBytes());
-  request_timeout_ = callbacks_->dispatcher().createTimer([this]() -> void { onRequestTimeout(); });
-  request_timeout_->enableTimer(settings_->maxRequestTime());
+  // request_timeout_ = callbacks_->dispatcher().createTimer([this]() -> void { onRequestTimeout(); });
+  // request_timeout_->enableTimer(settings_->maxRequestTime());
 
   return Http::FilterHeadersStatus::StopIteration;
 }
