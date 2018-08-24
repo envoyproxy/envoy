@@ -31,8 +31,12 @@ option go_package = "v2alpha";
 //       permissions:
 //         - any: true
 //       principals:
-//         - authenticated: { name: "cluster.local/ns/default/sa/admin" }
-//         - authenticated: { name: "cluster.local/ns/default/sa/superuser" }
+//         - authenticated:
+//             principal_name:
+//               exact: "cluster.local/ns/default/sa/admin"
+//         - authenticated:
+//             principal_name:
+//               exact: "cluster.local/ns/default/sa/superuser"
 //     "product-viewer":
 //       permissions:
 //           - and_rules:
@@ -142,7 +146,7 @@ message Principal {
     // .. attention::
     //
     //   This field is deprecated. Use `principal_name` field instead. If both `name` and
-    // `principal_name` is set, only the `principal_name` will have effect.
+    //   `principal_name` is set, only the `principal_name` will have effect.
     //
     string name = 1 [deprecated = true];
 
