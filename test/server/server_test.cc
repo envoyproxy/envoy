@@ -145,7 +145,7 @@ protected:
   Stats::TestIsolatedStoreImpl stats_store_;
   Thread::MutexBasicLockable fakelock_;
   TestComponentFactory component_factory_;
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   std::unique_ptr<InstanceImpl> server_;
 };
 

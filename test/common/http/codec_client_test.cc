@@ -60,7 +60,7 @@ public:
 
   ~CodecClientTest() { EXPECT_EQ(0U, client_->numActiveRequests()); }
 
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   Event::MockDispatcher dispatcher_;
   Network::MockClientConnection* connection_;
   Http::MockClientConnection* codec_;
@@ -328,7 +328,7 @@ public:
   }
 
 protected:
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherPtr dispatcher_;
   Network::ListenerPtr upstream_listener_;
   Network::MockListenerCallbacks listener_callbacks_;

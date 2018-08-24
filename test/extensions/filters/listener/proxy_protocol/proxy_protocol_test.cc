@@ -144,7 +144,7 @@ public:
     EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto_error").value(), 1);
   }
 
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   Network::TcpListenSocket socket_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -943,7 +943,7 @@ public:
     dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
 
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   Network::TcpListenSocket socket_;
   Network::Address::InstanceConstSharedPtr local_dst_address_;

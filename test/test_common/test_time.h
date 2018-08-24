@@ -9,9 +9,9 @@ namespace Envoy {
 //
 // TODO(#4160): change all references to this class to instantiate instead to
 // some kind of mock or simulated-time source.
-class RealTestTime {
+class DangerousDeprecatedTestTime {
 public:
-  RealTestTime();
+  DangerousDeprecatedTestTime();
 
   TimeSource& timeSource() { return time_source_; }
 

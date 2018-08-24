@@ -59,7 +59,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         std::vector<std::string>{});
 
-  RealTestTime test_time;
+  DangerousDeprecatedTestTime test_time;
   Event::DispatcherImpl dispatcher(test_time.timeSource());
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
                                   true);
@@ -163,7 +163,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
   Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
                                                         server_names);
 
-  RealTestTime test_time;
+  DangerousDeprecatedTestTime test_time;
   Event::DispatcherImpl dispatcher(test_time.timeSource());
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
                                   true);
@@ -302,7 +302,7 @@ class SslSocketTest : public SslCertsTest,
 protected:
   SslSocketTest() : dispatcher_(std::make_unique<Event::DispatcherImpl>(test_time_.timeSource())) {}
 
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   std::unique_ptr<Event::DispatcherImpl> dispatcher_;
 };
 
@@ -1780,7 +1780,7 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
                                    true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
-  RealTestTime test_time;
+  DangerousDeprecatedTestTime test_time;
   Event::DispatcherImpl dispatcher(test_time.timeSource());
   Network::ListenerPtr listener1 = dispatcher.createListener(socket1, callbacks, true, false);
   Network::ListenerPtr listener2 = dispatcher.createListener(socket2, callbacks, true, false);
