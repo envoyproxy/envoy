@@ -26,7 +26,7 @@ private:
 
 TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
-  RealTestTime test_time;
+  DangerousDeprecatedTestTime test_time;
   DispatcherImpl dispatcher(test_time.timeSource());
   ReadyWatcher watcher1;
 
@@ -76,7 +76,7 @@ protected:
     dispatcher_thread_->join();
   }
 
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
 
   std::unique_ptr<Thread::Thread> dispatcher_thread_;
   DispatcherPtr dispatcher_;
