@@ -11,7 +11,7 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
                                      Grpc::AsyncClientPtr async_client,
                                      Event::Dispatcher& dispatcher,
-                                     MonotonicTimeSource& time_source)
+                                     TimeSource& time_source)
     : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)),
@@ -78,7 +78,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     }
     cluster_stats->set_total_dropped_requests(
         cluster.info()->loadReportStats().upstream_rq_dropped_.latch());
-    const auto now = time_source_.currentTime().time_since_epoch();
+    const auto now = time_source_.monotonicTime().time_since_epoch();
     const auto measured_interval = now - cluster_name_and_timestamp.second;
     cluster_stats->mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(
@@ -137,7 +137,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
   for (const std::string& cluster_name : message_->clusters()) {
     clusters_.emplace(cluster_name, existing_clusters.count(cluster_name) > 0
                                         ? existing_clusters[cluster_name]
-                                        : time_source_.currentTime().time_since_epoch());
+                                        : time_source_.monotonicTime().time_since_epoch());
     auto cluster_info_map = cm_.clusters();
     auto it = cluster_info_map.find(cluster_name);
     if (it == cluster_info_map.end()) {

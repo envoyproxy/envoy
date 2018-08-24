@@ -4,6 +4,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -24,7 +25,7 @@ public:
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
     envoy::api::v2::core::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
-    grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config);
+    grpc_client_ = std::make_unique<AsyncClientImpl>(cm_, config, test_time_.timeSource());
     ON_CALL(cm_, httpAsyncClientForCluster("test_cluster")).WillByDefault(ReturnRef(http_client_));
   }
 
