@@ -9,7 +9,7 @@ namespace Utility {
 class QueryParamsImpl : QueryParams {
 public:
   QueryParamsImpl();
-  ~QueryParamsImpl() {};
+  ~QueryParamsImpl(){};
 
   /**
    * Parse a URL into query parameters.
@@ -26,22 +26,21 @@ public:
   /**
    * Applies std::map::find()
    */
-  const QueryParamsMap::const_iterator find(const std::string key) const override;
+  QueryParamsMap::const_iterator find(const std::string key) const override;
 
   /**
    * Applies std::map::begin()
    */
-  const QueryParamsMap::const_iterator begin() const override;
+  QueryParamsMap::const_iterator begin() const override;
   /**
    * Applies std::map::end()
    */
-  const QueryParamsMap::const_iterator end() const override;
+  QueryParamsMap::const_iterator end() const override;
 
   /**
    * Applies std::map::size()
    */
   int size() override;
-
 };
 
 } // namespace Utility

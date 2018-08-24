@@ -3,8 +3,9 @@
 #include <map>
 #include <string>
 
-#include "absl/strings/string_view.h"
 #include "envoy/common/pure.h"
+
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Http {
@@ -18,7 +19,7 @@ typedef std::map<std::string, std::string> QueryParamsMap;
 
 class QueryParams {
 public:
-  virtual ~QueryParams() {};
+  virtual ~QueryParams(){};
 
   /**
    * @param url supplies the url to parse.
@@ -32,9 +33,9 @@ public:
    */
   virtual absl::string_view queryParamsToString(const QueryParamsMap&) PURE;
 
-  virtual const QueryParamsMap::const_iterator find(const std::string key) const PURE;
-  virtual const QueryParamsMap::const_iterator begin() const PURE;
-  virtual const QueryParamsMap::const_iterator end() const PURE;
+  virtual QueryParamsMap::const_iterator find(const std::string key) const PURE;
+  virtual QueryParamsMap::const_iterator begin() const PURE;
+  virtual QueryParamsMap::const_iterator end() const PURE;
   virtual int size() PURE;
 };
 

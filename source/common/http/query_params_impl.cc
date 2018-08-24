@@ -1,9 +1,9 @@
 #include "common/http/query_params_impl.h"
+
 #include "common/common/utility.h"
 
-#include "absl/strings/string_view.h"
 #include "absl/strings/str_cat.h"
-
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Http {
@@ -29,7 +29,7 @@ QueryParamsMap QueryParamsImpl::parseQueryString(absl::string_view url) {
     const size_t equal = param.find('=');
     if (equal != std::string::npos) {
       params.emplace(StringUtil::subspan(url, start, start + equal),
-                            StringUtil::subspan(url, start + equal + 1, end));
+                     StringUtil::subspan(url, start + equal + 1, end));
     } else {
       params.emplace(StringUtil::subspan(url, start, end), "");
     }
@@ -50,9 +50,11 @@ absl::string_view QueryParamsImpl::queryParamsToString(const QueryParamsMap& par
   return out;
 }
 
-const QueryParamsMap::const_iterator QueryParamsImpl::find(const std::string key) const { return this->find(key); }
-const QueryParamsMap::const_iterator QueryParamsImpl::begin() const { return this->begin(); }
-const QueryParamsMap::const_iterator QueryParamsImpl::end() const { return this->end(); }
+QueryParamsMap::const_iterator QueryParamsImpl::find(const std::string key) const {
+  return this->find(key);
+}
+QueryParamsMap::const_iterator QueryParamsImpl::begin() const { return this->begin(); }
+QueryParamsMap::const_iterator QueryParamsImpl::end() const { return this->end(); }
 int QueryParamsImpl::size() { return this->size(); }
 
 } // namespace Utility
