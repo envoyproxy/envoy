@@ -14,8 +14,7 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
                                  const envoy::api::v2::core::GrpcService& config,
                                  TimeSource& time_source)
     : cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
-      initial_metadata_(config.initial_metadata()),
-      time_source_(time_source) {}
+      initial_metadata_(config.initial_metadata()), time_source_(time_source) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {

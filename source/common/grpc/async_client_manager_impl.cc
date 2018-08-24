@@ -13,8 +13,7 @@ namespace Grpc {
 
 AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
                                                const envoy::api::v2::core::GrpcService& config,
-                                               bool skip_cluster_check,
-                                               TimeSource& time_source)
+                                               bool skip_cluster_check, TimeSource& time_source)
     : cm_(cm), config_(config), time_source_(time_source) {
   if (skip_cluster_check) {
     return;
@@ -32,8 +31,7 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
 }
 
 AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
-                                               ThreadLocal::Instance& tls,
-                                               TimeSource& time_source)
+                                               ThreadLocal::Instance& tls, TimeSource& time_source)
     : cm_(cm), tls_(tls), time_source_(time_source) {
 #ifdef ENVOY_GOOGLE_GRPC
   google_tls_slot_ = tls.allocateSlot();

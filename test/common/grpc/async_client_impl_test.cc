@@ -33,6 +33,7 @@ public:
   NiceMock<Http::MockAsyncClient> http_client_;
   NiceMock<Upstream::MockClusterManager> cm_;
   std::unique_ptr<AsyncClientImpl> grpc_client_;
+  DangerousDeprecatedTestTime test_time_;
 };
 
 // Validate that a failure in the HTTP client returns immediately with status

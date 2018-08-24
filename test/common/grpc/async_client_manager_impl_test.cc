@@ -20,7 +20,7 @@ public:
   Upstream::MockClusterManager cm_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::MockStore scope_;
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
 };
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {

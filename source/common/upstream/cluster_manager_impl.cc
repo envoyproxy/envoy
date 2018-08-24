@@ -305,7 +305,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                               Config::Utility::factoryForGrpcApiConfigSource(
                                   *async_client_manager_, load_stats_config, stats)
                                   ->create(),
-                              main_thread_dispatcher, time_source_));
+                              main_thread_dispatcher));
   }
 }
 
