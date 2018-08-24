@@ -26,7 +26,7 @@ public:
     dispatcher_ = validation_->allocateDispatcher(test_time_.timeSource());
   }
 
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherPtr dispatcher_;
 
 private:

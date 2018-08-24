@@ -4,6 +4,6 @@
 
 namespace Envoy {
 
-RealTestTime::RealTestTime() {}
+DangerousDeprecatedTestTime::DangerousDeprecatedTestTime() {}
 
 } // namespace Envoy

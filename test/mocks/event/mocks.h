@@ -108,7 +108,7 @@ public:
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
 
   // TODO(jmarantz): Switch these to using mock-time.
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   TimeSource* time_source_;
 
   std::list<DeferredDeletablePtr> to_delete_;
