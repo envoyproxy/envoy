@@ -26,7 +26,7 @@ class AuthenticatorImpl : public Logger::Loggable<Logger::Id::filter>,
                           public Authenticator,
                           public Common::JwksFetcher::JwksReceiver {
 public:
-  AuthenticatorImpl(FilterConfigSharedPtr config, Common::JwksFetcher::JwksFetcherPtr& fetcher)
+  AuthenticatorImpl(FilterConfigSharedPtr config, Common::JwksFetcherPtr&& fetcher)
       : config_(config), fetcher_(std::move(fetcher)) {}
 
   // Following functions are for JwksFetcher::JwksReceiver interface
@@ -51,7 +51,7 @@ private:
   FilterConfigSharedPtr config_;
 
   // The Jwks fetcher object
-  Common::JwksFetcher::JwksFetcherPtr fetcher_;
+  Common::JwksFetcherPtr fetcher_;
 
   // The token data
   JwtLocationConstPtr token_;
@@ -64,11 +64,6 @@ private:
   Http::HeaderMap* headers_{};
   // The on_done function.
   Authenticator::Callbacks* callback_{};
-
-  // The pending uri_, only used for logging.
-  std::string uri_;
-  // The pending remote request so it can be canceled.
-  Http::AsyncClient::Request* request_{};
 };
 
 void AuthenticatorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
@@ -124,7 +119,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
     doneWithStatus(Status::JwtNotYetValid);
     return;
   }
-  if (jwt_.exp && jwt_.exp_ < unix_timestamp) {
+  if (jwt_.exp_ && jwt_.exp_ < unix_timestamp) {
     doneWithStatus(Status::JwtExpired);
     return;
   }
@@ -142,6 +137,13 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
 
   auto jwks_obj = jwks_data_->getJwksObj();
   if (jwks_obj != nullptr && !jwks_data_->isExpired()) {
+    // TODO: It would seem there's a window of error whereby if the JWT issuer
+    // has started signing with a new key that's not in our cache, then the
+    // verification will fail even though the JWT is valid. A simple fix
+    // would be to check the JWS kid header field; if present check we have
+    // the key cached, if we do proceed to verify else try a new JWKS retrieval.
+    // JWTs without a kid header field in the JWS we might be best to get each
+    // time? This all only matters for remote JWKS.
     verifyKey();
     return;
   }
@@ -170,7 +172,7 @@ void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
 
 void AuthenticatorImpl::onJwksError(Failure) { doneWithStatus(Status::JwksFetchFail); }
 
-void AuthenticatorImpl::onDestroy() { fetcher_->close(); }
+void AuthenticatorImpl::onDestroy() { fetcher_->cancel(); }
 
 // Verify with a specific public key.
 void AuthenticatorImpl::verifyKey() {
@@ -210,8 +212,8 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 } // namespace
 
 AuthenticatorPtr Authenticator::create(FilterConfigSharedPtr config,
-                                       Common::JwksFetcher::JwksFetcherPtr& fetcher) {
-  return std::make_unique<AuthenticatorImpl>(config, fetcher);
+                                       Common::JwksFetcherPtr&& fetcher) {
+  return std::make_unique<AuthenticatorImpl>(config, std::move(fetcher));
 }
 
 } // namespace JwtAuthn

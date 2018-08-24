@@ -23,7 +23,7 @@ private:
 public:
   JwksFetcherImpl(Upstream::ClusterManager& cm) : cm_(cm) { ENVOY_LOG(trace, "{}", __func__); }
 
-  void close() {
+  void cancel() {
     if (request_) {
       request_->cancel();
       request_ = nullptr;
@@ -82,7 +82,7 @@ public:
 };
 } // namespace
 
-JwksFetcher::JwksFetcherPtr JwksFetcher::create(Upstream::ClusterManager& cm) {
+JwksFetcherPtr JwksFetcher::create(Upstream::ClusterManager& cm) {
   return JwksFetcherPtr(new JwksFetcherImpl(cm));
 }
 } // namespace Common

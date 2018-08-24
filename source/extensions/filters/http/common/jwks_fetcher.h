@@ -11,10 +11,16 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Common {
 
+class JwksFetcher;
+typedef std::unique_ptr<JwksFetcher> JwksFetcherPtr;
+/**
+ * JwksFetcher interface can be used to retrieve remote JWKS
+ * (https://tools.ietf.org/html/rfc7517) data structures returning a concrete,
+ * type-safe representation. An instance of this interface is designed to
+ * retrieve a single JWKS and should not be re-used to fetch further instances.
+ */
 class JwksFetcher {
 public:
-  typedef std::unique_ptr<JwksFetcher> JwksFetcherPtr;
-
   class JwksReceiver {
   public:
     enum class Failure {
@@ -40,9 +46,9 @@ public:
   virtual ~JwksFetcher(){};
 
   /*
-   * Close/stop any inflight request.
+   * Cancel any inflight request.
    */
-  virtual void close() PURE;
+  virtual void cancel() PURE;
 
   /*
    * Retrieve a JWKS resource from a remote HTTP host.

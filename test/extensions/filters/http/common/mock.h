@@ -9,7 +9,7 @@ namespace Common {
 
 class MockJwksFetcher : public JwksFetcher {
 public:
-  MOCK_METHOD0(close, void());
+  MOCK_METHOD0(cancel, void());
   MOCK_METHOD2(fetch, void(const ::envoy::api::v2::core::HttpUri& uri, JwksReceiver* receiver));
 };
 

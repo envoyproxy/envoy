@@ -96,7 +96,7 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
       {":path", "/"},
       {":scheme", "http"},
       {":authority", "host"},
-      {"Authorization", "Bearer " + std::string(ExpiredToken)},
+      {"Authorization", "Bearer " + std::string(Common::ExpiredToken)},
   });
 
   response->waitForEndStream();

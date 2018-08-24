@@ -36,8 +36,7 @@ public:
   virtual void sanitizePayloadHeaders(Http::HeaderMap& headers) const PURE;
 
   // Authenticator factory function.
-  static AuthenticatorPtr create(FilterConfigSharedPtr config,
-                                 Common::JwksFetcher::JwksFetcherPtr& fetcher);
+  static AuthenticatorPtr create(FilterConfigSharedPtr config, Common::JwksFetcherPtr&& fetcher);
 };
 
 } // namespace JwtAuthn

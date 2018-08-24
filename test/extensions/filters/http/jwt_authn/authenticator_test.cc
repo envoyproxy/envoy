@@ -14,22 +14,23 @@
 #include "gtest/gtest.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
-using ::google::jwt_verify::Status;
-using ::testing::_;
-using ::testing::Invoke;
-using ::testing::NiceMock;
-using ::testing::_;
 using Envoy::Extensions::HttpFilters::Common::ExampleConfig;
 using Envoy::Extensions::HttpFilters::Common::ExpectedPayloadValue;
 using Envoy::Extensions::HttpFilters::Common::ExpiredToken;
 using Envoy::Extensions::HttpFilters::Common::GoodToken;
 using Envoy::Extensions::HttpFilters::Common::InvalidAudToken;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcher;
+using Envoy::Extensions::HttpFilters::Common::JwksFetcherPtr;
 using Envoy::Extensions::HttpFilters::Common::MockJwksFetcher;
 using Envoy::Extensions::HttpFilters::Common::NonExistKidToken;
+using Envoy::Extensions::HttpFilters::Common::NonExpiringToken;
 using Envoy::Extensions::HttpFilters::Common::NotYetValidToken;
 using Envoy::Extensions::HttpFilters::Common::ProviderName;
 using Envoy::Extensions::HttpFilters::Common::PublicKey;
+using ::google::jwt_verify::Status;
+using ::testing::_;
+using ::testing::Invoke;
+using ::testing::NiceMock;
 
 namespace Envoy {
 namespace Extensions {
@@ -47,7 +48,7 @@ public:
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
     fetcher_ = new MockJwksFetcher;
     fetcherPtr_.reset(fetcher_);
-    auth_ = Authenticator::create(filter_config_, fetcherPtr_);
+    auth_ = Authenticator::create(filter_config_, std::move(fetcherPtr_));
     jwks_ = ::google::jwt_verify::Jwks::createFrom(PublicKey, ::google::jwt_verify::Jwks::JWKS);
     EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
   }
@@ -55,7 +56,7 @@ public:
   JwtAuthentication proto_config_;
   FilterConfigSharedPtr filter_config_;
   MockJwksFetcher* fetcher_;
-  JwksFetcher::JwksFetcherPtr fetcherPtr_;
+  JwksFetcherPtr fetcherPtr_;
   AuthenticatorPtr auth_;
   ::google::jwt_verify::JwksPtr jwks_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
@@ -271,7 +272,7 @@ TEST_F(AuthenticatorTest, TestPubkeyFetchFail) {
 // Most importantly, no crash.
 TEST_F(AuthenticatorTest, TestOnDestroy) {
   EXPECT_CALL(*fetcher_, fetch(_, _)).Times(1);
-  EXPECT_CALL(*fetcher_, close()).Times(1);
+  EXPECT_CALL(*fetcher_, cancel()).Times(1);
 
   // onComplete() should not be called.
   EXPECT_CALL(mock_cb_, onComplete(_)).Times(0);

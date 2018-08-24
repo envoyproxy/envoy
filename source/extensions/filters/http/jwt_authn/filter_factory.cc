@@ -48,7 +48,7 @@ FilterFactory::createFilterFactoryFromProtoTyped(const JwtAuthentication& proto_
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto jwks_fetcher = Common::JwksFetcher::create(filter_config->cm());
     callbacks.addStreamDecoderFilter(std::make_shared<Filter>(
-        filter_config->stats(), Authenticator::create(filter_config, jwks_fetcher)));
+        filter_config->stats(), Authenticator::create(filter_config, std::move(jwks_fetcher))));
   };
 }
 
