@@ -99,12 +99,8 @@ envoy_cc_test_library(
         "//source/common/http/http2:conn_pool_lib",
         "//test/integration:integration_lib",
         "//test/mocks/local_info:local_info_mocks",
-<<<<<<< HEAD
         "//test/proto:helloworld_proto_cc",
-=======
-        "//test/proto:helloworld_proto",
         "//test/test_common:test_time_lib",
->>>>>>> upstream/master
     ],
 )
 
