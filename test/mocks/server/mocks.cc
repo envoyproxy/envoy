@@ -148,8 +148,7 @@ MockMain::MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill)
   ON_CALL(*this, wdMultiKillTimeout()).WillByDefault(Return(wd_multikill_));
 }
 
-MockFactoryContext::MockFactoryContext()
-    : singleton_manager_(new Singleton::ManagerImpl()) {
+MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::ManagerImpl()) {
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));

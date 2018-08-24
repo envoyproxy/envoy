@@ -34,8 +34,7 @@ namespace {
 // is provided in [grpc_]subscription_impl_test.cc.
 class GrpcMuxImplTest : public testing::Test {
 public:
-  GrpcMuxImplTest()
-      : async_client_(new Grpc::MockAsyncClient()) {
+  GrpcMuxImplTest() : async_client_(new Grpc::MockAsyncClient()) {
     dispatcher_.setTimeSource(mock_time_source_);
   }
 

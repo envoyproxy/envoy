@@ -163,9 +163,7 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 
 class ClusterManagerImplTest : public testing::Test {
 public:
-  ClusterManagerImplTest() {
-    factory_.dispatcher_.setTimeSource(time_source_);
-  }
+  ClusterManagerImplTest() { factory_.dispatcher_.setTimeSource(time_source_); }
 
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_.reset(new ClusterManagerImpl(

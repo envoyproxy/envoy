@@ -27,7 +27,9 @@ class LoadStatsReporterTest : public testing::Test {
 public:
   LoadStatsReporterTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
-        async_client_(new Grpc::MockAsyncClient()) {}
+        async_client_(new Grpc::MockAsyncClient()) {
+    dispatcher_.setTimeSource(time_source_);
+  }
 
   void createLoadStatsReporter() {
     InSequence s;
@@ -39,9 +41,8 @@ public:
       response_timer_cb_ = timer_cb;
       return response_timer_;
     }));
-    load_stats_reporter_.reset(new LoadStatsReporter(local_info_, cm_, stats_store_,
-                                                     Grpc::AsyncClientPtr(async_client_),
-                                                     dispatcher_, time_source_));
+    load_stats_reporter_.reset(new LoadStatsReporter(
+        local_info_, cm_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_));
   }
 
   void expectSendMessage(

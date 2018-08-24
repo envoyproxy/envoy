@@ -228,8 +228,8 @@ public:
 
 private:
   DetectorImpl(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
-               Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-               TimeSource& time_source, EventLoggerSharedPtr event_logger);
+               Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
+               EventLoggerSharedPtr event_logger);
 
   void addHostMonitor(HostSharedPtr host);
   void armIntervalTimer();
