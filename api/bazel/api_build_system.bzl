@@ -88,7 +88,15 @@ def api_proto_library_internal(visibility = ["//visibility:private"], **kwargs):
 # gRPC stub generation.
 # TODO(htuch): Automatically generate go_proto_library and go_grpc_library
 # from api_proto_library.
-def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], deps = [], has_services = 0, require_py = 1):
+def api_proto_library(
+        name,
+        visibility = ["//visibility:private"],
+        srcs = [],
+        deps = [],
+        external_proto_deps = [],
+        external_cc_proto_deps = [],
+        has_services = 0,
+        require_py = 1):
     # This is now vestigial, since there are no direct consumers in
     # the data plane API. However, we want to maintain native proto_library support
     # in the proto graph to (1) support future C++ use of native rules with
@@ -99,7 +107,7 @@ def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], de
     native.proto_library(
         name = name,
         srcs = srcs,
-        deps = deps + [
+        deps = deps + external_proto_deps + [
             "@com_google_protobuf//:any_proto",
             "@com_google_protobuf//:descriptor_proto",
             "@com_google_protobuf//:duration_proto",
@@ -107,7 +115,6 @@ def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], de
             "@com_google_protobuf//:struct_proto",
             "@com_google_protobuf//:timestamp_proto",
             "@com_google_protobuf//:wrappers_proto",
-            "@googleapis//:api_httpbody_protos_proto",
             "@googleapis//:http_api_protos_proto",
             "@googleapis//:rpc_status_protos_lib",
             "@com_github_gogo_protobuf//:gogo_proto",
@@ -124,9 +131,8 @@ def api_proto_library(name, visibility = ["//visibility:private"], srcs = [], de
         name = _Suffix(name, _CC_SUFFIX),
         srcs = srcs,
         deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps],
-        external_deps = [
+        external_deps = external_cc_proto_deps + [
             "@com_google_protobuf//:cc_wkt_protos",
-            "@googleapis//:api_httpbody_protos",
             "@googleapis//:http_api_protos",
             "@googleapis//:rpc_status_protos",
             "@com_github_gogo_protobuf//:gogo_proto_cc",
