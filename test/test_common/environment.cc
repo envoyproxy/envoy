@@ -3,8 +3,10 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#ifndef __APPLE__
+#ifdef __has_include
+#if __has_include(<experimental/filesystem>)
 #include <experimental/filesystem>
+#endif
 #endif
 #include <fstream>
 #include <iostream>
@@ -62,25 +64,25 @@ char** argv_;
 } // namespace
 
 void TestEnvironment::createPath(const std::string& path) {
-#ifdef __APPLE__
-  // No support in Clang OS X libc++ today for std::filesystem.
-  RELEASE_ASSERT(::system(("mkdir -p " + path).c_str()) == 0, "");
-#else
+#ifdef __cpp_lib_experimental_filesystem
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
   std::experimental::filesystem::create_directories(std::experimental::filesystem::path(path));
+#else
+  // No support on this system for std::experimental::filesystem.
+  RELEASE_ASSERT(::system(("mkdir -p " + path).c_str()) == 0, "");
 #endif
 }
 
 void TestEnvironment::createParentPath(const std::string& path) {
-#ifdef __APPLE__
-  // No support in Clang OS X libc++ today for std::filesystem.
-  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + path + ")").c_str()) == 0, "");
-#else
+#ifdef __cpp_lib_experimental_filesystem
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
   std::experimental::filesystem::create_directories(
       std::experimental::filesystem::path(path).parent_path());
+#else
+  // No support on this system for std::experimental::filesystem.
+  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + path + ")").c_str()) == 0, "");
 #endif
 }
 absl::optional<std::string> TestEnvironment::getOptionalEnvVar(const std::string& var) {

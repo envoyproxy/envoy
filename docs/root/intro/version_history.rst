@@ -39,6 +39,14 @@ Version history
 * http: added generic :ref:`Upgrade support 
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`.
 * http: better handling of HEAD requests. Now sending transfer-encoding: chunked rather than content-length: 0.
+* http: fixed missing support for appending to predefined inline headers, e.g.
+  *authorization*, in features that interact with request and response headers,
+  e.g. :ref:`request_headers_to_add
+  <envoy_api_field_route.Route.request_headers_to_add>`. For example, a
+  request header *authorization: token1* will appear as *authorization:
+  token1,token2*, after having :ref:`request_headers_to_add
+  <envoy_api_field_route.Route.request_headers_to_add>` with *authorization:
+  token2* applied.
 * http: response filters not applied to early error paths such as http_parser generated 400s.
 * http: :ref:`hpack_table_size <envoy_api_field_core.Http2ProtocolOptions.hpack_table_size>` now controls
   dynamic table size of both: encoder and decoder.

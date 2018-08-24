@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/secret/secret_callbacks.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
@@ -20,6 +21,13 @@ public:
   MOCK_METHOD1(createInlineTlsCertificateProvider,
                TlsCertificateConfigProviderSharedPtr(
                    const envoy::api::v2::auth::TlsCertificate& tls_certificate));
+};
+
+class MockSecretCallbacks : public SecretCallbacks {
+public:
+  MockSecretCallbacks();
+  ~MockSecretCallbacks();
+  MOCK_METHOD0(onAddOrUpdateSecret, void());
 };
 
 } // namespace Secret

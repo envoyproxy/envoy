@@ -4,6 +4,7 @@
 
 namespace Envoy {
 
-DangerousDeprecatedTestTime::DangerousDeprecatedTestTime() : time_source_(system_time_, monotonic_time_) {}
+DangerousDeprecatedTestTime::DangerousDeprecatedTestTime()
+    : time_source_(system_time_, monotonic_time_) {}
 
 } // namespace Envoy

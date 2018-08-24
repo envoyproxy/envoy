@@ -56,42 +56,34 @@ public:
 class TimeSource {
 public:
   TimeSource(SystemTimeSource& system, MonotonicTimeSource& monotonic)
-      : system_(&system), monotonic_(&monotonic) {}
-  TimeSource(const TimeSource& src) : system_(src.system_), monotonic_(src.monotonic_) {}
-  TimeSource& operator=(const TimeSource& src) {
-    if (&src != this) {
-      system_ = src.system_;
-      monotonic_ = src.monotonic_;
-    }
-    return *this;
-  }
+      : system_(system), monotonic_(monotonic) {}
 
   /**
    * @return the current system time; not guaranteed to be monotonically increasing.
    */
-  SystemTime systemTime() { return system_->currentTime(); }
+  SystemTime systemTime() { return system_.currentTime(); }
 
   /**
    * @return the current monotonic time.
    */
-  MonotonicTime monotonicTime() { return monotonic_->currentTime(); }
+  MonotonicTime monotonicTime() { return monotonic_.currentTime(); }
 
   /**
    * Compares two time-sources for equality; this is needed for mocks.
    */
   bool operator==(const TimeSource& ts) const {
-    return system_ == ts.system_ && monotonic_ == ts.monotonic_;
+    return &system_ == &ts.system_ && &monotonic_ == &ts.monotonic_;
   }
 
   // TODO(jmarantz): Eliminate these methods and the SystemTimeSource and MonotonicTimeSource
   // classes, and change method calls to work directly off of TimeSource.
-  SystemTimeSource& system() { return *system_; }
-  MonotonicTimeSource& monotonic() { return *monotonic_; }
+  SystemTimeSource& system() { return system_; }
+  MonotonicTimeSource& monotonic() { return monotonic_; }
 
 private:
   // These are pointers rather than references in order to support assignment.
-  SystemTimeSource* system_;
-  MonotonicTimeSource* monotonic_;
+  SystemTimeSource& system_;
+  MonotonicTimeSource& monotonic_;
 };
 
 } // namespace Envoy
