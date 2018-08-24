@@ -741,6 +741,31 @@ TEST_F(AsyncClientImplTest, StreamTimeout) {
       cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_504").value());
 }
 
+TEST_F(AsyncClientImplTest, StreamTimeoutHeadReply) {
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](StreamDecoder&,
+                           ConnectionPool::Callbacks& callbacks) -> ConnectionPool::Cancellable* {
+        callbacks.onPoolReady(stream_encoder_, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  MessagePtr message{new RequestMessageImpl()};
+  HttpTestUtility::addDefaultHeaders(message->headers(), "HEAD");
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&message->headers()), true));
+  timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
+  EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(40)));
+  EXPECT_CALL(stream_encoder_.stream_, resetStream(_));
+
+  TestHeaderMapImpl expected_timeout{
+      {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
+  EXPECT_CALL(stream_callbacks_, onHeaders_(HeaderMapEqualRef(&expected_timeout), true));
+
+  AsyncClient::Stream* stream =
+      client_.start(stream_callbacks_, std::chrono::milliseconds(40), false);
+  stream->sendHeaders(message->headers(), true);
+  timer_->callback_();
+}
+
 TEST_F(AsyncClientImplTest, RequestTimeout) {
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
       .WillOnce(Invoke([&](StreamDecoder&,

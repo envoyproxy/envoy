@@ -37,8 +37,8 @@ public:
       : domain_(config.domain()), stage_(static_cast<uint64_t>(config.stage())),
         request_type_(config.request_type().empty() ? stringToType("both")
                                                     : stringToType(config.request_type())),
-        local_info_(local_info), scope_(scope), runtime_(runtime), cm_(cm) {}
-
+        local_info_(local_info), scope_(scope), runtime_(runtime), cm_(cm),
+        failure_mode_deny_(config.failure_mode_deny()) {}
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
@@ -46,6 +46,8 @@ public:
   Stats::Scope& scope() { return scope_; }
   Upstream::ClusterManager& cm() { return cm_; }
   FilterRequestType requestType() const { return request_type_; }
+
+  bool failureModeAllow() const { return !failure_mode_deny_; }
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -66,6 +68,7 @@ private:
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Upstream::ClusterManager& cm_;
+  const bool failure_mode_deny_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;

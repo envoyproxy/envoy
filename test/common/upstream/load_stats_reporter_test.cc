@@ -5,6 +5,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -26,9 +27,7 @@ class LoadStatsReporterTest : public testing::Test {
 public:
   LoadStatsReporterTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
-        async_client_(new Grpc::MockAsyncClient()) {
-    node_.set_id("baz");
-  }
+        async_client_(new Grpc::MockAsyncClient()) {}
 
   void createLoadStatsReporter() {
     InSequence s;
@@ -40,14 +39,15 @@ public:
       response_timer_cb_ = timer_cb;
       return response_timer_;
     }));
-    load_stats_reporter_.reset(new LoadStatsReporter(
-        node_, cm_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_, time_source_));
+    load_stats_reporter_.reset(new LoadStatsReporter(local_info_, cm_, stats_store_,
+                                                     Grpc::AsyncClientPtr(async_client_),
+                                                     dispatcher_, time_source_));
   }
 
   void expectSendMessage(
       const std::vector<envoy::api::v2::endpoint::ClusterStats>& expected_cluster_stats) {
     envoy::service::load_stats::v2::LoadStatsRequest expected_request;
-    expected_request.mutable_node()->MergeFrom(node_);
+    expected_request.mutable_node()->MergeFrom(local_info_.node());
     std::copy(expected_cluster_stats.begin(), expected_cluster_stats.end(),
               Protobuf::RepeatedPtrFieldBackInserter(expected_request.mutable_cluster_stats()));
     EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
@@ -64,7 +64,6 @@ public:
     load_stats_reporter_->onReceiveMessage(std::move(response));
   }
 
-  envoy::api::v2::core::Node node_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -76,6 +75,7 @@ public:
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
   MockMonotonicTimeSource time_source_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 // Validate that stream creation results in a timer based retry.

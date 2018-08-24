@@ -173,9 +173,12 @@ TEST_P(ServerInstanceImplTest, V1ConfigFallback) {
 TEST_P(ServerInstanceImplTest, Stats) {
   options_.service_cluster_name_ = "some_cluster_name";
   options_.service_node_name_ = "some_node_name";
+  options_.concurrency_ = 2;
+  options_.hot_restart_epoch_ = 3;
   initialize(std::string());
   EXPECT_NE(nullptr, TestUtility::findCounter(stats_store_, "server.watchdog_miss"));
-  EXPECT_NE(nullptr, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch"));
+  EXPECT_EQ(2L, TestUtility::findGauge(stats_store_, "server.concurrency")->value());
+  EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
 }
 
 // Validate server localInfo() from bootstrap Node.

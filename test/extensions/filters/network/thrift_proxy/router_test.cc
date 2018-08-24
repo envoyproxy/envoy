@@ -104,6 +104,8 @@ public:
 
     initializeMetadata(msg_type);
 
+    EXPECT_CALL(callbacks_, downstreamTransportType()).WillOnce(Return(TransportType::Framed));
+    EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Binary));
     EXPECT_EQ(ThriftFilters::FilterStatus::StopIteration, router_->messageBegin(metadata_));
 
     NiceMock<Network::MockClientConnection> connection;
@@ -122,12 +124,8 @@ public:
           upstream_callbacks_ = &cb;
         }));
 
-    EXPECT_CALL(callbacks_, downstreamTransportType()).WillOnce(Return(TransportType::Framed));
-    transport_ = new NiceMock<MockTransport>();
-    ON_CALL(*transport_, type()).WillByDefault(Return(TransportType::Framed));
-
-    EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Binary));
     protocol_ = new NiceMock<MockProtocol>();
+
     ON_CALL(*protocol_, type()).WillByDefault(Return(ProtocolType::Binary));
     EXPECT_CALL(*protocol_, writeMessageBegin(_, _))
         .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
@@ -166,9 +164,6 @@ public:
     EXPECT_EQ(nullptr, router_->downstreamHeaders());
 
     EXPECT_CALL(callbacks_, downstreamTransportType()).WillOnce(Return(TransportType::Framed));
-    transport_ = new NiceMock<MockTransport>();
-    ON_CALL(*transport_, type()).WillByDefault(Return(TransportType::Framed));
-
     EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Binary));
     protocol_ = new NiceMock<MockProtocol>();
     ON_CALL(*protocol_, type()).WillByDefault(Return(ProtocolType::Binary));
@@ -245,6 +240,8 @@ public:
   }
 
   void completeRequest() {
+    transport_ = new NiceMock<MockTransport>();
+
     EXPECT_CALL(*protocol_, writeMessageEnd(_));
     EXPECT_CALL(*transport_, encodeFrame(_, _, _));
     EXPECT_CALL(upstream_connection_, write(_, false));

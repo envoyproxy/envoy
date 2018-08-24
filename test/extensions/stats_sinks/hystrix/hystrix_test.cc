@@ -4,6 +4,7 @@
 
 #include "extensions/stat_sinks/hystrix/hystrix.h"
 
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -13,10 +14,12 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -428,6 +431,42 @@ TEST_F(HystrixSinkTest, AddAndRemoveClusters) {
   // Check that old values of test_cluster2 were deleted.
   validateResults(cluster_message_map[cluster2_name_], 0, 0, 0, 0, 0, window_size_);
 }
+
+TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {
+  InSequence s;
+  Buffer::OwnedImpl buffer = createClusterAndCallbacks();
+  // Register callback to sink.
+  sink_->registerConnection(&callbacks_);
+
+  // This value doesn't matter in handlerHystrixEventStream
+  absl::string_view path_and_query;
+
+  Http::HeaderMapImpl response_headers;
+
+  NiceMock<Server::Configuration::MockAdminStream> admin_stream_mock;
+  NiceMock<Network::MockConnection> connection_mock;
+
+  auto addr_instance_ = Envoy::Network::Utility::parseInternetAddress("2.3.4.5", 123, false);
+
+  ON_CALL(admin_stream_mock, getDecoderFilterCallbacks()).WillByDefault(ReturnRef(callbacks_));
+  ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_mock));
+  ON_CALL(connection_mock, remoteAddress()).WillByDefault(ReturnRef(addr_instance_));
+
+  ASSERT_EQ(
+      sink_->handlerHystrixEventStream(path_and_query, response_headers, buffer, admin_stream_mock),
+      Http::Code::OK);
+
+  // Check that response_headers has been set correctly
+  EXPECT_EQ(response_headers.ContentType()->value(), "text/event-stream");
+  EXPECT_EQ(response_headers.CacheControl()->value(), "no-cache");
+  EXPECT_EQ(response_headers.Connection()->value(), "close");
+  EXPECT_EQ(response_headers.AccessControlAllowOrigin()->value(), "*");
+
+  std::string access_control_allow_headers =
+      std::string(response_headers.AccessControlAllowHeaders()->value().getStringView());
+  EXPECT_THAT(access_control_allow_headers, HasSubstr("Accept"));
+}
+
 } // namespace Hystrix
 } // namespace StatSinks
 } // namespace Extensions

@@ -28,6 +28,11 @@ public:
   LoadBalancerFactorySharedPtr factory() override { return factory_; }
   void initialize() override;
 
+  // Upstream::LoadBalancerBase
+  HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
 protected:
   ThreadAwareLoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,
                               Runtime::Loader& runtime, Runtime::RandomGenerator& random,
