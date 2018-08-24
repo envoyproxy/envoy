@@ -164,6 +164,7 @@ private:
   // header_map_impl.cc.
   union {
     char inline_buffer_[128];
+    // Since this is a union, this is only valid for type_ == Type::Dynamic.
     uint32_t dynamic_capacity_;
   };
 

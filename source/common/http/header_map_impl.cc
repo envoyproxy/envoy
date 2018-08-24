@@ -196,7 +196,7 @@ void HeaderString::setInteger(uint64_t value) {
     ASSERT(buffer_.dynamic_ == inline_buffer_);
   case Type::Dynamic: {
     // Whether dynamic or inline the buffer is guaranteed to be large enough.
-    ASSERT(dynamic_capacity_ >= MaxIntegerLength);
+    ASSERT(type_ == Type::Inline || dynamic_capacity_ >= MaxIntegerLength);
     // It's safe to use buffer.dynamic_, since buffer.ref_ is union aliased.
     ASSERT(&buffer_.dynamic_ == &buffer_.ref_);
     string_length_ = StringUtil::itoa(buffer_.dynamic_, 32, value);
