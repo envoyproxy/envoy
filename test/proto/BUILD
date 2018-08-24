@@ -19,8 +19,7 @@ envoy_proto_library(
 envoy_proto_library(
     name = "bookstore_proto",
     srcs = [":bookstore.proto"],
-    external_cc_proto_deps = ["@googleapis//:api_httpbody_protos"],
-    external_proto_deps = ["@googleapis//:api_httpbody_protos_proto"],
+    external_deps = ["api_httpbody_protos"],
 )
 
 envoy_proto_descriptor(
