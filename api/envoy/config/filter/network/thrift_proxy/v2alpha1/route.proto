@@ -54,8 +54,8 @@ message RouteMatch {
   // Specifies a set of headers that the route should match on. The router will check the request’s
   // headers against all the specified headers in the route config. A match will happen if all the
   // headers in the route are present in the request with the same values (or based on presence if
-  // the value field is not in the config). Note that this only applies when using the Header thrift
-  // transport type.
+  // the value field is not in the config). Note that this only applies for Thrift transports and/or
+  // protocols that support headers.
   repeated envoy.api.v2.route.HeaderMatcher headers = 4;
 }
 
