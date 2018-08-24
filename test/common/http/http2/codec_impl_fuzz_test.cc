@@ -99,10 +99,9 @@ public:
                          const test::common::http::http2::DirectionalAction& directional_action) {
     const bool end_stream = directional_action.end_stream();
     switch (directional_action.directional_action_selector_case()) {
-    case test::common::http::http2::DirectionalAction::kContinue100Headers: {
+    case test::common::http::http2::DirectionalAction::kContinueHeaders: {
       if (state == StreamState::PendingHeaders) {
-        Http::TestHeaderMapImpl headers =
-            Fuzz::fromHeaders(directional_action.continue_100_headers());
+        Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(directional_action.continue_headers());
         headers.setReferenceKey(Headers::get().Status, "100");
         encoder.encode100ContinueHeaders(headers);
       }
@@ -130,10 +129,10 @@ public:
       }
       break;
     }
-    case test::common::http::http2::DirectionalAction::kReset: {
+    case test::common::http::http2::DirectionalAction::kResetStream: {
       if (state != StreamState::Closed) {
         encoder.getStream().resetStream(
-            static_cast<Http::StreamResetReason>(directional_action.reset()));
+            static_cast<Http::StreamResetReason>(directional_action.reset_stream()));
         request_state_ = response_state_ = StreamState::Closed;
       }
       break;
