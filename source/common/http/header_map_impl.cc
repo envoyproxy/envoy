@@ -18,6 +18,14 @@ namespace {
 constexpr size_t MinDynamicCapacity{32};
 // This includes the NULL (StringUtil::itoa technically only needs 21).
 constexpr size_t MaxIntegerLength{32};
+
+void validateCapacity(size_t new_capacity) {
+  // If the resizing will cause buffer overflow due to hitting uint32_t::max, an OOM is likely
+  // imminent. Fast-fail rather than allow a buffer overflow attack (issue #1421)
+  RELEASE_ASSERT(new_capacity <= std::numeric_limits<uint32_t>::max(), "");
+  ASSERT(new_capacity >= MinDynamicCapacity);
+}
+
 } // namespace
 
 HeaderString::HeaderString() : type_(Type::Inline) {
@@ -80,6 +88,7 @@ void HeaderString::append(const char* data, uint32_t size) {
     type_ = Type::Dynamic;
     dynamic_capacity_ =
         std::max(MinDynamicCapacity, static_cast<size_t>((string_length_ + size) * 2));
+    validateCapacity(dynamic_capacity_);
     char* buf = static_cast<char*>(malloc(dynamic_capacity_));
     RELEASE_ASSERT(buf != nullptr, "");
     memcpy(buf, buffer_.ref_, string_length_);
@@ -100,19 +109,17 @@ void HeaderString::append(const char* data, uint32_t size) {
     // We can get here either because we didn't fit in inline or we are already dynamic.
     if (type_ == Type::Inline) {
       const uint64_t new_capacity = (static_cast<uint64_t>(string_length_) + size) * 2;
-      // If the resizing will cause buffer overflow due to hitting uint32_t::max, an OOM is likely
-      // imminent. Fast-fail rather than allow a buffer overflow attack (issue #1421)
-      RELEASE_ASSERT(new_capacity <= std::numeric_limits<uint32_t>::max(), "");
-      ASSERT(new_capacity >= MinDynamicCapacity);
+      validateCapacity(new_capacity);
       buffer_.dynamic_ = static_cast<char*>(malloc(new_capacity));
-      memcpy(buffer_.dynamic_, inline_buffer_, string_length_);
       RELEASE_ASSERT(buffer_.dynamic_ != nullptr, "");
+      memcpy(buffer_.dynamic_, inline_buffer_, string_length_);
       dynamic_capacity_ = new_capacity;
       type_ = Type::Dynamic;
     } else {
       if (size + 1 + string_length_ > dynamic_capacity_) {
         // Need to reallocate.
         dynamic_capacity_ = (string_length_ + size) * 2;
+        validateCapacity(dynamic_capacity_);
         buffer_.dynamic_ = static_cast<char*>(realloc(buffer_.dynamic_, dynamic_capacity_));
         RELEASE_ASSERT(buffer_.dynamic_ != nullptr, "");
       }
@@ -163,14 +170,18 @@ void HeaderString::setCopy(const char* data, uint32_t size) {
     // We can get here either because we didn't fit in inline or we are already dynamic.
     if (type_ == Type::Inline) {
       dynamic_capacity_ = size * 2;
+      validateCapacity(dynamic_capacity_);
       buffer_.dynamic_ = static_cast<char*>(malloc(dynamic_capacity_));
+      RELEASE_ASSERT(buffer_.dynamic_ != nullptr, "");
       type_ = Type::Dynamic;
     } else {
       if (size + 1 > dynamic_capacity_) {
         // Need to reallocate. Use free/malloc to avoid the copy since we are about to overwrite.
         dynamic_capacity_ = size * 2;
+        validateCapacity(dynamic_capacity_);
         free(buffer_.dynamic_);
         buffer_.dynamic_ = static_cast<char*>(malloc(dynamic_capacity_));
+        RELEASE_ASSERT(buffer_.dynamic_ != nullptr, "");
       }
     }
   }

@@ -692,7 +692,8 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
     HeaderMapImpl::appendToHeader(value3, "");
     EXPECT_EQ(value3, "empty");
   }
-  // Regression test for appending to an empty string with empty, then setting integer.
+  // Regression test for appending to an empty string with a short string, then
+  // setting integer.
   {
     const std::string empty;
     HeaderString value4(empty);
