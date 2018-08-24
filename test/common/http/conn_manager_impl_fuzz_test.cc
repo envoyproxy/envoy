@@ -290,10 +290,10 @@ public:
                       const test::common::http::ResponseAction& response_action) {
     const bool end_stream = response_action.end_stream();
     switch (response_action.response_action_selector_case()) {
-    case test::common::http::ResponseAction::kContinue100Headers: {
+    case test::common::http::ResponseAction::kContinueHeaders: {
       if (state == StreamState::PendingHeaders) {
         auto headers = std::make_unique<TestHeaderMapImpl>(
-            Fuzz::fromHeaders(response_action.continue_100_headers()));
+            Fuzz::fromHeaders(response_action.continue_headers()));
         headers->setReferenceKey(Headers::get().Status, "100");
         decoder_filter_->callbacks_->encode100ContinueHeaders(std::move(headers));
       }

@@ -4,6 +4,8 @@
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
 
+#include "source/common/ratelimit/ratelimit.pb.h"
+
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
 
@@ -22,7 +24,11 @@ public:
   ~RatelimitGrpcClientIntegrationParamTest() {}
   Network::Address::IpVersion ipVersion() const override { return std::get<0>(GetParam()); }
   Grpc::ClientType clientType() const override { return std::get<1>(GetParam()); }
-  bool useDataPlaneProto() const { return std::get<2>(GetParam()); }
+  bool useDataPlaneProto() const {
+    // Force link time dependency on deprecated message type.
+    pb::lyft::ratelimit::RateLimit _ignore;
+    return std::get<2>(GetParam());
+  }
 };
 
 class RatelimitIntegrationTest : public HttpIntegrationTest,

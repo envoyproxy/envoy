@@ -18,7 +18,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "//test/proto:helloworld_proto",
+        "//test/proto:helloworld_proto_cc",
     ],
 )
 
@@ -40,7 +40,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/grpc:codec_lib",
-        "//test/proto:helloworld_proto",
+        "//test/proto:helloworld_proto_cc",
     ],
 )
 
@@ -51,7 +51,7 @@ envoy_cc_test(
         "//source/common/grpc:common_lib",
         "//source/common/http:headers_lib",
         "//test/mocks/upstream:upstream_mocks",
-        "//test/proto:helloworld_proto",
+        "//test/proto:helloworld_proto_cc",
         "//test/test_common:utility_lib",
     ],
 )
@@ -66,7 +66,7 @@ envoy_cc_test(
         "//source/common/tracing:http_tracer_lib",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/tracing:tracing_mocks",
-        "//test/proto:helloworld_proto",
+        "//test/proto:helloworld_proto_cc",
         "//test/test_common:test_time_lib",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
 )
@@ -99,7 +99,7 @@ envoy_cc_test_library(
         "//source/common/http/http2:conn_pool_lib",
         "//test/integration:integration_lib",
         "//test/mocks/local_info:local_info_mocks",
-        "//test/proto:helloworld_proto",
+        "//test/proto:helloworld_proto_cc",
         "//test/test_common:test_time_lib",
     ],
 )

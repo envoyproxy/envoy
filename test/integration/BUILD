@@ -60,7 +60,7 @@ py_binary(
 envoy_proto_library(
     name = "capture_fuzz_proto",
     srcs = [":capture_fuzz.proto"],
-    external_deps = ["well_known_protos"],
+    require_py = 1,
 )
 
 envoy_cc_test(
@@ -424,7 +424,7 @@ envoy_cc_test(
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
-        "//source/common/ratelimit:ratelimit_proto",
+        "//source/common/ratelimit:ratelimit_proto_cc",
         "//source/extensions/filters/http/ratelimit:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "@envoy_api//envoy/service/ratelimit/v2:rls_cc",
@@ -582,7 +582,7 @@ envoy_cc_test_library(
         "h1_fuzz.h",
     ],
     deps = [
-        ":capture_fuzz_proto",
+        ":capture_fuzz_proto_cc",
         ":http_integration_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
