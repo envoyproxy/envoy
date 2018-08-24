@@ -20,8 +20,9 @@ namespace Server {
 
 class ProdWorkerFactory : public WorkerFactory, Logger::Loggable<Logger::Id::main> {
 public:
-  ProdWorkerFactory(ThreadLocal::Instance& tls, Api::Api& api, TestHooks& hooks)
-      : tls_(tls), api_(api), hooks_(hooks) {}
+  ProdWorkerFactory(ThreadLocal::Instance& tls, Api::Api& api, TestHooks& hooks,
+                    TimeSource& time_source)
+      : tls_(tls), api_(api), hooks_(hooks), time_source_(time_source) {}
 
   // Server::WorkerFactory
   WorkerPtr createWorker() override;
@@ -30,6 +31,7 @@ private:
   ThreadLocal::Instance& tls_;
   Api::Api& api_;
   TestHooks& hooks_;
+  TimeSource time_source_;
 };
 
 /**

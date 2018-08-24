@@ -201,9 +201,6 @@ std::string DateFormatter::now() {
   return fromTime(current_time_t);
 }
 
-ProdSystemTimeSource ProdSystemTimeSource::instance_;
-ProdMonotonicTimeSource ProdMonotonicTimeSource::instance_;
-
 ConstMemoryStreamBuffer::ConstMemoryStreamBuffer(const char* data, size_t size) {
   // std::streambuf won't modify `data`, but the interface still requires a char* for convenience,
   // so we need to const_cast.

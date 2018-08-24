@@ -30,6 +30,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 
@@ -42,18 +43,20 @@ namespace Http {
 class FuzzConfig : public ConnectionManagerConfig {
 public:
   struct RouteConfigProvider : public Router::RouteConfigProvider {
+    RouteConfigProvider(TimeSource& time_source) : time_source_(time_source) {}
+
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return route_config_; }
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
-    SystemTime lastUpdated() const override {
-      return ProdSystemTimeSource::instance_.currentTime();
-    }
+    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
 
+    TimeSource& time_source_;
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   };
 
   FuzzConfig()
-      : stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
+      : route_config_provider_(test_time_.timeSource()),
+        stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                         POOL_HISTOGRAM(fake_stats_))},
                "",
                fake_stats_},
@@ -114,6 +117,7 @@ public:
   MockStreamEncoderFilter* encoder_filter_{};
   NiceMock<MockFilterChainFactory> filter_factory_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
+  DangerousDeprecatedTestTime test_time_;
   RouteConfigProvider route_config_provider_;
   std::string server_name_;
   Stats::IsolatedStoreImpl fake_stats_;

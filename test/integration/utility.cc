@@ -53,13 +53,16 @@ void BufferingStreamDecoder::onComplete() {
 
 void BufferingStreamDecoder::onResetStream(Http::StreamResetReason) { ADD_FAILURE(); }
 
+DangerousDeprecatedTestTime IntegrationUtil::evil_singleton_test_time_;
+
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,
                                    const std::string& method, const std::string& url,
                                    const std::string& body, Http::CodecClient::Type type,
                                    const std::string& host, const std::string& content_type) {
+
   Api::Impl api(std::chrono::milliseconds(9000));
-  Event::DispatcherPtr dispatcher(api.allocateDispatcher());
+  Event::DispatcherPtr dispatcher(api.allocateDispatcher(evil_singleton_test_time_.timeSource()));
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{
       Upstream::makeTestHostDescription(cluster, "tcp://127.0.0.1:80")};
@@ -107,7 +110,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
                                          ReadCallback data_callback,
                                          Network::Address::IpVersion version) {
   api_.reset(new Api::Impl(std::chrono::milliseconds(10000)));
-  dispatcher_ = api_->allocateDispatcher();
+  dispatcher_ = api_->allocateDispatcher(IntegrationUtil::evil_singleton_test_time_.timeSource());
   client_ = dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),

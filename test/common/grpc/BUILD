@@ -67,6 +67,7 @@ envoy_cc_test(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/proto:helloworld_proto",
+        "//test/test_common:test_time_lib",
     ] + envoy_select_google_grpc(["//source/common/grpc:google_async_client_lib"]),
 )
 
@@ -99,6 +100,7 @@ envoy_cc_test_library(
         "//test/integration:integration_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/proto:helloworld_proto",
+        "//test/test_common:test_time_lib",
     ],
 )
 

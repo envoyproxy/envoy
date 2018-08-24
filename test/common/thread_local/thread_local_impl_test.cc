@@ -2,6 +2,7 @@
 #include "common/thread_local/thread_local_impl.h"
 
 #include "test/mocks/event/mocks.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 
@@ -113,8 +114,10 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
 // Validate ThreadLocal::InstanceImpl's dispatcher() behavior.
 TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
-  Event::DispatcherImpl main_dispatcher;
-  Event::DispatcherImpl thread_dispatcher;
+
+  DangerousDeprecatedTestTime test_time;
+  Event::DispatcherImpl main_dispatcher(test_time.timeSource());
+  Event::DispatcherImpl thread_dispatcher(test_time.timeSource());
 
   tls.registerThread(main_dispatcher, true);
   tls.registerThread(thread_dispatcher, false);

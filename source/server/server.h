@@ -135,8 +135,9 @@ public:
   /**
    * @throw EnvoyException if initialization fails.
    */
-  InstanceImpl(Options& options, Network::Address::InstanceConstSharedPtr local_address,
-               TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
+  InstanceImpl(Options& options, TimeSource& time_source,
+               Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
+               HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls);
 
@@ -178,6 +179,7 @@ public:
   Tracing::HttpTracer& httpTracer() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
+  TimeSource& timeSource() override { return time_source_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_->statsFlushInterval();
@@ -194,6 +196,7 @@ private:
   void terminate();
 
   Options& options_;
+  TimeSource time_source_;
   HotRestart& restarter_;
   const time_t start_time_;
   time_t original_start_time_;
