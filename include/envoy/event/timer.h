@@ -34,5 +34,15 @@ public:
 
 typedef std::unique_ptr<Timer> TimerPtr;
 
+class TimerFactory {
+public:
+  virtual ~TimerFactory() {}
+
+  /**
+   * Creates a timer.
+   */
+  TimerPtr createTimer() PURE;
+};
+
 } // namespace Event
 } // namespace Envoy

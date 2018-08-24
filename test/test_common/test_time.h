@@ -25,4 +25,15 @@ private:
   TimeSource time_source_;
 };
 
+class SimulatedTestTime {
+public:
+  SimulatedTestTime();
+
+  TimeSource& timeSource() { return time_source_; }
+
+ private:
+
+};
+
+
 } // namespace Envoy

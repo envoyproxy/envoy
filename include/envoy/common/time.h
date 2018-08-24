@@ -45,6 +45,12 @@ public:
   virtual MonotonicTime currentTime() PURE;
 };
 
+
+class TimerFactory {
+  timer
+};
+
+
 /**
  * Captures a system-time source, capable of computing both monotonically increasing
  * and real time.
