@@ -108,7 +108,7 @@ void HeaderString::append(const char* data, uint32_t size) {
   case Type::Dynamic: {
     // We can get here either because we didn't fit in inline or we are already dynamic.
     if (type_ == Type::Inline) {
-      const uint64_t new_capacity = (static_cast<uint64_t>(string_length_) + size) * 2;
+      const size_t new_capacity = (static_cast<uint64_t>(string_length_) + size) * 2;
       validateCapacity(new_capacity);
       buffer_.dynamic_ = static_cast<char*>(malloc(new_capacity));
       RELEASE_ASSERT(buffer_.dynamic_ != nullptr, "");
