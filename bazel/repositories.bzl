@@ -465,9 +465,9 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/debugging:symbolize",
     )
     native.bind(
-            name = "abseil_time",
-            actual = "@com_google_absl//absl/time:time",
-        )
+        name = "abseil_time",
+        actual = "@com_google_absl//absl/time:time",
+    )
 
 def _com_google_protobuf():
     _repository_impl("com_google_protobuf")
