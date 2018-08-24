@@ -23,11 +23,7 @@ namespace Server {
 
 class GuardDogTestBase : public testing::Test {
 protected:
-  GuardDogTestBase() : time_source_(system_time_source_, monotonic_time_source_) {}
-
-  NiceMock<MockMonotonicTimeSource> monotonic_time_source_;
-  ProdSystemTimeSource system_time_source_;
-  TimeSource time_source_;
+  NiceMock<MockTimeSource> time_source_;
 };
 
 /**
@@ -42,7 +38,7 @@ protected:
   GuardDogDeathTest()
       : config_kill_(1000, 1000, 100, 1000), config_multikill_(1000, 1000, 1000, 500),
         mock_time_(0) {
-    ON_CALL(monotonic_time_source_, currentTime()).WillByDefault(testing::Invoke([this]() {
+    ON_CALL(time_source_, monotonicTime()).WillByDefault(testing::Invoke([this]() {
       return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
     }));
   }
@@ -140,7 +136,7 @@ TEST_F(GuardDogAlmostDeadTest, NearDeathTest) {
 class GuardDogMissTest : public GuardDogTestBase {
 protected:
   GuardDogMissTest() : config_miss_(500, 1000, 0, 0), config_mega_(1000, 500, 0, 0), mock_time_(0) {
-    ON_CALL(monotonic_time_source_, currentTime()).WillByDefault(testing::Invoke([this]() {
+    ON_CALL(time_source_, monotonicTime()).WillByDefault(testing::Invoke([this]() {
       return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
     }));
   }
@@ -173,7 +169,7 @@ TEST_F(GuardDogMissTest, MissTest) {
 TEST_F(GuardDogMissTest, MegaMissTest) {
   // This test checks the actual collected statistics after doing some timer
   // advances that should and shouldn't increment the counters.
-  ON_CALL(monotonic_time_source_, currentTime()).WillByDefault(testing::Invoke([this]() {
+  ON_CALL(time_source_, monotonicTime()).WillByDefault(testing::Invoke([this]() {
     return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
   }));
   GuardDogImpl gd(stats_store_, config_mega_, time_source_);
@@ -196,7 +192,7 @@ TEST_F(GuardDogMissTest, MissCountTest) {
   // This tests a flake discovered in the MissTest where real timeout or
   // spurious condition_variable wakeup causes the counter to get incremented
   // more than it should be.
-  ON_CALL(monotonic_time_source_, currentTime()).WillByDefault(testing::Invoke([this]() {
+  ON_CALL(time_source_, monotonicTime()).WillByDefault(testing::Invoke([this]() {
     return std::chrono::steady_clock::time_point(std::chrono::milliseconds(mock_time_));
   }));
   GuardDogImpl gd(stats_store_, config_miss_, time_source_);
@@ -272,7 +268,6 @@ TEST_F(GuardDogTestBase, WatchDogThreadIdTest) {
 // The WatchDog/GuardDog relies on this being a lock free atomic for perf reasons so some workaround
 // will be required if this test starts failing.
 TEST_F(GuardDogTestBase, AtomicIsAtomicTest) {
-  ProdMonotonicTimeSource time_source;
   std::atomic<std::chrono::steady_clock::duration> atomic_time;
   ASSERT_EQ(atomic_time.is_lock_free(), true);
 }

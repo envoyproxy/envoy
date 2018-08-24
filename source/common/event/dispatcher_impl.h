@@ -68,7 +68,7 @@ private:
     return run_tid_ == 0 || run_tid_ == Thread::Thread::currentThreadId();
   }
 
-  TimeSource time_source_;
+  TimeSource& time_source_;
   Thread::ThreadId run_tid_{};
   Buffer::WatermarkFactoryPtr buffer_factory_;
   Libevent::BasePtr base_;

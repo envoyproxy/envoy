@@ -237,9 +237,7 @@ public:
                std::unique_ptr<ClusterUpdateCallbacksHandle>(ClusterUpdateCallbacks& callbacks));
 
   // TODO(jmarantz): Switch these to using mock-time.
-  ProdSystemTimeSource system_time_;
-  ProdMonotonicTimeSource monotonic_time_;
-  TimeSource time_source_;
+  RealTimeSource time_source_;
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;

@@ -25,7 +25,7 @@ DetectorSharedPtr DetectorImplFactory::createForCluster(
     Runtime::Loader& runtime, EventLoggerSharedPtr event_logger) {
   if (cluster_config.has_outlier_detection()) {
     return DetectorImpl::create(cluster, cluster_config.outlier_detection(), dispatcher, runtime,
-                                dispatcher.timeSource().monotonic(), event_logger);
+                                dispatcher.timeSource(), event_logger);
   } else {
     return nullptr;
   }
@@ -130,7 +130,7 @@ DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::api::v2::cluster::OutlierDetection& config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                           MonotonicTimeSource& time_source, EventLoggerSharedPtr event_logger)
+                           TimeSource& time_source, EventLoggerSharedPtr event_logger)
     : config_(config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
       stats_(generateStats(cluster.info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
@@ -150,7 +150,7 @@ std::shared_ptr<DetectorImpl>
 DetectorImpl::create(const Cluster& cluster,
                      const envoy::api::v2::cluster::OutlierDetection& config,
                      Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                     MonotonicTimeSource& time_source, EventLoggerSharedPtr event_logger) {
+                     TimeSource& time_source, EventLoggerSharedPtr event_logger) {
   std::shared_ptr<DetectorImpl> detector(
       new DetectorImpl(cluster, config, dispatcher, runtime, time_source, event_logger));
   detector->initialize(cluster);
@@ -268,7 +268,7 @@ void DetectorImpl::ejectHost(HostSharedPtr host, EjectionType type) {
     if (enforceEjection(type)) {
       stats_.ejections_active_.inc();
       updateEnforcedEjectionStats(type);
-      host_monitors_[host]->eject(time_source_.currentTime());
+      host_monitors_[host]->eject(time_source_.monotonicTime());
       runCallbacks(host);
 
       if (event_logger_) {
@@ -432,7 +432,7 @@ void DetectorImpl::processSuccessRateEjections() {
 }
 
 void DetectorImpl::onIntervalTimer() {
-  MonotonicTime now = time_source_.currentTime();
+  MonotonicTime now = time_source_.monotonicTime();
 
   for (auto host : host_monitors_) {
     checkHostForUneject(host.first, host.second, now);
@@ -486,8 +486,8 @@ void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, Detector& det
     "\"cluster_success_rate_ejection_threshold\": \"{}\"" +
     "}}\n";
   // clang-format on
-  SystemTime now = time_source_.currentTime();
-  MonotonicTime monotonic_now = monotonic_time_source_.currentTime();
+  SystemTime now = time_source_.systemTime();
+  MonotonicTime monotonic_now = time_source_.monotonicTime();
 
   switch (type) {
   case EjectionType::Consecutive5xx:
@@ -522,8 +522,8 @@ void EventLoggerImpl::logUneject(HostDescriptionConstSharedPtr host) {
     "\"num_ejections\": {}" +
     "}}\n";
   // clang-format on
-  SystemTime now = time_source_.currentTime();
-  MonotonicTime monotonic_now = monotonic_time_source_.currentTime();
+  SystemTime now = time_source_.systemTime();
+  MonotonicTime monotonic_now = time_source_.monotonicTime();
   file_->write(fmt::format(
       json, AccessLogDateTimeFormatter::fromTime(now),
       secsSinceLastAction(host->outlierDetector().lastEjectionTime(), monotonic_now),

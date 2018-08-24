@@ -35,20 +35,13 @@ public:
   MOCK_METHOD0(ready, void());
 };
 
-class MockSystemTimeSource : public SystemTimeSource {
+class MockTimeSource : public TimeSource {
 public:
-  MockSystemTimeSource();
-  ~MockSystemTimeSource();
+  MockTimeSource();
+  ~MockTimeSource();
 
-  MOCK_METHOD0(currentTime, SystemTime());
-};
-
-class MockMonotonicTimeSource : public MonotonicTimeSource {
-public:
-  MockMonotonicTimeSource();
-  ~MockMonotonicTimeSource();
-
-  MOCK_METHOD0(currentTime, MonotonicTime());
+  MOCK_METHOD0(systemTime, SystemTime());
+  MOCK_METHOD0(monotonicTime, MonotonicTime());
 };
 
 class MockTokenBucket : public TokenBucket {
