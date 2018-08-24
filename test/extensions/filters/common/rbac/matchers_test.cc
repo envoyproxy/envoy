@@ -192,11 +192,17 @@ TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnection ssl;
 
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return("foo"));
-  EXPECT_CALL(Const(conn), ssl()).WillOnce(Return(&ssl));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return("foo"));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
 
   envoy::config::rbac::v2alpha::Principal_Authenticated auth;
   auth.set_name("foo");
+  checkMatcher(AuthenticatedMatcher(auth), true, conn);
+
+  auth.set_name("bar");
+  checkMatcher(AuthenticatedMatcher(auth), false, conn);
+
+  auth.mutable_principal_name()->set_exact("foo");
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 }
 
@@ -204,20 +210,35 @@ TEST(AuthenticatedMatcher, subjectPeerCertificate) {
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnection ssl;
 
-  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillOnce(Return(""));
-  EXPECT_CALL(ssl, subjectPeerCertificate()).WillOnce(Return("bar"));
-  EXPECT_CALL(Const(conn), ssl()).WillOnce(Return(&ssl));
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return(""));
+  EXPECT_CALL(ssl, subjectPeerCertificate()).WillRepeatedly(Return("bar"));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
 
   envoy::config::rbac::v2alpha::Principal_Authenticated auth;
   auth.set_name("bar");
+  checkMatcher(AuthenticatedMatcher(auth), true, conn);
+
+  auth.set_name("foo");
+  checkMatcher(AuthenticatedMatcher(auth), false, conn);
+
+  auth.mutable_principal_name()->set_exact("bar");
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 }
 
 TEST(AuthenticatedMatcher, AnySSLSubject) {
   Envoy::Network::MockConnection conn;
   Envoy::Ssl::MockConnection ssl;
-  EXPECT_CALL(Const(conn), ssl()).WillOnce(Return(&ssl));
-  checkMatcher(AuthenticatedMatcher({}), true, conn);
+  EXPECT_CALL(ssl, uriSanPeerCertificate()).WillRepeatedly(Return("foo"));
+  EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(&ssl));
+
+  envoy::config::rbac::v2alpha::Principal_Authenticated auth;
+  checkMatcher(AuthenticatedMatcher(auth), true, conn);
+
+  auth.set_name("bar");
+  checkMatcher(AuthenticatedMatcher(auth), false, conn);
+
+  auth.mutable_principal_name()->set_regex(".*");
+  checkMatcher(AuthenticatedMatcher(auth), true, conn);
 }
 
 TEST(AuthenticatedMatcher, NoSSL) {
