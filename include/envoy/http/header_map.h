@@ -155,10 +155,13 @@ public:
 
 private:
   union {
+    // This should reference inline_buffer_ for Type::Inline.
     char* dynamic_;
     const char* ref_;
   } buffer_;
 
+  // Capacity in both Type::Inline and Type::Dynamic cases must be at least MinDynamicCapacity in
+  // header_map_impl.cc.
   union {
     char inline_buffer_[128];
     uint32_t dynamic_capacity_;

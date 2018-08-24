@@ -14,9 +14,17 @@
 namespace Envoy {
 namespace Http {
 
+namespace {
+constexpr size_t MinDynamicCapacity{32};
+// This includes the NULL (StringUtil::itoa technically only needs 21).
+constexpr size_t MaxIntegerLength{32};
+} // namespace
+
 HeaderString::HeaderString() : type_(Type::Inline) {
   buffer_.dynamic_ = inline_buffer_;
   clear();
+  static_assert(sizeof(inline_buffer_) >= MaxIntegerLength, "");
+  static_assert(MinDynamicCapacity >= MaxIntegerLength, "");
 }
 
 HeaderString::HeaderString(const LowerCaseString& ref_value) : type_(Type::Reference) {
@@ -70,7 +78,8 @@ void HeaderString::append(const char* data, uint32_t size) {
     // Rather than be too clever and optimize this uncommon case, we dynamically
     // allocate and copy.
     type_ = Type::Dynamic;
-    dynamic_capacity_ = (string_length_ + size) * 2;
+    dynamic_capacity_ =
+        std::max(MinDynamicCapacity, static_cast<size_t>((string_length_ + size) * 2));
     char* buf = static_cast<char*>(malloc(dynamic_capacity_));
     RELEASE_ASSERT(buf != nullptr, "");
     memcpy(buf, buffer_.ref_, string_length_);
@@ -94,6 +103,7 @@ void HeaderString::append(const char* data, uint32_t size) {
       // If the resizing will cause buffer overflow due to hitting uint32_t::max, an OOM is likely
       // imminent. Fast-fail rather than allow a buffer overflow attack (issue #1421)
       RELEASE_ASSERT(new_capacity <= std::numeric_limits<uint32_t>::max(), "");
+      ASSERT(new_capacity >= MinDynamicCapacity);
       buffer_.dynamic_ = static_cast<char*>(malloc(new_capacity));
       memcpy(buffer_.dynamic_, inline_buffer_, string_length_);
       RELEASE_ASSERT(buffer_.dynamic_ != nullptr, "");
@@ -182,8 +192,13 @@ void HeaderString::setInteger(uint64_t value) {
   }
 
   case Type::Inline:
+    // buffer_.dynamic_ should always point at inline_buffer_ for Type::Inline.
+    ASSERT(buffer_.dynamic_ == inline_buffer_);
   case Type::Dynamic: {
     // Whether dynamic or inline the buffer is guaranteed to be large enough.
+    ASSERT(dynamic_capacity_ >= MaxIntegerLength);
+    // It's safe to use buffer.dynamic_, since buffer.ref_ is union aliased.
+    ASSERT(&buffer_.dynamic_ == &buffer_.ref_);
     string_length_ = StringUtil::itoa(buffer_.dynamic_, 32, value);
   }
   }
