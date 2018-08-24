@@ -23,11 +23,11 @@ public:
   ~MockApi();
 
   // Api::Api
-  Event::DispatcherPtr allocateDispatcher() override {
-    return Event::DispatcherPtr{allocateDispatcher_()};
+  Event::DispatcherPtr allocateDispatcher(TimeSource& time_source) override {
+    return Event::DispatcherPtr{allocateDispatcher_(time_source)};
   }
 
-  MOCK_METHOD0(allocateDispatcher_, Event::Dispatcher*());
+  MOCK_METHOD1(allocateDispatcher_, Event::Dispatcher*(TimeSource&));
   MOCK_METHOD4(createFile,
                Filesystem::FileSharedPtr(const std::string& path, Event::Dispatcher& dispatcher,
                                          Thread::BasicLockable& lock, Stats::Store& stats_store));

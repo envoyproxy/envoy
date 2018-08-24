@@ -5,6 +5,7 @@
 #include <list>
 #include <vector>
 
+#include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection_handler.h"
@@ -21,8 +22,8 @@ namespace Event {
  */
 class DispatcherImpl : Logger::Loggable<Logger::Id::main>, public Dispatcher {
 public:
-  DispatcherImpl();
-  DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory);
+  explicit DispatcherImpl(TimeSource& time_source);
+  DispatcherImpl(TimeSource& time_source, Buffer::WatermarkFactoryPtr&& factory);
   ~DispatcherImpl();
 
   /**
@@ -31,6 +32,7 @@ public:
   event_base& base() { return *base_; }
 
   // Event::Dispatcher
+  TimeSource& timeSource() override { return time_source_; }
   void clearDeferredDeleteList() override;
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
@@ -66,6 +68,7 @@ private:
     return run_tid_ == 0 || run_tid_ == Thread::Thread::currentThreadId();
   }
 
+  TimeSource time_source_;
   Thread::ThreadId run_tid_{};
   Buffer::WatermarkFactoryPtr buffer_factory_;
   Libevent::BasePtr base_;
