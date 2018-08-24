@@ -310,7 +310,7 @@ public:
   /**
    * @return SNI value for downstream host
    */
-  virtual const absl::string_view& requestedServerName() const PURE;
+  virtual const std::string& requestedServerName() const PURE;
 };
 
 } // namespace RequestInfo

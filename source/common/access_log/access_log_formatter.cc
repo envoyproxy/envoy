@@ -303,12 +303,10 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
     };
   } else if (field_name == "REQUESTED_SERVER_NAME") {
     field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      absl::string_view requested_server_name;
       if (!request_info.requestedServerName().empty()) {
-        return request_info.requestedServerName().data();
+        return request_info.requestedServerName();
       } else {
-        requested_server_name = UnspecifiedValueString;
-        return requested_server_name.data();
+        return UnspecifiedValueString;
       }
     };
   } else {

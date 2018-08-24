@@ -178,11 +178,11 @@ struct RequestInfoImpl : public RequestInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  void setRequestedServerName(const absl::string_view requested_server_name) override {
-    requested_server_name_ = requested_server_name;
+  void setRequestedServerName(absl::string_view requested_server_name) override {
+    requested_server_name_ = std::string(requested_server_name);
   }
 
-  const absl::string_view& requestedServerName() const override { return requested_server_name_; }
+  const std::string& requestedServerName() const override { return requested_server_name_; }
 
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
@@ -210,7 +210,7 @@ private:
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
-  absl::string_view requested_server_name_;
+  std::string requested_server_name_;
 };
 
 } // namespace RequestInfo

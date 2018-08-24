@@ -141,10 +141,10 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
     request_info.route_entry_ = &route_entry;
     EXPECT_EQ(&route_entry, request_info.routeEntry());
 
-    EXPECT_EQ(nullptr, request_info.requestedServerName());
+    EXPECT_EQ("", request_info.requestedServerName());
     absl::string_view sni_name = "stubserver.org";
     request_info.setRequestedServerName(sni_name);
-    EXPECT_EQ(sni_name, request_info.requestedServerName());
+    EXPECT_EQ(std::string(sni_name), request_info.requestedServerName());
   }
 }
 
