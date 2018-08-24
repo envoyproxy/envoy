@@ -966,8 +966,8 @@ routes:
   - match:
       method_name: "method1"
       headers:
-      - name: "content-type"
-        exact_match: "application/grpc"
+      - name: "x-header-1"
+        exact_match: "x-value-1"
     route:
       cluster: "cluster1"
 )EOF";
@@ -984,7 +984,7 @@ routes:
   route = matcher.route(metadata);
   EXPECT_EQ(nullptr, route);
 
-  metadata.headers().addCopy(Http::LowerCaseString("content-type"), "application/grpc");
+  metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "x-value-1");
   route = matcher.route(metadata);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());

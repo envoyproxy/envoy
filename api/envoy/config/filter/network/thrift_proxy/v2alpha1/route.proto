@@ -29,7 +29,7 @@ message Route {
   RouteAction route = 2 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
 }
 
-// [#comment:next free field: 4]
+// [#comment:next free field: 5]
 message RouteMatch {
   oneof match_specifier {
     option (validate.required) = true;
@@ -44,10 +44,18 @@ message RouteMatch {
     string service_name = 2;
   }
 
-  // Inverts whatever matching is done in match_specifier. Cannot be combined with wildcard matching
-  // as that would result in routes never being matched.
+  // Inverts whatever matching is done in the :ref:`method_name
+  // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.RouteMatch.method_name>` or :ref:
+  // `service_name
+  // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.RouteMatch.service_name>` fields.
+  // Cannot be combined with wildcard matching as that would result in routes never being matched.
   bool invert = 3;
 
+  // Specifies a set of headers that the route should match on. The router will check the request’s
+  // headers against all the specified headers in the route config. A match will happen if all the
+  // headers in the route are present in the request with the same values (or based on presence if
+  // the value field is not in the config). Note that this only applies when using the Header thrift
+  // transport type.
   repeated envoy.api.v2.route.HeaderMatcher headers = 4;
 }
 

@@ -2,7 +2,7 @@
 
 # Generates request and response fixtures for integration tests.
 
-# Usage: generate_fixture.sh <transport> <protocol> -s [multiplex-service] -H [headers ] method [param...]
+# Usage: generate_fixture.sh <transport> <protocol> -s [multiplex-service] -H [headers] method [param...]
 
 set -e
 

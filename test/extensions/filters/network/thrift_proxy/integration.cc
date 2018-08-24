@@ -70,17 +70,12 @@ void BaseThriftIntegrationTest::preparePayloads(const PayloadOptions& options,
   if (options.headers_.size() > 0) {
     args.push_back("-H");
 
-    std::stringstream ss;
-    size_t sz = options.headers_.size();
-    for (size_t i = 0; i < sz; i++) {
-      std::pair<std::string, std::string> p = options.headers_.at(i);
-      ss << p.first << "=" << p.second;
-      if (i < sz - 1) {
-        ss << ",";
-      }
-    }
-
-    args.push_back(ss.str());
+    std::vector<std::string> headers;
+    std::transform(options.headers_.begin(), options.headers_.end(), std::back_inserter(headers),
+                   [](const std::pair<std::string, std::string>& header) -> std::string {
+                     return header.first + "=" + header.second;
+                   });
+    args.push_back(StringUtil::join(headers, ","));
   }
 
   args.push_back(options.method_name_);
