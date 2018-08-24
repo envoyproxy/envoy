@@ -23,7 +23,7 @@ static void errorCallbackTest(Address::IpVersion version) {
   // Force the error callback to fire by closing the socket under the listener. We run this entire
   // test in the forked process to avoid confusion when the fork happens.
   Stats::IsolatedStoreImpl stats_store;
-  RealTestTime test_time;
+  DangerousDeprecatedTestTime test_time;
   Event::DispatcherImpl dispatcher(test_time.timeSource());
 
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
@@ -83,7 +83,7 @@ protected:
 
   const Address::IpVersion version_;
   const Address::InstanceConstSharedPtr alt_address_;
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
 };
 INSTANTIATE_TEST_CASE_P(IpVersions, ListenerImplTest,

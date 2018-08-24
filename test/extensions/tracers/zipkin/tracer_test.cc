@@ -39,7 +39,7 @@ class ZipkinTracerTest : public testing::Test {
 protected:
   ZipkinTracerTest() : time_source_(test_time_.timeSource()) {}
 
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   TimeSource time_source_;
 };
 

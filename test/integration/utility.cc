@@ -53,7 +53,7 @@ void BufferingStreamDecoder::onComplete() {
 
 void BufferingStreamDecoder::onResetStream(Http::StreamResetReason) { ADD_FAILURE(); }
 
-RealTestTime IntegrationUtil::evil_singleton_test_time_;
+DangerousDeprecatedTestTime IntegrationUtil::evil_singleton_test_time_;
 
 BufferingStreamDecoderPtr
 IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPtr& addr,

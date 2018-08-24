@@ -33,7 +33,7 @@ public:
 
 protected:
   int fds_[2];
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   DispatcherImpl dispatcher_;
 };
 
@@ -52,7 +52,7 @@ TEST_P(FileEventImplActivateTest, Activate) {
   }
   ASSERT_NE(-1, fd);
 
-  RealTestTime test_time;
+  DangerousDeprecatedTestTime test_time;
   DispatcherImpl dispatcher(test_time.timeSource());
   ReadyWatcher read_event;
   EXPECT_CALL(read_event, ready()).Times(1);

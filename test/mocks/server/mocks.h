@@ -352,7 +352,7 @@ public:
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockListenerManager> listener_manager_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   Singleton::ManagerPtr singleton_manager_;
 };
 
