@@ -30,10 +30,10 @@ public:
   MockDispatcher();
   ~MockDispatcher();
 
-  void setTimeSource(const TimeSource& time_source) { time_source_ = time_source; }
+  void setTimeSource(TimeSource& time_source) { time_source_ = &time_source; }
 
   // Dispatcher
-  TimeSource& timeSource() override { return time_source_; }
+  TimeSource& timeSource() override { return *time_source_; }
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket) override {
@@ -108,8 +108,8 @@ public:
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
 
   // TODO(jmarantz): Switch these to using mock-time.
-  RealTestTime test_time_;
-  TimeSource time_source_;
+  DangerousDeprecatedTestTime test_time_;
+  TimeSource* time_source_;
 
   std::list<DeferredDeletablePtr> to_delete_;
   MockBufferFactory buffer_factory_;

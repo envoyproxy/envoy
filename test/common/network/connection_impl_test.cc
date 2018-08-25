@@ -77,7 +77,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplDeathTest,
                         TestUtility::ipTestParamsToString);
 
 TEST_P(ConnectionImplDeathTest, BadFd) {
-  RealTestTime test_time;
+  DangerousDeprecatedTestTime test_time;
   Event::DispatcherImpl dispatcher(test_time.timeSource());
   EXPECT_DEATH_LOG_TO_STDERR(
       ConnectionImpl(dispatcher, std::make_unique<ConnectionSocketImpl>(-1, nullptr, nullptr),
@@ -169,7 +169,7 @@ public:
   }
 
 protected:
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherPtr dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), nullptr, true};
@@ -1271,7 +1271,7 @@ TEST_P(ReadBufferLimitTest, SomeLimit) {
 class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
   TcpClientConnectionImplTest() : dispatcher_(test_time_.timeSource()) {}
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
 };
 INSTANTIATE_TEST_CASE_P(IpVersions, TcpClientConnectionImplTest,

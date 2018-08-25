@@ -30,3 +30,24 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],
 )
+
+envoy_cc_library(
+    name = "sds_api_lib",
+    srcs = ["sds_api.cc"],
+    hdrs = ["sds_api.h"],
+    deps = [
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/init:init_interface",
+        "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/runtime:runtime_interface",
+        "//include/envoy/secret:secret_provider_interface",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/common:callback_impl_lib",
+        "//source/common/common:cleanup_lib",
+        "//source/common/config:resources_lib",
+        "//source/common/config:subscription_factory_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/ssl:tls_certificate_config_impl_lib",
+    ],
+)

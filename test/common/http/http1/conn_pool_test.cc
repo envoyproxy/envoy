@@ -111,7 +111,7 @@ public:
     EXPECT_FALSE(upstream_ready_enabled_);
   }
 
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   Event::MockDispatcher& mock_dispatcher_;
   NiceMock<Event::MockTimer>* mock_upstream_ready_timer_;
   std::vector<TestCodecClient> test_clients_;

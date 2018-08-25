@@ -28,7 +28,7 @@ protected:
   void SetUp() { thread_.start(guard_dog_); }
   NiceMock<Server::Configuration::MockMain> config_;
   NiceMock<Stats::MockStore> fakestats_;
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   Envoy::Server::GuardDogImpl guard_dog_;
   DispatchedThreadImpl thread_;
 };

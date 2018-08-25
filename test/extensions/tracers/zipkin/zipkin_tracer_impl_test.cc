@@ -49,7 +49,8 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000)));
     }
 
-    driver_.reset(new Driver(config, cm_, stats_, tls_, runtime_, local_info_, random_));
+    driver_.reset(
+        new Driver(config, cm_, stats_, tls_, runtime_, local_info_, random_, time_source_));
   }
 
   void setupValidDriver() {
@@ -66,9 +67,10 @@ public:
     setup(*loader, true);
   }
 
-  // TODO(#4160): Currently time_source_ is initialized from RealTestTime, which uses real time,
-  // not mock-time. When that is switched to use mock-time intead, I think generateRandom64()
-  // may not be as random as we want, and we'll need to inject entropy appropriate for the test.
+  // TODO(#4160): Currently time_source_ is initialized from DangerousDeprecatedTestTime, which uses
+  // real time, not mock-time. When that is switched to use mock-time intead, I think
+  // generateRandom64() may not be as random as we want, and we'll need to inject entropy
+  // appropriate for the test.
   uint64_t generateRandom64() { return Util::generateRandom64(time_source_); }
 
   const std::string operation_name_{"test"};
@@ -87,7 +89,7 @@ public:
   NiceMock<Runtime::MockRandomGenerator> random_;
 
   NiceMock<Tracing::MockConfig> config_;
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   TimeSource& time_source_;
 };
 

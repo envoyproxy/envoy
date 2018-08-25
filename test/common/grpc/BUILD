@@ -19,6 +19,7 @@ envoy_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/proto:helloworld_proto",
+        "//test/test_common:test_time_lib",
     ],
 )
 

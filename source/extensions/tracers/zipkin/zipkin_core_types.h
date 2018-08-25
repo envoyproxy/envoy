@@ -562,7 +562,7 @@ private:
   absl::optional<uint64_t> trace_id_high_;
   int64_t monotonic_start_time_;
   TracerInterface* tracer_;
-  TimeSource time_source_;
+  TimeSource& time_source_;
 };
 
 } // namespace Zipkin

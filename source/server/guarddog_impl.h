@@ -75,7 +75,7 @@ private:
     bool megamiss_alerted_{};
   };
 
-  TimeSource time_source_;
+  TimeSource& time_source_;
   const std::chrono::milliseconds miss_timeout_;
   const std::chrono::milliseconds megamiss_timeout_;
   const std::chrono::milliseconds kill_timeout_;

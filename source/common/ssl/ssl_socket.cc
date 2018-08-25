@@ -17,6 +17,24 @@ using Envoy::Network::PostIoAction;
 namespace Envoy {
 namespace Ssl {
 
+namespace {
+// This SslSocket will be used when SSL secret is not fetched from SDS server.
+class NotReadySslSocket : public Network::TransportSocket {
+public:
+  // Network::TransportSocket
+  void setTransportSocketCallbacks(Network::TransportSocketCallbacks&) override {}
+  std::string protocol() const override { return EMPTY_STRING; }
+  bool canFlushClose() override { return true; }
+  void closeSocket(Network::ConnectionEvent) override {}
+  Network::IoResult doRead(Buffer::Instance&) override { return {PostIoAction::Close, 0, false}; }
+  Network::IoResult doWrite(Buffer::Instance&, bool) override {
+    return {PostIoAction::Close, 0, false};
+  }
+  void onConnected() override {}
+  const Ssl::Connection* ssl() const override { return nullptr; }
+};
+} // namespace
+
 SslSocket::SslSocket(ContextSharedPtr ctx, InitialState state)
     : ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)), ssl_(ctx_->newSsl()) {
   if (state == InitialState::Client) {
@@ -391,7 +409,11 @@ ClientSslSocketFactory::ClientSslSocketFactory(ClientContextConfigPtr config,
       ssl_ctx_(manager_.createSslClientContext(stats_scope_, *config_)) {}
 
 Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() const {
-  return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Client);
+  if (ssl_ctx_) {
+    return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Client);
+  } else {
+    return std::make_unique<NotReadySslSocket>();
+  }
 }
 
 bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
@@ -405,7 +427,11 @@ ServerSslSocketFactory::ServerSslSocketFactory(ServerContextConfigPtr config,
       ssl_ctx_(manager_.createSslServerContext(stats_scope_, *config_, server_names_)) {}
 
 Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() const {
-  return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Server);
+  if (ssl_ctx_) {
+    return std::make_unique<Ssl::SslSocket>(ssl_ctx_, Ssl::InitialState::Server);
+  } else {
+    return std::make_unique<NotReadySslSocket>();
+  }
 }
 
 bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }

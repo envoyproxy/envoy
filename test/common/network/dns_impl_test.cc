@@ -323,7 +323,7 @@ private:
 class DnsImplConstructor : public testing::Test {
 protected:
   DnsImplConstructor() : dispatcher_(test_time_.timeSource()) {}
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
 };
 
@@ -434,7 +434,7 @@ protected:
   Network::TcpListenSocketPtr socket_;
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Network::Listener> listener_;
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   DnsResolverSharedPtr resolver_;
 };

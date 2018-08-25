@@ -10,7 +10,7 @@ namespace Tracers {
 namespace Zipkin {
 
 TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
-  RealTestTime test_time;
+  DangerousDeprecatedTestTime test_time;
   SpanBuffer buffer;
 
   EXPECT_EQ(0ULL, buffer.pendingSpans());
@@ -63,7 +63,7 @@ TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
 }
 
 TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
-  RealTestTime test_time;
+  DangerousDeprecatedTestTime test_time;
   SpanBuffer buffer(2);
 
   EXPECT_EQ(0ULL, buffer.pendingSpans());

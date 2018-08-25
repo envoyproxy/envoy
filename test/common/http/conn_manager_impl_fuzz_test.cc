@@ -117,7 +117,7 @@ public:
   MockStreamEncoderFilter* encoder_filter_{};
   NiceMock<MockFilterChainFactory> filter_factory_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
-  RealTestTime test_time_;
+  DangerousDeprecatedTestTime test_time_;
   RouteConfigProvider route_config_provider_;
   std::string server_name_;
   Stats::IsolatedStoreImpl fake_stats_;

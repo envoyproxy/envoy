@@ -4,15 +4,13 @@
 
 namespace Envoy {
 
-TokenBucketImpl::TokenBucketImpl(uint64_t max_tokens, MonotonicTimeSource& monotonic_time_source,
-                                 double fill_rate)
+TokenBucketImpl::TokenBucketImpl(uint64_t max_tokens, TimeSource& time_source, double fill_rate)
     : max_tokens_(max_tokens), fill_rate_(std::abs(fill_rate)), tokens_(max_tokens),
-      last_fill_(monotonic_time_source.currentTime()),
-      monotonic_time_source_(monotonic_time_source) {}
+      last_fill_(time_source.monotonicTime()), time_source_(time_source) {}
 
 bool TokenBucketImpl::consume(uint64_t tokens) {
   if (tokens_ < max_tokens_) {
-    const auto time_now = monotonic_time_source_.currentTime();
+    const auto time_now = time_source_.monotonicTime();
     tokens_ = std::min((std::chrono::duration<double>(time_now - last_fill_).count() * fill_rate_) +
                            tokens_,
                        max_tokens_);

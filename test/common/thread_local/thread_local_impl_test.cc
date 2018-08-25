@@ -115,7 +115,7 @@ TEST_F(ThreadLocalInstanceImplTest, RunOnAllThreads) {
 TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
 
-  RealTestTime test_time;
+  DangerousDeprecatedTestTime test_time;
   Event::DispatcherImpl main_dispatcher(test_time.timeSource());
   Event::DispatcherImpl thread_dispatcher(test_time.timeSource());
 
