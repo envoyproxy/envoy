@@ -123,9 +123,8 @@ public:
     EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Binary));
     EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
 
-    NiceMock<Network::MockClientConnection> connection;
-    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection));
-    EXPECT_EQ(&connection, router_->downstreamConnection());
+    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
+    EXPECT_EQ(&connection_, router_->downstreamConnection());
 
     // Not yet implemented:
     EXPECT_EQ(absl::optional<uint64_t>(), router_->computeHashKey());
@@ -166,9 +165,8 @@ public:
           upstream_callbacks_ = &cb;
         }));
 
-    NiceMock<Network::MockClientConnection> connection;
-    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection));
-    EXPECT_EQ(&connection, router_->downstreamConnection());
+    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
+    EXPECT_EQ(&connection_, router_->downstreamConnection());
 
     // Not yet implemented:
     EXPECT_EQ(absl::optional<uint64_t>(), router_->computeHashKey());
@@ -292,6 +290,7 @@ public:
   std::function<void(MockProtocol*)> mock_protocol_cb_{};
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  NiceMock<Network::MockClientConnection> connection_;
   NiceMock<ThriftFilters::MockDecoderFilterCallbacks> callbacks_;
   NiceMock<MockTransport>* transport_{};
   NiceMock<MockProtocol>* protocol_{};

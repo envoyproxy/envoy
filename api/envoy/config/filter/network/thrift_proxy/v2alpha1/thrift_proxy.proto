@@ -65,6 +65,9 @@ enum ProtocolType {
 
   // The Thrift proxy will use the Thrift compact protocol.
   COMPACT = 3;
+
+  // The Thrift proxy will use the Thrift "Twitter" protocol implemented by the finagle library.
+  TWITTER = 4;
 }
 
 // ThriftProtocolOptions specifies Thrift upstream protocol options. This object is used in
