@@ -61,10 +61,12 @@ public:
   }
 
   void setSecretUpdateCallback(std::function<void()> callback) override {
-    if (secret_update_callback_handle_) {
-      secret_update_callback_handle_->remove();
+    if (tls_certficate_provider_) {
+      if (secret_update_callback_handle_) {
+        secret_update_callback_handle_->remove();
+      }
+      secret_update_callback_handle_ = tls_certficate_provider_->addUpdateCallback(callback);
     }
-    secret_update_callback_handle_ = tls_certficate_provider_->addUpdateCallback(callback);
   }
 
 protected:
