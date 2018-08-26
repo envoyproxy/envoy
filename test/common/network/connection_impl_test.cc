@@ -1314,6 +1314,7 @@ protected:
   PipeClientConnectionImplTest() : dispatcher_(time_source_) {}
   MockTimeSource time_source_;
   Event::DispatcherImpl dispatcher_;
+  const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};
 };
 
 // Validate we skip setting socket options on UDS.
@@ -1323,7 +1324,7 @@ TEST_F(PipeClientConnectionImplTest, SkipSocketOptions) {
   auto options = std::make_shared<Socket::Options>();
   options->emplace_back(option);
   ClientConnectionPtr connection = dispatcher_.createClientConnection(
-      Utility::resolveUrl("unix://@foo"), Network::Address::InstanceConstSharedPtr(),
+      Utility::resolveUrl("unix://" + path_), Network::Address::InstanceConstSharedPtr(),
       Network::Test::createRawBufferSocket(), options);
   connection->close(ConnectionCloseType::NoFlush);
 }
@@ -1331,7 +1332,7 @@ TEST_F(PipeClientConnectionImplTest, SkipSocketOptions) {
 // Validate we skip setting source address.
 TEST_F(PipeClientConnectionImplTest, SkipSourceAddress) {
   ClientConnectionPtr connection = dispatcher_.createClientConnection(
-      Utility::resolveUrl("unix://@foo"), Utility::resolveUrl("tcp://1.2.3.4:5"),
+      Utility::resolveUrl("unix://" + path_), Utility::resolveUrl("tcp://1.2.3.4:5"),
       Network::Test::createRawBufferSocket(), nullptr);
   connection->close(ConnectionCloseType::NoFlush);
 }
