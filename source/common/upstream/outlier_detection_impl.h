@@ -11,6 +11,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/cluster/outlier_detection.pb.h"
+#include "envoy/common/time.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
 #include "envoy/runtime/runtime.h"
@@ -228,8 +229,8 @@ public:
 
 private:
   DetectorImpl(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
-               Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-               EventLoggerSharedPtr event_logger);
+               Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+               TimeSource& time_source, EventLoggerSharedPtr event_logger);
 
   void addHostMonitor(HostSharedPtr host);
   void armIntervalTimer();

@@ -187,7 +187,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
     if (!event_log_file_path.empty()) {
       outlier_event_logger_.reset(
-          new Outlier::EventLoggerImpl(log_manager, event_log_file_path, dispatcher_.timeSource()));
+          new Outlier::EventLoggerImpl(log_manager, event_log_file_path, time_source_));
     }
   }
 

@@ -4,6 +4,7 @@
 
 #include "envoy/common/time.h"
 #include "envoy/common/token_bucket.h"
+#include "envoy/event/timer.h"
 
 #include "common/common/logger.h"
 
@@ -42,6 +43,18 @@ public:
 
   MOCK_METHOD0(systemTime, SystemTime());
   MOCK_METHOD0(monotonicTime, MonotonicTime());
+};
+
+class MockTimeSystem : public Event::TimeSystem {
+ public:
+  MockTimeSystem();
+  ~MockTimeSystem();
+
+  MOCK_METHOD1(createTimerFactory, Event::TimerFactoryPtr(Event::Libevent::BasePtr&));
+  MOCK_METHOD0(systemTime, SystemTime());
+  MOCK_METHOD0(monotonicTime, MonotonicTime());
+
+  MockTimeSource mock_time_source_;
 };
 
 class MockTokenBucket : public TokenBucket {

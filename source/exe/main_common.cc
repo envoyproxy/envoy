@@ -65,7 +65,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
                                                                  restarter_->statsAllocator());
 
     server_ = std::make_unique<Server::InstanceImpl>(
-        options_, time_source_, local_address, default_test_hooks_, *restarter_, *stats_store_,
+        options_, time_system_, local_address, default_test_hooks_, *restarter_, *stats_store_,
         access_log_lock, component_factory_, std::make_unique<Runtime::RandomGeneratorImpl>(),
         *tls_);
     break;

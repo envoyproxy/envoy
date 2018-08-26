@@ -5,9 +5,14 @@
 #include <memory>
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
+
+#include "common/event/libevent.h"
 
 namespace Envoy {
 namespace Event {
+
+class TimerCB;
 
 /**
  * Callback invoked when a timer event fires.
@@ -35,13 +40,29 @@ public:
 typedef std::unique_ptr<Timer> TimerPtr;
 
 class TimerFactory {
-public:
+ public:
   virtual ~TimerFactory() {}
 
   /**
    * Creates a timer.
    */
-  TimerPtr createTimer() PURE;
+  virtual TimerPtr createTimer(const TimerCb& cb) PURE;
+};
+
+typedef std::unique_ptr<TimerFactory> TimerFactoryPtr;
+
+/**
+ * Captures a system for measuring time and setting timers with callbacks.
+ */
+class TimeSystem : public TimeSource {
+public:
+  virtual ~TimeSystem() {}
+
+  /**
+   * Creates a timer factory. This indirection enables thread-local timer-queue management,
+   * so servers can have a separate timer-factory in each thread.
+   */
+  virtual TimerFactoryPtr createTimerFactory(Libevent::BasePtr&) PURE;
 };
 
 } // namespace Event

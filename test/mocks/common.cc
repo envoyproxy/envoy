@@ -7,6 +7,9 @@ ReadyWatcher::~ReadyWatcher() {}
 MockTimeSource::MockTimeSource() {}
 MockTimeSource::~MockTimeSource() {}
 
+MockTimeSystem::MockTimeSystem() {}
+MockTimeSystem::~MockTimeSystem() {}
+
 MockTokenBucket::MockTokenBucket() {}
 MockTokenBucket::~MockTokenBucket() {}
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/common/utility.h"
+#include "common/event/real_time_system.h"
 
 namespace Envoy {
 
@@ -13,21 +13,11 @@ class DangerousDeprecatedTestTime {
 public:
   DangerousDeprecatedTestTime();
 
-  TimeSource& timeSource() { return time_source_; }
+  // TODO(jmarantz) rename this method and all call-sites to timeSystem().
+  Event::TimeSystem& timeSource() { return time_system_; }
 
 private:
-  RealTimeSource time_source_;
+  Event::RealTimeSystem time_system_;
 };
-
-class SimulatedTestTime {
-public:
-  SimulatedTestTime();
-
-  TimeSource& timeSource() { return time_source_; }
-
- private:
-
-};
-
 
 } // namespace Envoy
