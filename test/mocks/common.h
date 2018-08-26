@@ -46,7 +46,7 @@ public:
 };
 
 class MockTimeSystem : public Event::TimeSystem {
- public:
+public:
   MockTimeSystem();
   ~MockTimeSystem();
 

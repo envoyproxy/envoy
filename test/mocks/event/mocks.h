@@ -5,11 +5,11 @@
 #include <functional>
 #include <list>
 
+#include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/signal.h"
-#include "envoy/common/time.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/dns.h"
@@ -65,7 +65,9 @@ public:
         createListener_(socket, cb, bind_to_port, hand_off_restored_destination_connections)};
   }
 
-  Event::TimerPtr createTimer(Event::TimerCb cb) override { return Event::TimerPtr{createTimer_(cb)}; }
+  Event::TimerPtr createTimer(Event::TimerCb cb) override {
+    return Event::TimerPtr{createTimer_(cb)};
+  }
 
   void deferredDelete(DeferredDeletablePtr&& to_delete) override {
     deferredDelete_(to_delete.get());

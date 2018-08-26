@@ -43,13 +43,13 @@ private:
 };
 
 class RealTimerFactory : public TimerFactory {
- public:
+public:
   RealTimerFactory(Libevent::BasePtr& libevent) : libevent_(libevent) {}
   TimerPtr createTimer(const TimerCb& cb) override {
     return std::make_unique<TimerImpl>(libevent_, cb);
   };
 
- private:
+private:
   Libevent::BasePtr& libevent_;
 };
 

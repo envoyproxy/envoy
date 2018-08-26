@@ -40,7 +40,7 @@ public:
 typedef std::unique_ptr<Timer> TimerPtr;
 
 class TimerFactory {
- public:
+public:
   virtual ~TimerFactory() {}
 
   /**

@@ -1,7 +1,8 @@
 #pragma once
 
-#include "common/common/utility.h"
 #include "envoy/event/timer.h"
+
+#include "common/common/utility.h"
 
 namespace Envoy {
 namespace Event {
@@ -18,7 +19,7 @@ public:
   SystemTime systemTime() override { return time_source_.systemTime(); }
   MonotonicTime monotonicTime() override { return time_source_.monotonicTime(); }
 
- private:
+private:
   RealTimeSource time_source_;
 };
 
