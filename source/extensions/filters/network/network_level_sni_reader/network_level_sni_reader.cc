@@ -63,7 +63,6 @@ Network::FilterStatus NetworkLevelSniReaderFilter::onData(Buffer::Instance& data
   Ssl::Utility::parseClientHello(buf_, len, ssl_, read_, config_->maxClientHelloSize(),
                                  config_->stats(), [&](bool success) -> void { done(success); },
                                  alpn_found_, clienthello_success_, []() -> void {});
-
   return Network::FilterStatus::Continue;
 }
 
