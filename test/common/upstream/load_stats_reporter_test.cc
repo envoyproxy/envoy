@@ -76,7 +76,7 @@ public:
   Event::TimerCb response_timer_cb_;
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
-  ProdSystemTimeSource system_time_source_;
+  MockSystemTimeSource system_time_source_;
   MockMonotonicTimeSource monotonic_time_source_;
   TimeSource time_source_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
