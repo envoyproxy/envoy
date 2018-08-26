@@ -154,13 +154,17 @@ public:
   bool operator!=(const char* rhs) const { return 0 != strcmp(c_str(), rhs); }
 
 private:
-  union {
+  union Buffer {
+    // This should reference inline_buffer_ for Type::Inline.
     char* dynamic_;
     const char* ref_;
   } buffer_;
 
+  // Capacity in both Type::Inline and Type::Dynamic cases must be at least MinDynamicCapacity in
+  // header_map_impl.cc.
   union {
     char inline_buffer_[128];
+    // Since this is a union, this is only valid for type_ == Type::Dynamic.
     uint32_t dynamic_capacity_;
   };
 

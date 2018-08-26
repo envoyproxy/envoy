@@ -98,7 +98,13 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
   // Copy the current cached formatted format string, then replace its subseconds part (when it has
   // non-zero width) by correcting its position using prepared subseconds offsets.
   std::string formatted_str = formatted.str;
-  const std::string nanoseconds = fmt::FormatInt(epoch_time_ns.count()).str();
+  std::string nanoseconds = fmt::FormatInt(epoch_time_ns.count()).str();
+  // Special case handling for beginning of time, we should never need to do this outside of
+  // tests or a time machine.
+  if (nanoseconds.size() < 10) {
+    nanoseconds = std::string(10 - nanoseconds.size(), '0') + nanoseconds;
+  }
+
   for (size_t i = 0; i < specifiers_.size(); ++i) {
     const auto& specifier = specifiers_.at(i);
 

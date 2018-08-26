@@ -96,8 +96,6 @@ envoy_cc_test_library(
 envoy_proto_library(
     name = "conn_manager_impl_fuzz_proto",
     srcs = ["conn_manager_impl_fuzz.proto"],
-    external_deps = ["well_known_protos"],
-    generate_python = 0,
     deps = [
         "//test/fuzz:common_proto",
     ],
@@ -108,7 +106,7 @@ envoy_cc_fuzz_test(
     srcs = ["conn_manager_impl_fuzz_test.cc"],
     corpus = "conn_manager_impl_corpus",
     deps = [
-        ":conn_manager_impl_fuzz_proto",
+        ":conn_manager_impl_fuzz_proto_cc",
         "//source/common/common:empty_string",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:date_provider_lib",
@@ -211,7 +209,6 @@ envoy_cc_test(
 envoy_proto_library(
     name = "header_map_impl_fuzz_proto",
     srcs = ["header_map_impl_fuzz.proto"],
-    external_deps = ["well_known_protos"],
 )
 
 envoy_cc_fuzz_test(
@@ -219,7 +216,7 @@ envoy_cc_fuzz_test(
     srcs = ["header_map_impl_fuzz_test.cc"],
     corpus = "header_map_impl_corpus",
     deps = [
-        ":header_map_impl_fuzz_proto",
+        ":header_map_impl_fuzz_proto_cc",
         "//source/common/http:header_map_lib",
     ],
 )
@@ -254,7 +251,7 @@ envoy_cc_fuzz_test(
     srcs = ["utility_fuzz_test.cc"],
     corpus = "utility_corpus",
     deps = [
-        ":utility_fuzz_proto",
+        ":utility_fuzz_proto_cc",
         "//source/common/http:utility_lib",
         "//test/test_common:utility_lib",
     ],
