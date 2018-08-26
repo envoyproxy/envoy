@@ -301,9 +301,16 @@ public:
     }
     case test::common::http::ResponseAction::kHeaders: {
       if (state == StreamState::PendingHeaders) {
-        decoder_filter_->callbacks_->encodeHeaders(
-            std::make_unique<TestHeaderMapImpl>(Fuzz::fromHeaders(response_action.headers())),
-            end_stream);
+        auto headers =
+            std::make_unique<TestHeaderMapImpl>(Fuzz::fromHeaders(response_action.headers()));
+        // The client codec will ensure we always have a valid :status.
+        // Similarly, local replies should always contain this.
+        try {
+          Utility::getResponseStatus(*headers);
+        } catch (const CodecClientException&) {
+          headers->setReferenceKey(Headers::get().Status, "200");
+        }
+        decoder_filter_->callbacks_->encodeHeaders(std::move(headers), end_stream);
         state = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
       }
       break;

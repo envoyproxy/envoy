@@ -1,0 +1,53 @@
+actions {
+}
+actions {
+  stream_action {
+  }
+}
+actions {
+  new_stream {
+    request_headers {
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/"
+      }
+      headers {
+        key: ":scheme"
+        value: "GET"
+      }
+      headers {
+        key: ":authority"
+        value: "foo.com"
+      }
+      headers {
+        value: "nosniff"
+      }
+      headers {
+        key: "GET"
+        value: "foo=bar"
+      }
+      headers {
+        key: "cookie"
+        value: "foo2=bar2"
+      }
+    }
+  }
+}
+actions {
+  stream_action {
+    response {
+      headers {
+      }
+    }
+  }
+}
+actions {
+}
+actions {
+}
+actions {
+}
