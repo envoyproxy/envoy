@@ -36,7 +36,7 @@ inline test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
 inline TestRequestInfo fromRequestInfo(const test::fuzz::RequestInfo& request_info) {
   TestRequestInfo test_request_info;
   test_request_info.metadata_ = request_info.dynamic_metadata();
-  test_request_info.start_time_ = SystemTime(std::chrono::microseconds(request_info.start_time()));
+  test_request_info.start_time_ = SystemTime(std::chrono::nanoseconds(request_info.start_time()));
   if (request_info.has_response_code()) {
     test_request_info.response_code_ = request_info.response_code().value();
   }
