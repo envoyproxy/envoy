@@ -54,7 +54,9 @@ NetworkLevelSniReaderFilter::NetworkLevelSniReaderFilter(const ConfigSharedPtr c
 Network::FilterStatus NetworkLevelSniReaderFilter::onData(Buffer::Instance& data, bool) {
   ENVOY_CONN_LOG(trace, "NetworkLevelSniReader: got {} bytes", read_callbacks_->connection(),
                  data.length());
-
+  if (done_) {
+    return Network::FilterStatus::Continue;
+  }
   // TODO: append data to the buffer instead of overwriting it.
   size_t len =
       (data.length() < Config::TLS_MAX_CLIENT_HELLO) ? data.length() : Config::TLS_MAX_CLIENT_HELLO;
@@ -63,7 +65,7 @@ Network::FilterStatus NetworkLevelSniReaderFilter::onData(Buffer::Instance& data
   Ssl::Utility::parseClientHello(buf_, len, ssl_, read_, config_->maxClientHelloSize(),
                                  config_->stats(), [&](bool success) -> void { done(success); },
                                  alpn_found_, clienthello_success_, []() -> void {});
-  return Network::FilterStatus::Continue;
+  return done_ ? Network::FilterStatus::Continue : Network::FilterStatus::StopIteration;
 }
 
 void NetworkLevelSniReaderFilter::onServername(absl::string_view name) {
@@ -80,7 +82,10 @@ void NetworkLevelSniReaderFilter::onServername(absl::string_view name) {
 
 void NetworkLevelSniReaderFilter::done(bool success) {
   ENVOY_LOG(trace, "network level sni reader: done: {}", success);
-  read_callbacks_->continueReading();
+  if (success) {
+    done_ = true;
+    read_callbacks_->continueReading();
+  }
 }
 
 } // namespace NetworkLevelSniReader

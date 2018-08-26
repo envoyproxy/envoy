@@ -58,6 +58,7 @@ private:
   uint64_t read_{0};
   bool alpn_found_{false};
   bool clienthello_success_{false};
+  bool done_{false};
 
   static thread_local uint8_t buf_[Config::TLS_MAX_CLIENT_HELLO];
 
