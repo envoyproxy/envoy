@@ -16,7 +16,7 @@ namespace NetworkFilters {
 namespace NetworkLevelSniReader {
 
 Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
-    : stats_{ALL_NETWORK_LEVEL_SNI_READER_STATS(POOL_COUNTER_PREFIX(scope, "network_levelsni_reader."))},
+    : stats_{TLS_STATS(POOL_COUNTER_PREFIX(scope, "network_levelsni_reader."))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
       max_client_hello_size_(max_client_hello_size) {
 
@@ -28,24 +28,26 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
   SSL_CTX_set_options(ssl_ctx_.get(), SSL_OP_NO_TICKET);
   SSL_CTX_set_session_cache_mode(ssl_ctx_.get(), SSL_SESS_CACHE_OFF);
   // TODO: Remove following
-//  SSL_CTX_set_select_certificate_cb(
-//      ssl_ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
-//        const uint8_t* data;
-//        size_t len;
-//        if (SSL_early_callback_ctx_extension_get(
-//                client_hello, TLSEXT_TYPE_application_layer_protocol_negotiation, &data, &len)) {
-//          NetworkLevelSniReaderFilter* filter = static_cast<NetworkLevelSniReaderFilter*>(SSL_get_app_data(client_hello->ssl));
-////          filter->onALPN(data, len);
-//          if (filter != nullptr) {}
-//
-//        }
-//        return ssl_select_cert_success;
-//      });
+  //  SSL_CTX_set_select_certificate_cb(
+  //      ssl_ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
+  //        const uint8_t* data;
+  //        size_t len;
+  //        if (SSL_early_callback_ctx_extension_get(
+  //                client_hello, TLSEXT_TYPE_application_layer_protocol_negotiation, &data, &len))
+  //                {
+  //          NetworkLevelSniReaderFilter* filter =
+  //          static_cast<NetworkLevelSniReaderFilter*>(SSL_get_app_data(client_hello->ssl));
+  ////          filter->onALPN(data, len);
+  //          if (filter != nullptr) {}
+  //
+  //        }
+  //        return ssl_select_cert_success;
+  //      });
   SSL_CTX_set_tlsext_servername_callback(
       ssl_ctx_.get(), [](SSL* ssl, int* out_alert, void*) -> int {
-        NetworkLevelSniReaderFilter* filter = static_cast<NetworkLevelSniReaderFilter*>(SSL_get_app_data(ssl));
+        NetworkLevelSniReaderFilter* filter =
+            static_cast<NetworkLevelSniReaderFilter*>(SSL_get_app_data(ssl));
         filter->onServername(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name));
-          if (filter != nullptr) {}
 
         // Return an error to stop the handshake; we have what we wanted already.
         *out_alert = SSL_AD_USER_CANCELLED;
@@ -57,7 +59,8 @@ bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_
 
 thread_local uint8_t NetworkLevelSniReaderFilter::buf_[Config::TLS_MAX_CLIENT_HELLO];
 
-NetworkLevelSniReaderFilter::NetworkLevelSniReaderFilter(const ConfigSharedPtr config) : config_(config), ssl_(config_->newSsl()) {
+NetworkLevelSniReaderFilter::NetworkLevelSniReaderFilter(const ConfigSharedPtr config)
+    : config_(config), ssl_(config_->newSsl()) {
   RELEASE_ASSERT(sizeof(buf_) >= config_->maxClientHelloSize(), "");
 
   SSL_set_app_data(ssl_.get(), this);
@@ -65,19 +68,25 @@ NetworkLevelSniReaderFilter::NetworkLevelSniReaderFilter(const ConfigSharedPtr c
 }
 
 Network::FilterStatus NetworkLevelSniReaderFilter::onData(Buffer::Instance& data, bool) {
-  ENVOY_CONN_LOG(trace, "NetworkLevelSniReader: got {} bytes", read_callbacks_->connection(), data.length());
+  ENVOY_CONN_LOG(trace, "NetworkLevelSniReader: got {} bytes", read_callbacks_->connection(),
+                 data.length());
 
   // TODO: append data to the buffer instead of overwriting it.
-  size_t len = (data.length() < Config::TLS_MAX_CLIENT_HELLO) ? data.length() : Config::TLS_MAX_CLIENT_HELLO ;
+  size_t len =
+      (data.length() < Config::TLS_MAX_CLIENT_HELLO) ? data.length() : Config::TLS_MAX_CLIENT_HELLO;
   data.copyOut(0, len, buf_);
 
+  Ssl::Utility::parseClientHello(buf_, len, ssl_, read_, config_->maxClientHelloSize(),
+                                 config_->stats(), [&](bool success) -> void { done(success); },
+                                 alpn_found_, clienthello_success_, []() -> void {});
   parseClientHello(buf_, len);
 
   return Network::FilterStatus::Continue;
 }
 
 void NetworkLevelSniReaderFilter::onServername(absl::string_view name) {
-  ENVOY_CONN_LOG(debug, "network level sni reader: servername: {}", read_callbacks_->connection(), name);
+  ENVOY_CONN_LOG(debug, "network level sni reader: servername: {}", read_callbacks_->connection(),
+                 name);
   if (!name.empty()) {
     config_->stats().sni_found_.inc();
     read_callbacks_->networkLevelRequestedServerName(name);

@@ -25,7 +25,7 @@ namespace ListenerFilters {
 namespace TlsInspector {
 
 Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
-    : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
+    : stats_{TLS_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
       max_client_hello_size_(max_client_hello_size) {
 
@@ -161,7 +161,13 @@ void Filter::onRead() {
     const uint8_t* data = buf_ + read_;
     const size_t len = result.rc_ - read_;
     read_ = result.rc_;
-    parseClientHello(data, len);
+    Ssl::Utility::parseClientHello(data, len, ssl_, read_, config_->maxClientHelloSize(),
+                                   config_->stats(), [&](bool success) -> void { done(success); },
+                                   alpn_found_, clienthello_success_,
+                                   [&]() -> void {
+                                     cb_->socket().setDetectedTransportProtocol(
+                                         TransportSockets::TransportSocketNames::get().Tls);
+                                   });
   }
 }
 
