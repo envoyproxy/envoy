@@ -27,22 +27,6 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
 
   SSL_CTX_set_options(ssl_ctx_.get(), SSL_OP_NO_TICKET);
   SSL_CTX_set_session_cache_mode(ssl_ctx_.get(), SSL_SESS_CACHE_OFF);
-  // TODO: Remove following
-  //  SSL_CTX_set_select_certificate_cb(
-  //      ssl_ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
-  //        const uint8_t* data;
-  //        size_t len;
-  //        if (SSL_early_callback_ctx_extension_get(
-  //                client_hello, TLSEXT_TYPE_application_layer_protocol_negotiation, &data, &len))
-  //                {
-  //          NetworkLevelSniReaderFilter* filter =
-  //          static_cast<NetworkLevelSniReaderFilter*>(SSL_get_app_data(client_hello->ssl));
-  ////          filter->onALPN(data, len);
-  //          if (filter != nullptr) {}
-  //
-  //        }
-  //        return ssl_select_cert_success;
-  //      });
   SSL_CTX_set_tlsext_servername_callback(
       ssl_ctx_.get(), [](SSL* ssl, int* out_alert, void*) -> int {
         NetworkLevelSniReaderFilter* filter =
@@ -79,7 +63,6 @@ Network::FilterStatus NetworkLevelSniReaderFilter::onData(Buffer::Instance& data
   Ssl::Utility::parseClientHello(buf_, len, ssl_, read_, config_->maxClientHelloSize(),
                                  config_->stats(), [&](bool success) -> void { done(success); },
                                  alpn_found_, clienthello_success_, []() -> void {});
-  parseClientHello(buf_, len);
 
   return Network::FilterStatus::Continue;
 }
@@ -94,49 +77,6 @@ void NetworkLevelSniReaderFilter::onServername(absl::string_view name) {
     config_->stats().sni_not_found_.inc();
   }
   clienthello_success_ = true;
-}
-
-void NetworkLevelSniReaderFilter::parseClientHello(const void* data, size_t len) {
-  // Ownership is passed to ssl_ in SSL_set_bio()
-  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(data, len));
-
-  // Make the mem-BIO return that there is more data
-  // available beyond it's end
-  BIO_set_mem_eof_return(bio.get(), -1);
-
-  SSL_set_bio(ssl_.get(), bio.get(), bio.get());
-  bio.release();
-
-  int ret = SSL_do_handshake(ssl_.get());
-
-  // This should never succeed because an error is always returned from the SNI callback.
-  ASSERT(ret <= 0);
-  switch (SSL_get_error(ssl_.get(), ret)) {
-  case SSL_ERROR_WANT_READ:
-    if (read_ == config_->maxClientHelloSize()) {
-      // We've hit the specified size limit. This is an unreasonably large ClientHello;
-      // indicate failure.
-      config_->stats().client_hello_too_large_.inc();
-      done(false);
-    }
-    break;
-  case SSL_ERROR_SSL:
-    if (clienthello_success_) {
-      config_->stats().tls_found_.inc();
-      if (alpn_found_) {
-        config_->stats().alpn_found_.inc();
-      } else {
-        config_->stats().alpn_not_found_.inc();
-      }
-    } else {
-      config_->stats().tls_not_found_.inc();
-    }
-    done(true);
-    break;
-  default:
-    done(false);
-    break;
-  }
 }
 
 void NetworkLevelSniReaderFilter::done(bool success) {

@@ -40,9 +40,9 @@ struct TlsStats {
  */
 std::string getSerialNumberFromCertificate(X509& cert);
 
-void parseClientHello(const void* data, size_t len, bssl::UniquePtr<SSL>& ssl_, uint64_t read_,
+void parseClientHello(const void* data, size_t len, bssl::UniquePtr<SSL>& ssl, uint64_t read,
                       uint32_t maxClientHelloSize, const Ssl::Utility::TlsStats& stats,
-                      std::function<void(bool)>, bool& alpn_found_, bool& clienthello_success_,
+                      std::function<void(bool)> done, bool& alpn_found, bool& clienthello_success,
                       std::function<void()> onSuccess);
 
 } // namespace Utility

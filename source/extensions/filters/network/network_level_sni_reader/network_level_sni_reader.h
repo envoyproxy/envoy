@@ -48,7 +48,6 @@ public:
   }
 
 private:
-  void parseClientHello(const void* data, size_t len);
   void done(bool success);
   void onServername(absl::string_view name);
 
