@@ -181,7 +181,7 @@ public:
     }
     // SocketAddress.address is a proto string, not std::string, so convert it before comparing.
     if (address->ip()->addressAsString() !=
-        std::string(endpoint.endpoint().address().socket_address().address())) {
+        absl::string_view(endpoint.endpoint().address().socket_address().address())) {
       return false;
     }
     return true;
