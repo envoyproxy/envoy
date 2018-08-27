@@ -83,72 +83,79 @@ public:
   // buffer level.
   enum class StreamState { PendingHeaders, PendingDataOrTrailers, Closed };
 
+  struct DirectionalState {
+    StreamEncoder* encoder_;
+    NiceMock<MockStreamDecoder> decoder_;
+    StreamState stream_state_;
+    uint32_t read_disable_count_{};
+  } request_, response_;
+
   Stream(TestClientConnectionImpl& client, const TestHeaderMapImpl& request_headers,
-         bool end_stream)
-      : request_encoder_(&client.newStream(response_decoder_)) {
+         bool end_stream) {
+    request_.encoder_ = &client.newStream(response_.decoder_);
     ON_CALL(server_stream_callbacks_, onResetStream(_)).WillByDefault(InvokeWithoutArgs([this] {
-      request_state_ = response_state_ = StreamState::Closed;
+      request_.stream_state_ = response_.stream_state_ = StreamState::Closed;
     }));
-    request_encoder_->encodeHeaders(request_headers, end_stream);
-    request_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
-    response_state_ = StreamState::PendingHeaders;
+    request_.encoder_->encodeHeaders(request_headers, end_stream);
+    request_.stream_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
+    response_.stream_state_ = StreamState::PendingHeaders;
   }
 
   // Some stream action applied in either the request or resposne direction.
-  void directionalAction(StreamState& state, StreamEncoder& encoder,
+  void directionalAction(DirectionalState& state,
                          const test::common::http::http2::DirectionalAction& directional_action) {
     const bool end_stream = directional_action.end_stream();
     switch (directional_action.directional_action_selector_case()) {
     case test::common::http::http2::DirectionalAction::kContinueHeaders: {
-      if (state == StreamState::PendingHeaders) {
+      if (state.stream_state_ == StreamState::PendingHeaders) {
         Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(directional_action.continue_headers());
         headers.setReferenceKey(Headers::get().Status, "100");
-        encoder.encode100ContinueHeaders(headers);
+        state.encoder_->encode100ContinueHeaders(headers);
       }
       break;
     }
     case test::common::http::http2::DirectionalAction::kHeaders: {
-      if (state == StreamState::PendingHeaders) {
-        encoder.encodeHeaders(Fuzz::fromHeaders(directional_action.headers()), end_stream);
-        state = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
+      if (state.stream_state_ == StreamState::PendingHeaders) {
+        state.encoder_->encodeHeaders(Fuzz::fromHeaders(directional_action.headers()), end_stream);
+        state.stream_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
       }
       break;
     }
     case test::common::http::http2::DirectionalAction::kData: {
-      if (state == StreamState::PendingDataOrTrailers) {
+      if (state.stream_state_ == StreamState::PendingDataOrTrailers) {
         Buffer::OwnedImpl buf(std::string(directional_action.data() % (1024 * 1024), 'a'));
-        encoder.encodeData(buf, end_stream);
-        state = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
+        state.encoder_->encodeData(buf, end_stream);
+        state.stream_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
       }
       break;
     }
     case test::common::http::http2::DirectionalAction::kTrailers: {
-      if (state == StreamState::PendingDataOrTrailers) {
-        encoder.encodeTrailers(Fuzz::fromHeaders(directional_action.trailers()));
-        state = StreamState::Closed;
+      if (state.stream_state_ == StreamState::PendingDataOrTrailers) {
+        state.encoder_->encodeTrailers(Fuzz::fromHeaders(directional_action.trailers()));
+        state.stream_state_ = StreamState::Closed;
       }
       break;
     }
     case test::common::http::http2::DirectionalAction::kResetStream: {
-      if (state != StreamState::Closed) {
-        encoder.getStream().resetStream(
+      if (state.stream_state_ != StreamState::Closed) {
+        state.encoder_->getStream().resetStream(
             static_cast<Http::StreamResetReason>(directional_action.reset_stream()));
-        request_state_ = response_state_ = StreamState::Closed;
+        request_.stream_state_ = response_.stream_state_ = StreamState::Closed;
       }
       break;
     }
     case test::common::http::http2::DirectionalAction::kReadDisable: {
-      if (state != StreamState::Closed) {
+      if (state.stream_state_ != StreamState::Closed) {
         const bool disable = directional_action.read_disable();
-        if (read_disable_count_ == 0 && !disable) {
+        if (state.read_disable_count_ == 0 && !disable) {
           return;
         }
         if (disable) {
-          ++read_disable_count_;
+          ++state.read_disable_count_;
         } else {
-          --read_disable_count_;
+          --state.read_disable_count_;
         }
-        encoder.getStream().readDisable(disable);
+        state.encoder_->getStream().readDisable(disable);
       }
       break;
     }
@@ -161,11 +168,11 @@ public:
   void streamAction(const test::common::http::http2::StreamAction& stream_action) {
     switch (stream_action.stream_action_selector_case()) {
     case test::common::http::http2::StreamAction::kRequest: {
-      directionalAction(request_state_, *request_encoder_, stream_action.request());
+      directionalAction(request_, stream_action.request());
       break;
     }
     case test::common::http::http2::StreamAction::kResponse: {
-      directionalAction(response_state_, *response_encoder_, stream_action.response());
+      directionalAction(response_, stream_action.response());
       break;
     }
     default:
@@ -175,13 +182,6 @@ public:
   }
 
   NiceMock<MockStreamCallbacks> server_stream_callbacks_;
-  NiceMock<MockStreamDecoder> response_decoder_;
-  StreamEncoder* request_encoder_;
-  StreamEncoder* response_encoder_;
-  NiceMock<MockStreamDecoder> request_decoder_;
-  StreamState request_state_;
-  StreamState response_state_;
-  uint32_t read_disable_count_{};
 };
 
 // Buffer between client and server H2 codecs. This models each write operation
@@ -283,9 +283,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::CodecImplFuzzTestCase& inpu
         auto stream_ptr = pending_streams.front()->removeFromList(pending_streams);
         Stream* const stream = stream_ptr.get();
         stream_ptr->moveIntoListBack(std::move(stream_ptr), streams);
-        stream->response_encoder_ = &encoder;
+        stream->response_.encoder_ = &encoder;
         encoder.getStream().addCallbacks(stream->server_stream_callbacks_);
-        return stream->request_decoder_;
+        return stream->request_.decoder_;
       }));
 
   try {
