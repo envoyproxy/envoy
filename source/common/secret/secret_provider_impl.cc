@@ -14,9 +14,7 @@ TlsCertificateConfigProviderImpl::TlsCertificateConfigProviderImpl(
 CertificateValidationContextConfigProviderImpl::CertificateValidationContextConfigProviderImpl(
     const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context)
     : certificate_validation_context_(std::make_unique<Ssl::CertificateValidationContextConfigImpl>(
-          certificate_validation_context)) {
-  std::cout << "called CertificateValidationContextConfigProviderImpl()" << std::endl;
-}
+          certificate_validation_context)) {}
 
 } // namespace Secret
 } // namespace Envoy
