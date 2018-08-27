@@ -89,7 +89,7 @@ message Http2ProtocolOptions {
   // with simply enabling CONNECT for H2. This may require some tweaks to the
   // headers making pre-CONNECT-support proxying not backwards compatible with
   // post-CONNECT-support proxying.
-  google.protobuf.BoolValue allow_connect = 5;
+  bool allow_connect = 5;
 }
 
 // [#not-implemented-hide:]

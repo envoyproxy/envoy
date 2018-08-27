@@ -171,14 +171,14 @@ void WebsocketIntegrationTest::initialize() {
       config_helper_.addConfigModifier(
           [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
             auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-            cluster->mutable_http2_protocol_options()->mutable_allow_connect()->set_value(true);
+            cluster->mutable_http2_protocol_options()->set_allow_connect(true);
           });
     }
     if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
       config_helper_.addConfigModifier(
           [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
                   hcm) -> void {
-            hcm.mutable_http2_protocol_options()->mutable_allow_connect()->set_value(true);
+            hcm.mutable_http2_protocol_options()->set_allow_connect(true);
           });
     }
   }
