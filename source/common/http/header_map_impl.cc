@@ -205,6 +205,7 @@ void HeaderString::setInteger(uint64_t value) {
   case Type::Inline:
     // buffer_.dynamic_ should always point at inline_buffer_ for Type::Inline.
     ASSERT(buffer_.dynamic_ == inline_buffer_);
+    FALLTHRU;
   case Type::Dynamic: {
     // Whether dynamic or inline the buffer is guaranteed to be large enough.
     ASSERT(type_ == Type::Inline || dynamic_capacity_ >= MaxIntegerLength);
