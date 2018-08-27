@@ -19,10 +19,15 @@ constexpr size_t MinDynamicCapacity{32};
 // This includes the NULL (StringUtil::itoa technically only needs 21).
 constexpr size_t MaxIntegerLength{32};
 
+size_t newCapacity(uint32_t existing_capacity, uint32_t size_to_append) {
+  return (static_cast<size_t>(existing_capacity) + size_to_append) * 2;
+}
+
 void validateCapacity(size_t new_capacity) {
   // If the resizing will cause buffer overflow due to hitting uint32_t::max, an OOM is likely
   // imminent. Fast-fail rather than allow a buffer overflow attack (issue #1421)
-  RELEASE_ASSERT(new_capacity <= std::numeric_limits<uint32_t>::max(), "");
+  RELEASE_ASSERT(new_capacity <= std::numeric_limits<uint32_t>::max(),
+                 "Trying to allocate overly large headers.");
   ASSERT(new_capacity >= MinDynamicCapacity);
 }
 
@@ -88,7 +93,9 @@ void HeaderString::append(const char* data, uint32_t size) {
     type_ = Type::Dynamic;
     dynamic_capacity_ =
         std::max(MinDynamicCapacity, static_cast<size_t>((string_length_ + size) * 2));
-    validateCapacity(dynamic_capacity_);
+    if (dynamic_capacity_ != MinDynamicCapacity) {
+      validateCapacity(newCapacity(string_length_, size));
+    }
     char* buf = static_cast<char*>(malloc(dynamic_capacity_));
     RELEASE_ASSERT(buf != nullptr, "");
     memcpy(buf, buffer_.ref_, string_length_);
@@ -108,7 +115,7 @@ void HeaderString::append(const char* data, uint32_t size) {
   case Type::Dynamic: {
     // We can get here either because we didn't fit in inline or we are already dynamic.
     if (type_ == Type::Inline) {
-      const size_t new_capacity = (string_length_ + size) * 2;
+      const size_t new_capacity = newCapacity(string_length_, size);
       validateCapacity(new_capacity);
       buffer_.dynamic_ = static_cast<char*>(malloc(new_capacity));
       RELEASE_ASSERT(buffer_.dynamic_ != nullptr, "");
@@ -117,9 +124,11 @@ void HeaderString::append(const char* data, uint32_t size) {
       type_ = Type::Dynamic;
     } else {
       if (size + 1 + string_length_ > dynamic_capacity_) {
+        const size_t new_capacity = newCapacity(string_length_, size);
+        validateCapacity(new_capacity);
+
         // Need to reallocate.
-        dynamic_capacity_ = (string_length_ + size) * 2;
-        validateCapacity(dynamic_capacity_);
+        dynamic_capacity_ = new_capacity;
         buffer_.dynamic_ = static_cast<char*>(realloc(buffer_.dynamic_, dynamic_capacity_));
         RELEASE_ASSERT(buffer_.dynamic_ != nullptr, "");
       }

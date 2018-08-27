@@ -159,6 +159,29 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"list_key\"])", "");
 }
 
+TEST_F(RequestInfoHeaderFormatterTest, UserDefinedHeadersConsideredHarmful) {
+  // This must be an inline header to get the append-in-place semantics.
+  const char* header_name = "connection";
+  Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
+  int loop_factor = 10;
+  uint64_t length = std::numeric_limits<uint32_t>::max() / loop_factor;
+  std::string really_long_string(length + 1, 'a');
+  std::cerr << "really long string " << really_long_string.size() << std::endl;
+  for (int i = 0; i < loop_factor; ++i) {
+    envoy::api::v2::core::HeaderValueOption* header = to_add.Add();
+    header->mutable_header()->set_key(header_name);
+    header->mutable_header()->set_value(really_long_string);
+    header->mutable_append()->set_value(true);
+  }
+
+  HeaderParserPtr req_header_parser = HeaderParser::configure(to_add);
+
+  Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  EXPECT_DEATH(req_header_parser->evaluateHeaders(headerMap, request_info),
+               "Trying to allocate overly large headers.");
+}
+
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMissingHost) {
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host;
