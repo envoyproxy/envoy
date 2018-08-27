@@ -36,6 +36,9 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
   if (output.admin().has_address()) {
     makePortHermetic(*output.mutable_admin()->mutable_address());
   }
+  if (output.has_runtime()) {
+    output.mutable_runtime()->set_symlink_root(test_env.temporaryPath(""));
+  }
   for (auto& listener : *output.mutable_static_resources()->mutable_listeners()) {
     if (listener.has_address()) {
       makePortHermetic(*listener.mutable_address());
