@@ -6,6 +6,7 @@
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_time.h"
 
 namespace Envoy {
 namespace Http {
@@ -15,7 +16,8 @@ TEST(ValidationAsyncClientTest, MockedMethods) {
   MockAsyncClientCallbacks callbacks;
   MockAsyncClientStreamCallbacks stream_callbacks;
 
-  ValidationAsyncClient client;
+  DangerousDeprecatedTestTime test_time;
+  ValidationAsyncClient client(test_time.timeSource());
   EXPECT_EQ(nullptr, client.send(std::move(message), callbacks,
                                  absl::optional<std::chrono::milliseconds>()));
   EXPECT_EQ(nullptr,

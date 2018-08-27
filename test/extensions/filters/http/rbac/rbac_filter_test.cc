@@ -54,13 +54,21 @@ public:
     ON_CALL(connection_, localAddress()).WillByDefault(ReturnRef(address_));
   }
 
+  void setMetadata() {
+    ON_CALL(req_info_, setDynamicMetadata(HttpFilterNames::get().Rbac, _))
+        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
+          req_info_.metadata_.mutable_filter_metadata()->insert(
+              Protobuf::MapPair<Envoy::ProtobufTypes::String, ProtobufWkt::Struct>(
+                  HttpFilterNames::get().Rbac, obj));
+        }));
+  }
+
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Network::MockConnection> connection_{};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> req_info_;
   Stats::IsolatedStoreImpl store_;
   RoleBasedAccessControlFilterConfigSharedPtr config_;
 
-  envoy::api::v2::core::Metadata metadata_;
   RoleBasedAccessControlFilter filter_;
   Network::Address::InstanceConstSharedPtr address_;
   Http::TestHeaderMapImpl headers_;
@@ -80,6 +88,7 @@ TEST_F(RoleBasedAccessControlFilterTest, Allowed) {
 
 TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   setDestinationPort(456);
+  setMetadata();
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "403"},
@@ -92,6 +101,10 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers_, true));
   EXPECT_EQ(1U, config_->stats().denied_.value());
   EXPECT_EQ(1U, config_->stats().shadow_allowed_.value());
+
+  auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(HttpFilterNames::get().Rbac);
+  EXPECT_EQ("200", filter_meta.fields().at("shadow_response_code").string_value());
+  EXPECT_EQ("bar", filter_meta.fields().at("shadow_effective_policyID").string_value());
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
