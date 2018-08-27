@@ -4,7 +4,10 @@
 
 #include <algorithm>
 #include <list>
+#include <memory>
 #include <string>
+
+#include "envoy/buffer/buffer.h"
 
 #include "common/common/macros.h"
 #include "common/http/header_map_impl.h"
@@ -62,6 +65,11 @@ public:
   AppExceptionType appExceptionType() const { return app_ex_type_.value(); }
   const std::string& appExceptionMessage() const { return app_ex_msg_.value(); }
 
+  bool isProtocolUpgradeMessage() const { return protocol_upgrade_message_; }
+  void setProtocolUpgradeMessage(bool upgrade_message) {
+    protocol_upgrade_message_ = upgrade_message;
+  }
+
 private:
   absl::optional<uint32_t> frame_size_{};
   absl::optional<ProtocolType> proto_{};
@@ -71,9 +79,31 @@ private:
   Http::HeaderMapImpl headers_;
   absl::optional<AppExceptionType> app_ex_type_;
   absl::optional<std::string> app_ex_msg_;
+  bool protocol_upgrade_message_{false};
 };
 
 typedef std::shared_ptr<MessageMetadata> MessageMetadataSharedPtr;
+
+class Protocol;
+
+/**
+ * A DirectResponse manipulates a Protocol to directly create a Thrift response message.
+ */
+class DirectResponse {
+public:
+  virtual ~DirectResponse() {}
+
+  /**
+   * Encodes the response via the given Protocol.
+   * @param metadata the MessageMetadata for the request that generated this response
+   * @param proto the Protocol to be used for message encoding
+   * @param buffer the Buffer into which the message should be encoded
+   */
+  virtual void encode(MessageMetadata& metadata, Protocol& proto,
+                      Buffer::Instance& buffer) const PURE;
+};
+
+typedef std::unique_ptr<DirectResponse> DirectResponsePtr;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

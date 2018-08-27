@@ -15,6 +15,7 @@
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
 #include "extensions/filters/network/thrift_proxy/router/router.h"
+#include "extensions/filters/network/thrift_proxy/thrift_object.h"
 
 #include "absl/types/optional.h"
 
@@ -135,6 +136,7 @@ private:
     void onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn,
                      Upstream::HostDescriptionConstSharedPtr host) override;
 
+    void onRequestStart(bool continue_decoding);
     void onRequestComplete();
     void onResponseComplete();
     void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host);
@@ -147,8 +149,9 @@ private:
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
     Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
-    TransportType transport_type_;
-    ProtocolType protocol_type_;
+    TransportPtr transport_;
+    ProtocolPtr protocol_;
+    ThriftObjectPtr upgrade_response_;
 
     bool request_complete_ : 1;
     bool response_started_ : 1;

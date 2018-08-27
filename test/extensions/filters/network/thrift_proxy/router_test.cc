@@ -21,6 +21,7 @@
 
 using testing::_;
 using testing::ContainsRegex;
+using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
@@ -71,8 +72,22 @@ public:
 class ThriftRouterTestBase {
 public:
   ThriftRouterTestBase()
-      : transport_factory_([&]() -> MockTransport* { return transport_; }),
-        protocol_factory_([&]() -> MockProtocol* { return protocol_; }),
+      : transport_factory_([&]() -> MockTransport* {
+          ASSERT(transport_ == nullptr);
+          transport_ = new NiceMock<MockTransport>();
+          if (mock_transport_cb_) {
+            mock_transport_cb_(transport_);
+          }
+          return transport_;
+        }),
+        protocol_factory_([&]() -> MockProtocol* {
+          ASSERT(protocol_ == nullptr);
+          protocol_ = new NiceMock<MockProtocol>();
+          if (mock_protocol_cb_) {
+            mock_protocol_cb_(protocol_);
+          }
+          return protocol_;
+        }),
         transport_register_(transport_factory_), protocol_register_(protocol_factory_) {}
 
   void initializeRouter() {
@@ -124,9 +139,6 @@ public:
           upstream_callbacks_ = &cb;
         }));
 
-    protocol_ = new NiceMock<MockProtocol>();
-
-    ON_CALL(*protocol_, type()).WillByDefault(Return(ProtocolType::Binary));
     EXPECT_CALL(*protocol_, writeMessageBegin(_, _))
         .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
           EXPECT_EQ(metadata_->methodName(), metadata.methodName());
@@ -165,15 +177,16 @@ public:
 
     EXPECT_CALL(callbacks_, downstreamTransportType()).WillOnce(Return(TransportType::Framed));
     EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Binary));
-    protocol_ = new NiceMock<MockProtocol>();
-    ON_CALL(*protocol_, type()).WillByDefault(Return(ProtocolType::Binary));
-    EXPECT_CALL(*protocol_, writeMessageBegin(_, _))
-        .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
-          EXPECT_EQ(metadata_->methodName(), metadata.methodName());
-          EXPECT_EQ(metadata_->messageType(), metadata.messageType());
-          EXPECT_EQ(metadata_->sequenceId(), metadata.sequenceId());
-        }));
 
+    mock_protocol_cb_ = [&](MockProtocol* protocol) -> void {
+      ON_CALL(*protocol, type()).WillByDefault(Return(ProtocolType::Binary));
+      EXPECT_CALL(*protocol, writeMessageBegin(_, _))
+          .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
+            EXPECT_EQ(metadata_->methodName(), metadata.methodName());
+            EXPECT_EQ(metadata_->messageType(), metadata.messageType());
+            EXPECT_EQ(metadata_->sequenceId(), metadata.sequenceId());
+          }));
+    };
     EXPECT_CALL(callbacks_, continueDecoding()).Times(0);
     EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, newConnection(_))
         .WillOnce(
@@ -240,8 +253,6 @@ public:
   }
 
   void completeRequest() {
-    transport_ = new NiceMock<MockTransport>();
-
     EXPECT_CALL(*protocol_, writeMessageEnd(_));
     EXPECT_CALL(*transport_, encodeFrame(_, _, _));
     EXPECT_CALL(upstream_connection_, write(_, false));
@@ -257,7 +268,7 @@ public:
   void returnResponse() {
     Buffer::OwnedImpl buffer;
 
-    EXPECT_CALL(callbacks_, startUpstreamResponse(TransportType::Framed, ProtocolType::Binary));
+    EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
 
     EXPECT_CALL(callbacks_, upstreamData(Ref(buffer))).WillOnce(Return(false));
     upstream_callbacks_->onUpstreamData(buffer, false);
@@ -276,6 +287,9 @@ public:
   TestNamedProtocolConfigFactory protocol_factory_;
   Registry::InjectFactory<NamedTransportConfigFactory> transport_register_;
   Registry::InjectFactory<NamedProtocolConfigFactory> protocol_register_;
+
+  std::function<void(MockTransport*)> mock_transport_cb_{};
+  std::function<void(MockProtocol*)> mock_protocol_cb_{};
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<ThriftFilters::MockDecoderFilterCallbacks> callbacks_;
@@ -472,7 +486,7 @@ TEST_F(ThriftRouterTest, TruncatedResponse) {
 
   Buffer::OwnedImpl buffer;
 
-  EXPECT_CALL(callbacks_, startUpstreamResponse(TransportType::Framed, ProtocolType::Binary));
+  EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
   EXPECT_CALL(callbacks_, upstreamData(Ref(buffer))).WillOnce(Return(false));
   EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, released(Ref(upstream_connection_)));
   EXPECT_CALL(callbacks_, resetDownstreamConnection());
@@ -531,7 +545,7 @@ TEST_F(ThriftRouterTest, UpstreamDataTriggersReset) {
 
   Buffer::OwnedImpl buffer;
 
-  EXPECT_CALL(callbacks_, startUpstreamResponse(TransportType::Framed, ProtocolType::Binary));
+  EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
   EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
       .WillOnce(Invoke([&](Buffer::Instance&) -> bool {
         router_->resetUpstreamConnection();
@@ -587,6 +601,100 @@ TEST_F(ThriftRouterTest, UnexpectedRouterDestroy) {
   startRequest(MessageType::Call);
   connectUpstream();
   EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  destroyRouter();
+}
+
+TEST_F(ThriftRouterTest, ProtocolUpgrade) {
+  initializeRouter();
+  startRequest(MessageType::Call);
+
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
+      .WillOnce(Invoke(
+          [&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void { upstream_callbacks_ = &cb; }));
+
+  Tcp::ConnectionPool::ConnectionStatePtr conn_state;
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, connectionState())
+      .WillRepeatedly(
+          Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state.get(); }));
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, setConnectionState_(_))
+      .WillOnce(Invoke(
+          [&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void { conn_state.swap(cs); }));
+
+  EXPECT_CALL(*protocol_, supportsUpgrade()).WillOnce(Return(true));
+
+  MockThriftObject* upgrade_response = new NiceMock<MockThriftObject>();
+
+  EXPECT_CALL(*protocol_, attemptUpgrade(_, _, _))
+      .WillOnce(Invoke(
+          [&](Transport&, ThriftConnectionState&, Buffer::Instance& buffer) -> ThriftObjectPtr {
+            buffer.add("upgrade request");
+            return ThriftObjectPtr{upgrade_response};
+          }));
+  EXPECT_CALL(upstream_connection_, write(_, false))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
+        EXPECT_EQ("upgrade request", buffer.toString());
+      }));
+
+  context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
+  EXPECT_NE(nullptr, upstream_callbacks_);
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_CALL(*upgrade_response, onData(Ref(buffer))).WillOnce(Return(false));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+
+  EXPECT_CALL(*upgrade_response, onData(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(*protocol_, completeUpgrade(_, Ref(*upgrade_response)));
+  EXPECT_CALL(callbacks_, continueDecoding());
+  EXPECT_CALL(*protocol_, writeMessageBegin(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
+        EXPECT_EQ(metadata_->methodName(), metadata.methodName());
+        EXPECT_EQ(metadata_->messageType(), metadata.messageType());
+        EXPECT_EQ(metadata_->sequenceId(), metadata.sequenceId());
+      }));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+
+  // Then the actual request...
+  sendTrivialStruct(FieldType::String);
+  completeRequest();
+  returnResponse();
+  destroyRouter();
+}
+
+TEST_F(ThriftRouterTest, ProtocolUpgradeSkippedOnExistingConnection) {
+  initializeRouter();
+  startRequest(MessageType::Call);
+
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
+      .WillOnce(Invoke(
+          [&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void { upstream_callbacks_ = &cb; }));
+
+  Tcp::ConnectionPool::ConnectionStatePtr conn_state = std::make_unique<ThriftConnectionState>();
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, connectionState())
+      .WillRepeatedly(
+          Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state.get(); }));
+
+  EXPECT_CALL(*protocol_, supportsUpgrade()).WillOnce(Return(true));
+
+  // Protocol determines that connection state shows upgrade already occurred
+  EXPECT_CALL(*protocol_, attemptUpgrade(_, _, _))
+      .WillOnce(Invoke([&](Transport&, ThriftConnectionState&,
+                           Buffer::Instance&) -> ThriftObjectPtr { return nullptr; }));
+
+  EXPECT_CALL(*protocol_, writeMessageBegin(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
+        EXPECT_EQ(metadata_->methodName(), metadata.methodName());
+        EXPECT_EQ(metadata_->messageType(), metadata.messageType());
+        EXPECT_EQ(metadata_->sequenceId(), metadata.sequenceId());
+      }));
+  EXPECT_CALL(callbacks_, continueDecoding());
+
+  context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
+  EXPECT_NE(nullptr, upstream_callbacks_);
+
+  // Then the actual request...
+  sendTrivialStruct(FieldType::String);
+  completeRequest();
+  returnResponse();
   destroyRouter();
 }
 
