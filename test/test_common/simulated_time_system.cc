@@ -101,8 +101,19 @@ void Alarm::enableTimer(const std::chrono::milliseconds& duration) {
 
 } // namespace
 
+// When we initialize our simulated time, we'll start the current time based on
+// the real current time. But thereafter, real-time will not be used, and time
+// will march forward only by calling sleep().
+SimulatedTimeSystem::SimulatedTimeSystem()
+    : monotonic_time_(real_time_source_.monotonicTime()),
+      system_time_(real_time_source_.systemTime()) {}
+
 TimerFactoryPtr SimulatedTimeSystem::createTimerFactory(Libevent::BasePtr& libevent) {
   return std::make_unique<SimulatedTimerFactory>(libevent);
+}
+
+void SimulatedTimeSystem::sleep(std::chrono::duration duration) {
+
 }
 
 } // namespace Event

@@ -16,6 +16,10 @@ class SimulatedTimeSystem : public TimeSystem {
   SystemTime systemTime() override { return system_time_; }
   MonotonicTime monotonicTime() override { return monotonic_time_; }
 
+  // Advances time forward by the specified duration, running any timers
+  // that are scheduled to wake up.
+  void sleep(std::chrono::duration);
+
 private:
   RealTimeSource real_time_source_;
   MonotonicTime monotonic_time_;
