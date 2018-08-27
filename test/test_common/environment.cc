@@ -87,6 +87,7 @@ void TestEnvironment::createParentPath(const std::string& path) {
 }
 
 void TestEnvironment::removePath(const std::string& path) {
+  RELEASE_ASSERT(StringUtil::startsWith(path.c_str(), TestEnvironment::temporaryDirectory()), "");
 #ifdef __cpp_lib_experimental_filesystem
   // We don't want to rely on rm etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
