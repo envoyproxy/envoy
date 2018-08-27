@@ -26,6 +26,7 @@ namespace Logger {
   FUNCTION(client)               \
   FUNCTION(config)               \
   FUNCTION(connection)           \
+  FUNCTION(dubbo)                \
   FUNCTION(file)                 \
   FUNCTION(filter)               \
   FUNCTION(grpc)                 \
@@ -48,8 +49,7 @@ namespace Logger {
   FUNCTION(testing)              \
   FUNCTION(thrift)               \
   FUNCTION(tracing)              \
-  FUNCTION(upstream)		 \
-  FUNCTION(dubbo)
+  FUNCTION(upstream)
 
 enum class Id {
   ALL_LOGGER_IDS(GENERATE_ENUM)

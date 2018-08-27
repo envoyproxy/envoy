@@ -34,7 +34,7 @@ void Decoder::onData(Buffer::Instance& data) {
     ENVOY_LOG(debug, "dubbo: expected body size is {}", context_.body_size_);
 
     if (data.length() < context_.body_size_) {
-      ENVOY_LOG(debug, "dubbo: need more data for {} deserialize", serializer_->name());
+      ENVOY_LOG(debug, "dubbo: need more data for {} deserialization", serializer_->name());
       return;
     }
 

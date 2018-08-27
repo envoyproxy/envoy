@@ -29,7 +29,7 @@ TEST(HessianProtocolTest, deserializeRpcInvocation) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {
                      0x05, '2', '.', '0', '.', '2', // Dubbo version
-                     0x04, 't', 'e', 's', 't',      // Service naem
+                     0x04, 't', 'e', 's', 't',      // Service name
                      0x05, '0', '.', '0', '.', '0', // Service version
                      0x04, 't', 'e', 's', 't',      // method name
                  });
