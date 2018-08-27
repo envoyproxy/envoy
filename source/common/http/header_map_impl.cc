@@ -92,9 +92,12 @@ void HeaderString::append(const char* data, uint32_t size) {
     // allocate and copy.
     type_ = Type::Dynamic;
     const uint64_t new_capacity = newCapacity(string_length_, size);
-    dynamic_capacity_ = std::max(MinDynamicCapacity, new_capacity);
-    if (dynamic_capacity_ != MinDynamicCapacity) {
+    if (new_capacity > MinDynamicCapacity) {
+      // TODO(alyssawilk) unit test.
       validateCapacity(new_capacity);
+      dynamic_capacity_ = new_capacity;
+    } else {
+      dynamic_capacity_ = MinDynamicCapacity;
     }
     char* buf = static_cast<char*>(malloc(dynamic_capacity_));
     RELEASE_ASSERT(buf != nullptr, "");
@@ -104,7 +107,8 @@ void HeaderString::append(const char* data, uint32_t size) {
   }
 
   case Type::Inline: {
-    if (size + 1 + string_length_ <= sizeof(inline_buffer_)) {
+    const uint64_t new_capacity = static_cast<uint64_t>(size) + 1 + string_length_;
+    if (new_capacity <= sizeof(inline_buffer_)) {
       // Already inline and the new value fits in inline storage.
       break;
     }
