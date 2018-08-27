@@ -177,9 +177,7 @@ void WebsocketIntegrationTest::initialize() {
     if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
       config_helper_.addConfigModifier(
           [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-                  hcm) -> void {
-            hcm.mutable_http2_protocol_options()->set_allow_connect(true);
-          });
+                  hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_connect(true); });
     }
   }
   HttpIntegrationTest::initialize();
