@@ -161,13 +161,13 @@ void Filter::onRead() {
     const uint8_t* data = buf_ + read_;
     const size_t len = result.rc_ - read_;
     read_ = result.rc_;
-    Ssl::Utility::parseClientHello(data, len, ssl_, read_, config_->maxClientHelloSize(),
-                                   config_->stats(), [&](bool success) -> void { done(success); },
-                                   alpn_found_, clienthello_success_,
-                                   [&]() -> void {
-                                     cb_->socket().setDetectedTransportProtocol(
-                                         TransportSockets::TransportSocketNames::get().Tls);
-                                   });
+    parseClientHello(data, len, ssl_, read_, config_->maxClientHelloSize(), config_->stats(),
+                     [&](bool success) -> void { done(success); }, alpn_found_,
+                     clienthello_success_,
+                     [&]() -> void {
+                       cb_->socket().setDetectedTransportProtocol(
+                           TransportSockets::TransportSocketNames::get().Tls);
+                     });
   }
 }
 
@@ -184,41 +184,44 @@ void Filter::done(bool success) {
   cb_->continueFilterChain(success);
 }
 
-void Filter::parseClientHello(const void* data, size_t len) {
-  // Ownership is passed to ssl_ in SSL_set_bio()
+void Filter::parseClientHello(const void* data, size_t len, bssl::UniquePtr<SSL>& ssl,
+                              uint64_t read, uint32_t maxClientHelloSize, const TlsStats& stats,
+                              std::function<void(bool)> done, bool& alpn_found,
+                              bool& clienthello_success, std::function<void()> onSuccess) {
+  // Ownership is passed to ssl in SSL_set_bio()
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(data, len));
 
   // Make the mem-BIO return that there is more data
   // available beyond it's end
   BIO_set_mem_eof_return(bio.get(), -1);
 
-  SSL_set_bio(ssl_.get(), bio.get(), bio.get());
+  SSL_set_bio(ssl.get(), bio.get(), bio.get());
   bio.release();
 
-  int ret = SSL_do_handshake(ssl_.get());
+  int ret = SSL_do_handshake(ssl.get());
 
   // This should never succeed because an error is always returned from the SNI callback.
   ASSERT(ret <= 0);
-  switch (SSL_get_error(ssl_.get(), ret)) {
+  switch (SSL_get_error(ssl.get(), ret)) {
   case SSL_ERROR_WANT_READ:
-    if (read_ == config_->maxClientHelloSize()) {
+    if (read == maxClientHelloSize) {
       // We've hit the specified size limit. This is an unreasonably large ClientHello;
       // indicate failure.
-      config_->stats().client_hello_too_large_.inc();
+      stats.client_hello_too_large_.inc();
       done(false);
     }
     break;
   case SSL_ERROR_SSL:
-    if (clienthello_success_) {
-      config_->stats().tls_found_.inc();
-      if (alpn_found_) {
-        config_->stats().alpn_found_.inc();
+    if (clienthello_success) {
+      stats.tls_found_.inc();
+      if (alpn_found) {
+        stats.alpn_found_.inc();
       } else {
-        config_->stats().alpn_not_found_.inc();
+        stats.alpn_not_found_.inc();
       }
-      cb_->socket().setDetectedTransportProtocol(TransportSockets::TransportSocketNames::get().Tls);
+      onSuccess();
     } else {
-      config_->stats().tls_not_found_.inc();
+      stats.tls_not_found_.inc();
     }
     done(true);
     break;

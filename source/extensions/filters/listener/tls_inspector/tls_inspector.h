@@ -4,9 +4,9 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
-#include "common/ssl/utility.h"
 
 #include "openssl/bytestring.h"
 #include "openssl/ssl.h"
@@ -17,20 +17,42 @@ namespace ListenerFilters {
 namespace TlsInspector {
 
 /**
+ * All stats for the TLS inspector. @see stats_macros.h
+ */
+#define TLS_STATS(COUNTER)                                                                         \
+  COUNTER(connection_closed)                                                                       \
+  COUNTER(client_hello_too_large)                                                                  \
+  COUNTER(read_error)                                                                              \
+  COUNTER(read_timeout)                                                                            \
+  COUNTER(tls_found)                                                                               \
+  COUNTER(tls_not_found)                                                                           \
+  COUNTER(alpn_found)                                                                              \
+  COUNTER(alpn_not_found)                                                                          \
+  COUNTER(sni_found)                                                                               \
+  COUNTER(sni_not_found)
+
+/**
+ * Definition of stats for the TLS. @see stats_macros.h
+ */
+struct TlsStats {
+  TLS_STATS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
  * Global configuration for TLS inspector.
  */
 class Config {
 public:
   Config(Stats::Scope& scope, uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
 
-  const Ssl::Utility::TlsStats& stats() const { return stats_; }
+  const TlsStats& stats() const { return stats_; }
   bssl::UniquePtr<SSL> newSsl();
   uint32_t maxClientHelloSize() const { return max_client_hello_size_; }
 
   static constexpr size_t TLS_MAX_CLIENT_HELLO = 64 * 1024;
 
 private:
-  Ssl::Utility::TlsStats stats_;
+  TlsStats stats_;
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   const uint32_t max_client_hello_size_;
 };
@@ -48,7 +70,10 @@ public:
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
 private:
-  void parseClientHello(const void* data, size_t len);
+  void parseClientHello(const void* data, size_t len, bssl::UniquePtr<SSL>& ssl, uint64_t read,
+                        uint32_t maxClientHelloSize, const TlsStats& stats,
+                        std::function<void(bool)> done, bool& alpn_found, bool& clienthello_success,
+                        std::function<void()> onSuccess);
   void onRead();
   void onTimeout();
   void done(bool success);
