@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/string_view.h"
@@ -34,6 +35,20 @@ public:
       hash += ((hash << 5) + hash) + absl::ascii_tolower(c);
     };
     return hash;
+  }
+
+  /**
+   * Return 64-bit hash from a vector of uint32s.
+   * @param input supplies the vector to be hashed.
+   * Adapted from boost::hash_combine. See details here: https://stackoverflow.com/a/4948967
+   * @return 64-bit hash of the supplied vector.
+   */
+  static uint64_t hashVector(std::vector<uint32_t> const& input) {
+    std::size_t seed = input.size();
+    for (auto& i : input) {
+      seed ^= i + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    }
+    return seed;
   }
 };
 

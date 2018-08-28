@@ -36,11 +36,11 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
-  std::unordered_set<std::string> names;
+  std::unordered_set<StatName*, StatNameHash_, StatNameCompare_> names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto& counter : scope->central_cache_.counters_) {
-      if (names.insert(counter.first).second) {
+      if (names.insert(counter.first.get()).second) {
         ret.push_back(counter.second);
       }
     }
@@ -59,11 +59,11 @@ ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
-  std::unordered_set<std::string> names;
+  std::unordered_set<StatName*, StatNameHash_, StatNameCompare_> names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto& gauge : scope->central_cache_.gauges_) {
-      if (names.insert(gauge.first).second) {
+      if (names.insert(gauge.first.get()).second) {
         ret.push_back(gauge.second);
       }
     }
@@ -190,7 +190,8 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() { parent_.releaseScopeCrossThread(
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     const std::string& name,
-    std::unordered_map<std::string, std::shared_ptr<StatType>>& central_cache_map,
+    std::unordered_map<StatNamePtr, std::shared_ptr<StatType>, StatNamePtrHash_,
+                       StatNamePtrCompare_>& central_cache_map,
     MakeStatFn<StatType> make_stat, std::shared_ptr<StatType>* tls_ref) {
 
   // If we have a valid cache entry, return it.
@@ -201,7 +202,8 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   // We must now look in the central store so we must be locked. We grab a reference to the
   // central store location. It might contain nothing. In this case, we allocate a new stat.
   Thread::LockGuard lock(parent_.lock_);
-  std::shared_ptr<StatType>& central_ref = central_cache_map[name];
+  StatNamePtr stat_name_ptr = parent_.heap_allocator_.encode(name);
+  std::shared_ptr<StatType>& central_ref = central_cache_map[std::move(stat_name_ptr)];
   if (!central_ref) {
     std::vector<Tag> tags;
 
@@ -237,9 +239,11 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // if we don't have TLS initialized currently. The de-referenced pointer might be null if there
   // is no cache entry.
   CounterSharedPtr* tls_ref = nullptr;
+  StatNamePtr stat_name_ptr = parent_.heap_allocator_.encode(final_name);
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref =
-        &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].counters_[final_name];
+    tls_ref = &parent_.tls_->getTyped<TlsCache>()
+                   .scope_cache_[this->scope_id_]
+                   .counters_[std::move(stat_name_ptr)];
   }
 
   return safeMakeStat<Counter>(
@@ -272,8 +276,11 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
   GaugeSharedPtr* tls_ref = nullptr;
+  StatNamePtr stat_name_ptr = parent_.heap_allocator_.encode(final_name);
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].gauges_[final_name];
+    tls_ref = &parent_.tls_->getTyped<TlsCache>()
+                   .scope_cache_[this->scope_id_]
+                   .gauges_[std::move(stat_name_ptr)];
   }
 
   return safeMakeStat<Gauge>(
@@ -290,11 +297,11 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
   ParentHistogramSharedPtr* tls_ref = nullptr;
-
+  StatNamePtr stat_name_ptr = parent_.heap_allocator_.encode(final_name);
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_ref = &parent_.tls_->getTyped<TlsCache>()
                    .scope_cache_[this->scope_id_]
-                   .parent_histograms_[final_name];
+                   .parent_histograms_[std::move(stat_name_ptr)];
   }
 
   if (tls_ref && *tls_ref) {
@@ -302,7 +309,12 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   }
 
   Thread::LockGuard lock(parent_.lock_);
-  ParentHistogramImplSharedPtr& central_ref = central_cache_.histograms_[final_name];
+  // TODO(ambuc): This is obviously a duplicate of the work done just a few lines ago. If these were
+  // shared ptrs, or if we had a good method for duplicating StatNamePtrs without the cost of
+  // lookups, this could be optimized.
+  StatNamePtr stat_name_ptr_reencode = parent_.heap_allocator_.encode(final_name);
+  ParentHistogramImplSharedPtr& central_ref =
+      central_cache_.histograms_[std::move(stat_name_ptr_reencode)];
   if (!central_ref) {
     std::vector<Tag> tags;
     std::string tag_extracted_name = parent_.getTagsForName(final_name, tags);
@@ -323,8 +335,11 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
   // Here prefix will not be considered because, by the time ParentHistogram calls this method
   // during recordValue, the prefix is already attached to the name.
   TlsHistogramSharedPtr* tls_ref = nullptr;
+  StatNamePtr stat_name_ptr = parent_.heap_allocator_.encode(name);
   if (!parent_.shutting_down_ && parent_.tls_) {
-    tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].histograms_[name];
+    tls_ref = &parent_.tls_->getTyped<TlsCache>()
+                   .scope_cache_[this->scope_id_]
+                   .histograms_[std::move(stat_name_ptr)];
   }
 
   if (tls_ref && *tls_ref) {

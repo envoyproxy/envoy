@@ -8,11 +8,13 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "envoy/stats/symbol_table.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/source_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
 
 #include "circllhist.h"
@@ -212,16 +214,22 @@ public:
 
 private:
   struct TlsCacheEntry {
-    std::unordered_map<std::string, CounterSharedPtr> counters_;
-    std::unordered_map<std::string, GaugeSharedPtr> gauges_;
-    std::unordered_map<std::string, TlsHistogramSharedPtr> histograms_;
-    std::unordered_map<std::string, ParentHistogramSharedPtr> parent_histograms_;
+    std::unordered_map<StatNamePtr, CounterSharedPtr, StatNamePtrHash_, StatNamePtrCompare_>
+        counters_;
+    std::unordered_map<StatNamePtr, GaugeSharedPtr, StatNamePtrHash_, StatNamePtrCompare_> gauges_;
+    std::unordered_map<StatNamePtr, TlsHistogramSharedPtr, StatNamePtrHash_, StatNamePtrCompare_>
+        histograms_;
+    std::unordered_map<StatNamePtr, ParentHistogramSharedPtr, StatNamePtrHash_, StatNamePtrCompare_>
+        parent_histograms_;
   };
 
   struct CentralCacheEntry {
-    std::unordered_map<std::string, CounterSharedPtr> counters_;
-    std::unordered_map<std::string, GaugeSharedPtr> gauges_;
-    std::unordered_map<std::string, ParentHistogramImplSharedPtr> histograms_;
+    std::unordered_map<StatNamePtr, CounterSharedPtr, StatNamePtrHash_, StatNamePtrCompare_>
+        counters_;
+    std::unordered_map<StatNamePtr, GaugeSharedPtr, StatNamePtrHash_, StatNamePtrCompare_> gauges_;
+    std::unordered_map<StatNamePtr, ParentHistogramImplSharedPtr, StatNamePtrHash_,
+                       StatNamePtrCompare_>
+        histograms_;
   };
 
   struct ScopeImpl : public TlsScope {
@@ -261,7 +269,8 @@ private:
     template <class StatType>
     StatType&
     safeMakeStat(const std::string& name,
-                 std::unordered_map<std::string, std::shared_ptr<StatType>>& central_cache_map,
+                 std::unordered_map<StatNamePtr, std::shared_ptr<StatType>, StatNamePtrHash_,
+                                    StatNamePtrCompare_>& central_cache_map,
                  MakeStatFn<StatType> make_stat, std::shared_ptr<StatType>* tls_ref);
 
     static std::atomic<uint64_t> next_scope_id_;
@@ -292,8 +301,9 @@ private:
   const Stats::StatsOptions& stats_options_;
   StatDataAllocator& alloc_;
   Event::Dispatcher* main_thread_dispatcher_{};
-  ThreadLocal::SlotPtr tls_;
   mutable Thread::MutexBasicLockable lock_;
+  HeapStatDataAllocator heap_allocator_ GUARDED_BY(lock_);
+  ThreadLocal::SlotPtr tls_;
   std::unordered_set<ScopeImpl*> scopes_ GUARDED_BY(lock_);
   ScopePtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
@@ -301,7 +311,6 @@ private:
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
-  HeapStatDataAllocator heap_allocator_;
   SourceImpl source_;
 };
 

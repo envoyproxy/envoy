@@ -9,10 +9,11 @@
 namespace Envoy {
 namespace Stats {
 
-// TODO(ambuc): There is a possible performance optimization here for avoiding the encoding of IPs,
-// if they appear in stat names. We don't want to waste time symbolizing an integer as an integer,
-// if we can help it.
+// TODO(ambuc): There is a possible performance optimization here for avoiding the encoding of IPs /
+// numbers if they appear in stat names. We don't want to waste time symbolizing an integer as an
+// integer, if we can help it.
 StatNamePtr SymbolTableImpl::encode(const absl::string_view name) {
+  Thread::LockGuard lock(lock_);
   SymbolVec symbol_vec;
   std::vector<absl::string_view> name_vec = absl::StrSplit(name, '.');
   symbol_vec.reserve(name_vec.size());
@@ -31,6 +32,7 @@ std::string SymbolTableImpl::decode(const SymbolVec& symbol_vec) const {
 }
 
 void SymbolTableImpl::free(const SymbolVec& symbol_vec) {
+  Thread::LockGuard lock(lock_);
   for (const Symbol symbol : symbol_vec) {
     auto decode_search = decode_map_.find(symbol);
     ASSERT(decode_search != decode_map_.end());
