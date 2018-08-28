@@ -82,7 +82,7 @@ public:
   }
 
   void testBasicSetup(const std::string& config, const std::string& expected_address,
-                      ConfigType config_type = ConfigType::V2_YAML) {
+                      const uint32_t expected_port, ConfigType config_type = ConfigType::V2_YAML) {
     expectResolve(Network::DnsLookupFamily::V4Only, expected_address);
     if (config_type == ConfigType::V1_JSON) {
       setupFromV1Json(config);
@@ -106,6 +106,12 @@ public:
               cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts()[0]);
     HostSharedPtr logical_host = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0];
 
+    // Regression test for issue #3908. Make sure we do not get "0.0.0.0:0" as the logical host's
+    // health check address.
+    EXPECT_NE("0.0.0.0:0", logical_host->healthCheckAddress()->asString());
+    EXPECT_EQ(fmt::format("127.0.0.1:{}", expected_port),
+              logical_host->healthCheckAddress()->asString());
+
     EXPECT_CALL(dispatcher_,
                 createClientConnection_(
                     PointeesEq(Network::Utility::resolveUrl("tcp://127.0.0.1:443")), _, _, _))
@@ -119,6 +125,10 @@ public:
     // Should not cause any changes.
     EXPECT_CALL(*resolve_timer_, enableTimer(_));
     dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2", "127.0.0.3"}));
+
+    EXPECT_NE("0.0.0.0:0", logical_host->healthCheckAddress()->asString());
+    EXPECT_EQ(fmt::format("127.0.0.1:{}", expected_port),
+              logical_host->healthCheckAddress()->asString());
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
     EXPECT_CALL(dispatcher_,
@@ -147,6 +157,10 @@ public:
     // Should cause a change.
     EXPECT_CALL(*resolve_timer_, enableTimer(_));
     dns_callback_(TestUtility::makeDnsResponse({"127.0.0.3", "127.0.0.1", "127.0.0.2"}));
+
+    EXPECT_NE("0.0.0.0:0", logical_host->healthCheckAddress()->asString());
+    EXPECT_EQ(fmt::format("127.0.0.3:{}", expected_port),
+              logical_host->healthCheckAddress()->asString());
 
     EXPECT_EQ(logical_host, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts()[0]);
     EXPECT_CALL(dispatcher_,
@@ -393,9 +407,10 @@ TEST_F(LogicalDnsClusterTest, Basic) {
               port_value: 8000
   )EOF";
 
-  testBasicSetup(json, "foo.bar.com", ConfigType::V1_JSON);
-  testBasicSetup(basic_yaml_hosts, "foo.bar.com");
-  testBasicSetup(basic_yaml_load_assignment, "foo.bar.com");
+  testBasicSetup(json, "foo.bar.com", 443, ConfigType::V1_JSON);
+  testBasicSetup(basic_yaml_hosts, "foo.bar.com", 443);
+  // Expect to override the health check address port value.
+  testBasicSetup(basic_yaml_load_assignment, "foo.bar.com", 8000);
 }
 
 } // namespace Upstream

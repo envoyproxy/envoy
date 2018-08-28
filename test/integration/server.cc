@@ -102,9 +102,9 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
   } else {
     random_generator = std::make_unique<Runtime::RandomGeneratorImpl>();
   }
-  server_.reset(new Server::InstanceImpl(options, Network::Utility::getLocalAddress(version), *this,
-                                         restarter, stats_store, lock, *this,
-                                         std::move(random_generator), tls));
+  server_.reset(new Server::InstanceImpl(
+      options, test_time_.timeSource(), Network::Utility::getLocalAddress(version), *this,
+      restarter, stats_store, lock, *this, std::move(random_generator), tls));
   pending_listeners_ = server_->listenerManager().listeners().size();
   ENVOY_LOG(info, "waiting for {} test server listeners", pending_listeners_);
   server_set_.setReady();

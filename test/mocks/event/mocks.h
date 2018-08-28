@@ -18,6 +18,7 @@
 #include "envoy/ssl/context.h"
 
 #include "test/mocks/buffer/mocks.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 
@@ -29,6 +30,10 @@ public:
   MockDispatcher();
   ~MockDispatcher();
 
+  void setTimeSource(TimeSource& time_source) { time_source_ = &time_source; }
+
+  // Dispatcher
+  TimeSource& timeSource() override { return *time_source_; }
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket) override {
@@ -101,6 +106,10 @@ public:
   MOCK_METHOD1(post, void(std::function<void()> callback));
   MOCK_METHOD1(run, void(RunType type));
   Buffer::WatermarkFactory& getWatermarkFactory() override { return buffer_factory_; }
+
+  // TODO(jmarantz): Switch these to using mock-time.
+  DangerousDeprecatedTestTime test_time_;
+  TimeSource* time_source_;
 
   std::list<DeferredDeletablePtr> to_delete_;
   MockBufferFactory buffer_factory_;

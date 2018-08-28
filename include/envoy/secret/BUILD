@@ -9,9 +9,16 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "secret_callbacks_interface",
+    hdrs = ["secret_callbacks.h"],
+)
+
+envoy_cc_library(
     name = "secret_provider_interface",
     hdrs = ["secret_provider.h"],
     deps = [
+        ":secret_callbacks_interface",
+        "//include/envoy/common:callback",
         "//include/envoy/ssl:tls_certificate_config_interface",
     ],
 )

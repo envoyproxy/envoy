@@ -24,14 +24,14 @@
 namespace Envoy {
 namespace Event {
 
-DispatcherImpl::DispatcherImpl()
-    : DispatcherImpl(Buffer::WatermarkFactoryPtr{new Buffer::WatermarkBufferFactory}) {
+DispatcherImpl::DispatcherImpl(TimeSource& time_source)
+    : DispatcherImpl(time_source, Buffer::WatermarkFactoryPtr{new Buffer::WatermarkBufferFactory}) {
   // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
   RELEASE_ASSERT(Libevent::Global::initialized(), "");
 }
 
-DispatcherImpl::DispatcherImpl(Buffer::WatermarkFactoryPtr&& factory)
-    : buffer_factory_(std::move(factory)), base_(event_base_new()),
+DispatcherImpl::DispatcherImpl(TimeSource& time_source, Buffer::WatermarkFactoryPtr&& factory)
+    : time_source_(time_source), buffer_factory_(std::move(factory)), base_(event_base_new()),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {

@@ -282,7 +282,7 @@ private:
           encodeHeaders(std::move(headers), end_stream);
         },
         [this](Buffer::Instance& data, bool end_stream) -> void { encodeData(data, end_stream); },
-        remote_closed_, code, body);
+        remote_closed_, code, body, is_head_request_);
   }
   // The async client won't pause if sending an Expect: 100-Continue so simply
   // swallows any incoming encode100Continue.
@@ -308,6 +308,7 @@ private:
   bool remote_closed_{};
   Buffer::InstancePtr buffered_body_;
   bool is_grpc_request_{};
+  bool is_head_request_{false};
   friend class AsyncClientImpl;
 };
 

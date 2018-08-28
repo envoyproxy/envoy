@@ -435,6 +435,20 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
+    // This tests the beginning of time.
+    const std::string format = "%START_TIME(%Y/%m/%d)%|%START_TIME(%s)%|%START_TIME(bad_format)%|"
+                               "%START_TIME%|%START_TIME(%f.%1f.%2f.%3f)%";
+
+    const time_t test_epoch = 0;
+    const SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
+    EXPECT_CALL(request_info, startTime()).WillRepeatedly(Return(time));
+    FormatterImpl formatter(format);
+
+    EXPECT_EQ("1970/01/01|0|bad_format|1970-01-01T00:00:00.000Z|000000000.0.00.000",
+              formatter.format(request_header, response_header, response_trailer, request_info));
+  }
+
+  {
     // This tests multiple START_TIMEs.
     const std::string format =
         "%START_TIME(%s.%3f)%|%START_TIME(%s.%4f)%|%START_TIME(%s.%5f)%|%START_TIME(%s.%6f)%";

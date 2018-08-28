@@ -8,10 +8,11 @@ The tool can also be used to check whether a path redirect, path rewrite, or hos
 match what is expected.
 
 Input
-  The tool expects two input JSON files:
+  The tool expects two input files:
 
-  1. A router config JSON file. The router config JSON file schema is found in
-     :ref:`config <config_http_conn_man_route_table>`.
+  1. A v2 router config file (YAML or JSON). The router config file schema is found in
+     :ref:`config <envoy_api_file_envoy/api/v2/route/route.proto>` and the config file extension
+     must reflect its file type (for instance, .json for JSON and .yaml for YAML).
 
   2. A tool config JSON file. The tool config JSON file schema is found in
      :ref:`config <config_tools_router_check_tool>`.
@@ -47,19 +48,19 @@ Building
     bazel build //test/tools/router_check:router_check_tool
 
 Running
-  The tool takes two input json files and an optional command line parameter ``--details``. The
+  The tool takes two input files and an optional command line parameter ``--details``. The
   expected order of command line arguments is:
-  1. The router configuration json file.
+  1. The router configuration file.
   2. The tool configuration json file.
   3. The optional details flag. ::
 
-    bazel-bin/test/tools/router_check/router_check_tool router_config.json tool_config.json
+    bazel-bin/test/tools/router_check/router_check_tool router_config.(yaml|json) tool_config.json
 
-    bazel-bin/test/tools/router_check/router_check_tool router_config.json tool_config.json --details
+    bazel-bin/test/tools/router_check/router_check_tool router_config.(yaml|json) tool_config.json --details
 
 Testing
   A bash shell script test can be run with bazel. The test compares routes using different router and
-  tool configuration json files. The configuration json files can be found in
+  tool configuration files. The configuration files can be found in
   test/tools/router_check/test/config/... . ::
 
     bazel test //test/tools/router_check/...

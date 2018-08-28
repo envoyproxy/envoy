@@ -5,6 +5,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -29,7 +30,8 @@ public:
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
-  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl();
+  DangerousDeprecatedTestTime test_time;
+  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(test_time.timeSource());
   Network::MockConnectionHandler* handler_ = new Network::MockConnectionHandler();
   NiceMock<MockGuardDog> guard_dog_;
   DefaultTestHooks hooks_;

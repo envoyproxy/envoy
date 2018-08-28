@@ -110,6 +110,15 @@ envoy_cc_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "test_time_lib",
+    srcs = ["test_time.cc"],
+    hdrs = ["test_time.h"],
+    deps = [
+        "//source/common/common:utility_lib",
+    ],
+)
+
 envoy_cc_library(
     name = "tls_utility_lib",
     srcs = ["tls_utility.cc"],
