@@ -16,10 +16,20 @@ function install {
     fi
 }
 
+# TODO (cmluciano): remove once homebrew core is properly updated
+# with bazel 0.17.0
+function bazel_tap {
+    echo "Installing bazel tap"
+    brew tap bazelbuild/tap
+    brew tap-pin bazelbuild/tap
+}
+
 if ! brew update; then
     echo "Failed to update homebrew"
     exit 1
 fi
+
+bazel_tap
 
 DEPS="automake bazel cmake coreutils go libtool wget ninja"
 for DEP in ${DEPS}
