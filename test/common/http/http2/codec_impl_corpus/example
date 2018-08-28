@@ -221,7 +221,7 @@ actions {
   stream_action {
     stream_id: 3
     request {
-      reset: 0
+      reset_stream: 0
     }
   }
 }
@@ -252,7 +252,7 @@ actions {
   stream_action {
     stream_id: 4
     response {
-      reset: 0
+      reset_stream: 0
     }
   }
 }

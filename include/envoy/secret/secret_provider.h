@@ -1,5 +1,8 @@
 #pragma once
 
+#include <functional>
+
+#include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
@@ -18,7 +21,14 @@ public:
    */
   virtual const SecretType* secret() const PURE;
 
-  // TODO(lizan): Add more methods for dynamic secret provider.
+  /**
+   * Add secret update callback into secret provider.
+   * It is safe to call this method by main thread and is safe to be invoked
+   * on main thread.
+   * @param callback callback that is executed by secret provider.
+   * @return CallbackHandle the handle which can remove that update callback.
+   */
+  virtual Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) PURE;
 };
 
 typedef SecretProvider<Ssl::TlsCertificateConfig> TlsCertificateConfigProvider;

@@ -60,7 +60,7 @@ actions {
   stream_action {
     stream_id: 0
     response {
-      continue_100_headers {}
+      continue_headers {}
     }
   }
 }

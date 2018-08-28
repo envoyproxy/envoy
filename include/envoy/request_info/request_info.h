@@ -312,6 +312,16 @@ public:
    */
   virtual FilterState& perRequestState() PURE;
   virtual const FilterState& perRequestState() const PURE;
+
+  /**
+   * @param SNI value requested
+   */
+  virtual void setRequestedServerName(const absl::string_view requested_server_name) PURE;
+
+  /**
+   * @return SNI value for downstream host
+   */
+  virtual const std::string& requestedServerName() const PURE;
 };
 
 } // namespace RequestInfo

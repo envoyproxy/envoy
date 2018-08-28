@@ -13,8 +13,8 @@ namespace Grpc {
 
 AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
                                                const envoy::api::v2::core::GrpcService& config,
-                                               bool skip_cluster_check)
-    : cm_(cm), config_(config) {
+                                               bool skip_cluster_check, TimeSource& time_source)
+    : cm_(cm), config_(config), time_source_(time_source) {
   if (skip_cluster_check) {
     return;
   }
@@ -31,8 +31,8 @@ AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
 }
 
 AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
-                                               ThreadLocal::Instance& tls)
-    : cm_(cm), tls_(tls) {
+                                               ThreadLocal::Instance& tls, TimeSource& time_source)
+    : cm_(cm), tls_(tls), time_source_(time_source) {
 #ifdef ENVOY_GOOGLE_GRPC
   google_tls_slot_ = tls.allocateSlot();
   google_tls_slot_->set(
@@ -41,7 +41,7 @@ AsyncClientManagerImpl::AsyncClientManagerImpl(Upstream::ClusterManager& cm,
 }
 
 AsyncClientPtr AsyncClientFactoryImpl::create() {
-  return std::make_unique<AsyncClientImpl>(cm_, config_);
+  return std::make_unique<AsyncClientImpl>(cm_, config_, time_source_);
 }
 
 GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
@@ -50,6 +50,7 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
     : tls_(tls), google_tls_slot_(google_tls_slot),
       scope_(scope.createScope(fmt::format("grpc.{}.", config.google_grpc().stat_prefix()))),
       config_(config) {
+
 #ifndef ENVOY_GOOGLE_GRPC
   UNREFERENCED_PARAMETER(tls_);
   UNREFERENCED_PARAMETER(google_tls_slot_);
@@ -77,7 +78,7 @@ AsyncClientManagerImpl::factoryForGrpcService(const envoy::api::v2::core::GrpcSe
                                               Stats::Scope& scope, bool skip_cluster_check) {
   switch (config.target_specifier_case()) {
   case envoy::api::v2::core::GrpcService::kEnvoyGrpc:
-    return std::make_unique<AsyncClientFactoryImpl>(cm_, config, skip_cluster_check);
+    return std::make_unique<AsyncClientFactoryImpl>(cm_, config, skip_cluster_check, time_source_);
   case envoy::api::v2::core::GrpcService::kGoogleGrpc:
     return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, google_tls_slot_.get(), scope,
                                                           config);

@@ -193,6 +193,11 @@ public:
   virtual const LocalInfo::LocalInfo& localInfo() PURE;
 
   /**
+   * @return the time source used for the server.
+   */
+  virtual TimeSource& timeSource() PURE;
+
+  /**
    * @return the flush interval of stats sinks.
    */
   virtual std::chrono::milliseconds statsFlushInterval() const PURE;

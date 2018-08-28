@@ -182,6 +182,12 @@ struct RequestInfoImpl : public RequestInfo {
   FilterState& perRequestState() override { return per_request_state_; }
   const FilterState& perRequestState() const override { return per_request_state_; }
 
+  void setRequestedServerName(absl::string_view requested_server_name) override {
+    requested_server_name_ = std::string(requested_server_name);
+  }
+
+  const std::string& requestedServerName() const override { return requested_server_name_; }
+
   const SystemTime start_time_;
   const MonotonicTime start_time_monotonic_;
 
@@ -209,6 +215,7 @@ private:
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_local_address_;
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
+  std::string requested_server_name_;
 };
 
 } // namespace RequestInfo

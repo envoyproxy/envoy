@@ -11,9 +11,11 @@
 #include "envoy/network/filter.h"
 
 #include "common/common/assert.h"
+#include "common/common/utility.h"
 #include "common/http/codec_client.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time.h"
 
 namespace Envoy {
 /**
@@ -123,6 +125,9 @@ public:
                     const std::string& body, Http::CodecClient::Type type,
                     Network::Address::IpVersion ip_version, const std::string& host = "host",
                     const std::string& content_type = "");
+
+  // TODO(jmarantz): this should be injectable.
+  static DangerousDeprecatedTestTime evil_singleton_test_time_;
 };
 
 // A set of connection callbacks which tracks connection state.

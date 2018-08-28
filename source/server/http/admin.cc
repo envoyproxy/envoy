@@ -853,8 +853,8 @@ void AdminFilter::onComplete() {
   }
 }
 
-AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider()
-    : config_(new Router::NullConfigImpl()) {}
+AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
+    : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
 AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& profile_path,
                      const std::string& address_out_path,
@@ -865,6 +865,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
+      route_config_provider_(server.timeSource()),
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
           {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false, false},
