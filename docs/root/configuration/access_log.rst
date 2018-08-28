@@ -228,6 +228,8 @@ The following command operators are supported:
     Not implemented ("-").
 
 %REQUESTED_SERVER_NAME%
+  HTTP
+    String value set on ssl connection socket for Server Name Indication (SNI)
   TCP
     String value set on ssl connection socket for Server Name Indication (SNI)
 
