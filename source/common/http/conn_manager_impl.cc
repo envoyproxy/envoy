@@ -580,7 +580,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   // Modify the downstream remote address depending on configuration and headers.
   request_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
-      *request_headers_, protocol, connection_manager_.read_callbacks_->connection(),
+      *request_headers_, connection_manager_.read_callbacks_->connection(),
       connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
       connection_manager_.runtime_, connection_manager_.local_info_));
   ASSERT(request_info_.downstreamRemoteAddress() != nullptr);
