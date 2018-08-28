@@ -93,7 +93,6 @@ void HeaderString::append(const char* data, uint32_t size) {
     type_ = Type::Dynamic;
     const uint64_t new_capacity = newCapacity(string_length_, size);
     if (new_capacity > MinDynamicCapacity) {
-      // TODO(alyssawilk) unit test.
       validateCapacity(new_capacity);
       dynamic_capacity_ = new_capacity;
     } else {

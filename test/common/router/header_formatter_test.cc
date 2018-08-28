@@ -177,8 +177,8 @@ TEST_F(RequestInfoHeaderFormatterTest, UserDefinedHeadersConsideredHarmful) {
 
   Http::TestHeaderMapImpl header_map{{":method", "POST"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  EXPECT_DEATH(req_header_parser->evaluateHeaders(header_map, request_info),
-               "Trying to allocate overly large headers.");
+  EXPECT_DEATH_LOG_TO_STDERR(req_header_parser->evaluateHeaders(header_map, request_info),
+                             "Trying to allocate overly large headers.");
 }
 
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMissingHost) {
