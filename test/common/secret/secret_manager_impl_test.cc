@@ -122,9 +122,8 @@ TEST_F(SecretManagerImplTest, DuplicateStaticCertificateValidationContextSecret)
 
   ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
 
-  EXPECT_THROW_WITH_MESSAGE(
-      secret_manager->findStaticCertificateValidationContextProvider(secret_config), EnvoyException,
-      "Duplicate static CertificateValidationContext secret name abc.com");
+  EXPECT_THROW_WITH_MESSAGE(secret_manager->addStaticSecret(secret_config), EnvoyException,
+                            "Duplicate static CertificateValidationContext secret name abc.com");
 }
 
 TEST_F(SecretManagerImplTest, NotImplementedException) {
