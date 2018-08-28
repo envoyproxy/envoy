@@ -208,7 +208,7 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
     for (auto watch : api_state_[type_url].watches_) {
       // onConfigUpdate should be called in all cases for single watch xDS (Cluster and Listener)
       // even if the message does not have resources so that update_empty stat is properly
-      // incremented.
+      // incremented and state-of-the-world semantics are maintained.
       if (watch->resources_.empty()) {
         watch->callbacks_.onConfigUpdate(message->resources(), message->version_info());
         continue;
