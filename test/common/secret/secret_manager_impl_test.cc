@@ -17,7 +17,7 @@ namespace {
 
 class SecretManagerImplTest : public testing::Test {};
 
-TEST_F(SecretManagerImplTest, SecretLoadSuccess) {
+TEST_F(SecretManagerImplTest, TlsCertificateSecretLoadSuccess) {
   envoy::api::v2::auth::Secret secret_config;
 
   std::string yaml =
@@ -48,6 +48,81 @@ tls_certificate:
   const std::string key_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
             secret_manager->findStaticTlsCertificateProvider("abc.com")->secret()->privateKey());
+}
+
+TEST_F(SecretManagerImplTest, DuplicateStaticTlsCertificateSecret) {
+  envoy::api::v2::auth::Secret secret_config;
+
+  std::string yaml =
+      R"EOF(
+    name: "abc.com"
+    tls_certificate:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+    )EOF";
+
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+
+  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
+
+  secret_manager->addStaticSecret(secret_config);
+
+  ASSERT_NE(secret_manager->findStaticTlsCertificateProvider("abc.com"), nullptr);
+
+  EXPECT_THROW_WITH_MESSAGE(secret_manager->addStaticSecret(secret_config), EnvoyException,
+                            "Duplicate static TlsCertificate secret name abc.com");
+}
+
+TEST_F(SecretManagerImplTest, CertificateValidationContextSecretLoadSuccess) {
+  envoy::api::v2::auth::Secret secret_config;
+
+  std::string yaml =
+      R"EOF(
+      name: "abc.com"
+      validation_context:
+        trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+        allow_expired_certificate: true
+      )EOF";
+
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+
+  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
+
+  secret_manager->addStaticSecret(secret_config);
+
+  ASSERT_EQ(secret_manager->findStaticCertificateValidationContextProvider("undefined"), nullptr);
+
+  ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
+
+  const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
+            secret_manager->findStaticCertificateValidationContextProvider("abc.com")->caCert());
+}
+
+TEST_F(SecretManagerImplTest, DuplicateStaticCertificateValidationContextSecret) {
+  envoy::api::v2::auth::Secret secret_config;
+
+  std::string yaml =
+      R"EOF(
+    name: "abc.com"
+    validation_context:
+      trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+      allow_expired_certificate: true
+    )EOF";
+
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), secret_config);
+
+  std::unique_ptr<SecretManager> secret_manager(new SecretManagerImpl());
+
+  secret_manager->addStaticSecret(secret_config);
+
+  ASSERT_NE(secret_manager->findStaticCertificateValidationContextProvider("abc.com"), nullptr);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      secret_manager->findStaticCertificateValidationContextProvider(secret_config), EnvoyException,
+      "Duplicate static CertificateValidationContext secret name abc.com");
 }
 
 TEST_F(SecretManagerImplTest, NotImplementedException) {
