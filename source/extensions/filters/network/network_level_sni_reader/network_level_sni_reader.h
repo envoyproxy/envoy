@@ -6,6 +6,8 @@
 #include "common/common/logger.h"
 #include "common/ssl/utility.h"
 
+#include "extensions/filters/listener/tls_inspector/tls_inspector.h"
+
 #include "openssl/bytestring.h"
 #include "openssl/ssl.h"
 
@@ -21,14 +23,15 @@ class Config {
 public:
   Config(Stats::Scope& scope, uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
 
-  const Ssl::Utility::TlsStats& stats() const { return stats_; }
+  const Extensions::ListenerFilters::TlsInspector::TlsStats& stats() const { return stats_; }
   bssl::UniquePtr<SSL> newSsl();
   uint32_t maxClientHelloSize() const { return max_client_hello_size_; }
 
+  // TODO: extract the following to common
   static constexpr size_t TLS_MAX_CLIENT_HELLO = 64 * 1024;
 
 private:
-  Ssl::Utility::TlsStats stats_;
+  Extensions::ListenerFilters::TlsInspector::TlsStats stats_;
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   const uint32_t max_client_hello_size_;
 };

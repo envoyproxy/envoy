@@ -62,9 +62,10 @@ Network::FilterStatus NetworkLevelSniReaderFilter::onData(Buffer::Instance& data
       (data.length() < Config::TLS_MAX_CLIENT_HELLO) ? data.length() : Config::TLS_MAX_CLIENT_HELLO;
   data.copyOut(0, len, buf_);
 
-  Ssl::Utility::parseClientHello(buf_, len, ssl_, read_, config_->maxClientHelloSize(),
-                                 config_->stats(), [&](bool success) -> void { done(success); },
-                                 alpn_found_, clienthello_success_, []() -> void {});
+  Extensions::ListenerFilters::TlsInspector::Filter::parseClientHello(
+      buf_, len, ssl_, read_, config_->maxClientHelloSize(), config_->stats(),
+      [&](bool success) -> void { done(success); }, alpn_found_, clienthello_success_,
+      []() -> void {});
   return done_ ? Network::FilterStatus::Continue : Network::FilterStatus::StopIteration;
 }
 
@@ -82,8 +83,8 @@ void NetworkLevelSniReaderFilter::onServername(absl::string_view name) {
 
 void NetworkLevelSniReaderFilter::done(bool success) {
   ENVOY_LOG(trace, "network level sni reader: done: {}", success);
+  done_ = true;
   if (success) {
-    done_ = true;
     read_callbacks_->continueReading();
   }
 }

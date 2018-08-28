@@ -19,7 +19,7 @@ envoy_cc_library(
         "//include/envoy/network:filter_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/common/ssl:utility_lib",
+        "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
     ],
 )
 
@@ -30,6 +30,7 @@ envoy_cc_library(
         ":network_level_sni_reader",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "//source/extensions/filters/network:well_known_names",
     ],
 )

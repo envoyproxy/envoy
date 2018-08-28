@@ -69,11 +69,12 @@ public:
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
 
+  static void parseClientHello(const void* data, size_t len, bssl::UniquePtr<SSL>& ssl,
+                               uint64_t read, uint32_t maxClientHelloSize, const TlsStats& stats,
+                               std::function<void(bool)> done, bool& alpn_found,
+                               bool& clienthello_success, std::function<void()> onSuccess);
+
 private:
-  void parseClientHello(const void* data, size_t len, bssl::UniquePtr<SSL>& ssl, uint64_t read,
-                        uint32_t maxClientHelloSize, const TlsStats& stats,
-                        std::function<void(bool)> done, bool& alpn_found, bool& clienthello_success,
-                        std::function<void()> onSuccess);
   void onRead();
   void onTimeout();
   void done(bool success);

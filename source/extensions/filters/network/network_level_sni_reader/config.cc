@@ -1,6 +1,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
+#include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 #include "extensions/filters/network/network_level_sni_reader/network_level_sni_reader.h"
 #include "extensions/filters/network/well_known_names.h"
 
