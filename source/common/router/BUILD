@@ -225,11 +225,22 @@ envoy_cc_library(
     hdrs = ["header_formatter.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        "//include/envoy/request_info:filter_state_interface",
+        "//include/envoy/request_info:request_info_interface",
+        "//include/envoy/router:string_accessor_interface",
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "string_accessor_lib",
+    hdrs = ["string_accessor_impl.h"],
+    deps = [
+        "//include/envoy/router:string_accessor_interface",
     ],
 )

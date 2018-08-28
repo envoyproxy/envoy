@@ -2,12 +2,14 @@
 #include <functional>
 
 #include "envoy/http/protocol.h"
+#include "envoy/request_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
 
 #include "common/common/fmt.h"
 #include "common/protobuf/utility.h"
 #include "common/request_info/request_info_impl.h"
 
+#include "test/common/request_info/test_int_accessor.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
@@ -140,6 +142,9 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
     NiceMock<Router::MockRouteEntry> route_entry;
     request_info.route_entry_ = &route_entry;
     EXPECT_EQ(&route_entry, request_info.routeEntry());
+
+    request_info.perRequestState().setData("test", std::make_unique<TestIntAccessor>(1));
+    EXPECT_EQ(1, request_info.perRequestState().getData<TestIntAccessor>("test").access());
 
     EXPECT_EQ("", request_info.requestedServerName());
     absl::string_view sni_name = "stubserver.org";

@@ -6,6 +6,7 @@
 #include "envoy/request_info/request_info.h"
 
 #include "common/common/assert.h"
+#include "common/request_info/filter_state_impl.h"
 
 namespace Envoy {
 namespace RequestInfo {
@@ -178,6 +179,9 @@ struct RequestInfoImpl : public RequestInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
+  FilterState& perRequestState() override { return per_request_state_; }
+  const FilterState& perRequestState() const override { return per_request_state_; }
+
   void setRequestedServerName(absl::string_view requested_server_name) override {
     requested_server_name_ = std::string(requested_server_name);
   }
@@ -203,6 +207,7 @@ struct RequestInfoImpl : public RequestInfo {
   bool hc_request_{};
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
+  FilterStateImpl per_request_state_{};
 
 private:
   uint64_t bytes_received_{};
