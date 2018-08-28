@@ -13,6 +13,11 @@ namespace ThriftProxy {
 class ThriftConnectionState : public Tcp::ConnectionPool::ConnectionState {
 public:
   /**
+   * @return int32_t the next Thrift sequence id to use for this connection.
+   */
+  int32_t nextSequenceId() { return next_sequence_id_++; }
+
+  /**
    * @return true if this upgrade has been attempted on this connection.
    */
   bool upgradeAttempted() const { return upgrade_attempted_; }
@@ -38,6 +43,7 @@ public:
   }
 
 private:
+  int32_t next_sequence_id_{0};
   bool upgrade_attempted_{false};
   bool upgraded_{false};
 };
