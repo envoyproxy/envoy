@@ -104,6 +104,8 @@ public:
 
     initializeMetadata(msg_type);
 
+    EXPECT_CALL(callbacks_, downstreamTransportType()).WillOnce(Return(TransportType::Framed));
+    EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Binary));
     EXPECT_EQ(ThriftFilters::FilterStatus::StopIteration, router_->messageBegin(metadata_));
 
     NiceMock<Network::MockClientConnection> connection;
@@ -122,12 +124,8 @@ public:
           upstream_callbacks_ = &cb;
         }));
 
-    EXPECT_CALL(callbacks_, downstreamTransportType()).WillOnce(Return(TransportType::Framed));
-    transport_ = new NiceMock<MockTransport>();
-    ON_CALL(*transport_, type()).WillByDefault(Return(TransportType::Framed));
-
-    EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Binary));
     protocol_ = new NiceMock<MockProtocol>();
+
     ON_CALL(*protocol_, type()).WillByDefault(Return(ProtocolType::Binary));
     EXPECT_CALL(*protocol_, writeMessageBegin(_, _))
         .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
@@ -166,9 +164,6 @@ public:
     EXPECT_EQ(nullptr, router_->downstreamHeaders());
 
     EXPECT_CALL(callbacks_, downstreamTransportType()).WillOnce(Return(TransportType::Framed));
-    transport_ = new NiceMock<MockTransport>();
-    ON_CALL(*transport_, type()).WillByDefault(Return(TransportType::Framed));
-
     EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Binary));
     protocol_ = new NiceMock<MockProtocol>();
     ON_CALL(*protocol_, type()).WillByDefault(Return(ProtocolType::Binary));
@@ -245,6 +240,8 @@ public:
   }
 
   void completeRequest() {
+    transport_ = new NiceMock<MockTransport>();
+
     EXPECT_CALL(*protocol_, writeMessageEnd(_));
     EXPECT_CALL(*transport_, encodeFrame(_, _, _));
     EXPECT_CALL(upstream_connection_, write(_, false));
@@ -960,6 +957,225 @@ routes:
       parseRouteConfigurationFromV2Yaml(yaml);
 
   EXPECT_THROW(new RouteMatcher(config), EnvoyException);
+}
+
+TEST(RouteMatcherTest, RouteByExactHeaderMatcher) {
+  const std::string yaml = R"EOF(
+name: config
+routes:
+  - match:
+      method_name: "method1"
+      headers:
+      - name: "x-header-1"
+        exact_match: "x-value-1"
+    route:
+      cluster: "cluster1"
+)EOF";
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+
+  RouteMatcher matcher(config);
+  MessageMetadata metadata;
+  RouteConstSharedPtr route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+
+  metadata.setMethodName("method1");
+  route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+
+  metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "x-value-1");
+  route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
+}
+
+TEST(RouteMatcherTest, RouteByRegexHeaderMatcher) {
+  const std::string yaml = R"EOF(
+name: config
+routes:
+  - match:
+      method_name: "method1"
+      headers:
+      - name: "x-version"
+        regex_match: "0.[5-9]"
+    route:
+      cluster: "cluster1"
+)EOF";
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+
+  RouteMatcher matcher(config);
+  MessageMetadata metadata;
+  RouteConstSharedPtr route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+
+  metadata.setMethodName("method1");
+  route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+
+  metadata.headers().addCopy(Http::LowerCaseString("x-version"), "0.1");
+  route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+  metadata.headers().remove(Http::LowerCaseString("x-version"));
+
+  metadata.headers().addCopy(Http::LowerCaseString("x-version"), "0.8");
+  route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
+}
+
+TEST(RouteMatcherTest, RouteByRangeHeaderMatcher) {
+  const std::string yaml = R"EOF(
+name: config
+routes:
+  - match:
+      method_name: "method1"
+      headers:
+      - name: "x-user-id"
+        range_match:
+          start: 100
+          end: 200
+    route:
+      cluster: "cluster1"
+)EOF";
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+
+  RouteMatcher matcher(config);
+  MessageMetadata metadata;
+  RouteConstSharedPtr route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+
+  metadata.setMethodName("method1");
+  route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+
+  metadata.headers().addCopy(Http::LowerCaseString("x-user-id"), "50");
+  route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+  metadata.headers().remove(Http::LowerCaseString("x-user-id"));
+
+  metadata.headers().addCopy(Http::LowerCaseString("x-user-id"), "199");
+  route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
+}
+
+TEST(RouteMatcherTest, RouteByPresentHeaderMatcher) {
+  const std::string yaml = R"EOF(
+name: config
+routes:
+  - match:
+      method_name: "method1"
+      headers:
+      - name: "x-user-id"
+        present_match: true
+    route:
+      cluster: "cluster1"
+)EOF";
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+
+  RouteMatcher matcher(config);
+  MessageMetadata metadata;
+  RouteConstSharedPtr route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+
+  metadata.setMethodName("method1");
+  route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+
+  metadata.headers().addCopy(Http::LowerCaseString("x-user-id"), "50");
+  route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
+  metadata.headers().remove(Http::LowerCaseString("x-user-id"));
+
+  metadata.headers().addCopy(Http::LowerCaseString("x-user-id"), "");
+  route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
+}
+
+TEST(RouteMatcherTest, RouteByPrefixHeaderMatcher) {
+  const std::string yaml = R"EOF(
+name: config
+routes:
+  - match:
+      method_name: "method1"
+      headers:
+      - name: "x-header-1"
+        prefix_match: "user_id:"
+    route:
+      cluster: "cluster1"
+)EOF";
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+
+  RouteMatcher matcher(config);
+  MessageMetadata metadata;
+  RouteConstSharedPtr route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+
+  metadata.setMethodName("method1");
+  route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+
+  metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "500");
+  route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+  metadata.headers().remove(Http::LowerCaseString("x-header-1"));
+
+  metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "user_id:500");
+  route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
+}
+
+TEST(RouteMatcherTest, RouteBySuffixHeaderMatcher) {
+  const std::string yaml = R"EOF(
+name: config
+routes:
+  - match:
+      method_name: "method1"
+      headers:
+      - name: "x-header-1"
+        suffix_match: "asdf"
+    route:
+      cluster: "cluster1"
+)EOF";
+
+  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+
+  RouteMatcher matcher(config);
+  MessageMetadata metadata;
+  RouteConstSharedPtr route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+
+  metadata.setMethodName("method1");
+  route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+
+  metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "asdfvalue");
+  route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+  metadata.headers().remove(Http::LowerCaseString("x-header-1"));
+
+  metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "valueasdfvalue");
+  route = matcher.route(metadata);
+  EXPECT_EQ(nullptr, route);
+  metadata.headers().remove(Http::LowerCaseString("x-header-1"));
+
+  metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "value:asdf");
+  route = matcher.route(metadata);
+  EXPECT_NE(nullptr, route);
+  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
 
 } // namespace Router

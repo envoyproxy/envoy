@@ -184,6 +184,9 @@ message ResponseFlags {
 
   // Indicates if the request was deemed unauthorized and the reason for it.
   Unauthorized unauthorized_details = 13;
+
+  // Indicates that the request was rejected because there was an error in rate limit service.
+  bool rate_limit_service_error = 14;
 }
 
 // [#not-implemented-hide:]

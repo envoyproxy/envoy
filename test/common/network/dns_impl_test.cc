@@ -25,6 +25,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "ares.h"
@@ -319,15 +320,21 @@ private:
   DnsResolverImpl* resolver_;
 };
 
-TEST(DnsImplConstructor, SupportsCustomResolvers) {
-  Event::DispatcherImpl dispatcher;
+class DnsImplConstructor : public testing::Test {
+protected:
+  DnsImplConstructor() : dispatcher_(test_time_.timeSource()) {}
+  DangerousDeprecatedTestTime test_time_;
+  Event::DispatcherImpl dispatcher_;
+};
+
+TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   char addr4str[INET_ADDRSTRLEN];
   // we pick a port that isn't 53 as the default resolve.conf might be
   // set to point to localhost.
   auto addr4 = Network::Utility::parseInternetAddressAndPort("127.0.0.1:54");
   char addr6str[INET6_ADDRSTRLEN];
   auto addr6 = Network::Utility::parseInternetAddressAndPort("[::1]:54");
-  auto resolver = dispatcher.createDnsResolver({addr4, addr6});
+  auto resolver = dispatcher_.createDnsResolver({addr4, addr6});
   auto peer = std::unique_ptr<DnsResolverImplPeer>{
       new DnsResolverImplPeer(dynamic_cast<DnsResolverImpl*>(resolver.get()))};
   ares_addr_port_node* resolvers;
@@ -369,11 +376,10 @@ private:
   Address::Ipv4Instance instance_;
 };
 
-TEST(DnsImplConstructor, SupportCustomAddressInstances) {
-  Event::DispatcherImpl dispatcher;
+TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
   auto test_instance(std::make_shared<CustomInstance>("127.0.0.1", 45));
   EXPECT_EQ(test_instance->asString(), "127.0.0.1:borked_port_45");
-  auto resolver = dispatcher.createDnsResolver({test_instance});
+  auto resolver = dispatcher_.createDnsResolver({test_instance});
   auto peer = std::unique_ptr<DnsResolverImplPeer>{
       new DnsResolverImplPeer(dynamic_cast<DnsResolverImpl*>(resolver.get()))};
   ares_addr_port_node* resolvers;
@@ -386,17 +392,18 @@ TEST(DnsImplConstructor, SupportCustomAddressInstances) {
   ares_free_data(resolvers);
 }
 
-TEST(DnsImplConstructor, BadCustomResolvers) {
-  Event::DispatcherImpl dispatcher;
+TEST_F(DnsImplConstructor, BadCustomResolvers) {
   envoy::api::v2::core::Address pipe_address;
   pipe_address.mutable_pipe()->set_path("foo");
   auto pipe_instance = Network::Utility::protobufAddressToAddress(pipe_address);
-  EXPECT_THROW_WITH_MESSAGE(dispatcher.createDnsResolver({pipe_instance}), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(dispatcher_.createDnsResolver({pipe_instance}), EnvoyException,
                             "DNS resolver 'foo' is not an IP address");
 }
 
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
+  DnsImplTest() : dispatcher_(test_time_.timeSource()) {}
+
   void SetUp() override {
     resolver_ = dispatcher_.createDnsResolver({});
 
@@ -427,6 +434,7 @@ protected:
   Network::TcpListenSocketPtr socket_;
   Stats::IsolatedStoreImpl stats_store_;
   std::unique_ptr<Network::Listener> listener_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   DnsResolverSharedPtr resolver_;
 };

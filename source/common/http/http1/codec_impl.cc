@@ -244,11 +244,10 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
   if (!method || !path) {
     throw CodecClientException(":method and :path must be specified");
   }
-
   if (method->value() == Headers::get().MethodValues.Head.c_str()) {
     head_request_ = true;
   }
-
+  connection_.onEncodeHeaders(headers);
   connection_.reserveBuffer(std::max(4096U, path->value().size() + 4096));
   connection_.copyToBuffer(method->value().c_str(), method->value().size());
   connection_.addCharToBuffer(' ');
@@ -685,9 +684,10 @@ StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& response_decoder) 
   return *request_encoder_;
 }
 
-void ClientConnectionImpl::onEncodeComplete() {
-  // Transfer head request state into the pending response before we reuse the encoder.
-  pending_responses_.back().head_request_ = request_encoder_->headRequest();
+void ClientConnectionImpl::onEncodeHeaders(const HeaderMap& headers) {
+  if (headers.Method()->value() == Headers::get().MethodValues.Head.c_str()) {
+    pending_responses_.back().head_request_ = true;
+  }
 }
 
 int ClientConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {

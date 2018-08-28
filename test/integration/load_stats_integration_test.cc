@@ -164,6 +164,9 @@ public:
       return;
     } else if (loadstats_request.cluster_stats_size() == 0) {
       loadstats_request.CopyFrom(local_loadstats_request);
+      ASSERT_TRUE(loadstats_request.has_node());
+      ASSERT_FALSE(loadstats_request.node().id().empty());
+      ASSERT_FALSE(loadstats_request.node().cluster().empty());
       return;
     }
 

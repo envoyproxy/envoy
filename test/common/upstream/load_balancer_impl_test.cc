@@ -18,6 +18,7 @@
 using testing::ElementsAre;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
@@ -48,6 +49,10 @@ public:
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config) {}
   using LoadBalancerBase::chooseHostSet;
   using LoadBalancerBase::percentageLoad;
+
+  HostConstSharedPtr chooseHostOnce(LoadBalancerContext*) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 };
 
 class LoadBalancerBaseTest : public LoadBalancerTestBase {
@@ -82,14 +87,17 @@ INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, LoadBalancerBaseTest, ::testing::Valu
 
 // Basic test of host set selection.
 TEST_P(LoadBalancerBaseTest, PrioritySelection) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
   updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 1, 0);
 
+  PriorityLoad priority_load = {100, 0};
+  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
   // With both the primary and failover hosts unhealthy, we should select an
   // unhealthy primary host.
   EXPECT_EQ(100, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(1));
-  EXPECT_EQ(&host_set_, &lb_.chooseHostSet());
+  EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context));
 
   // Update the priority set with a new priority level P=2 and ensure the host
   // is chosen
@@ -98,7 +106,8 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   EXPECT_EQ(0, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(1));
   EXPECT_EQ(100, lb_.percentageLoad(2));
-  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet());
+  priority_load = {0, 0, 100};
+  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context));
 
   // Now add a healthy host in P=0 and make sure it is immediately selected.
   updateHostSet(host_set_, 1 /* num_hosts */, 1 /* num_healthy_hosts */);
@@ -106,13 +115,30 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   host_set_.runCallbacks({}, {});
   EXPECT_EQ(100, lb_.percentageLoad(0));
   EXPECT_EQ(0, lb_.percentageLoad(2));
-  EXPECT_EQ(&host_set_, &lb_.chooseHostSet());
+  priority_load = {100, 0, 0};
+  EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context));
 
   // Remove the healthy host and ensure we fail back over to tertiary_host_set_
   updateHostSet(host_set_, 1 /* num_hosts */, 0 /* num_healthy_hosts */);
   EXPECT_EQ(0, lb_.percentageLoad(0));
   EXPECT_EQ(100, lb_.percentageLoad(2));
-  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet());
+  priority_load = {0, 0, 100};
+  EXPECT_EQ(&tertiary_host_set_, &lb_.chooseHostSet(&context));
+}
+
+// Test of host set selection with priority filter
+TEST_P(LoadBalancerBaseTest, PrioritySelectionWithFilter) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+
+  PriorityLoad priority_load = {0, 100};
+  // return a filter that excludes priority 0
+  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillOnce(ReturnRef(priority_load));
+
+  updateHostSet(host_set_, 1 /* num_hosts */, 1 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 1, 1);
+
+  // Since we've excluded P0, we should pick the failover host set
+  EXPECT_EQ(failover_host_set_.priority(), lb_.chooseHostSet(&context).priority());
 }
 
 TEST_P(LoadBalancerBaseTest, OverProvisioningFactor) {
@@ -494,6 +520,50 @@ TEST_P(RoundRobinLoadBalancerTest, MaxUnhealthyPanic) {
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr));
 
   EXPECT_EQ(3UL, stats_.lb_healthy_panic_.value());
+}
+
+// Test of host set selection with host filter
+TEST_P(RoundRobinLoadBalancerTest, HostSelectionWithFilter) {
+  NiceMock<Upstream::MockLoadBalancerContext> context;
+
+  HostVectorSharedPtr hosts(new HostVector(
+      {makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81")}));
+  HostsPerLocalitySharedPtr hosts_per_locality = makeHostsPerLocality(
+      {{makeTestHost(info_, "tcp://127.0.0.1:80")}, {makeTestHost(info_, "tcp://127.0.0.1:81")}});
+
+  hostSet().hosts_ = *hosts;
+  hostSet().healthy_hosts_ = *hosts;
+  hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
+
+  init(false);
+
+  // return a predicate that only accepts the first host
+  EXPECT_CALL(context, shouldSelectAnotherHost(_))
+      .WillRepeatedly(Invoke([&](const Host& host) -> bool {
+        return host.address()->asString() != hostSet().hosts_[0]->address()->asString();
+      }));
+  PriorityLoad priority_load;
+
+  if (GetParam()) {
+    priority_load = {100, 0};
+  } else {
+    priority_load = {0, 100};
+  }
+  EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
+  EXPECT_CALL(context, hostSelectionRetryCount()).WillRepeatedly(Return(2));
+
+  // Calling chooseHost multiple times always returns host one, since the filter will reject
+  // the other host.
+  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context));
+  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context));
+  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context));
+
+  // By setting the retry counter to zero, we effectively disable the filter.
+  EXPECT_CALL(context, hostSelectionRetryCount()).WillRepeatedly(Return(0));
+
+  EXPECT_EQ(hostSet().hosts_[1], lb_->chooseHost(&context));
+  EXPECT_EQ(hostSet().hosts_[0], lb_->chooseHost(&context));
+  EXPECT_EQ(hostSet().hosts_[1], lb_->chooseHost(&context));
 }
 
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareSmallCluster) {

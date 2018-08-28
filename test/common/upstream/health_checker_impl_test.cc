@@ -1022,6 +1022,8 @@ TEST_F(HttpHealthCheckerImplTest, HttpFail) {
       Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
 
+  EXPECT_EQ(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->getActiveHealthFailureType(),
+            Host::ActiveHealthFailureType::UNHEALTHY);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
   expectStreamCreate(0);
   test_sessions_[0]->interval_timer_->callback_();
@@ -1107,6 +1109,9 @@ TEST_F(HttpHealthCheckerImplTest, Timeout) {
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+
+  EXPECT_EQ(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->getActiveHealthFailureType(),
+            Host::ActiveHealthFailureType::TIMEOUT);
 }
 
 TEST_F(HttpHealthCheckerImplTest, DynamicAddAndRemove) {
@@ -1822,6 +1827,33 @@ TEST_F(TcpHealthCheckerImplTest, DataWithoutReusingConnection) {
   EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
 }
 
+// Tests an unsuccessful healthcheck, where the endpoint sends wrong data
+TEST_F(TcpHealthCheckerImplTest, WrongData) {
+  InSequence s;
+
+  setupDataDontReuseConnection();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectClientCreate();
+  EXPECT_CALL(*connection_, write(_, _)).Times(1);
+  EXPECT_CALL(*timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  connection_->raiseEvent(Network::ConnectionEvent::Connected);
+
+  // Not the expected response
+  Buffer::OwnedImpl response;
+  add_uint8(response, 3);
+  read_filter_->onData(response, false);
+
+  // These are the expected metric results after testing.
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.success").value());
+  // TODO(lilika): This should indicate a failure
+  EXPECT_EQ(0UL, cluster_->info_->stats_store_.counter("health_check.failure").value());
+  EXPECT_EQ(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->getActiveHealthFailureType(),
+            Host::ActiveHealthFailureType::UNHEALTHY);
+}
 TEST_F(TcpHealthCheckerImplTest, Timeout) {
   InSequence s;
 
@@ -1847,6 +1879,8 @@ TEST_F(TcpHealthCheckerImplTest, Timeout) {
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_));
   timeout_timer_->callback_();
+  EXPECT_EQ(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->getActiveHealthFailureType(),
+            Host::ActiveHealthFailureType::TIMEOUT);
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
 
   expectClientCreate();

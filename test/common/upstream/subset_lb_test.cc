@@ -87,7 +87,7 @@ private:
   std::vector<Router::MetadataMatchCriterionConstSharedPtr> matches_;
 };
 
-class TestLoadBalancerContext : public LoadBalancerContext {
+class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
   TestLoadBalancerContext(
       std::initializer_list<std::map<std::string, std::string>::value_type> metadata_matches)

@@ -532,17 +532,70 @@ TEST_P(AdminInstanceTest, ConfigDump) {
     return msg;
   });
   const std::string expected_json = R"EOF({
- "configs": {
-  "foo": {
+ "configs": [
+  {
    "@type": "type.googleapis.com/google.protobuf.StringValue",
    "value": "bar"
   }
- }
+ ]
 }
 )EOF";
   EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
   std::string output = response.toString();
   EXPECT_EQ(expected_json, output);
+}
+
+TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
+  // Add configs in random order and validate config_dump dumps in the order.
+  auto bootstrap_entry = admin_.getConfigTracker().add("bootstrap", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("bootstrap_config");
+    return msg;
+  });
+  auto route_entry = admin_.getConfigTracker().add("routes", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("routes_config");
+    return msg;
+  });
+  auto listener_entry = admin_.getConfigTracker().add("listeners", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("listeners_config");
+    return msg;
+  });
+  auto cluster_entry = admin_.getConfigTracker().add("clusters", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("clusters_config");
+    return msg;
+  });
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "bootstrap_config"
+  },
+  {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "clusters_config"
+  },
+  {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "listeners_config"
+  },
+  {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "routes_config"
+  }
+ ]
+}
+)EOF";
+  // Run it multiple times and validate that order is preserved.
+  for (size_t i = 0; i < 5; i++) {
+    Buffer::OwnedImpl response;
+    Http::HeaderMapImpl header_map;
+    EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
+    const std::string output = response.toString();
+    EXPECT_EQ(expected_json, output);
+  }
 }
 
 TEST_P(AdminInstanceTest, Runtime) {

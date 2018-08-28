@@ -184,7 +184,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
   // For base ID, scale what the user inputs by 10 so that we have spread for domain sockets.
   base_id_ = base_id.getValue() * 10;
-  concurrency_ = concurrency.getValue();
+  concurrency_ = std::max(1U, concurrency.getValue());
   config_path_ = config_path.getValue();
   config_yaml_ = config_yaml.getValue();
   v2_config_only_ = !allow_v1_config.getValue();

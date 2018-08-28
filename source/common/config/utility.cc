@@ -69,7 +69,9 @@ void Utility::checkLocalInfo(const std::string& error_prefix,
                              const LocalInfo::LocalInfo& local_info) {
   if (local_info.clusterName().empty() || local_info.nodeName().empty()) {
     throw EnvoyException(
-        fmt::format("{}: setting --service-cluster and --service-node is required", error_prefix));
+        fmt::format("{}: node 'id' and 'cluster' are required. Set it either in 'node' config or "
+                    "via --service-node and --service-cluster options.",
+                    error_prefix, local_info.node().DebugString()));
   }
 }
 

@@ -389,13 +389,11 @@ Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& re
 Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& response_headers,
                                         Buffer::Instance& response, AdminStream&) const {
   envoy::admin::v2alpha::ConfigDump dump;
-  auto& config_dump_map = *(dump.mutable_configs());
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     RELEASE_ASSERT(message, "");
-    ProtobufWkt::Any any_message;
+    auto& any_message = *(dump.add_configs());
     any_message.PackFrom(*message);
-    config_dump_map[key_callback_pair.first] = any_message;
   }
 
   response_headers.insertContentType().value().setReference(
@@ -855,8 +853,8 @@ void AdminFilter::onComplete() {
   }
 }
 
-AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider()
-    : config_(new Router::NullConfigImpl()) {}
+AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
+    : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
 AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& profile_path,
                      const std::string& address_out_path,
@@ -867,6 +865,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
+      route_config_provider_(server.timeSource()),
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
           {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false, false},

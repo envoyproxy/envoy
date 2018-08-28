@@ -154,6 +154,7 @@ envoy_cc_test(
         "//source/common/upstream:load_stats_reporter_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",

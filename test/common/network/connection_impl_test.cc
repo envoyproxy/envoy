@@ -20,6 +20,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -76,7 +77,8 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplDeathTest,
                         TestUtility::ipTestParamsToString);
 
 TEST_P(ConnectionImplDeathTest, BadFd) {
-  Event::DispatcherImpl dispatcher;
+  MockTimeSource time_source;
+  Event::DispatcherImpl dispatcher(time_source);
   EXPECT_DEATH_LOG_TO_STDERR(
       ConnectionImpl(dispatcher, std::make_unique<ConnectionSocketImpl>(-1, nullptr, nullptr),
                      Network::Test::createRawBufferSocket(), false),
@@ -87,7 +89,7 @@ class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
   void setUpBasicConnection() {
     if (dispatcher_.get() == nullptr) {
-      dispatcher_.reset(new Event::DispatcherImpl);
+      dispatcher_.reset(new Event::DispatcherImpl(time_source_));
     }
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
@@ -149,7 +151,8 @@ public:
     ASSERT(dispatcher_.get() == nullptr);
 
     MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
-    dispatcher_.reset(new Event::DispatcherImpl(Buffer::WatermarkFactoryPtr{factory}));
+    dispatcher_.reset(
+        new Event::DispatcherImpl(time_source_, Buffer::WatermarkFactoryPtr{factory}));
     // The first call to create a client session will get a MockBuffer.
     // Other calls for server sessions will by default get a normal OwnedImpl.
     EXPECT_CALL(*factory, create_(_, _))
@@ -166,6 +169,7 @@ public:
   }
 
 protected:
+  MockTimeSource time_source_;
   Event::DispatcherPtr dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), nullptr, true};
@@ -229,7 +233,7 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
 }
 
 TEST_P(ConnectionImplTest, ImmediateConnectError) {
-  dispatcher_.reset(new Event::DispatcherImpl);
+  dispatcher_.reset(new Event::DispatcherImpl(time_source_));
 
   // Using a broadcast/multicast address as the connection destiantion address causes an
   // immediate error return from connect().
@@ -801,7 +805,7 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
     source_address_ = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv6Instance(address_string, 0)};
   }
-  dispatcher_.reset(new Event::DispatcherImpl);
+  dispatcher_.reset(new Event::DispatcherImpl(time_source_));
   listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
   client_connection_ = dispatcher_->createClientConnection(
@@ -1195,7 +1199,7 @@ class ReadBufferLimitTest : public ConnectionImplTest {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
     const uint32_t buffer_size = 256 * 1024;
-    dispatcher_.reset(new Event::DispatcherImpl);
+    dispatcher_.reset(new Event::DispatcherImpl(time_source_));
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
     client_connection_ = dispatcher_->createClientConnection(
@@ -1264,13 +1268,17 @@ TEST_P(ReadBufferLimitTest, SomeLimit) {
   readBufferLimitTest(read_buffer_limit, read_buffer_limit - 1 + 16384);
 }
 
-class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {};
+class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
+protected:
+  TcpClientConnectionImplTest() : dispatcher_(time_source_) {}
+  MockTimeSource time_source_;
+  Event::DispatcherImpl dispatcher_;
+};
 INSTANTIATE_TEST_CASE_P(IpVersions, TcpClientConnectionImplTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
 TEST_P(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
-  Event::DispatcherImpl dispatcher;
   Address::InstanceConstSharedPtr address;
   if (GetParam() == Network::Address::IpVersion::v4) {
     // Connecting to 255.255.255.255 will cause a perm error and not ECONNREFUSED which is a
@@ -1281,25 +1289,52 @@ TEST_P(TcpClientConnectionImplTest, BadConnectNotConnRefused) {
     address = Utility::resolveUrl("tcp://[ff00::]:1");
   }
   ClientConnectionPtr connection =
-      dispatcher.createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                        Network::Test::createRawBufferSocket(), nullptr);
+      dispatcher_.createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                         Network::Test::createRawBufferSocket(), nullptr);
   connection->connect();
   connection->noDelay(true);
   connection->close(ConnectionCloseType::NoFlush);
-  dispatcher.run(Event::Dispatcher::RunType::Block);
+  dispatcher_.run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
-  Event::DispatcherImpl dispatcher;
   // Connecting to an invalid port on localhost will cause ECONNREFUSED which is a different code
   // path from other errors. Test this also.
-  ClientConnectionPtr connection = dispatcher.createClientConnection(
+  ClientConnectionPtr connection = dispatcher_.createClientConnection(
       Utility::resolveUrl(
           fmt::format("tcp://{}:1", Network::Test::getLoopbackAddressUrlString(GetParam()))),
       Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr);
   connection->connect();
   connection->noDelay(true);
-  dispatcher.run(Event::Dispatcher::RunType::Block);
+  dispatcher_.run(Event::Dispatcher::RunType::Block);
+}
+
+class PipeClientConnectionImplTest : public testing::Test {
+protected:
+  PipeClientConnectionImplTest() : dispatcher_(time_source_) {}
+  MockTimeSource time_source_;
+  Event::DispatcherImpl dispatcher_;
+  const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};
+};
+
+// Validate we skip setting socket options on UDS.
+TEST_F(PipeClientConnectionImplTest, SkipSocketOptions) {
+  auto option = std::make_shared<MockSocketOption>();
+  EXPECT_CALL(*option, setOption(_, _)).Times(0);
+  auto options = std::make_shared<Socket::Options>();
+  options->emplace_back(option);
+  ClientConnectionPtr connection = dispatcher_.createClientConnection(
+      Utility::resolveUrl("unix://" + path_), Network::Address::InstanceConstSharedPtr(),
+      Network::Test::createRawBufferSocket(), options);
+  connection->close(ConnectionCloseType::NoFlush);
+}
+
+// Validate we skip setting source address.
+TEST_F(PipeClientConnectionImplTest, SkipSourceAddress) {
+  ClientConnectionPtr connection = dispatcher_.createClientConnection(
+      Utility::resolveUrl("unix://" + path_), Utility::resolveUrl("tcp://1.2.3.4:5"),
+      Network::Test::createRawBufferSocket(), nullptr);
+  connection->close(ConnectionCloseType::NoFlush);
 }
 
 } // namespace Network

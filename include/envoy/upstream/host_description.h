@@ -108,6 +108,11 @@ public:
    * @return the address used to health check the host.
    */
   virtual Network::Address::InstanceConstSharedPtr healthCheckAddress() const PURE;
+
+  /**
+   * Set the address used to health check the host.
+   */
+  virtual void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr) PURE;
 };
 
 typedef std::shared_ptr<const HostDescription> HostDescriptionConstSharedPtr;

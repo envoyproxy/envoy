@@ -14,7 +14,7 @@ envoy_cc_library(
     srcs = ["ratelimit_impl.cc"],
     hdrs = ["ratelimit_impl.h"],
     deps = [
-        ":ratelimit_proto",
+        ":ratelimit_proto_cc",
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/grpc:async_client_manager_interface",
         "//include/envoy/ratelimit:ratelimit_interface",

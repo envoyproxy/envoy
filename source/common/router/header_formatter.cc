@@ -11,6 +11,7 @@
 #include "common/json/json_loader.h"
 #include "common/request_info/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -143,9 +144,13 @@ RequestInfoHeaderFormatter::RequestInfoHeaderFormatter(absl::string_view field_n
     }
     field_extractor_ = [this, pattern](const Envoy::RequestInfo::RequestInfo& request_info) {
       const auto& formatters = start_time_formatters_.at(pattern);
-      ASSERT(formatters.size() == 1);
       Http::HeaderMapImpl empty_map;
-      return formatters.at(0)->format(empty_map, empty_map, empty_map, request_info);
+      std::string formatted;
+      for (const auto& formatter : formatters) {
+        absl::StrAppend(&formatted,
+                        formatter->format(empty_map, empty_map, empty_map, request_info));
+      }
+      return formatted;
     };
   } else if (field_name.find("UPSTREAM_METADATA") == 0) {
     field_extractor_ =

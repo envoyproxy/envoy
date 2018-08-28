@@ -13,8 +13,6 @@ envoy_package()
 envoy_proto_library(
     name = "codec_impl_fuzz_proto",
     srcs = ["codec_impl_fuzz.proto"],
-    external_deps = ["well_known_protos"],
-    generate_python = 0,
     deps = ["//test/fuzz:common_proto"],
 )
 
@@ -23,7 +21,7 @@ envoy_cc_fuzz_test(
     srcs = ["codec_impl_fuzz_test.cc"],
     corpus = "codec_impl_corpus",
     deps = [
-        ":codec_impl_fuzz_proto",
+        ":codec_impl_fuzz_proto_cc",
         "//source/common/http:header_map_lib",
         "//source/common/http/http2:codec_lib",
         "//test/fuzz:utility_lib",
@@ -65,5 +63,6 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:test_time_lib",
     ],
 )

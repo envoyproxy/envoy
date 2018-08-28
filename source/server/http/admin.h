@@ -133,16 +133,15 @@ private:
    * Implementation of RouteConfigProvider that returns a static null route config.
    */
   struct NullRouteConfigProvider : public Router::RouteConfigProvider {
-    NullRouteConfigProvider();
+    NullRouteConfigProvider(TimeSource& time_source);
 
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return config_; }
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
-    SystemTime lastUpdated() const override {
-      return ProdSystemTimeSource::instance_.currentTime();
-    }
+    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
 
     Router::ConfigConstSharedPtr config_;
+    TimeSource& time_source_;
   };
 
   friend class AdminStatsTest;

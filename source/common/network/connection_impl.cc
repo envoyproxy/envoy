@@ -542,28 +542,32 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::ConnectionSocket::OptionsSharedPtr& options)
     : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
                      std::move(transport_socket), false) {
-  if (!Network::Socket::applyOptions(options, *socket_,
-                                     envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
-    // Set a special error state to ensure asynchronous close to give the owner of the
-    // ConnectionImpl a chance to add callbacks and detect the "disconnect".
-    immediate_error_event_ = ConnectionEvent::LocalClose;
-    // Trigger a write event to close this connection out-of-band.
-    file_event_->activate(Event::FileReadyType::Write);
-    return;
-  }
-
-  if (source_address != nullptr) {
-    const Api::SysCallIntResult result = source_address->bind(fd());
-    if (result.rc_ < 0) {
-      ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
-                     strerror(result.errno_));
-      bind_error_ = true;
+  // There are no meaningful socket options or source address semantics for
+  // non-IP sockets, so skip.
+  if (remote_address->ip() != nullptr) {
+    if (!Network::Socket::applyOptions(options, *socket_,
+                                       envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect".
       immediate_error_event_ = ConnectionEvent::LocalClose;
-
       // Trigger a write event to close this connection out-of-band.
       file_event_->activate(Event::FileReadyType::Write);
+      return;
+    }
+
+    if (source_address != nullptr) {
+      const Api::SysCallIntResult result = source_address->bind(fd());
+      if (result.rc_ < 0) {
+        ENVOY_LOG_MISC(debug, "Bind failure. Failed to bind to {}: {}", source_address->asString(),
+                       strerror(result.errno_));
+        bind_error_ = true;
+        // Set a special error state to ensure asynchronous close to give the owner of the
+        // ConnectionImpl a chance to add callbacks and detect the "disconnect".
+        immediate_error_event_ = ConnectionEvent::LocalClose;
+
+        // Trigger a write event to close this connection out-of-band.
+        file_event_->activate(Event::FileReadyType::Write);
+      }
     }
   }
 }
