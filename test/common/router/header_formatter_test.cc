@@ -159,7 +159,10 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"list_key\"])", "");
 }
 
-TEST_F(RequestInfoHeaderFormatterTest, UserDefinedHeadersConsideredHarmful) {
+// Breaks tsan/asan builds by trying to allocate a lot of memory.
+// Works on debug builds and needs to be fixed. See
+// https://github.com/envoyproxy/envoy/issues/4268
+TEST_F(RequestInfoHeaderFormatterTest, DISABLED_UserDefinedHeadersConsideredHarmful) {
   // This must be an inline header to get the append-in-place semantics.
   const char* header_name = "connection";
   Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
