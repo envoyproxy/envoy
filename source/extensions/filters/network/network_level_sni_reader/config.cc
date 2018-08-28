@@ -20,20 +20,13 @@ public:
   Network::FilterFactoryCb
   createFilterFactory(const Json::Object&,
                       Server::Configuration::FactoryContext& context) override {
-    // TODO: call createFilterFactoryFromProto and remove duplicate code
-    ConfigSharedPtr filter_config(new Config(context.scope()));
-    return [filter_config](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<NetworkLevelSniReaderFilter>(filter_config));
-    };
+    return createFilterFactoryFromContext(context);
   }
 
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext& context) override {
-    ConfigSharedPtr filter_config(new Config(context.scope()));
-    return [filter_config](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<NetworkLevelSniReaderFilter>(filter_config));
-    };
+    return createFilterFactoryFromContext(context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
@@ -41,6 +34,15 @@ public:
   }
 
   std::string name() override { return NetworkFilterNames::get().NetworkLevelSniReader; }
+
+private:
+  Network::FilterFactoryCb
+  createFilterFactoryFromContext(Server::Configuration::FactoryContext& context) {
+    ConfigSharedPtr filter_config(new Config(context.scope()));
+    return [filter_config](Network::FilterManager& filter_manager) -> void {
+      filter_manager.addReadFilter(std::make_shared<NetworkLevelSniReaderFilter>(filter_config));
+    };
+  }
 };
 
 /**
