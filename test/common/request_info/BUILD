@@ -22,7 +22,7 @@ envoy_cc_test(
     name = "request_info_impl_test",
     srcs = ["request_info_impl_test.cc"],
     deps = [
-        ":test_int_accessor_interface",
+        ":test_int_accessor_lib",
         "//include/envoy/http:protocol_interface",
         "//include/envoy/upstream:host_description_interface",
         "//source/common/request_info:request_info_lib",
@@ -32,7 +32,7 @@ envoy_cc_test(
 )
 
 envoy_cc_test_library(
-    name = "test_int_accessor_interface",
+    name = "test_int_accessor_lib",
     hdrs = ["test_int_accessor.h"],
     deps = [
         "//include/envoy/request_info:filter_state_interface",
