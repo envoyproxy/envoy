@@ -6,6 +6,7 @@
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 
+#include "extensions/filters/http/jwt_authn/filter_config.h"
 #include "extensions/filters/http/jwt_authn/matcher.h"
 
 namespace Envoy {
@@ -15,10 +16,10 @@ namespace JwtAuthn {
 
 // The Envoy filter to process JWT auth.
 class Filter : public Http::StreamDecoderFilter,
-               public Verifier::Callbacks,
+               public VerifierCallbacks,
                public Logger::Loggable<Logger::Id::filter> {
 public:
-  Filter(JwtAuthnFilterStats& stats, std::vector<MatcherConstSharedPtr> rule_matchers);
+  Filter(FilterConfigSharedPtr config);
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -30,9 +31,9 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
 private:
-  // the function for Authenticator::Callbacks interface.
+  // the function for VerifierCallbacks interface.
   // It will be called when its verify() call is completed.
-  void onComplete(const ::google::jwt_verify::Status& status) override;
+  void onComplete(const ::google::jwt_verify::Status& status, VerifyContext& context) override;
 
   // The callback funcion.
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
@@ -43,7 +44,10 @@ private:
   State state_ = Init;
   // Mark if request has been stopped.
   bool stopped_ = false;
-  std::vector<MatcherConstSharedPtr> rule_matchers_;
+  // Filter config object.
+  FilterConfigSharedPtr config_;
+  // Verify context for current.
+  VerifyContextPtr context_;
 };
 
 } // namespace JwtAuthn

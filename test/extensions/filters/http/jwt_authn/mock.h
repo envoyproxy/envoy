@@ -7,15 +7,22 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-class MockAuthenticatorCallbacks : public Authenticator::Callbacks {
+class MockAuthFactory : public AuthFactory {
 public:
-  MOCK_METHOD1(onComplete, void(const ::google::jwt_verify::Status& status));
+  MOCK_CONST_METHOD3(create, AuthenticatorPtr(const std::vector<std::string>&,
+                                              const absl::optional<std::string>&, bool));
 };
 
 class MockAuthenticator : public Authenticator {
 public:
-  MOCK_METHOD4(verify, void(const ExtractParam* e_params, const absl::optional<std::string>& issuer,
-                            Http::HeaderMap& headers, Authenticator::Callbacks* callback));
+  MOCK_METHOD3(doVerify, void(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>* tokens,
+                              std::function<void(const ::google::jwt_verify::Status&)>* callback));
+
+  void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
+              std::function<void(const ::google::jwt_verify::Status&)>&& callback) {
+    doVerify(headers, &tokens, &callback);
+  }
+
   MOCK_METHOD0(onDestroy, void());
   MOCK_CONST_METHOD1(sanitizePayloadHeaders, void(Http::HeaderMap& headers));
 };

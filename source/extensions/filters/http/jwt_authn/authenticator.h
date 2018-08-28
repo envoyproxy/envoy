@@ -1,6 +1,9 @@
 #pragma once
 
-#include "extensions/filters/http/jwt_authn/filter_config.h"
+#include "envoy/server/filter_config.h"
+
+#include "extensions/filters/http/jwt_authn/extractor.h"
+#include "extensions/filters/http/jwt_authn/jwks_cache.h"
 
 #include "jwt_verify_lib/status.h"
 
@@ -20,16 +23,11 @@ class Authenticator {
 public:
   virtual ~Authenticator() {}
 
-  // The callback interface to notify the completion event.
-  class Callbacks {
-  public:
-    virtual ~Callbacks() {}
-    virtual void onComplete(const ::google::jwt_verify::Status& status) PURE;
-  };
   // Verify if headers satisfyies the JWT requirements. Can be limited to single provider with
   // extract_param.
-  virtual void verify(const ExtractParam* extract_param, const absl::optional<std::string>& issuer,
-                      Http::HeaderMap& headers, Callbacks* callback) PURE;
+  virtual void
+  verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
+         std::function<void(const ::google::jwt_verify::Status& status)>&& callback) PURE;
 
   // Called when the object is about to be destroyed.
   virtual void onDestroy() PURE;
@@ -38,8 +36,13 @@ public:
   virtual void sanitizePayloadHeaders(Http::HeaderMap& headers) const PURE;
 
   // Authenticator factory function.
-  static AuthenticatorPtr create(const std::vector<std::string>& audiences,
-                                 FilterConfigSharedPtr config);
+  static AuthenticatorPtr
+  create(const std::vector<std::string>& audiences, const absl::optional<std::string>& issuer,
+         bool allow_failed,
+         const Protobuf::Map<ProtobufTypes::String,
+                             ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider>&
+             providers,
+         JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager);
 };
 
 } // namespace JwtAuthn

@@ -8,6 +8,7 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/logger.h"
+#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -34,16 +35,6 @@ public:
 
   // Remove the token from the headers
   virtual void removeJwt(Http::HeaderMap& headers) const PURE;
-};
-
-/**
- * Struct to hold data that limits the location to extract from.
- */
-struct ExtractParam {
-  // header keys to extract from. (header name + value prefix)
-  std::unordered_set<std::string> header_keys_;
-  // param keys to extract from. (param name)
-  std::unordered_set<std::string> param_keys_;
 };
 
 typedef std::unique_ptr<const JwtLocation> JwtLocationConstPtr;
@@ -80,11 +71,9 @@ public:
    * is not empty only those in the matching locations wil be returned.
    *
    * @param headers is the HTTP request headers.
-   * @param extract_param used to limit tokens returned by header or param location.
    * @return list of extracted Jwt location info.
    */
-  virtual std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers,
-                                                   const ExtractParam* extract_param) const PURE;
+  virtual std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers) const PURE;
 
   /**
    * Create an instance of Extractor for a given config.
@@ -93,6 +82,17 @@ public:
    */
   static ExtractorConstPtr
   create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config);
+  /**
+   * Create an instance of Extractor for a given config.
+   * @param from_headers header location config.
+   * @param from_params query param location config.
+   * @return the extractor object.
+   */
+  static ExtractorConstPtr
+  create(const std::string& issuer,
+         const Protobuf::RepeatedPtrField<
+             ::envoy::config::filter::http::jwt_authn::v2alpha::JwtHeader>& from_headers,
+         const Protobuf::RepeatedPtrField<ProtobufTypes::String>& from_params);
 };
 
 } // namespace JwtAuthn

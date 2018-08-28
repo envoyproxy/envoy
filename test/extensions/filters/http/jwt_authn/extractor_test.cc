@@ -5,6 +5,7 @@
 #include "test/test_common/utility.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
+using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtHeader;
 using ::Envoy::Http::TestHeaderMapImpl;
 
 using ::testing::_;
@@ -61,28 +62,28 @@ public:
 // Test not token in the request headers
 TEST_F(ExtractorTest, TestNoToken) {
   auto headers = TestHeaderMapImpl{};
-  auto tokens = extractor_->extract(headers, nullptr);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 0);
 }
 
 // Test the token in the wrong header.
 TEST_F(ExtractorTest, TestWrongHeaderToken) {
   auto headers = TestHeaderMapImpl{{"wrong-token-header", "jwt_token"}};
-  auto tokens = extractor_->extract(headers, nullptr);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 0);
 }
 
 // Test the token in the wrong query parameter.
 TEST_F(ExtractorTest, TestWrongParamToken) {
   auto headers = TestHeaderMapImpl{{":path", "/path?wrong_token=jwt_token"}};
-  auto tokens = extractor_->extract(headers, nullptr);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 0);
 }
 
 // Test extracting token from the default header location: "Authorization"
 TEST_F(ExtractorTest, TestDefaultHeaderLocation) {
   auto headers = TestHeaderMapImpl{{"Authorization", "Bearer jwt_token"}};
-  auto tokens = extractor_->extract(headers, nullptr);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 1);
 
   // Only the issue1 is using default header location.
@@ -104,7 +105,7 @@ TEST_F(ExtractorTest, TestDefaultHeaderLocation) {
 // Test extracting token from the default query parameter: "access_token"
 TEST_F(ExtractorTest, TestDefaultParamLocation) {
   auto headers = TestHeaderMapImpl{{":path", "/path?access_token=jwt_token"}};
-  auto tokens = extractor_->extract(headers, nullptr);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 1);
 
   // Only the issue1 is using default header location.
@@ -124,7 +125,7 @@ TEST_F(ExtractorTest, TestDefaultParamLocation) {
 // Test extracting token from the custom header: "token-header"
 TEST_F(ExtractorTest, TestCustomHeaderToken) {
   auto headers = TestHeaderMapImpl{{"token-header", "jwt_token"}};
-  auto tokens = extractor_->extract(headers, nullptr);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 1);
 
   // Only issuer2 and issuer4 are using "token-header" location
@@ -147,7 +148,7 @@ TEST_F(ExtractorTest, TestCustomHeaderToken) {
 // value prefix doesn't match. It has to be eitehr "AAA" or "AAABBB".
 TEST_F(ExtractorTest, TestPrefixHeaderNotMatch) {
   auto headers = TestHeaderMapImpl{{"prefix-header", "jwt_token"}};
-  auto tokens = extractor_->extract(headers, nullptr);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 0);
 }
 
@@ -155,7 +156,7 @@ TEST_F(ExtractorTest, TestPrefixHeaderNotMatch) {
 // The value matches both prefix values: "AAA" or "AAABBB".
 TEST_F(ExtractorTest, TestPrefixHeaderMatch) {
   auto headers = TestHeaderMapImpl{{"prefix-header", "AAABBBjwt_token"}};
-  auto tokens = extractor_->extract(headers, nullptr);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 2);
 
   // Match issuer 5 with map key as: prefix-header + AAA
@@ -174,7 +175,7 @@ TEST_F(ExtractorTest, TestPrefixHeaderMatch) {
 // Test extracting token from the custom query parameter: "token_param"
 TEST_F(ExtractorTest, TestCustomParamToken) {
   auto headers = TestHeaderMapImpl{{":path", "/path?token_param=jwt_token"}};
-  auto tokens = extractor_->extract(headers, nullptr);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 1);
 
   // Both issuer3 and issuer4 have specified this custom query location.
@@ -198,7 +199,7 @@ TEST_F(ExtractorTest, TestMultipleTokens) {
       {"authorization", "Bearer token1"},
       {"prefix-header", "AAAtoken5"},
   };
-  auto tokens = extractor_->extract(headers, nullptr);
+  auto tokens = extractor_->extract(headers);
   EXPECT_EQ(tokens.size(), 5);
 
   EXPECT_EQ(tokens[0]->token(), "token1"); // from authorization
@@ -216,15 +217,23 @@ TEST_F(ExtractorTest, TestExtractParam) {
       {"authorization", "Bearer token1"},
       {"prefix-header", "AAAtoken5"},
   };
-  ExtractParam param;
-  auto tokens = extractor_->extract(headers, &param);
-  EXPECT_EQ(tokens.size(), 0);
-  param.header_keys_.insert("authorizationBearer ");
-  param.param_keys_.insert("access_token");
-  tokens = extractor_->extract(headers, &param);
+  Protobuf::RepeatedPtrField<JwtHeader> from_headers;
+
+  Protobuf::RepeatedPtrField<ProtobufTypes::String> from_params;
+  auto extractor = Extractor::create(std::string("foo"), from_headers, from_params);
+  auto tokens = extractor->extract(headers);
   EXPECT_EQ(tokens.size(), 2);
   EXPECT_EQ(tokens[0]->token(), "token1");
   EXPECT_EQ(tokens[1]->token(), "token4");
+  auto header = from_headers.Add();
+  header->set_name("prefix-header");
+  header->set_value_prefix("AAA");
+  from_params.Add("token_param");
+  extractor = Extractor::create(std::string("foo"), from_headers, from_params);
+  tokens = extractor->extract(headers);
+  EXPECT_EQ(tokens.size(), 2);
+  EXPECT_EQ(tokens[0]->token(), "token5");
+  EXPECT_EQ(tokens[1]->token(), "token3");
 }
 
 } // namespace

@@ -48,7 +48,7 @@ public:
          const Protobuf::Map<ProtobufTypes::String,
                              ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider>&
              providers,
-         const AuthFactory& factory);
+         const AuthFactory& factory, const Extractor& extractor);
 };
 
 } // namespace JwtAuthn

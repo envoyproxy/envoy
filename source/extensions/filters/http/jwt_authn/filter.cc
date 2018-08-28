@@ -9,13 +9,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-Filter::Filter(JwtAuthnFilterStats& stats, std::vector<MatcherConstSharedPtr> rule_matchers)
-    : stats_(stats), rule_matchers_(rule_matchers) {}
+Filter::Filter(FilterConfigSharedPtr config) : stats_(config->stats()), config_(config) {}
 
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
-  for (const auto& it : rule_matchers_) {
-    it->verifier()->close();
+  if (context_) {
+    context_->cancel();
   }
 }
 
@@ -24,19 +23,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
 
   state_ = Calling;
   stopped_ = false;
-
   // Verify the JWT token, onComplete() will be called when completed.
-  bool found = false;
-  for (const auto& matcher : rule_matchers_) {
-    if (matcher->matches(headers)) {
-      found = true;
-      matcher->verifier()->verify(headers, *this);
-      break;
-    }
+  auto matcher = config_->findVerifier(headers);
+  context_ = VerifyContext::create(headers, this);
+  if (!matcher) {
+    onComplete(Status::Ok, *context_);
+  } else {
+    matcher->verifier()->verify(*context_);
   }
-  if (!found) {
-    onComplete(Status::Ok);
-  }
+
   if (state_ == Complete) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -45,7 +40,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-void Filter::onComplete(const Status& status) {
+void Filter::onComplete(const Status& status, VerifyContext&) {
   ENVOY_LOG(debug, "Called Filter : check complete {}", int(status));
   // This stream has been reset, abort the callback.
   if (state_ == Responded) {

@@ -45,20 +45,8 @@ FilterFactory::createFilterFactoryFromProtoTyped(const JwtAuthentication& proto_
                                                  Server::Configuration::FactoryContext& context) {
   validateJwtConfig(proto_config);
   auto filter_config = std::make_shared<FilterConfig>(proto_config, prefix, context);
-
-  auto factory = [filter_config](const std::vector<std::string>& audiences) -> AuthenticatorPtr {
-    return Authenticator::create(audiences, filter_config);
-  };
-
-  std::vector<MatcherConstSharedPtr> rule_matchers;
-  for (const auto& it : filter_config->getProtoConfig().rules()) {
-    rule_matchers.push_back(
-        Matcher::create(it, filter_config->getProtoConfig().providers(), factory));
-  }
-
-  return [filter_config, rule_matchers](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamDecoderFilter(
-        std::make_shared<Filter>(filter_config->stats(), rule_matchers));
+  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamDecoderFilter(std::make_shared<Filter>(filter_config));
   };
 }
 
