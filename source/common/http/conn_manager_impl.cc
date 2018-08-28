@@ -379,6 +379,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
         [this]() -> void { onIdleTimeout(); });
     resetIdleTimer();
   }
+  request_info_.setRequestedServerName(
+      connection_manager_.read_callbacks_->connection().requestedServerName());
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
