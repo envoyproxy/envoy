@@ -100,6 +100,16 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 }
 
 void Filter::onALPN(const unsigned char* data, unsigned int len) {
+  doOnALPN(data, len,
+           [&](std::vector<absl::string_view> protocols) {
+             cb_->socket().setRequestedApplicationProtocols(protocols);
+           },
+           alpn_found_);
+}
+
+void Filter::doOnALPN(const unsigned char* data, unsigned int len,
+                      std::function<void(std::vector<absl::string_view> protocols)> onAlpnCb,
+                      bool& alpn_found) {
   CBS wire, list;
   CBS_init(&wire, reinterpret_cast<const uint8_t*>(data), static_cast<size_t>(len));
   if (!CBS_get_u16_length_prefixed(&wire, &list) || CBS_len(&wire) != 0 || CBS_len(&list) < 2) {
@@ -115,18 +125,27 @@ void Filter::onALPN(const unsigned char* data, unsigned int len) {
     }
     protocols.emplace_back(reinterpret_cast<const char*>(CBS_data(&name)), CBS_len(&name));
   }
-  cb_->socket().setRequestedApplicationProtocols(protocols);
-  alpn_found_ = true;
+  onAlpnCb(protocols);
+  alpn_found = true;
 }
 
-void Filter::onServername(absl::string_view name) {
+void Filter::onServername(absl::string_view servername) {
+  doOnServername(
+      servername, config_->stats(),
+      [&](absl::string_view name) -> void { cb_->socket().setRequestedServerName(name); },
+      clienthello_success_);
+}
+
+void Filter::doOnServername(absl::string_view name, const TlsStats& stats,
+                            std::function<void(absl::string_view name)> onServernameCb,
+                            bool& clienthello_success) {
   if (!name.empty()) {
-    config_->stats().sni_found_.inc();
-    cb_->socket().setRequestedServerName(name);
+    stats.sni_found_.inc();
+    onServernameCb(name);
   } else {
-    config_->stats().sni_not_found_.inc();
+    stats.sni_not_found_.inc();
   }
-  clienthello_success_ = true;
+  clienthello_success = true;
 }
 
 void Filter::onRead() {

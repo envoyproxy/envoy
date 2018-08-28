@@ -73,6 +73,12 @@ public:
                                uint64_t read, uint32_t maxClientHelloSize, const TlsStats& stats,
                                std::function<void(bool)> done, bool& alpn_found,
                                bool& clienthello_success, std::function<void()> onSuccess);
+  static void doOnServername(absl::string_view name, const TlsStats& stats,
+                             std::function<void(absl::string_view name)> onServernameCb,
+                             bool& clienthello_success_);
+  static void doOnALPN(const unsigned char* data, unsigned int len,
+                       std::function<void(std::vector<absl::string_view> protocols)> onAlpnCb,
+                       bool& alpn_found);
 
 private:
   void onRead();

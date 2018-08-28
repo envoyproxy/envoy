@@ -4,7 +4,6 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
-#include "common/ssl/utility.h"
 
 #include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 

@@ -69,16 +69,15 @@ Network::FilterStatus NetworkLevelSniReaderFilter::onData(Buffer::Instance& data
   return done_ ? Network::FilterStatus::Continue : Network::FilterStatus::StopIteration;
 }
 
-void NetworkLevelSniReaderFilter::onServername(absl::string_view name) {
+void NetworkLevelSniReaderFilter::onServername(absl::string_view servername) {
   ENVOY_CONN_LOG(debug, "network level sni reader: servername: {}", read_callbacks_->connection(),
-                 name);
-  if (!name.empty()) {
-    config_->stats().sni_found_.inc();
-    read_callbacks_->networkLevelRequestedServerName(name);
-  } else {
-    config_->stats().sni_not_found_.inc();
-  }
-  clienthello_success_ = true;
+                 servername);
+  Extensions::ListenerFilters::TlsInspector::Filter::doOnServername(
+      servername, config_->stats(),
+      [&](absl::string_view name) -> void {
+        read_callbacks_->networkLevelRequestedServerName(name);
+      },
+      clienthello_success_);
 }
 
 void NetworkLevelSniReaderFilter::done(bool success) {
