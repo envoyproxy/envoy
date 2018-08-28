@@ -17,13 +17,21 @@ namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
-    : cluster_name_(route.route().cluster()) {}
+    : cluster_name_(route.route().cluster()) {
+  for (const auto& header_map : route.match().headers()) {
+    config_headers_.push_back(header_map);
+  }
+}
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
 const RouteEntry* RouteEntryImplBase::routeEntry() const { return this; }
 
 RouteConstSharedPtr RouteEntryImplBase::clusterEntry() const { return shared_from_this(); }
+
+bool RouteEntryImplBase::headersMatch(const Http::HeaderMap& headers) const {
+  return Http::HeaderUtility::matchHeaders(headers, config_headers_);
+}
 
 MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
@@ -35,11 +43,13 @@ MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
 }
 
 RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
-  bool matches =
-      method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
+  if (RouteEntryImplBase::headersMatch(metadata.headers())) {
+    bool matches =
+        method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
 
-  if (matches ^ invert_) {
-    return clusterEntry();
+    if (matches ^ invert_) {
+      return clusterEntry();
+    }
   }
 
   return nullptr;
@@ -61,12 +71,14 @@ ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
 }
 
 RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
-  bool matches = service_name_.empty() ||
-                 (metadata.hasMethodName() &&
-                  StringUtil::startsWith(metadata.methodName().c_str(), service_name_));
+  if (RouteEntryImplBase::headersMatch(metadata.headers())) {
+    bool matches = service_name_.empty() ||
+                   (metadata.hasMethodName() &&
+                    StringUtil::startsWith(metadata.methodName().c_str(), service_name_));
 
-  if (matches ^ invert_) {
-    return clusterEntry();
+    if (matches ^ invert_) {
+      return clusterEntry();
+    }
   }
 
   return nullptr;

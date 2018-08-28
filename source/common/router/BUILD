@@ -214,6 +214,7 @@ envoy_cc_library(
         ":header_formatter_lib",
         "//include/envoy/http:header_map_interface",
         "//source/common/config:base_json_lib",
+        "//source/common/http:headers_lib",
         "//source/common/protobuf:utility_lib",
     ],
 )
