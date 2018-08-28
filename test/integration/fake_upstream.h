@@ -378,8 +378,7 @@ public:
 
 protected:
   FakeConnectionBase(SharedConnectionWrapper& shared_connection, Event::TimeSystem& time_system)
-      : shared_connection_(shared_connection),
-        time_system_(time_system) {}
+      : shared_connection_(shared_connection), time_system_(time_system) {}
 
   Common::CallbackHandle* disconnect_callback_handle_;
   SharedConnectionWrapper& shared_connection_;

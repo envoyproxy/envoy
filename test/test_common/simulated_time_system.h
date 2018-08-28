@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Event {
 
 class SimulatedTimeSystem : public TimeSystem {
- public:
+public:
   // TimeSystem
   TimerFactoryPtr createTimerFactory(Libevent::BasePtr&) override;
 

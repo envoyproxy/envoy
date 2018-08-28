@@ -27,6 +27,8 @@ REPOSITORIES_BZL = "bazel/repositories.bzl"
 # definitions for prod time, the construction of them in main(), and perf annotation.
 # For now it includes the validation server but that really should be injected too.
 REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
+                       './source/common/event/real_time_system.cc',
+                       './source/common/event/real_time_system.h',
                        './source/exe/main_common.cc',
                        './source/exe/main_common.h',
                        './source/server/config_validation/server.cc',
@@ -161,7 +163,7 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use <mutex> or <condition_variable*>, switch to "
                 "Thread::MutexBasicLockable in source/common/common/thread.h")
   if not whitelistedForRealTime(file_path):
-    if 'RealTimeSource' in line:
+    if 'RealTimeSource' in line or 'RealTimeSystem' in line:
       reportError("Don't reference real-time sources from production code; use injection")
 
 def checkBuildLine(line, file_path, reportError):

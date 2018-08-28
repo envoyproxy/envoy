@@ -428,9 +428,8 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
     if (new_connections_.empty()) {
       return AssertionFailure() << "Got a new connection event, but didn't create a connection.";
     }
-    connection =
-        std::make_unique<FakeHttpConnection>(consumeConnection(), stats_store_, http_type_,
-                                             time_system);
+    connection = std::make_unique<FakeHttpConnection>(consumeConnection(), stats_store_, http_type_,
+                                                      time_system);
   }
   VERIFY_ASSERTION(connection->initialize());
   VERIFY_ASSERTION(connection->readDisable(false));

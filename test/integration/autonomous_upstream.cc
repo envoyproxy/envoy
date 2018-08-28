@@ -60,9 +60,9 @@ void AutonomousStream::sendResponse() {
   encodeData(response_body_length, true);
 }
 
-AutonomousHttpConnection::AutonomousHttpConnection(
-    SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
-    AutonomousUpstream& upstream)
+AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shared_connection,
+                                                   Stats::Store& store, Type type,
+                                                   AutonomousUpstream& upstream)
     : FakeHttpConnection(shared_connection, store, type, upstream.timeSystem()),
       upstream_(upstream) {}
 
