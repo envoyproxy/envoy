@@ -61,9 +61,7 @@ public:
     ON_CALL(mock_cm.async_client_, send_(testing::_, testing::_, testing::_))
         .WillByDefault(testing::Invoke([request](Http::MessagePtr&, Http::AsyncClient::Callbacks&,
                                                  const absl::optional<std::chrono::milliseconds>&)
-                                           -> Http::AsyncClient::Request* {
-          return request;
-        }));
+                                           -> Http::AsyncClient::Request* { return request; }));
   }
 
 private:
