@@ -470,7 +470,7 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
     onConnectionSuccess();
 
     getRequestInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
-    ENVOY_LOG(debug, "TCP:onData(), requestedServerName: {} ",
+    ENVOY_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
               getRequestInfo().requestedServerName());
 
     if (config_->idleTimeout()) {
