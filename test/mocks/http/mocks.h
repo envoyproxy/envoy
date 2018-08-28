@@ -14,10 +14,6 @@
 #include "envoy/http/filter.h"
 #include "envoy/ssl/connection.h"
 
-#include "absl/strings/ascii.h"
-#include "absl/strings/str_cat.h"
-#include "absl/strings/str_join.h"
-
 #include "common/http/utility.h"
 
 #include "test/mocks/common.h"
@@ -28,6 +24,9 @@
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
 
+#include "absl/strings/ascii.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -457,41 +456,34 @@ public:
 
 } // namespace ConnectionPool
 
+class HeaderValueOfMatcher : public testing::MatcherInterface<const HeaderMap&> {
+public:
+  explicit HeaderValueOfMatcher(LowerCaseString key, testing::Matcher<absl::string_view> matcher)
+      : key_(std::move(key)), matcher_(std::move(matcher)) {}
+
+  bool MatchAndExplain(const HeaderMap& headers,
+                       testing::MatchResultListener* listener) const override;
+
+  void DescribeTo(std::ostream* os) const override;
+
+  void DescribeNegationTo(std::ostream* os) const override;
+
+private:
+  const LowerCaseString key_;
+  const testing::Matcher<absl::string_view> matcher_;
+};
+
 // Test that a HeaderMap argument contains exactly one header with the given
 // key, whose value satisfies the given expectation. The expectation can be a
 // matcher, or a string that the value should equal.
-MATCHER_P2(HeaderValueOf, key, expectation,
-           std::string(negation ? "doesn't have" : "has") + " a '" + std::string(key) +
-               "' header with value that " +
-               testing::DescribeMatcher<std::string>(expectation)) {
-  // Get all headers with matching keys.
-  std::vector<absl::string_view> values;
-  std::pair<std::string, std::vector<absl::string_view>*> context =
-      std::make_pair(absl::AsciiStrToLower(key), &values);
-  Envoy::Http::HeaderMap::ConstIterateCb get_headers_cb = [](const Envoy::Http::HeaderEntry& header,
-                                                             void* context) {
-    auto* typed_context =
-        static_cast<std::pair<std::string, std::vector<absl::string_view>*>*>(context);
-    if (header.key().getStringView() == typed_context->first) {
-      typed_context->second->push_back(header.value().getStringView());
-    }
-    return Envoy::Http::HeaderMap::Iterate::Continue;
-  };
-  arg.iterate(get_headers_cb, &context);
+template <typename T>
+testing::Matcher<const HeaderMap&> HeaderValueOf(LowerCaseString key, T matcher) {
+  return testing::MakeMatcher(
+      new HeaderValueOfMatcher(key, testing::SafeMatcherCast<absl::string_view>(matcher)));
+}
 
-  if (values.empty()) {
-    *result_listener << "which has no '" << key << "' header";
-    return false;
-  } else if (values.size() > 1) {
-    *result_listener << "which has " << absl::StrCat(values.size()) << " '"
-                     << key << "' headers, with values: "
-                     << absl::StrJoin(values, ", ");
-    return false;
-  }
-  absl::string_view value = values[0];
-  *result_listener << "which has a '" << key << "' header with value " << value
-                   << " ";
-  return testing::ExplainMatchResult(expectation, value, result_listener);
+template <typename T> testing::Matcher<const HeaderMap&> HeaderValueOf(std::string key, T matcher) {
+  return HeaderValueOf(LowerCaseString(key), matcher);
 }
 
 // Tests the provided Envoy HeaderMap for the provided HTTP status code.
@@ -525,9 +517,11 @@ MATCHER_P(HeaderMapEqualRef, rhs, "") {
 
 // Test that a HeaderMapPtr argument includes a given key-value pair, e.g.,
 //  HeaderHasValue("Upgrade", "WebSocket")
-testing::Matcher<const Http::HeaderMap*> HeaderHasValue(std::string key, std::string value);
+testing::Matcher<const Http::HeaderMap*> HeaderHasValue(const std::string& key,
+                                                        const std::string& value);
 
 // Like HeaderHasValue, but matches against a (const) HeaderMap& argument.
-testing::Matcher<const Http::HeaderMap&> HeaderHasValueRef(std::string key, std::string value);
+testing::Matcher<const Http::HeaderMap&> HeaderHasValueRef(const std::string& key,
+                                                           const std::string& value);
 
 } // namespace Envoy
