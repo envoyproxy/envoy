@@ -95,8 +95,8 @@ TEST_F(SecretManagerImplTest, SdsDynamicSecretUpdateSuccess) {
     EXPECT_CALL(secret_context, clusterManager()).WillOnce(ReturnRef(cluster_manager));
     EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
 
-    auto secret_provider =
-        secret_manager->findOrCreateDynamicSecretProvider(config_source, "abc.com", secret_context);
+    auto secret_provider = secret_manager->findOrCreateTlsCertificateProvider(
+        config_source, "abc.com", secret_context);
     std::string yaml =
         R"EOF(
 name: "abc.com"

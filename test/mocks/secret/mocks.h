@@ -22,7 +22,7 @@ public:
   MOCK_METHOD1(createInlineTlsCertificateProvider,
                TlsCertificateConfigProviderSharedPtr(
                    const envoy::api::v2::auth::TlsCertificate& tls_certificate));
-  MOCK_METHOD3(findOrCreateDynamicSecretProvider,
+  MOCK_METHOD3(findOrCreateTlsCertificateProvider,
                TlsCertificateConfigProviderSharedPtr(
                    const envoy::api::v2::core::ConfigSource&, const std::string&,
                    Server::Configuration::TransportSocketFactoryContext&));

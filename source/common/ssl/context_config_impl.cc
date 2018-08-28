@@ -38,7 +38,7 @@ Secret::TlsCertificateConfigProviderSharedPtr getTlsCertificateConfigProvider(
       }
       return secret_provider;
     } else {
-      return factory_context.secretManager().findOrCreateDynamicSecretProvider(
+      return factory_context.secretManager().findOrCreateTlsCertificateProvider(
           sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
     }
   }

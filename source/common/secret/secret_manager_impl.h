@@ -22,7 +22,7 @@ public:
   TlsCertificateConfigProviderSharedPtr createInlineTlsCertificateProvider(
       const envoy::api::v2::auth::TlsCertificate& tls_certificate) override;
 
-  TlsCertificateConfigProviderSharedPtr findOrCreateDynamicSecretProvider(
+  TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 

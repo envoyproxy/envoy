@@ -53,7 +53,7 @@ public:
    * secret provider.
    * @return TlsCertificateConfigProviderSharedPtr the dynamic TLS secret provider.
    */
-  virtual TlsCertificateConfigProviderSharedPtr findOrCreateDynamicSecretProvider(
+  virtual TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 };
