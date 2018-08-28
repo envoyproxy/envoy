@@ -17,6 +17,7 @@ namespace Fuzz {
 class PerTestEnvironment {
 public:
   PerTestEnvironment();
+  ~PerTestEnvironment();
 
   std::string temporaryPath(const std::string& path) const { return test_tmpdir_ + "/" + path; }
 

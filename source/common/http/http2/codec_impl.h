@@ -19,6 +19,7 @@
 #include "common/common/logger.h"
 #include "common/http/codec_helper.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/utility.h"
 
 #include "absl/types/optional.h"
 #include "nghttp2/nghttp2.h"
@@ -187,6 +188,13 @@ protected:
     // I don't fully understand.
     static const uint64_t MAX_HEADER_SIZE = 63 * 1024;
 
+    // Does any necessary WebSocket/Upgrade conversion, then passes the headers
+    // to the decoder_.
+    void decodeHeaders();
+
+    virtual void transformUpgradeFromH1toH2(HeaderMap& headers) PURE;
+    virtual void maybeTransformUpgradeFromH2ToH1() PURE;
+
     bool buffers_overrun() const { return read_disable_count_ > 0; }
 
     ConnectionImpl& parent_;
@@ -224,6 +232,16 @@ protected:
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
+    void transformUpgradeFromH1toH2(HeaderMap& headers) override {
+      upgrade_type_ = headers.Upgrade()->value().c_str();
+      Http::Utility::transformUpgradeRequestFromH1toH2(headers);
+    }
+    void maybeTransformUpgradeFromH2ToH1() override {
+      if (!upgrade_type_.empty() && headers_->Status()) {
+        Http::Utility::transformUpgradeResponseFromH2toH1(*headers_, upgrade_type_);
+      }
+    }
+    std::string upgrade_type_;
   };
 
   /**
@@ -235,6 +253,14 @@ protected:
     // StreamImpl
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
+    void transformUpgradeFromH1toH2(HeaderMap& headers) override {
+      Http::Utility::transformUpgradeResponseFromH1toH2(headers);
+    }
+    void maybeTransformUpgradeFromH2ToH1() override {
+      if (Http::Utility::isH2UpgradeRequest(*headers_)) {
+        Http::Utility::transformUpgradeRequestFromH2toH1(*headers_);
+      }
+    }
   };
 
   ConnectionImpl* base() { return this; }

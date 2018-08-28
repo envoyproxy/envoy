@@ -26,8 +26,6 @@ public:
   AsyncStream* start(const Protobuf::MethodDescriptor& service_method,
                      AsyncStreamCallbacks& callbacks) override;
 
-  TimeSource& timeSource() { return time_source_; }
-
 private:
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;

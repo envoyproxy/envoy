@@ -48,6 +48,8 @@ Version history
   <envoy_api_field_route.Route.request_headers_to_add>` with *authorization:
   token2* applied.
 * http: response filters not applied to early error paths such as http_parser generated 400s.
+* http: restrictions added to reject *:*-prefixed pseudo-headers in :ref:`custom
+  request headers <config_http_conn_man_headers_custom_request_headers>`.
 * http: :ref:`hpack_table_size <envoy_api_field_core.Http2ProtocolOptions.hpack_table_size>` now controls
   dynamic table size of both: encoder and decoder.
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using

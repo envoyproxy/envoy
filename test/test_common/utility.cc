@@ -43,6 +43,34 @@ TestRandomGenerator::TestRandomGenerator()
 
 uint64_t TestRandomGenerator::random() { return generator_(); }
 
+bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
+                                            const Http::HeaderMap& rhs) {
+  if (lhs.size() != rhs.size()) {
+    return false;
+  }
+
+  struct State {
+    const Http::HeaderMap& lhs;
+    bool equal;
+  };
+
+  State state{lhs, true};
+  rhs.iterate(
+      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+        State* state = static_cast<State*>(context);
+        const Http::HeaderEntry* entry =
+            state->lhs.get(Http::LowerCaseString(std::string(header.key().c_str())));
+        if (entry == nullptr || (entry->value() != header.value().c_str())) {
+          state->equal = false;
+          return Http::HeaderMap::Iterate::Break;
+        }
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      &state);
+
+  return state.equal;
+}
+
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
   if (lhs.length() != rhs.length()) {
     return false;

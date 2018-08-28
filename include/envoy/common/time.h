@@ -15,8 +15,10 @@ namespace Envoy {
 typedef std::chrono::time_point<std::chrono::system_clock> SystemTime;
 typedef std::chrono::time_point<std::chrono::steady_clock> MonotonicTime;
 
-// Captures a mechanism to measuring time, either monotonically or following the
-// system time, which can fluctuate.
+/**
+ * Captures a system-time source, capable of computing both monotonically increasing
+ * and real time.
+ */
 class TimeSource {
 public:
   virtual ~TimeSource() {}
@@ -25,7 +27,6 @@ public:
    * @return the current system time; not guaranteed to be monotonically increasing.
    */
   virtual SystemTime systemTime() PURE;
-
   /**
    * @return the current monotonic time.
    */
