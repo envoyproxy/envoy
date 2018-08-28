@@ -62,12 +62,11 @@ private:
       parent_.host_description_ = host;
     }
     absl::string_view networkLevelRequestedServerName() override {
-      // TODO: return an empty string and write a warning to log when inner SNI reader is not
-      // configured.
+      // TODO: write a warning to log when inner SNI reader is not set.
       return parent_.network_level_requested_server_name_;
     }
     void networkLevelRequestedServerName(absl::string_view name) override {
-      parent_.network_level_requested_server_name_ = name;
+      parent_.network_level_requested_server_name_ = std::string(name);
     }
 
     FilterManagerImpl& parent_;
@@ -81,7 +80,7 @@ private:
 
   Connection& connection_;
   BufferSource& buffer_source_;
-  absl::string_view network_level_requested_server_name_;
+  std::string network_level_requested_server_name_;
   Upstream::HostDescriptionConstSharedPtr host_description_;
   std::list<ActiveReadFilterPtr> upstream_filters_;
   std::list<WriteFilterSharedPtr> downstream_filters_;
