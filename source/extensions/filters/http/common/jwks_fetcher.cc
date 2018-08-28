@@ -31,9 +31,9 @@ public:
     }
   }
 
-  void fetch(const ::envoy::api::v2::core::HttpUri& uri, JwksFetcher::JwksReceiver* receiver) {
+  void fetch(const ::envoy::api::v2::core::HttpUri& uri, JwksFetcher::JwksReceiver& receiver) {
     ENVOY_LOG(trace, "{}", __func__);
-    receiver_ = receiver;
+    receiver_ = &receiver;
     uri_ = &uri;
     Http::MessagePtr message = Http::Utility::prepareHeaders(uri);
     message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
@@ -61,29 +61,29 @@ public:
           receiver_->onJwksSuccess(std::move(jwks));
         } else {
           ENVOY_LOG(debug, "{}: fetch pubkey [uri = {}]: invalid jwks", __func__, uri_->uri());
-          receiver_->onJwksError(JwksFetcher::JwksReceiver::Failure::invalid_jwks);
+          receiver_->onJwksError(JwksFetcher::JwksReceiver::Failure::InvalidJwks);
         }
       } else {
         ENVOY_LOG(debug, "{}: fetch pubkey [uri = {}]: body is empty", __func__, uri_->uri());
-        receiver_->onJwksError(JwksFetcher::JwksReceiver::Failure::network);
+        receiver_->onJwksError(JwksFetcher::JwksReceiver::Failure::Network);
       }
     } else {
       ENVOY_LOG(debug, "{}: fetch pubkey [uri = {}]: response status code {}", __func__,
                 uri_->uri(), status_code);
-      receiver_->onJwksError(JwksFetcher::JwksReceiver::Failure::network);
+      receiver_->onJwksError(JwksFetcher::JwksReceiver::Failure::Network);
     }
   }
 
   void onFailure(Http::AsyncClient::FailureReason reason) {
     ENVOY_LOG(debug, "{}: fetch pubkey [uri = {}]: network error {}", __func__, uri_->uri(),
               enumToInt(reason));
-    receiver_->onJwksError(JwksFetcher::JwksReceiver::Failure::network);
+    receiver_->onJwksError(JwksFetcher::JwksReceiver::Failure::Network);
   }
 };
 } // namespace
 
 JwksFetcherPtr JwksFetcher::create(Upstream::ClusterManager& cm) {
-  return JwksFetcherPtr(new JwksFetcherImpl(cm));
+  return std::make_unique<JwksFetcherImpl>(cm);
 }
 } // namespace Common
 } // namespace HttpFilters

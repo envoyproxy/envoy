@@ -62,8 +62,6 @@ public:
         .WillByDefault(testing::Invoke([request](Http::MessagePtr&, Http::AsyncClient::Callbacks&,
                                                  const absl::optional<std::chrono::milliseconds>&)
                                            -> Http::AsyncClient::Request* {
-          Http::MessagePtr response_message(
-              new Http::ResponseMessageImpl(Http::HeaderMapPtr{new Http::TestHeaderMapImpl{}}));
           return request;
         }));
   }
@@ -96,7 +94,7 @@ TEST_F(JwksFetcherTest, TestGetSuccess) {
   EXPECT_CALL(receiver, onJwksError(testing::_)).Times(0);
 
   // Act
-  fetcher->fetch(uri_, &receiver);
+  fetcher->fetch(uri_, receiver);
 }
 
 TEST_F(JwksFetcherTest, TestGet400) {
@@ -106,10 +104,10 @@ TEST_F(JwksFetcherTest, TestGet400) {
   std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
-  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::network)).Times(1);
+  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network)).Times(1);
 
   // Act
-  fetcher->fetch(uri_, &receiver);
+  fetcher->fetch(uri_, receiver);
 }
 
 TEST_F(JwksFetcherTest, TestGetNoBody) {
@@ -119,10 +117,10 @@ TEST_F(JwksFetcherTest, TestGetNoBody) {
   std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
-  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::network)).Times(1);
+  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network)).Times(1);
 
   // Act
-  fetcher->fetch(uri_, &receiver);
+  fetcher->fetch(uri_, receiver);
 }
 
 TEST_F(JwksFetcherTest, TestGetInvalidJwks) {
@@ -132,10 +130,10 @@ TEST_F(JwksFetcherTest, TestGetInvalidJwks) {
   std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
-  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::invalid_jwks)).Times(1);
+  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::InvalidJwks)).Times(1);
 
   // Act
-  fetcher->fetch(uri_, &receiver);
+  fetcher->fetch(uri_, receiver);
 }
 
 TEST_F(JwksFetcherTest, TestCancel) {
@@ -147,10 +145,10 @@ TEST_F(JwksFetcherTest, TestCancel) {
   EXPECT_TRUE(fetcher != nullptr);
   EXPECT_CALL(request, cancel()).Times(1);
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
-  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::invalid_jwks)).Times(0);
+  EXPECT_CALL(receiver, onJwksError(testing::_)).Times(0);
 
   // Act
-  fetcher->fetch(uri_, &receiver);
+  fetcher->fetch(uri_, receiver);
   // Proper cancel
   fetcher->cancel();
   // Re-entrant cancel

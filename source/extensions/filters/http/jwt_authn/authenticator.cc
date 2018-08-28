@@ -115,10 +115,14 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
   const auto unix_timestamp = std::chrono::duration_cast<std::chrono::seconds>(
                                   std::chrono::system_clock::now().time_since_epoch())
                                   .count();
+  // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
+  // to 0.
   if (jwt_.nbf_ > unix_timestamp) {
     doneWithStatus(Status::JwtNotYetValid);
     return;
   }
+  // If the exp claim does *not* appear in the JWT then the exp field is defaulted
+  // to 0.
   if (jwt_.exp_ && jwt_.exp_ < unix_timestamp) {
     doneWithStatus(Status::JwtExpired);
     return;
@@ -153,7 +157,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
   // of using the same jwks comes. The request 2 will trigger another remote fetching for the
   // jwks. This can be optimized; the same remote jwks fetching can be shared by two requrests.
   if (jwks_data_->getJwtProvider().has_remote_jwks()) {
-    fetcher_->fetch(jwks_data_->getJwtProvider().remote_jwks().http_uri(), this);
+    fetcher_->fetch(jwks_data_->getJwtProvider().remote_jwks().http_uri(), *this);
   } else {
     // No valid keys for this issuer. This may happen as a result of incorrect local
     // JWKS configuration.
