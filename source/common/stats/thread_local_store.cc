@@ -239,12 +239,14 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // if we don't have TLS initialized currently. The de-referenced pointer might be null if there
   // is no cache entry.
   CounterSharedPtr* tls_ref = nullptr;
+  Thread::ReleasableLockGuard lock(parent_.lock_);
   StatNamePtr stat_name_ptr = parent_.heap_allocator_.encode(final_name);
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_ref = &parent_.tls_->getTyped<TlsCache>()
                    .scope_cache_[this->scope_id_]
                    .counters_[std::move(stat_name_ptr)];
   }
+  lock.release();
 
   return safeMakeStat<Counter>(
       final_name, central_cache_.counters_,
@@ -276,12 +278,14 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
   GaugeSharedPtr* tls_ref = nullptr;
+  Thread::ReleasableLockGuard lock(parent_.lock_);
   StatNamePtr stat_name_ptr = parent_.heap_allocator_.encode(final_name);
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_ref = &parent_.tls_->getTyped<TlsCache>()
                    .scope_cache_[this->scope_id_]
                    .gauges_[std::move(stat_name_ptr)];
   }
+  lock.release();
 
   return safeMakeStat<Gauge>(
       final_name, central_cache_.gauges_,
@@ -297,6 +301,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
   ParentHistogramSharedPtr* tls_ref = nullptr;
+  Thread::LockGuard lock(parent_.lock_);
   StatNamePtr stat_name_ptr = parent_.heap_allocator_.encode(final_name);
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_ref = &parent_.tls_->getTyped<TlsCache>()
@@ -308,7 +313,6 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
     return **tls_ref;
   }
 
-  Thread::LockGuard lock(parent_.lock_);
   // TODO(ambuc): This is obviously a duplicate of the work done just a few lines ago. If these were
   // shared ptrs, or if we had a good method for duplicating StatNamePtrs without the cost of
   // lookups, this could be optimized.
@@ -335,6 +339,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name
   // Here prefix will not be considered because, by the time ParentHistogram calls this method
   // during recordValue, the prefix is already attached to the name.
   TlsHistogramSharedPtr* tls_ref = nullptr;
+  Thread::LockGuard lock(parent_.lock_);
   StatNamePtr stat_name_ptr = parent_.heap_allocator_.encode(name);
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_ref = &parent_.tls_->getTyped<TlsCache>()

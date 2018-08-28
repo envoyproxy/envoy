@@ -24,6 +24,7 @@ StatNamePtr SymbolTableImpl::encode(const absl::string_view name) {
 }
 
 std::string SymbolTableImpl::decode(const SymbolVec& symbol_vec) const {
+  Thread::LockGuard lock(lock_);
   std::vector<absl::string_view> name;
   name.reserve(symbol_vec.size());
   std::transform(symbol_vec.begin(), symbol_vec.end(), std::back_inserter(name),
