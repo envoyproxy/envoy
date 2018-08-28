@@ -3,6 +3,7 @@
 #include <unordered_set>
 
 #include "common/common/token_bucket_impl.h"
+#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 
@@ -207,14 +208,28 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
         watch->callbacks_.onConfigUpdate(message->resources(), message->version_info());
         continue;
       }
+      bool resource_found = false;
       Protobuf::RepeatedPtrField<ProtobufWkt::Any> found_resources;
       for (auto watched_resource_name : watch->resources_) {
         auto it = resources.find(watched_resource_name);
         if (it != resources.end()) {
           found_resources.Add()->MergeFrom(it->second);
+          resource_found = true;
         }
       }
-      watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
+
+      // onConfigUpdate should be called even if the found_resources is empty for single watch xDS
+      // (Cluster and Listener) so that update_empty stat is incremented. onConfigUpdate with empty
+      // resources is called for every watch, only if message has no resources for multi watch xDS
+      // (ClusterLoadAssignment and RouteConfiguration).
+      if (type_url == Config::TypeUrl::get().Cluster ||
+          type_url == Config::TypeUrl::get().Listener) {
+        watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
+      } else {
+        if (message->resources().empty() || resource_found) {
+          watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
+        }
+      }
     }
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we would do
     // that tracking here.
