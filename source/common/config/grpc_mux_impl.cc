@@ -220,10 +220,9 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
           found_resources.Add()->MergeFrom(it->second);
         }
       }
-      // onConfigUpdate should be called for all watches only if message has no resources for multi
-      // watch xDS (ClusterLoadAssignment and RouteConfiguration). Otherwise only call on
-      // watches(clusters/routes) that have updates in the message.
-      if (message->resources().empty() || found_resources.size() > 0) {
+      // onConfigUpdate should be called only on watches(clusters/routes) that have updates in the
+      // message.
+      if (found_resources.size() > 0) {
         watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
       }
     }
