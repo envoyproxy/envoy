@@ -98,6 +98,24 @@ public:
   NiceMock<Stats::MockCounter> retry_4xx_counter_;
 };
 
+class HistogramWrapper {
+public:
+  HistogramWrapper() { histogram = hist_alloc(); }
+
+  ~HistogramWrapper() { hist_free(histogram); }
+
+  const histogram_t* getHistogram() { return histogram; }
+
+  void initHistogram(const std::vector<uint64_t>& values) {
+    for (uint64_t value : values) {
+      hist_insert_intscale(histogram, value, 0, 1);
+    }
+  }
+
+private:
+  histogram_t* histogram;
+};
+
 class HystrixSinkTest : public testing::Test {
 public:
   HystrixSinkTest() { sink_.reset(new HystrixSink(server_, window_size_)); }
@@ -210,14 +228,6 @@ public:
       }
     }
     return cluster_message_map;
-  }
-
-  histogram_t* makeHistogram(const std::vector<uint64_t>& values) {
-    histogram_t* histogram = hist_alloc(); // The histogram needs to be freed later
-    for (uint64_t value : values) {
-      hist_insert_intscale(histogram, value, 0, 1);
-    }
-    return histogram;
   }
 
   TestRandomGenerator rand_;
@@ -469,8 +479,10 @@ TEST_F(HystrixSinkTest, HistogramTest) {
     h1_interval_values.push_back(i);
   }
 
-  histogram_t* hist1_interval = makeHistogram(h1_interval_values);
-  Stats::HistogramStatisticsImpl h1_interval_statistics(hist1_interval);
+  HistogramWrapper hist1_interval;
+  hist1_interval.initHistogram(h1_interval_values);
+
+  Stats::HistogramStatisticsImpl h1_interval_statistics(hist1_interval.getHistogram());
   ON_CALL(*histogram, intervalStatistics())
       .WillByDefault(testing::ReturnRef(h1_interval_statistics));
   stored_histograms.push_back(histogram);
@@ -494,8 +506,6 @@ TEST_F(HystrixSinkTest, HistogramTest) {
   for (const double quantile : hystrix_quantiles) {
     EXPECT_EQ(quantile * 100, latency->getDouble(fmt::sprintf("%g", quantile * 100)));
   }
-
-  hist_free(hist1_interval);
 }
 
 TEST_F(HystrixSinkTest, HystrixEventStreamHandler) {

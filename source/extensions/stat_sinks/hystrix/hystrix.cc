@@ -47,10 +47,11 @@ void ClusterStatsCache::printRollingWindow(absl::string_view name, RollingWindow
 
 void HystrixSink::addHistogramToStream(const QuantileLatencyMap& latency_map, absl::string_view key,
                                        std::stringstream& ss) {
+  // TODO: Consider if we better use join here
   ss << ", \"" << key << "\": {";
   bool is_first = true;
   for (const std::pair<double, double>& element : latency_map) {
-    std::string quantile = fmt::sprintf("%g", element.first * 100);
+    const std::string quantile = fmt::sprintf("%g", element.first * 100);
     HystrixSink::addDoubleToStream(quantile, element.second, ss, is_first);
     is_first = false;
   }
@@ -325,7 +326,7 @@ void HystrixSink::flush(Stats::Source& source) {
 
   // Save a map of the relevant histograms per cluster in a convenient format.
   std::unordered_map<std::string, QuantileLatencyMap> time_histograms;
-  for (const Stats::ParentHistogramSharedPtr histogram : source.cachedHistograms()) {
+  for (const Stats::ParentHistogramSharedPtr& histogram : source.cachedHistograms()) {
     if (histogram->tagExtractedName() == "cluster.upstream_rq_time") {
       // TODO(mrice32): add an Envoy utility function to look up and return a tag for a metric.
       auto it = std::find_if(histogram->tags().begin(), histogram->tags().end(),
@@ -346,7 +347,7 @@ void HystrixSink::flush(Stats::Source& source) {
         // binary-search here is likely not worth it, as hystrix_quantiles has <10 elements.
         if (std::find(hystrix_quantiles.begin(), hystrix_quantiles.end(), supported_quantiles[i]) !=
             hystrix_quantiles.end()) {
-          double value = histogram->intervalStatistics().computedQuantiles()[i];
+          const double value = histogram->intervalStatistics().computedQuantiles()[i];
           if (!std::isnan(value)) {
             hist_map[supported_quantiles[i]] = value;
           }
