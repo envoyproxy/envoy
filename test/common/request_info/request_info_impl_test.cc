@@ -146,7 +146,6 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
     request_info.perRequestState().setData("test", std::make_unique<TestIntAccessor>(1));
     EXPECT_EQ(1, request_info.perRequestState().getData<TestIntAccessor>("test").access());
 
-
     EXPECT_EQ("", request_info.requestedServerName());
     absl::string_view sni_name = "stubserver.org";
     request_info.setRequestedServerName(sni_name);
