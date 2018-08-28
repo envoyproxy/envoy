@@ -100,21 +100,6 @@ message WeightedCluster {
     // weight. The sum of weights across all entries in the clusters array must add up to the
     // total weight.
     google.protobuf.UInt32Value weight = 2;
-
-    // Optional endpoint metadata match criteria. Only endpoints in the upstream
-    // cluster with metadata matching that set in metadata_match will be
-    // considered.
-    envoy.api.v2.core.Metadata metadata_match = 3;
-
-    // Specifies a list of headers to be added to requests when this cluster is selected
-    // through the enclosing
-    // :ref:`envoy_api_msg_config.filter.network.thrift_proxy.v2alpha1.RouteAction`.
-    repeated envoy.api.v2.core.HeaderValueOption request_headers_to_add = 4;
-
-    // Specifies a list of headers to be added to responses when this cluster is selected
-    // through the enclosing
-    // :ref:`envoy_api_msg_config.filter.network.thrift_proxy.v2alpha1.RouteAction`.
-    repeated envoy.api.v2.core.HeaderValueOption response_headers_to_add = 5;
   }
 
   // Specifies one or more upstream clusters associated with the route.
