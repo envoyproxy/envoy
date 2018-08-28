@@ -9,6 +9,7 @@
 #include "common/protobuf/utility.h"
 #include "common/request_info/request_info_impl.h"
 
+#include "test/common/request_info/test_int_accessor.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 
@@ -115,20 +116,6 @@ TEST(RequestInfoImplTest, ResponseFlagTest) {
   EXPECT_TRUE(request_info2.intersectResponseFlags(FailedLocalHealthCheck));
 }
 
-namespace {
-
-class IntAccessor : public FilterState::Object {
-public:
-  IntAccessor(int value) : value_(value) {}
-
-  int access() const { return value_; }
-
-private:
-  int value_;
-};
-
-} // namespace
-
 TEST(RequestInfoImplTest, MiscSettersAndGetters) {
   {
     RequestInfoImpl request_info(Http::Protocol::Http2);
@@ -156,8 +143,8 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
     request_info.route_entry_ = &route_entry;
     EXPECT_EQ(&route_entry, request_info.routeEntry());
 
-    request_info.perRequestState().setData("test", std::make_unique<IntAccessor>(1));
-    EXPECT_EQ(1, request_info.perRequestState().getData<IntAccessor>("test").access());
+    request_info.perRequestState().setData("test", std::make_unique<TestIntAccessor>(1));
+    EXPECT_EQ(1, request_info.perRequestState().getData<TestIntAccessor>("test").access());
   }
 }
 

@@ -10,6 +10,7 @@
 #include "common/router/header_parser.h"
 #include "common/router/string_accessor_impl.h"
 
+#include "test/common/request_info/test_int_accessor.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
@@ -183,24 +184,10 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
   EXPECT_EQ("test_value", per_request_state.getData<StringAccessor>("testing").asString());
 }
 
-namespace {
-
-class IntAccessor : public RequestInfo::FilterState::Object {
-public:
-  IntAccessor(int value) : value_(value) {}
-
-  int access() const { return value_; }
-
-private:
-  int value_;
-};
-
-} // namespace
-
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
   Envoy::RequestInfo::FilterStateImpl per_request_state;
-  per_request_state.setData("testing", std::make_unique<IntAccessor>(1));
-  EXPECT_EQ(1, per_request_state.getData<IntAccessor>("testing").access());
+  per_request_state.setData("testing", std::make_unique<RequestInfo::TestIntAccessor>(1));
+  EXPECT_EQ(1, per_request_state.getData<RequestInfo::TestIntAccessor>("testing").access());
 
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));

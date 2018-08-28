@@ -195,6 +195,7 @@ envoy_cc_test(
         "//source/common/router:header_formatter_lib",
         "//source/common/router:header_parser_lib",
         "//source/common/router:string_accessor_lib",
+        "//test/common/request_info:test_int_accessor_interface",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",

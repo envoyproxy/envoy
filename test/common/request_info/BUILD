@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
 )
 
@@ -21,11 +22,20 @@ envoy_cc_test(
     name = "request_info_impl_test",
     srcs = ["request_info_impl_test.cc"],
     deps = [
+        ":test_int_accessor_interface",
         "//include/envoy/http:protocol_interface",
         "//include/envoy/upstream:host_description_interface",
         "//source/common/request_info:request_info_lib",
         "//test/mocks/router:router_mocks",
         "//test/mocks/upstream:upstream_mocks",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "test_int_accessor_interface",
+    hdrs = ["test_int_accessor.h"],
+    deps = [
+        "//include/envoy/request_info:filter_state_interface",
     ],
 )
 
