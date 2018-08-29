@@ -162,6 +162,6 @@ message ResponseFlagFilter {
   // This field is optional. If it is not specified, then any response flag will pass
   // the filter check.
   repeated string flags = 1 [(validate.rules).repeated .items.string = {
-    in: ["LH", "UH", "UT", "LR", "UR", "UF", "UC", "UO", "NR", "DI", "FI", "RL", "UAEX", "RLSE"]
+    in: ["LH", "UH", "UT", "LR", "UR", "UF", "UC", "UO", "NR", "DI", "FI", "RL", "UAEX"]
   }];
 }
