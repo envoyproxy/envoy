@@ -418,10 +418,11 @@ TEST(ClientContextConfigImplTest, MultipleTlsCertificates) {
       "Multiple TLS certificates are not supported for client contexts");
 }
 
+// Validate that client context config with static TLS certificates is created successfully.
 TEST(ClientContextConfigImplTest, StaticTlsCertificates) {
   envoy::api::v2::auth::Secret secret_config;
 
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: "abc.com"
 tls_certificate:
   certificate_chain:
@@ -451,10 +452,54 @@ tls_certificate:
             client_context_config.tlsCertificate()->privateKey());
 }
 
+// Validate that client context config with static certificate validation context is created
+// successfully.
+TEST(ClientContextConfigImplTest, StaticCertificateValidationContext) {
+  envoy::api::v2::auth::Secret tls_certificate_secret_config;
+  const std::string tls_certificate_yaml = R"EOF(
+  name: "abc.com"
+  tls_certificate:
+    certificate_chain:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+    private_key:
+      filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            tls_certificate_secret_config);
+  std::unique_ptr<Secret::SecretManager> secret_manager(new Secret::SecretManagerImpl());
+  secret_manager->addStaticSecret(tls_certificate_secret_config);
+  envoy::api::v2::auth::Secret certificate_validation_context_secret_config;
+  const std::string certificate_validation_context_yaml = R"EOF(
+    name: "def.com"
+    validation_context:
+      trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+      allow_expired_certificate: true
+  )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(certificate_validation_context_yaml),
+                            certificate_validation_context_secret_config);
+  secret_manager->addStaticSecret(certificate_validation_context_secret_config);
+
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()
+      ->mutable_tls_certificate_sds_secret_configs()
+      ->Add()
+      ->set_name("abc.com");
+  tls_context.mutable_common_tls_context()
+      ->mutable_validation_context_sds_secret_config()
+      ->set_name("def.com");
+  ClientContextConfigImpl client_context_config(tls_context, *secret_manager.get());
+
+  const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
+  EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
+            client_context_config.certificateValidationContext()->caCert());
+}
+
+// Validate that constructor of client context config throws an exception when static TLS
+// certificate is missing.
 TEST(ClientContextConfigImplTest, MissingStaticSecretTlsCertificates) {
   envoy::api::v2::auth::Secret secret_config;
 
-  std::string yaml = R"EOF(
+  const std::string yaml = R"EOF(
 name: "abc.com"
 tls_certificate:
   certificate_chain:
@@ -478,6 +523,46 @@ tls_certificate:
   EXPECT_THROW_WITH_MESSAGE(
       ClientContextConfigImpl client_context_config(tls_context, *secret_manager.get()),
       EnvoyException, "Static secret is not defined: missing");
+}
+
+// Validate that constructor of client context config throws an exception when static certificate
+// validation context is missing.
+TEST(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
+  envoy::api::v2::auth::Secret tls_certificate_secret_config;
+  const std::string tls_certificate_yaml = R"EOF(
+    name: "abc.com"
+    tls_certificate:
+      certificate_chain:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem"
+    )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
+                            tls_certificate_secret_config);
+  std::unique_ptr<Secret::SecretManager> secret_manager(new Secret::SecretManagerImpl());
+  secret_manager->addStaticSecret(tls_certificate_secret_config);
+  envoy::api::v2::auth::Secret certificate_validation_context_secret_config;
+  const std::string certificate_validation_context_yaml = R"EOF(
+      name: "def.com"
+      validation_context:
+        trusted_ca: { filename: "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem" }
+        allow_expired_certificate: true
+    )EOF";
+  MessageUtil::loadFromYaml(TestEnvironment::substitute(certificate_validation_context_yaml),
+                            certificate_validation_context_secret_config);
+  secret_manager->addStaticSecret(certificate_validation_context_secret_config);
+
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  tls_context.mutable_common_tls_context()
+      ->mutable_tls_certificate_sds_secret_configs()
+      ->Add()
+      ->set_name("abc.com");
+  tls_context.mutable_common_tls_context()
+      ->mutable_validation_context_sds_secret_config()
+      ->set_name("missing");
+  EXPECT_THROW_WITH_MESSAGE(
+      ClientContextConfigImpl client_context_config(tls_context, *secret_manager.get()),
+      EnvoyException, "Unknown static certificate validation context: missing");
 }
 
 // Multiple TLS certificates are not yet supported, but one is expected for
