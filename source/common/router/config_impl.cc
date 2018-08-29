@@ -81,7 +81,7 @@ public:
   HeaderHashMethod(const std::string& header_name, bool terminal)
       : header_name_(header_name), terminal_(terminal) {}
 
-  bool terminal() const { return terminal_; }
+  bool terminal() const override { return terminal_; }
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const Http::HeaderMap& headers,
@@ -106,7 +106,7 @@ public:
                    const absl::optional<std::chrono::seconds>& ttl, bool terminal)
       : key_(key), path_(path), ttl_(ttl), terminal_(terminal) {}
 
-  bool terminal() const { return terminal_; }
+  bool terminal() const override { return terminal_; }
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const Http::HeaderMap& headers,
@@ -142,7 +142,7 @@ class IpHashMethod : public HashPolicyImpl::HashMethod {
 public:
   IpHashMethod(bool terminal) : terminal_(terminal) {}
 
-  bool terminal() const { return terminal_; }
+  bool terminal() const override { return terminal_; }
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
                                     const Http::HeaderMap&,
