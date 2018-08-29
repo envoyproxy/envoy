@@ -14,6 +14,9 @@ class ResourceMonitorNameValues {
 public:
   // Heap monitor with statically configured max.
   const std::string FixedHeap = "envoy.resource_monitors.fixed_heap";
+
+  // File-based injected resource monitor.
+  const std::string InjectedResource = "envoy.resource_monitors.injected_resource";
 };
 
 typedef ConstSingleton<ResourceMonitorNameValues> ResourceMonitorNames;
