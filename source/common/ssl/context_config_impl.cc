@@ -46,10 +46,11 @@ Secret::TlsCertificateConfigProviderSharedPtr getTlsCertificateConfigProvider(
 }
 
 Secret::CertificateValidationContextConfigProviderSharedPtr
-getCertificateValidationContextConfigProvider(const envoy::api::v2::auth::CommonTlsContext& config,
-                                              Secret::SecretManager& secret_manager) {
+getCertificateValidationContextConfigProvider(
+    const envoy::api::v2::auth::CommonTlsContext& config,
+    Server::Configuration::TransportSocketFactoryContext& factory_context) {
   if (config.has_validation_context()) {
-    return secret_manager.createInlineCertificateValidationContextProvider(
+    return factory_context.secretManager().createInlineCertificateValidationContextProvider(
         config.validation_context());
   }
   if (config.has_validation_context_sds_secret_config()) {
@@ -57,7 +58,8 @@ getCertificateValidationContextConfigProvider(const envoy::api::v2::auth::Common
     if (!sds_secret_config.has_sds_config()) {
       // static secret
       auto secret_provider =
-          secret_manager.findStaticCertificateValidationContextProvider(sds_secret_config.name());
+          factory_context.secretManager().findStaticCertificateValidationContextProvider(
+              sds_secret_config.name());
       if (!secret_provider) {
         throw EnvoyException(fmt::format("Unknown static certificate validation context: {}",
                                          sds_secret_config.name()));
@@ -95,10 +97,10 @@ ContextConfigImpl::ContextConfigImpl(
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), DEFAULT_CIPHER_SUITES)),
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), DEFAULT_ECDH_CURVES)),
-      tls_certficate_provider_(getTlsCertificateConfigProvider(config, secret_manager)),
+      tls_certficate_provider_(getTlsCertificateConfigProvider(config, factory_context)),
       secret_update_callback_handle_(nullptr),
       certficate_validation_context_provider_(
-          getCertificateValidationContextConfigProvider(config, secret_manager)),
+          getCertificateValidationContextConfigProvider(config, factory_context)),
       min_protocol_version_(
           tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(), TLS1_VERSION)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
