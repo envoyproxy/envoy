@@ -6,8 +6,8 @@
 
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "extensions/filters/network/thrift_proxy/metadata.h"
-#include "extensions/filters/network/thrift_proxy/protocol.h"
-#include "extensions/filters/network/thrift_proxy/transport_impl.h"
+#include "extensions/filters/network/thrift_proxy/thrift.h"
+#include "extensions/filters/network/thrift_proxy/transport.h"
 
 #include "absl/types/optional.h"
 

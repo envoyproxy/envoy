@@ -51,6 +51,15 @@ public:
   MOCK_METHOD0(currentTime, MonotonicTime());
 };
 
+class MockTimeSource : public TimeSource {
+public:
+  MockTimeSource();
+  ~MockTimeSource();
+
+  MockSystemTimeSource system_;
+  MockMonotonicTimeSource monotonic_;
+};
+
 class MockTokenBucket : public TokenBucket {
 public:
   MockTokenBucket();

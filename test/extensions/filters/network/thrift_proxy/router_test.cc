@@ -96,7 +96,7 @@ public:
   }
 
   void startRequest(MessageType msg_type) {
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->transportBegin(metadata_));
+    EXPECT_EQ(FilterStatus::Continue, router_->transportBegin(metadata_));
 
     EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
     EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
@@ -106,7 +106,7 @@ public:
 
     EXPECT_CALL(callbacks_, downstreamTransportType()).WillOnce(Return(TransportType::Framed));
     EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Binary));
-    EXPECT_EQ(ThriftFilters::FilterStatus::StopIteration, router_->messageBegin(metadata_));
+    EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
 
     NiceMock<Network::MockClientConnection> connection;
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection));
@@ -141,7 +141,7 @@ public:
   }
 
   void startRequestWithExistingConnection(MessageType msg_type) {
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->transportBegin({}));
+    EXPECT_EQ(FilterStatus::Continue, router_->transportBegin({}));
 
     EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
     EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
@@ -183,56 +183,56 @@ public:
               return nullptr;
             }));
 
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->messageBegin(metadata_));
+    EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
     EXPECT_NE(nullptr, upstream_callbacks_);
   }
 
   void sendTrivialStruct(FieldType field_type) {
     EXPECT_CALL(*protocol_, writeStructBegin(_, ""));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->structBegin({}));
+    EXPECT_EQ(FilterStatus::Continue, router_->structBegin({}));
 
     EXPECT_CALL(*protocol_, writeFieldBegin(_, "", field_type, 1));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->fieldBegin({}, field_type, 1));
+    EXPECT_EQ(FilterStatus::Continue, router_->fieldBegin({}, field_type, 1));
 
     sendTrivialValue(field_type);
 
     EXPECT_CALL(*protocol_, writeFieldEnd(_));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->fieldEnd());
+    EXPECT_EQ(FilterStatus::Continue, router_->fieldEnd());
 
     EXPECT_CALL(*protocol_, writeFieldBegin(_, "", FieldType::Stop, 0));
     EXPECT_CALL(*protocol_, writeStructEnd(_));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->structEnd());
+    EXPECT_EQ(FilterStatus::Continue, router_->structEnd());
   }
 
   void sendTrivialValue(FieldType field_type) {
     switch (field_type) {
     case FieldType::Bool:
       EXPECT_CALL(*protocol_, writeBool(_, true));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->boolValue(true));
+      EXPECT_EQ(FilterStatus::Continue, router_->boolValue(true));
       break;
     case FieldType::Byte:
       EXPECT_CALL(*protocol_, writeByte(_, 2));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->byteValue(2));
+      EXPECT_EQ(FilterStatus::Continue, router_->byteValue(2));
       break;
     case FieldType::I16:
       EXPECT_CALL(*protocol_, writeInt16(_, 3));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->int16Value(3));
+      EXPECT_EQ(FilterStatus::Continue, router_->int16Value(3));
       break;
     case FieldType::I32:
       EXPECT_CALL(*protocol_, writeInt32(_, 4));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->int32Value(4));
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(4));
       break;
     case FieldType::I64:
       EXPECT_CALL(*protocol_, writeInt64(_, 5));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->int64Value(5));
+      EXPECT_EQ(FilterStatus::Continue, router_->int64Value(5));
       break;
     case FieldType::Double:
       EXPECT_CALL(*protocol_, writeDouble(_, 6.0));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->doubleValue(6.0));
+      EXPECT_EQ(FilterStatus::Continue, router_->doubleValue(6.0));
       break;
     case FieldType::String:
       EXPECT_CALL(*protocol_, writeString(_, "seven"));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->stringValue("seven"));
+      EXPECT_EQ(FilterStatus::Continue, router_->stringValue("seven"));
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -250,8 +250,8 @@ public:
       EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, released(Ref(upstream_connection_)));
     }
 
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->messageEnd());
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->transportEnd());
+    EXPECT_EQ(FilterStatus::Continue, router_->messageEnd());
+    EXPECT_EQ(FilterStatus::Continue, router_->transportEnd());
   }
 
   void returnResponse() {
@@ -404,7 +404,7 @@ TEST_F(ThriftRouterTest, NoRoute) {
         EXPECT_EQ(AppExceptionType::UnknownMethod, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no route.*"));
       }));
-  EXPECT_EQ(ThriftFilters::FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
 }
 
 TEST_F(ThriftRouterTest, NoCluster) {
@@ -421,7 +421,7 @@ TEST_F(ThriftRouterTest, NoCluster) {
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*unknown cluster.*"));
       }));
-  EXPECT_EQ(ThriftFilters::FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
 }
 
 TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
@@ -440,7 +440,7 @@ TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*maintenance mode.*"));
       }));
-  EXPECT_EQ(ThriftFilters::FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
 }
 
 TEST_F(ThriftRouterTest, NoHealthyHosts) {
@@ -460,7 +460,7 @@ TEST_F(ThriftRouterTest, NoHealthyHosts) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no healthy upstream.*"));
       }));
 
-  EXPECT_EQ(ThriftFilters::FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
 }
 
 TEST_F(ThriftRouterTest, TruncatedResponse) {
@@ -631,55 +631,54 @@ TEST_P(ThriftRouterContainerTest, DecoderFilterCallbacks) {
   connectUpstream();
 
   EXPECT_CALL(*protocol_, writeStructBegin(_, ""));
-  EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->structBegin({}));
+  EXPECT_EQ(FilterStatus::Continue, router_->structBegin({}));
 
   EXPECT_CALL(*protocol_, writeFieldBegin(_, "", field_type, 1));
-  EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->fieldBegin({}, field_type, 1));
+  EXPECT_EQ(FilterStatus::Continue, router_->fieldBegin({}, field_type, 1));
 
   switch (field_type) {
   case FieldType::Map:
     EXPECT_CALL(*protocol_, writeMapBegin(_, FieldType::I32, FieldType::I32, 2));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue,
-              router_->mapBegin(FieldType::I32, FieldType::I32, 2));
+    EXPECT_EQ(FilterStatus::Continue, router_->mapBegin(FieldType::I32, FieldType::I32, 2));
     for (int i = 0; i < 2; i++) {
       EXPECT_CALL(*protocol_, writeInt32(_, i));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->int32Value(i));
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i));
       EXPECT_CALL(*protocol_, writeInt32(_, i + 100));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->int32Value(i + 100));
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i + 100));
     }
     EXPECT_CALL(*protocol_, writeMapEnd(_));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->mapEnd());
+    EXPECT_EQ(FilterStatus::Continue, router_->mapEnd());
     break;
   case FieldType::List:
     EXPECT_CALL(*protocol_, writeListBegin(_, FieldType::I32, 3));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->listBegin(FieldType::I32, 3));
+    EXPECT_EQ(FilterStatus::Continue, router_->listBegin(FieldType::I32, 3));
     for (int i = 0; i < 3; i++) {
       EXPECT_CALL(*protocol_, writeInt32(_, i));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->int32Value(i));
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i));
     }
     EXPECT_CALL(*protocol_, writeListEnd(_));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->listEnd());
+    EXPECT_EQ(FilterStatus::Continue, router_->listEnd());
     break;
   case FieldType::Set:
     EXPECT_CALL(*protocol_, writeSetBegin(_, FieldType::I32, 4));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->setBegin(FieldType::I32, 4));
+    EXPECT_EQ(FilterStatus::Continue, router_->setBegin(FieldType::I32, 4));
     for (int i = 0; i < 4; i++) {
       EXPECT_CALL(*protocol_, writeInt32(_, i));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->int32Value(i));
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i));
     }
     EXPECT_CALL(*protocol_, writeSetEnd(_));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->setEnd());
+    EXPECT_EQ(FilterStatus::Continue, router_->setEnd());
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   EXPECT_CALL(*protocol_, writeFieldEnd(_));
-  EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->fieldEnd());
+  EXPECT_EQ(FilterStatus::Continue, router_->fieldEnd());
 
   EXPECT_CALL(*protocol_, writeFieldBegin(_, _, FieldType::Stop, 0));
   EXPECT_CALL(*protocol_, writeStructEnd(_));
-  EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->structEnd());
+  EXPECT_EQ(FilterStatus::Continue, router_->structEnd());
 
   completeRequest();
   destroyRouter();

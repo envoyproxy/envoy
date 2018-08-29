@@ -204,8 +204,10 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
     codec_.reset(new Http::Http1::ServerConnectionImpl(shared_connection_.connection(), *this,
                                                        Http::Http1Settings()));
   } else {
+    auto settings = Http::Http2Settings();
+    settings.allow_connect_ = true;
     codec_.reset(new Http::Http2::ServerConnectionImpl(shared_connection_.connection(), *this,
-                                                       store, Http::Http2Settings()));
+                                                       store, settings));
     ASSERT(type == Type::HTTP2);
   }
 

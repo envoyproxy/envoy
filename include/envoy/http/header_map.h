@@ -281,6 +281,7 @@ private:
   HEADER_FUNC(Origin)                                                                              \
   HEADER_FUNC(OtSpanContext)                                                                       \
   HEADER_FUNC(Path)                                                                                \
+  HEADER_FUNC(Protocol)                                                                            \
   HEADER_FUNC(ProxyConnection)                                                                     \
   HEADER_FUNC(Referer)                                                                             \
   HEADER_FUNC(RequestId)                                                                           \
