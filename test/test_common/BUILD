@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_basic_cc_library",
     "envoy_cc_library",
+    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -89,6 +90,14 @@ envoy_cc_test_library(
         "//source/common/stats:stats_lib",
         "//source/common/stats:stats_options_lib",
         "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+    ],
+)
+
+envoy_cc_test(
+    name = "utility_test",
+    srcs = ["utility_test.cc"],
+    deps = [
+        ":utility_lib",
     ],
 )
 

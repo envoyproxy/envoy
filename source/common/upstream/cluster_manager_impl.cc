@@ -181,7 +181,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
       config_tracker_entry_(
           admin.getConfigTracker().add("clusters", [this] { return dumpClusterConfigs(); })),
       time_source_(main_thread_dispatcher.timeSource()), dispatcher_(main_thread_dispatcher) {
-  async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls);
+  async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(*this, tls, time_source_);
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
@@ -305,7 +305,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
                               Config::Utility::factoryForGrpcApiConfigSource(
                                   *async_client_manager_, load_stats_config, stats)
                                   ->create(),
-                              main_thread_dispatcher, timeSource().monotonic()));
+                              main_thread_dispatcher));
   }
 }
 
