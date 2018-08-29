@@ -17,7 +17,7 @@ TEST(HeapStatDataTest, HeapNoTruncate) {
   const std::string long_string(stats_options.maxNameLength() + 1, 'A');
   HeapStatData* stat{};
   EXPECT_NO_LOGS(stat = alloc.alloc(long_string));
-  EXPECT_EQ(stat->key(), long_string);
+  EXPECT_EQ(stat->name(), long_string);
   alloc.free(*stat);
 }
 

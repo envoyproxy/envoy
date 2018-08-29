@@ -26,12 +26,7 @@ struct HeapStatData {
    */
   std::string name() const { return name_ptr_->toString(); }
 
-  /**
-   * Alias for name(), because BlockMemoryHashSet<Value> expects Value::key().
-   */
-  std::string key() const { return name(); }
-
-  bool operator==(const HeapStatData& rhs) const { return *name_ptr_ == *(rhs.name_ptr_); }
+  bool operator==(const HeapStatData& rhs) const { return *name_ptr_ == *rhs.name_ptr_; }
 
   std::atomic<uint64_t> value_{0};
   std::atomic<uint64_t> pending_increment_{0};

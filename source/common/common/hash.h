@@ -45,7 +45,7 @@ public:
    */
   static uint64_t hashVector(std::vector<uint32_t> const& input) {
     std::size_t seed = input.size();
-    for (auto& i : input) {
+    for (const auto i : input) {
       seed ^= i + 0x9e3779b9 + (seed << 6) + (seed >> 2);
     }
     return seed;
