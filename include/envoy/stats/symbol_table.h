@@ -24,11 +24,11 @@ public:
 
 using StatNamePtr = std::unique_ptr<StatName>;
 
-struct StatNameHash_ {
+struct StatNameHash {
   size_t operator()(const StatName* a) const { return a->hash(); }
 };
 
-struct StatNameCompare_ {
+struct StatNameCompare {
   bool operator()(const StatName* a, const StatName* b) const { return (*a == *b); }
 };
 

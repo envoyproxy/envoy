@@ -58,18 +58,18 @@ public:
   }
 
 private:
-  struct HeapStatHash_ {
+  struct HeapStatHash {
     size_t operator()(const HeapStatData* a) const { return a->name_ptr_->hash(); }
   };
-  struct HeapStatCompare_ {
+  struct HeapStatCompare {
     bool operator()(const HeapStatData* a, const HeapStatData* b) const { return (*a == *b); }
   };
 
-  typedef std::unordered_set<HeapStatData*, HeapStatHash_, HeapStatCompare_> StatSet;
+  typedef std::unordered_set<HeapStatData*, HeapStatHash, HeapStatCompare> StatSet;
 
   // An unordered set of HeapStatData pointers which keys off the key()
   // field in each object. This necessitates a custom comparator and hasher, which key off of the
-  // StatNamePtr's own StatNamePtrHash_ and StatNamePtrCompare_ operators.
+  // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
   StatSet stats_ GUARDED_BY(mutex_);
   // A locally held symbol table which encodes stat names as StatNamePtrs and decodes StatNamePtrs
   // back into strings.

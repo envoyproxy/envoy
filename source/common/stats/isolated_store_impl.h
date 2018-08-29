@@ -52,7 +52,7 @@ public:
   }
 
 private:
-  std::unordered_map<StatNamePtr, std::shared_ptr<Base>, StatNamePtrHash_, StatNamePtrCompare_>
+  std::unordered_map<StatNamePtr, std::shared_ptr<Base>, StatNamePtrHash, StatNamePtrCompare>
       stats_;
   Allocator alloc_;
   HeapStatDataAllocator& heap_alloc_;

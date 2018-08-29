@@ -151,11 +151,11 @@ private:
   SymbolTableImpl& symbol_table_;
 };
 
-struct StatNamePtrHash_ {
+struct StatNamePtrHash {
   size_t operator()(const StatNamePtr& a) const { return a->hash(); }
 };
 
-struct StatNamePtrCompare_ {
+struct StatNamePtrCompare {
   bool operator()(const StatNamePtr& a, const StatNamePtr& b) const {
     // This extracts the underlying statnames.
     return (*a.get() == *b.get());
