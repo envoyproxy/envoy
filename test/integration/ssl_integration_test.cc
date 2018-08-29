@@ -150,6 +150,13 @@ TEST_P(SslIntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
 }
 
 TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
+#ifdef __APPLE__
+  // Skip this test on OS X: we can't detect the early close on OS X, and we
+  // won't clean up the upstream connection until it times out. See #4294.
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    return;
+  }
+#endif
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(false, false);
   };
