@@ -373,6 +373,11 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
     idle_timeout_ = std::chrono::milliseconds(
         DurationUtil::durationToMilliseconds(config.common_http_protocol_options().idle_timeout()));
   }
+
+  // TODO(htuch): Remove this temporary workaround when we have
+  // https://github.com/lyft/protoc-gen-validate/issues/97 resolved. This just provides early
+  // validation of sanity of fields that we should catch at config ingestion.
+  DurationUtil::durationToMilliseconds(common_lb_config_.update_merge_window());
 }
 
 ProtocolOptionsConfigConstSharedPtr
