@@ -40,6 +40,29 @@ getTlsCertificateConfigProvider(const envoy::api::v2::auth::CommonTlsContext& co
   return nullptr;
 }
 
+Secret::CertificateValidationContextConfigProviderSharedPtr
+getCertificateValidationContextConfigProvider(const envoy::api::v2::auth::CommonTlsContext& config,
+                                              Secret::SecretManager& secret_manager) {
+  if (config.has_validation_context()) {
+    return secret_manager.createInlineCertificateValidationContextProvider(
+        config.validation_context());
+  }
+  if (config.has_validation_context_sds_secret_config()) {
+    const auto& sds_secret_config = config.validation_context_sds_secret_config();
+    if (!sds_secret_config.has_sds_config()) {
+      // static secret
+      auto secret_provider =
+          secret_manager.findStaticCertificateValidationContextProvider(sds_secret_config.name());
+      if (!secret_provider) {
+        throw EnvoyException(fmt::format("Unknown static certificate validation context: {}",
+                                         sds_secret_config.name()));
+      }
+      return secret_provider;
+    }
+  }
+  return nullptr;
+}
+
 } // namespace
 
 const std::string ContextConfigImpl::DEFAULT_CIPHER_SUITES =
@@ -66,40 +89,13 @@ ContextConfigImpl::ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContex
           RepeatedPtrUtil::join(config.tls_params().cipher_suites(), ":"), DEFAULT_CIPHER_SUITES)),
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), DEFAULT_ECDH_CURVES)),
-      ca_cert_(Config::DataSource::read(config.validation_context().trusted_ca(), true)),
-      ca_cert_path_(Config::DataSource::getPath(config.validation_context().trusted_ca())
-                        .value_or(EMPTY_STRING)),
-      certificate_revocation_list_(
-          Config::DataSource::read(config.validation_context().crl(), true)),
-      certificate_revocation_list_path_(
-          Config::DataSource::getPath(config.validation_context().crl()).value_or(EMPTY_STRING)),
       tls_certficate_provider_(getTlsCertificateConfigProvider(config, secret_manager)),
-      verify_subject_alt_name_list_(config.validation_context().verify_subject_alt_name().begin(),
-                                    config.validation_context().verify_subject_alt_name().end()),
-      verify_certificate_hash_list_(config.validation_context().verify_certificate_hash().begin(),
-                                    config.validation_context().verify_certificate_hash().end()),
-      verify_certificate_spki_list_(config.validation_context().verify_certificate_spki().begin(),
-                                    config.validation_context().verify_certificate_spki().end()),
-      allow_expired_certificate_(config.validation_context().allow_expired_certificate()),
+      certficate_validation_context_provider_(
+          getCertificateValidationContextConfigProvider(config, secret_manager)),
       min_protocol_version_(
           tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(), TLS1_VERSION)),
-      max_protocol_version_(
-          tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(), TLS1_2_VERSION)) {
-  if (ca_cert_.empty()) {
-    if (!certificate_revocation_list_.empty()) {
-      throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",
-                                       certificateRevocationListPath()));
-    }
-    if (!verify_subject_alt_name_list_.empty()) {
-      throw EnvoyException(fmt::format("SAN-based verification of peer certificates without "
-                                       "trusted CA is insecure and not allowed"));
-    }
-    if (allow_expired_certificate_) {
-      throw EnvoyException(
-          fmt::format("Certificate validity period is always ignored without trusted CA"));
-    }
-  }
-}
+      max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
+                                                TLS1_2_VERSION)) {}
 
 unsigned ContextConfigImpl::tlsVersionFromProto(
     const envoy::api::v2::auth::TlsParameters_TlsProtocol& version, unsigned default_version) {
