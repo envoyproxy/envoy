@@ -23,31 +23,14 @@ public:
   const std::string& altAlpnProtocols() const override { return alt_alpn_protocols_; }
   const std::string& cipherSuites() const override { return cipher_suites_; }
   const std::string& ecdhCurves() const override { return ecdh_curves_; }
-  const std::string& caCert() const override { return ca_cert_; }
-  const std::string& caCertPath() const override {
-    return (ca_cert_path_.empty() && !ca_cert_.empty()) ? INLINE_STRING : ca_cert_path_;
-  }
-  const std::string& certificateRevocationList() const override {
-    return certificate_revocation_list_;
-  }
-  const std::string& certificateRevocationListPath() const override {
-    return (certificate_revocation_list_path_.empty() && !certificate_revocation_list_.empty())
-               ? INLINE_STRING
-               : certificate_revocation_list_path_;
-  }
   const TlsCertificateConfig* tlsCertificate() const override {
     return tls_certficate_provider_ == nullptr ? nullptr : tls_certficate_provider_->secret();
   }
-  const std::vector<std::string>& verifySubjectAltNameList() const override {
-    return verify_subject_alt_name_list_;
-  };
-  const std::vector<std::string>& verifyCertificateHashList() const override {
-    return verify_certificate_hash_list_;
-  };
-  const std::vector<std::string>& verifyCertificateSpkiList() const override {
-    return verify_certificate_spki_list_;
-  };
-  bool allowExpiredCertificate() const override { return allow_expired_certificate_; };
+  const CertificateValidationContextConfig* certificateValidationContext() const override {
+    return certficate_validation_context_provider_ == nullptr
+               ? nullptr
+               : certficate_validation_context_provider_->secret();
+  }
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
 
@@ -67,15 +50,9 @@ private:
   const std::string alt_alpn_protocols_;
   const std::string cipher_suites_;
   const std::string ecdh_curves_;
-  const std::string ca_cert_;
-  const std::string ca_cert_path_;
-  const std::string certificate_revocation_list_;
-  const std::string certificate_revocation_list_path_;
   Secret::TlsCertificateConfigProviderSharedPtr tls_certficate_provider_;
-  const std::vector<std::string> verify_subject_alt_name_list_;
-  const std::vector<std::string> verify_certificate_hash_list_;
-  const std::vector<std::string> verify_certificate_spki_list_;
-  const bool allow_expired_certificate_;
+  Secret::CertificateValidationContextConfigProviderSharedPtr
+      certficate_validation_context_provider_;
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
 };

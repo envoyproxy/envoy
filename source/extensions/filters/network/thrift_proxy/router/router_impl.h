@@ -92,20 +92,23 @@ private:
 class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
                public Upstream::LoadBalancerContextBase,
                public ProtocolConverter,
+               public ThriftFilters::DecoderFilter,
                Logger::Loggable<Logger::Id::thrift> {
 public:
   Router(Upstream::ClusterManager& cluster_manager) : cluster_manager_(cluster_manager) {}
 
   ~Router() {}
 
-  // ProtocolConverter
+  // ThriftFilters::DecoderFilter
   void onDestroy() override;
   void setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) override;
   void resetUpstreamConnection() override;
-  ThriftFilters::FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
-  ThriftFilters::FilterStatus transportEnd() override;
-  ThriftFilters::FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
-  ThriftFilters::FilterStatus messageEnd() override;
+
+  // ProtocolConverter
+  FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
+  FilterStatus transportEnd() override;
+  FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
+  FilterStatus messageEnd() override;
 
   // Upstream::LoadBalancerContext
   const Network::Connection* downstreamConnection() const override;
@@ -123,7 +126,7 @@ private:
                     ProtocolType protocol_type);
     ~UpstreamRequest();
 
-    ThriftFilters::FilterStatus start();
+    FilterStatus start();
     void resetStream();
 
     // Tcp::ConnectionPool::Callbacks

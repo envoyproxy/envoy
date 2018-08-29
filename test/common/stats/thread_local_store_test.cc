@@ -47,6 +47,24 @@ public:
   std::unique_ptr<ThreadLocalStoreImpl> store_;
 };
 
+class HistogramWrapper {
+public:
+  HistogramWrapper() : histogram_(hist_alloc()) {}
+
+  ~HistogramWrapper() { hist_free(histogram_); }
+
+  const histogram_t* getHistogram() { return histogram_; }
+
+  void setHistogramValues(const std::vector<uint64_t>& values) {
+    for (uint64_t value : values) {
+      hist_insert_intscale(histogram_, value, 0, 1);
+    }
+  }
+
+private:
+  histogram_t* histogram_;
+};
+
 class HistogramTest : public testing::Test {
 public:
   typedef std::map<std::string, ParentHistogramSharedPtr> NameHistogramMap;
@@ -88,15 +106,20 @@ public:
 
     std::vector<ParentHistogramSharedPtr> histogram_list = store_->histograms();
 
-    histogram_t* hist1_cumulative = makeHistogram(h1_cumulative_values_);
-    histogram_t* hist2_cumulative = makeHistogram(h2_cumulative_values_);
-    histogram_t* hist1_interval = makeHistogram(h1_interval_values_);
-    histogram_t* hist2_interval = makeHistogram(h2_interval_values_);
+    HistogramWrapper hist1_cumulative;
+    HistogramWrapper hist2_cumulative;
+    HistogramWrapper hist1_interval;
+    HistogramWrapper hist2_interval;
 
-    HistogramStatisticsImpl h1_cumulative_statistics(hist1_cumulative);
-    HistogramStatisticsImpl h2_cumulative_statistics(hist2_cumulative);
-    HistogramStatisticsImpl h1_interval_statistics(hist1_interval);
-    HistogramStatisticsImpl h2_interval_statistics(hist2_interval);
+    hist1_cumulative.setHistogramValues(h1_cumulative_values_);
+    hist2_cumulative.setHistogramValues(h2_cumulative_values_);
+    hist1_interval.setHistogramValues(h1_interval_values_);
+    hist2_interval.setHistogramValues(h2_interval_values_);
+
+    HistogramStatisticsImpl h1_cumulative_statistics(hist1_cumulative.getHistogram());
+    HistogramStatisticsImpl h2_cumulative_statistics(hist2_cumulative.getHistogram());
+    HistogramStatisticsImpl h1_interval_statistics(hist1_interval.getHistogram());
+    HistogramStatisticsImpl h2_interval_statistics(hist2_interval.getHistogram());
 
     NameHistogramMap name_histogram_map = makeHistogramMap(histogram_list);
     const ParentHistogramSharedPtr& h1 = name_histogram_map["h1"];
@@ -108,11 +131,6 @@ public:
       EXPECT_EQ(h2->cumulativeStatistics().summary(), h2_cumulative_statistics.summary());
       EXPECT_EQ(h2->intervalStatistics().summary(), h2_interval_statistics.summary());
     }
-
-    hist_free(hist1_cumulative);
-    hist_free(hist2_cumulative);
-    hist_free(hist1_interval);
-    hist_free(hist2_interval);
 
     h1_interval_values_.clear();
     h2_interval_values_.clear();
@@ -131,14 +149,6 @@ public:
       h2_cumulative_values_.push_back(record_value);
       h2_interval_values_.push_back(record_value);
     }
-  }
-
-  histogram_t* makeHistogram(const std::vector<uint64_t>& values) {
-    histogram_t* histogram = hist_alloc();
-    for (uint64_t value : values) {
-      hist_insert_intscale(histogram, value, 0, 1);
-    }
-    return histogram;
   }
 
   MOCK_METHOD1(alloc, RawStatData*(const std::string& name));
@@ -610,9 +620,9 @@ TEST_F(HistogramTest, BasicHistogramSummaryValidate) {
 
   const std::string h1_expected_summary =
       "P0: 1, P25: 1.025, P50: 1.05, P75: 1.075, P90: 1.09, P95: 1.095, "
-      "P99: 1.099, P99.9: 1.0999, P100: 1.1";
-  const std::string h2_expected_summary =
-      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, P99.9: 99.9, P100: 100";
+      "P99: 1.099, P99.5: 1.0995, P99.9: 1.0999, P100: 1.1";
+  const std::string h2_expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, "
+                                          "P99: 99, P99.5: 99.5, P99.9: 99.9, P100: 100";
 
   for (size_t i = 0; i < 100; ++i) {
     expectCallAndAccumulate(h2, i);
@@ -639,8 +649,8 @@ TEST_F(HistogramTest, BasicHistogramMergeSummary) {
   }
   EXPECT_EQ(1, validateMerge());
 
-  const std::string expected_summary =
-      "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: 99, P99.9: 99.9, P100: 100";
+  const std::string expected_summary = "P0: 0, P25: 25, P50: 50, P75: 75, P90: 90, P95: 95, P99: "
+                                       "99, P99.5: 99.5, P99.9: 99.9, P100: 100";
 
   NameHistogramMap name_histogram_map = makeHistogramMap(store_->histograms());
   EXPECT_EQ(expected_summary, name_histogram_map["h1"]->cumulativeStatistics().summary());
