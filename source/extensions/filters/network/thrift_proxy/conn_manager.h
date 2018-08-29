@@ -68,7 +68,7 @@ public:
   void onBelowWriteBufferLowWatermark() override {}
 
   // DecoderCallbacks
-  ThriftFilters::DecoderFilter& newDecoderFilter() override;
+  DecoderEventHandler& newDecoderEventHandler() override;
 
 private:
   struct ActiveRpc;
@@ -91,17 +91,17 @@ private:
     bool onData(Buffer::Instance& data);
 
     // ProtocolConverter
-    ThriftFilters::FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
-    ThriftFilters::FilterStatus fieldBegin(absl::string_view name, FieldType field_type,
-                                           int16_t field_id) override;
-    ThriftFilters::FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
+    FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
+    FilterStatus fieldBegin(absl::string_view name, FieldType field_type,
+                            int16_t field_id) override;
+    FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
       UNREFERENCED_PARAMETER(metadata);
-      return ThriftFilters::FilterStatus::Continue;
+      return FilterStatus::Continue;
     }
-    ThriftFilters::FilterStatus transportEnd() override;
+    FilterStatus transportEnd() override;
 
     // DecoderCallbacks
-    ThriftFilters::DecoderFilter& newDecoderFilter() override { return *this; }
+    DecoderEventHandler& newDecoderEventHandler() override { return *this; }
 
     ActiveRpc& parent_;
     DecoderPtr decoder_;
@@ -116,7 +116,7 @@ private:
   // ActiveRpc tracks request/response pairs.
   struct ActiveRpc : LinkedObject<ActiveRpc>,
                      public Event::DeferredDeletable,
-                     public ThriftFilters::DecoderFilter,
+                     public DelegatingDecoderEventHandler,
                      public ThriftFilters::DecoderFilterCallbacks,
                      public ThriftFilters::FilterChainFactoryCallbacks {
     ActiveRpc(ConnectionManager& parent)
@@ -133,64 +133,9 @@ private:
       }
     }
 
-    // ThriftFilters::DecoderFilter
-    void onDestroy() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-    void setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks&) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
-    void resetUpstreamConnection() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-    ThriftFilters::FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
-      return decoder_filter_->transportBegin(metadata);
-    }
-    ThriftFilters::FilterStatus transportEnd() override;
-    ThriftFilters::FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override {
-      metadata_ = metadata;
-      return decoder_filter_->messageBegin(metadata);
-    }
-    ThriftFilters::FilterStatus messageEnd() override { return decoder_filter_->messageEnd(); }
-    ThriftFilters::FilterStatus structBegin(absl::string_view name) override {
-      return decoder_filter_->structBegin(name);
-    }
-    ThriftFilters::FilterStatus structEnd() override { return decoder_filter_->structEnd(); }
-    ThriftFilters::FilterStatus fieldBegin(absl::string_view name, FieldType field_type,
-                                           int16_t field_id) override {
-      return decoder_filter_->fieldBegin(name, field_type, field_id);
-    }
-    ThriftFilters::FilterStatus fieldEnd() override { return decoder_filter_->fieldEnd(); }
-    ThriftFilters::FilterStatus boolValue(bool value) override {
-      return decoder_filter_->boolValue(value);
-    }
-    ThriftFilters::FilterStatus byteValue(uint8_t value) override {
-      return decoder_filter_->byteValue(value);
-    }
-    ThriftFilters::FilterStatus int16Value(int16_t value) override {
-      return decoder_filter_->int16Value(value);
-    }
-    ThriftFilters::FilterStatus int32Value(int32_t value) override {
-      return decoder_filter_->int32Value(value);
-    }
-    ThriftFilters::FilterStatus int64Value(int64_t value) override {
-      return decoder_filter_->int64Value(value);
-    }
-    ThriftFilters::FilterStatus doubleValue(double value) override {
-      return decoder_filter_->doubleValue(value);
-    }
-    ThriftFilters::FilterStatus stringValue(absl::string_view value) override {
-      return decoder_filter_->stringValue(value);
-    }
-    ThriftFilters::FilterStatus mapBegin(FieldType key_type, FieldType value_type,
-                                         uint32_t size) override {
-      return decoder_filter_->mapBegin(key_type, value_type, size);
-    }
-    ThriftFilters::FilterStatus mapEnd() override { return decoder_filter_->mapEnd(); }
-    ThriftFilters::FilterStatus listBegin(FieldType elem_type, uint32_t size) override {
-      return decoder_filter_->listBegin(elem_type, size);
-    }
-    ThriftFilters::FilterStatus listEnd() override { return decoder_filter_->listEnd(); }
-    ThriftFilters::FilterStatus setBegin(FieldType elem_type, uint32_t size) override {
-      return decoder_filter_->setBegin(elem_type, size);
-    }
-    ThriftFilters::FilterStatus setEnd() override { return decoder_filter_->setEnd(); }
+    // DecoderEventHandler
+    FilterStatus transportEnd() override;
+    FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
 
     // ThriftFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return stream_id_; }
@@ -213,6 +158,7 @@ private:
       // TODO(zuercher): support multiple filters
       filter->setDecoderFilterCallbacks(*this);
       decoder_filter_ = filter;
+      event_handler_ = decoder_filter_.get();
     }
 
     void createFilterChain();

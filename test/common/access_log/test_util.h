@@ -3,6 +3,7 @@
 #include "envoy/request_info/request_info.h"
 
 #include "common/common/assert.h"
+#include "common/request_info/filter_state_impl.h"
 
 namespace Envoy {
 
@@ -156,6 +157,11 @@ public:
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
+  const Envoy::RequestInfo::FilterState& perRequestState() const override {
+    return per_request_state_;
+  }
+  Envoy::RequestInfo::FilterState& perRequestState() override { return per_request_state_; }
+
   void setRequestedServerName(const absl::string_view requested_server_name) override {
     requested_server_name_ = std::string(requested_server_name);
   }
@@ -184,6 +190,7 @@ public:
   Network::Address::InstanceConstSharedPtr downstream_remote_address_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
+  Envoy::RequestInfo::FilterStateImpl per_request_state_{};
   std::string requested_server_name_;
 };
 

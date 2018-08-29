@@ -493,6 +493,12 @@ Supported variable names are:
     namespace and key(s) are specified as a JSON array of strings. Finally, percent symbols in the
     parameters **do not** need to be escaped by doubling them.
 
+%PER_REQUEST_STATE(reverse.dns.data.name)%
+    Populates the header with values set on the request info perRequestState() object. To be
+    usable in custom request/response headers, these values must be of type
+    Envoy::Router::StringAccessor. These values should be named in standard reverse DNS style,
+    identifying the organization that created the value and ending in a unique name for the data. 
+
 %START_TIME%
     Request start time. START_TIME can be customized with specifiers as specified in
     :ref:`access log format rules<config_access_log_format_start_time>`.

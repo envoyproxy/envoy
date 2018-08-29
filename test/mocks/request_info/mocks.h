@@ -60,6 +60,8 @@ public:
   MOCK_METHOD2(setDynamicMetadata, void(const std::string&, const ProtobufWkt::Struct&));
   MOCK_METHOD3(setDynamicMetadata,
                void(const std::string&, const std::string&, const std::string&));
+  MOCK_METHOD0(perRequestState, FilterState&());
+  MOCK_CONST_METHOD0(perRequestState, const FilterState&());
   MOCK_METHOD1(setRequestedServerName, void(const absl::string_view));
   MOCK_CONST_METHOD0(requestedServerName, const std::string&());
 

@@ -6,7 +6,6 @@
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/network_utility.h"
 
-#include "absl/strings/ascii.h"
 #include "gtest/gtest.h"
 
 using testing::Combine;
