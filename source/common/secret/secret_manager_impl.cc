@@ -48,7 +48,7 @@ void SecretManagerImpl::removeDynamicSecretProvider(const std::string& map_key) 
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(
     const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
-  const std::string map_key = sds_config_source.SerializeAsString + config_name;
+  const std::string map_key = sds_config_source.SerializeAsString() + config_name;
 
   TlsCertificateConfigProviderSharedPtr secret_provider = dynamic_secret_providers_[map_key].lock();
   if (!secret_provider) {
