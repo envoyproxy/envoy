@@ -206,6 +206,9 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
       resources.emplace(resource_name, resource);
     }
     for (auto watch : api_state_[type_url].watches_) {
+      // onConfigUpdate should be called in all cases for single watch xDS (Cluster and Listener)
+      // even if the message does not have resources so that update_empty stat is properly
+      // incremented and state-of-the-world semantics are maintained.
       if (watch->resources_.empty()) {
         watch->callbacks_.onConfigUpdate(message->resources(), message->version_info());
         continue;
@@ -217,7 +220,11 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
           found_resources.Add()->MergeFrom(it->second);
         }
       }
-      watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
+      // onConfigUpdate should be called only on watches(clusters/routes) that have updates in the
+      // message.
+      if (found_resources.size() > 0) {
+        watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
+      }
     }
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we would do
     // that tracking here.
