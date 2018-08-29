@@ -7,6 +7,7 @@
 #include "envoy/event/timer.h"
 
 #include "common/common/logger.h"
+#include "common/event/real_time_system.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
@@ -50,10 +51,17 @@ public:
   MockTimeSystem();
   ~MockTimeSystem();
 
-  MOCK_METHOD1(createTimerFactory, Event::TimerFactoryPtr(Event::Libevent::BasePtr&));
+  // TODO(#4160): Eliminate all uses of MockTimeSystem, replacing with SimulatedTimeSystem,
+  // where timer callbacks are triggered by the advancement of time. This implementation
+  // matches recent behavior, where real-time timers were created directly in libevent
+  // by dispatcher_impl.cc.
+  Event::TimerFactoryPtr createTimerFactory(Event::Libevent::BasePtr& base) override {
+    return real_time_system_.createTimerFactory(base);
+  }
   MOCK_METHOD0(systemTime, SystemTime());
   MOCK_METHOD0(monotonicTime, MonotonicTime());
 
+  Event::RealTimeSystem real_time_system_;
   MockTimeSource mock_time_source_;
 };
 
