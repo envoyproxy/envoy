@@ -38,7 +38,7 @@ envoy_cc_library(
         ":app_exception_lib",
         ":conn_manager_lib",
         ":decoder_lib",
-        ":protocol_lib",
+        ":protocol_interface",
         "//include/envoy/registry",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/network:well_known_names",
@@ -77,13 +77,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "decoder_events_lib",
+    hdrs = ["decoder_events.h"],
+    deps = [
+        ":metadata_lib",
+        ":thrift_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "decoder_lib",
     srcs = ["decoder.cc"],
     hdrs = ["decoder.h"],
     deps = [
-        ":protocol_lib",
+        ":app_exception_lib",
+        ":protocol_interface",
         ":stats_lib",
-        ":transport_lib",
+        ":transport_interface",
         "//source/common/buffer:buffer_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
     ],
@@ -105,9 +115,9 @@ envoy_cc_library(
         "protocol_converter.h",
     ],
     deps = [
+        ":decoder_events_lib",
         ":protocol_interface",
         "//include/envoy/buffer:buffer_interface",
-        "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
     ],
 )
 
@@ -118,6 +128,7 @@ envoy_cc_library(
     ],
     external_deps = ["abseil_optional"],
     deps = [
+        ":decoder_events_lib",
         ":metadata_lib",
         ":thrift_lib",
         "//include/envoy/buffer:buffer_interface",
@@ -129,22 +140,59 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "protocol_lib",
+    name = "auto_protocol_lib",
+    srcs = [
+        "auto_protocol_impl.cc",
+    ],
+    hdrs = [
+        "auto_protocol_impl.h",
+    ],
+    deps = [
+        ":binary_protocol_lib",
+        ":buffer_helper_lib",
+        ":compact_protocol_lib",
+        ":protocol_interface",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
+    name = "binary_protocol_lib",
     srcs = [
         "binary_protocol_impl.cc",
-        "compact_protocol_impl.cc",
-        "protocol_impl.cc",
     ],
     hdrs = [
         "binary_protocol_impl.h",
+    ],
+    deps = [
+        ":buffer_helper_lib",
+        ":protocol_interface",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
+    name = "compact_protocol_lib",
+    srcs = [
+        "compact_protocol_impl.cc",
+    ],
+    hdrs = [
         "compact_protocol_impl.h",
-        "protocol_impl.h",
     ],
     external_deps = ["abseil_optional"],
     deps = [
         ":buffer_helper_lib",
         ":protocol_interface",
-        "//source/common/singleton:const_singleton",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
+    name = "protocol_lib",
+    deps = [
+        ":auto_protocol_lib",
+        ":binary_protocol_lib",
+        ":compact_protocol_lib",
     ],
 )
 
@@ -183,26 +231,76 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "transport_lib",
+    name = "auto_transport_lib",
+    srcs = [
+        "auto_transport_impl.cc",
+    ],
+    hdrs = [
+        "auto_transport_impl.h",
+    ],
+    deps = [
+        ":buffer_helper_lib",
+        ":framed_transport_lib",
+        ":header_transport_lib",
+        ":protocol_lib",
+        ":transport_interface",
+        ":unframed_transport_lib",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "framed_transport_lib",
     srcs = [
         "framed_transport_impl.cc",
-        "header_transport_impl.cc",
-        "transport_impl.cc",
-        "unframed_transport_impl.cc",
     ],
     hdrs = [
         "framed_transport_impl.h",
+    ],
+    deps = [
+        ":buffer_helper_lib",
+        ":transport_interface",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "header_transport_lib",
+    srcs = [
+        "header_transport_impl.cc",
+    ],
+    hdrs = [
         "header_transport_impl.h",
-        "transport_impl.h",
-        "unframed_transport_impl.h",
     ],
     deps = [
         ":app_exception_lib",
         ":buffer_helper_lib",
-        ":metadata_lib",
-        ":protocol_lib",
         ":transport_interface",
         "//source/common/common:assert_lib",
-        "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "unframed_transport_lib",
+    srcs = [
+        "unframed_transport_impl.cc",
+    ],
+    hdrs = [
+        "unframed_transport_impl.h",
+    ],
+    deps = [
+        ":buffer_helper_lib",
+        ":transport_interface",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "transport_lib",
+    deps = [
+        ":auto_transport_lib",
+        ":framed_transport_lib",
+        ":header_transport_lib",
+        ":unframed_transport_lib",
     ],
 )

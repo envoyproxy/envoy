@@ -1,4 +1,4 @@
-#include "extensions/filters/network/thrift_proxy/protocol_impl.h"
+#include "extensions/filters/network/thrift_proxy/auto_protocol_impl.h"
 
 #include <algorithm>
 

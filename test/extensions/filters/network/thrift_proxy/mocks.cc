@@ -33,6 +33,12 @@ MockProtocol::~MockProtocol() {}
 MockDecoderCallbacks::MockDecoderCallbacks() {}
 MockDecoderCallbacks::~MockDecoderCallbacks() {}
 
+MockDecoderEventHandler::MockDecoderEventHandler() {}
+MockDecoderEventHandler::~MockDecoderEventHandler() {}
+
+MockDirectResponse::MockDirectResponse() {}
+MockDirectResponse::~MockDirectResponse() {}
+
 namespace ThriftFilters {
 
 MockDecoderFilter::MockDecoderFilter() {

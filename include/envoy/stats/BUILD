@@ -28,6 +28,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "symbol_table_interface",
+    hdrs = ["symbol_table.h"],
+)
+
+envoy_cc_library(
     name = "timespan",
     hdrs = ["timespan.h"],
     deps = [

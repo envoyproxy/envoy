@@ -7,8 +7,9 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/byte_order.h"
 
-#include "extensions/filters/network/thrift_proxy/protocol.h"
+#include "extensions/filters/network/thrift_proxy/thrift.h"
 
+#include "absl/strings/ascii.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
