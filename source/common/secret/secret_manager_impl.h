@@ -29,7 +29,7 @@ public:
   CertificateValidationContextConfigProviderSharedPtr
   createInlineCertificateValidationContextProvider(
       const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context)
-  override;
+      override;
 
   TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
       const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,

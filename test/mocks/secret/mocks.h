@@ -25,9 +25,9 @@ public:
                TlsCertificateConfigProviderSharedPtr(
                    const envoy::api::v2::auth::TlsCertificate& tls_certificate));
   MOCK_METHOD1(createInlineCertificateValidationContextProvider,
-      CertificateValidationContextConfigProviderSharedPtr(
-      const envoy::api::v2::auth::CertificateValidationContext&
-      certificate_validation_context));
+               CertificateValidationContextConfigProviderSharedPtr(
+                   const envoy::api::v2::auth::CertificateValidationContext&
+                       certificate_validation_context));
   MOCK_METHOD3(findOrCreateTlsCertificateProvider,
                TlsCertificateConfigProviderSharedPtr(
                    const envoy::api::v2::core::ConfigSource&, const std::string&,

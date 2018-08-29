@@ -419,7 +419,8 @@ TEST(ClientContextConfigImplTest, MultipleTlsCertificates) {
       "Multiple TLS certificates are not supported for client contexts");
 }
 
-// Validate context config does not support handling both static TLS certificate and dynamic TLS certificate.
+// Validate context config does not support handling both static TLS certificate and dynamic TLS
+// certificate.
 TEST(ClientContextConfigImplTest, TlsCertificatesAndSdsConfig) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
@@ -430,7 +431,8 @@ TEST(ClientContextConfigImplTest, TlsCertificatesAndSdsConfig) {
       "Multiple TLS certificates are not supported for client contexts");
 }
 
-// Validate context config supports SDS, and is marked as not ready if secrets are not yet downloaded.
+// Validate context config supports SDS, and is marked as not ready if secrets are not yet
+// downloaded.
 TEST(ClientContextConfigImplTest, SecretNotReady) {
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   NiceMock<LocalInfo::MockLocalInfo> local_info;

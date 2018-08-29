@@ -52,14 +52,15 @@ public:
       const envoy::api::v2::auth::TlsCertificate& tls_certificate) PURE;
 
   /**
-   * @param certificate_validation_context the protobuf config of the certificate validation context.
+   * @param certificate_validation_context the protobuf config of the certificate validation
+   * context.
    * @return a CertificateValidationContextConfigProviderSharedPtr created from
    * certificate_validation_context.
    */
   virtual CertificateValidationContextConfigProviderSharedPtr
   createInlineCertificateValidationContextProvider(
       const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context)
-  PURE;
+      PURE;
 
   /**
    * Finds and returns a dynamic secret provider associated to SDS config. Create

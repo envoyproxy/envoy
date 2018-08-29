@@ -57,7 +57,6 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::createInlineTlsCertific
   return std::make_shared<TlsCertificateConfigProviderImpl>(tls_certificate);
 }
 
-
 CertificateValidationContextConfigProviderSharedPtr
 SecretManagerImpl::createInlineCertificateValidationContextProvider(
     const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context) {
@@ -75,11 +74,9 @@ void SecretManagerImpl::removeDynamicSecretProvider(const std::string& map_key) 
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(
     const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
-  const std::string
-      map_key = sds_config_source.SerializeAsString() + config_name;
+  const std::string map_key = sds_config_source.SerializeAsString() + config_name;
 
-  TlsCertificateConfigProviderSharedPtr
-      secret_provider = dynamic_secret_providers_[map_key].lock();
+  TlsCertificateConfigProviderSharedPtr secret_provider = dynamic_secret_providers_[map_key].lock();
   if (!secret_provider) {
     ASSERT(secret_provider_context.initManager() != nullptr);
 
@@ -90,15 +87,10 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertific
     };
 
     secret_provider = std::make_shared<SdsApi>(
-        secret_provider_context.localInfo(),
-        secret_provider_context.dispatcher(),
-        secret_provider_context.random(),
-        secret_provider_context.stats(),
-        secret_provider_context.clusterManager(),
-        *secret_provider_context.initManager(),
-        sds_config_source,
-        config_name,
-        unregister_secret_provider);
+        secret_provider_context.localInfo(), secret_provider_context.dispatcher(),
+        secret_provider_context.random(), secret_provider_context.stats(),
+        secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
+        sds_config_source, config_name, unregister_secret_provider);
     dynamic_secret_providers_[map_key] = secret_provider;
   }
 
