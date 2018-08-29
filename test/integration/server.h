@@ -238,7 +238,6 @@ public:
   }
   void start(const Network::Address::IpVersion version,
              std::function<void()> pre_worker_start_test_steps, bool deterministic);
-  void start();
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
     while (counter(name) == nullptr || counter(name)->value() < value) {
