@@ -540,8 +540,8 @@ message RouteAction {
 
     // Envoy supports two types of cookie affinity:
     //
-    // 1. Passive. Envoy takes a cookie that's present in the cookies header and
-    //    hashes on its value.
+    // 1. Passive. Envoy takes a cookie that's present in the cookies header or
+    // the whole cookies header and hashes on the value.
     //
     // 2. Generated. Envoy generates and sets a cookie with an expiration (TTL)
     //    on the first request from the client in its response to the client,
@@ -553,9 +553,11 @@ message RouteAction {
     //    streams on the same connection will independently receive the same
     //    cookie, even if they arrive at the Envoy simultaneously.
     message Cookie {
-      // The name of the cookie that will be used to obtain the hash key. If the
-      // cookie is not present and ttl below is not set, no hash will be
-      // produced.
+      // The name of the cookie that will be used to obtain the hash key.
+      // If the name is empty, hash on the cookies header, no hash will be
+      // produced if cookies header is empty.
+      // If the name is set but the cookie is not present and ttl below is
+      // not set, no hash will be produced.
       string name = 1 [(validate.rules).string.min_bytes = 1];
 
       // If specified, a cookie with the TTL will be generated if the cookie is
@@ -573,6 +575,15 @@ message RouteAction {
       bool source_ip = 1;
     }
 
+    message QueryParameter {
+      // Hash on query parameter value.
+      string key = 1;
+    }
+
+    message HostPath {
+      // Hash on host and path value.
+    }
+
     oneof policy_specifier {
       option (validate.required) = true;
 
@@ -584,13 +595,29 @@ message RouteAction {
 
       // Connection properties hash policy.
       ConnectionProperties connection_properties = 3;
+
+      // Query parameter hash policy.
+      QueryParameter query_parameter = 4;
+
+      // Host path hash policy.
+      HostPath host_path = 5;
     }
+
+    // If true, and there is already a hash computed, ignore rest of the
+    // list of hash polices.
+    // For example, if there are the following hash methods configured:
+    //   [(specifier, terminal),...]
+    //   [(Header A,    true),
+    //    (Cookie B,    false),
+    //    (Cookie C,    false)]
+    // The generateHash process ends after computing "header A", as it's a terminal policy.
+    bool terminal = 6;
   }
 
   // Specifies a list of hash policies to use for ring hash load balancing. Each
   // hash policy is evaluated individually and the combined result is used to
   // route the request. The method of combination is deterministic such that
-  // identical lists of hash policies will produce the same hash. Since a hash
+  // identical lists of hash policies will produce the same hash.Since a hash
   // policy examines specific parts of a request, it can fail to produce a hash
   // (i.e. if the hashed header is not present). If (and only if) all configured
   // hash policies fail to generate a hash, no hash will be produced for

@@ -78,7 +78,10 @@ ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& con
 
 class HeaderHashMethod : public HashPolicyImpl::HashMethod {
 public:
-  HeaderHashMethod(const std::string& header_name) : header_name_(header_name) {}
+  HeaderHashMethod(const std::string& header_name, bool terminal)
+      : header_name_(header_name), terminal_(terminal) {}
+
+  bool terminal() const { return terminal_; }
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const Http::HeaderMap& headers,
@@ -94,20 +97,30 @@ public:
 
 private:
   const Http::LowerCaseString header_name_;
+  const bool terminal_;
 };
 
 class CookieHashMethod : public HashPolicyImpl::HashMethod {
 public:
   CookieHashMethod(const std::string& key, const std::string& path,
-                   const absl::optional<std::chrono::seconds>& ttl)
-      : key_(key), path_(path), ttl_(ttl) {}
+                   const absl::optional<std::chrono::seconds>& ttl, bool terminal)
+      : key_(key), path_(path), ttl_(ttl), terminal_(terminal) {}
+
+  bool terminal() const { return terminal_; }
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const Http::HeaderMap& headers,
                                     const HashPolicy::AddCookieCallback add_cookie) const override {
     absl::optional<uint64_t> hash;
+    if (key_.empty()) {
+      // If no cookie key specified, use the whole cookies header.
+      const Http::HeaderEntry* cookie = headers.get(Http::Headers::get().Cookie);
+      if (cookie != nullptr && cookie->value().size() > 0) {
+        return HashUtil::xxHash64(std::string(cookie->value().c_str()));
+      }
+      return hash;
+    }
     std::string value = Http::Utility::parseCookieValue(headers, key_);
-
     if (value.empty() && ttl_.has_value()) {
       value = add_cookie(key_, path_, ttl_.value());
       hash = HashUtil::xxHash64(value);
@@ -122,10 +135,15 @@ private:
   const std::string key_;
   const std::string path_;
   const absl::optional<std::chrono::seconds> ttl_;
+  const bool terminal_;
 };
 
 class IpHashMethod : public HashPolicyImpl::HashMethod {
 public:
+  IpHashMethod(bool terminal) : terminal_(terminal) {}
+
+  bool terminal() const { return terminal_; }
+
   absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
                                     const Http::HeaderMap&,
                                     const HashPolicy::AddCookieCallback) const override {
@@ -142,6 +160,49 @@ public:
     }
     return HashUtil::xxHash64(downstream_addr_str);
   }
+
+private:
+  const bool terminal_;
+};
+
+class HostPathHashMethod : public HashPolicyImpl::HashMethod {
+public:
+  HostPathHashMethod(bool terminal) : terminal_(terminal) {}
+  absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
+                                    const Http::HeaderMap& headers,
+                                    const HashPolicy::AddCookieCallback) const override {
+    return HashUtil::xxHash64(
+        absl::StrCat(headers.Host()->value().c_str(), headers.Path()->value().c_str()));
+  }
+  bool terminal() const override { return terminal_; }
+
+private:
+  bool terminal_ = false;
+};
+
+class QueryParameterHashMethod : public HashPolicyImpl::HashMethod {
+public:
+  QueryParameterHashMethod(const std::string& key, bool terminal)
+      : key_(key), terminal_(terminal) {}
+  absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
+                                    const Http::HeaderMap& headers,
+                                    const HashPolicy::AddCookieCallback) const override {
+    if (key_.empty()) {
+      return absl::nullopt;
+    }
+    Http::Utility::QueryParams query_parameters =
+        Http::Utility::parseQueryString(headers.Path()->value().c_str());
+    auto it = query_parameters.find(key_);
+    if (it == query_parameters.end() || it->second.empty()) {
+      return absl::nullopt;
+    }
+    return HashUtil::xxHash64(it->second);
+  }
+  bool terminal() const override { return terminal_; }
+
+private:
+  const std::string key_;
+  bool terminal_ = false;
 };
 
 HashPolicyImpl::HashPolicyImpl(
@@ -153,21 +214,29 @@ HashPolicyImpl::HashPolicyImpl(
   for (auto& hash_policy : hash_policies) {
     switch (hash_policy.policy_specifier_case()) {
     case envoy::api::v2::route::RouteAction::HashPolicy::kHeader:
-      hash_impls_.emplace_back(new HeaderHashMethod(hash_policy.header().header_name()));
+      hash_impls_.emplace_back(
+          new HeaderHashMethod(hash_policy.header().header_name(), hash_policy.terminal()));
       break;
     case envoy::api::v2::route::RouteAction::HashPolicy::kCookie: {
       absl::optional<std::chrono::seconds> ttl;
       if (hash_policy.cookie().has_ttl()) {
         ttl = std::chrono::seconds(hash_policy.cookie().ttl().seconds());
       }
-      hash_impls_.emplace_back(
-          new CookieHashMethod(hash_policy.cookie().name(), hash_policy.cookie().path(), ttl));
+      hash_impls_.emplace_back(new CookieHashMethod(
+          hash_policy.cookie().name(), hash_policy.cookie().path(), ttl, hash_policy.terminal()));
       break;
     }
     case envoy::api::v2::route::RouteAction::HashPolicy::kConnectionProperties:
       if (hash_policy.connection_properties().source_ip()) {
-        hash_impls_.emplace_back(new IpHashMethod());
+        hash_impls_.emplace_back(new IpHashMethod(hash_policy.terminal()));
       }
+      break;
+    case envoy::api::v2::route::RouteAction::HashPolicy::kQueryParameter:
+      hash_impls_.emplace_back(new QueryParameterHashMethod(hash_policy.query_parameter().key(),
+                                                            hash_policy.terminal()));
+      break;
+    case envoy::api::v2::route::RouteAction::HashPolicy::kHostPath:
+      hash_impls_.emplace_back(new HostPathHashMethod(hash_policy.terminal()));
       break;
     default:
       throw EnvoyException(
@@ -189,6 +258,11 @@ HashPolicyImpl::generateHash(const Network::Address::Instance* downstream_addr,
       // and preserves all of the entropy
       const uint64_t old_value = hash ? ((hash.value() << 1) | (hash.value() >> 63)) : 0;
       hash = old_value ^ new_hash.value();
+    }
+    // If the policy is a terminal policy and there are hash generated, ignore
+    // the rest hash policies.
+    if (hash_impl->terminal() && hash) {
+      break;
     }
   }
   return hash;
