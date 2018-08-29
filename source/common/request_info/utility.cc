@@ -19,7 +19,6 @@ const std::string ResponseFlagUtils::DELAY_INJECTED = "DI";
 const std::string ResponseFlagUtils::FAULT_INJECTED = "FI";
 const std::string ResponseFlagUtils::RATE_LIMITED = "RL";
 const std::string ResponseFlagUtils::UNAUTHORIZED_EXTERNAL_SERVICE = "UAEX";
-const std::string ResponseFlagUtils::RATELIMIT_SERVICE_ERROR = "RLSE";
 
 void ResponseFlagUtils::appendString(std::string& result, const std::string& append) {
   if (result.empty()) {
@@ -32,7 +31,7 @@ void ResponseFlagUtils::appendString(std::string& result, const std::string& app
 const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_info) {
   std::string result;
 
-  static_assert(ResponseFlag::LastFlag == 0x2000, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x1000, "A flag has been added. Fix this code.");
 
   if (request_info.hasResponseFlag(ResponseFlag::FailedLocalHealthCheck)) {
     appendString(result, FAILED_LOCAL_HEALTH_CHECK);
@@ -86,10 +85,6 @@ const std::string ResponseFlagUtils::toShortString(const RequestInfo& request_in
     appendString(result, UNAUTHORIZED_EXTERNAL_SERVICE);
   }
 
-  if (request_info.hasResponseFlag(ResponseFlag::RateLimitServiceError)) {
-    appendString(result, RATELIMIT_SERVICE_ERROR);
-  }
-
   return result.empty() ? NONE : result;
 }
 
@@ -109,7 +104,6 @@ absl::optional<ResponseFlag> ResponseFlagUtils::toResponseFlag(const std::string
       {ResponseFlagUtils::FAULT_INJECTED, ResponseFlag::FaultInjected},
       {ResponseFlagUtils::RATE_LIMITED, ResponseFlag::RateLimited},
       {ResponseFlagUtils::UNAUTHORIZED_EXTERNAL_SERVICE, ResponseFlag::UnauthorizedExternalService},
-      {ResponseFlagUtils::RATELIMIT_SERVICE_ERROR, ResponseFlag::RateLimitServiceError},
   };
   const auto& it = map.find(flag);
   if (it != map.end()) {

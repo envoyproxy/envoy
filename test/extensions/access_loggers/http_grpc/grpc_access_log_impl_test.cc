@@ -434,7 +434,6 @@ TEST(responseFlagsToAccessLogResponseFlagsTest, All) {
   common_access_log_expected.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
       envoy::data::accesslog::v2::ResponseFlags_Unauthorized_Reason::
           ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
-  common_access_log_expected.mutable_response_flags()->set_rate_limit_service_error(true);
 
   EXPECT_EQ(common_access_log_expected.DebugString(), common_access_log.DebugString());
 }
