@@ -8,6 +8,8 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"
 
@@ -116,9 +118,8 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
   }
 
   // Check "exp" claim.
-  const auto unix_timestamp = std::chrono::duration_cast<std::chrono::seconds>(
-                                  std::chrono::system_clock::now().time_since_epoch())
-                                  .count();
+  const auto unix_timestamp = absl::ToUnixSeconds(absl::Now());
+
   // NOTE: Service account tokens generally don't have an expiration time (due to being long lived)
   // and defaulted to 0 by google::jwt_verify library but are still valid.
   if (jwt_.exp_ > 0 && jwt_.exp_ < unix_timestamp) {

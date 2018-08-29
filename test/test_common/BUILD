@@ -73,6 +73,7 @@ envoy_cc_test_library(
     hdrs = ["utility.h"],
     external_deps = [
         "abseil_strings",
+        "abseil_time",
     ],
     deps = [
         "//include/envoy/buffer:buffer_interface",

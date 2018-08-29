@@ -40,6 +40,9 @@ envoy_cc_library(
         "authenticator.h",
         "filter_config.h",
     ],
+    external_deps = [
+        "abseil_time",
+    ],
     deps = [
         ":extractor_lib",
         ":jwks_cache_lib",

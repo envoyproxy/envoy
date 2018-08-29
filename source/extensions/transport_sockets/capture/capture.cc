@@ -6,6 +6,9 @@
 #include "common/network/utility.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -59,10 +62,8 @@ Network::IoResult CaptureSocket::doRead(Buffer::Instance& buffer) {
     char* data = static_cast<char*>(buffer.linearize(buffer.length())) +
                  (buffer.length() - result.bytes_processed_);
     auto* event = trace_.add_events();
-    event->mutable_timestamp()->MergeFrom(Protobuf::util::TimeUtil::NanosecondsToTimestamp(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::system_clock::now().time_since_epoch())
-            .count()));
+    event->mutable_timestamp()->MergeFrom(
+        Protobuf::util::TimeUtil::NanosecondsToTimestamp(absl::ToUnixNanos(absl::Now())));
     event->mutable_read()->set_data(data, result.bytes_processed_);
   }
 
@@ -77,10 +78,8 @@ Network::IoResult CaptureSocket::doWrite(Buffer::Instance& buffer, bool end_stre
     // TODO(htuch): avoid linearizing.
     char* data = static_cast<char*>(copy.linearize(result.bytes_processed_));
     auto* event = trace_.add_events();
-    event->mutable_timestamp()->MergeFrom(Protobuf::util::TimeUtil::NanosecondsToTimestamp(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::system_clock::now().time_since_epoch())
-            .count()));
+    event->mutable_timestamp()->MergeFrom(
+        Protobuf::util::TimeUtil::NanosecondsToTimestamp(absl::ToUnixNanos(absl::Now())));
     event->mutable_write()->set_data(data, result.bytes_processed_);
     event->mutable_write()->set_end_stream(end_stream);
   }

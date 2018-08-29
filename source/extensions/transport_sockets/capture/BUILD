@@ -14,6 +14,9 @@ envoy_cc_library(
     name = "capture_lib",
     srcs = ["capture.cc"],
     hdrs = ["capture.h"],
+    external_deps = [
+        "abseil_time",
+    ],
     deps = [
         "//include/envoy/network:transport_socket_interface",
         "//source/common/buffer:buffer_lib",
