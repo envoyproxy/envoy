@@ -200,6 +200,12 @@ void Filter::readDisableUpstream(bool disable) {
 }
 
 void Filter::readDisableDownstream(bool disable) {
+  if (read_callbacks_->connection().state() != Network::Connection::State::Open) {
+    // During idle timeouts, we close both upstream and downstream with NoFlush.
+    // Envoy still does a best-effort flush which can case readDisableDownstream to be called
+    // despite the downstream connection being closed.
+    return;
+  }
   read_callbacks_->connection().readDisable(disable);
 
   if (disable) {
