@@ -15,8 +15,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-ConnectionManager::ConnectionManager(Config& config)
-    : config_(config), stats_(config_.stats()), decoder_(config_.createDecoder(*this)) {}
+ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator)
+  : config_(config), stats_(config_.stats()), decoder_(config_.createDecoder(*this)), random_generator_(random_generator){}
 
 ConnectionManager::~ConnectionManager() {}
 
