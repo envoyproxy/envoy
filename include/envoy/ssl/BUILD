@@ -22,7 +22,8 @@ envoy_cc_library(
     name = "context_config_interface",
     hdrs = ["context_config.h"],
     deps = [
-        "//include/envoy/secret:secret_provider_interface",
+        ":certificate_validation_context_config_interface",
+        ":tls_certificate_config_interface",
     ],
 )
 
@@ -39,4 +40,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "tls_certificate_config_interface",
     hdrs = ["tls_certificate_config.h"],
+)
+
+envoy_cc_library(
+    name = "certificate_validation_context_config_interface",
+    hdrs = ["certificate_validation_context_config.h"],
 )

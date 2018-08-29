@@ -187,5 +187,11 @@ public:
    * @param path.
    */
   static void createParentPath(const std::string& path);
+
+  /**
+   * Remove a path on the filesystem (rm -rf ... equivalent).
+   * @param path.
+   */
+  static void removePath(const std::string& path);
 };
 } // namespace Envoy

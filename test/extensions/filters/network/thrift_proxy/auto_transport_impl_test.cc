@@ -2,7 +2,7 @@
 
 #include "common/buffer/buffer_impl.h"
 
-#include "extensions/filters/network/thrift_proxy/transport_impl.h"
+#include "extensions/filters/network/thrift_proxy/auto_transport_impl.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"

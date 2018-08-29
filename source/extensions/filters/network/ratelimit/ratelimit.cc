@@ -16,7 +16,8 @@ namespace RateLimitFilter {
 Config::Config(const envoy::config::filter::network::rate_limit::v2::RateLimit& config,
                Stats::Scope& scope, Runtime::Loader& runtime)
     : domain_(config.domain()), stats_(generateStats(config.stat_prefix(), scope)),
-      runtime_(runtime), failure_mode_deny_(config.failure_mode_deny()) {
+      runtime_(runtime) {
+
   for (const auto& descriptor : config.descriptors()) {
     RateLimit::Descriptor new_descriptor;
     for (const auto& entry : descriptor.entries()) {
@@ -84,18 +85,11 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&&) {
     break;
   }
 
+  // We fail open if there is an error contacting the service.
   if (status == RateLimit::LimitStatus::OverLimit &&
       config_->runtime().snapshot().featureEnabled("ratelimit.tcp_filter_enforcing", 100)) {
     config_->stats().cx_closed_.inc();
     filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-  } else if (status == RateLimit::LimitStatus::Error) {
-    if (config_->failureModeAllow()) {
-      config_->stats().failure_mode_allowed_.inc();
-      filter_callbacks_->continueReading();
-    } else {
-      config_->stats().cx_closed_.inc();
-      filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
-    }
   } else {
     // We can get completion inline, so only call continue if that isn't happening.
     if (!calling_limit_) {

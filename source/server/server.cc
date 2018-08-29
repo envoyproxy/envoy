@@ -298,8 +298,8 @@ void InstanceImpl::initialize(Options& options,
 
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
-    async_client_manager_ =
-        std::make_unique<Grpc::AsyncClientManagerImpl>(clusterManager(), thread_local_);
+    async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
+        clusterManager(), thread_local_, time_source_);
     hds_delegate_.reset(new Upstream::HdsDelegate(
         bootstrap_.node(), stats(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())

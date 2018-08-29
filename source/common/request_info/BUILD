@@ -12,17 +12,18 @@ envoy_cc_library(
     name = "request_info_lib",
     hdrs = ["request_info_impl.h"],
     deps = [
+        ":filter_state_lib",
         "//include/envoy/request_info:request_info_interface",
         "//source/common/common:assert_lib",
     ],
 )
 
 envoy_cc_library(
-    name = "dynamic_metadata_lib",
-    srcs = ["dynamic_metadata_impl.cc"],
-    hdrs = ["dynamic_metadata_impl.h"],
+    name = "filter_state_lib",
+    srcs = ["filter_state_impl.cc"],
+    hdrs = ["filter_state_impl.h"],
     deps = [
-        "//include/envoy/request_info:dynamic_metadata_interface",
+        "//include/envoy/request_info:filter_state_interface",
     ],
 )
 

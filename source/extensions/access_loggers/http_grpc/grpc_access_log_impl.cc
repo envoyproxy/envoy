@@ -85,7 +85,7 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
     const RequestInfo::RequestInfo& request_info) {
 
-  static_assert(RequestInfo::ResponseFlag::LastFlag == 0x2000,
+  static_assert(RequestInfo::ResponseFlag::LastFlag == 0x1000,
                 "A flag has been added. Fix this code.");
 
   if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -140,10 +140,6 @@ void HttpGrpcAccessLog::responseFlagsToAccessLogResponseFlags(
     common_access_log.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
         envoy::data::accesslog::v2::ResponseFlags_Unauthorized_Reason::
             ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
-  }
-
-  if (request_info.hasResponseFlag(RequestInfo::ResponseFlag::RateLimitServiceError)) {
-    common_access_log.mutable_response_flags()->set_rate_limit_service_error(true);
   }
 }
 

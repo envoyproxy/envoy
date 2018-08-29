@@ -10,6 +10,9 @@ MockSystemTimeSource::~MockSystemTimeSource() {}
 MockMonotonicTimeSource::MockMonotonicTimeSource() {}
 MockMonotonicTimeSource::~MockMonotonicTimeSource() {}
 
+MockTimeSource::MockTimeSource() : TimeSource(system_, monotonic_) {}
+MockTimeSource::~MockTimeSource() {}
+
 MockTokenBucket::MockTokenBucket() {}
 MockTokenBucket::~MockTokenBucket() {}
 
