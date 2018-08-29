@@ -301,9 +301,16 @@ public:
     }
     case test::common::http::ResponseAction::kHeaders: {
       if (state == StreamState::PendingHeaders) {
-        decoder_filter_->callbacks_->encodeHeaders(
-            std::make_unique<TestHeaderMapImpl>(Fuzz::fromHeaders(response_action.headers())),
-            end_stream);
+        auto headers =
+            std::make_unique<TestHeaderMapImpl>(Fuzz::fromHeaders(response_action.headers()));
+        // The client codec will ensure we always have a valid :status.
+        // Similarly, local replies should always contain this.
+        try {
+          Utility::getResponseStatus(*headers);
+        } catch (const CodecClientException&) {
+          headers->setReferenceKey(Headers::get().Status, "200");
+        }
+        decoder_filter_->callbacks_->encodeHeaders(std::move(headers), end_stream);
         state = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
       }
       break;
@@ -368,9 +375,12 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   std::unique_ptr<Ssl::MockConnection> ssl_connection;
+  bool connection_alive = true;
 
   ON_CALL(filter_callbacks.connection_, ssl()).WillByDefault(Return(ssl_connection.get()));
   ON_CALL(Const(filter_callbacks.connection_), ssl()).WillByDefault(Return(ssl_connection.get()));
+  ON_CALL(filter_callbacks.connection_, close(_))
+      .WillByDefault(InvokeWithoutArgs([&connection_alive] { connection_alive = false; }));
   filter_callbacks.connection_.local_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
   filter_callbacks.connection_.remote_address_ =
@@ -384,6 +394,11 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
 
   for (const auto& action : input.actions()) {
     ENVOY_LOG_MISC(trace, "action {} with {} streams", action.DebugString(), streams.size());
+    if (!connection_alive) {
+      ENVOY_LOG_MISC(trace, "skipping due to dead connection");
+      break;
+    }
+
     switch (action.action_selector_case()) {
     case test::common::http::Action::kNewStream: {
       streams.emplace_back(new FuzzStream(conn_manager, config,
