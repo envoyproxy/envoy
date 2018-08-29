@@ -49,20 +49,20 @@ public:
 
 class HistogramWrapper {
 public:
-  HistogramWrapper() { histogram = hist_alloc(); }
+  HistogramWrapper() : histogram_(hist_alloc()) {}
 
-  ~HistogramWrapper() { hist_free(histogram); }
+  ~HistogramWrapper() { hist_free(histogram_); }
 
-  const histogram_t* getHistogram() { return histogram; }
+  const histogram_t* getHistogram() { return histogram_; }
 
-  void initHistogram(const std::vector<uint64_t>& values) {
+  void setHistogramValues(const std::vector<uint64_t>& values) {
     for (uint64_t value : values) {
-      hist_insert_intscale(histogram, value, 0, 1);
+      hist_insert_intscale(histogram_, value, 0, 1);
     }
   }
 
 private:
-  histogram_t* histogram;
+  histogram_t* histogram_;
 };
 
 class HistogramTest : public testing::Test {
@@ -111,10 +111,10 @@ public:
     HistogramWrapper hist1_interval;
     HistogramWrapper hist2_interval;
 
-    hist1_cumulative.initHistogram(h1_cumulative_values_);
-    hist2_cumulative.initHistogram(h2_cumulative_values_);
-    hist1_interval.initHistogram(h1_interval_values_);
-    hist2_interval.initHistogram(h2_interval_values_);
+    hist1_cumulative.setHistogramValues(h1_cumulative_values_);
+    hist2_cumulative.setHistogramValues(h2_cumulative_values_);
+    hist1_interval.setHistogramValues(h1_interval_values_);
+    hist2_interval.setHistogramValues(h2_interval_values_);
 
     HistogramStatisticsImpl h1_cumulative_statistics(hist1_cumulative.getHistogram());
     HistogramStatisticsImpl h2_cumulative_statistics(hist2_cumulative.getHistogram());

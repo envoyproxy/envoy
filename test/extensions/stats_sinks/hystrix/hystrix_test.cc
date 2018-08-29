@@ -100,20 +100,20 @@ public:
 
 class HistogramWrapper {
 public:
-  HistogramWrapper() { histogram = hist_alloc(); }
+  HistogramWrapper() : histogram_(hist_alloc()) {}
 
-  ~HistogramWrapper() { hist_free(histogram); }
+  ~HistogramWrapper() { hist_free(histogram_); }
 
-  const histogram_t* getHistogram() { return histogram; }
+  const histogram_t* getHistogram() { return histogram_; }
 
-  void initHistogram(const std::vector<uint64_t>& values) {
+  void setHistogramValues(const std::vector<uint64_t>& values) {
     for (uint64_t value : values) {
-      hist_insert_intscale(histogram, value, 0, 1);
+      hist_insert_intscale(histogram_, value, 0, 1);
     }
   }
 
 private:
-  histogram_t* histogram;
+  histogram_t* histogram_;
 };
 
 class HystrixSinkTest : public testing::Test {
@@ -480,7 +480,7 @@ TEST_F(HystrixSinkTest, HistogramTest) {
   }
 
   HistogramWrapper hist1_interval;
-  hist1_interval.initHistogram(h1_interval_values);
+  hist1_interval.setHistogramValues(h1_interval_values);
 
   Stats::HistogramStatisticsImpl h1_interval_statistics(hist1_interval.getHistogram());
   ON_CALL(*histogram, intervalStatistics())
