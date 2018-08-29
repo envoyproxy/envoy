@@ -427,7 +427,7 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() cons
     return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Client);
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
-    stats_.upstream_context_secrets_not_ready.inc();
+    stats_.upstream_context_secrets_not_ready_.inc();
     return std::make_unique<NotReadySslSocket>();
   }
 }
@@ -459,7 +459,7 @@ Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() cons
     return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Server);
   } else {
     ENVOY_LOG(debug, "Create NotReadySslSocket");
-    stats_.downstream_context_secrets_not_ready.inc();
+    stats_.downstream_context_secrets_not_ready_.inc();
     return std::make_unique<NotReadySslSocket>();
   }
 }
