@@ -320,16 +320,14 @@ TEST_F(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
   expectSendMessage(type_url, {"x", "y"}, "");
   grpc_mux_->start();
 
-  {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
-    response->set_type_url(type_url);
-    response->set_version_info("1");
+  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+      new envoy::api::v2::DiscoveryResponse());
+  response->set_type_url(type_url);
+  response->set_version_info("1");
 
-    EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1")).Times(0);
-    expectSendMessage(type_url, {"x", "y"}, "1");
-    grpc_mux_->onReceiveMessage(std::move(response));
-  }
+  EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1")).Times(0);
+  expectSendMessage(type_url, {"x", "y"}, "1");
+  grpc_mux_->onReceiveMessage(std::move(response));
 
   expectSendMessage(type_url, {}, "1");
 }
@@ -345,18 +343,16 @@ TEST_F(GrpcMuxImplTest, SingleWatcherWithEmptyUpdates) {
   expectSendMessage(type_url, {}, "");
   grpc_mux_->start();
 
-  {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
-    response->set_type_url(type_url);
-    response->set_version_info("1");
-    // Validate that onConfigUpdate is called with empty resources.
-    EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
-        .WillOnce(Invoke([](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                            const std::string&) { EXPECT_TRUE(resources.empty()); }));
-    expectSendMessage(type_url, {}, "1");
-    grpc_mux_->onReceiveMessage(std::move(response));
-  }
+  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
+      new envoy::api::v2::DiscoveryResponse());
+  response->set_type_url(type_url);
+  response->set_version_info("1");
+  // Validate that onConfigUpdate is called with empty resources.
+  EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
+      .WillOnce(Invoke([](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                          const std::string&) { EXPECT_TRUE(resources.empty()); }));
+  expectSendMessage(type_url, {}, "1");
+  grpc_mux_->onReceiveMessage(std::move(response));
 }
 
 //  Verifies that warning messages get logged when Envoy detects too many requests.
