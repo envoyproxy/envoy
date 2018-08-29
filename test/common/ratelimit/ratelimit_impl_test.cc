@@ -47,6 +47,8 @@ public:
           Grpc::AsyncClientPtr{async_client_}, absl::optional<std::chrono::milliseconds>(),
           "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit"));
     } else {
+      // Force link time dependency on deprecated message type.
+      pb::lyft::ratelimit::RateLimit _ignore;
       client_.reset(new GrpcClientImpl(Grpc::AsyncClientPtr{async_client_},
                                        absl::optional<std::chrono::milliseconds>(),
                                        "pb.lyft.ratelimit.RateLimitService.ShouldRateLimit"));

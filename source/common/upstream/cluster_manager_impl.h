@@ -211,6 +211,7 @@ public:
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
+  TimeSource& timeSource() override { return time_source_; }
 
 protected:
   virtual void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
