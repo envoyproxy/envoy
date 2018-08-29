@@ -196,7 +196,7 @@ private:
   void terminate();
 
   Options& options_;
-  TimeSource time_source_;
+  TimeSource& time_source_;
   HotRestart& restarter_;
   const time_t start_time_;
   time_t original_start_time_;

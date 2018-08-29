@@ -51,7 +51,7 @@ public:
 
 class ListenerManagerImplTest : public testing::Test {
 public:
-  ListenerManagerImplTest() : time_source_(system_time_source_, monotonic_time_source_) {
+  ListenerManagerImplTest() {
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
     manager_.reset(
         new ListenerManagerImpl(server_, listener_factory_, worker_factory_, time_source_));
@@ -115,9 +115,7 @@ public:
   NiceMock<MockWorkerFactory> worker_factory_;
   std::unique_ptr<ListenerManagerImpl> manager_;
   NiceMock<MockGuardDog> guard_dog_;
-  NiceMock<MockSystemTimeSource> system_time_source_;
-  ProdMonotonicTimeSource monotonic_time_source_;
-  TimeSource time_source_;
+  NiceMock<MockTimeSource> time_source_;
 };
 
 class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
@@ -470,7 +468,7 @@ TEST_F(ListenerManagerImplTest, AddListenerOnIpv6OnlySetups) {
 
 // Make sure that a listener that is not modifiable cannot be updated or removed.
 TEST_F(ListenerManagerImplTest, UpdateRemoveNotModifiableListener) {
-  ON_CALL(system_time_source_, currentTime())
+  ON_CALL(time_source_, systemTime())
       .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1001001001001))));
 
   InSequence s;
@@ -528,7 +526,7 @@ dynamic_draining_listeners:
 }
 
 TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
-  ON_CALL(system_time_source_, currentTime())
+  ON_CALL(time_source_, systemTime())
       .WillByDefault(Return(SystemTime(std::chrono::milliseconds(1001001001001))));
 
   InSequence s;
@@ -596,7 +594,7 @@ filter_chains: {}
 per_connection_buffer_limit_bytes: 10
   )EOF";
 
-  ON_CALL(system_time_source_, currentTime())
+  ON_CALL(time_source_, systemTime())
       .WillByDefault(Return(SystemTime(std::chrono::milliseconds(2002002002002))));
 
   ListenerHandle* listener_foo_update1 = expectListenerCreate(false);
@@ -636,7 +634,7 @@ dynamic_draining_listeners:
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_update1_yaml), "", true));
   checkStats(1, 1, 0, 0, 1, 0);
 
-  ON_CALL(system_time_source_, currentTime())
+  ON_CALL(time_source_, systemTime())
       .WillByDefault(Return(SystemTime(std::chrono::milliseconds(3003003003003))));
 
   // Update foo. Should go into warming, have an immediate warming callback, and start immediate
@@ -688,7 +686,7 @@ dynamic_draining_listeners:
   worker_->callRemovalCompletion();
   checkStats(1, 2, 0, 0, 1, 0);
 
-  ON_CALL(system_time_source_, currentTime())
+  ON_CALL(time_source_, systemTime())
       .WillByDefault(Return(SystemTime(std::chrono::milliseconds(4004004004004))));
 
   // Add bar listener.
@@ -710,7 +708,7 @@ filter_chains: {}
   worker_->callAddCompletion(true);
   checkStats(2, 2, 0, 0, 2, 0);
 
-  ON_CALL(system_time_source_, currentTime())
+  ON_CALL(time_source_, systemTime())
       .WillByDefault(Return(SystemTime(std::chrono::milliseconds(5005005005005))));
 
   // Add baz listener, this time requiring initializing.

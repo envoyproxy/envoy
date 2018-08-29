@@ -31,7 +31,7 @@ private:
   ThreadLocal::Instance& tls_;
   Api::Api& api_;
   TestHooks& hooks_;
-  TimeSource time_source_;
+  TimeSource& time_source_;
 };
 
 /**

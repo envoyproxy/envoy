@@ -22,9 +22,7 @@ bool validateConfig(Options& options, Network::Address::InstanceConstSharedPtr l
   Stats::IsolatedStoreImpl stats_store;
 
   try {
-    ProdSystemTimeSource system_time_source;
-    ProdMonotonicTimeSource monotonic_time_source;
-    TimeSource time_source(system_time_source, monotonic_time_source);
+    RealTimeSource time_source;
     ValidationInstance server(options, time_source, local_address, stats_store, access_log_lock,
                               component_factory);
     std::cout << "configuration '" << options.configPath() << "' OK" << std::endl;
