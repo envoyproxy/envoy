@@ -78,7 +78,7 @@ private:
     ResponseDecoder(ActiveRpc& parent, Transport& transport, Protocol& protocol)
         : parent_(parent), decoder_(std::make_unique<Decoder>(transport, protocol, *this)),
           complete_(false), first_reply_field_(false) {
-      initProtocolConverter(parent_.parent_.protocol_.get(), parent_.response_buffer_);
+      initProtocolConverter(*parent_.parent_.protocol_, parent_.response_buffer_);
     }
 
     bool onData(Buffer::Instance& data);

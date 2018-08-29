@@ -371,7 +371,7 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
 }
 
 void Router::UpstreamRequest::onRequestStart(bool continue_decoding) {
-  parent_.initProtocolConverter(protocol_.get(), parent_.upstream_request_buffer_);
+  parent_.initProtocolConverter(*protocol_, parent_.upstream_request_buffer_);
 
   // TODO(zuercher): need to use an upstream-connection-specific sequence id
   parent_.convertMessageBegin(metadata_);

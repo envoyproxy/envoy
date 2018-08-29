@@ -19,8 +19,8 @@ public:
   ProtocolConverter() {}
   virtual ~ProtocolConverter() {}
 
-  void initProtocolConverter(Protocol* proto, Buffer::Instance& buffer) {
-    proto_ = proto;
+  void initProtocolConverter(Protocol& proto, Buffer::Instance& buffer) {
+    proto_ = &proto;
     buffer_ = &buffer;
   }
 

@@ -429,7 +429,7 @@ public:
   }
 
   /**
-   * Check whether a given upstream connection can be upgraded and generates an upgrade request
+   * Checks whether a given upstream connection can be upgraded and generates an upgrade request
    * message. If this method returns a ThriftObject it will be used to decode the upstream's next
    * response.
    *
