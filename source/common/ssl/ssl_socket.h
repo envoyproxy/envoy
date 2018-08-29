@@ -20,8 +20,8 @@ namespace Ssl {
 // clang-format off
 #define ALL_SSL_SOCKET_FACTORY_STATS(COUNTER)                                 \
   COUNTER(ssl_context_update_by_sds)                                          \
-  COUNTER(upstream_connection_reset_by_sds)                                   \
-  COUNTER(downstream_connection_reset_by_sds)
+  COUNTER(upstream_context_secrets_not_ready)                                 \
+  COUNTER(downstream_context_secrets_not_ready)
 // clang-format on
 
 /**

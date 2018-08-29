@@ -55,9 +55,9 @@ public:
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
 
   bool isReady() const override {
-    // either tls_certficate_provider_ is nullptr or
+    // Either tls_certficate_provider_ is nullptr or
     // tls_certficate_provider_->secret() is NOT nullptr.
-    return !tls_certficate_provider_ || tls_certficate_provider_->secret();
+    return !tls_certficate_provider_ || tls_certficate_provider_->secret() != nullptr;
   }
 
   void setSecretUpdateCallback(std::function<void()> callback) override {
