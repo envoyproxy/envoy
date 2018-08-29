@@ -8,7 +8,6 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "envoy/stats/symbol_table.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/stats/heap_stat_data.h"
@@ -214,21 +213,27 @@ public:
 
 private:
   struct TlsCacheEntry {
-    std::unordered_map<StatNamePtr, CounterSharedPtr, StatNamePtrHash, StatNamePtrCompare>
+    std::unordered_map<StatNamePtr, CounterSharedPtr, StatNameUniquePtrHash,
+                       StatNameUniquePtrCompare>
         counters_;
-    std::unordered_map<StatNamePtr, GaugeSharedPtr, StatNamePtrHash, StatNamePtrCompare> gauges_;
-    std::unordered_map<StatNamePtr, TlsHistogramSharedPtr, StatNamePtrHash, StatNamePtrCompare>
+    std::unordered_map<StatNamePtr, GaugeSharedPtr, StatNameUniquePtrHash, StatNameUniquePtrCompare>
+        gauges_;
+    std::unordered_map<StatNamePtr, TlsHistogramSharedPtr, StatNameUniquePtrHash,
+                       StatNameUniquePtrCompare>
         histograms_;
-    std::unordered_map<StatNamePtr, ParentHistogramSharedPtr, StatNamePtrHash, StatNamePtrCompare>
+    std::unordered_map<StatNamePtr, ParentHistogramSharedPtr, StatNameUniquePtrHash,
+                       StatNameUniquePtrCompare>
         parent_histograms_;
   };
 
   struct CentralCacheEntry {
-    std::unordered_map<StatNamePtr, CounterSharedPtr, StatNamePtrHash, StatNamePtrCompare>
+    std::unordered_map<StatNamePtr, CounterSharedPtr, StatNameUniquePtrHash,
+                       StatNameUniquePtrCompare>
         counters_;
-    std::unordered_map<StatNamePtr, GaugeSharedPtr, StatNamePtrHash, StatNamePtrCompare> gauges_;
-    std::unordered_map<StatNamePtr, ParentHistogramImplSharedPtr, StatNamePtrHash,
-                       StatNamePtrCompare>
+    std::unordered_map<StatNamePtr, GaugeSharedPtr, StatNameUniquePtrHash, StatNameUniquePtrCompare>
+        gauges_;
+    std::unordered_map<StatNamePtr, ParentHistogramImplSharedPtr, StatNameUniquePtrHash,
+                       StatNameUniquePtrCompare>
         histograms_;
   };
 
@@ -269,8 +274,8 @@ private:
     template <class StatType>
     StatType&
     safeMakeStat(const std::string& name,
-                 std::unordered_map<StatNamePtr, std::shared_ptr<StatType>, StatNamePtrHash,
-                                    StatNamePtrCompare>& central_cache_map,
+                 std::unordered_map<StatNamePtr, std::shared_ptr<StatType>, StatNameUniquePtrHash,
+                                    StatNameUniquePtrCompare>& central_cache_map,
                  MakeStatFn<StatType> make_stat, std::shared_ptr<StatType>* tls_ref);
 
     static std::atomic<uint64_t> next_scope_id_;

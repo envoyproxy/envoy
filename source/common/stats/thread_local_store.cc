@@ -36,7 +36,7 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
 std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<CounterSharedPtr> ret;
-  std::unordered_set<StatName*, StatNameHash, StatNameCompare> names;
+  std::unordered_set<StatName*, StatNamePtrHash, StatNamePtrCompare> names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto& counter : scope->central_cache_.counters_) {
@@ -59,7 +59,7 @@ ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
 std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   // Handle de-dup due to overlapping scopes.
   std::vector<GaugeSharedPtr> ret;
-  std::unordered_set<StatName*, StatNameHash, StatNameCompare> names;
+  std::unordered_set<StatName*, StatNamePtrHash, StatNamePtrCompare> names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
     for (auto& gauge : scope->central_cache_.gauges_) {
@@ -190,8 +190,8 @@ ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() { parent_.releaseScopeCrossThread(
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     const std::string& name,
-    std::unordered_map<StatNamePtr, std::shared_ptr<StatType>, StatNamePtrHash, StatNamePtrCompare>&
-        central_cache_map,
+    std::unordered_map<StatNamePtr, std::shared_ptr<StatType>, StatNameUniquePtrHash,
+                       StatNameUniquePtrCompare>& central_cache_map,
     MakeStatFn<StatType> make_stat, std::shared_ptr<StatType>* tls_ref) {
 
   // If we have a valid cache entry, return it.

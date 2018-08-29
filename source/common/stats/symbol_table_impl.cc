@@ -12,7 +12,7 @@ namespace Stats {
 // TODO(ambuc): There is a possible performance optimization here for avoiding the encoding of IPs /
 // numbers if they appear in stat names. We don't want to waste time symbolizing an integer as an
 // integer, if we can help it.
-StatNamePtr SymbolTableImpl::encode(const absl::string_view name) {
+StatNamePtr SymbolTable::encode(const absl::string_view name) {
   Thread::LockGuard lock(lock_);
   SymbolVec symbol_vec;
   std::vector<absl::string_view> name_vec = absl::StrSplit(name, '.');
@@ -20,10 +20,10 @@ StatNamePtr SymbolTableImpl::encode(const absl::string_view name) {
   std::transform(name_vec.begin(), name_vec.end(), std::back_inserter(symbol_vec),
                  [this](absl::string_view x) { return toSymbol(x); });
 
-  return std::make_unique<StatNameImpl>(symbol_vec, *this);
+  return std::make_unique<StatName>(symbol_vec, *this);
 }
 
-std::string SymbolTableImpl::decode(const SymbolVec& symbol_vec) const {
+std::string SymbolTable::decode(const SymbolVec& symbol_vec) const {
   Thread::LockGuard lock(lock_);
   std::vector<absl::string_view> name;
   name.reserve(symbol_vec.size());
@@ -32,7 +32,7 @@ std::string SymbolTableImpl::decode(const SymbolVec& symbol_vec) const {
   return absl::StrJoin(name, ".");
 }
 
-void SymbolTableImpl::free(const SymbolVec& symbol_vec) {
+void SymbolTable::free(const SymbolVec& symbol_vec) {
   Thread::LockGuard lock(lock_);
   for (const Symbol symbol : symbol_vec) {
     auto decode_search = decode_map_.find(symbol);
@@ -52,7 +52,7 @@ void SymbolTableImpl::free(const SymbolVec& symbol_vec) {
   }
 }
 
-Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
+Symbol SymbolTable::toSymbol(absl::string_view sv) {
   Symbol result;
   auto encode_find = encode_map_.find(sv);
   // If the string segment doesn't already exist,
@@ -79,7 +79,7 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   return result;
 }
 
-absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const {
+absl::string_view SymbolTable::fromSymbol(const Symbol symbol) const {
   auto search = decode_map_.find(symbol);
   ASSERT(search != decode_map_.end());
   return search->second;

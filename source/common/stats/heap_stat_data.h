@@ -51,7 +51,7 @@ public:
   // StatDataAllocator
   bool requiresBoundedStatNameSize() const override { return false; }
 
-  // SymbolTableImpl
+  // SymbolTable
   StatNamePtr encode(absl::string_view sv) {
     Thread::LockGuard lock(mutex_);
     return table_.encode(sv);
@@ -73,7 +73,7 @@ private:
   StatSet stats_ GUARDED_BY(mutex_);
   // A locally held symbol table which encodes stat names as StatNamePtrs and decodes StatNamePtrs
   // back into strings.
-  SymbolTableImpl table_ GUARDED_BY(mutex_);
+  SymbolTable table_ GUARDED_BY(mutex_);
   // A mutex is needed here to protect both the stats_ object and the table_ object from both
   // alloc() and free() operations. Although alloc() operations are called under existing locking,
   // free() operations are made from the destructors of the individual stat objects, which are not

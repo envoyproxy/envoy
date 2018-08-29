@@ -8,7 +8,6 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/stats_options.h"
 #include "envoy/stats/store.h"
-#include "envoy/stats/symbol_table.h"
 
 #include "common/common/utility.h"
 #include "common/stats/heap_stat_data.h"
@@ -52,7 +51,8 @@ public:
   }
 
 private:
-  std::unordered_map<StatNamePtr, std::shared_ptr<Base>, StatNamePtrHash, StatNamePtrCompare>
+  std::unordered_map<StatNamePtr, std::shared_ptr<Base>, StatNameUniquePtrHash,
+                     StatNameUniquePtrCompare>
       stats_;
   Allocator alloc_;
   HeapStatDataAllocator& heap_alloc_;
