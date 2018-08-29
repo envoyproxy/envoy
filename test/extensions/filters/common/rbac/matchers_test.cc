@@ -204,6 +204,9 @@ TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
 
   auth.mutable_principal_name()->set_exact("foo");
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
+
+  auth.clear_name();
+  checkMatcher(AuthenticatedMatcher(auth), true, conn);
 }
 
 TEST(AuthenticatedMatcher, subjectPeerCertificate) {
@@ -223,6 +226,9 @@ TEST(AuthenticatedMatcher, subjectPeerCertificate) {
 
   auth.mutable_principal_name()->set_exact("bar");
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
+
+  auth.clear_name();
+  checkMatcher(AuthenticatedMatcher(auth), true, conn);
 }
 
 TEST(AuthenticatedMatcher, AnySSLSubject) {
@@ -238,6 +244,9 @@ TEST(AuthenticatedMatcher, AnySSLSubject) {
   checkMatcher(AuthenticatedMatcher(auth), false, conn);
 
   auth.mutable_principal_name()->set_regex(".*");
+  checkMatcher(AuthenticatedMatcher(auth), true, conn);
+
+  auth.clear_name();
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 }
 

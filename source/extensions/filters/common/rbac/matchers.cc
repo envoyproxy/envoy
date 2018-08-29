@@ -142,7 +142,7 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
   std::string principal = ssl->uriSanPeerCertificate();
   principal = principal.empty() ? ssl->subjectPeerCertificate() : principal;
 
-  return matcher_.has_value() ? (*matcher_).match(principal) : principal == name_;
+  return matcher_.has_value() ? matcher_.value().match(principal) : principal == name_;
 }
 
 bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap&,
