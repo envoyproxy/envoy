@@ -3,7 +3,52 @@
 namespace Envoy {
 namespace {
 
-typedef HttpProtocolIntegrationTest BufferIntegrationTest;
+class BufferIntegrationTest : public HttpProtocolIntegrationTest {
+ public:
+  ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config) {
+    ProtobufWkt::Struct pfc;
+    RELEASE_ASSERT(Protobuf::util::JsonStringToMessage(json_config, &pfc).ok(), "");
+
+    return
+        [pfc](
+            envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
+          auto* config = cfg.mutable_route_config()
+                             ->mutable_virtual_hosts()
+                             ->Mutable(0)
+                             ->mutable_per_filter_config();
+
+          (*config)["envoy.buffer"] = pfc;
+        };
+  }
+
+  void overrideTimeout(int max_request_time) {
+    // {{ and }} are escaped braces in fmt
+    std::string config = fmt::format(R"EOF({{"buffer": {{
+      "max_request_time": {{"seconds": {}}}
+    }}}})EOF", max_request_time);
+
+    ConfigHelper::HttpModifierFunction mod = overrideConfig(config);
+    config_helper_.addConfigModifier(mod);
+  }
+
+  AssertionResult setupRequestTimeoutTest(std::chrono::milliseconds http_connection_timeout,
+                                          const char* method = "GET") {
+    config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
+    initialize();
+
+    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+    codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+    auto encoder_decoder =
+        codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", method},
+                                                            {":path", "/test/long/url"},
+                                                            {":scheme", "http"},
+                                                            {":authority", "host"}});
+    request_encoder_ = &encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    return fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
+                                                     http_connection_timeout);
+  }
+};
 
 INSTANTIATE_TEST_CASE_P(Protocols, BufferIntegrationTest,
                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
@@ -52,22 +97,6 @@ TEST_P(BufferIntegrationTest, RouterRequestBufferLimitExceeded) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_STREQ("413", response->headers().Status()->value().c_str());
-}
-
-ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config) {
-  ProtobufWkt::Struct pfc;
-  RELEASE_ASSERT(Protobuf::util::JsonStringToMessage(json_config, &pfc).ok(), "");
-
-  return
-      [pfc](
-          envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
-        auto* config = cfg.mutable_route_config()
-                           ->mutable_virtual_hosts()
-                           ->Mutable(0)
-                           ->mutable_per_filter_config();
-
-        (*config)["envoy.buffer"] = pfc;
-      };
 }
 
 TEST_P(BufferIntegrationTest, RouteDisabled) {
@@ -119,6 +148,17 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+}
+
+TEST_P(BufferIntegrationTest, RequestPathTimesOutInBuffer) {
+  int buffer_timeout = 1;
+  std::chrono::milliseconds connection_timeout = std::chrono::milliseconds(2500);
+
+  overrideTimeout(buffer_timeout);
+  AssertionResult result = setupRequestTimeoutTest(connection_timeout);
+
+  EXPECT_FALSE(result);
+  // TODO Check stats increments
 }
 
 } // namespace

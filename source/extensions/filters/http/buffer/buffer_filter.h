@@ -11,6 +11,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/common/fmt.h"
 
 namespace Envoy {
 namespace Extensions {
