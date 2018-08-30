@@ -27,7 +27,6 @@ namespace RateLimitFilter {
   COUNTER(error)                                                                                   \
   COUNTER(over_limit)                                                                              \
   COUNTER(ok)                                                                                      \
-  COUNTER(failure_mode_allowed)                                                                    \
   COUNTER(cx_closed)                                                                               \
   GAUGE  (active)
 // clang-format on
@@ -50,7 +49,6 @@ public:
   const std::vector<RateLimit::Descriptor>& descriptors() { return descriptors_; }
   Runtime::Loader& runtime() { return runtime_; }
   const InstanceStats& stats() { return stats_; }
-  bool failureModeAllow() const { return !failure_mode_deny_; };
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
@@ -59,7 +57,6 @@ private:
   std::vector<RateLimit::Descriptor> descriptors_;
   const InstanceStats stats_;
   Runtime::Loader& runtime_;
-  const bool failure_mode_deny_;
 };
 
 typedef std::shared_ptr<Config> ConfigSharedPtr;

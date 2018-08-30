@@ -36,13 +36,9 @@ inline test::fuzz::Headers toHeaders(const Http::HeaderMap& headers) {
 inline TestRequestInfo fromRequestInfo(const test::fuzz::RequestInfo& request_info) {
   TestRequestInfo test_request_info;
   test_request_info.metadata_ = request_info.dynamic_metadata();
-#ifdef __APPLE__
-  // Clocks don't track at nanosecond on OS X.
+  // libc++ clocks don't track at nanosecond on OS X.
   test_request_info.start_time_ =
       SystemTime(std::chrono::microseconds(request_info.start_time() / 1000));
-#else
-  test_request_info.start_time_ = SystemTime(std::chrono::nanoseconds(request_info.start_time()));
-#endif
   if (request_info.has_response_code()) {
     test_request_info.response_code_ = request_info.response_code().value();
   }

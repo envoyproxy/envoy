@@ -109,7 +109,7 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "twitter.common.finagle-thrift-0.3.9/src",
     ),
     com_google_googletest = dict(
-        commit = "c3d9db428a7f403185b936a709abfe58b1f3c0d6",  # 2018-08-24
+        commit = "3d5612182581df64acc12d2633e473decf5adc47",  # Aug 29, 2018
         remote = "https://github.com/google/googletest",
     ),
     com_google_protobuf = dict(

@@ -27,6 +27,7 @@ message RateLimit {
   // set, this defaults to 20ms.
   google.protobuf.Duration timeout = 4 [(gogoproto.stdduration) = true];
 
+  // [#not-implemented-hide:] Hide from docs.
   // The filter's behaviour in case the rate limiting service does
   // not respond back. When it is set to true, Envoy will not allow traffic in case of
   // communication failure between rate limiting service and the proxy.
