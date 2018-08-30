@@ -1142,7 +1142,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+      [this](const std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();
