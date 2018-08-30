@@ -161,5 +161,21 @@ TEST_P(BufferIntegrationTest, RequestPathTimesOutInBuffer) {
   // TODO Check stats increments
 }
 
+TEST_P(BufferIntegrationTest, RequestPathTimesntOutInBuffer) {
+  int buffer_timeout = 3; // Greater than connectiom timeout
+  std::chrono::milliseconds connection_timeout = std::chrono::milliseconds(2500);
+
+  overrideTimeout(buffer_timeout);
+  AssertionResult result = setupRequestTimeoutTest(connection_timeout);
+
+  // TODO assert this will segfault
+  // AssertionResult result =
+  // fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_);
+  // EXPECT_FALSE(result);
+  // TODO Check stats increments
+}
+
+
+
 } // namespace
 } // namespace Envoy
