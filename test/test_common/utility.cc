@@ -1,11 +1,10 @@
 #include "utility.h"
 
-#include <cstdint>
 #include <dirent.h>
-#include <fstream>
 #include <unistd.h>
 
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <list>
 #include <stdexcept>
@@ -217,8 +216,7 @@ ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
 
 AtomicFileUpdater::AtomicFileUpdater(const std::string& filename)
     : link_(filename), new_link_(absl::StrCat(filename, ".new")),
-      target1_(absl::StrCat(filename, ".target1")),
-      target2_(absl::StrCat(filename, ".target2")),
+      target1_(absl::StrCat(filename, ".target1")), target2_(absl::StrCat(filename, ".target2")),
       use_target1_(true) {
   unlink(link_.c_str());
   unlink(new_link_.c_str());

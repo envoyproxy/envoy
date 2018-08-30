@@ -51,9 +51,7 @@ protected:
         resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
         file_updater_(resource_filename_) {}
 
-  void updateResource(const std::string& contents) {
-    file_updater_.update(contents);
-  }
+  void updateResource(const std::string& contents) { file_updater_.update(contents); }
 
   void updateResource(double pressure) { updateResource(absl::StrCat(pressure)); }
 
