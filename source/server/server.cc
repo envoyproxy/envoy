@@ -97,6 +97,17 @@ InstanceImpl::~InstanceImpl() {
   // Stop logging to file before all the AccessLogManager and its dependencies are
   // destructed to avoid crashing at shutdown.
   file_logger_.reset();
+
+  // Destruct the ListenerManager explicitly, before InstanceImpl's local init_manager_ is
+  // destructed.
+  //
+  // The ListenerManager's DestinationPortsMap contains FilterChainSharedPtrs. There is a rare race
+  // condition where one of these FilterChains contains an HttpConnectionManager, which contains an
+  // RdsRouteConfigProvider, which contains an RdsRouteConfigSubscriptionSharedPtr. Since
+  // RdsRouteConfigSubscription is an Init::Target, ~RdsRouteConfigSubscription triggers a callback
+  // set at initialization, which goes to unregister it from the top-level InitManager, which has
+  // already been destructed (use-after-free) causing a segfault.
+  listener_manager_.reset();
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_->clusterManager(); }
