@@ -344,6 +344,8 @@ envoy_cc_test(
     srcs = [
         "echo_integration_test.cc",
     ],
+    # This test must be run in exclusive mode: see comments in AddRemoveListener
+    tags = ["exclusive"],
     deps = [
         ":integration_lib",
         "//source/extensions/filters/network/echo:config",
