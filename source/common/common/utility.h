@@ -102,8 +102,6 @@ class ProdSystemTimeSource : public SystemTimeSource {
 public:
   // SystemTimeSource
   SystemTime currentTime() override { return std::chrono::system_clock::now(); }
-
-  static ProdSystemTimeSource instance_;
 };
 
 /**
@@ -113,8 +111,6 @@ class ProdMonotonicTimeSource : public MonotonicTimeSource {
 public:
   // MonotonicTimeSource
   MonotonicTime currentTime() override { return std::chrono::steady_clock::now(); }
-
-  static ProdMonotonicTimeSource instance_;
 };
 
 /**

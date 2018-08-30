@@ -462,6 +462,10 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
         Upstream::Outlier::Result::SUCCESS);
     onConnectionSuccess();
 
+    getRequestInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
+    ENVOY_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
+              getRequestInfo().requestedServerName());
+
     if (config_->idleTimeout()) {
       // The idle_timer_ can be moved to a Drainer, so related callbacks call into
       // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch

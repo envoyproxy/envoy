@@ -165,6 +165,8 @@ public:
   AsyncStream* start(const Protobuf::MethodDescriptor& service_method,
                      AsyncStreamCallbacks& callbacks) override;
 
+  TimeSource& timeSource() { return dispatcher_.timeSource(); }
+
 private:
   static std::shared_ptr<grpc::Channel>
   createChannel(const envoy::api::v2::core::GrpcService::GoogleGrpc& config);

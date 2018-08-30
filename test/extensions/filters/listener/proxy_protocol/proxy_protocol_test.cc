@@ -22,6 +22,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -49,7 +50,8 @@ class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVers
                           protected Logger::Loggable<Logger::Id::main> {
 public:
   ProxyProtocolTest()
-      : socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true),
+      : dispatcher_(test_time_.timeSource()),
+        socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true),
         connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
 
@@ -142,6 +144,7 @@ public:
     EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto_error").value(), 1);
   }
 
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   Network::TcpListenSocket socket_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -860,7 +863,8 @@ class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address
                                   protected Logger::Loggable<Logger::Id::main> {
 public:
   WildcardProxyProtocolTest()
-      : socket_(Network::Test::getAnyAddress(GetParam()), nullptr, true),
+      : dispatcher_(test_time_.timeSource()),
+        socket_(Network::Test::getAnyAddress(GetParam()), nullptr, true),
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
             socket_.localAddress()->ip()->port())),
@@ -939,6 +943,7 @@ public:
     dispatcher_.run(Event::Dispatcher::RunType::Block);
   }
 
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   Network::TcpListenSocket socket_;
   Network::Address::InstanceConstSharedPtr local_dst_address_;

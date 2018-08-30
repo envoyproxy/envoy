@@ -1,5 +1,7 @@
 #include "extensions/tracers/zipkin/util.h"
 
+#include "test/test_common/test_time.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -8,7 +10,8 @@ namespace Tracers {
 namespace Zipkin {
 
 TEST(ZipkinUtilTest, utilTests) {
-  EXPECT_EQ(typeid(uint64_t).name(), typeid(Util::generateRandom64()).name());
+  DangerousDeprecatedTestTime time;
+  EXPECT_EQ(typeid(uint64_t).name(), typeid(Util::generateRandom64(time.timeSource())).name());
 
   // Test JSON merging
 

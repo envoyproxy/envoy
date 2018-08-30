@@ -146,7 +146,7 @@ message HeaderValue {
 // Header name/value pair plus option to control append behavior.
 message HeaderValueOption {
   // Header name/value pair that this option applies to.
-  HeaderValue header = 1;
+  HeaderValue header = 1 [(validate.rules).message.required = true];
 
   // Should the value be appended? If true (default), the value is appended to
   // existing values.

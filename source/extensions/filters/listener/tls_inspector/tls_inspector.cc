@@ -132,7 +132,9 @@ void Filter::doOnALPN(const unsigned char* data, unsigned int len,
 void Filter::onServername(absl::string_view servername) {
   doOnServername(
       servername, config_->stats(),
-      [&](absl::string_view name) -> void { cb_->socket().setRequestedServerName(name); },
+      [&](absl::string_view name) -> void {
+        cb_->socket().setRequestedServerName(name);
+        ENVOY_LOG(debug, "tls:onServerName(), requestedServerName: {}", name); },
       clienthello_success_);
 }
 

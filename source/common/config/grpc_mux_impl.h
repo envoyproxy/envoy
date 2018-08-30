@@ -26,8 +26,7 @@ class GrpcMuxImpl : public GrpcMux,
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              Runtime::RandomGenerator& random,
-              MonotonicTimeSource& time_source = ProdMonotonicTimeSource::instance_);
+              Runtime::RandomGenerator& random);
   ~GrpcMuxImpl();
 
   void start() override;
@@ -104,7 +103,7 @@ private:
   std::list<std::string> subscriptions_;
   Event::TimerPtr retry_timer_;
   Runtime::RandomGenerator& random_;
-  MonotonicTimeSource& time_source_;
+  TimeSource time_source_;
   BackOffStrategyPtr backoff_strategy_;
 };
 

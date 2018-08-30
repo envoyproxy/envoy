@@ -3,8 +3,10 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#ifndef __APPLE__
+#ifdef __has_include
+#if __has_include(<experimental/filesystem>)
 #include <experimental/filesystem>
+#endif
 #endif
 #include <fstream>
 #include <iostream>
@@ -29,19 +31,6 @@
 namespace Envoy {
 namespace {
 
-// Create the parent directory of a given filesystem path.
-void createParentPath(const std::string& path) {
-#ifdef __APPLE__
-  // No support in Clang OS X libc++ today for std::filesystem.
-  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + path + ")").c_str()) == 0, "");
-#else
-  // We don't want to rely on mkdir etc. if we can avoid it, since it might not
-  // exist in some environments such as ClusterFuzz.
-  std::experimental::filesystem::create_directories(
-      std::experimental::filesystem::path(path).parent_path());
-#endif
-}
-
 std::string getOrCreateUnixDomainSocketDirectory() {
   const char* path = ::getenv("TEST_UDSDIR");
   if (path != nullptr) {
@@ -62,10 +51,9 @@ std::string getTemporaryDirectory() {
   if (::getenv("TMPDIR")) {
     return TestEnvironment::getCheckedEnvVar("TMPDIR");
   }
-  // In environments outside of Bazel, we still don't want to use deterministic paths, as we may
-  // have multiple instances conflict, e.g. when running under a fuzzer.
   char test_tmpdir[] = "/tmp/envoy_test_tmp.XXXXXX";
-  RELEASE_ASSERT(::mkdtemp(test_tmpdir) != nullptr, "");
+  RELEASE_ASSERT(::mkdtemp(test_tmpdir) != nullptr,
+                 fmt::format("Failed to create tmpdir {} {}", test_tmpdir, strerror(errno)));
   return std::string(test_tmpdir);
 }
 
@@ -74,6 +62,41 @@ int argc_;
 char** argv_;
 
 } // namespace
+
+void TestEnvironment::createPath(const std::string& path) {
+#ifdef __cpp_lib_experimental_filesystem
+  // We don't want to rely on mkdir etc. if we can avoid it, since it might not
+  // exist in some environments such as ClusterFuzz.
+  std::experimental::filesystem::create_directories(std::experimental::filesystem::path(path));
+#else
+  // No support on this system for std::experimental::filesystem.
+  RELEASE_ASSERT(::system(("mkdir -p " + path).c_str()) == 0, "");
+#endif
+}
+
+void TestEnvironment::createParentPath(const std::string& path) {
+#ifdef __cpp_lib_experimental_filesystem
+  // We don't want to rely on mkdir etc. if we can avoid it, since it might not
+  // exist in some environments such as ClusterFuzz.
+  std::experimental::filesystem::create_directories(
+      std::experimental::filesystem::path(path).parent_path());
+#else
+  // No support on this system for std::experimental::filesystem.
+  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + path + ")").c_str()) == 0, "");
+#endif
+}
+
+void TestEnvironment::removePath(const std::string& path) {
+  RELEASE_ASSERT(StringUtil::startsWith(path.c_str(), TestEnvironment::temporaryDirectory()), "");
+#ifdef __cpp_lib_experimental_filesystem
+  // We don't want to rely on rm etc. if we can avoid it, since it might not
+  // exist in some environments such as ClusterFuzz.
+  std::experimental::filesystem::remove_all(std::experimental::filesystem::path(path));
+#else
+  // No support on this system for std::experimental::filesystem.
+  RELEASE_ASSERT(::system(("rm -rf " + path).c_str()) == 0, "");
+#endif
+}
 
 absl::optional<std::string> TestEnvironment::getOptionalEnvVar(const std::string& var) {
   const char* path = ::getenv(var.c_str());

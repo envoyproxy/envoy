@@ -94,15 +94,6 @@ void LogicalDnsCluster::startResolve() {
           Network::Address::InstanceConstSharedPtr new_address =
               Network::Utility::getAddressWithPort(*address_list.front(),
                                                    Network::Utility::portFromTcpUrl(dns_url_));
-          if (!current_resolved_address_ || !(*new_address == *current_resolved_address_)) {
-            current_resolved_address_ = new_address;
-            // Capture URL to avoid a race with another update.
-            tls_->runOnAllThreads([this, new_address]() -> void {
-              PerThreadCurrentHostData& data = tls_->getTyped<PerThreadCurrentHostData>();
-              data.current_resolved_address_ = new_address;
-            });
-          }
-
           if (!logical_host_) {
             // TODO(mattklein123): The logical host is only used in /clusters admin output. We used
             // to show the friendly DNS name in that output, but currently there is no way to
@@ -128,6 +119,19 @@ void LogicalDnsCluster::startResolve() {
             priority_state_manager.updateClusterPrioritySet(
                 priority, std::move(priority_state_manager.priorityState()[priority].first),
                 absl::nullopt, absl::nullopt, absl::nullopt);
+          }
+
+          if (!current_resolved_address_ || !(*new_address == *current_resolved_address_)) {
+            current_resolved_address_ = new_address;
+
+            // Make sure that we have an updated health check address.
+            logical_host_->setHealthCheckAddress(new_address);
+
+            // Capture URL to avoid a race with another update.
+            tls_->runOnAllThreads([this, new_address]() -> void {
+              PerThreadCurrentHostData& data = tls_->getTyped<PerThreadCurrentHostData>();
+              data.current_resolved_address_ = new_address;
+            });
           }
         }
 

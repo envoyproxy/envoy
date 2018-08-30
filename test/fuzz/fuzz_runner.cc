@@ -12,14 +12,14 @@ namespace Fuzz {
 
 spdlog::level::level_enum Runner::log_level_;
 
+uint32_t PerTestEnvironment::test_num_;
+
 PerTestEnvironment::PerTestEnvironment()
-    : test_tmpdir_([] {
-        const std::string fuzz_path = TestEnvironment::temporaryPath("fuzz_XXXXXX");
-        char test_tmpdir[fuzz_path.size() + 1];
-        StringUtil::strlcpy(test_tmpdir, fuzz_path.data(), fuzz_path.size() + 1);
-        RELEASE_ASSERT(::mkdtemp(test_tmpdir) != nullptr, "");
-        return std::string(test_tmpdir);
-      }()) {}
+    : test_tmpdir_(TestEnvironment::temporaryPath(fmt::format("fuzz_{}", test_num_++))) {
+  TestEnvironment::createPath(test_tmpdir_);
+}
+
+PerTestEnvironment::~PerTestEnvironment() { TestEnvironment::removePath(test_tmpdir_); }
 
 void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum default_log_level) {
   Event::Libevent::Global::initialize();

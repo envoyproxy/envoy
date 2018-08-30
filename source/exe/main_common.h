@@ -49,6 +49,9 @@ public:
 protected:
   Envoy::OptionsImpl& options_;
   ProdComponentFactory component_factory_;
+  ProdSystemTimeSource system_time_source_;
+  ProdMonotonicTimeSource monotonic_time_source_;
+  TimeSource time_source_;
   DefaultTestHooks default_test_hooks_;
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
