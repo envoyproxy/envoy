@@ -271,6 +271,56 @@ TEST_F(TsiSocketTest, HandshakeWithUnusedData) {
                  client_.tsi_socket_->doRead(client_.read_buffer_));
 }
 
+TEST_F(TsiSocketTest, HandshakeWithUnusedDataAndEndOfStream) {
+  initialize(nullptr, nullptr);
+
+  doFakeInitHandshake();
+  EXPECT_CALL(*client_.raw_socket_, doRead(_));
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 client_.tsi_socket_->doRead(client_.read_buffer_));
+  EXPECT_EQ(makeFakeTsiFrame("CLIENT_FINISHED"), client_to_server_.toString());
+  EXPECT_EQ(0L, client_.read_buffer_.length());
+
+  // Inject unused data
+  client_to_server_.add(makeFakeTsiFrame(ClientToServerData));
+
+  EXPECT_CALL(*server_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::KeepOpen, client_to_server_.length(), true};
+    buffer.move(client_to_server_);
+    return result;
+  }));
+  EXPECT_CALL(*server_.raw_socket_, doWrite(_, false));
+  EXPECT_CALL(server_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  expectIoResult({Network::PostIoAction::KeepOpen, 21UL, true},
+                 server_.tsi_socket_->doRead(server_.read_buffer_));
+  EXPECT_EQ(makeFakeTsiFrame("SERVER_FINISHED"), server_to_client_.toString());
+  EXPECT_EQ(ClientToServerData, server_.read_buffer_.toString());
+
+  EXPECT_CALL(*client_.raw_socket_, doRead(_));
+  EXPECT_CALL(client_.callbacks_, raiseEvent(Network::ConnectionEvent::Connected));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 client_.tsi_socket_->doRead(client_.read_buffer_));
+}
+
+TEST_F(TsiSocketTest, HandshakeWithReadError) {
+  initialize(nullptr, nullptr);
+
+  doFakeInitHandshake();
+
+  EXPECT_CALL(*client_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::Close, server_to_client_.length(), false};
+    buffer.move(server_to_client_);
+    return result;
+  }));
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false)).Times(0);
+  EXPECT_CALL(client_.callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  expectIoResult({Network::PostIoAction::KeepOpen, 0UL, false},
+                 client_.tsi_socket_->doRead(client_.read_buffer_));
+  EXPECT_EQ("", client_to_server_.toString());
+  EXPECT_EQ(0L, client_.read_buffer_.length());
+}
+
 TEST_F(TsiSocketTest, HandshakeWithInternalError) {
   auto raw_handshaker = tsi_create_fake_handshaker(/* is_client= */ 1);
   const tsi_handshaker_vtable* vtable = raw_handshaker->vtable;

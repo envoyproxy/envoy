@@ -119,6 +119,12 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
     callbacks_->raiseEvent(Network::ConnectionEvent::Connected);
   }
 
+  if (read_error_ || (!handshake_complete_ && end_stream_read_)) {
+    ENVOY_CONN_LOG(debug, "TSI: Handshake failed: end of stream without enough data",
+                   callbacks_->connection());
+    return Network::PostIoAction::Close;
+  }
+
   if (raw_read_buffer_.length() > 0) {
     callbacks_->setReadBufferReady();
   }
@@ -132,12 +138,18 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
 }
 
 Network::IoResult TsiSocket::doRead(Buffer::Instance& buffer) {
-  Network::IoResult result = raw_buffer_socket_->doRead(raw_read_buffer_);
-  ENVOY_CONN_LOG(debug, "TSI: raw read result action {} bytes {} end_stream {}",
-                 callbacks_->connection(), enumToInt(result.action_), result.bytes_processed_,
-                 result.end_stream_read_);
-  if (result.action_ == Network::PostIoAction::Close && result.bytes_processed_ == 0) {
-    return result;
+  Network::IoResult result = {Network::PostIoAction::KeepOpen, 0, false};
+  if (!end_stream_read_ && !read_error_) {
+    result = raw_buffer_socket_->doRead(raw_read_buffer_);
+    ENVOY_CONN_LOG(debug, "TSI: raw read result action {} bytes {} end_stream {}",
+                   callbacks_->connection(), enumToInt(result.action_), result.bytes_processed_,
+                   result.end_stream_read_);
+    if (result.action_ == Network::PostIoAction::Close && result.bytes_processed_ == 0) {
+      return result;
+    }
+
+    end_stream_read_ = result.end_stream_read_;
+    read_error_ = result.action_ == Network::PostIoAction::Close;
   }
 
   if (!handshake_complete_) {

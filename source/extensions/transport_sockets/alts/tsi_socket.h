@@ -86,6 +86,8 @@ private:
   Envoy::Buffer::OwnedImpl raw_read_buffer_;
   Envoy::Buffer::OwnedImpl raw_write_buffer_;
   bool handshake_complete_{};
+  bool end_stream_read_{};
+  bool read_error_{};
 };
 
 /**
