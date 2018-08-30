@@ -23,6 +23,8 @@ EXTENSIONS = {
     # HTTP filters
     #
 
+    # TODO(junr03): switch to filter config once filter is put in place.
+    "envoy.filters.http.adaptive_concurrency_limit":    "//source/extensions/filters/http/adaptive_concurrency_limit/limit:gradient_lib",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
     "envoy.filters.http.dynamo":                        "//source/extensions/filters/http/dynamo:config",

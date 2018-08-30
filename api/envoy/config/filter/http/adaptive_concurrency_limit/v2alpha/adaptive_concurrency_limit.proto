@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.adaptive_concurrency_limit.v2alpha;
+option go_package = "v2alpha";
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
+import "gogoproto/gogo.proto";
+
+// [#comment:TODO(junr03): fill this out in subsequent filter PR.
+message AdaptiveConcurrencyLimit {
+
+  // Configuration of the limit algorithm to use.
+  message Limit {
+    string name = 1;
+
+    message CommonConfig {
+
+      // Initial limit of concurrent requests allowed by the Limit.
+      google.protobuf.UInt32Value initial_limit = 1 [(validate.rules).uint32.gte = 1];
+
+      // Minimim concurrency limit allowed. The minimum prevents the algorithm from adjusting the
+      // limit too far down.
+      google.protobuf.UInt32Value min_limit = 2 [(validate.rules).uint32.gte = 1];
+
+      // Maximum concurrency limit allowed. Any estimated limit will be capped at this value.
+      google.protobuf.UInt32Value max_limit = 3 [(validate.rules).uint32.gte = 1];
+    }
+
+    CommonConfig common_config = 2;
+
+    google.protobuf.Struct limit_specific_config = 3;
+  }
+
+  Limit limit = 1;
+
+  // Configuration of the strategy algorithm to use.
+  message Strategy {
+    string name = 1;
+    google.protobuf.Struct config = 2;
+  }
+
+  Strategy strategy = 2;
+}
+
+// Concurrency limit algorithm that adjust the limit based on the gradient of change in the
+// samples minimum Round Trip Time (RTT) and absolute minimum RTT allowing for a queue of
+// square root of the current limit.
+message GradientLimitConfig {
+  // Smoothing factor to limit how aggressively the estimated limit can shrink when queueing
+  // has been detected. A value closer to 1.0 means that the limit can shrink more aggressively.
+  google.protobuf.DoubleValue smoothing = 1 [(validate.rules).double = {gte: 0.2, lte: 1.0}];
+
+  // Tolerance for changes in minimum latency. This value indicates how much change in minimum
+  // latency is tolerated before reducing the limit. For instance, a value of 2.0 means that a
+  // 2x increase in latency is acceptable. This value defends against outliers in latency data.
+  google.protobuf.DoubleValue rtt_tolerance = 2 [(validate.rules).double.gte = 1];
+
+  google.protobuf.UInt32Value probe_interval = 3;
+}
+
+// Simplest strategy for enforcing a concurrency limit that has a single counter
+// for tracking total usage.
+message FirstComeFirstServedStrategyConfig {
+}
