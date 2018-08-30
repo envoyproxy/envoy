@@ -61,7 +61,8 @@ public:
   RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback,
                       Network::Address::IpVersion version);
   ~RawConnectionDriver();
-  void run();
+  const Network::Connection& connection() { return *client_; }
+  void run(Event::Dispatcher::RunType run_type = Event::Dispatcher::RunType::Block);
   void close();
 
 private:
