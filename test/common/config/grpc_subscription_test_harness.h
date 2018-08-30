@@ -45,8 +45,6 @@ public:
         *method_descriptor_, stats_));
   }
 
-  ~GrpcSubscriptionTestHarness() { EXPECT_CALL(async_stream_, sendMessage(_, false)); }
-
   void expectSendMessage(const std::vector<std::string>& cluster_names,
                          const std::string& version) override {
     expectSendMessage(cluster_names, version, Grpc::Status::GrpcStatus::Ok, "");
