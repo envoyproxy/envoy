@@ -117,11 +117,11 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
   });
   listener_removed.waitReady();
 
-  // Now connect. This should fail.
-  RawConnectionDriver connection2(
-      new_listener_port, buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_);
-  connection2.run();
+  // We can't usefully regression test that the listener has been removed by
+  // attempting to connect to the former port.
+  // Because integration tests are often run in parallel, it's entirely possible
+  // that some other test will take the abandoned port and start listening on
+  // it.
 }
 
 } // namespace Envoy
