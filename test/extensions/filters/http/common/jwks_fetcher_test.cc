@@ -6,7 +6,6 @@
 
 #include "extensions/filters/http/common/jwks_fetcher.h"
 
-#include "test/extensions/filters/http/common/test_common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/utility.h"
@@ -19,6 +18,29 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Common {
 namespace {
+
+const char publicKey[] = R"(
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "alg": "RS256",
+      "use": "sig",
+      "kid": "62a93512c9ee4c7f8067b5a216dade2763d32a47",
+      "n": "up97uqrF9MWOPaPkwSaBeuAPLOr9FKcaWGdVEGzQ4f3Zq5WKVZowx9TCBxmImNJ1qmUi13pB8otwM_l5lfY1AFBMxVbQCUXntLovhDaiSvYp4wGDjFzQiYA-pUq8h6MUZBnhleYrkU7XlCBwNVyN8qNMkpLA7KFZYz-486GnV2NIJJx_4BGa3HdKwQGxi2tjuQsQvao5W4xmSVaaEWopBwMy2QmlhSFQuPUpTaywTqUcUq_6SfAHhZ4IDa_FxEd2c2z8gFGtfst9cY3lRYf-c_ZdboY3mqN9Su3-j3z5r2SHWlhB_LNAjyWlBGsvbGPlTqDziYQwZN4aGsqVKQb9Vw",
+      "e": "AQAB"
+    },
+    {
+      "kty": "RSA",
+      "alg": "RS256",
+      "use": "sig",
+      "kid": "b3319a147514df7ee5e4bcdee51350cc890cc89e",
+      "n": "up97uqrF9MWOPaPkwSaBeuAPLOr9FKcaWGdVEGzQ4f3Zq5WKVZowx9TCBxmImNJ1qmUi13pB8otwM_l5lfY1AFBMxVbQCUXntLovhDaiSvYp4wGDjFzQiYA-pUq8h6MUZBnhleYrkU7XlCBwNVyN8qNMkpLA7KFZYz-486GnV2NIJJx_4BGa3HdKwQGxi2tjuQsQvao5W4xmSVaaEWopBwMy2QmlhSFQuPUpTaywTqUcUq_6SfAHhZ4IDa_FxEd2c2z8gFGtfst9cY3lRYf-c_ZdboY3mqN9Su3-j3z5r2SHWlhB_LNAjyWlBGsvbGPlTqDziYQwZN4aGsqVKQb9Vw",
+      "e": "AQAB"
+    }
+  ]
+}
+)";
 
 const std::string JwksUri = R"(
 uri: https://pubkey_server/pubkey_path
@@ -59,9 +81,7 @@ public:
   MockUpstream(Upstream::MockClusterManager& mock_cm, Http::MockAsyncClientRequest* request)
       : request_(&mock_cm.async_client_) {
     ON_CALL(mock_cm.async_client_, send_(testing::_, testing::_, testing::_))
-        .WillByDefault(testing::Invoke([request](Http::MessagePtr&, Http::AsyncClient::Callbacks&,
-                                                 const absl::optional<std::chrono::milliseconds>&)
-                                           -> Http::AsyncClient::Request* { return request; }));
+        .WillByDefault(testing::Return(request));
   }
 
 private:
@@ -84,7 +104,7 @@ public:
 // Test findByIssuer
 TEST_F(JwksFetcherTest, TestGetSuccess) {
   // Setup
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "200", PublicKey);
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, "200", publicKey);
   MockJwksReceiver receiver;
   std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
   EXPECT_TRUE(fetcher != nullptr);

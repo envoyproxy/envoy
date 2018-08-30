@@ -26,8 +26,8 @@ class AuthenticatorImpl : public Logger::Loggable<Logger::Id::filter>,
                           public Authenticator,
                           public Common::JwksFetcher::JwksReceiver {
 public:
-  AuthenticatorImpl(FilterConfigSharedPtr config, Common::JwksFetcherPtr&& fetcher)
-      : config_(config), fetcher_(std::move(fetcher)) {}
+  AuthenticatorImpl(FilterConfigSharedPtr config, CreateJwksFetcherCb createJwksFetcherCb)
+      : config_(config), createJwksFetcherCb_(createJwksFetcherCb) {}
 
   // Following functions are for JwksFetcher::JwksReceiver interface
   void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
@@ -49,6 +49,9 @@ private:
 
   // The config object.
   FilterConfigSharedPtr config_;
+
+  // The callback used to create a JwksFetcher instance.
+  CreateJwksFetcherCb createJwksFetcherCb_;
 
   // The Jwks fetcher object
   Common::JwksFetcherPtr fetcher_;
@@ -157,6 +160,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
   // of using the same jwks comes. The request 2 will trigger another remote fetching for the
   // jwks. This can be optimized; the same remote jwks fetching can be shared by two requrests.
   if (jwks_data_->getJwtProvider().has_remote_jwks()) {
+    fetcher_ = createJwksFetcherCb_(config_->cm());
     fetcher_->fetch(jwks_data_->getJwtProvider().remote_jwks().http_uri(), *this);
   } else {
     // No valid keys for this issuer. This may happen as a result of incorrect local
@@ -176,7 +180,12 @@ void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
 
 void AuthenticatorImpl::onJwksError(Failure) { doneWithStatus(Status::JwksFetchFail); }
 
-void AuthenticatorImpl::onDestroy() { fetcher_->cancel(); }
+void AuthenticatorImpl::onDestroy() {
+  if (fetcher_) {
+    fetcher_->cancel();
+    fetcher_.reset(nullptr);
+  }
+}
 
 // Verify with a specific public key.
 void AuthenticatorImpl::verifyKey() {
@@ -216,8 +225,8 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 } // namespace
 
 AuthenticatorPtr Authenticator::create(FilterConfigSharedPtr config,
-                                       Common::JwksFetcherPtr&& fetcher) {
-  return std::make_unique<AuthenticatorImpl>(config, std::move(fetcher));
+                                       CreateJwksFetcherCb createJwksFetcherCb) {
+  return std::make_unique<AuthenticatorImpl>(config, createJwksFetcherCb);
 }
 
 } // namespace JwtAuthn

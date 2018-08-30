@@ -3,7 +3,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
-namespace Common {
+namespace JwtAuthn {
 
 // A good public key
 const char PublicKey[] = R"(
@@ -131,7 +131,7 @@ const char ExpectedPayloadValue[] = "eyJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwic3V
                                     "xlLmNvbSIsImV4cCI6MjAwMTAwMTAwMSwiYXVkIjoiZXhhbXBsZV9zZXJ2"
                                     "aWNlIn0";
 
-} // namespace Common
+} // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions
 } // namespace Envoy

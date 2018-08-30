@@ -5,8 +5,8 @@
 #include "extensions/filters/http/jwt_authn/authenticator.h"
 
 #include "test/extensions/filters/http/common/mock.h"
-#include "test/extensions/filters/http/common/test_common.h"
 #include "test/extensions/filters/http/jwt_authn/mock.h"
+#include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
@@ -14,19 +14,9 @@
 #include "gtest/gtest.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
-using Envoy::Extensions::HttpFilters::Common::ExampleConfig;
-using Envoy::Extensions::HttpFilters::Common::ExpectedPayloadValue;
-using Envoy::Extensions::HttpFilters::Common::ExpiredToken;
-using Envoy::Extensions::HttpFilters::Common::GoodToken;
-using Envoy::Extensions::HttpFilters::Common::InvalidAudToken;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcher;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcherPtr;
 using Envoy::Extensions::HttpFilters::Common::MockJwksFetcher;
-using Envoy::Extensions::HttpFilters::Common::NonExistKidToken;
-using Envoy::Extensions::HttpFilters::Common::NonExpiringToken;
-using Envoy::Extensions::HttpFilters::Common::NotYetValidToken;
-using Envoy::Extensions::HttpFilters::Common::ProviderName;
-using Envoy::Extensions::HttpFilters::Common::PublicKey;
 using ::google::jwt_verify::Status;
 using ::testing::_;
 using ::testing::Invoke;
@@ -48,7 +38,8 @@ public:
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
     fetcher_ = new MockJwksFetcher;
     fetcherPtr_.reset(fetcher_);
-    auth_ = Authenticator::create(filter_config_, std::move(fetcherPtr_));
+    auth_ = Authenticator::create(
+        filter_config_, [this](Upstream::ClusterManager&) { return std::move(fetcherPtr_); });
     jwks_ = ::google::jwt_verify::Jwks::createFrom(PublicKey, ::google::jwt_verify::Jwks::JWKS);
     EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
   }
@@ -196,9 +187,7 @@ TEST_F(AuthenticatorTest, TestExpiredJWT) {
 // This test verifies when a JWT is not yet valid, JwtNotYetValid status is returned.
 TEST_F(AuthenticatorTest, TestNotYetValidJWT) {
   EXPECT_CALL(*fetcher_, fetch(_, _)).Times(0);
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::JwtNotYetValid);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtNotYetValid)).Times(1);
 
   auto headers =
       Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(NotYetValidToken)}};
