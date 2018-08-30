@@ -43,7 +43,8 @@ class SdsDynamicIntegrationBaseTest : public HttpIntegrationTest,
                                       public Grpc::GrpcClientIntegrationParamTest {
 public:
   SdsDynamicIntegrationBaseTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()),
+        server_cert_("server_cert"), client_cert_("client_cert") {}
 
 protected:
   void createSdsStream(FakeUpstream& upstream) {
@@ -58,7 +59,7 @@ protected:
 
   envoy::api::v2::auth::Secret getServerSecret() {
     envoy::api::v2::auth::Secret secret;
-    secret.set_name("server_cert");
+    secret.set_name(server_cert_);
     auto* tls_certificate = secret.mutable_tls_certificate();
     tls_certificate->mutable_certificate_chain()->set_filename(
         TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"));
@@ -69,7 +70,7 @@ protected:
 
   envoy::api::v2::auth::Secret getClientSecret() {
     envoy::api::v2::auth::Secret secret;
-    secret.set_name("client_cert");
+    secret.set_name(client_cert_);
     auto* tls_certificate = secret.mutable_tls_certificate();
     tls_certificate->mutable_certificate_chain()->set_filename(
         TestEnvironment::runfilesPath("/test/config/integration/certs/clientcert.pem"));
@@ -78,9 +79,10 @@ protected:
     return secret;
   }
 
-  envoy::api::v2::auth::Secret getWrongSecret() {
+  envoy::api::v2::auth::Secret getWrongSecret(const std::string& secret_name) {
     envoy::api::v2::auth::Secret secret;
-    secret.set_name("wrong_cert");
+    secret.set_name(secret_name);
+    secret.mutable_tls_certificate();
     return secret;
   }
 
@@ -112,6 +114,8 @@ protected:
     }
   }
 
+  const std::string server_cert_;
+  const std::string client_cert_;
   Runtime::MockLoader runtime_;
   Ssl::ContextManagerImpl context_manager_{runtime_};
   FakeHttpConnectionPtr sds_connection_;
@@ -208,7 +212,7 @@ TEST_P(SdsDynamicDownstreamIntegrationTest, BasicSuccess) {
 TEST_P(SdsDynamicDownstreamIntegrationTest, WrongSecretFirst) {
   pre_worker_start_test_steps_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
-    sendSdsResponse(getWrongSecret());
+    sendSdsResponse(getWrongSecret(server_cert_));
   };
   initialize();
 
@@ -318,7 +322,7 @@ TEST_P(SdsDynamicUpstreamIntegrationTest, BasicSuccess) {
 TEST_P(SdsDynamicUpstreamIntegrationTest, WrongSecretFirst) {
   pre_worker_start_test_steps_ = [this]() {
     createSdsStream(*(fake_upstreams_[1]));
-    sendSdsResponse(getWrongSecret());
+    sendSdsResponse(getWrongSecret(client_cert_));
   };
   initialize();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
