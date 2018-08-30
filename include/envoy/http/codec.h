@@ -28,7 +28,8 @@ public:
   virtual void encode100ContinueHeaders(const HeaderMap& headers) PURE;
 
   /**
-   * Encode headers, optionally indicating end of stream.
+   * Encode headers, optionally indicating end of stream. Response headers must
+   * have a valid :status set.
    * @param headers supplies the header map to encode.
    * @param end_stream supplies whether this is a header only request/response.
    */
