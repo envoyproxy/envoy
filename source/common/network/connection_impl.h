@@ -1,5 +1,7 @@
 #pragma once
 
+#include <netinet/tcp.h>
+
 #include <atomic>
 #include <cstdint>
 #include <list>
@@ -129,7 +131,6 @@ protected:
   Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
 
-protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
@@ -146,6 +147,10 @@ private:
   // Returns true iff end of stream has been both written and read.
   bool bothSidesHalfClosed();
 
+#ifdef __APPLE__
+  bool detectEarlyClose();
+#endif
+
   static std::atomic<uint64_t> next_global_id_;
 
   Event::Dispatcher& dispatcher_;
@@ -161,6 +166,10 @@ private:
   bool read_end_stream_{false};
   bool write_end_stream_{false};
   bool current_write_end_stream_{false};
+#ifdef __APPLE__
+  bool disabled_read_pending_{false};
+#endif
+  bool is_uds_{false};
   Buffer::Instance* current_write_buffer_{};
   uint64_t last_read_buffer_size_{};
   uint64_t last_write_buffer_size_{};

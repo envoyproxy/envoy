@@ -260,6 +260,12 @@ TEST_P(ProxyProtocolTest, errorRecv_2) {
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  // Pass through sys calls made by ConnectionImpl.
+  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(::getsockopt));
+
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillOnce(Return(Api::SysCallSizeResult{-1, 0}));
@@ -297,6 +303,12 @@ TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  // Pass through sys calls made by ConnectionImpl.
+  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(::getsockopt));
+
   EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
   EXPECT_CALL(os_sys_calls, writev(_, _, _))
       .Times(AnyNumber())
@@ -490,6 +502,11 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  // Pass through sys calls made by ConnectionImpl.
+  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(::getsockopt));
+
   EXPECT_CALL(os_sys_calls, ioctl(_, FIONREAD, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([](int fd, unsigned long int request, void* argp) {
@@ -621,6 +638,11 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
 
+  // Pass through sys calls made by ConnectionImpl.
+  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(::getsockopt));
+
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())
       .WillRepeatedly(Invoke([](int fd, void* buf, size_t len, int flags) {
@@ -666,6 +688,11 @@ TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
 
   Api::MockOsSysCalls os_sys_calls;
   TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+
+  // Pass through sys calls made by ConnectionImpl.
+  EXPECT_CALL(os_sys_calls, getsockopt_(_, _, _, _, _))
+      .Times(AnyNumber())
+      .WillRepeatedly(Invoke(::getsockopt));
 
   EXPECT_CALL(os_sys_calls, recv(_, _, _, _))
       .Times(AnyNumber())

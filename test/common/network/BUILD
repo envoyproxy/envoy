@@ -52,6 +52,7 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
     ],
 )
 

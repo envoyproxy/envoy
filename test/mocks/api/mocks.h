@@ -69,6 +69,7 @@ public:
                int(int sockfd, int level, int optname, const void* optval, socklen_t optlen));
   MOCK_METHOD5(getsockopt_,
                int(int sockfd, int level, int optname, void* optval, socklen_t* optlen));
+  MOCK_METHOD3(getsockname, SysCallIntResult(int sockfd, sockaddr* addr, socklen_t* addrlen));
   MOCK_METHOD3(socket, SysCallIntResult(int domain, int type, int protocol));
 
   size_t num_writes_;

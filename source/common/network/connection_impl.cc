@@ -1,6 +1,10 @@
 #include "common/network/connection_impl.h"
 
 #include <netinet/tcp.h>
+
+#ifdef __APPLE__
+#include <netinet/tcp_fsm.h>
+#endif
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -12,6 +16,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -65,6 +70,13 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
       Event::FileReadyType::Read | Event::FileReadyType::Write);
 
   transport_socket_->setTransportSocketCallbacks(*this);
+
+  sockaddr addr;
+  socklen_t len = sizeof(addr);
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  const Api::SysCallIntResult result = os_syscalls.getsockname(fd(), &addr, &len);
+  RELEASE_ASSERT(result.rc_ == 0, "");
+  is_uds_ = addr.sa_family == AF_UNIX;
 }
 
 ConnectionImpl::~ConnectionImpl() {
@@ -159,27 +171,24 @@ void ConnectionImpl::noDelay(bool enable) {
   }
 
   // Don't set NODELAY for unix domain sockets
-  sockaddr addr;
-  socklen_t len = sizeof(addr);
-  int rc = getsockname(fd(), &addr, &len);
-  RELEASE_ASSERT(rc == 0, "");
-
-  if (addr.sa_family == AF_UNIX) {
+  if (is_uds_) {
     return;
   }
 
   // Set NODELAY
   int new_value = enable;
-  rc = setsockopt(fd(), IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+  const Api::SysCallIntResult result =
+      os_syscalls.setsockopt(fd(), IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
 #ifdef __APPLE__
-  if (-1 == rc && errno == EINVAL) {
+  if (-1 == result.rc_ && result.errno_ == EINVAL) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
     // enabled despite this result.
     return;
   }
 #endif
 
-  RELEASE_ASSERT(0 == rc, "");
+  RELEASE_ASSERT(0 == result.rc_, "");
 }
 
 uint64_t ConnectionImpl::id() const { return id_; }
@@ -249,7 +258,14 @@ void ConnectionImpl::readDisable(bool disable) {
     // If half-close semantics are enabled, we never want early close notifications; we
     // always want to read all avaiable data, even if the other side has closed.
     if (detect_early_close_ && !enable_half_close_) {
+#ifdef __APPLE__
+      // libevent only supports detecting early close with epoll, so we leave read events enabled
+      // and check the connection state on read, tracking real read events in
+      // disabled_read_pending_.
+      file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Read);
+#else
       file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
+#endif // __APPLE__
     } else {
       file_event_->setEnabled(Event::FileReadyType::Write);
     }
@@ -263,6 +279,17 @@ void ConnectionImpl::readDisable(bool disable) {
     // We never ask for both early close and read at the same time. If we are reading, we want to
     // consume all available data.
     file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
+
+#ifdef __APPLE__
+    if (disabled_read_pending_) {
+      // An actual read event occurred while reads were disabled (see above).
+      ENVOY_CONN_LOG(trace, "readDisable trigger pending read", *this);
+      disabled_read_pending_ = false;
+      file_event_->activate(Event::FileReadyType::Read);
+      return;
+    }
+#endif
+
     // If the connection has data buffered there's no guarantee there's also data in the kernel
     // which will kick off the filter chain. Instead fake an event to make sure the buffered data
     // gets processed regardless.
@@ -403,6 +430,28 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
     return;
   }
 
+#ifdef __APPLE__
+  // Because OSX doesn't support early close detection via events, we leave the read event enabled
+  // even when reads are disabled. Detect it here and convert it to a Closed event if we can detect
+  // the connection is closed. See https://github.com/envoyproxy/envoy/issues/4294.
+  if (detect_early_close_ && !read_enabled_ && (events & Event::FileReadyType::Read) != 0) {
+    if (detectEarlyClose()) {
+      // No longer connected. Convert to a closed event.
+      ENVOY_CONN_LOG(trace, "early close detection triggered", *this);
+      events |= Event::FileReadyType::Closed;
+    } else {
+      ENVOY_CONN_LOG(trace, "pending read in early close detection", *this);
+      disabled_read_pending_ = true;
+    }
+
+    // Reads are disabled, so never pass the read event along.
+    events &= ~Event::FileReadyType::Read;
+    if (!events) {
+      return;
+    }
+  }
+#endif
+
   if (events & Event::FileReadyType::Closed) {
     // We never ask for both early close and read at the same time. If we are reading, we want to
     // consume all available data.
@@ -459,8 +508,10 @@ void ConnectionImpl::onWriteReady() {
   if (connecting_) {
     int error;
     socklen_t error_size = sizeof(error);
-    int rc = getsockopt(fd(), SOL_SOCKET, SO_ERROR, &error, &error_size);
-    ASSERT(0 == rc);
+    auto& os_syscalls = Api::OsSysCallsSingleton::get();
+    const Api::SysCallIntResult result =
+        os_syscalls.getsockopt(fd(), SOL_SOCKET, SO_ERROR, &error, &error_size);
+    ASSERT(0 == result.rc_);
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
@@ -534,6 +585,34 @@ bool ConnectionImpl::bothSidesHalfClosed() {
   // If the write_buffer_ is not empty, then the end_stream has not been sent to the transport yet.
   return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
 }
+
+#ifdef __APPLE__
+bool ConnectionImpl::detectEarlyClose() {
+  auto& os_syscalls = Api::OsSysCallsSingleton::get();
+
+  if (is_uds_) {
+    ENVOY_CONN_LOG(trace, "checking for UDS early close with read disabled", *this);
+
+    int bytes;
+    socklen_t bytes_size = sizeof(int);
+    const Api::SysCallIntResult result =
+        os_syscalls.getsockopt(fd(), SOL_SOCKET, SO_NREAD, &bytes, &bytes_size);
+    ASSERT(0 == result.rc_);
+
+    return bytes == 0;
+  }
+
+  ENVOY_CONN_LOG(trace, "checking for TCP early close with read disabled", *this);
+  tcp_connection_info info;
+  socklen_t info_size = sizeof(tcp_connection_info);
+  const Api::SysCallIntResult result =
+      os_syscalls.getsockopt(fd(), IPPROTO_TCP, TCP_CONNECTION_INFO, &info, &info_size);
+  ASSERT(0 == result.rc_);
+
+  return info.tcpi_state == TCPS_CLOSED ||
+         (info.tcpi_state >= TCPS_CLOSE_WAIT && info.tcpi_state <= TCPS_TIME_WAIT);
+}
+#endif
 
 ClientConnectionImpl::ClientConnectionImpl(
     Event::Dispatcher& dispatcher, const Address::InstanceConstSharedPtr& remote_address,

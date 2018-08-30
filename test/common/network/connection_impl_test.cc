@@ -21,6 +21,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -887,6 +888,13 @@ public:
         .WillOnce(Invoke([this](TransportSocketCallbacks& callbacks) {
           transport_socket_callbacks_ = &callbacks;
         }));
+    EXPECT_CALL(os_sys_calls_, getsockname(_, _, _))
+        .WillOnce(Invoke([](int, sockaddr* addr, socklen_t* addrlen) -> Api::SysCallIntResult {
+          EXPECT_NE(nullptr, addr);
+          EXPECT_NE(nullptr, addrlen);
+          addr->sa_family = AF_INET;
+          return {0, 0};
+        }));
     connection_.reset(
         new ConnectionImpl(dispatcher_, std::make_unique<ConnectionSocketImpl>(0, nullptr, nullptr),
                            TransportSocketPtr(transport_socket_), true));
@@ -902,6 +910,9 @@ public:
     buffer.drain(size);
     return {PostIoAction::KeepOpen, size, false};
   }
+
+  NiceMock<Api::MockOsSysCalls> os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls_{&os_sys_calls_};
 
   std::unique_ptr<ConnectionImpl> connection_;
   Event::MockDispatcher dispatcher_;

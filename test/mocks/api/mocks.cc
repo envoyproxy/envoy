@@ -46,7 +46,7 @@ SysCallIntResult MockOsSysCalls::setsockopt(int sockfd, int level, int optname, 
 
   // Allow mocking system call failure.
   if (setsockopt_(sockfd, level, optname, optval, optlen) != 0) {
-    return SysCallIntResult{-1, 0};
+    return SysCallIntResult{-1, errno};
   }
 
   boolsockopts_[SockOptKey(sockfd, level, optname)] = !!*reinterpret_cast<const int*>(optval);
@@ -63,7 +63,7 @@ SysCallIntResult MockOsSysCalls::getsockopt(int sockfd, int level, int optname, 
   }
   // Allow mocking system call failure.
   if (getsockopt_(sockfd, level, optname, optval, optlen) != 0) {
-    return {-1, 0};
+    return {-1, errno};
   }
   *reinterpret_cast<int*>(optval) = val;
   return {0, 0};
