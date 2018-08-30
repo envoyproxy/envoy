@@ -769,7 +769,6 @@ TEST(DnsImplUnitTest, PendingTimerEnable) {
                              [&](const std::list<Address::InstanceConstSharedPtr>&& results) {
                                UNREFERENCED_PARAMETER(results);
                              }));
-  EXPECT_CALL(dispatcher, post(_));
 }
 
 } // namespace Network
