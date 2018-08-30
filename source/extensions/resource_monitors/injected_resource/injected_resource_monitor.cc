@@ -29,6 +29,9 @@ void InjectedResourceMonitor::updateResourceUsage(Server::ResourceMonitor::Callb
       const std::string contents = Filesystem::fileReadToEnd(filename_);
       double pressure;
       if (absl::SimpleAtod(contents, &pressure)) {
+        if (pressure < 0 || pressure > 1) {
+          throw EnvoyException("pressure out of range");
+        }
         pressure_ = pressure;
         error_.reset();
       } else {

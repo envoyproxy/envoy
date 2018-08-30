@@ -7,6 +7,7 @@ load(
 load(
     "//test/extensions:extensions_build_system.bzl",
     "envoy_cc_test",
+    "envoy_extension_cc_test",
 )
 
 envoy_package()
@@ -20,12 +21,14 @@ envoy_cc_test(
         "//source/server:resource_monitor_config_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:utility_lib",
     ],
 )
 
-envoy_cc_test(
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    extension_name = "envoy.resource_monitors.injected_resource",
     deps = [
         "//include/envoy/registry",
         "//source/common/event:dispatcher_lib",

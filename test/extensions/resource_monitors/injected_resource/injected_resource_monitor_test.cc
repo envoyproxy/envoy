@@ -1,6 +1,3 @@
-#include <cstdint>
-#include <fstream>
-
 #include "common/event/dispatcher_impl.h"
 
 #include "server/resource_monitor_config_impl.h"
@@ -9,6 +6,7 @@
 
 #include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -48,54 +46,28 @@ public:
 
 class InjectedResourceMonitorTest : public testing::Test {
 protected:
-  InjectedResourceMonitorTest() : dispatcher_(test_time_.timeSource()) {}
-
-  void SetUp() override {
-    injected_resource_target1_ = TestEnvironment::temporaryPath("envoy_test/injected_resource1");
-    injected_resource_target2_ = TestEnvironment::temporaryPath("envoy_test/injected_resource2");
-    injected_resource_link_ = TestEnvironment::temporaryPath("envoy_test/injected_resource");
-    injected_resource_new_link_ =
-        TestEnvironment::temporaryPath("envoy_test/injected_resource_tmp");
-
-    unlink(injected_resource_target1_.c_str());
-    unlink(injected_resource_target2_.c_str());
-    unlink(injected_resource_link_.c_str());
-    unlink(injected_resource_new_link_.c_str());
-    mkdir(TestEnvironment::temporaryPath("envoy_test").c_str(), S_IRWXU);
-
-    use_target1_ = true;
-  }
+  InjectedResourceMonitorTest()
+      : dispatcher_(test_time_.timeSource()),
+        resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
+        file_updater_(resource_filename_) {}
 
   void updateResource(const std::string& contents) {
-    const std::string target =
-        use_target1_ ? injected_resource_target1_ : injected_resource_target2_;
-    use_target1_ = !use_target1_;
-    {
-      std::ofstream file(target);
-      file << contents;
-    }
-    int rc = symlink(target.c_str(), injected_resource_new_link_.c_str());
-    EXPECT_EQ(0, rc) << strerror(errno);
-    rc = rename(injected_resource_new_link_.c_str(), injected_resource_link_.c_str());
-    EXPECT_EQ(0, rc) << strerror(errno);
+    file_updater_.update(contents);
   }
 
   void updateResource(double pressure) { updateResource(absl::StrCat(pressure)); }
 
   std::unique_ptr<InjectedResourceMonitor> createMonitor() {
     envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig config;
-    config.set_filename(injected_resource_link_);
+    config.set_filename(resource_filename_);
     Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher_);
     return std::make_unique<TestableInjectedResourceMonitor>(config, context);
   }
 
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
-  bool use_target1_;
-  std::string injected_resource_target1_;
-  std::string injected_resource_target2_;
-  std::string injected_resource_link_;
-  std::string injected_resource_new_link_;
+  const std::string resource_filename_;
+  AtomicFileUpdater file_updater_;
   MockedCallbacks cb_;
 };
 
@@ -115,7 +87,7 @@ TEST_F(InjectedResourceMonitorTest, ReportsCorrectPressure) {
 
 MATCHER_P(ExceptionContains, rhs, "") { return absl::StrContains(arg.what(), rhs); }
 
-TEST_F(InjectedResourceMonitorTest, ErrorOnParseError) {
+TEST_F(InjectedResourceMonitorTest, ReportsParseError) {
   auto monitor(createMonitor());
 
   updateResource("bad content");
@@ -124,7 +96,21 @@ TEST_F(InjectedResourceMonitorTest, ErrorOnParseError) {
   monitor->updateResourceUsage(cb_);
 }
 
-TEST_F(InjectedResourceMonitorTest, ErrorOnFileRead) {
+TEST_F(InjectedResourceMonitorTest, ReportsErrorForOutOfRangePressure) {
+  auto monitor(createMonitor());
+
+  updateResource(-1);
+  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  EXPECT_CALL(cb_, onFailure(ExceptionContains("pressure out of range")));
+  monitor->updateResourceUsage(cb_);
+
+  updateResource(2);
+  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  EXPECT_CALL(cb_, onFailure(ExceptionContains("pressure out of range")));
+  monitor->updateResourceUsage(cb_);
+}
+
+TEST_F(InjectedResourceMonitorTest, ReportsErrorOnFileRead) {
   auto monitor(createMonitor());
 
   EXPECT_CALL(cb_, onFailure(ExceptionContains("unable to read file")));
