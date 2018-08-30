@@ -86,6 +86,7 @@ public:
   struct DirectionalState {
     StreamEncoder* encoder_;
     NiceMock<MockStreamDecoder> decoder_;
+    NiceMock<MockStreamCallbacks> stream_callbacks_;
     StreamState stream_state_;
     uint32_t read_disable_count_{};
   } request_, response_;
@@ -93,13 +94,23 @@ public:
   Stream(TestClientConnectionImpl& client, const TestHeaderMapImpl& request_headers,
          bool end_stream) {
     request_.encoder_ = &client.newStream(response_.decoder_);
-    ON_CALL(server_stream_callbacks_, onResetStream(_)).WillByDefault(InvokeWithoutArgs([this] {
-      request_.stream_state_ = response_.stream_state_ = StreamState::Closed;
+    ON_CALL(request_.stream_callbacks_, onResetStream(_)).WillByDefault(InvokeWithoutArgs([this] {
+      ENVOY_LOG_MISC(trace, "reset request for stream index {}", stream_index_);
+      resetStream();
+    }));
+    ON_CALL(response_.stream_callbacks_, onResetStream(_)).WillByDefault(InvokeWithoutArgs([this] {
+      ENVOY_LOG_MISC(trace, "reset response for stream index {}", stream_index_);
+      resetStream();
     }));
     request_.encoder_->encodeHeaders(request_headers, end_stream);
+    if (!end_stream) {
+      request_.encoder_->getStream().addCallbacks(request_.stream_callbacks_);
+    }
     request_.stream_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
     response_.stream_state_ = StreamState::PendingHeaders;
   }
+
+  void resetStream() { request_.stream_state_ = response_.stream_state_ = StreamState::Closed; }
 
   // Some stream action applied in either the request or resposne direction.
   void directionalAction(DirectionalState& state,
@@ -181,7 +192,7 @@ public:
     }
   }
 
-  NiceMock<MockStreamCallbacks> server_stream_callbacks_;
+  int32_t stream_index_{-1};
 };
 
 // Buffer between client and server H2 codecs. This models each write operation
@@ -284,7 +295,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::CodecImplFuzzTestCase& inpu
         Stream* const stream = stream_ptr.get();
         stream_ptr->moveIntoListBack(std::move(stream_ptr), streams);
         stream->response_.encoder_ = &encoder;
-        encoder.getStream().addCallbacks(stream->server_stream_callbacks_);
+        encoder.getStream().addCallbacks(stream->response_.stream_callbacks_);
+        stream->stream_index_ = streams.size() - 1;
         return stream->request_.decoder_;
       }));
 
@@ -304,8 +316,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::http2::CodecImplFuzzTestCase& inpu
         if (streams.empty()) {
           break;
         }
-        (*std::next(streams.begin(), stream_action.stream_id() % streams.size()))
-            ->streamAction(stream_action);
+        const uint32_t stream_id = stream_action.stream_id() % streams.size();
+        ENVOY_LOG_MISC(trace, "action for stream index {}", stream_id);
+        (*std::next(streams.begin(), stream_id))->streamAction(stream_action);
         break;
       }
       case test::common::http::http2::Action::kMutate: {
