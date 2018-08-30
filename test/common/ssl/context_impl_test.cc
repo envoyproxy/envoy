@@ -504,8 +504,8 @@ TEST(ClientContextConfigImplTest, StaticCertificateValidationContext) {
   )EOF";
   MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             tls_certificate_secret_config);
-  std::unique_ptr<Secret::SecretManager> secret_manager(new Secret::SecretManagerImpl());
-  secret_manager->addStaticSecret(tls_certificate_secret_config);
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  factory_context.secretManager().addStaticSecret(tls_certificate_secret_config);
   envoy::api::v2::auth::Secret certificate_validation_context_secret_config;
   const std::string certificate_validation_context_yaml = R"EOF(
     name: "def.com"
@@ -515,7 +515,7 @@ TEST(ClientContextConfigImplTest, StaticCertificateValidationContext) {
   )EOF";
   MessageUtil::loadFromYaml(TestEnvironment::substitute(certificate_validation_context_yaml),
                             certificate_validation_context_secret_config);
-  secret_manager->addStaticSecret(certificate_validation_context_secret_config);
+  factory_context.secretManager().addStaticSecret(certificate_validation_context_secret_config);
 
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()
@@ -525,7 +525,7 @@ TEST(ClientContextConfigImplTest, StaticCertificateValidationContext) {
   tls_context.mutable_common_tls_context()
       ->mutable_validation_context_sds_secret_config()
       ->set_name("def.com");
-  ClientContextConfigImpl client_context_config(tls_context, *secret_manager.get());
+  ClientContextConfigImpl client_context_config(tls_context, factory_context);
 
   const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
@@ -576,8 +576,8 @@ TEST(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
     )EOF";
   MessageUtil::loadFromYaml(TestEnvironment::substitute(tls_certificate_yaml),
                             tls_certificate_secret_config);
-  std::unique_ptr<Secret::SecretManager> secret_manager(new Secret::SecretManagerImpl());
-  secret_manager->addStaticSecret(tls_certificate_secret_config);
+  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  factory_context.secretManager().addStaticSecret(tls_certificate_secret_config);
   envoy::api::v2::auth::Secret certificate_validation_context_secret_config;
   const std::string certificate_validation_context_yaml = R"EOF(
       name: "def.com"
@@ -587,7 +587,7 @@ TEST(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
     )EOF";
   MessageUtil::loadFromYaml(TestEnvironment::substitute(certificate_validation_context_yaml),
                             certificate_validation_context_secret_config);
-  secret_manager->addStaticSecret(certificate_validation_context_secret_config);
+  factory_context.secretManager().addStaticSecret(certificate_validation_context_secret_config);
 
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
   tls_context.mutable_common_tls_context()
@@ -598,8 +598,8 @@ TEST(ClientContextConfigImplTest, MissingStaticCertificateValidationContext) {
       ->mutable_validation_context_sds_secret_config()
       ->set_name("missing");
   EXPECT_THROW_WITH_MESSAGE(
-      ClientContextConfigImpl client_context_config(tls_context, *secret_manager.get()),
-      EnvoyException, "Unknown static certificate validation context: missing");
+      ClientContextConfigImpl client_context_config(tls_context, factory_context), EnvoyException,
+      "Unknown static certificate validation context: missing");
 }
 
 // Multiple TLS certificates are not yet supported, but one is expected for
