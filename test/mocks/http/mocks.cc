@@ -187,7 +187,7 @@ bool HeaderValueOfMatcher::MatchAndExplain(const HeaderMap& headers,
     *listener << "which has no '" << key_.get() << "' header";
     return false;
   } else if (values.size() > 1) {
-    *listener << "which has " << absl::StrCat(values.size()) << " '" << key_.get()
+    *listener << "which has " << values.size() << " '" << key_.get()
               << "' headers, with values: " << absl::StrJoin(values, ", ");
     return false;
   }
@@ -229,7 +229,7 @@ public:
   }
 
   void DescribeTo(std::ostream* os) const override {
-    *os << "is subset of headers:\n" << expected_headers_;
+    *os << "is a subset of headers:\n" << expected_headers_;
   }
 
   const HeaderMap& expected_headers_;

@@ -494,7 +494,7 @@ MATCHER_P(HttpStatusIs, expected_code, "") {
     return false;
   }
   const absl::string_view code = status->value().getStringView();
-  if (code != expected_code) {
+  if (code != absl::StrCat(expected_code)) {
     *result_listener << "which has status code " << code;
     return false;
   }
