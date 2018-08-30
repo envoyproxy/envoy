@@ -68,7 +68,7 @@ void SecretManagerImpl::removeDynamicSecretProvider(const std::string& map_key) 
   ENVOY_LOG(debug, "Unregister secret provider. hash key: {}", map_key);
 
   auto num_deleted = dynamic_secret_providers_.erase(map_key);
-  RELEASE_ASSERT(num_deleted == 1, "");
+  ASSERT(num_deleted == 1, "");
 }
 
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(
