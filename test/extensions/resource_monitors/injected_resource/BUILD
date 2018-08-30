@@ -34,6 +34,7 @@ envoy_extension_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/extensions/resource_monitors/injected_resource:config",
         "//source/server:resource_monitor_config_lib",
+        "//test/test_common:environment_lib",
         "//test/test_common:test_time_lib",
         "@envoy_api//envoy/config/resource_monitor/injected_resource/v2alpha:injected_resource_cc",
     ],

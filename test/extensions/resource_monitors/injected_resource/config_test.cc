@@ -7,6 +7,7 @@
 
 #include "extensions/resource_monitors/injected_resource/config.h"
 
+#include "test/test_common/environment.h"
 #include "test/test_common/test_time.h"
 
 #include "gtest/gtest.h"
@@ -23,7 +24,7 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   EXPECT_NE(factory, nullptr);
 
   envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig config;
-  config.set_filename("/config");
+  config.set_filename(TestEnvironment::temporaryPath("injected_resource"));
   DangerousDeprecatedTestTime test_time;
   Event::DispatcherImpl dispatcher(test_time.timeSource());
   Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher);
