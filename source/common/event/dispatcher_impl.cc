@@ -31,7 +31,7 @@ DispatcherImpl::DispatcherImpl(TimeSystem& time_system)
 
 DispatcherImpl::DispatcherImpl(TimeSystem& time_system, Buffer::WatermarkFactoryPtr&& factory)
     : time_system_(time_system), buffer_factory_(std::move(factory)), base_(event_base_new()),
-      timer_factory_(time_system_.createTimerFactory(base_)),
+      scheduler_(time_system_.createScheduler(base_)),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
@@ -117,7 +117,7 @@ DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbac
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
   ASSERT(isThreadSafe());
-  return timer_factory_->createTimer(cb);
+  return scheduler_->createTimer(cb);
 }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {

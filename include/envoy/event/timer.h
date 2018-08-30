@@ -39,9 +39,9 @@ public:
 
 typedef std::unique_ptr<Timer> TimerPtr;
 
-class TimerFactory {
+class Scheduler {
 public:
-  virtual ~TimerFactory() {}
+  virtual ~Scheduler() {}
 
   /**
    * Creates a timer.
@@ -49,7 +49,7 @@ public:
   virtual TimerPtr createTimer(const TimerCb& cb) PURE;
 };
 
-typedef std::unique_ptr<TimerFactory> TimerFactoryPtr;
+typedef std::unique_ptr<Scheduler> SchedulerPtr;
 
 /**
  * Captures a system for measuring time and setting timers with callbacks.
@@ -62,7 +62,7 @@ public:
    * Creates a timer factory. This indirection enables thread-local timer-queue management,
    * so servers can have a separate timer-factory in each thread.
    */
-  virtual TimerFactoryPtr createTimerFactory(Libevent::BasePtr&) PURE;
+  virtual SchedulerPtr createScheduler(Libevent::BasePtr&) PURE;
 };
 
 } // namespace Event

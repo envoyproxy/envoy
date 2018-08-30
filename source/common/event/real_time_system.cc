@@ -42,9 +42,9 @@ private:
   TimerCb cb_;
 };
 
-class RealTimerFactory : public TimerFactory {
+class RealScheduler : public Scheduler {
 public:
-  RealTimerFactory(Libevent::BasePtr& libevent) : libevent_(libevent) {}
+  RealScheduler(Libevent::BasePtr& libevent) : libevent_(libevent) {}
   TimerPtr createTimer(const TimerCb& cb) override {
     return std::make_unique<TimerImpl>(libevent_, cb);
   };
@@ -55,8 +55,8 @@ private:
 
 } // namespace
 
-TimerFactoryPtr RealTimeSystem::createTimerFactory(Libevent::BasePtr& libevent) {
-  return std::make_unique<RealTimerFactory>(libevent);
+SchedulerPtr RealTimeSystem::createScheduler(Libevent::BasePtr& libevent) {
+  return std::make_unique<RealScheduler>(libevent);
 }
 
 } // namespace Event
