@@ -364,7 +364,7 @@ config:
                                           {":authority", "host"},
                                           {"x-forwarded-for", "10.0.0.1"}};
 
-  for (uint32_t i = 0; i < 30; i++) {
+  for (uint32_t i = 0; i < 30; ++i) {
     auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
 
     waitForNextUpstreamRequest();
