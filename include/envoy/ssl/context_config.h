@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
 namespace Envoy {
@@ -40,51 +41,14 @@ public:
   virtual const std::string& ecdhCurves() const PURE;
 
   /**
-   * @return The CA certificate to use for peer validation.
-   */
-  virtual const std::string& caCert() const PURE;
-
-  /**
-   * @return Path of the CA certificate to use for peer validation or "<inline>"
-   * if the CA certificate was inlined.
-   */
-  virtual const std::string& caCertPath() const PURE;
-
-  /**
-   * @return The CRL to check if a cert is revoked.
-   */
-  virtual const std::string& certificateRevocationList() const PURE;
-
-  /**
-   * @return Path of the certificate revocation list, or "<inline>" if the CRL
-   * was inlined.
-   */
-  virtual const std::string& certificateRevocationListPath() const PURE;
-
-  /**
    * @return TlsCertificateConfig the certificate config used to identify the local side.
    */
   virtual const TlsCertificateConfig* tlsCertificate() const PURE;
 
   /**
-   * @return The subject alt names to be verified, if enabled. Otherwise, ""
+   * @return CertificateValidationContextConfig the certificate validation context config.
    */
-  virtual const std::vector<std::string>& verifySubjectAltNameList() const PURE;
-
-  /**
-   * @return A list of a hex-encoded SHA-256 certificate hashes to be verified.
-   */
-  virtual const std::vector<std::string>& verifyCertificateHashList() const PURE;
-
-  /**
-   * @return A list of a hex-encoded SHA-256 SPKI hashes to be verified.
-   */
-  virtual const std::vector<std::string>& verifyCertificateSpkiList() const PURE;
-
-  /**
-   * @return whether to ignore expired certificates (both too new and too old).
-   */
-  virtual bool allowExpiredCertificate() const PURE;
+  virtual const CertificateValidationContextConfig* certificateValidationContext() const PURE;
 
   /**
    * @return The minimum TLS protocol version to negotiate.

@@ -52,7 +52,8 @@ class ValidationInstance : Logger::Loggable<Logger::Id::main>,
                            public ListenerComponentFactory,
                            public WorkerFactory {
 public:
-  ValidationInstance(Options& options, Network::Address::InstanceConstSharedPtr local_address,
+  ValidationInstance(Options& options, TimeSource& time_source,
+                     Network::Address::InstanceConstSharedPtr local_address,
                      Stats::IsolatedStoreImpl& store, Thread::BasicLockable& access_log_lock,
                      ComponentFactory& component_factory);
 
@@ -92,6 +93,7 @@ public:
   Tracing::HttpTracer& httpTracer() override { return config_->httpTracer(); }
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
+  TimeSource& timeSource() override { return time_source_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_->statsFlushInterval();
@@ -136,6 +138,7 @@ private:
                   ComponentFactory& component_factory);
 
   Options& options_;
+  TimeSource time_source_;
   Stats::IsolatedStoreImpl& stats_store_;
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;

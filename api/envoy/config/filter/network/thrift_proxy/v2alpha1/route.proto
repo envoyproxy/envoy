@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.filter.network.thrift_proxy.v2alpha1;
 option go_package = "v2";
 
+import "envoy/api/v2/route/route.proto";
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
@@ -28,7 +29,7 @@ message Route {
   RouteAction route = 2 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
 }
 
-// [#comment:next free field: 4]
+// [#comment:next free field: 5]
 message RouteMatch {
   oneof match_specifier {
     option (validate.required) = true;
@@ -43,9 +44,26 @@ message RouteMatch {
     string service_name = 2;
   }
 
-  // Inverts whatever matching is done in match_specifier. Cannot be combined with wildcard matching
-  // as that would result in routes never being matched.
+  // Inverts whatever matching is done in the :ref:`method_name
+  // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.RouteMatch.method_name>` or
+  // :ref:`service_name
+  // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.RouteMatch.service_name>` fields.
+  // Cannot be combined with wildcard matching as that would result in routes never being matched.
+  //
+  // .. note::
+  //
+  //   This does not invert matching done as part of the :ref:`headers field
+  //   <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.RouteMatch.headers>` field. To
+  //   invert header matching, see :ref:`invert_match
+  //   <envoy_api_field_route.HeaderMatcher.invert_match>`.
   bool invert = 3;
+
+  // Specifies a set of headers that the route should match on. The router will check the request’s
+  // headers against all the specified headers in the route config. A match will happen if all the
+  // headers in the route are present in the request with the same values (or based on presence if
+  // the value field is not in the config). Note that this only applies for Thrift transports and/or
+  // protocols that support headers.
+  repeated envoy.api.v2.route.HeaderMatcher headers = 4;
 }
 
 // [#comment:next free field: 2]

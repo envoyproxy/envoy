@@ -915,6 +915,33 @@ response_headers_to_remove: ["x-global-remove"]
               ContainerEq(config.internalOnlyHeaders()));
 }
 
+// Validate that we can't add :-prefixed request headers.
+TEST(RouteMatcherTest, TestRequestHeadersToAddNoPseudoHeader) {
+  for (const std::string& header : {":path", ":authority", ":method", ":scheme", ":status",
+                                    ":protocol", ":no-chunks", ":status"}) {
+    const std::string yaml = fmt::format(R"EOF(
+name: foo
+virtual_hosts:
+  - name: www2
+    domains: ["*"]
+    request_headers_to_add:
+      - header:
+          key: {}
+          value: vhost-www2
+        append: false
+)EOF",
+                                         header);
+
+    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+    NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+
+    envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
+
+    EXPECT_THROW_WITH_MESSAGE(TestConfigImpl config(route_config, factory_context, true),
+                              EnvoyException, ":-prefixed headers may not be modified");
+  }
+}
+
 TEST(RouteMatcherTest, Priority) {
   std::string json = R"EOF(
 {

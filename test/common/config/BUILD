@@ -30,6 +30,7 @@ envoy_cc_test_library(
         "//source/common/event:dispatcher_lib",
         "//test/mocks/config:config_mocks",
         "//test/test_common:environment_lib",
+        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:eds_cc",
     ],

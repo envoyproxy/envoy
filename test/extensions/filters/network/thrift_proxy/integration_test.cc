@@ -34,12 +34,29 @@ public:
                     cluster: "cluster_0"
                 - match:
                     method_name: "execute"
+                    headers:
+                    - name: "x-header-1"
+                      exact_match: "x-value-1"
+                    - name: "x-header-2"
+                      regex_match: "0.[5-9]"
+                    - name: "x-header-3"
+                      range_match:
+                        start: 100
+                        end: 200
+                    - name: "x-header-4"
+                      prefix_match: "user_id:"
+                    - name: "x-header-5"
+                      suffix_match: "asdf"
                   route:
                     cluster: "cluster_1"
                 - match:
-                    method_name: "poke"
+                    method_name: "execute"
                   route:
                     cluster: "cluster_2"
+                - match:
+                    method_name: "poke"
+                  route:
+                    cluster: "cluster_3"
       )EOF";
   }
 
@@ -51,7 +68,16 @@ public:
       service_name = "svcname";
     }
 
-    PayloadOptions options(transport_, protocol_, mode, service_name, "execute");
+    std::vector<std::pair<std::string, std::string>> headers;
+    if (transport_ == TransportType::Header) {
+      headers.push_back(std::make_pair("x-header-1", "x-value-1"));
+      headers.push_back(std::make_pair("x-header-2", "0.6"));
+      headers.push_back(std::make_pair("x-header-3", "150"));
+      headers.push_back(std::make_pair("x-header-4", "user_id:10"));
+      headers.push_back(std::make_pair("x-header-5", "garbage_asdf"));
+    }
+
+    PayloadOptions options(transport_, protocol_, mode, service_name, "execute", {}, headers);
     preparePayloads(options, request_bytes_, response_bytes_);
     ASSERT(request_bytes_.length() > 0);
     ASSERT(response_bytes_.length() > 0);
@@ -76,16 +102,14 @@ public:
   // We allocate as many upstreams as there are clusters, with each upstream being allocated
   // to clusters in the order they're defined in the bootstrap config.
   void initializeCommon() {
-    setUpstreamCount(3);
+    setUpstreamCount(4);
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      auto* c1 = bootstrap.mutable_static_resources()->add_clusters();
-      c1->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      c1->set_name("cluster_1");
-
-      auto* c2 = bootstrap.mutable_static_resources()->add_clusters();
-      c2->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      c2->set_name("cluster_2");
+      for (int i = 1; i < 4; i++) {
+        auto* c = bootstrap.mutable_static_resources()->add_clusters();
+        c->MergeFrom(bootstrap.static_resources().clusters()[0]);
+        c->set_name(fmt::format("cluster_{}", i));
+      }
     });
 
     BaseThriftIntegrationTest::initialize();
@@ -101,11 +125,13 @@ protected:
   // while oneway's are handled by the "poke" method. All other requests
   // are handled by "execute".
   FakeUpstream* getExpectedUpstream(bool oneway) {
-    int upstreamIdx = 1;
+    int upstreamIdx = 2;
     if (multiplexed_) {
       upstreamIdx = 0;
     } else if (oneway) {
-      upstreamIdx = 2;
+      upstreamIdx = 3;
+    } else if (transport_ == TransportType::Header) {
+      upstreamIdx = 1;
     }
 
     return fake_upstreams_[upstreamIdx].get();

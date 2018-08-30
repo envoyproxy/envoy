@@ -2,9 +2,9 @@
 
 #include "common/buffer/buffer_impl.h"
 
+#include "extensions/filters/network/thrift_proxy/auto_protocol_impl.h"
 #include "extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
 #include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
-#include "extensions/filters/network/thrift_proxy/protocol_impl.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"

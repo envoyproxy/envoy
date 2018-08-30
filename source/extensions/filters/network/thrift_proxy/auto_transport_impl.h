@@ -8,8 +8,6 @@
 
 #include "extensions/filters/network/thrift_proxy/transport.h"
 
-#include "absl/types/optional.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

@@ -165,9 +165,7 @@ public:
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                      AccessLog::AccessLogManager& log_manager,
-                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                     SystemTimeSource& system_time_source,
-                     MonotonicTimeSource& monotonic_time_source);
+                     Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin);
 
   // Upstream::ClusterManager
   bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
@@ -213,6 +211,7 @@ public:
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
+  TimeSource& timeSource() override { return time_source_; }
 
 protected:
   virtual void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
@@ -437,7 +436,7 @@ private:
   std::string local_cluster_name_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
-  SystemTimeSource& system_time_source_;
+  TimeSource time_source_;
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
 };

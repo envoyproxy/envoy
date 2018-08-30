@@ -758,7 +758,7 @@ TEST_P(AdsIntegrationTest, XdsBatching) {
                                         {"eds_cluster2", "eds_cluster"}));
     sendDiscoveryResponse<envoy::api::v2::ClusterLoadAssignment>(
         Config::TypeUrl::get().ClusterLoadAssignment,
-        {buildClusterLoadAssignment("eds_cluster"), buildClusterLoadAssignment("eds_cluster1")},
+        {buildClusterLoadAssignment("eds_cluster"), buildClusterLoadAssignment("eds_cluster2")},
         "1");
 
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",

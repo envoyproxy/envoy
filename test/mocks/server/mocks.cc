@@ -90,6 +90,7 @@ MockListenerManager::MockListenerManager() {}
 MockListenerManager::~MockListenerManager() {}
 
 MockWorkerFactory::MockWorkerFactory() {}
+
 MockWorkerFactory::~MockWorkerFactory() {}
 
 MockWorker::MockWorker() {
@@ -132,6 +133,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
+  ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(test_time_.timeSource()));
 }
 
 MockInstance::~MockInstance() {}
@@ -146,7 +148,9 @@ MockMain::MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill)
   ON_CALL(*this, wdMultiKillTimeout()).WillByDefault(Return(wd_multikill_));
 }
 
-MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::ManagerImpl()) {
+MockFactoryContext::MockFactoryContext()
+    : singleton_manager_(new Singleton::ManagerImpl()),
+      time_source_(system_time_source_, monotonic_time_source_) {
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
@@ -162,6 +166,7 @@ MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::Man
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(listener_scope_));
   ON_CALL(*this, systemTimeSource()).WillByDefault(ReturnRef(system_time_source_));
+  ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_source_));
 }
 
 MockFactoryContext::~MockFactoryContext() {}

@@ -19,6 +19,7 @@
 #include "server/test_hooks.h"
 
 #include "test/integration/server_stats.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -301,6 +302,7 @@ private:
   Thread::CondVar listeners_cv_;
   Thread::MutexBasicLockable listeners_mutex_;
   uint64_t pending_listeners_;
+  DangerousDeprecatedTestTime test_time_;
   ConditionalInitializer server_set_;
   std::unique_ptr<Server::InstanceImpl> server_;
   Server::TestDrainManager* drain_manager_{};

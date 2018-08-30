@@ -5,9 +5,12 @@
 
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
+#include "common/request_info/filter_state_impl.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
+#include "common/router/string_accessor_impl.h"
 
+#include "test/common/request_info/test_int_accessor.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
@@ -167,6 +170,53 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMis
   testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"key\"])", "");
 }
 
+TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
+  Envoy::RequestInfo::FilterStateImpl per_request_state;
+  per_request_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  EXPECT_EQ("test_value", per_request_state.getData<StringAccessor>("testing").asString());
+
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
+
+  testFormatting(request_info, "PER_REQUEST_STATE(testing)", "test_value");
+  testFormatting(request_info, "PER_REQUEST_STATE(testing2)", "");
+  EXPECT_EQ("test_value", per_request_state.getData<StringAccessor>("testing").asString());
+}
+
+TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
+  Envoy::RequestInfo::FilterStateImpl per_request_state;
+  per_request_state.setData("testing", std::make_unique<RequestInfo::TestIntAccessor>(1));
+  EXPECT_EQ(1, per_request_state.getData<RequestInfo::TestIntAccessor>("testing").access());
+
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
+
+  testFormatting(request_info, "PER_REQUEST_STATE(testing)", "");
+}
+
+TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnPerRequestStateVariable) {
+  // No parameters
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE()", false),
+                            EnvoyException,
+                            "Invalid header configuration. Expected format "
+                            "PER_REQUEST_STATE(<data_name>), actual format "
+                            "PER_REQUEST_STATE()");
+
+  // Missing single parens
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE(testing", false),
+                            EnvoyException,
+                            "Invalid header configuration. Expected format "
+                            "PER_REQUEST_STATE(<data_name>), actual format "
+                            "PER_REQUEST_STATE(testing");
+  EXPECT_THROW_WITH_MESSAGE(RequestInfoHeaderFormatter("PER_REQUEST_STATE testing)", false),
+                            EnvoyException,
+                            "Invalid header configuration. Expected format "
+                            "PER_REQUEST_STATE(<data_name>), actual format "
+                            "PER_REQUEST_STATE testing)");
+}
+
 TEST_F(RequestInfoHeaderFormatterTest, UnknownVariable) { testInvalidFormat("INVALID_VARIABLE"); }
 
 TEST_F(RequestInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
@@ -268,6 +318,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       {"%UPSTREAM_METADATA([\"ns\", \t \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA([\"ns\", \n \"key\"])%", {"value"}, {}},
       {"%UPSTREAM_METADATA( \t [ \t \"ns\" \t , \t \"key\" \t ] \t )%", {"value"}, {}},
+      {"%PER_REQUEST_STATE(testing)%", {"test_value"}, {}},
       {"%START_TIME%", {"2018-04-03T23:06:09.123Z"}, {}},
 
       // Unescaped %
@@ -312,6 +363,11 @@ TEST(HeaderParserTest, TestParseInternal) {
         "...]), actual format UPSTREAM_METADATA( no array), because JSON supplied is not valid. "
         "Error(offset 2, line 1): Invalid value.\n"}},
 
+      {"%PER_REQUEST_STATE no parens%",
+       {},
+       {"Invalid header configuration. Expected format PER_REQUEST_STATE(<data_name>), "
+        "actual format PER_REQUEST_STATE no parens"}},
+
       // Invalid arguments
       {"%UPSTREAM_METADATA%",
        {},
@@ -331,7 +387,7 @@ TEST(HeaderParserTest, TestParseInternal) {
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
 
-  // Metadata with percent signs in the key.
+  // Upstream metadata with percent signs in the key.
   auto metadata = std::make_shared<envoy::api::v2::core::Metadata>(
       TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
           R"EOF(
@@ -344,6 +400,11 @@ TEST(HeaderParserTest, TestParseInternal) {
   // "2018-04-03T23:06:09.123Z".
   const SystemTime start_time(std::chrono::milliseconds(1522796769123));
   ON_CALL(request_info, startTime()).WillByDefault(Return(start_time));
+
+  Envoy::RequestInfo::FilterStateImpl per_request_state;
+  per_request_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
 
   for (const auto& test_case : test_cases) {
     Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
@@ -473,6 +534,9 @@ route:
     - header:
         key: "x-metadata"
         value: "%UPSTREAM_METADATA([\"namespace\", \"%key%\"])%"
+    - header:
+        key: "x-per-request"
+        value: "%PER_REQUEST_STATE(testing)%"
   )EOF";
 
   HeaderParserPtr req_header_parser =
@@ -495,6 +559,11 @@ route:
             "%key%": value
       )EOF"));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
+
+  Envoy::RequestInfo::FilterStateImpl per_request_state;
+  per_request_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"));
+  ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
+  ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
 
   req_header_parser->evaluateHeaders(headerMap, request_info);
 
@@ -521,6 +590,9 @@ route:
 
   EXPECT_TRUE(headerMap.has("x-metadata"));
   EXPECT_EQ("value", headerMap.get_("x-metadata"));
+
+  EXPECT_TRUE(headerMap.has("x-per-request"));
+  EXPECT_EQ("test_value", headerMap.get_("x-per-request"));
 }
 
 TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {

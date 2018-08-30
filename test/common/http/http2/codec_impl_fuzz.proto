@@ -15,11 +15,11 @@ message NewStream {
 
 message DirectionalAction {
   oneof directional_action_selector {
-    test.fuzz.Headers continue_100_headers = 1;
+    test.fuzz.Headers continue_headers = 1;
     test.fuzz.Headers headers = 2;
     uint32 data = 3;
     test.fuzz.Headers trailers = 4;
-    uint32 reset = 5;
+    uint32 reset_stream = 5;
     bool read_disable = 6;
   }
   bool end_stream = 7;

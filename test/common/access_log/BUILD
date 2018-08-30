@@ -24,7 +24,6 @@ envoy_cc_library(
 envoy_proto_library(
     name = "access_log_formatter_fuzz_proto",
     srcs = ["access_log_formatter_fuzz.proto"],
-    generate_python = 0,
     deps = ["//test/fuzz:common_proto"],
 )
 
@@ -33,7 +32,7 @@ envoy_cc_fuzz_test(
     srcs = ["access_log_formatter_fuzz_test.cc"],
     corpus = "access_log_formatter_corpus",
     deps = [
-        ":access_log_formatter_fuzz_proto",
+        ":access_log_formatter_fuzz_proto_cc",
         "//source/common/access_log:access_log_formatter_lib",
         "//test/fuzz:utility_lib",
     ],

@@ -8,6 +8,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -112,7 +113,7 @@ protected:
           bootstrap_path, {{"upstream_0", 0}, {"upstream_1", 0}}, version_);
     }
     server_.reset(new InstanceImpl(
-        options_,
+        options_, test_time_.timeSource(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_));
@@ -128,7 +129,7 @@ protected:
          {"health_check_interval", fmt::format("{}", interval).c_str()}},
         TestEnvironment::PortMap{}, version_);
     server_.reset(new InstanceImpl(
-        options_,
+        options_, test_time_.timeSource(),
         Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
         hooks_, restart_, stats_store_, fakelock_, component_factory_,
         std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_));
@@ -144,6 +145,7 @@ protected:
   Stats::TestIsolatedStoreImpl stats_store_;
   Thread::MutexBasicLockable fakelock_;
   TestComponentFactory component_factory_;
+  DangerousDeprecatedTestTime test_time_;
   std::unique_ptr<InstanceImpl> server_;
 };
 
@@ -296,7 +298,7 @@ TEST_P(ServerInstanceImplTest, LogToFileError) {
 TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
   EXPECT_THROW_WITH_MESSAGE(
       server_.reset(new InstanceImpl(
-          options_,
+          options_, test_time_.timeSource(),
           Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("127.0.0.1")),
           hooks_, restart_, stats_store_, fakelock_, component_factory_,
           std::make_unique<NiceMock<Runtime::MockRandomGenerator>>(), thread_local_)),
