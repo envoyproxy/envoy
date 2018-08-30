@@ -16,7 +16,8 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator)
-  : config_(config), stats_(config_.stats()), decoder_(config_.createDecoder(*this)), random_generator_(random_generator){}
+    : config_(config), stats_(config_.stats()), decoder_(config_.createDecoder(*this)),
+      random_generator_(random_generator) {}
 
 ConnectionManager::~ConnectionManager() {}
 
@@ -267,7 +268,8 @@ void ConnectionManager::ActiveRpc::continueDecoding() { parent_.continueDecoding
 Router::RouteConstSharedPtr ConnectionManager::ActiveRpc::route() {
   if (!cached_route_) {
     if (metadata_ != nullptr) {
-      Router::RouteConstSharedPtr route = parent_.config_.routerConfig().route(*metadata_);
+      Router::RouteConstSharedPtr route =
+          parent_.config_.routerConfig().route(*metadata_, stream_id_);
       cached_route_ = std::move(route);
     } else {
       cached_route_ = nullptr;

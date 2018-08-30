@@ -703,19 +703,19 @@ routes:
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
-  EXPECT_EQ(nullptr, matcher.route(metadata));
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
   metadata.setMethodName("unknown");
-  EXPECT_EQ(nullptr, matcher.route(metadata));
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
   metadata.setMethodName("METHOD1");
-  EXPECT_EQ(nullptr, matcher.route(metadata));
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
   metadata.setMethodName("method1");
-  RouteConstSharedPtr route = matcher.route(metadata);
+  RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 
   metadata.setMethodName("method2");
-  RouteConstSharedPtr route2 = matcher.route(metadata);
+  RouteConstSharedPtr route2 = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route2);
   EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
 }
@@ -740,27 +740,27 @@ routes:
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
-  RouteConstSharedPtr route = matcher.route(metadata);
+  RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
 
   metadata.setMethodName("unknown");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
 
   metadata.setMethodName("METHOD1");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
 
   metadata.setMethodName("method1");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 
   metadata.setMethodName("method2");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 }
 
@@ -786,19 +786,19 @@ routes:
   {
     MessageMetadata metadata;
     metadata.setMethodName("method1");
-    RouteConstSharedPtr route = matcher.route(metadata);
+    RouteConstSharedPtr route = matcher.route(metadata, 0);
     EXPECT_NE(nullptr, route);
     EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 
     metadata.setMethodName("anything");
-    RouteConstSharedPtr route2 = matcher.route(metadata);
+    RouteConstSharedPtr route2 = matcher.route(metadata, 0);
     EXPECT_NE(nullptr, route2);
     EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
   }
 
   {
     MessageMetadata metadata;
-    RouteConstSharedPtr route2 = matcher.route(metadata);
+    RouteConstSharedPtr route2 = matcher.route(metadata, 0);
     EXPECT_NE(nullptr, route2);
     EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
   }
@@ -840,19 +840,19 @@ routes:
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
-  EXPECT_EQ(nullptr, matcher.route(metadata));
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
   metadata.setMethodName("unknown");
-  EXPECT_EQ(nullptr, matcher.route(metadata));
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
   metadata.setMethodName("METHOD1");
-  EXPECT_EQ(nullptr, matcher.route(metadata));
+  EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
   metadata.setMethodName("service2:method1");
-  RouteConstSharedPtr route = matcher.route(metadata);
+  RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
 
   metadata.setMethodName("service2:method2");
-  RouteConstSharedPtr route2 = matcher.route(metadata);
+  RouteConstSharedPtr route2 = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route2);
   EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
 }
@@ -877,27 +877,27 @@ routes:
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
-  RouteConstSharedPtr route = matcher.route(metadata);
+  RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
 
   metadata.setMethodName("unknown");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
 
   metadata.setMethodName("METHOD1");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
 
   metadata.setMethodName("method1");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 
   metadata.setMethodName("service2:method1");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 }
 
@@ -923,19 +923,19 @@ routes:
   {
     MessageMetadata metadata;
     metadata.setMethodName("method1");
-    RouteConstSharedPtr route = matcher.route(metadata);
+    RouteConstSharedPtr route = matcher.route(metadata, 0);
     EXPECT_NE(nullptr, route);
     EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 
     metadata.setMethodName("anything");
-    RouteConstSharedPtr route2 = matcher.route(metadata);
+    RouteConstSharedPtr route2 = matcher.route(metadata, 0);
     EXPECT_NE(nullptr, route2);
     EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
   }
 
   {
     MessageMetadata metadata;
-    RouteConstSharedPtr route2 = matcher.route(metadata);
+    RouteConstSharedPtr route2 = matcher.route(metadata, 0);
     EXPECT_NE(nullptr, route2);
     EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
   }
@@ -976,15 +976,15 @@ routes:
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
-  RouteConstSharedPtr route = matcher.route(metadata);
+  RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
   metadata.setMethodName("method1");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
   metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "x-value-1");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
@@ -1007,20 +1007,20 @@ routes:
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
-  RouteConstSharedPtr route = matcher.route(metadata);
+  RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
   metadata.setMethodName("method1");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
   metadata.headers().addCopy(Http::LowerCaseString("x-version"), "0.1");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
   metadata.headers().remove(Http::LowerCaseString("x-version"));
 
   metadata.headers().addCopy(Http::LowerCaseString("x-version"), "0.8");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
@@ -1045,20 +1045,20 @@ routes:
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
-  RouteConstSharedPtr route = matcher.route(metadata);
+  RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
   metadata.setMethodName("method1");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
   metadata.headers().addCopy(Http::LowerCaseString("x-user-id"), "50");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
   metadata.headers().remove(Http::LowerCaseString("x-user-id"));
 
   metadata.headers().addCopy(Http::LowerCaseString("x-user-id"), "199");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
@@ -1081,21 +1081,21 @@ routes:
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
-  RouteConstSharedPtr route = matcher.route(metadata);
+  RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
   metadata.setMethodName("method1");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
   metadata.headers().addCopy(Http::LowerCaseString("x-user-id"), "50");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
   metadata.headers().remove(Http::LowerCaseString("x-user-id"));
 
   metadata.headers().addCopy(Http::LowerCaseString("x-user-id"), "");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
@@ -1118,20 +1118,20 @@ routes:
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
-  RouteConstSharedPtr route = matcher.route(metadata);
+  RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
   metadata.setMethodName("method1");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
   metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "500");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
   metadata.headers().remove(Http::LowerCaseString("x-header-1"));
 
   metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "user_id:500");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }
@@ -1154,25 +1154,25 @@ routes:
 
   RouteMatcher matcher(config);
   MessageMetadata metadata;
-  RouteConstSharedPtr route = matcher.route(metadata);
+  RouteConstSharedPtr route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
   metadata.setMethodName("method1");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
 
   metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "asdfvalue");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
   metadata.headers().remove(Http::LowerCaseString("x-header-1"));
 
   metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "valueasdfvalue");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_EQ(nullptr, route);
   metadata.headers().remove(Http::LowerCaseString("x-header-1"));
 
   metadata.headers().addCopy(Http::LowerCaseString("x-header-1"), "value:asdf");
-  route = matcher.route(metadata);
+  route = matcher.route(metadata, 0);
   EXPECT_NE(nullptr, route);
   EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
 }

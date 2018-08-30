@@ -27,7 +27,11 @@ const std::string& RouteEntryImplBase::clusterName() const { return cluster_name
 
 const RouteEntry* RouteEntryImplBase::routeEntry() const { return this; }
 
-RouteConstSharedPtr RouteEntryImplBase::clusterEntry() const { return shared_from_this(); }
+RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value) const {
+  // @bramos: just to make the compiler happy for now
+  ++random_value;
+  return shared_from_this();
+}
 
 bool RouteEntryImplBase::headersMatch(const Http::HeaderMap& headers) const {
   return Http::HeaderUtility::matchHeaders(headers, config_headers_);
@@ -42,13 +46,14 @@ MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
   }
 }
 
-RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
+RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata,
+                                                      uint64_t random_value) const {
   if (RouteEntryImplBase::headersMatch(metadata.headers())) {
     bool matches =
         method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
 
     if (matches ^ invert_) {
-      return clusterEntry();
+      return clusterEntry(random_value);
     }
   }
 
@@ -70,14 +75,15 @@ ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
   }
 }
 
-RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
+RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata,
+                                                       uint64_t random_value) const {
   if (RouteEntryImplBase::headersMatch(metadata.headers())) {
     bool matches = service_name_.empty() ||
                    (metadata.hasMethodName() &&
                     StringUtil::startsWith(metadata.methodName().c_str(), service_name_));
 
     if (matches ^ invert_) {
-      return clusterEntry();
+      return clusterEntry(random_value);
     }
   }
 
@@ -102,9 +108,10 @@ RouteMatcher::RouteMatcher(
   }
 }
 
-RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata) const {
+RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata,
+                                        uint64_t random_value) const {
   for (const auto& route : routes_) {
-    RouteConstSharedPtr route_entry = route->matches(metadata);
+    RouteConstSharedPtr route_entry = route->matches(metadata, random_value);
     if (nullptr != route_entry) {
       return route_entry;
     }
