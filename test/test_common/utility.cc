@@ -32,12 +32,17 @@ using testing::GTEST_FLAG(random_seed);
 
 namespace Envoy {
 
+<<<<<<< 9eaec741a77eefb572a17a45118d0cb19b1b7a56
 // The purpose of using the static seed here is to use --test_arg=--gtest_random_seed=[seed]
 // to specify the seed of the problem to replay.
 int32_t getSeed() {
   static const int32_t seed = std::chrono::duration_cast<std::chrono::nanoseconds>(
                                   std::chrono::system_clock::now().time_since_epoch())
                                   .count();
+=======
+int32_t getSeed() {
+  static int32_t seed = absl::ToUnixNanos(absl::Now());
+>>>>>>> fix static initialization fiasco
   return seed;
 }
 
