@@ -13,7 +13,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/http/header_utility.h"
+#include "common/common/matchers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -43,7 +43,7 @@ class FaultSettings : public Router::RouteSpecificFilterConfig {
 public:
   FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault);
 
-  const std::vector<Http::HeaderUtility::HeaderData>& filterHeaders() const {
+  const std::vector<Matchers::HeaderUtility::HeaderData>& filterHeaders() const {
     return fault_filter_headers_;
   }
   envoy::type::FractionalPercent abortPercentage() const { return abort_percentage_; }
@@ -59,7 +59,7 @@ private:
   envoy::type::FractionalPercent fixed_delay_percentage_;
   uint64_t fixed_duration_ms_{}; // in milliseconds
   std::string upstream_cluster_; // restrict faults to specific upstream cluster
-  std::vector<Http::HeaderUtility::HeaderData> fault_filter_headers_;
+  std::vector<Matchers::HeaderUtility::HeaderData> fault_filter_headers_;
   std::unordered_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
 };
 

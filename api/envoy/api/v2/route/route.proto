@@ -5,7 +5,7 @@ option go_package = "route";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
-import "envoy/type/range.proto";
+import "envoy/type/matcher/header.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -112,7 +112,7 @@ message VirtualHost {
 // .. attention::
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
-//   <envoy_api_msg_route.HeaderMatcher>`.
+//   <envoy_api_msg_type.matcher.HeaderMatcher>`.
 message Route {
   // Route matching parameters.
   RouteMatch match = 1 [(validate.rules).message.required = true, (gogoproto.nullable) = false];
@@ -290,7 +290,7 @@ message RouteMatch {
   // config. A match will happen if all the headers in the route are present in
   // the request with the same values (or based on presence if the value field
   // is not in the config).
-  repeated HeaderMatcher headers = 6;
+  repeated envoy.type.matcher.HeaderMatcher headers = 6;
 
   // Specifies a set of URL query parameters on which the route should
   // match. The router will check the query string from the *path* header
@@ -876,7 +876,8 @@ message RateLimit {
       // specified headers in the config. A match will happen if all the
       // headers in the config are present in the request with the same values
       // (or based on presence if the value field is not in the config).
-      repeated HeaderMatcher headers = 3 [(validate.rules).repeated .min_items = 1];
+      repeated envoy.type.matcher.HeaderMatcher headers = 3
+          [(validate.rules).repeated .min_items = 1];
     }
 
     oneof action_specifier {
@@ -909,99 +910,6 @@ message RateLimit {
   // configuration. See :ref:`composing actions
   // <config_http_filters_rate_limit_composing_actions>` for additional documentation.
   repeated Action actions = 3 [(validate.rules).repeated .min_items = 1];
-}
-
-// .. attention::
-//
-//   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1 *Host*
-//   header. Thus, if attempting to match on *Host*, match on *:authority* instead.
-//
-// .. attention::
-//
-//   To route on HTTP method, use the special HTTP/2 *:method* header. This works for both
-//   HTTP/1 and HTTP/2 as Envoy normalizes headers. E.g.,
-//
-//   .. code-block:: json
-//
-//     {
-//       "name": ":method",
-//       "value": "POST"
-//     }
-//
-// .. attention::
-//   In the absence of any header match specifier, match will default to :ref:`present_match
-//   <envoy_api_field_route.HeaderMatcher.present_match>`. i.e, a request that has the :ref:`name
-//   <envoy_api_field_route.HeaderMatcher.name>` header will match, regardless of the header's
-//   value.
-//
-message HeaderMatcher {
-  // Specifies the name of the header in the request.
-  string name = 1 [(validate.rules).string.min_bytes = 1];
-
-  reserved 2; // value deprecated by :ref:`exact_match
-              // <envoy_api_field_route.HeaderMatcher.exact_match>`
-
-  reserved 3; // regex deprecated by :ref:`regex_match
-              // <envoy_api_field_route.HeaderMatcher.regex_match>`
-
-  // Specifies how the header match will be performed to route the request.
-  oneof header_match_specifier {
-    // If specified, header match will be performed based on the value of the header.
-    string exact_match = 4;
-
-    // If specified, this regex string is a regular expression rule which implies the entire request
-    // header value must match the regex. The rule will not match if only a subsequence of the
-    // request header value matches the regex. The regex grammar used in the value field is defined
-    // `here <http://en.cppreference.com/w/cpp/regex/ecmascript>`_.
-    //
-    // Examples:
-    //
-    // * The regex *\d{3}* matches the value *123*
-    // * The regex *\d{3}* does not match the value *1234*
-    // * The regex *\d{3}* does not match the value *123.456*
-    string regex_match = 5 [(validate.rules).string.max_bytes = 1024];
-
-    // If specified, header match will be performed based on range.
-    // The rule will match if the request header value is within this range.
-    // The entire request header value must represent an integer in base 10 notation: consisting of
-    // an optional plus or minus sign followed by a sequence of digits. The rule will not match if
-    // the header value does not represent an integer. Match will fail for empty values, floating
-    // point numbers or if only a subsequence of the header value is an integer.
-    //
-    // Examples:
-    //
-    // * For range [-10,0), route will match for header value -1, but not for 0, "somestring", 10.9,
-    //   "-1somestring"
-    envoy.type.Int64Range range_match = 6;
-
-    // If specified, header match will be be performed based on whether the header is in the
-    // request.
-    bool present_match = 7;
-
-    // If specified, header match will be performed based on the prefix of the header value.
-    // Note: empty prefix is not allowed, please use present_match instead.
-    //
-    // Examples:
-    //
-    // * The prefix *abcd* matches the value *abcdxyz*, but not for *abcxyz*.
-    string prefix_match = 9 [(validate.rules).string.min_bytes = 1];
-
-    // If specified, header match will be performed based on the suffix of the header value.
-    // Note: empty suffix is not allowed, please use present_match instead.
-    //
-    // Examples:
-    //
-    // * The suffix *abcd* matches the value *xyzabcd*, but not for *xyzbcd*.
-    string suffix_match = 10 [(validate.rules).string.min_bytes = 1];
-  }
-
-  // If specified, the match result will be inverted before checking. Defaults to false.
-  //
-  // Examples:
-  //
-  // * The regex *\d{3}* does not match the value *1234*, so it will match when inverted.
-  // * The range [-10,0) will match the value -1, so it will not match when inverted.
-  bool invert_match = 8;
 }
 
 // Query parameter matching treats the query string of a request's :path header

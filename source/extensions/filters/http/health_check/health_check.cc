@@ -9,6 +9,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/common/matchers.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -34,7 +35,7 @@ void HealthCheckCacheManager::onTimer() {
 
 Http::FilterHeadersStatus HealthCheckFilter::decodeHeaders(Http::HeaderMap& headers,
                                                            bool end_stream) {
-  if (Http::HeaderUtility::matchHeaders(headers, *header_match_data_)) {
+  if (Matchers::HeaderUtility::matchHeaders(headers, *header_match_data_)) {
     health_check_request_ = true;
     callbacks_->requestInfo().healthCheck(true);
 

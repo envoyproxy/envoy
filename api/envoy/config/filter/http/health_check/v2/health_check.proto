@@ -6,8 +6,8 @@ option go_package = "v2";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "envoy/api/v2/route/route.proto";
 import "envoy/type/percent.proto";
+import "envoy/type/matcher/header.proto";
 
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
@@ -34,5 +34,5 @@ message HealthCheck {
   // Specifies a set of health check request headers to match on. The health check filter will
   // check a request’s headers against all the specified headers. To specify the health check
   // endpoint, set the ``:path`` header to match on.
-  repeated envoy.api.v2.route.HeaderMatcher headers = 5;
+  repeated envoy.type.matcher.HeaderMatcher headers = 5;
 }

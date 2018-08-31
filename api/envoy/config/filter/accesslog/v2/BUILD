@@ -12,8 +12,8 @@ api_proto_library_internal(
     ],
     deps = [
         "//envoy/api/v2/core:base",
-        "//envoy/api/v2/route",
         "//envoy/type:percent",
+        "//envoy/type/matcher:header",
     ],
 )
 
@@ -22,7 +22,7 @@ api_go_proto_library(
     proto = ":accesslog",
     deps = [
         "//envoy/api/v2/core:base_go_proto",
-        "//envoy/api/v2/route:route_go_proto",
         "//envoy/type:percent_go_proto",
+        "//envoy/type/matcher:header_go_proto",
     ],
 )

@@ -9,7 +9,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 
-#include "common/http/header_utility.h"
+#include "common/common/matchers.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -162,7 +162,7 @@ public:
                 const Http::HeaderMap& request_headers) override;
 
 private:
-  std::vector<Http::HeaderUtility::HeaderData> header_data_;
+  std::vector<Matchers::HeaderUtility::HeaderData> header_data_;
 };
 
 /**

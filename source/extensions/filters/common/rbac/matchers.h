@@ -6,9 +6,9 @@
 #include "envoy/config/rbac/v2alpha/rbac.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/type/matcher/header.pb.h"
 
 #include "common/common/matchers.h"
-#include "common/http/header_utility.h"
 #include "common/network/cidr_range.h"
 
 namespace Envoy {
@@ -116,13 +116,13 @@ private:
  */
 class HeaderMatcher : public Matcher {
 public:
-  HeaderMatcher(const envoy::api::v2::route::HeaderMatcher& matcher) : header_(matcher) {}
+  HeaderMatcher(const envoy::type::matcher::HeaderMatcher& matcher) : header_(matcher) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::HeaderMap& headers,
                const envoy::api::v2::core::Metadata&) const override;
 
 private:
-  const Envoy::Http::HeaderUtility::HeaderData header_;
+  const Envoy::Matchers::HeaderUtility::HeaderData header_;
 };
 
 /**

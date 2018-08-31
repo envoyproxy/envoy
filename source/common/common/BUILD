@@ -131,8 +131,12 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":utility_lib",
+        "//include/envoy/http:header_map_interface",
+        "//include/envoy/json:json_object_interface",
         "//source/common/config:metadata_lib",
+        "//source/common/config:rds_json_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/type/matcher:header_cc",
         "@envoy_api//envoy/type/matcher:metadata_cc",
         "@envoy_api//envoy/type/matcher:number_cc",
         "@envoy_api//envoy/type/matcher:string_cc",

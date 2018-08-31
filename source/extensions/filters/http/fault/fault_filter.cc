@@ -13,10 +13,10 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/matchers.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
-#include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -46,7 +46,7 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
     fixed_duration_ms_ = PROTOBUF_GET_MS_OR_DEFAULT(delay, fixed_delay, 0);
   }
 
-  for (const Http::HeaderUtility::HeaderData& header_map : fault.headers()) {
+  for (const Matchers::HeaderUtility::HeaderData& header_map : fault.headers()) {
     fault_filter_headers_.push_back(header_map);
   }
 
@@ -96,7 +96,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   }
 
   // Check for header matches
-  if (!Http::HeaderUtility::matchHeaders(headers, fault_settings_->filterHeaders())) {
+  if (!Matchers::HeaderUtility::matchHeaders(headers, fault_settings_->filterHeaders())) {
     return Http::FilterHeadersStatus::Continue;
   }
 

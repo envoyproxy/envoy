@@ -65,3 +65,20 @@ api_go_proto_library(
         ":string_go_proto",
     ],
 )
+
+api_proto_library_internal(
+    name = "header",
+    srcs = ["header.proto"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/type:range",
+    ],
+)
+
+api_go_proto_library(
+    name = "header",
+    proto = ":header",
+    deps = [
+        "//envoy/type:range_go_proto",
+    ],
+)

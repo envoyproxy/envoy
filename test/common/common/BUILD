@@ -188,3 +188,12 @@ envoy_cc_test(
         "//source/common/common:thread_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "header_utility_test",
+    srcs = ["header_utility_test.cc"],
+    deps = [
+        "//source/common/common:matchers_lib",
+        "//test/test_common:utility_lib",
+    ],
+)

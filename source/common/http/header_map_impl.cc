@@ -431,7 +431,7 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, uint64_t value) {
   ASSERT(new_value.empty());
 }
 
-void HeaderMapImpl::addCopy(const LowerCaseString& key, const std::string& value) {
+void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value) {
   auto* entry = getExistingInline(key.get().c_str());
   if (entry != nullptr) {
     appendToHeader(entry->value(), value);
@@ -440,7 +440,7 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, const std::string& value
   HeaderString new_key;
   new_key.setCopy(key.get().c_str(), key.get().size());
   HeaderString new_value;
-  new_value.setCopy(value.c_str(), value.size());
+  new_value.setCopy(value.data(), value.length());
   insertByKey(std::move(new_key), std::move(new_value));
   ASSERT(new_key.empty());
   ASSERT(new_value.empty());

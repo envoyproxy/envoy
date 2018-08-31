@@ -131,7 +131,7 @@ TEST(NotMatcher, Principal) {
 }
 
 TEST(HeaderMatcher, HeaderMatcher) {
-  envoy::api::v2::route::HeaderMatcher config;
+  envoy::type::matcher::HeaderMatcher config;
   config.set_name("foo");
   config.set_exact_match("bar");
 

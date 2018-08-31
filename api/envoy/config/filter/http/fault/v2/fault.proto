@@ -3,9 +3,9 @@ syntax = "proto3";
 package envoy.config.filter.http.fault.v2;
 option go_package = "v2";
 
-import "envoy/api/v2/route/route.proto";
 import "envoy/config/filter/fault/v2/fault.proto";
 import "envoy/type/percent.proto";
+import "envoy/type/matcher/header.proto";
 
 import "validate/validate.proto";
 
@@ -56,7 +56,7 @@ message HTTPFault {
   // config. A match will happen if all the headers in the config are present in
   // the request with the same values (or based on presence if the *value* field
   // is not in the config).
-  repeated envoy.api.v2.route.HeaderMatcher headers = 4;
+  repeated envoy.type.matcher.HeaderMatcher headers = 4;
 
   // Faults are injected for the specified list of downstream hosts. If this
   // setting is not set, faults are injected for all downstream nodes.

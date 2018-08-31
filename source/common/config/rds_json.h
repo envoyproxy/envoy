@@ -4,6 +4,7 @@
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/stats/stats_options.h"
+#include "envoy/type/matcher/header.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -47,7 +48,7 @@ public:
    * @param header_matcher destination v2 envoy::api::v2::route::HeaderMatcher.
    */
   static void translateHeaderMatcher(const Json::Object& json_header_matcher,
-                                     envoy::api::v2::route::HeaderMatcher& header_matcher);
+                                     envoy::type::matcher::HeaderMatcher& header_matcher);
 
   /**
    * Translate a v1 JSON query parameter matcher object to v2

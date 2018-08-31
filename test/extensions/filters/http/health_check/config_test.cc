@@ -72,7 +72,7 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
 
   config.mutable_pass_through_mode()->set_value(false);
   config.mutable_cache_time()->set_seconds(10);
-  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
+  envoy::type::matcher::HeaderMatcher& header = *config.add_headers();
   header.set_name(":path");
   header.set_exact_match("foo");
 
@@ -87,7 +87,7 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto)
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   config.mutable_pass_through_mode()->set_value(false);
-  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
+  envoy::type::matcher::HeaderMatcher& header = *config.add_headers();
   header.set_name(":path");
   header.set_exact_match("foo");
   healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
@@ -101,7 +101,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
           healthCheckFilterConfig.createEmptyConfigProto().get());
 
   config.mutable_pass_through_mode()->set_value(false);
-  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
+  envoy::type::matcher::HeaderMatcher& header = *config.add_headers();
   header.set_name(":path");
   header.set_exact_match("foo");
   healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
@@ -153,10 +153,10 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatch) {
 
   config.mutable_pass_through_mode()->set_value(false);
 
-  envoy::api::v2::route::HeaderMatcher& xheader = *config.add_headers();
+  envoy::type::matcher::HeaderMatcher& xheader = *config.add_headers();
   xheader.set_name("x-healthcheck");
 
-  envoy::api::v2::route::HeaderMatcher& yheader = *config.add_headers();
+  envoy::type::matcher::HeaderMatcher& yheader = *config.add_headers();
   yheader.set_name("y-healthcheck");
   yheader.set_exact_match("foo");
 
@@ -171,10 +171,10 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchWrongValue) {
 
   config.mutable_pass_through_mode()->set_value(false);
 
-  envoy::api::v2::route::HeaderMatcher& xheader = *config.add_headers();
+  envoy::type::matcher::HeaderMatcher& xheader = *config.add_headers();
   xheader.set_name("x-healthcheck");
 
-  envoy::api::v2::route::HeaderMatcher& yheader = *config.add_headers();
+  envoy::type::matcher::HeaderMatcher& yheader = *config.add_headers();
   yheader.set_name("y-healthcheck");
   yheader.set_exact_match("foo");
 
@@ -189,10 +189,10 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchMissingHeader) {
 
   config.mutable_pass_through_mode()->set_value(false);
 
-  envoy::api::v2::route::HeaderMatcher& xheader = *config.add_headers();
+  envoy::type::matcher::HeaderMatcher& xheader = *config.add_headers();
   xheader.set_name("x-healthcheck");
 
-  envoy::api::v2::route::HeaderMatcher& yheader = *config.add_headers();
+  envoy::type::matcher::HeaderMatcher& yheader = *config.add_headers();
   yheader.set_name("y-healthcheck");
   yheader.set_exact_match("foo");
 
@@ -207,11 +207,11 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateMatch) {
 
   config.mutable_pass_through_mode()->set_value(false);
 
-  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
+  envoy::type::matcher::HeaderMatcher& header = *config.add_headers();
   header.set_name("x-healthcheck");
   header.set_exact_match("foo");
 
-  envoy::api::v2::route::HeaderMatcher& dup_header = *config.add_headers();
+  envoy::type::matcher::HeaderMatcher& dup_header = *config.add_headers();
   dup_header.set_name("x-healthcheck");
 
   Http::TestHeaderMapImpl headers{{"x-healthcheck", "foo"}};
@@ -225,11 +225,11 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
 
   config.mutable_pass_through_mode()->set_value(false);
 
-  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
+  envoy::type::matcher::HeaderMatcher& header = *config.add_headers();
   header.set_name("x-healthcheck");
   header.set_exact_match("foo");
 
-  envoy::api::v2::route::HeaderMatcher& dup_header = *config.add_headers();
+  envoy::type::matcher::HeaderMatcher& dup_header = *config.add_headers();
   dup_header.set_name("x-healthcheck");
   dup_header.set_exact_match("bar");
 

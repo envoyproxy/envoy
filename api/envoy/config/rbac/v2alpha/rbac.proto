@@ -2,8 +2,9 @@ syntax = "proto3";
 
 import "validate/validate.proto";
 import "envoy/api/v2/core/address.proto";
-import "envoy/api/v2/route/route.proto";
+
 import "envoy/type/matcher/metadata.proto";
+import "envoy/type/matcher/header.proto";
 
 package envoy.config.rbac.v2alpha;
 option go_package = "v2alpha";
@@ -105,7 +106,7 @@ message Permission {
 
     // A header (or psuedo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
-    envoy.api.v2.route.HeaderMatcher header = 4;
+    envoy.type.matcher.HeaderMatcher header = 4;
 
     // A CIDR block that describes the destination IP.
     envoy.api.v2.core.CidrRange destination_ip = 5;
@@ -160,7 +161,7 @@ message Principal {
 
     // A header (or psuedo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
-    envoy.api.v2.route.HeaderMatcher header = 6;
+    envoy.type.matcher.HeaderMatcher header = 6;
 
     // Metadata that describes additional information about the principal. Only available for HTTP
     // request.
