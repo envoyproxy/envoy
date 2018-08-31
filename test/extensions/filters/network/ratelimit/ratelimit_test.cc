@@ -261,29 +261,6 @@ TEST_F(RateLimitFilterTest, ImmediateOK) {
   EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.ok").value());
 }
 
-TEST_F(RateLimitFilterTest, ImmediateError) {
-  InSequence s;
-  SetUpTest(filter_config_);
-
-  EXPECT_CALL(filter_callbacks_, continueReading()).Times(0);
-  EXPECT_CALL(*client_, limit(_, "foo", _, _))
-      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
-        callbacks.complete(RateLimit::LimitStatus::Error, nullptr);
-      })));
-
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
-  Buffer::OwnedImpl data("hello");
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
-
-  EXPECT_CALL(*client_, cancel()).Times(0);
-  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-
-  EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.total").value());
-  EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.error").value());
-  EXPECT_EQ(1U, stats_store_.counter("ratelimit.name.failure_mode_allowed").value());
-}
-
 TEST_F(RateLimitFilterTest, RuntimeDisable) {
   InSequence s;
   SetUpTest(filter_config_);

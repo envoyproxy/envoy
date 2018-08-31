@@ -150,9 +150,7 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&& header
   } else if (status == RateLimit::LimitStatus::Error) {
     if (config_->failureModeAllow()) {
       cluster_->statsScope().counter("ratelimit.failure_mode_allowed").inc();
-      if (!initiating_call_) {
-        callbacks_->continueDecoding();
-      }
+      callbacks_->continueDecoding();
     } else {
       state_ = State::Responded;
       callbacks_->sendLocalReply(Http::Code::InternalServerError, "", nullptr);
