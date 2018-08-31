@@ -76,12 +76,20 @@ ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& con
   runtime_key_ = config.request_mirror_policy().runtime_key();
 }
 
-class HeaderHashMethod : public HashPolicyImpl::HashMethod {
+class HashMethodImplBase : public HashPolicyImpl::HashMethod {
 public:
-  HeaderHashMethod(const std::string& header_name, bool terminal)
-      : header_name_(header_name), terminal_(terminal) {}
+  HashMethodImplBase(bool terminal) : terminal_(terminal) {}
 
   bool terminal() const override { return terminal_; }
+
+private:
+  const bool terminal_;
+};
+
+class HeaderHashMethod : public HashMethodImplBase {
+public:
+  HeaderHashMethod(const std::string& header_name, bool terminal)
+      : HashMethodImplBase(terminal), header_name_(header_name) {}
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const Http::HeaderMap& headers,
@@ -97,29 +105,18 @@ public:
 
 private:
   const Http::LowerCaseString header_name_;
-  const bool terminal_;
 };
 
-class CookieHashMethod : public HashPolicyImpl::HashMethod {
+class CookieHashMethod : public HashMethodImplBase {
 public:
   CookieHashMethod(const std::string& key, const std::string& path,
                    const absl::optional<std::chrono::seconds>& ttl, bool terminal)
-      : key_(key), path_(path), ttl_(ttl), terminal_(terminal) {}
-
-  bool terminal() const override { return terminal_; }
+      : HashMethodImplBase(terminal), key_(key), path_(path), ttl_(ttl) {}
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
                                     const Http::HeaderMap& headers,
                                     const HashPolicy::AddCookieCallback add_cookie) const override {
     absl::optional<uint64_t> hash;
-    if (key_.empty()) {
-      // If no cookie key specified, use the whole cookies header.
-      const Http::HeaderEntry* cookie = headers.get(Http::Headers::get().Cookie);
-      if (cookie != nullptr && cookie->value().size() > 0) {
-        return HashUtil::xxHash64(std::string(cookie->value().c_str()));
-      }
-      return hash;
-    }
     std::string value = Http::Utility::parseCookieValue(headers, key_);
     if (value.empty() && ttl_.has_value()) {
       value = add_cookie(key_, path_, ttl_.value());
@@ -135,14 +132,11 @@ private:
   const std::string key_;
   const std::string path_;
   const absl::optional<std::chrono::seconds> ttl_;
-  const bool terminal_;
 };
 
-class IpHashMethod : public HashPolicyImpl::HashMethod {
+class IpHashMethod : public HashMethodImplBase {
 public:
-  IpHashMethod(bool terminal) : terminal_(terminal) {}
-
-  bool terminal() const override { return terminal_; }
+  IpHashMethod(bool terminal) : HashMethodImplBase(terminal) {}
 
   absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
                                     const Http::HeaderMap&,
@@ -160,49 +154,6 @@ public:
     }
     return HashUtil::xxHash64(downstream_addr_str);
   }
-
-private:
-  const bool terminal_;
-};
-
-class HostPathHashMethod : public HashPolicyImpl::HashMethod {
-public:
-  HostPathHashMethod(bool terminal) : terminal_(terminal) {}
-  absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
-                                    const Http::HeaderMap& headers,
-                                    const HashPolicy::AddCookieCallback) const override {
-    return HashUtil::xxHash64(
-        absl::StrCat(headers.Host()->value().c_str(), headers.Path()->value().c_str()));
-  }
-  bool terminal() const override { return terminal_; }
-
-private:
-  bool terminal_ = false;
-};
-
-class QueryParameterHashMethod : public HashPolicyImpl::HashMethod {
-public:
-  QueryParameterHashMethod(const std::string& key, bool terminal)
-      : key_(key), terminal_(terminal) {}
-  absl::optional<uint64_t> evaluate(const Network::Address::Instance*,
-                                    const Http::HeaderMap& headers,
-                                    const HashPolicy::AddCookieCallback) const override {
-    if (key_.empty()) {
-      return absl::nullopt;
-    }
-    Http::Utility::QueryParams query_parameters =
-        Http::Utility::parseQueryString(headers.Path()->value().c_str());
-    auto it = query_parameters.find(key_);
-    if (it == query_parameters.end() || it->second.empty()) {
-      return absl::nullopt;
-    }
-    return HashUtil::xxHash64(it->second);
-  }
-  bool terminal() const override { return terminal_; }
-
-private:
-  const std::string key_;
-  bool terminal_ = false;
 };
 
 HashPolicyImpl::HashPolicyImpl(
@@ -231,13 +182,6 @@ HashPolicyImpl::HashPolicyImpl(
         hash_impls_.emplace_back(new IpHashMethod(hash_policy.terminal()));
       }
       break;
-    case envoy::api::v2::route::RouteAction::HashPolicy::kQueryParameter:
-      hash_impls_.emplace_back(new QueryParameterHashMethod(hash_policy.query_parameter().key(),
-                                                            hash_policy.terminal()));
-      break;
-    case envoy::api::v2::route::RouteAction::HashPolicy::kHostPath:
-      hash_impls_.emplace_back(new HostPathHashMethod(hash_policy.terminal()));
-      break;
     default:
       throw EnvoyException(
           fmt::format("Unsupported hash policy {}", hash_policy.policy_specifier_case()));
@@ -259,8 +203,8 @@ HashPolicyImpl::generateHash(const Network::Address::Instance* downstream_addr,
       const uint64_t old_value = hash ? ((hash.value() << 1) | (hash.value() >> 63)) : 0;
       hash = old_value ^ new_hash.value();
     }
-    // If the policy is a terminal policy and there are hash generated, ignore
-    // the rest hash policies.
+    // If the policy is a terminal policy and a hash has been generated, ignore
+    // the rest of the hash policies.
     if (hash_impl->terminal() && hash) {
       break;
     }
