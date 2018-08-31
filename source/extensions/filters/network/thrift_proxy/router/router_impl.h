@@ -44,8 +44,26 @@ protected:
   bool headersMatch(const Http::HeaderMap& headers) const;
 
 private:
+  class WeightedClusterEntry : public RouteEntry, public Route {
+  public:
+    WeightedClusterEntry(
+        const envoy::config::filter::network::thrift_proxy::v2alpha1::WeightedCluster_ClusterWeight&
+            cluster);
+
+    uint64_t clusterWeight() const { return cluster_weight_; }
+    const std::string& clusterName() const override { return cluster_name_; }
+    const RouteEntry* routeEntry() const override { return this; }
+
+  private:
+    const std::string cluster_name_;
+    const uint64_t cluster_weight_;
+  };
+  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
+
   const std::string cluster_name_;
   std::vector<Http::HeaderUtility::HeaderData> config_headers_;
+  std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
+  const uint64_t total_cluster_weight_;
 };
 
 typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;

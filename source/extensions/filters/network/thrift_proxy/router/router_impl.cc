@@ -17,9 +17,29 @@ namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
-    : cluster_name_(route.route().cluster()) {
+    : cluster_name_(route.route().cluster()),
+      total_cluster_weight_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route().weighted_clusters(), total_weight, 100UL)) {
   for (const auto& header_map : route.match().headers()) {
     config_headers_.push_back(header_map);
+  }
+
+  if (route.route().cluster_specifier_case() ==
+      envoy::config::filter::network::thrift_proxy::v2alpha1::RouteAction::kWeightedClusters) {
+    ASSERT(total_cluster_weight_ > 0);
+
+    uint64_t total_weight = 0UL;
+
+    for (const auto& cluster : route.route().weighted_clusters().clusters()) {
+      std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(cluster));
+      weighted_clusters_.emplace_back(std::move(cluster_entry));
+      total_weight += weighted_clusters_.back()->clusterWeight();
+    }
+
+    if (total_weight != total_cluster_weight_) {
+      throw EnvoyException(fmt::format("Sum of weights in the weighted_cluster should add up to {}",
+                                       total_cluster_weight_));
+    }
   }
 }
 
@@ -28,14 +48,39 @@ const std::string& RouteEntryImplBase::clusterName() const { return cluster_name
 const RouteEntry* RouteEntryImplBase::routeEntry() const { return this; }
 
 RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value) const {
-  // @bramos: just to make the compiler happy for now
-  ++random_value;
-  return shared_from_this();
+  if (weighted_clusters_.empty()) {
+    return shared_from_this();
+  }
+
+  uint64_t selected_value = random_value % total_cluster_weight_;
+  uint64_t begin = 0UL;
+  uint64_t end = 0UL;
+
+  // Find the right cluster to route to based on the interval in which
+  // the selected value falls. The intervals are determined as
+  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
+  for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
+    end = begin + cluster->clusterWeight();
+    if (((selected_value >= begin) && (selected_value < end)) || (end >= total_cluster_weight_)) {
+      // end > total_cluster_weight_: This case can only occur with Runtimes, when the user
+      // specifies invalid weights such that sum(weights) > total_cluster_weight_. In this case,
+      // terminate the search and just return the cluster whose weight caused the overflow.
+      return cluster;
+    }
+    begin = end;
+  }
+  NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
 bool RouteEntryImplBase::headersMatch(const Http::HeaderMap& headers) const {
   return Http::HeaderUtility::matchHeaders(headers, config_headers_);
 }
+
+RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
+    const envoy::config::filter::network::thrift_proxy::v2alpha1::WeightedCluster_ClusterWeight&
+        cluster)
+    : cluster_name_(cluster.name()),
+      cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)) {}
 
 MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
