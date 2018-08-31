@@ -58,11 +58,12 @@ void IntegrationTestServer::start(const Network::Address::IpVersion version,
 IntegrationTestServer::~IntegrationTestServer() {
   ENVOY_LOG(info, "stopping integration test server");
 
-  BufferingStreamDecoderPtr response =
-      IntegrationUtil::makeSingleRequest(server_->admin().socket().localAddress(), "POST",
-                                         "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
-  EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  if (admin_address_ != nullptr) {
+    BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+        admin_address_, "POST", "/quitquitquit", "", Http::CodecClient::Type::HTTP1);
+    EXPECT_TRUE(response->complete());
+    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  }
 
   thread_->join();
 }
@@ -107,6 +108,10 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
       restarter, stats_store, lock, *this, std::move(random_generator), tls));
   pending_listeners_ = server_->listenerManager().listeners().size();
   ENVOY_LOG(info, "waiting for {} test server listeners", pending_listeners_);
+  // This is technically thread unsafe (assigning to a shared_ptr accessed
+  // across threads), but because we synchronize below on server_set, the only
+  // consumer on the main test thread in ~IntegrationTestServer will not race.
+  admin_address_ = server_->admin().socket().localAddress();
   server_set_.setReady();
   server_->run();
   server_.reset();
