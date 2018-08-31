@@ -30,7 +30,7 @@ class BufferIntegrationTest : public HttpProtocolIntegrationTest {
     return overrideConfig(config);
   }
 
-  AssertionResult runRequestTimeoutTest(std::chrono::milliseconds http_connection_timeout,
+  AssertionResult runRequestTimeoutTest(std::chrono::milliseconds test_connection_initiation_timeout,
                                           const char* method = "GET") {
     initialize();
 
@@ -44,7 +44,7 @@ class BufferIntegrationTest : public HttpProtocolIntegrationTest {
     request_encoder_ = &encoder_decoder.first;
     auto response = std::move(encoder_decoder.second);
     return fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
-                                                     http_connection_timeout);
+                                                     test_connection_initiation_timeout);
   }
 };
 
@@ -150,12 +150,12 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
 
 TEST_P(BufferIntegrationTest, RequestPathTimesOutInBuffer) {
   std::chrono::seconds buffer_timeout = std::chrono::seconds(1);
-  std::chrono::milliseconds connection_timeout = std::chrono::milliseconds(2500);
+  std::chrono::milliseconds test_connection_initiation_timeout = std::chrono::milliseconds(2500);
 
   ConfigHelper::HttpModifierFunction mod = overrideConfigBufferTimeout(buffer_timeout);
   config_helper_.addConfigModifier(mod);
   config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
-  AssertionResult result = runRequestTimeoutTest(connection_timeout);
+  AssertionResult result = runRequestTimeoutTest(test_connection_initiation_timeout);
 
   EXPECT_FALSE(result);
   // TODO Check stats increments
@@ -163,12 +163,12 @@ TEST_P(BufferIntegrationTest, RequestPathTimesOutInBuffer) {
 
 TEST_P(BufferIntegrationTest, RequestPathTimesntOutInBuffer) {
   std::chrono::seconds buffer_timeout = std::chrono::seconds(1); // Greater than connectiom timeout
-  std::chrono::milliseconds connection_timeout = std::chrono::milliseconds(2500);
+  std::chrono::milliseconds test_connection_initiation_timeout = std::chrono::milliseconds(2500);
 
   ConfigHelper::HttpModifierFunction mod = overrideConfigBufferTimeout(buffer_timeout);
   config_helper_.addConfigModifier(mod);
   config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
-  AssertionResult result = runRequestTimeoutTest(connection_timeout);
+  AssertionResult result = runRequestTimeoutTest(test_connection_initiation_timeout);
 
   // TODO assert this will segfault
   // AssertionResult result =
