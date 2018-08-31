@@ -96,7 +96,8 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
       if (peer_validated) {
         ENVOY_CONN_LOG(debug, "TSI: Handshake validation succeeded.", callbacks_->connection());
       } else {
-        ENVOY_CONN_LOG(debug, "TSI: Handshake validation failed: {}", callbacks_->connection(), err);
+        ENVOY_CONN_LOG(debug, "TSI: Handshake validation failed: {}", callbacks_->connection(),
+                       err);
         return Network::PostIoAction::Close;
       }
     } else {
