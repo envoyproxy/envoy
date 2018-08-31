@@ -16,9 +16,9 @@
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
-#include "common/protobuf/protobuf.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
+#include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
@@ -27,9 +27,9 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/http/websocket/ws_handler_impl.h"
+#include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/retry_state_impl.h"
-#include "common/common/logger.h"
 
 #include "extensions/filters/http/well_known_names.h"
 
@@ -348,7 +348,7 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
 
   if (runtime_) {
     matches &= random_value % runtime_->denominator_val_ < runtime_->numerator_val_;
-    if (!matches){
+    if (!matches) {
       // No need to waste further cycles calculating a route match.
       return false;
     }
@@ -414,7 +414,7 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
   if (route_match.runtime_specifier_case() == envoy::api::v2::route::RouteMatch::kRuntimeFraction) {
     envoy::type::FractionalPercent fractional_percent;
     const std::string& fraction_text =
-      loader_.snapshot().get(route_match.runtime_fraction().runtime_key());
+        loader_.snapshot().get(route_match.runtime_fraction().runtime_key());
     if (!Protobuf::TextFormat::ParseFromString(fraction_text, &fractional_percent)) {
       // Since we failed to parse the textual protobuf, let's load up the default value.
       fractional_percent = route_match.runtime_fraction().default_value();
@@ -423,15 +423,14 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
     }
     runtime_data.numerator_val_ = fractional_percent.numerator();
     runtime_data.denominator_val_ =
-      ProtobufPercentHelper::fractionalPercentDenominatorToInt(fractional_percent.denominator());
+        ProtobufPercentHelper::fractionalPercentDenominatorToInt(fractional_percent.denominator());
   } else if (route_match.runtime_specifier_case() == envoy::api::v2::route::RouteMatch::kRuntime) {
     // For backwards compatibility, the deprecated 'runtime' field must be converted to a
     // RuntimeData format with a variable denominator type. The 'runtime' field assumes a percentage
     // (0-100), so the hard-coded denominator value reflects this.
     runtime_data.denominator_val_ = 100;
-    runtime_data.numerator_val_ =
-      loader_.snapshot().getInteger(route_match.runtime().runtime_key(),
-                                    route_match.runtime().default_value());
+    runtime_data.numerator_val_ = loader_.snapshot().getInteger(
+        route_match.runtime().runtime_key(), route_match.runtime().default_value());
   } else {
     return runtime;
   }

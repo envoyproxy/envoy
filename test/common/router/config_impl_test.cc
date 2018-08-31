@@ -1821,7 +1821,9 @@ TEST(RouteMatcherTest, Runtime) {
   Runtime::MockSnapshot snapshot;
 
   ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
-  EXPECT_CALL(snapshot, getInteger("some_key", 50)).Times(testing::AtLeast(1)).WillRepeatedly(Return(42));
+  EXPECT_CALL(snapshot, getInteger("some_key", 50))
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(Return(42));
 
   TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
@@ -1861,7 +1863,9 @@ virtual_hosts:
     numerator: 42
     denominator: HUNDRED
   )EOF";
-  EXPECT_CALL(snapshot, get("bogus_key")).Times(testing::AtLeast(1)).WillRepeatedly(ReturnRef(runtime_fraction));
+  EXPECT_CALL(snapshot, get("bogus_key"))
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(ReturnRef(runtime_fraction));
 
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
 
@@ -1902,7 +1906,9 @@ virtual_hosts:
   const std::string runtime_fraction = R"EOF(
     this string is nonsense
   )EOF";
-  EXPECT_CALL(snapshot, get("bogus_key")).Times(testing::AtLeast(1)).WillRepeatedly(ReturnRef(runtime_fraction));
+  EXPECT_CALL(snapshot, get("bogus_key"))
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(ReturnRef(runtime_fraction));
 
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
 
