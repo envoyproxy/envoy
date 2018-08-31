@@ -11,6 +11,7 @@ namespace Secret {
 class SecretCallbacks {
 public:
   virtual ~SecretCallbacks() {}
+
   virtual void onAddOrUpdateSecret() PURE;
 };
 

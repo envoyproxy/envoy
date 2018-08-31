@@ -15,6 +15,7 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/secret:secret_callbacks_interface",
         "//include/envoy/secret:secret_manager_interface",
+        "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/ssl:tls_certificate_config_interface",
         "//source/common/secret:secret_provider_impl_lib",
     ],

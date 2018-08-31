@@ -55,9 +55,9 @@ InstanceImpl::InstanceImpl(Options& options, TimeSource& time_source,
       dispatcher_(api_->allocateDispatcher(time_source)),
       singleton_manager_(new Singleton::ManagerImpl()),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
-      random_generator_(std::move(random_generator)), listener_component_factory_(*this),
-      worker_factory_(thread_local_, *api_, hooks, time_source),
-      secret_manager_(new Secret::SecretManagerImpl()),
+      random_generator_(std::move(random_generator)),
+      secret_manager_(std::make_unique<Secret::SecretManagerImpl>()),
+      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks, time_source),
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false) {
 
