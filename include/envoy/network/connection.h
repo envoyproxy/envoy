@@ -63,7 +63,8 @@ public:
  */
 enum class ConnectionCloseType {
   FlushWrite, // Flush pending write data before raising ConnectionEvent::LocalClose
-  NoFlush     // Do not flush any pending data and immediately raise ConnectionEvent::LocalClose
+  NoFlush,    // Do not flush any pending data and immediately raise ConnectionEvent::LocalClose
+  FlushWriteAndDelay
 };
 
 /**
@@ -86,6 +87,8 @@ public:
     Stats::Gauge& write_current_;
     // Counter* as this is an optional counter. Bind errors will not be tracked if this is nullptr.
     Stats::Counter* bind_errors_;
+    // Optional counter. Delayed close semantics are only used by HTTP connections.
+    Stats::Counter* delayed_close_timeouts_;
   };
 
   virtual ~Connection() {}
@@ -233,6 +236,18 @@ public:
    * Get the socket options set on this connection.
    */
   virtual const ConnectionSocket::OptionsSharedPtr& socketOptions() const PURE;
+
+  /**
+   * Set the timeout for delayed connection close()s.
+   * This is only used for downstream connections processing HTTP/1 and HTTP/2.
+   * @param timeout The timeout value in milliseconds
+   */
+  virtual void setDelayedCloseTimeout(std::chrono::milliseconds timeout) PURE;
+
+  /**
+   * @return std::chrono::milliseconds The delayed close timeout value.
+   */
+  virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;

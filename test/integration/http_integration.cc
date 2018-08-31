@@ -149,18 +149,36 @@ IntegrationCodecClient::startRequest(const Http::HeaderMap& headers) {
   return {encoder, std::move(response)};
 }
 
-void IntegrationCodecClient::waitForDisconnect() {
+bool IntegrationCodecClient::waitForDisconnect(uint32_t time_to_wait) {
+  Event::TimerPtr wait_timer;
+  bool wait_timer_triggered = false;
+  if (time_to_wait) {
+    wait_timer = connection_->dispatcher().createTimer([this, &wait_timer_triggered] {
+      connection_->dispatcher().exit();
+      wait_timer_triggered = true;
+    });
+    wait_timer->enableTimer(std::chrono::milliseconds(time_to_wait));
+  }
+
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+  if (wait_timer_triggered && !disconnected_) {
+    return false;
+  }
   EXPECT_TRUE(disconnected_);
+
+  return true;
 }
 
 void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent event) {
+  parent_.last_connection_event_ = event;
   if (event == Network::ConnectionEvent::Connected) {
     parent_.connected_ = true;
     parent_.connection_->dispatcher().exit();
   } else if (event == Network::ConnectionEvent::RemoteClose) {
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
+  } else {
+    parent_.disconnected_ = true;
   }
 }
 

@@ -86,6 +86,8 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
   MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
+  MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
+  MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
 };
 
 /**
@@ -125,7 +127,8 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
   MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
-
+  MOCK_METHOD1(setDelayedCloseTimeout, void(std::chrono::milliseconds));
+  MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());
 };

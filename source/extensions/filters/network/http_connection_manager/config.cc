@@ -136,7 +136,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       date_provider_(date_provider),
       listener_stats_(Http::ConnectionManagerImpl::generateListenerStats(stats_prefix_,
                                                                          context_.listenerScope())),
-      proxy_100_continue_(config.proxy_100_continue()) {
+      proxy_100_continue_(config.proxy_100_continue()),
+      delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)) {
 
   route_config_provider_ = Router::RouteConfigProviderUtil::create(config, context_, stats_prefix_,
                                                                    route_config_provider_manager_);
@@ -303,19 +304,19 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          Http::ServerConnectionCallbacks& callbacks) {
   switch (codec_type_) {
   case CodecType::HTTP1:
-    return Http::ServerConnectionPtr{
-        new Http::Http1::ServerConnectionImpl(connection, callbacks, http1_settings_)};
+    return Http::ServerConnectionPtr{new Http::Http1::ServerConnectionImpl(
+        connection, callbacks, http1_settings_, delayed_close_timeout_)};
   case CodecType::HTTP2:
     return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-        connection, callbacks, context_.scope(), http2_settings_)};
+        connection, callbacks, context_.scope(), http2_settings_, delayed_close_timeout_)};
   case CodecType::AUTO:
     if (HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data) ==
         Http::Http2::ALPN_STRING) {
       return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-          connection, callbacks, context_.scope(), http2_settings_)};
+          connection, callbacks, context_.scope(), http2_settings_, delayed_close_timeout_)};
     } else {
-      return Http::ServerConnectionPtr{
-          new Http::Http1::ServerConnectionImpl(connection, callbacks, http1_settings_)};
+      return Http::ServerConnectionPtr{new Http::Http1::ServerConnectionImpl(
+          connection, callbacks, http1_settings_, delayed_close_timeout_)};
     }
   }
 
