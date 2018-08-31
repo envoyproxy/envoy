@@ -69,7 +69,9 @@ void MetricsServiceSink::flushCounter(const Stats::Counter& counter) {
   metrics_family->set_type(io::prometheus::client::MetricType::COUNTER);
   metrics_family->set_name(counter.name());
   auto* metric = metrics_family->add_metric();
-  metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
+  metric->set_timestamp_ms(std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::system_clock::now().time_since_epoch())
+                               .count());
   auto* counter_metric = metric->mutable_counter();
   counter_metric->set_value(counter.value());
 }
@@ -79,7 +81,9 @@ void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge) {
   metrics_family->set_type(io::prometheus::client::MetricType::GAUGE);
   metrics_family->set_name(gauge.name());
   auto* metric = metrics_family->add_metric();
-  metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
+  metric->set_timestamp_ms(std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::system_clock::now().time_since_epoch())
+                               .count());
   auto* gauage_metric = metric->mutable_gauge();
   gauage_metric->set_value(gauge.value());
 }
@@ -88,7 +92,9 @@ void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& histogram)
   metrics_family->set_type(io::prometheus::client::MetricType::SUMMARY);
   metrics_family->set_name(histogram.name());
   auto* metric = metrics_family->add_metric();
-  metric->set_timestamp_ms(std::chrono::system_clock::now().time_since_epoch().count());
+  metric->set_timestamp_ms(std::chrono::duration_cast<std::chrono::milliseconds>(
+                               std::chrono::system_clock::now().time_since_epoch())
+                               .count());
   auto* summary_metric = metric->mutable_summary();
   const Stats::HistogramStatistics& hist_stats = histogram.intervalStatistics();
   for (size_t i = 0; i < hist_stats.supportedQuantiles().size(); i++) {
