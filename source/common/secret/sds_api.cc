@@ -51,7 +51,10 @@ void SdsApi::onConfigUpdate(const ResourceVector& resources, const std::string&)
   }
   const auto& secret = resources[0];
   MessageUtil::validate(secret);
-  if (secret.name() != sds_config_name_) {
+
+  // Wrap sds_config_name_ in string_view to deal with proto string/std::string incompatibility
+  // issues within Google.
+  if (secret.name() != absl::string_view(sds_config_name_)) {
     throw EnvoyException(
         fmt::format("Unexpected SDS secret (expecting {}): {}", sds_config_name_, secret.name()));
   }
