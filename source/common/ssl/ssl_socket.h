@@ -5,7 +5,9 @@
 
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/secret/secret_callbacks.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
 #include "common/common/logger.h"
 #include "common/ssl/context_impl.h"
@@ -14,6 +16,20 @@
 
 namespace Envoy {
 namespace Ssl {
+
+// clang-format off
+#define ALL_SSL_SOCKET_FACTORY_STATS(COUNTER)                                 \
+  COUNTER(ssl_context_update_by_sds)                                          \
+  COUNTER(upstream_context_secrets_not_ready)                                 \
+  COUNTER(downstream_context_secrets_not_ready)
+// clang-format on
+
+/**
+ * Wrapper struct for SSL socket factory stats. @see stats_macros.h
+ */
+struct SslSocketFactoryStats {
+  ALL_SSL_SOCKET_FACTORY_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 enum class InitialState { Client, Server };
 
@@ -67,7 +83,9 @@ private:
   mutable std::string cached_url_encoded_pem_encoded_peer_certificate_;
 };
 
-class ClientSslSocketFactory : public Network::TransportSocketFactory {
+class ClientSslSocketFactory : public Network::TransportSocketFactory,
+                               public Secret::SecretCallbacks,
+                               Logger::Loggable<Logger::Id::config> {
 public:
   ClientSslSocketFactory(ClientContextConfigPtr config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope);
@@ -75,14 +93,20 @@ public:
   Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
 
+  // Secret::SecretCallbacks
+  void onAddOrUpdateSecret() override;
+
 private:
   Ssl::ContextManager& manager_;
   Stats::Scope& stats_scope_;
+  SslSocketFactoryStats stats_;
   ClientContextConfigPtr config_;
   ClientContextSharedPtr ssl_ctx_;
 };
 
-class ServerSslSocketFactory : public Network::TransportSocketFactory {
+class ServerSslSocketFactory : public Network::TransportSocketFactory,
+                               public Secret::SecretCallbacks,
+                               Logger::Loggable<Logger::Id::config> {
 public:
   ServerSslSocketFactory(ServerContextConfigPtr config, Ssl::ContextManager& manager,
                          Stats::Scope& stats_scope, const std::vector<std::string>& server_names);
@@ -90,9 +114,13 @@ public:
   Network::TransportSocketPtr createTransportSocket() const override;
   bool implementsSecureTransport() const override;
 
+  // Secret::SecretCallbacks
+  void onAddOrUpdateSecret() override;
+
 private:
   Ssl::ContextManager& manager_;
   Stats::Scope& stats_scope_;
+  SslSocketFactoryStats stats_;
   ServerContextConfigPtr config_;
   const std::vector<std::string> server_names_;
   ServerContextSharedPtr ssl_ctx_;

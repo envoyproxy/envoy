@@ -229,6 +229,7 @@ ClusterInfoConstSharedPtr ProdClusterInfoFactory::createClusterInfo(
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
 
+  // TODO(JimmyCYJ): Support SDS for HDS cluster.
   Network::TransportSocketFactoryPtr socket_factory =
       Upstream::createTransportSocketFactory(cluster, factory_context);
 

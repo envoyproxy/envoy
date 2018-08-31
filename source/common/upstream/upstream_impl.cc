@@ -513,6 +513,7 @@ ClusterImplBase::ClusterImplBase(
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : runtime_(runtime) {
+  factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
                                             runtime, std::move(socket_factory),
@@ -576,6 +577,10 @@ void ClusterImplBase::onPreInitComplete() {
   }
   initialization_started_ = true;
 
+  init_manager_.initialize([this]() { onInitDone(); });
+}
+
+void ClusterImplBase::onInitDone() {
   if (health_checker_ && pending_initialize_health_checks_ == 0) {
     for (auto& host_set : prioritySet().hostSetsPerPriority()) {
       pending_initialize_health_checks_ += host_set->hosts().size();

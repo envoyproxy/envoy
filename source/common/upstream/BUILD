@@ -406,6 +406,8 @@ envoy_cc_library(
         "//source/common/stats:isolated_store_lib",
         "//source/common/stats:stats_lib",
         "//source/common/upstream:locality_lib",
+        "//source/server:init_manager_lib",
+        "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/api/v2/core:base_cc",
         "@envoy_api//envoy/api/v2/endpoint:endpoint_cc",
     ],
