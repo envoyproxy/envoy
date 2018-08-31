@@ -2,6 +2,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/network/transport_socket.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/event/dispatcher_impl.h"
@@ -2578,6 +2580,86 @@ TEST_P(SslSocketTest, GetRequestedServerName) {
 
   testUtilV2(listener, client, "", true, "", "", "", "lyft.com", "", "ssl.handshake", 2,
              GetParam());
+}
+
+// Validate that if downstream secrets are not yet downloaded from SDS server, Envoy creates
+// NotReadySslSocket object to handle downstream connection.
+TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
+  Stats::IsolatedStoreImpl stats_store;
+  Runtime::MockLoader runtime;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Init::MockManager> init_manager;
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
+  EXPECT_CALL(factory_context, random()).WillOnce(ReturnRef(random));
+  EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
+  EXPECT_CALL(factory_context, clusterManager()).WillOnce(ReturnRef(cluster_manager));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
+
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  auto sds_secret_configs =
+      tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
+  sds_secret_configs->set_name("abc.com");
+  sds_secret_configs->mutable_sds_config();
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context);
+  EXPECT_EQ(nullptr, server_cfg->tlsCertificate());
+  EXPECT_FALSE(server_cfg->isReady());
+
+  ContextManagerImpl manager(runtime);
+  Ssl::ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager, stats_store,
+                                                        std::vector<std::string>{});
+  auto transport_socket = server_ssl_socket_factory.createTransportSocket();
+  EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
+  EXPECT_EQ(nullptr, transport_socket->ssl());
+  Buffer::OwnedImpl buffer;
+  Network::IoResult result = transport_socket->doRead(buffer);
+  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  result = transport_socket->doWrite(buffer, true);
+  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+}
+
+// Validate that if upstream secrets are not yet downloaded from SDS server, Envoy creates
+// NotReadySslSocket object to handle upstream connection.
+TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
+  Stats::IsolatedStoreImpl stats_store;
+  Runtime::MockLoader runtime;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
+  NiceMock<LocalInfo::MockLocalInfo> local_info;
+  NiceMock<Event::MockDispatcher> dispatcher;
+  NiceMock<Runtime::MockRandomGenerator> random;
+  NiceMock<Upstream::MockClusterManager> cluster_manager;
+  NiceMock<Init::MockManager> init_manager;
+  EXPECT_CALL(factory_context, localInfo()).WillOnce(ReturnRef(local_info));
+  EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
+  EXPECT_CALL(factory_context, random()).WillOnce(ReturnRef(random));
+  EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
+  EXPECT_CALL(factory_context, clusterManager()).WillOnce(ReturnRef(cluster_manager));
+  EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
+
+  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  auto sds_secret_configs =
+      tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
+  sds_secret_configs->set_name("abc.com");
+  sds_secret_configs->mutable_sds_config();
+  auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context);
+  EXPECT_EQ(nullptr, client_cfg->tlsCertificate());
+  EXPECT_FALSE(client_cfg->isReady());
+
+  ContextManagerImpl manager(runtime);
+  Ssl::ClientSslSocketFactory client_ssl_socket_factory(std::move(client_cfg), manager,
+                                                        stats_store);
+  auto transport_socket = client_ssl_socket_factory.createTransportSocket();
+  EXPECT_EQ(EMPTY_STRING, transport_socket->protocol());
+  EXPECT_EQ(nullptr, transport_socket->ssl());
+  Buffer::OwnedImpl buffer;
+  Network::IoResult result = transport_socket->doRead(buffer);
+  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
+  result = transport_socket->doWrite(buffer, true);
+  EXPECT_EQ(Network::PostIoAction::Close, result.action_);
 }
 
 class SslReadBufferLimitTest : public SslSocketTest {
