@@ -303,6 +303,21 @@ TEST_F(TsiSocketTest, HandshakeWithUnusedDataAndEndOfStream) {
                  client_.tsi_socket_->doRead(client_.read_buffer_));
 }
 
+TEST_F(TsiSocketTest, HandshakeWithImmediateReadError) {
+  initialize(nullptr, nullptr);
+
+  EXPECT_CALL(*client_.raw_socket_, doRead(_)).WillOnce(Invoke([&](Buffer::Instance& buffer) {
+    Network::IoResult result = {Network::PostIoAction::Close, server_to_client_.length(), false};
+    buffer.move(server_to_client_);
+    return result;
+  }));
+  EXPECT_CALL(*client_.raw_socket_, doWrite(_, false)).Times(0);
+  expectIoResult({Network::PostIoAction::Close, 0UL, false},
+                 client_.tsi_socket_->doRead(client_.read_buffer_));
+  EXPECT_EQ("", client_to_server_.toString());
+  EXPECT_EQ(0L, client_.read_buffer_.length());
+}
+
 TEST_F(TsiSocketTest, HandshakeWithReadError) {
   initialize(nullptr, nullptr);
 
