@@ -284,12 +284,24 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         envoy::admin::v2alpha::HostStatus& host_status = *cluster_status.add_host_statuses();
         Network::Utility::addressToProtobufAddress(*host->address(),
                                                    *host_status.mutable_address());
+
+        std::sort(
+            host->counters().begin(), host->counters().end(),
+            [](const Stats::CounterSharedPtr& counter1, const Stats::CounterSharedPtr& counter2) {
+              return counter1->name().compare(counter2->name()) < 0;
+            });
+
         for (const Stats::CounterSharedPtr& counter : host->counters()) {
           auto& metric = *host_status.add_stats();
           metric.set_name(counter->name());
           metric.set_value(counter->value());
           metric.set_type(envoy::admin::v2alpha::SimpleMetric::COUNTER);
         }
+
+        std::sort(host->gauges().begin(), host->gauges().end(),
+                  [](const Stats::GaugeSharedPtr& gauge1, const Stats::GaugeSharedPtr& gauge2) {
+                    return gauge1->name().compare(gauge2->name()) < 0;
+                  });
 
         for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
           auto& metric = *host_status.add_stats();
@@ -315,7 +327,7 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
       }
     }
   }
-  response.add(MessageUtil::getJsonStringFromMessage(clusters, true, true)); // pretty-print
+  response.add(MessageUtil::getJsonStringFromMessage(clusters, true)); // pretty-print
 }
 
 void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
