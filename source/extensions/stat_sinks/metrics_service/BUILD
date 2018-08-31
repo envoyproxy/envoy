@@ -14,9 +14,6 @@ envoy_cc_library(
     name = "metrics_service_grpc_lib",
     srcs = ["grpc_metrics_service_impl.cc"],
     hdrs = ["grpc_metrics_service_impl.h"],
-    external_deps = [
-        "abseil_time",
-    ],
     deps = [
         "//include/envoy/grpc:async_client_interface",
         "//include/envoy/local_info:local_info_interface",
