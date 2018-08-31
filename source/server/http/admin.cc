@@ -284,26 +284,33 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         envoy::admin::v2alpha::HostStatus& host_status = *cluster_status.add_host_statuses();
         Network::Utility::addressToProtobufAddress(*host->address(),
                                                    *host_status.mutable_address());
-
+        std::vector<Stats::CounterSharedPtr> sorted_counters;
+        for (const Stats::CounterSharedPtr& counter : host->counters()) {
+          sorted_counters.push_back(counter);
+        }
         std::sort(
-            host->counters().begin(), host->counters().end(),
+            sorted_counters.begin(), sorted_counters.end(),
             [](const Stats::CounterSharedPtr& counter1, const Stats::CounterSharedPtr& counter2) {
-              return counter1->name().compare(counter2->name()) < 0;
+              return counter1->name() < counter2->name();
             });
 
-        for (const Stats::CounterSharedPtr& counter : host->counters()) {
+        for (const Stats::CounterSharedPtr& counter : sorted_counters) {
           auto& metric = *host_status.add_stats();
           metric.set_name(counter->name());
           metric.set_value(counter->value());
           metric.set_type(envoy::admin::v2alpha::SimpleMetric::COUNTER);
         }
 
-        std::sort(host->gauges().begin(), host->gauges().end(),
+        std::vector<Stats::GaugeSharedPtr> sorted_gauges;
+        for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
+          sorted_gauges.push_back(gauge);
+        }
+        std::sort(sorted_gauges.begin(), sorted_gauges.end(),
                   [](const Stats::GaugeSharedPtr& gauge1, const Stats::GaugeSharedPtr& gauge2) {
-                    return gauge1->name().compare(gauge2->name()) < 0;
+                    return gauge1->name() < gauge2->name();
                   });
 
-        for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
+        for (const Stats::GaugeSharedPtr& gauge : sorted_gauges) {
           auto& metric = *host_status.add_stats();
           metric.set_name(gauge->name());
           metric.set_value(gauge->value());
