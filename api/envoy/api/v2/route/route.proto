@@ -585,8 +585,6 @@ message RouteAction {
       // Connection properties hash policy.
       ConnectionProperties connection_properties = 3;
     }
-    // Reserve for new policy_specifier.
-    /* RESERVED */ reserved 4 to 20;
 
     // If true, and there is already a hash computed, ignore rest of the
     // list of hash polices.
@@ -596,7 +594,7 @@ message RouteAction {
     //    (Cookie B,    false),
     //    (Cookie C,    false)]
     // The generateHash process ends after computing "header A", as it's a terminal policy.
-    bool terminal = 21;
+    bool terminal = 4;
   }
 
   // Specifies a list of hash policies to use for ring hash load balancing. Each

@@ -1700,7 +1700,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashMultiple) {
 }
 
 TEST_F(RouterMatcherHashPolicyTest, HashTerminal) {
-  // Hash pilicy list: cookie, header [terminal=true], user_ip.
+  // Hash policy list: cookie, header [terminal=true], user_ip.
   auto route = route_config_.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
   route->add_hash_policy()->mutable_cookie()->set_name("cookie_hash");
   auto* header_hash = route->add_hash_policy();
@@ -1738,6 +1738,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashTerminal) {
   // If no hash computed after evaluating a hash policy, the rest of the policy
   // list is evaluated.
   {
+    // Input: {}, {}, address1. Hash on address1.
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
     hash_1 = route->routeEntry()
@@ -1746,6 +1747,7 @@ TEST_F(RouterMatcherHashPolicyTest, HashTerminal) {
                  .value();
   }
   {
+    // Input: {}, {}, address2. Hash on address2.
     Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
     Router::RouteConstSharedPtr route = config().route(headers, 0);
     hash_2 = route->routeEntry()
