@@ -162,6 +162,31 @@ TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariable) {
   testFormatting(request_info, "UPSTREAM_METADATA([\"namespace\", \"nested\", \"list_key\"])", "");
 }
 
+// Breaks tsan/asan builds by trying to allocate a lot of memory.
+// Works on debug builds and needs to be fixed. See
+// https://github.com/envoyproxy/envoy/issues/4268
+TEST_F(RequestInfoHeaderFormatterTest, DISABLED_UserDefinedHeadersConsideredHarmful) {
+  // This must be an inline header to get the append-in-place semantics.
+  const char* header_name = "connection";
+  Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> to_add;
+  const uint32_t num_header_chunks = 10;
+  const uint64_t length = std::numeric_limits<uint32_t>::max() / num_header_chunks;
+  std::string really_long_string(length + 1, 'a');
+  for (uint32_t i = 0; i < num_header_chunks; ++i) {
+    envoy::api::v2::core::HeaderValueOption* header = to_add.Add();
+    header->mutable_header()->set_key(header_name);
+    header->mutable_header()->set_value(really_long_string);
+    header->mutable_append()->set_value(true);
+  }
+
+  HeaderParserPtr req_header_parser = HeaderParser::configure(to_add);
+
+  Http::TestHeaderMapImpl header_map{{":method", "POST"}};
+  NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+  EXPECT_DEATH_LOG_TO_STDERR(req_header_parser->evaluateHeaders(header_map, request_info),
+                             "Trying to allocate overly large headers.");
+}
+
 TEST_F(RequestInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMissingHost) {
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host;
@@ -421,14 +446,14 @@ TEST(HeaderParserTest, TestParseInternal) {
 
     HeaderParserPtr req_header_parser = HeaderParser::configure(to_add);
 
-    Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
-    req_header_parser->evaluateHeaders(headerMap, request_info);
+    Http::TestHeaderMapImpl header_map{{":method", "POST"}};
+    req_header_parser->evaluateHeaders(header_map, request_info);
 
     std::string descriptor = fmt::format("for test case input: {}", test_case.input_);
 
-    EXPECT_TRUE(headerMap.has("x-header")) << descriptor;
+    EXPECT_TRUE(header_map.has("x-header")) << descriptor;
     EXPECT_TRUE(test_case.expected_output_) << descriptor;
-    EXPECT_EQ(test_case.expected_output_.value(), headerMap.get_("x-header")) << descriptor;
+    EXPECT_EQ(test_case.expected_output_.value(), header_map.get_("x-header")) << descriptor;
   }
 }
 
@@ -448,10 +473,10 @@ TEST(HeaderParserTest, EvaluateHeaders) {
   )EOF";
   HeaderParserPtr req_header_parser =
       HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add());
-  Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
+  Http::TestHeaderMapImpl header_map{{":method", "POST"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  req_header_parser->evaluateHeaders(headerMap, request_info);
-  EXPECT_TRUE(headerMap.has("x-client-ip"));
+  req_header_parser->evaluateHeaders(header_map, request_info);
+  EXPECT_TRUE(header_map.has("x-client-ip"));
 }
 
 TEST(HeaderParserTest, EvaluateEmptyHeaders) {
@@ -470,15 +495,15 @@ TEST(HeaderParserTest, EvaluateEmptyHeaders) {
   )EOF";
   HeaderParserPtr req_header_parser =
       HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add());
-  Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
+  Http::TestHeaderMapImpl header_map{{":method", "POST"}};
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   auto metadata = std::make_shared<envoy::api::v2::core::Metadata>();
   ON_CALL(request_info, upstreamHost()).WillByDefault(Return(host));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
-  req_header_parser->evaluateHeaders(headerMap, request_info);
-  EXPECT_FALSE(headerMap.has("x-key"));
+  req_header_parser->evaluateHeaders(header_map, request_info);
+  EXPECT_FALSE(header_map.has("x-key"));
 }
 
 TEST(HeaderParserTest, EvaluateStaticHeaders) {
@@ -497,11 +522,11 @@ TEST(HeaderParserTest, EvaluateStaticHeaders) {
   )EOF";
   HeaderParserPtr req_header_parser =
       HeaderParser::configure(parseRouteFromJson(json).route().request_headers_to_add());
-  Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
+  Http::TestHeaderMapImpl header_map{{":method", "POST"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
-  req_header_parser->evaluateHeaders(headerMap, request_info);
-  EXPECT_TRUE(headerMap.has("static-header"));
-  EXPECT_EQ("static-value", headerMap.get_("static-header"));
+  req_header_parser->evaluateHeaders(header_map, request_info);
+  EXPECT_TRUE(header_map.has("static-header"));
+  EXPECT_EQ("static-value", header_map.get_("static-header"));
 }
 
 TEST(HeaderParserTest, EvaluateCompoundHeaders) {
@@ -541,7 +566,7 @@ route:
 
   HeaderParserPtr req_header_parser =
       HeaderParser::configure(parseRouteFromV2Yaml(yaml).route().request_headers_to_add());
-  Http::TestHeaderMapImpl headerMap{{":method", "POST"}};
+  Http::TestHeaderMapImpl header_map{{":method", "POST"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(request_info, protocol()).WillByDefault(ReturnPointee(&protocol));
@@ -565,34 +590,34 @@ route:
   ON_CALL(request_info, perRequestState()).WillByDefault(ReturnRef(per_request_state));
   ON_CALL(Const(request_info), perRequestState()).WillByDefault(ReturnRef(per_request_state));
 
-  req_header_parser->evaluateHeaders(headerMap, request_info);
+  req_header_parser->evaluateHeaders(header_map, request_info);
 
-  EXPECT_TRUE(headerMap.has("x-prefix"));
-  EXPECT_EQ("prefix-127.0.0.1", headerMap.get_("x-prefix"));
+  EXPECT_TRUE(header_map.has("x-prefix"));
+  EXPECT_EQ("prefix-127.0.0.1", header_map.get_("x-prefix"));
 
-  EXPECT_TRUE(headerMap.has("x-suffix"));
-  EXPECT_EQ("127.0.0.1-suffix", headerMap.get_("x-suffix"));
+  EXPECT_TRUE(header_map.has("x-suffix"));
+  EXPECT_EQ("127.0.0.1-suffix", header_map.get_("x-suffix"));
 
-  EXPECT_TRUE(headerMap.has("x-both"));
-  EXPECT_EQ("prefix-127.0.0.1-suffix", headerMap.get_("x-both"));
+  EXPECT_TRUE(header_map.has("x-both"));
+  EXPECT_EQ("prefix-127.0.0.1-suffix", header_map.get_("x-both"));
 
-  EXPECT_TRUE(headerMap.has("x-escaping-1"));
-  EXPECT_EQ("%127.0.0.1%", headerMap.get_("x-escaping-1"));
+  EXPECT_TRUE(header_map.has("x-escaping-1"));
+  EXPECT_EQ("%127.0.0.1%", header_map.get_("x-escaping-1"));
 
-  EXPECT_TRUE(headerMap.has("x-escaping-2"));
-  EXPECT_EQ("%%%", headerMap.get_("x-escaping-2"));
+  EXPECT_TRUE(header_map.has("x-escaping-2"));
+  EXPECT_EQ("%%%", header_map.get_("x-escaping-2"));
 
-  EXPECT_TRUE(headerMap.has("x-multi"));
-  EXPECT_EQ("HTTP/1.1 from 127.0.0.1", headerMap.get_("x-multi"));
+  EXPECT_TRUE(header_map.has("x-multi"));
+  EXPECT_EQ("HTTP/1.1 from 127.0.0.1", header_map.get_("x-multi"));
 
-  EXPECT_TRUE(headerMap.has("x-multi-back-to-back"));
-  EXPECT_EQ("HTTP/1.1127.0.0.1", headerMap.get_("x-multi-back-to-back"));
+  EXPECT_TRUE(header_map.has("x-multi-back-to-back"));
+  EXPECT_EQ("HTTP/1.1127.0.0.1", header_map.get_("x-multi-back-to-back"));
 
-  EXPECT_TRUE(headerMap.has("x-metadata"));
-  EXPECT_EQ("value", headerMap.get_("x-metadata"));
+  EXPECT_TRUE(header_map.has("x-metadata"));
+  EXPECT_EQ("value", header_map.get_("x-metadata"));
 
-  EXPECT_TRUE(headerMap.has("x-per-request"));
-  EXPECT_EQ("test_value", headerMap.get_("x-per-request"));
+  EXPECT_TRUE(header_map.has("x-per-request"));
+  EXPECT_EQ("test_value", header_map.get_("x-per-request"));
 }
 
 TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
@@ -634,29 +659,29 @@ TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
 
   HeaderParserPtr req_header_parser =
       Router::HeaderParser::configure(route_action.request_headers_to_add());
-  Http::TestHeaderMapImpl headerMap{
+  Http::TestHeaderMapImpl header_map{
       {":method", "POST"}, {"static-header", "old-value"}, {"x-client-ip", "0.0.0.0"}};
 
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   const SystemTime start_time(std::chrono::microseconds(1522796769123456));
   EXPECT_CALL(request_info, startTime()).Times(3).WillRepeatedly(Return(start_time));
 
-  req_header_parser->evaluateHeaders(headerMap, request_info);
-  EXPECT_TRUE(headerMap.has("static-header"));
-  EXPECT_EQ("static-value", headerMap.get_("static-header"));
-  EXPECT_TRUE(headerMap.has("x-client-ip"));
-  EXPECT_EQ("127.0.0.1", headerMap.get_("x-client-ip"));
-  EXPECT_TRUE(headerMap.has("x-request-start"));
-  EXPECT_EQ("1522796769123", headerMap.get_("x-request-start"));
-  EXPECT_TRUE(headerMap.has("x-request-start-default"));
-  EXPECT_EQ("2018-04-03T23:06:09.123Z", headerMap.get_("x-request-start-default"));
-  EXPECT_TRUE(headerMap.has("x-request-start-range"));
+  req_header_parser->evaluateHeaders(header_map, request_info);
+  EXPECT_TRUE(header_map.has("static-header"));
+  EXPECT_EQ("static-value", header_map.get_("static-header"));
+  EXPECT_TRUE(header_map.has("x-client-ip"));
+  EXPECT_EQ("127.0.0.1", header_map.get_("x-client-ip"));
+  EXPECT_TRUE(header_map.has("x-request-start"));
+  EXPECT_EQ("1522796769123", header_map.get_("x-request-start"));
+  EXPECT_TRUE(header_map.has("x-request-start-default"));
+  EXPECT_EQ("2018-04-03T23:06:09.123Z", header_map.get_("x-request-start-default"));
+  EXPECT_TRUE(header_map.has("x-request-start-range"));
   EXPECT_EQ("123456000, 1, 12, 123, 1234, 12345, 123456, 1234560, 12345600, 123456000",
-            headerMap.get_("x-request-start-range"));
+            header_map.get_("x-request-start-range"));
 
   typedef std::map<std::string, int> CountMap;
   CountMap counts;
-  headerMap.iterate(
+  header_map.iterate(
       [](const Http::HeaderEntry& header, void* cb_v) -> Http::HeaderMap::Iterate {
         CountMap* m = static_cast<CountMap*>(cb_v);
         std::string key = std::string{header.key().c_str()};
@@ -711,29 +736,29 @@ route:
   const auto route = parseRouteFromV2Yaml(yaml).route();
   HeaderParserPtr resp_header_parser =
       HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
-  Http::TestHeaderMapImpl headerMap{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
+  Http::TestHeaderMapImpl header_map{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
 
   // Initialize start_time as 2018-04-03T23:06:09.123Z in microseconds.
   const SystemTime start_time(std::chrono::microseconds(1522796769123456));
   EXPECT_CALL(request_info, startTime()).Times(7).WillRepeatedly(Return(start_time));
 
-  resp_header_parser->evaluateHeaders(headerMap, request_info);
-  EXPECT_TRUE(headerMap.has("x-client-ip"));
-  EXPECT_TRUE(headerMap.has("x-request-start-multiple"));
-  EXPECT_TRUE(headerMap.has("x-safe"));
-  EXPECT_FALSE(headerMap.has("x-nope"));
-  EXPECT_TRUE(headerMap.has("x-request-start"));
-  EXPECT_EQ("1522796769.123", headerMap.get_("x-request-start"));
+  resp_header_parser->evaluateHeaders(header_map, request_info);
+  EXPECT_TRUE(header_map.has("x-client-ip"));
+  EXPECT_TRUE(header_map.has("x-request-start-multiple"));
+  EXPECT_TRUE(header_map.has("x-safe"));
+  EXPECT_FALSE(header_map.has("x-nope"));
+  EXPECT_TRUE(header_map.has("x-request-start"));
+  EXPECT_EQ("1522796769.123", header_map.get_("x-request-start"));
   EXPECT_EQ("1522796769.123 2018-04-03T23:06:09.123Z 1522796769",
-            headerMap.get_("x-request-start-multiple"));
-  EXPECT_TRUE(headerMap.has("x-request-start-f"));
-  EXPECT_EQ("f", headerMap.get_("x-request-start-f"));
-  EXPECT_TRUE(headerMap.has("x-request-start-default"));
-  EXPECT_EQ("2018-04-03T23:06:09.123Z", headerMap.get_("x-request-start-default"));
-  EXPECT_TRUE(headerMap.has("x-request-start-range"));
+            header_map.get_("x-request-start-multiple"));
+  EXPECT_TRUE(header_map.has("x-request-start-f"));
+  EXPECT_EQ("f", header_map.get_("x-request-start-f"));
+  EXPECT_TRUE(header_map.has("x-request-start-default"));
+  EXPECT_EQ("2018-04-03T23:06:09.123Z", header_map.get_("x-request-start-default"));
+  EXPECT_TRUE(header_map.has("x-request-start-range"));
   EXPECT_EQ("123456000, 1, 12, 123, 1234, 12345, 123456, 1234560, 12345600, 123456000",
-            headerMap.get_("x-request-start-range"));
+            header_map.get_("x-request-start-range"));
 }
 
 } // namespace Router

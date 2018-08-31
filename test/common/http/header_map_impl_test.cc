@@ -704,6 +704,19 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
   }
 }
 
+TEST(HeaderMapImplTest, TestHeaderLengthChecks) {
+  HeaderString value;
+  value.setCopy("some;", 5);
+  EXPECT_DEATH_LOG_TO_STDERR(value.append(nullptr, std::numeric_limits<uint32_t>::max()),
+                             "Trying to allocate overly large headers.");
+
+  std::string source("hello");
+  HeaderString reference;
+  reference.setReference(source);
+  EXPECT_DEATH_LOG_TO_STDERR(reference.append(nullptr, std::numeric_limits<uint32_t>::max()),
+                             "Trying to allocate overly large headers.");
+}
+
 TEST(HeaderMapImplTest, PseudoHeaderOrder) {
   typedef testing::MockFunction<void(const std::string&, const std::string&)> MockCb;
   MockCb cb;
