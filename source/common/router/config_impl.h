@@ -267,7 +267,8 @@ class RouteEntryImplBase : public RouteEntry,
                            public DirectResponseEntry,
                            public Route,
                            public PathMatchCriterion,
-                           public std::enable_shared_from_this<RouteEntryImplBase> {
+                           public std::enable_shared_from_this<RouteEntryImplBase>,
+                           Logger::Loggable<Logger::Id::router> {
 public:
   /**
    * @throw EnvoyException with reason if the route configuration contains any errors
@@ -362,8 +363,7 @@ protected:
 
 private:
   struct RuntimeData {
-    std::string numerator_key_{};
-    uint64_t numerator_default_{};
+    uint64_t numerator_val_{};
     uint64_t denominator_val_{};
   };
 
