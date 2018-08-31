@@ -807,4 +807,15 @@ TEST(WelfordStandardDeviation, InsufficientData) {
   EXPECT_TRUE(std::isnan(wsd.computeStandardDeviation()));
 }
 
+TEST(DateFormatter, FromTime) {
+  const SystemTime time1(std::chrono::seconds(1522796769));
+  EXPECT_EQ("2018-04-03T23:06:09.000Z", DateFormatter("%Y-%m-%dT%H:%M:%S.000Z").fromTime(time1));
+  EXPECT_EQ("aaa23", DateFormatter(std::string(3, 'a') + "%H").fromTime(time1));
+  EXPECT_EQ("", DateFormatter(std::string(1022, 'a') + "%H").fromTime(time1));
+  const time_t time2 = 0;
+  EXPECT_EQ("1970-01-01T00:00:00.000Z", DateFormatter("%Y-%m-%dT%H:%M:%S.000Z").fromTime(time2));
+  EXPECT_EQ("aaa00", DateFormatter(std::string(3, 'a') + "%H").fromTime(time2));
+  EXPECT_EQ("", DateFormatter(std::string(1022, 'a') + "%H").fromTime(time2));
+}
+
 } // namespace Envoy
