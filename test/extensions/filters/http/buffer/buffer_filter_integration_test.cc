@@ -21,19 +21,17 @@ class BufferIntegrationTest : public HttpProtocolIntegrationTest {
         };
   }
 
-  void overrideTimeout(int max_request_time) {
+  ConfigHelper::HttpModifierFunction overrideConfigBufferTimeout(std::chrono::seconds max_request_time) {
     // {{ and }} are escaped braces in fmt
     std::string config = fmt::format(R"EOF({{"buffer": {{
       "max_request_time": {{"seconds": {}}}
-    }}}})EOF", max_request_time);
+    }}}})EOF", max_request_time.count());
 
-    ConfigHelper::HttpModifierFunction mod = overrideConfig(config);
-    config_helper_.addConfigModifier(mod);
+    return overrideConfig(config);
   }
 
-  AssertionResult setupRequestTimeoutTest(std::chrono::milliseconds http_connection_timeout,
+  AssertionResult runRequestTimeoutTest(std::chrono::milliseconds http_connection_timeout,
                                           const char* method = "GET") {
-    config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
     initialize();
 
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
@@ -151,22 +149,26 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
 }
 
 TEST_P(BufferIntegrationTest, RequestPathTimesOutInBuffer) {
-  int buffer_timeout = 1;
+  std::chrono::seconds buffer_timeout = std::chrono::seconds(1);
   std::chrono::milliseconds connection_timeout = std::chrono::milliseconds(2500);
 
-  overrideTimeout(buffer_timeout);
-  AssertionResult result = setupRequestTimeoutTest(connection_timeout);
+  ConfigHelper::HttpModifierFunction mod = overrideConfigBufferTimeout(buffer_timeout);
+  config_helper_.addConfigModifier(mod);
+  config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
+  AssertionResult result = runRequestTimeoutTest(connection_timeout);
 
   EXPECT_FALSE(result);
   // TODO Check stats increments
 }
 
 TEST_P(BufferIntegrationTest, RequestPathTimesntOutInBuffer) {
-  int buffer_timeout = 3; // Greater than connectiom timeout
+  std::chrono::seconds buffer_timeout = std::chrono::seconds(1); // Greater than connectiom timeout
   std::chrono::milliseconds connection_timeout = std::chrono::milliseconds(2500);
 
-  overrideTimeout(buffer_timeout);
-  AssertionResult result = setupRequestTimeoutTest(connection_timeout);
+  ConfigHelper::HttpModifierFunction mod = overrideConfigBufferTimeout(buffer_timeout);
+  config_helper_.addConfigModifier(mod);
+  config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
+  AssertionResult result = runRequestTimeoutTest(connection_timeout);
 
   // TODO assert this will segfault
   // AssertionResult result =
