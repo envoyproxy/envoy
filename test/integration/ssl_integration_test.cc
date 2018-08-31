@@ -28,7 +28,7 @@ namespace Envoy {
 namespace Ssl {
 
 void SslIntegrationTest::initialize() {
-  config_helper_.addSslConfig();
+  config_helper_.addTlsListenerConfig();
   HttpIntegrationTest::initialize();
 
   runtime_.reset(new NiceMock<Runtime::MockLoader>());

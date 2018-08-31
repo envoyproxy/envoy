@@ -2,6 +2,7 @@
 
 #include "envoy/config/accesslog/v2/file.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
+#include "envoy/server/transport_socket_config.h"
 
 #include "common/filesystem/filesystem_impl.h"
 #include "common/network/utility.h"
@@ -9,7 +10,7 @@
 
 #include "test/integration/ssl_utility.h"
 #include "test/integration/utility.h"
-
+#include "test/test_common/logging.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -19,6 +20,74 @@ using testing::NiceMock;
 
 namespace Envoy {
 namespace {
+
+// Transport socket that does not raise a Connected event until it has
+// received a message from the other side indicating that it should be connected.
+class DelayConnectSocket : public Network::RawBufferSocket {
+  // Network::TransportSocket
+  void onConnected() override {
+    // Delay raising the event.
+  }
+  Network::IoResult doRead(Buffer::Instance& buffer) override {
+    Network::IoResult result = Network::RawBufferSocket::doRead(buffer);
+    if (buffer.length() > 0 && !raised_connected_) {
+      raised_connected_ = true;
+      Network::RawBufferSocket::onConnected();
+    }
+
+    if (result.end_stream_read_ && !raised_connected_) {
+      result.end_stream_read_ = false;
+      result.action_ = Network::PostIoAction::Close;
+    }
+
+    return result;
+  }
+
+private:
+  bool raised_connected_{false};
+};
+
+class DelayConnectSocketFactory : public Network::TransportSocketFactory {
+public:
+  Network::TransportSocketPtr createTransportSocket() const override {
+    return std::make_unique<DelayConnectSocket>();
+  }
+  bool implementsSecureTransport() const override { return false; }
+};
+
+class DelayConnectSocketConfigFactory
+    : public Server::Configuration::UpstreamTransportSocketConfigFactory,
+      public Server::Configuration::DownstreamTransportSocketConfigFactory {
+public:
+  static constexpr const char* NAME = "DELAY_CONNECT";
+  std::string name() const override { return NAME; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<ProtobufWkt::Empty>();
+  }
+
+  // Server::Configuration::UpstreamTransportSocketConfigFactory
+  Network::TransportSocketFactoryPtr
+  createTransportSocketFactory(const Protobuf::Message&,
+                               Server::Configuration::TransportSocketFactoryContext&) override {
+    return std::make_unique<DelayConnectSocketFactory>();
+  }
+
+  // Server::Configuration::DownstreamTransportSocketConfigFactory
+  Network::TransportSocketFactoryPtr
+  createTransportSocketFactory(const Protobuf::Message&,
+                               Server::Configuration::TransportSocketFactoryContext&,
+                               const std::vector<std::string>&) override {
+    return std::make_unique<DelayConnectSocketFactory>();
+  }
+};
+
+Registry::RegisterFactory<DelayConnectSocketConfigFactory,
+                          Server::Configuration::UpstreamTransportSocketConfigFactory>
+    upstream_registered_;
+
+Registry::RegisterFactory<DelayConnectSocketConfigFactory,
+                          Server::Configuration::DownstreamTransportSocketConfigFactory>
+    downstream_registered_;
 
 INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxyIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
@@ -355,12 +424,62 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
 }
 
+// Test that a downstream disconnect while the upstream connection is not yet connected
+// successfully cleans up the upstream connection.
+TEST_P(TcpProxyIntegrationTest, TestDownstreamDisconnectWithUpstreamConnectionInProgress) {
+  LogLevelSetter setter(spdlog::level::trace);
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_static_resources()
+        ->mutable_listeners(0)
+        ->mutable_filter_chains(0)
+        ->mutable_transport_socket()
+        ->set_name(DelayConnectSocketConfigFactory::NAME);
+    bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket()->set_name(
+        DelayConnectSocketConfigFactory::NAME);
+  });
+  initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  AssertionResult result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection);
+  RELEASE_ASSERT(result, result.message());
+
+  tcp_client->close();
+  std::string cx_active_stat_name;
+  for (auto& gauge : test_server_->gauges()) {
+    if (std::regex_match(gauge->name(),
+                         std::regex(R"EOF(^listener\..*_0\.downstream_cx_active$)EOF"))) {
+      cx_active_stat_name = gauge->name();
+    }
+  }
+  RELEASE_ASSERT(!cx_active_stat_name.empty(), "Must find the stat we're waiting for");
+  ENVOY_LOG_MISC(debug, "Starting wait for downstream conn closed");
+  test_server_->waitForGaugeEq(cx_active_stat_name, 0);
+  ENVOY_LOG_MISC(debug, "Finished wait for downstream conn closed");
+  // test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 0);
+
+  // This establishes the DELAY_CONNECT connection.
+  fake_upstream_connection->write("a", false);
+
+  // The upstream connection was established after the downstream connection was closed,
+  // so it stayed in the connpool and should be used for this 2nd downstream connection.
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client2->write("foo", true);
+  ASSERT_TRUE(fake_upstream_connection->waitForData(3));
+  ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
+  fake_upstream_connection->write("", true);
+  tcp_client2->waitForData("ab");
+  tcp_client2->waitForDisconnect();
+  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
+}
+
 INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxySslIntegrationTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
 void TcpProxySslIntegrationTest::initialize() {
-  config_helper_.addSslConfig();
+  config_helper_.addTlsListenerConfig();
   TcpProxyIntegrationTest::initialize();
 
   context_manager_.reset(new Ssl::ContextManagerImpl(runtime_));
@@ -455,7 +574,7 @@ TEST_P(TcpProxySslIntegrationTest, DownstreamHalfClose) {
   Buffer::OwnedImpl empty_buffer;
   ssl_client_->write(empty_buffer, true);
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose(true));
 
   const std::string data("data");
   ASSERT_TRUE(fake_upstream_connection_->write(data, false));
@@ -491,6 +610,45 @@ TEST_P(TcpProxySslIntegrationTest, UpstreamHalfClose) {
     dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   }
   ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
+}
+
+// Test that upstream connection is properly closed if the downstream
+// connection aborts the handshake.
+TEST_P(TcpProxySslIntegrationTest, AbortTlsHandshake) {
+  initialize();
+
+  // Connect to a TLS listener with a raw client to ensure that the handshake doesn't
+  // succeed.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  AssertionResult result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
+// Test that upstream connection is properly closed if the downstream
+// TLS handshake fails.
+TEST_P(TcpProxySslIntegrationTest, FailTlsHandshake) {
+  initialize();
+
+  // Connect to a TLS listener with a raw client to ensure that the handshake doesn't
+  // succeed.
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  AssertionResult result = fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_);
+  RELEASE_ASSERT(result, result.message());
+
+  // Write garbage so that the remote TLS server will fail the handshake.
+  tcp_client->write(std::string(10000, 'a'), false);
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
+  fake_upstream_connection_->close();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  tcp_client->close();
 }
 
 } // namespace

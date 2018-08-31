@@ -88,8 +88,11 @@ public:
       envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::CodecType
           type);
 
-  // Add the default SSL configuration.
-  void addSslConfig();
+  // Add the default TLS listener configuration.
+  void addTlsListenerConfig();
+
+  // Add the default TLS upstream configuration.
+  void addTlsUpstreamConfig();
 
   // Renames the first listener to the name specified.
   void renameListener(const std::string& name);
