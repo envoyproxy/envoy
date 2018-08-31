@@ -355,6 +355,10 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
 }
 
+INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxySslIntegrationTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
 void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
   TcpProxyIntegrationTest::initialize();
@@ -450,6 +454,7 @@ TEST_P(TcpProxySslIntegrationTest, DownstreamHalfClose) {
 
   Buffer::OwnedImpl empty_buffer;
   ssl_client_->write(empty_buffer, true);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
 
   const std::string data("data");

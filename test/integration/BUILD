@@ -527,6 +527,9 @@ envoy_cc_test(
         "tcp_proxy_integration_test.cc",
         "tcp_proxy_integration_test.h",
     ],
+    data = [
+        "//test/config/integration/certs",
+    ],
     deps = [
         ":integration_lib",
         "//source/common/event:dispatcher_includes",
@@ -536,6 +539,7 @@ envoy_cc_test(
         "//source/common/ssl:context_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/transport_sockets/ssl:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
