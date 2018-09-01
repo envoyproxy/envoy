@@ -538,7 +538,7 @@ TEST(RouteMatcherTest, TestRoutes) {
 TEST(RouteMatcherTest, TestRoutesWithWildcardAndDefaultOnly) {
   std::string yaml = R"EOF(
 virtual_hosts:
-  - name: default
+  - name: wildcard
     domains: ["*.solo.io"]
     routes:
       - match: { prefix: "/" }
