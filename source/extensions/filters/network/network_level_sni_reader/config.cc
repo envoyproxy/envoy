@@ -39,7 +39,9 @@ public:
 private:
   Network::FilterFactoryCb
   createFilterFactoryFromContext(Server::Configuration::FactoryContext& context) {
-    ConfigSharedPtr filter_config(new Config(context.scope()));
+    Extensions::ListenerFilters::TlsInspector::ConfigSharedPtr filter_config(
+        new Extensions::ListenerFilters::TlsInspector::Config(context.scope(),
+                                                              "network_level_sni_reader."));
     return [filter_config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<NetworkLevelSniReaderFilter>(filter_config));
     };

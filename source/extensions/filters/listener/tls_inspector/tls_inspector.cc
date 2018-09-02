@@ -24,8 +24,8 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
 
-Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
-    : stats_{TLS_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
+Config::Config(Stats::Scope& scope, std::string stat_prefix, uint32_t max_client_hello_size)
+    : stats_{TLS_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
       max_client_hello_size_(max_client_hello_size) {
 
@@ -42,14 +42,14 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
         size_t len;
         if (SSL_early_callback_ctx_extension_get(
                 client_hello, TLSEXT_TYPE_application_layer_protocol_negotiation, &data, &len)) {
-          Filter* filter = static_cast<Filter*>(SSL_get_app_data(client_hello->ssl));
+          TlsFilterBase* filter = static_cast<TlsFilterBase*>(SSL_get_app_data(client_hello->ssl));
           filter->onALPN(data, len);
         }
         return ssl_select_cert_success;
       });
   SSL_CTX_set_tlsext_servername_callback(
       ssl_ctx_.get(), [](SSL* ssl, int* out_alert, void*) -> int {
-        Filter* filter = static_cast<Filter*>(SSL_get_app_data(ssl));
+        TlsFilterBase* filter = static_cast<TlsFilterBase*>(SSL_get_app_data(ssl));
         filter->onServername(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name));
 
         // Return an error to stop the handshake; we have what we wanted already.
@@ -63,7 +63,8 @@ bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_
 thread_local uint8_t Filter::buf_[Config::TLS_MAX_CLIENT_HELLO];
 
 Filter::Filter(const ConfigSharedPtr config) : config_(config), ssl_(config_->newSsl()) {
-  initializeSsl(config->maxClientHelloSize(), sizeof(buf_), ssl_, this);
+  initializeSsl(config->maxClientHelloSize(), sizeof(buf_), ssl_,
+                static_cast<TlsFilterBase*>(this));
 }
 
 void Filter::initializeSsl(uint32_t maxClientHelloSize, size_t bufSize,

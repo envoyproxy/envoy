@@ -43,7 +43,8 @@ struct TlsStats {
  */
 class Config {
 public:
-  Config(Stats::Scope& scope, uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
+  Config(Stats::Scope& scope, std::string stat_prefix,
+         uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
 
   const TlsStats& stats() const { return stats_; }
   bssl::UniquePtr<SSL> newSsl();
@@ -59,10 +60,24 @@ private:
 
 typedef std::shared_ptr<Config> ConfigSharedPtr;
 
+class TlsFilterBase {
+public:
+  virtual ~TlsFilterBase() {}
+
+private:
+  virtual void onALPN(const unsigned char* data, unsigned int len) PURE;
+  virtual void onServername(absl::string_view name) PURE;
+
+  // Allows callbacks on the SSL_CTX to set fields in this class.
+  friend class Config;
+};
+
 /**
  * TLS inspector listener filter.
  */
-class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
+class Filter : public Network::ListenerFilter,
+               public TlsFilterBase,
+               Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const ConfigSharedPtr config);
 
@@ -85,8 +100,9 @@ private:
   void onRead();
   void onTimeout();
   void done(bool success);
-  void onALPN(const unsigned char* data, unsigned int len);
-  void onServername(absl::string_view name);
+  // Extensions::ListenerFilters::TlsInspector::TlsFilterBase
+  void onALPN(const unsigned char* data, unsigned int len) override;
+  void onServername(absl::string_view name) override;
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_;
@@ -99,9 +115,6 @@ private:
   bool clienthello_success_{false};
 
   static thread_local uint8_t buf_[Config::TLS_MAX_CLIENT_HELLO];
-
-  // Allows callbacks on the SSL_CTX to set fields in this class.
-  friend class Config;
 };
 
 } // namespace TlsInspector

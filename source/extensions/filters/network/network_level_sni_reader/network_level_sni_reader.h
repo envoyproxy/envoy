@@ -15,32 +15,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace NetworkLevelSniReader {
 
-/**
- * Global configuration for network level SNI reader.
- */
-class Config {
-public:
-  Config(Stats::Scope& scope, uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
-
-  const Extensions::ListenerFilters::TlsInspector::TlsStats& stats() const { return stats_; }
-  bssl::UniquePtr<SSL> newSsl();
-  uint32_t maxClientHelloSize() const { return max_client_hello_size_; }
-
-  // TODO: extract the following to common
-  static constexpr size_t TLS_MAX_CLIENT_HELLO = 64 * 1024;
-
-private:
-  Extensions::ListenerFilters::TlsInspector::TlsStats stats_;
-  bssl::UniquePtr<SSL_CTX> ssl_ctx_;
-  const uint32_t max_client_hello_size_;
-};
-
-typedef std::shared_ptr<Config> ConfigSharedPtr;
-
 class NetworkLevelSniReaderFilter : public Network::ReadFilter,
+                                    public Extensions::ListenerFilters::TlsInspector::TlsFilterBase,
                                     Logger::Loggable<Logger::Id::filter> {
 public:
-  NetworkLevelSniReaderFilter(const ConfigSharedPtr config);
+  NetworkLevelSniReaderFilter(
+      const Extensions::ListenerFilters::TlsInspector::ConfigSharedPtr config);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -51,9 +31,11 @@ public:
 
 private:
   void done(bool success);
-  void onServername(absl::string_view name);
+  // Extensions::ListenerFilters::TlsInspector::TlsFilterBase
+  void onServername(absl::string_view name) override;
+  void onALPN(const unsigned char*, unsigned int) override{};
 
-  ConfigSharedPtr config_;
+  Extensions::ListenerFilters::TlsInspector::ConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{};
 
   bssl::UniquePtr<SSL> ssl_;
@@ -62,10 +44,8 @@ private:
   bool clienthello_success_{false};
   bool done_{false};
 
-  static thread_local uint8_t buf_[Config::TLS_MAX_CLIENT_HELLO];
-
-  // Allows callbacks on the SSL_CTX to set fields in this class.
-  friend class Config;
+  static thread_local uint8_t
+      buf_[Extensions::ListenerFilters::TlsInspector::Config::TLS_MAX_CLIENT_HELLO];
 };
 
 } // namespace NetworkLevelSniReader

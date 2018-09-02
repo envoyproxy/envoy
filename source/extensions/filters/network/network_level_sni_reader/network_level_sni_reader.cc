@@ -15,38 +15,15 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace NetworkLevelSniReader {
 
-Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
-    : stats_{TLS_STATS(POOL_COUNTER_PREFIX(scope, "network_levelsni_reader."))},
-      ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
-      max_client_hello_size_(max_client_hello_size) {
+thread_local uint8_t NetworkLevelSniReaderFilter::buf_
+    [Extensions::ListenerFilters::TlsInspector::Config::TLS_MAX_CLIENT_HELLO];
 
-  if (max_client_hello_size_ > TLS_MAX_CLIENT_HELLO) {
-    throw EnvoyException(fmt::format("max_client_hello_size of {} is greater than maximum of {}.",
-                                     max_client_hello_size_, size_t(TLS_MAX_CLIENT_HELLO)));
-  }
-
-  SSL_CTX_set_options(ssl_ctx_.get(), SSL_OP_NO_TICKET);
-  SSL_CTX_set_session_cache_mode(ssl_ctx_.get(), SSL_SESS_CACHE_OFF);
-  SSL_CTX_set_tlsext_servername_callback(
-      ssl_ctx_.get(), [](SSL* ssl, int* out_alert, void*) -> int {
-        NetworkLevelSniReaderFilter* filter =
-            static_cast<NetworkLevelSniReaderFilter*>(SSL_get_app_data(ssl));
-        filter->onServername(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name));
-
-        // Return an error to stop the handshake; we have what we wanted already.
-        *out_alert = SSL_AD_USER_CANCELLED;
-        return SSL_TLSEXT_ERR_ALERT_FATAL;
-      });
-}
-
-bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_ctx_.get())}; }
-
-thread_local uint8_t NetworkLevelSniReaderFilter::buf_[Config::TLS_MAX_CLIENT_HELLO];
-
-NetworkLevelSniReaderFilter::NetworkLevelSniReaderFilter(const ConfigSharedPtr config)
+NetworkLevelSniReaderFilter::NetworkLevelSniReaderFilter(
+    const Extensions::ListenerFilters::TlsInspector::ConfigSharedPtr config)
     : config_(config), ssl_(config_->newSsl()) {
-  Extensions::ListenerFilters::TlsInspector::Filter::initializeSsl(config->maxClientHelloSize(),
-                                                                   sizeof(buf_), ssl_, this);
+  Extensions::ListenerFilters::TlsInspector::Filter::initializeSsl(
+      config->maxClientHelloSize(), sizeof(buf_), ssl_,
+      static_cast<Extensions::ListenerFilters::TlsInspector::TlsFilterBase*>(this));
 }
 
 Network::FilterStatus NetworkLevelSniReaderFilter::onData(Buffer::Instance& data, bool) {
@@ -56,8 +33,8 @@ Network::FilterStatus NetworkLevelSniReaderFilter::onData(Buffer::Instance& data
     return Network::FilterStatus::Continue;
   }
   // TODO: append data to the buffer instead of overwriting it.
-  size_t len =
-      (data.length() < Config::TLS_MAX_CLIENT_HELLO) ? data.length() : Config::TLS_MAX_CLIENT_HELLO;
+  size_t len = (data.length() < config_->maxClientHelloSize()) ? data.length()
+                                                               : config_->maxClientHelloSize();
   data.copyOut(0, len, buf_);
 
   Extensions::ListenerFilters::TlsInspector::Filter::parseClientHello(
