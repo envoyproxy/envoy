@@ -68,7 +68,8 @@ public:
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
-
+  static void initializeSsl(uint32_t maxClientHelloSize, size_t bufSize,
+                            const bssl::UniquePtr<SSL>& ssl, void* appData);
   static void parseClientHello(const void* data, size_t len, bssl::UniquePtr<SSL>& ssl,
                                uint64_t read, uint32_t maxClientHelloSize, const TlsStats& stats,
                                std::function<void(bool)> done, bool& alpn_found,

@@ -63,10 +63,15 @@ bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_
 thread_local uint8_t Filter::buf_[Config::TLS_MAX_CLIENT_HELLO];
 
 Filter::Filter(const ConfigSharedPtr config) : config_(config), ssl_(config_->newSsl()) {
-  RELEASE_ASSERT(sizeof(buf_) >= config_->maxClientHelloSize(), "");
+  initializeSsl(config->maxClientHelloSize(), sizeof(buf_), ssl_, this);
+}
 
-  SSL_set_app_data(ssl_.get(), this);
-  SSL_set_accept_state(ssl_.get());
+void Filter::initializeSsl(uint32_t maxClientHelloSize, size_t bufSize,
+                           const bssl::UniquePtr<SSL>& ssl, void* appData) {
+  RELEASE_ASSERT(bufSize >= maxClientHelloSize, "");
+
+  SSL_set_app_data(ssl.get(), appData);
+  SSL_set_accept_state(ssl.get());
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
@@ -130,11 +135,10 @@ void Filter::doOnALPN(const unsigned char* data, unsigned int len,
 }
 
 void Filter::onServername(absl::string_view servername) {
+  ENVOY_LOG(debug, "tls:onServerName(), requestedServerName: {}", servername);
   doOnServername(
       servername, config_->stats(),
-      [&](absl::string_view name) -> void {
-        cb_->socket().setRequestedServerName(name);
-        ENVOY_LOG(debug, "tls:onServerName(), requestedServerName: {}", name); },
+      [&](absl::string_view name) -> void { cb_->socket().setRequestedServerName(name); },
       clienthello_success_);
 }
 

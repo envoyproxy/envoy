@@ -45,10 +45,8 @@ thread_local uint8_t NetworkLevelSniReaderFilter::buf_[Config::TLS_MAX_CLIENT_HE
 
 NetworkLevelSniReaderFilter::NetworkLevelSniReaderFilter(const ConfigSharedPtr config)
     : config_(config), ssl_(config_->newSsl()) {
-  RELEASE_ASSERT(sizeof(buf_) >= config_->maxClientHelloSize(), "");
-
-  SSL_set_app_data(ssl_.get(), this);
-  SSL_set_accept_state(ssl_.get());
+  Extensions::ListenerFilters::TlsInspector::Filter::initializeSsl(config->maxClientHelloSize(),
+                                                                   sizeof(buf_), ssl_, this);
 }
 
 Network::FilterStatus NetworkLevelSniReaderFilter::onData(Buffer::Instance& data, bool) {
