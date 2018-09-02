@@ -76,7 +76,7 @@ def whitelistedForProtobufDeps(file_path):
   return (file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL) or \
           any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_WHITELIST))
 
-# Production time sources should not be instantiated in the source, except for a few
+# Real-world time sources should not be instantiated in the source, except for a few
 # specific cases. They should be passed down from where they are instantied to where
 # they need to be used, e.g. through the ServerInstance, Dispatcher, or ClusterManager.
 def whitelistedForRealTime(file_path):
