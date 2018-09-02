@@ -32,15 +32,16 @@ Network::FilterStatus NetworkLevelSniReaderFilter::onData(Buffer::Instance& data
   if (done_) {
     return Network::FilterStatus::Continue;
   }
-  // TODO: append data to the buffer instead of overwriting it.
-  size_t len = (data.length() < config_->maxClientHelloSize()) ? data.length()
-                                                               : config_->maxClientHelloSize();
-  data.copyOut(0, len, buf_);
 
+  size_t freeSpaceInBuf = sizeof(buf_) - read_;
+  size_t lenToRead = (data.length() < freeSpaceInBuf) ? data.length() : freeSpaceInBuf;
+  data.copyOut(0, lenToRead, buf_ + read_);
+  read_ += lenToRead;
   Extensions::ListenerFilters::TlsInspector::Filter::parseClientHello(
-      buf_, len, ssl_, read_, config_->maxClientHelloSize(), config_->stats(),
+      buf_ + read_, lenToRead, ssl_, read_, config_->maxClientHelloSize(), config_->stats(),
       [&](bool success) -> void { done(success); }, alpn_found_, clienthello_success_,
       []() -> void {});
+
   return done_ ? Network::FilterStatus::Continue : Network::FilterStatus::StopIteration;
 }
 
