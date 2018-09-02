@@ -195,7 +195,7 @@ public:
 
   /**
    * @return the time source used for the server.
-   * TODO(jmarantz): rename this to timeSystem().
+   * TODO(#4160): rename this to timeSystem().
    */
   virtual Event::TimeSystem& timeSource() PURE;
 

@@ -30,5 +30,6 @@ envoy_cc_library(
     deps = [
         ":secret_provider_interface",
         "@envoy_api//envoy/api/v2/auth:cert_cc",
+        "@envoy_api//envoy/api/v2/core:config_source_cc",
     ],
 )

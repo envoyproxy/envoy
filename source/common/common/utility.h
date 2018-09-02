@@ -96,7 +96,7 @@ public:
 };
 
 /**
- * Real-time implementation of TimeSource.
+ * Real-world time implementation of TimeSource.
  */
 class RealTimeSource : public TimeSource {
 public:

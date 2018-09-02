@@ -72,7 +72,7 @@ private:
   Thread::ThreadId run_tid_{};
   Buffer::WatermarkFactoryPtr buffer_factory_;
   Libevent::BasePtr base_;
-  TimerFactoryPtr timer_factory_;
+  SchedulerPtr scheduler_;
   TimerPtr deferred_delete_timer_;
   TimerPtr post_timer_;
   std::vector<DeferredDeletablePtr> to_delete_1_;

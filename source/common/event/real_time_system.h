@@ -8,12 +8,12 @@ namespace Envoy {
 namespace Event {
 
 /**
- * Real-time implementation of TimeSystem.
+ * Real-world time implementation of TimeSystem.
  */
 class RealTimeSystem : public TimeSystem {
 public:
   // TimeSystem
-  TimerFactoryPtr createTimerFactory(Libevent::BasePtr&) override;
+  SchedulerPtr createScheduler(Libevent::BasePtr&) override;
 
   // TimeSource
   SystemTime systemTime() override { return time_source_.systemTime(); }

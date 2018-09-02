@@ -34,7 +34,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/ssl:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/secret:secret_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:cds_cc",
@@ -344,6 +344,8 @@ envoy_cc_test(
     srcs = [
         "echo_integration_test.cc",
     ],
+    # This test must be run in exclusive mode: see comments in AddRemoveListener
+    tags = ["exclusive"],
     deps = [
         ":integration_lib",
         "//source/extensions/filters/network/echo:config",
@@ -464,6 +466,35 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "sds_dynamic_integration_test",
+    srcs = [
+        "sds_dynamic_integration_test.cc",
+    ],
+    data = [
+        "//test/config/integration/certs",
+    ],
+    deps = [
+        ":http_integration_lib",
+        "//source/common/config:protobuf_link_hacks",
+        "//source/common/config:resources_lib",
+        "//source/common/event:dispatcher_includes",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:connection_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/ssl:context_config_lib",
+        "//source/common/ssl:context_lib",
+        "//source/extensions/filters/listener/tls_inspector:config",
+        "//source/extensions/transport_sockets/ssl:config",
+        "//test/common/grpc:grpc_client_integration_lib",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/transport_socket/capture/v2alpha:capture_cc",
+        "@envoy_api//envoy/data/tap/v2alpha:capture_cc",
+    ],
+)
+
+envoy_cc_test(
     name = "ssl_integration_test",
     srcs = [
         "ssl_integration_test.cc",
@@ -496,6 +527,9 @@ envoy_cc_test(
         "tcp_proxy_integration_test.cc",
         "tcp_proxy_integration_test.h",
     ],
+    data = [
+        "//test/config/integration/certs",
+    ],
     deps = [
         ":integration_lib",
         "//source/common/event:dispatcher_includes",
@@ -505,6 +539,7 @@ envoy_cc_test(
         "//source/common/ssl:context_lib",
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/transport_sockets/ssl:config",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
@@ -568,7 +603,7 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/transport_sockets/ssl:config",
-        "//test/mocks/secret:secret_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
     ],
 )

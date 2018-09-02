@@ -4,8 +4,9 @@
 #include <vector>
 
 #include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/secret/secret_manager.h"
+#include "envoy/secret/secret_callbacks.h"
 #include "envoy/secret/secret_provider.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_config.h"
 
 #include "common/common/empty_string.h"
@@ -18,6 +19,8 @@ static const std::string INLINE_STRING = "<inline>";
 
 class ContextConfigImpl : public virtual Ssl::ContextConfig {
 public:
+  ~ContextConfigImpl() override;
+
   // Ssl::ContextConfig
   const std::string& alpnProtocols() const override { return alpn_protocols_; }
   const std::string& altAlpnProtocols() const override { return alt_alpn_protocols_; }
@@ -34,9 +37,24 @@ public:
   unsigned minProtocolVersion() const override { return min_protocol_version_; };
   unsigned maxProtocolVersion() const override { return max_protocol_version_; };
 
+  bool isReady() const override {
+    // Either tls_certficate_provider_ is nullptr or
+    // tls_certficate_provider_->secret() is NOT nullptr.
+    return !tls_certficate_provider_ || tls_certficate_provider_->secret() != nullptr;
+  }
+
+  void setSecretUpdateCallback(std::function<void()> callback) override {
+    if (tls_certficate_provider_) {
+      if (secret_update_callback_handle_) {
+        secret_update_callback_handle_->remove();
+      }
+      secret_update_callback_handle_ = tls_certficate_provider_->addUpdateCallback(callback);
+    }
+  }
+
 protected:
   ContextConfigImpl(const envoy::api::v2::auth::CommonTlsContext& config,
-                    Secret::SecretManager& secret_manager);
+                    Server::Configuration::TransportSocketFactoryContext& factory_context);
 
 private:
   static unsigned
@@ -51,6 +69,7 @@ private:
   const std::string cipher_suites_;
   const std::string ecdh_curves_;
   Secret::TlsCertificateConfigProviderSharedPtr tls_certficate_provider_;
+  Common::CallbackHandle* secret_update_callback_handle_;
   Secret::CertificateValidationContextConfigProviderSharedPtr
       certficate_validation_context_provider_;
   const unsigned min_protocol_version_;
@@ -59,10 +78,12 @@ private:
 
 class ClientContextConfigImpl : public ContextConfigImpl, public ClientContextConfig {
 public:
-  explicit ClientContextConfigImpl(const envoy::api::v2::auth::UpstreamTlsContext& config,
-                                   Secret::SecretManager& secret_manager);
-  explicit ClientContextConfigImpl(const Json::Object& config,
-                                   Secret::SecretManager& secret_manager);
+  explicit ClientContextConfigImpl(
+      const envoy::api::v2::auth::UpstreamTlsContext& config,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
+  explicit ClientContextConfigImpl(
+      const Json::Object& config,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
 
   // Ssl::ClientContextConfig
   const std::string& serverNameIndication() const override { return server_name_indication_; }
@@ -75,10 +96,12 @@ private:
 
 class ServerContextConfigImpl : public ContextConfigImpl, public ServerContextConfig {
 public:
-  explicit ServerContextConfigImpl(const envoy::api::v2::auth::DownstreamTlsContext& config,
-                                   Secret::SecretManager& secret_manager);
-  explicit ServerContextConfigImpl(const Json::Object& config,
-                                   Secret::SecretManager& secret_manager);
+  explicit ServerContextConfigImpl(
+      const envoy::api::v2::auth::DownstreamTlsContext& config,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
+  explicit ServerContextConfigImpl(
+      const Json::Object& config,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context);
 
   // Ssl::ServerContextConfig
   bool requireClientCertificate() const override { return require_client_certificate_; }

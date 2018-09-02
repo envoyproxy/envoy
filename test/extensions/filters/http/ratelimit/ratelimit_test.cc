@@ -305,6 +305,39 @@ TEST_F(HttpRateLimitFilterTest, ImmediateOkResponse) {
             cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.ok").value());
 }
 
+TEST_F(HttpRateLimitFilterTest, ImmediateErrorResponse) {
+  SetUpTest(filter_config_);
+  InSequence s;
+
+  EXPECT_CALL(vh_rate_limit_, populateDescriptors(_, _, _, _, _))
+      .WillOnce(SetArgReferee<1>(descriptor_));
+
+  EXPECT_CALL(*client_, limit(_, "foo",
+                              testing::ContainerEq(std::vector<RateLimit::Descriptor>{
+                                  {{{"descriptor_key", "descriptor_value"}}}}),
+                              _))
+      .WillOnce(WithArgs<0>(Invoke([&](RateLimit::RequestCallbacks& callbacks) -> void {
+        callbacks.complete(RateLimit::LimitStatus::Error, nullptr);
+      })));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(request_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            filter_->encode100ContinueHeaders(response_headers_));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers_, false));
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(response_data_, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->encodeTrailers(response_headers_));
+
+  EXPECT_EQ(
+      1U,
+      cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("ratelimit.error").value());
+  EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
+                    .counter("ratelimit.failure_mode_allowed")
+                    .value());
+}
+
 TEST_F(HttpRateLimitFilterTest, ErrorResponse) {
   SetUpTest(filter_config_);
   InSequence s;

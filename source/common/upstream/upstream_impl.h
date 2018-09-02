@@ -40,6 +40,8 @@
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
+#include "server/init_manager_impl.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -518,12 +520,21 @@ protected:
   virtual void startPreInit() PURE;
 
   /**
-   * Called by every concrete cluster when pre-init is complete. At this point, shared init takes
-   * over and determines if there is an initial health check pass needed, etc.
+   * Called by every concrete cluster when pre-init is complete. At this point,
+   * shared init starts init_manager_ initialization and determines if there
+   * is an initial health check pass needed, etc.
    */
   void onPreInitComplete();
 
+  /**
+   * Called by every concrete cluster after all targets registered at init manager are
+   * initialized. At this point, shared init takes over and determines if there is an initial health
+   * check pass needed, etc.
+   */
+  void onInitDone();
+
   Runtime::Loader& runtime_;
+  Server::InitManagerImpl init_manager_;
   ClusterInfoConstSharedPtr info_; // This cluster info stores the stats scope so it must be
                                    // initialized first and destroyed last.
   HealthCheckerSharedPtr health_checker_;
