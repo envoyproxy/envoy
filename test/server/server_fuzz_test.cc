@@ -74,15 +74,21 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
     options.log_level_ = Fuzz::Runner::logLevel();
   }
 
+  std::unique_ptr<InstanceImpl> server;
   try {
-    auto server = std::make_unique<InstanceImpl>(
+    server = std::make_unique<InstanceImpl>(
         options, test_time.timeSource(),
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"), hooks, restart, stats_store,
         fakelock, component_factory, std::make_unique<Runtime::RandomGeneratorImpl>(),
         thread_local_instance);
   } catch (const EnvoyException& ex) {
     ENVOY_LOG_MISC(debug, "Controlled EnvoyException exit: {}", ex.what());
+    return;
   }
+  // If we were successful, run any pending events on the main thread's dispatcher loop. These might
+  // be, for example, pending DNS resolution callbacks. If they generate exceptions, we want to
+  // explode and fail the test, hence we do this outside of the try-catch above.
+  server->dispatcher().run(Event::Dispatcher::RunType::NonBlock);
 }
 
 } // namespace Server

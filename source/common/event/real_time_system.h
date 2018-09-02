@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Event {
 
 /**
- * Real-time implementation of TimeSystem.
+ * Real-world time implementation of TimeSystem.
  */
 class RealTimeSystem : public TimeSystem {
 public:

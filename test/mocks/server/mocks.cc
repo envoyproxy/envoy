@@ -168,7 +168,9 @@ MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::Man
 
 MockFactoryContext::~MockFactoryContext() {}
 
-MockTransportSocketFactoryContext::MockTransportSocketFactoryContext() {}
+MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
+    : secret_manager_(new Secret::SecretManagerImpl()) {}
+
 MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() {}
 
 MockListenerFactoryContext::MockListenerFactoryContext() {}

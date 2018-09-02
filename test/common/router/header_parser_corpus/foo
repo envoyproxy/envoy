@@ -1,0 +1,16 @@
+headers_to_add {
+  header {
+    key: "foo"
+    value: "%START_TIME(%0\240&&&&&&&&zzzzzzzzzzzzzamA(24d\240\240\240\240\240\240\240\240Q240\240\240\240\240\020\240^240&&7&&&&&&&&&&\006&val\177\377\376&&aenam\001s %1f,  %85/5_inf %8,,,,,,,,,,,,t_timefo 5#5555#555.5,  %85/5_inf %8,,,,,,,,,,,,t_t  %85555555\2005  %85/5555Fme:\t15227 f-5555_inf 965L5$59f)%"
+  }
+}
+headers_to_remove: "7"
+request_info {
+  upstream_metadata {
+    filter_metadata {
+      key: ""
+      value {
+      }
+    }
+  }
+}

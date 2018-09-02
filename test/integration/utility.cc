@@ -122,7 +122,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
 
 RawConnectionDriver::~RawConnectionDriver() {}
 
-void RawConnectionDriver::run() { dispatcher_->run(Event::Dispatcher::RunType::Block); }
+void RawConnectionDriver::run(Event::Dispatcher::RunType run_type) { dispatcher_->run(run_type); }
 
 void RawConnectionDriver::close() { client_->close(Network::ConnectionCloseType::FlushWrite); }
 

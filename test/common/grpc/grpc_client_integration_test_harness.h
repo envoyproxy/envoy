@@ -13,7 +13,7 @@
 #include "test/integration/fake_upstream.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/secret/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
@@ -464,7 +464,7 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     }
-    auto cfg = std::make_unique<Ssl::ClientContextConfigImpl>(tls_context, secret_manager_);
+    auto cfg = std::make_unique<Ssl::ClientContextConfigImpl>(tls_context, factory_context_);
 
     mock_cluster_info_->transport_socket_factory_ = std::make_unique<Ssl::ClientSslSocketFactory>(
         std::move(cfg), context_manager_, *stats_store_);
@@ -494,7 +494,7 @@ public:
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     }
 
-    auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, secret_manager_);
+    auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, factory_context_);
 
     static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return std::make_unique<Ssl::ServerSslSocketFactory>(
@@ -502,7 +502,7 @@ public:
   }
 
   bool use_client_cert_{};
-  NiceMock<Secret::MockSecretManager> secret_manager_;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 
 } // namespace

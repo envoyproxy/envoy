@@ -80,7 +80,6 @@ IntegrationCodecClient::IntegrationCodecClient(
   connection_->addConnectionCallbacks(callbacks_);
   setCodecConnectionCallbacks(codec_callbacks_);
   dispatcher.run(Event::Dispatcher::RunType::Block);
-  EXPECT_TRUE(connected_);
 }
 
 void IntegrationCodecClient::flushWrite() {
@@ -170,13 +169,20 @@ IntegrationCodecClientPtr HttpIntegrationTest::makeHttpConnection(uint32_t port)
 }
 
 IntegrationCodecClientPtr
-HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
+HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) {
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   cluster->http2_settings_.allow_connect_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
   return IntegrationCodecClientPtr{new IntegrationCodecClient(
       *dispatcher_, std::move(conn), host_description, downstream_protocol_)};
+}
+
+IntegrationCodecClientPtr
+HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
+  auto codec = makeRawHttpConnection(std::move(conn));
+  EXPECT_TRUE(codec->connected());
+  return codec;
 }
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,

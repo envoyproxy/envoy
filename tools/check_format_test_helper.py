@@ -143,7 +143,8 @@ if __name__ == "__main__":
                                     "Don't use <mutex> or <condition_variable*>")
   errors += fixFileExpectingFailure("condition_variable_any.cc",
                                     "Don't use <mutex> or <condition_variable*>")
-  real_time_inject_error = "Don't reference real-time sources from production code; use injection"
+  real_time_inject_error = (
+      "Don't reference real-world time sources from production code; use injection")
   errors += fixFileExpectingFailure("real_time_source.cc", real_time_inject_error)
   errors += fixFileExpectingFailure("real_time_system.cc", real_time_inject_error)
 
