@@ -38,10 +38,12 @@ envoy_cc_library(
     srcs = [
         "event_impl_base.cc",
         "real_time_system.cc",
+        "timer_impl.cc",
     ],
     hdrs = [
         "event_impl_base.h",
         "real_time_system.h",
+        "timer_impl.h",
     ],
     deps = [
         ":libevent_lib",
