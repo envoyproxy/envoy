@@ -1,8 +1,10 @@
 #include <chrono>
 
 #include "common/common/assert.h"
+#include "common/common/lock_guard.h"
 #include "common/event/event_impl_base.h"
 #include "common/event/real_time_system.h"
+#include "common/event/timer_impl.h"
 
 #include "event2/event.h"
 
@@ -15,7 +17,7 @@ class SimulatedTimerFactory;
 /**
  * An Alarm is created in the context of a thread's dispatcher.
  */
-class Alarm : public Timer {
+class Alarm : public TimerImpl {
 public:
   Alarm(SimulatedTimerFactory& time_factory, TimerCb cb, uint64_t index)
       : time_factory_(time_factory), cb_(cb), time_(0), index_(0) {
@@ -63,7 +65,10 @@ struct CompareAlarms {
 // Each scheduler maintains its own timer
 class SimulatedScheduler : public Scheduler {
 public:
-  SimulatedScheduler(Libevent::BasePtr& libevent) : libevent_(libevent) {}
+  SimulatedScheduler(Libevent::BasePtr& libevent, SimulaedTimeSystem& time_system)
+      : libevent_(libevent),
+        time_system_(time_system) {}
+  ~SimulatedScheduler() { time_system_.removeScheduler(this); }
   TimerPtr createTimer(const TimerCb& cb) override {
     return std::make_unique<TimerImpl>(libevent_, cb);
   };
@@ -75,6 +80,8 @@ public:
 private:
   typedef std::set<Alarm*, CompareAlarms> AlarmSet;
   AlarmSet alarms_;
+  Libevent::BasePtr& libevent_;
+  SimulatedTimeSystem* time_system_;
 };
 
 void Alarm::disableTimer() {
@@ -99,11 +106,32 @@ SimulatedTimeSystem::SimulatedTimeSystem()
     : monotonic_time_(real_time_source_.monotonicTime()),
       system_time_(real_time_source_.systemTime()) {}
 
-TimerFactoryPtr SimulatedTimeSystem::createTimerFactory(Libevent::BasePtr& libevent) {
-  return std::make_unique<SimulatedTimerFactory>(libevent);
+SystemTime SimulatedTimeSystem::systemTime() {
+  Thread::LockGuard lock(mutex_);
+  return system_time_;
 }
 
-void SimulatedTimeSystem::sleep(std::chrono::duration duration) {}
+MonotonicTime SimulatedTimeSystem::monotonicTime() {
+  Thread::LockGuard lock(mutex_);
+  return monotonic_time_;
+}
+
+TimerFactoryPtr SimulatedTimeSystem::createScheduler(Libevent::BasePtr& libevent) {
+  auto scheduler = std::make_unique<SimulatedScheduler>(libevent, *this);
+  {
+    Thread::LockGuard lock(mutex_);
+    schedulers_.insert(scheduler.get());
+  }
+  return std::move(scheduler);
+}
+
+void SimulatedTimeSystem::removeScheduler(SimulatedScheduler* scheduler) {
+  Thread::LockGuard lock(mutex_);
+  schedulers_.erase(scheduler);
+}
+
+void SimulatedTimeSystem::sleep(std::chrono::duration duration) {
+}
 
 } // namespace Event
 } // namespace Envoy

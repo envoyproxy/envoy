@@ -3,6 +3,7 @@
 #include "envoy/event/timer.h"
 
 #include "common/common/utility.h"
+#include "common/common/thread.h"
 
 namespace Envoy {
 namespace Event {
@@ -21,9 +22,15 @@ public:
   void sleep(std::chrono::duration);
 
 private:
-  RealTimeSource real_time_source_;
-  MonotonicTime monotonic_time_;
-  SystemTime system_time_;
+  friend class SimulatedScheduler;
+
+  void removeScheduler(SimulatedScheduler*);
+
+  RealTimeSource real_time_source_ GUARDED_BY(mutex_);
+  MonotonicTime monotonic_time_ GUARDED_BY(mutex_);
+  SystemTime system_time_ GUARDED_BY(mutex_);;
+  std:::unordered_set<SimulatedScheduler*> schedulers_ GUARDED_BY(mutex_);
+  Thread::MutexBasicLockable mutex_;
 };
 
 } // namespace Event
