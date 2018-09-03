@@ -12,13 +12,15 @@ namespace Grpc {
 class AsyncClientFactoryImpl : public AsyncClientFactory {
 public:
   AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
-                         const envoy::api::v2::core::GrpcService& config, bool skip_cluster_check);
+                         const envoy::api::v2::core::GrpcService& config, bool skip_cluster_check,
+                         TimeSource& time_source);
 
   AsyncClientPtr create() override;
 
 private:
   Upstream::ClusterManager& cm_;
   const envoy::api::v2::core::GrpcService config_;
+  TimeSource& time_source_;
 };
 
 class GoogleAsyncClientFactoryImpl : public AsyncClientFactory {
@@ -38,7 +40,8 @@ private:
 
 class AsyncClientManagerImpl : public AsyncClientManager {
 public:
-  AsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls);
+  AsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls,
+                         TimeSource& time_source);
 
   // Grpc::AsyncClientManager
   AsyncClientFactoryPtr factoryForGrpcService(const envoy::api::v2::core::GrpcService& config,
@@ -49,6 +52,7 @@ private:
   Upstream::ClusterManager& cm_;
   ThreadLocal::Instance& tls_;
   ThreadLocal::SlotPtr google_tls_slot_;
+  TimeSource& time_source_;
 };
 
 } // namespace Grpc

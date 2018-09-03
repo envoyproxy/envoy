@@ -54,6 +54,17 @@ private:
     createConnection(Event::Dispatcher& dispatcher,
                      const Network::ConnectionSocket::OptionsSharedPtr& options) const override;
 
+    // Upstream::HostDescription
+    // Override setting health check address, since for logical DNS the registered host has 0.0.0.0
+    // as its address (see mattklein123's comment in logical_dns_cluster.cc why this is),
+    // while the health check address needs the resolved address to do the health checking, so we
+    // set it here.
+    void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr address) override {
+      const auto& port_value = parent_.lbEndpoint().endpoint().health_check_config().port_value();
+      health_check_address_ =
+          port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);
+    }
+
     LogicalDnsCluster& parent_;
   };
 
@@ -95,6 +106,8 @@ private:
     Network::Address::InstanceConstSharedPtr healthCheckAddress() const override {
       return health_check_address_;
     }
+    // Setting health check address is usually done at initialization. This is NOP by default.
+    void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr) override {}
     uint32_t priority() const { return locality_lb_endpoint_.priority(); }
     Network::Address::InstanceConstSharedPtr address_;
     HostConstSharedPtr logical_host_;

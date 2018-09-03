@@ -17,7 +17,6 @@
 #include "common/http/codes.h"
 #include "common/http/exception.h"
 #include "common/http/headers.h"
-#include "common/http/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -90,7 +89,15 @@ void ConnectionImpl::StreamImpl::encode100ContinueHeaders(const HeaderMap& heade
 
 void ConnectionImpl::StreamImpl::encodeHeaders(const HeaderMap& headers, bool end_stream) {
   std::vector<nghttp2_nv> final_headers;
-  buildHeaders(final_headers, headers);
+
+  Http::HeaderMapPtr modified_headers;
+  if (Http::Utility::isUpgrade(headers)) {
+    modified_headers = std::make_unique<Http::HeaderMapImpl>(headers);
+    transformUpgradeFromH1toH2(*modified_headers);
+    buildHeaders(final_headers, *modified_headers);
+  } else {
+    buildHeaders(final_headers, headers);
+  }
 
   nghttp2_data_provider provider;
   if (!end_stream) {
@@ -149,6 +156,11 @@ void ConnectionImpl::StreamImpl::pendingRecvBufferLowWatermark() {
   ASSERT(pending_receive_buffer_high_watermark_called_);
   pending_receive_buffer_high_watermark_called_ = false;
   readDisable(false);
+}
+
+void ConnectionImpl::StreamImpl::decodeHeaders() {
+  maybeTransformUpgradeFromH2ToH1();
+  decoder_->decodeHeaders(std::move(headers_), remote_end_stream_);
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark() {
@@ -366,13 +378,13 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
         ASSERT(!stream->remote_end_stream_);
         stream->decoder_->decode100ContinueHeaders(std::move(stream->headers_));
       } else {
-        stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
+        stream->decodeHeaders();
       }
       break;
     }
 
     case NGHTTP2_HCAT_REQUEST: {
-      stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
+      stream->decodeHeaders();
       break;
     }
 
@@ -401,7 +413,7 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
           // start out with. In this case, raise as headers. nghttp2 message checking guarantees
           // proper flow here.
           ASSERT(!stream->headers_->Status() || stream->headers_->Status()->value() != "100");
-          stream->decoder_->decodeHeaders(std::move(stream->headers_), stream->remote_end_stream_);
+          stream->decodeHeaders();
         }
       }
 
@@ -733,6 +745,10 @@ ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings) 
 
   if (http2_settings.hpack_table_size_ != NGHTTP2_DEFAULT_HEADER_TABLE_SIZE) {
     nghttp2_option_set_max_deflate_dynamic_table_size(options_, http2_settings.hpack_table_size_);
+  }
+  if (http2_settings.allow_connect_) {
+    // TODO(alyssawilk) change to ENABLE_CONNECT_PROTOCOL when it's available.
+    nghttp2_option_set_no_http_messaging(options_, 1);
   }
 }
 

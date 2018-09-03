@@ -11,9 +11,6 @@
 #include "common/singleton/const_singleton.h"
 
 #include "extensions/filters/network/thrift_proxy/metadata.h"
-#include "extensions/filters/network/thrift_proxy/protocol.h"
-
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {

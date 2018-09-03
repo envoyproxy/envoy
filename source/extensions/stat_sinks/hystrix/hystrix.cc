@@ -9,9 +9,12 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
+#include "common/config/well_known_names.h"
 #include "common/http/headers.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
+#include "fmt/printf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,7 +22,6 @@ namespace StatSinks {
 namespace Hystrix {
 
 const uint64_t HystrixSink::DEFAULT_NUM_BUCKETS;
-
 ClusterStatsCache::ClusterStatsCache(const std::string& cluster_name)
     : cluster_name_(cluster_name) {}
 
@@ -41,6 +43,19 @@ void ClusterStatsCache::printRollingWindow(absl::string_view name, RollingWindow
     out_str << *specific_stat_vec_itr << " | ";
   }
   out_str << std::endl;
+}
+
+void HystrixSink::addHistogramToStream(const QuantileLatencyMap& latency_map, absl::string_view key,
+                                       std::stringstream& ss) {
+  // TODO: Consider if we better use join here
+  ss << ", \"" << key << "\": {";
+  bool is_first = true;
+  for (const std::pair<double, double>& element : latency_map) {
+    const std::string quantile = fmt::sprintf("%g", element.first * 100);
+    HystrixSink::addDoubleToStream(quantile, element.second, ss, is_first);
+    is_first = false;
+  }
+  ss << "}";
 }
 
 // Add new value to rolling window, in place of oldest one.
@@ -118,6 +133,11 @@ void HystrixSink::addIntToStream(absl::string_view key, uint64_t value, std::str
   addInfoToStream(key, std::to_string(value), info, is_first);
 }
 
+void HystrixSink::addDoubleToStream(absl::string_view key, double value, std::stringstream& info,
+                                    bool is_first) {
+  addInfoToStream(key, std::to_string(value), info, is_first);
+}
+
 void HystrixSink::addInfoToStream(absl::string_view key, absl::string_view value,
                                   std::stringstream& info, bool is_first) {
   if (!is_first) {
@@ -131,7 +151,7 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
                                     absl::string_view cluster_name,
                                     uint64_t max_concurrent_requests, uint64_t reporting_hosts,
                                     std::chrono::milliseconds rolling_window_ms,
-                                    std::stringstream& ss) {
+                                    const QuantileLatencyMap& histogram, std::stringstream& ss) {
 
   std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
@@ -161,7 +181,7 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
   addIntToStream("rollingCountResponsesFromCache", 0, ss);
 
   // Envoy's "circuit breaker" has similar meaning to hystrix's isolation
-  // so we count upstream_rq_pending_overflow and present it as ss
+  // so we count upstream_rq_pending_overflow and present it as rollingCountSemaphoreRejected
   addIntToStream("rollingCountSemaphoreRejected", rejected, ss);
 
   // Hystrix's short circuit is not similar to Envoy's since it is triggered by 503 responses
@@ -173,12 +193,8 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
   addIntToStream("rollingCountTimeout", timeouts, ss);
   addIntToStream("rollingCountBadRequests", 0, ss);
   addIntToStream("currentConcurrentExecutionCount", 0, ss);
-  addIntToStream("latencyExecute_mean", 0, ss);
-
-  // TODO trabetti : add histogram information once available by PR #2932
-  addInfoToStream(
-      "latencyExecute",
-      "{\"0\":0,\"25\":0,\"50\":0,\"75\":0,\"90\":0,\"95\":0,\"99\":0,\"99.5\":0,\"100\":0}", ss);
+  addStringToStream("latencyExecute_mean", "null", ss);
+  addHistogramToStream(histogram, "latencyExecute", ss);
   addIntToStream("propertyValue_circuitBreakerRequestVolumeThreshold", 0, ss);
   addIntToStream("propertyValue_circuitBreakerSleepWindowInMilliseconds", 0, ss);
   addIntToStream("propertyValue_circuitBreakerErrorThresholdPercentage", 0, ss);
@@ -230,10 +246,11 @@ void HystrixSink::addClusterStatsToStream(ClusterStatsCache& cluster_stats_cache
                                           uint64_t max_concurrent_requests,
                                           uint64_t reporting_hosts,
                                           std::chrono::milliseconds rolling_window_ms,
+                                          const QuantileLatencyMap& histogram,
                                           std::stringstream& ss) {
 
   addHystrixCommand(cluster_stats_cache, cluster_name, max_concurrent_requests, reporting_hosts,
-                    rolling_window_ms, ss);
+                    rolling_window_ms, histogram, ss);
   addHystrixThreadPool(cluster_name, max_concurrent_requests, reporting_hosts, rolling_window_ms,
                        ss);
 }
@@ -299,13 +316,46 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
   return Http::Code::OK;
 }
 
-void HystrixSink::flush(Stats::Source&) {
+void HystrixSink::flush(Stats::Source& source) {
   if (callbacks_list_.empty()) {
     return;
   }
   incCounter();
   std::stringstream ss;
   Upstream::ClusterManager::ClusterInfoMap clusters = server_.clusterManager().clusters();
+
+  // Save a map of the relevant histograms per cluster in a convenient format.
+  std::unordered_map<std::string, QuantileLatencyMap> time_histograms;
+  for (const Stats::ParentHistogramSharedPtr& histogram : source.cachedHistograms()) {
+    if (histogram->tagExtractedName() == "cluster.upstream_rq_time") {
+      // TODO(mrice32): add an Envoy utility function to look up and return a tag for a metric.
+      auto it = std::find_if(histogram->tags().begin(), histogram->tags().end(),
+                             [](const Stats::Tag& tag) {
+                               return (tag.name_ == Config::TagNames::get().CLUSTER_NAME);
+                             });
+
+      // Make sure we found the cluster name tag
+      ASSERT(it != histogram->tags().end());
+      auto it_bool_pair = time_histograms.emplace(std::make_pair(it->value_, QuantileLatencyMap()));
+      // Make sure histogram with this name was not already added
+      ASSERT(it_bool_pair.second);
+      QuantileLatencyMap& hist_map = it_bool_pair.first->second;
+
+      const std::vector<double>& supported_quantiles =
+          histogram->intervalStatistics().supportedQuantiles();
+      for (size_t i = 0; i < supported_quantiles.size(); ++i) {
+        // binary-search here is likely not worth it, as hystrix_quantiles has <10 elements.
+        if (std::find(hystrix_quantiles.begin(), hystrix_quantiles.end(), supported_quantiles[i]) !=
+            hystrix_quantiles.end()) {
+          const double value = histogram->intervalStatistics().computedQuantiles()[i];
+          if (!std::isnan(value)) {
+            hist_map[supported_quantiles[i]] = value;
+          }
+        }
+      }
+    }
+  }
+
   for (auto& cluster : clusters) {
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.second.get().info();
 
@@ -323,7 +373,7 @@ void HystrixSink::flush(Stats::Source&) {
         *cluster_stats_cache_ptr, cluster_info->name(),
         cluster_info->resourceManager(Upstream::ResourcePriority::Default).pendingRequests().max(),
         cluster_info->statsScope().gauge("membership_total").value(), server_.statsFlushInterval(),
-        ss);
+        time_histograms[cluster_info->name()], ss);
   }
 
   Buffer::OwnedImpl data;

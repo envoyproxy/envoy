@@ -131,9 +131,16 @@ public:
   virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
 
   /**
-   * @return SystemTimeSource& a reference to the top-level SystemTime source.
+   * @return SystemTimeSource& a reference to the system time source.
+   * TODO(#4160): This method should be eliminated, and call-sites and mocks should
+   * be converted to work with timeSource() below.
    */
   virtual SystemTimeSource& systemTimeSource() PURE;
+
+  /**
+   * @return TimeSource& a reference to the time source.
+   */
+  virtual TimeSource& timeSource() PURE;
 };
 
 class ListenerFactoryContext : public FactoryContext {

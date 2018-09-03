@@ -1,4 +1,4 @@
-#include "fake_upstream.h"
+#include "test/integration/fake_upstream.h"
 
 #include <chrono>
 #include <cstdint>
@@ -19,6 +19,7 @@
 
 #include "server/connection_handler_impl.h"
 
+#include "test/integration/utility.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
@@ -203,8 +204,10 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
     codec_.reset(new Http::Http1::ServerConnectionImpl(shared_connection_.connection(), *this,
                                                        Http::Http1Settings()));
   } else {
+    auto settings = Http::Http2Settings();
+    settings.allow_connect_ = true;
     codec_.reset(new Http::Http2::ServerConnectionImpl(shared_connection_.connection(), *this,
-                                                       store, Http::Http2Settings()));
+                                                       store, settings));
     ASSERT(type == Type::HTTP2);
   }
 
@@ -356,7 +359,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
                            Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type,
                            bool enable_half_close)
     : http_type_(type), socket_(std::move(listen_socket)), api_(new Api::Impl(milliseconds(10000))),
-      dispatcher_(api_->allocateDispatcher()),
+      dispatcher_(api_->allocateDispatcher(test_time_.timeSource())),
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close), listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
