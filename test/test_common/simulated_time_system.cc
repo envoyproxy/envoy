@@ -11,8 +11,9 @@ namespace Event {
 namespace {
 
 class SimulatedTimerFactory;
+
 /**
- * libevent implementation of Timer.
+ * An Alarm is created in the context of a thread's dispatcher.
  */
 class Alarm : public Timer {
 public:
@@ -59,9 +60,10 @@ struct CompareAlarms {
   bool operator()(const Alarm* a, const Alarm* b) const { return a->Compare(b) < 0; }
 };
 
-class SimulatedTimerFactory : public TimerFactory {
+// Each scheduler maintains its own timer
+class SimulatedScheduler : public Scheduler {
 public:
-  SimulatedTimerFactory(Libevent::BasePtr& libevent) : libevent_(libevent) {}
+  SimulatedScheduler(Libevent::BasePtr& libevent) : libevent_(libevent) {}
   TimerPtr createTimer(const TimerCb& cb) override {
     return std::make_unique<TimerImpl>(libevent_, cb);
   };

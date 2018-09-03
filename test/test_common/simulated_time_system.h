@@ -10,7 +10,7 @@ namespace Event {
 class SimulatedTimeSystem : public TimeSystem {
 public:
   // TimeSystem
-  TimerFactoryPtr createTimerFactory(Libevent::BasePtr&) override;
+  TimerFactoryPtr createScheduler(Libevent::BasePtr&) override;
 
   // TimeSource
   SystemTime systemTime() override { return system_time_; }
