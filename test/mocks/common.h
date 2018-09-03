@@ -55,8 +55,9 @@ public:
   // where timer callbacks are triggered by the advancement of time. This implementation
   // matches recent behavior, where real-time timers were created directly in libevent
   // by dispatcher_impl.cc.
-  Event::SchedulerPtr createScheduler(Event::Libevent::BasePtr& base) override {
-    return real_time_system_.createScheduler(base);
+  Event::SchedulerPtr createScheduler(
+      Event::Libevent::BasePtr& base, Event::Dispatcher& dispatcher) override {
+    return real_time_system_.createScheduler(base, dispatcher);
   }
   MOCK_METHOD0(systemTime, SystemTime());
   MOCK_METHOD0(monotonicTime, MonotonicTime());
