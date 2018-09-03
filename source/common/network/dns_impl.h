@@ -37,6 +37,8 @@ public:
 
 private:
   friend class DnsResolverImplPeer;
+  // This object is self-owned, resource reclamation occurs via self-deleting on
+  // query completion or error.
   struct PendingResolution : public ActiveDnsQuery {
     // Network::ActiveDnsQuery
     PendingResolution(ResolveCb callback, Event::Dispatcher& dispatcher, ares_channel channel,
@@ -66,11 +68,6 @@ private:
     const ResolveCb callback_;
     // Dispatcher to post callback_ to.
     Event::Dispatcher& dispatcher_;
-    // Does the object own itself? Resource reclamation occurs via self-deleting
-    // on query completion or error.
-    bool owned_ = false;
-    // Has the query completed? Only meaningful if !owned_;
-    bool completed_ = false;
     // Was the query cancelled via cancel()?
     bool cancelled_ = false;
     // If dns_lookup_family is "fallback", fallback to v4 address if v6

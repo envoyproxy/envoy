@@ -487,7 +487,7 @@ TEST_P(DnsImplTest, LocalLookup) {
 
   if (GetParam() == Address::IpVersion::v4) {
     // EXPECT_CALL(dispatcher_, post(_));
-    EXPECT_EQ(nullptr, resolver_->resolve(
+    EXPECT_NE(nullptr, resolver_->resolve(
                            "localhost", DnsLookupFamily::V4Only,
                            [&](const std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                              address_list = results;
@@ -501,7 +501,7 @@ TEST_P(DnsImplTest, LocalLookup) {
     const std::string error_msg =
         "Synchronous DNS IPv6 localhost resolution failed. Please verify localhost resolves to ::1 "
         "in /etc/hosts, since this misconfiguration is a common cause of these failures.";
-    EXPECT_EQ(nullptr, resolver_->resolve(
+    EXPECT_NE(nullptr, resolver_->resolve(
                            "localhost", DnsLookupFamily::V6Only,
                            [&](const std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                              address_list = results;
@@ -511,7 +511,7 @@ TEST_P(DnsImplTest, LocalLookup) {
     EXPECT_TRUE(hasAddress(address_list, "::1")) << error_msg;
     EXPECT_FALSE(hasAddress(address_list, "127.0.0.1"));
 
-    EXPECT_EQ(nullptr, resolver_->resolve(
+    EXPECT_NE(nullptr, resolver_->resolve(
                            "localhost", DnsLookupFamily::Auto,
                            [&](const std::list<Address::InstanceConstSharedPtr>&& results) -> void {
                              address_list = results;
@@ -726,6 +726,18 @@ TEST_P(DnsImplTest, Cancel) {
 
   dispatcher_.run(Event::Dispatcher::RunType::Block);
   EXPECT_TRUE(hasAddress(address_list, "201.134.56.7"));
+}
+
+// Validate working of cancellation provided by ActiveDnsQuery return when
+// resolution is synchronous.
+TEST_P(DnsImplTest, CancelImmediate) {
+  ActiveDnsQuery* query = resolver_->resolve(
+      "127.0.0.1", DnsLookupFamily::Auto,
+      [](const std::list<Address::InstanceConstSharedPtr> &&) -> void { FAIL(); });
+  ASSERT_NE(nullptr, query);
+  query->cancel();
+
+  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
 }
 
 class DnsImplZeroTimeoutTest : public DnsImplTest {
