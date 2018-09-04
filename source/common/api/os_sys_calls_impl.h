@@ -28,7 +28,6 @@ public:
                               socklen_t optlen) override;
   SysCallIntResult getsockopt(int sockfd, int level, int optname, void* optval,
                               socklen_t* optlen) override;
-  SysCallIntResult getsockname(int sockfd, sockaddr* addr, socklen_t* addrlen) override;
   SysCallIntResult socket(int domain, int type, int protocol) override;
 };
 

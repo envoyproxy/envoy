@@ -16,7 +16,6 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
-#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
@@ -73,9 +72,8 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 
   sockaddr addr;
   socklen_t len = sizeof(addr);
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallIntResult result = os_syscalls.getsockname(fd(), &addr, &len);
-  RELEASE_ASSERT(result.rc_ == 0, "");
+  int rc = getsockname(fd(), &addr, &len);
+  RELEASE_ASSERT(rc == 0, "");
   is_uds_ = addr.sa_family == AF_UNIX;
 }
 
@@ -177,18 +175,16 @@ void ConnectionImpl::noDelay(bool enable) {
 
   // Set NODELAY
   int new_value = enable;
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallIntResult result =
-      os_syscalls.setsockopt(fd(), IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
+  int rc = setsockopt(fd(), IPPROTO_TCP, TCP_NODELAY, &new_value, sizeof(new_value));
 #ifdef __APPLE__
-  if (-1 == result.rc_ && result.errno_ == EINVAL) {
+  if (-1 == rc && errno == EINVAL) {
     // Sometimes occurs when the connection is not yet fully formed. Empirically, TCP_NODELAY is
     // enabled despite this result.
     return;
   }
 #endif
 
-  RELEASE_ASSERT(0 == result.rc_, "");
+  RELEASE_ASSERT(0 == rc, "");
 }
 
 uint64_t ConnectionImpl::id() const { return id_; }
@@ -261,7 +257,7 @@ void ConnectionImpl::readDisable(bool disable) {
 #ifdef __APPLE__
       // libevent only supports detecting early close with epoll, so we leave read events enabled
       // and check the connection state on read, tracking real read events in
-      // disabled_read_pending_.
+      // pending_read_event_.
       file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Read);
 #else
       file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
@@ -281,10 +277,10 @@ void ConnectionImpl::readDisable(bool disable) {
     file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
 
 #ifdef __APPLE__
-    if (disabled_read_pending_) {
+    if (pending_read_event_) {
       // An actual read event occurred while reads were disabled (see above).
       ENVOY_CONN_LOG(trace, "readDisable trigger pending read", *this);
-      disabled_read_pending_ = false;
+      pending_read_event_ = false;
       file_event_->activate(Event::FileReadyType::Read);
       return;
     }
@@ -441,7 +437,7 @@ void ConnectionImpl::onFileEvent(uint32_t events) {
       events |= Event::FileReadyType::Closed;
     } else {
       ENVOY_CONN_LOG(trace, "pending read in early close detection", *this);
-      disabled_read_pending_ = true;
+      pending_read_event_ = true;
     }
 
     // Reads are disabled, so never pass the read event along.
@@ -508,10 +504,8 @@ void ConnectionImpl::onWriteReady() {
   if (connecting_) {
     int error;
     socklen_t error_size = sizeof(error);
-    auto& os_syscalls = Api::OsSysCallsSingleton::get();
-    const Api::SysCallIntResult result =
-        os_syscalls.getsockopt(fd(), SOL_SOCKET, SO_ERROR, &error, &error_size);
-    ASSERT(0 == result.rc_);
+    int rc = getsockopt(fd(), SOL_SOCKET, SO_ERROR, &error, &error_size);
+    ASSERT(0 == rc);
 
     if (error == 0) {
       ENVOY_CONN_LOG(debug, "connected", *this);
@@ -588,26 +582,16 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 
 #ifdef __APPLE__
 bool ConnectionImpl::detectEarlyClose() {
-  auto& os_syscalls = Api::OsSysCallsSingleton::get();
-
   if (is_uds_) {
-    ENVOY_CONN_LOG(trace, "checking for UDS early close with read disabled", *this);
-
-    int bytes;
-    socklen_t bytes_size = sizeof(int);
-    const Api::SysCallIntResult result =
-        os_syscalls.getsockopt(fd(), SOL_SOCKET, SO_NREAD, &bytes, &bytes_size);
-    ASSERT(0 == result.rc_);
-
-    return bytes == 0;
+    // Early close detection doesn't work for UDS in any event.
+    return false;
   }
 
   ENVOY_CONN_LOG(trace, "checking for TCP early close with read disabled", *this);
   tcp_connection_info info;
   socklen_t info_size = sizeof(tcp_connection_info);
-  const Api::SysCallIntResult result =
-      os_syscalls.getsockopt(fd(), IPPROTO_TCP, TCP_CONNECTION_INFO, &info, &info_size);
-  ASSERT(0 == result.rc_);
+  int rc = getsockopt(fd(), IPPROTO_TCP, TCP_CONNECTION_INFO, &info, &info_size);
+  ASSERT(0 == rc);
 
   return info.tcpi_state == TCPS_CLOSED ||
          (info.tcpi_state >= TCPS_CLOSE_WAIT && info.tcpi_state <= TCPS_TIME_WAIT);

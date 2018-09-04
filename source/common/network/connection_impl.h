@@ -1,7 +1,5 @@
 #pragma once
 
-#include <netinet/tcp.h>
-
 #include <atomic>
 #include <cstdint>
 #include <list>
@@ -167,7 +165,7 @@ private:
   bool write_end_stream_{false};
   bool current_write_end_stream_{false};
 #ifdef __APPLE__
-  bool disabled_read_pending_{false};
+  bool pending_read_event_{false};
 #endif
   bool is_uds_{false};
   Buffer::Instance* current_write_buffer_{};

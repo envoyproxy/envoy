@@ -120,11 +120,6 @@ public:
                                       socklen_t* optlen) PURE;
 
   /**
-   * @see man 2 getsockname
-   */
-  virtual SysCallIntResult getsockname(int sockfd, sockaddr* addr, socklen_t* addrlen) PURE;
-
-  /**
    * @see man 2 socket
    */
   virtual SysCallIntResult socket(int domain, int type, int protocol) PURE;

@@ -86,11 +86,6 @@ SysCallIntResult OsSysCallsImpl::getsockopt(int sockfd, int level, int optname, 
   return {rc, errno};
 }
 
-SysCallIntResult OsSysCallsImpl::getsockname(int sockfd, sockaddr* addr, socklen_t* addrlen) {
-  const int rc = ::getsockname(sockfd, addr, addrlen);
-  return {rc, errno};
-}
-
 SysCallIntResult OsSysCallsImpl::socket(int domain, int type, int protocol) {
   const int rc = ::socket(domain, type, protocol);
   return {rc, errno};
