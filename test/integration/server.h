@@ -309,6 +309,7 @@ private:
   Stats::Store* stat_store_{};
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
+  Network::Address::InstanceConstSharedPtr admin_address_;
 };
 
 } // namespace Envoy
