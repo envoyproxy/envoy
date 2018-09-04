@@ -140,18 +140,11 @@ message Principal {
 
   // Authentication attributes for a downstream.
   message Authenticated {
-    // The name of the principal. If set, the URI SAN is used from the certificate, otherwise the
-    // subject field is used. If unset, it applies to any user that is authenticated.
-    //
-    // .. attention::
-    //
-    //   This field is deprecated. Use `principal_name` field instead. If both `name` and
-    //   `principal_name` is set, only the `principal_name` will have effect.
-    //
-    string name = 1 [deprecated = true];
+    reserved 1;
+    reserved "name";
 
-    // The name of the principal. The URI SAN is used from the certificate, otherwise the
-    // subject field is used. Set to regex value `.*` to match to any user that is authenticated.
+    // The name of the principal. If set, The URI SAN is used from the certificate, otherwise the
+    // subject field is used. If unset, it applies to any user that is authenticated.
     envoy.type.matcher.StringMatcher principal_name = 2;
   }
 

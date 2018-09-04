@@ -163,8 +163,7 @@ private:
 class AuthenticatedMatcher : public Matcher {
 public:
   AuthenticatedMatcher(const envoy::config::rbac::v2alpha::Principal_Authenticated& auth)
-      : name_(auth.name()),
-        matcher_(auth.has_principal_name()
+      : matcher_(auth.has_principal_name()
                      ? absl::make_optional<Matchers::StringMatcher>(auth.principal_name())
                      : absl::nullopt) {}
 
@@ -172,7 +171,6 @@ public:
                const envoy::api::v2::core::Metadata&) const override;
 
 private:
-  const std::string name_;
   const absl::optional<Matchers::StringMatcher> matcher_;
 };
 
