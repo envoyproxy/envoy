@@ -60,6 +60,35 @@ TcpListenSocket::TcpListenSocket(int fd, const Address::InstanceConstSharedPtr& 
   setListenSocketOptions(options);
 }
 
+UdpListenSocket::UdpListenSocket(const Address::InstanceConstSharedPtr& address,
+                                 const Network::Socket::OptionsSharedPtr& options,
+                                 bool bind_to_port)
+    : ListenSocketImpl(address->socket(Address::SocketType::Datagram), address) {
+  RELEASE_ASSERT(fd_ != -1, "");
+
+  // TODO(htuch): This might benefit from moving to SocketOptionImpl.
+  // TODO(cmluciano): Analyze special options to be enabled/disabled for UDP
+  int on = 1;
+  int rc = setsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+  RELEASE_ASSERT(rc != -1, "");
+  rc = setsockopt(fd_, SOL_SOCKET, SO_SNDBUF, &on, sizeof(on));
+  RELEASE_ASSERT(rc != -1, "");
+  rc = setsockopt(fd_, SOL_SOCKET, SO_RCVBUF, &on, sizeof(on));
+  RELEASE_ASSERT(rc != -1, "");
+
+  setListenSocketOptions(options);
+
+  if (bind_to_port) {
+    doBind();
+  }
+}
+
+UdpListenSocket::UdpListenSocket(int fd, const Address::InstanceConstSharedPtr& address,
+                                 const Network::Socket::OptionsSharedPtr& options)
+    : ListenSocketImpl(fd, address) {
+  setListenSocketOptions(options);
+}
+
 UdsListenSocket::UdsListenSocket(const Address::InstanceConstSharedPtr& address)
     : ListenSocketImpl(address->socket(Address::SocketType::Stream), address) {
   RELEASE_ASSERT(fd_ != -1, "");

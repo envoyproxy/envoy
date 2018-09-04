@@ -215,6 +215,7 @@ message SocketOption {
     STATE_BOUND = 1;
     // Socket options are applied after calling listen()
     STATE_LISTENING = 2;
+    STATE_UNCONN = 3;
   }
   // The state in which the option will be applied. When used in BindConfig
   // STATE_PREBIND is currently the only valid value.
