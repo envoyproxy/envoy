@@ -9,7 +9,7 @@ namespace Upstream {
 typedef std::vector<uint32_t> PriorityLoad;
 
 /**
- * Used to optionally modify the Prioirtyload when selecting a priority for
+ * Used to optionally modify the PriorityLoad when selecting a priority for
  * a retry attempt.
  *
  * Each RetryPriority will live throughout the lifetime of a request and updated
