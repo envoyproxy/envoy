@@ -29,13 +29,13 @@ public:
     return overrideConfig(config);
   }
 
-  void setupRequestTimeoutTest(const char* method = "GET") {
+  void setupRequestTimeoutTest() {
     initialize();
 
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
     auto encoder_decoder =
-        codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", method},
+        codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
                                                             {":path", "/test/long/url"},
                                                             {":scheme", "http"},
                                                             {":authority", "host"}});
@@ -163,6 +163,7 @@ TEST_P(BufferIntegrationTest, RequestPathTimesOutInBuffer) {
       *dispatcher_, fake_upstream_connection_, test_connection_initiation_timeout);
 
   EXPECT_FALSE(result);
+  EXPECT_STREQ("408", response_->headers().Status()->value().c_str());
   EXPECT_EQ(getBufferTimeoutCount(), 1);
 }
 
