@@ -14,11 +14,11 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "thrift-0.11.0",
     ),
     com_github_bombela_backward = dict(
-        commit = "44ae9609e860e3428cd057f7052e505b4819eb84",  # 2018-02-06
+        commit = "84ae4f5e80381aca765a0810d4c811acae3cd7c7",  # v1.4
         remote = "https://github.com/bombela/backward-cpp",
     ),
     com_github_circonus_labs_libcircllhist = dict(
-        commit = "050da53a44dede7bda136b93a9aeef47bd91fa12",  # 2018-07-02
+        commit = "243060f3489d07782674d28f1056caa5a4c51a56",  # 2018-08-27
         remote = "https://github.com/circonus-labs/libcircllhist",
     ),
     com_github_cyan4973_xxhash = dict(
@@ -44,11 +44,11 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/gcovr/gcovr",
     ),
     com_github_google_libprotobuf_mutator = dict(
-        commit = "c3d2faf04a1070b0b852b0efdef81e1a81ba925e",
+        commit = "f2eac713f65dc55d663426647a40aff72e68a430",  #2018-08-24
         remote = "https://github.com/google/libprotobuf-mutator",
     ),
     com_github_grpc_grpc = dict(
-        commit = "3eedb606a07738e5446ba852085f676b134ecca4",  # v1.14.0
+        commit = "d3e16042d57439bf554649d110dbc61efa1d5cf7",  # v1.14.2
         remote = "https://github.com/grpc/grpc.git",
     ),
     com_github_nanopb_nanopb = dict(
@@ -109,7 +109,7 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "twitter.common.finagle-thrift-0.3.9/src",
     ),
     com_google_googletest = dict(
-        commit = "3d5612182581df64acc12d2633e473decf5adc47",  # Aug 29, 2018
+        commit = "2fe3bd994b3189899d93f1d5a881e725e046fdc2",  # v1.8.1
         remote = "https://github.com/google/googletest",
     ),
     com_google_protobuf = dict(
@@ -125,7 +125,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
     ),
     io_bazel_rules_go = dict(
-        commit = "0.11.1",
+        commit = "0.11.2",
         remote = "https://github.com/bazelbuild/rules_go",
     ),
     six_archive = dict(
