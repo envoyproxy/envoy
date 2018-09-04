@@ -450,7 +450,7 @@ TEST_P(TcpProxyIntegrationTest, DISABLED_TestDownstreamDisconnectWithUpstreamCon
   test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 0);
 
   // This establishes the DELAY_CONNECT connection.
-  fake_upstream_connection->write("a", false);
+  ASSERT_TRUE(fake_upstream_connection->write("a", false));
 
   // The upstream connection was established after the downstream connection was closed,
   // so it stayed in the connpool and should be used for this 2nd downstream connection.
@@ -458,7 +458,7 @@ TEST_P(TcpProxyIntegrationTest, DISABLED_TestDownstreamDisconnectWithUpstreamCon
   tcp_client2->write("foo", true);
   ASSERT_TRUE(fake_upstream_connection->waitForData(3));
   ASSERT_TRUE(fake_upstream_connection->waitForHalfClose());
-  fake_upstream_connection->write("", true);
+  ASSERT_TRUE(fake_upstream_connection->write("", true));
   tcp_client2->waitForData("ab");
   tcp_client2->waitForDisconnect();
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
@@ -636,7 +636,7 @@ TEST_P(TcpProxySslIntegrationTest, FailTlsHandshake) {
   tcp_client->write(std::string(10000, 'a'), false);
 
   ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
-  fake_upstream_connection_->close();
+  ASSERT_TRUE(fake_upstream_connection_->close());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   tcp_client->close();
 }
