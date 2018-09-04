@@ -36,6 +36,7 @@ namespace Envoy {
 namespace Network {
 
 const std::string Utility::TCP_SCHEME = "tcp://";
+const std::string Utility::UDP_SCHEME = "udp://";
 const std::string Utility::UNIX_SCHEME = "unix://";
 
 Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
@@ -44,13 +45,15 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
   } else if (urlIsUnixScheme(url)) {
     return Address::InstanceConstSharedPtr{
         new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
+  } else if (urlIsUdpScheme(url)) {
+    return parseInternetAddressAndPort(url.substr(UDP_SCHEME.size()));
   } else {
     throw EnvoyException(fmt::format("unknown protocol scheme: {}", url));
   }
 }
 
 bool Utility::urlIsTcpScheme(const std::string& url) { return url.find(TCP_SCHEME) == 0; }
-
+bool Utility::urlIsUdpScheme(const std::string& url) { return url.find(UDP_SCHEME) == 0; }
 bool Utility::urlIsUnixScheme(const std::string& url) { return url.find(UNIX_SCHEME) == 0; }
 
 std::string Utility::hostFromTcpUrl(const std::string& url) {
@@ -73,6 +76,40 @@ uint32_t Utility::portFromTcpUrl(const std::string& url) {
   }
 
   size_t colon_index = url.find(':', TCP_SCHEME.size());
+
+  if (colon_index == std::string::npos) {
+    throw EnvoyException(fmt::format("malformed url: {}", url));
+  }
+
+  try {
+    return std::stoi(url.substr(colon_index + 1));
+  } catch (const std::invalid_argument& e) {
+    throw EnvoyException(e.what());
+  } catch (const std::out_of_range& e) {
+    throw EnvoyException(e.what());
+  }
+}
+
+std::string Utility::hostFromUdpUrl(const std::string& url) {
+  if (!urlIsUdpScheme(url)) {
+    throw EnvoyException(fmt::format("expected UDP scheme, got: {}", url));
+  }
+
+  size_t colon_index = url.find(':', UDP_SCHEME.size());
+
+  if (colon_index == std::string::npos) {
+    throw EnvoyException(fmt::format("malformed url: {}", url));
+  }
+
+  return url.substr(UDP_SCHEME.size(), colon_index - UDP_SCHEME.size());
+}
+
+uint32_t Utility::portFromUdpUrl(const std::string& url) {
+  if (!urlIsUdpScheme(url)) {
+    throw EnvoyException(fmt::format("expected UDP scheme, got: {}", url));
+  }
+
+  size_t colon_index = url.find(':', UDP_SCHEME.size());
 
   if (colon_index == std::string::npos) {
     throw EnvoyException(fmt::format("malformed url: {}", url));
