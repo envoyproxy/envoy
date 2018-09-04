@@ -586,6 +586,11 @@ message RouteAction {
       ConnectionProperties connection_properties = 3;
     }
 
+    // The flag that shortcircuits the hash computing. This field provides a
+    // 'fallback' style of configuration: "if a terminal policy doesn't work,
+    // fallback to rest of the policy list", it saves time when the terminal
+    // policy works.
+    //
     // If true, and there is already a hash computed, ignore rest of the
     // list of hash polices.
     // For example, if the following hash methods are configured:
@@ -593,7 +598,8 @@ message RouteAction {
     //   [(Header A,    true),
     //    (Cookie B,    false),
     //    (Cookie C,    false)]
-    // The generateHash process ends after computing "header A", as it's a terminal policy.
+    // The generateHash process ends if policy "header A" generates a hash, as
+    // it's a terminal policy.
     bool terminal = 4;
   }
 
