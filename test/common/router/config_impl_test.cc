@@ -550,7 +550,7 @@ virtual_hosts:
         route: { cluster: "default" }
   )EOF";
 
-  const auto&& proto_config{parseRouteConfigurationFromV2Yaml(yaml)};
+  const auto proto_config = parseRouteConfigurationFromV2Yaml(yaml);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   TestConfigImpl config(proto_config, factory_context, true);
 
