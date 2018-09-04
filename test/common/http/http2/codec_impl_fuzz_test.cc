@@ -116,6 +116,7 @@ public:
   void directionalAction(DirectionalState& state,
                          const test::common::http::http2::DirectionalAction& directional_action) {
     const bool end_stream = directional_action.end_stream();
+    const bool response = &state == &response_;
     switch (directional_action.directional_action_selector_case()) {
     case test::common::http::http2::DirectionalAction::kContinueHeaders: {
       if (state.stream_state_ == StreamState::PendingHeaders) {
@@ -127,7 +128,11 @@ public:
     }
     case test::common::http::http2::DirectionalAction::kHeaders: {
       if (state.stream_state_ == StreamState::PendingHeaders) {
-        state.encoder_->encodeHeaders(Fuzz::fromHeaders(directional_action.headers()), end_stream);
+        auto headers = Fuzz::fromHeaders(directional_action.headers());
+        if (response && headers.Status() == nullptr) {
+          headers.setReferenceKey(Headers::get().Status, "200");
+        }
+        state.encoder_->encodeHeaders(headers, end_stream);
         state.stream_state_ = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
       }
       break;

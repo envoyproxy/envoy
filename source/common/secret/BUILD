@@ -13,8 +13,11 @@ envoy_cc_library(
     srcs = ["secret_manager_impl.cc"],
     hdrs = ["secret_manager_impl.h"],
     deps = [
+        ":sds_api_lib",
         ":secret_provider_impl_lib",
         "//include/envoy/secret:secret_manager_interface",
+        "//include/envoy/server:transport_socket_config_interface",
+        "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "@envoy_api//envoy/api/v2/auth:cert_cc",
     ],

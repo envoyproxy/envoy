@@ -4,6 +4,7 @@
 
 #include "envoy/secret/secret_manager.h"
 #include "envoy/secret/secret_provider.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
@@ -30,7 +31,14 @@ public:
       const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context)
       override;
 
+  TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
+      const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+
 private:
+  // Remove dynamic secret provider which has been deleted.
+  void removeDynamicSecretProvider(const std::string& map_key);
+
   // Manages pairs of secret name and TlsCertificateConfigProviderSharedPtr.
   std::unordered_map<std::string, TlsCertificateConfigProviderSharedPtr>
       static_tls_certificate_providers_;
@@ -38,6 +46,10 @@ private:
   // Manages pairs of secret name and CertificateValidationContextConfigProviderSharedPtr.
   std::unordered_map<std::string, CertificateValidationContextConfigProviderSharedPtr>
       static_certificate_validation_context_providers_;
+
+  // map hash code of SDS config source and SdsApi object.
+  std::unordered_map<std::string, std::weak_ptr<TlsCertificateConfigProvider>>
+      dynamic_secret_providers_;
 };
 
 } // namespace Secret

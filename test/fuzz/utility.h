@@ -37,8 +37,11 @@ inline TestRequestInfo fromRequestInfo(const test::fuzz::RequestInfo& request_in
   TestRequestInfo test_request_info;
   test_request_info.metadata_ = request_info.dynamic_metadata();
   // libc++ clocks don't track at nanosecond on OS X.
-  test_request_info.start_time_ =
-      SystemTime(std::chrono::microseconds(request_info.start_time() / 1000));
+  const auto start_time =
+      std::numeric_limits<std::chrono::nanoseconds::rep>::max() < request_info.start_time()
+          ? 0
+          : request_info.start_time() / 1000;
+  test_request_info.start_time_ = SystemTime(std::chrono::microseconds(start_time));
   if (request_info.has_response_code()) {
     test_request_info.response_code_ = request_info.response_code().value();
   }

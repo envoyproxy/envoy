@@ -203,11 +203,19 @@ MockListener::~MockListener() { onDestroy(); }
 MockConnectionHandler::MockConnectionHandler() {}
 MockConnectionHandler::~MockConnectionHandler() {}
 
-MockTransportSocket::MockTransportSocket() {}
+MockTransportSocket::MockTransportSocket() {
+  ON_CALL(*this, setTransportSocketCallbacks(_))
+      .WillByDefault(Invoke([&](TransportSocketCallbacks& callbacks) { callbacks_ = &callbacks; }));
+}
 MockTransportSocket::~MockTransportSocket() {}
 
 MockTransportSocketFactory::MockTransportSocketFactory() {}
 MockTransportSocketFactory::~MockTransportSocketFactory() {}
+
+MockTransportSocketCallbacks::MockTransportSocketCallbacks() {
+  ON_CALL(*this, connection()).WillByDefault(ReturnRef(connection_));
+}
+MockTransportSocketCallbacks::~MockTransportSocketCallbacks() {}
 
 } // namespace Network
 } // namespace Envoy
