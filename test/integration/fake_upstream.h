@@ -6,7 +6,6 @@
 #include <string>
 
 #include "envoy/api/api.h"
-#include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -42,8 +41,7 @@ class FakeStream : public Http::StreamDecoder,
                    public Http::StreamCallbacks,
                    Logger::Loggable<Logger::Id::testing> {
 public:
-  FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
-             Event::TimeSystem& time_system);
+  FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder);
 
   uint64_t bodyLength() { return body_.length(); }
   Buffer::Instance& body() { return body_; }
@@ -157,8 +155,6 @@ public:
 
   virtual void setEndStream(bool end) { end_stream_ = end; }
 
-  Event::TimeSystem& timeSystem() { return time_system_; }
-
 protected:
   Http::HeaderMapPtr headers_;
 
@@ -174,7 +170,6 @@ private:
   Grpc::Decoder grpc_decoder_;
   std::vector<Grpc::Frame> decoded_grpc_frames_;
   bool add_served_by_header_{};
-  Event::TimeSystem& time_system_;
 };
 
 typedef std::unique_ptr<FakeStream> FakeStreamPtr;
@@ -377,8 +372,8 @@ public:
   bool connected() const { return shared_connection_.connected(); }
 
 protected:
-  FakeConnectionBase(SharedConnectionWrapper& shared_connection, Event::TimeSystem& time_system)
-      : shared_connection_(shared_connection), time_system_(time_system) {}
+  FakeConnectionBase(SharedConnectionWrapper& shared_connection)
+      : shared_connection_(shared_connection) {}
 
   Common::CallbackHandle* disconnect_callback_handle_;
   SharedConnectionWrapper& shared_connection_;
@@ -386,7 +381,6 @@ protected:
   Thread::CondVar connection_event_;
   Thread::MutexBasicLockable lock_;
   bool half_closed_ GUARDED_BY(lock_){};
-  Event::TimeSystem& time_system_;
 };
 
 /**
@@ -396,8 +390,7 @@ class FakeHttpConnection : public Http::ServerConnectionCallbacks, public FakeCo
 public:
   enum class Type { HTTP1, HTTP2 };
 
-  FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type,
-                     Event::TimeSystem& time_system);
+  FakeHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store, Type type);
 
   // By default waitForNewStream assumes the next event is a new stream and
   // returns AssertionFaliure if an unexpected event occurs. If a caller truly
@@ -437,8 +430,8 @@ typedef std::unique_ptr<FakeHttpConnection> FakeHttpConnectionPtr;
  */
 class FakeRawConnection : public FakeConnectionBase {
 public:
-  FakeRawConnection(SharedConnectionWrapper& shared_connection, Event::TimeSystem& time_system)
-      : FakeConnectionBase(shared_connection, time_system) {}
+  FakeRawConnection(SharedConnectionWrapper& shared_connection)
+      : FakeConnectionBase(shared_connection) {}
   typedef const std::function<bool(const std::string&)> ValidatorFunction;
 
   // Writes to data. If data is nullptr, discards the received data.
@@ -544,8 +537,6 @@ public:
                            const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
-
-  Event::TimeSystem& timeSystem() { return dispatcher_->timeSource(); }
 
   // Stops the dispatcher loop and joins the listening thread.
   void cleanUp();

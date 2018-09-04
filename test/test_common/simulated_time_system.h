@@ -9,6 +9,9 @@
 namespace Envoy {
 namespace Event {
 
+// Represents a simulated time system, where time is advanced by calling
+// sleep(). systemTime() and monotonicTime() are computed from the sleeps,
+// and alarms are fired in response to sleep as well.
 class SimulatedTimeSystem : public TimeSystem {
 public:
   class Alarm;
@@ -22,8 +25,12 @@ public:
   SystemTime systemTime() override;
   MonotonicTime monotonicTime() override;
 
-  // Advances time forward by the specified duration, running any timers
-  // that are scheduled to wake up.
+  /**
+   * Advances time forward by the specified duration, running any timers
+   * along the way that have been scheduled to fire.
+   *
+   * @param duration The amount of time to sleep.
+   */
   template<class Duration>
   void sleep(Duration duration) {
     std::vector<Alarm*> ready;
@@ -36,12 +43,17 @@ public:
     runAlarms(ready);
   }
 
+private:
+  // The simulation keeps a unique ID for each alarm to act as a deterministic
+  // tie-breaker for alarm-ordering.
   int64_t nextIndex();
+
+  // Adds/removes an alarm.
   void addAlarm(Alarm*, const std::chrono::milliseconds& duration);
   void removeAlarm(Alarm*);
 
-private:
   friend class SimulatedScheduler;
+  friend Alarm;
   struct CompareAlarms {
     bool operator()(const Alarm* a, const Alarm* b) const;
   };

@@ -14,9 +14,11 @@
 namespace Envoy {
 namespace Event {
 
-/**
- * An Alarm is created in the context of a thread's dispatcher.
- */
+// Our simulated alarm inherits from TimerImpl so that the same dispatching
+// mechanism used in RealTimeSystem timers is employed for simulated alarms.
+// using libevent's event_active(). Note that libevent is placed into
+// thread-safe mode due to the call to evthread_use_pthreads() in
+// source/common/event/libevent.cc.
 class SimulatedTimeSystem::Alarm : public TimerImpl {
 public:
   Alarm(SimulatedTimeSystem& time_system, Libevent::BasePtr& libevent, TimerCb cb)
@@ -29,7 +31,6 @@ public:
 
   // Timer
   void disableTimer() override;
-
   void enableTimer(const std::chrono::milliseconds& duration) override;
 
   // Compare two alarms, based on wakeup time and insertion order. Result
@@ -59,6 +60,7 @@ public:
     TimerImpl::enableTimer(duration);
   }
   MonotonicTime time() const { ASSERT(armed_); return time_; }
+  uint64_t index() const { return index_; }
 
 private:
   SimulatedTimeSystem& time_system_;
@@ -67,8 +69,19 @@ private:
   bool armed_;
 };
 
+// Compare two alarms, based on wakeup time and insertion order. Returns true if
+// a comes before b.
+
+// like strcmp (<0 for a < b, >0 for a > b), based on wakeup time and index.
 bool SimulatedTimeSystem::CompareAlarms::operator()(const Alarm* a, const Alarm* b) const {
-  return a->Compare(b) < 0;
+  if (a != b) {
+    if (a->time() < b->time()) {
+      return true;
+    } else if (a->time() == b->time() && a->index() < b->index()) {
+      return true;
+    }
+  }
+  return false;
 };
 
 namespace {
@@ -152,7 +165,7 @@ std::vector<SimulatedTimeSystem::Alarm*> SimulatedTimeSystem::findReadyAlarmsLoc
       break;
     }
     alarms_.erase(p);
-    ready.push_back(alarm);  // Don't fine the alarms under lock.
+    ready.push_back(alarm);  // Don't fire alarms under lock.
   }
   return ready;
 }

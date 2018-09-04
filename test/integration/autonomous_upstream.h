@@ -19,7 +19,8 @@ public:
   static const char RESET_AFTER_REQUEST[];
 
   AutonomousStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
-                   AutonomousUpstream& upstream);
+                   AutonomousUpstream& upstream)
+      : FakeStream(parent, encoder), upstream_(upstream) {}
   ~AutonomousStream();
 
   void setEndStream(bool set) override;
@@ -33,7 +34,8 @@ private:
 class AutonomousHttpConnection : public FakeHttpConnection {
 public:
   AutonomousHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store,
-                           Type type, AutonomousUpstream& upstream);
+                           Type type, AutonomousUpstream& upstream)
+      : FakeHttpConnection(shared_connection, store, type), upstream_(upstream) {}
 
   Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder) override;
 
