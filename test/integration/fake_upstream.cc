@@ -276,13 +276,13 @@ AssertionResult FakeConnectionBase::waitForHalfClose(bool ignore_spurious_events
     if (std::chrono::steady_clock::now() >= end_time) {
       return AssertionFailure() << "Timed out waiting for half close.";
     }
-    connection_event_.waitFor(lock_, 5ms); // Safe since CondVar::waitFor won't throw.
+    Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
     // The default behavior of waitForHalfClose is to assume the test cleanly
     // calls waitForData, waitForNewStream, etc. to handle all events on the
     // connection. If the caller explicitly notes that other events should be
     // ignored, continue looping until a disconnect is detected. Otherwise fall
     // through and hit the assert below.
-    if (!ignore_spurious_events) {
+    if (status == Thread::CondVar::WaitStatus::NoTimeout && !ignore_spurious_events) {
       break;
     }
   }
