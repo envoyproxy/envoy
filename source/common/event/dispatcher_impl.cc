@@ -31,7 +31,7 @@ DispatcherImpl::DispatcherImpl(TimeSystem& time_system)
 
 DispatcherImpl::DispatcherImpl(TimeSystem& time_system, Buffer::WatermarkFactoryPtr&& factory)
     : time_system_(time_system), buffer_factory_(std::move(factory)), base_(event_base_new()),
-      scheduler_(time_system_.createScheduler(base_, *this)),
+      scheduler_(time_system_.createScheduler(base_)),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
