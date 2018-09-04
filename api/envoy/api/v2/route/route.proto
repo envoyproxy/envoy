@@ -594,10 +594,15 @@ message RouteAction {
     // If true, and there is already a hash computed, ignore rest of the
     // list of hash polices.
     // For example, if the following hash methods are configured:
-    //   [(specifier, terminal),...]
-    //   [(Header A,    true),
-    //    (Cookie B,    false),
-    //    (Cookie C,    false)]
+    //
+    //  ========= ========
+    //  specifier terminal
+    //  ========= ========
+    //  Header A  true
+    //  Header B  false
+    //  Header C  false
+    //  ========= ========
+    //
     // The generateHash process ends if policy "header A" generates a hash, as
     // it's a terminal policy.
     bool terminal = 4;
