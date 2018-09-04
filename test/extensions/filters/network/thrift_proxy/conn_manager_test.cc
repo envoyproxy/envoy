@@ -74,6 +74,7 @@ public:
     decoder_filter_.reset(new NiceMock<ThriftFilters::MockDecoderFilter>());
     config_.reset(new TestConfigImpl(proto_config_, context_, decoder_filter_, stats_));
 
+    ON_CALL(random_, random()).WillByDefault(Return(42));
     filter_.reset(new ConnectionManager(*config_, random_));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
@@ -272,7 +273,6 @@ public:
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCall) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).WillOnce(Return(42));
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -287,7 +287,6 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCall) {
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftOneWay) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).WillOnce(Return(42));
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
@@ -306,7 +305,6 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftOneWay) {
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).WillOnce(Return(42));
 
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
@@ -346,7 +344,6 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesFrameSplitAcrossBuffers) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).WillOnce(Return(42));
 
   writePartialFramedBinaryMessage(buffer_, MessageType::Call, 0x10, true);
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -363,7 +360,6 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesFrameSplitAcrossBuffers) {
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesInvalidMsgType) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).WillOnce(Return(42));
   writeFramedBinaryMessage(buffer_, MessageType::Reply, 0x0F); // reply is invalid for a request
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
@@ -377,7 +373,6 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesInvalidMsgType) {
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).WillOnce(Return(42));
   addSeq(buffer_, {
                       0x00, 0x00, 0x00, 0x1f,                     // framed: 31 bytes
                       0x80, 0x01, 0x00, 0x01,                     // binary, call
@@ -419,7 +414,6 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).WillOnce(Return(42));
   addSeq(buffer_, {
                       0x00, 0x00, 0x00, 0x1d,                     // framed: 29 bytes
                       0x80, 0x01, 0x00, 0xff,                     // binary, invalid type
@@ -436,7 +430,6 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolErrorDuringMessageBegin
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).Times(0);
   addSeq(buffer_, {
                       0x00, 0x00, 0x00, 0x64, // header: 100 bytes
                       0x0f, 0xff, 0x00, 0x00, // magic, flags
@@ -481,7 +474,6 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
   // No active calls
   {
     initializeFilter();
-    EXPECT_CALL(random_, random()).Times(0);
     filter_->onEvent(Network::ConnectionEvent::RemoteClose);
     filter_->onEvent(Network::ConnectionEvent::LocalClose);
     EXPECT_EQ(0U, store_.counter("test.cx_destroy_local_with_active_rq").value());
@@ -491,7 +483,6 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
   // Remote close mid-request
   {
     initializeFilter();
-    EXPECT_CALL(random_, random()).WillOnce(Return(42));
     addSeq(buffer_, {
                         0x00, 0x00, 0x00, 0x1d,                     // framed: 29 bytes
                         0x80, 0x01, 0x00, 0x01,                     // binary proto, call type
@@ -511,7 +502,6 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
   // Local close mid-request
   {
     initializeFilter();
-    EXPECT_CALL(random_, random()).WillOnce(Return(42));
     addSeq(buffer_, {
                         0x00, 0x00, 0x00, 0x1d,                     // framed: 29 bytes
                         0x80, 0x01, 0x00, 0x01,                     // binary proto, call type
@@ -533,7 +523,6 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
   // Remote close before response
   {
     initializeFilter();
-    EXPECT_CALL(random_, random()).WillOnce(Return(42));
     writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
@@ -550,7 +539,6 @@ TEST_F(ThriftConnectionManagerTest, OnEvent) {
   // Local close before response
   {
     initializeFilter();
-    EXPECT_CALL(random_, random()).WillOnce(Return(42));
     writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
     EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
@@ -580,7 +568,6 @@ route_config:
 )EOF";
 
   initializeFilter(yaml);
-  EXPECT_CALL(random_, random()).WillOnce(Return(42));
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
@@ -606,7 +593,6 @@ route_config:
 
 TEST_F(ThriftConnectionManagerTest, RequestAndResponse) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).WillOnce(Return(0));
   writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
@@ -639,7 +625,6 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponse) {
 
 TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).WillOnce(Return(42));
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
@@ -673,7 +658,6 @@ TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
 
 TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).WillOnce(Return(42));
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
@@ -706,7 +690,6 @@ TEST_F(ThriftConnectionManagerTest, RequestAndErrorResponse) {
 
 TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).WillOnce(Return(42));
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
@@ -740,7 +723,6 @@ TEST_F(ThriftConnectionManagerTest, RequestAndInvalidResponse) {
 
 TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).WillOnce(Return(42));
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
@@ -783,7 +765,6 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
 
 TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).WillOnce(Return(42));
   writeMessage(buffer_, TransportType::Header, ProtocolType::Binary, MessageType::Call, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
@@ -824,7 +805,6 @@ TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
 
 TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).WillRepeatedly(Return(42));
 
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x01);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x02);
@@ -862,7 +842,6 @@ TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
 
 TEST_F(ThriftConnectionManagerTest, ResetDownstreamConnection) {
   initializeFilter();
-  EXPECT_CALL(random_, random()).WillOnce(Return(42));
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};

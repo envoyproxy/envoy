@@ -17,28 +17,19 @@ namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
-    : cluster_name_(route.route().cluster()),
-      total_cluster_weight_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route().weighted_clusters(), total_weight, 100UL)) {
+    : cluster_name_(route.route().cluster()) {
   for (const auto& header_map : route.match().headers()) {
     config_headers_.push_back(header_map);
   }
 
   if (route.route().cluster_specifier_case() ==
       envoy::config::filter::network::thrift_proxy::v2alpha1::RouteAction::kWeightedClusters) {
-    ASSERT(total_cluster_weight_ > 0);
 
-    uint64_t total_weight = 0UL;
-
+    total_cluster_weight_ = 0UL;
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
       std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(cluster));
       weighted_clusters_.emplace_back(std::move(cluster_entry));
-      total_weight += weighted_clusters_.back()->clusterWeight();
-    }
-
-    if (total_weight != total_cluster_weight_) {
-      throw EnvoyException(fmt::format("Sum of weights in the weighted_cluster should add up to {}",
-                                       total_cluster_weight_));
+      total_cluster_weight_ += weighted_clusters_.back()->clusterWeight();
     }
   }
 }
@@ -61,14 +52,15 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value) cons
   // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
   for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
     end = begin + cluster->clusterWeight();
-    if (((selected_value >= begin) && (selected_value < end)) || (end >= total_cluster_weight_)) {
-      // end > total_cluster_weight_: This case can only occur with Runtimes, when the user
-      // specifies invalid weights such that sum(weights) > total_cluster_weight_. In this case,
-      // terminate the search and just return the cluster whose weight caused the overflow.
+    ASSERT(end <= total_cluster_weight_);
+
+    if (selected_value >= begin && selected_value < end) {
       return cluster;
     }
+
     begin = end;
   }
+
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 

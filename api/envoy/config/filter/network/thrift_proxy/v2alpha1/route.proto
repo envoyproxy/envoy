@@ -99,13 +99,9 @@ message WeightedCluster {
     // When a request matches the route, the choice of an upstream cluster is determined by its
     // weight. The sum of weights across all entries in the clusters array must add up to the
     // total weight.
-    google.protobuf.UInt32Value weight = 2;
+    google.protobuf.UInt32Value weight = 2 [(validate.rules).uint32.gte = 1];
   }
 
   // Specifies one or more upstream clusters associated with the route.
   repeated ClusterWeight clusters = 1 [(validate.rules).repeated .min_items = 1];
-
-  // Specifies the total weight across all clusters. The sum of all cluster weights must equal this
-  // value, which must be greater than 0. Defaults to 100.
-  google.protobuf.UInt32Value total_weight = 3 [(validate.rules).uint32.gte = 1];
 }

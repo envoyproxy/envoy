@@ -547,7 +547,6 @@ routes:
             weight: 3000
           - name: cluster3
             weight: 5000
-        total_weight: 10000
 )EOF";
 
   envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
@@ -555,68 +554,27 @@ routes:
   RouteMatcher matcher(config);
   MessageMetadata metadata;
 
-  // Distribute requests using default total weight
   {
     metadata.setMethodName("method1");
-    EXPECT_EQ("cluster1", matcher.route(metadata, 25)->routeEntry()->clusterName());
-    EXPECT_EQ("cluster2", matcher.route(metadata, 45)->routeEntry()->clusterName());
-    EXPECT_EQ("cluster3", matcher.route(metadata, 90)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster1", matcher.route(metadata, 0)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster1", matcher.route(metadata, 29)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster2", matcher.route(metadata, 30)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster2", matcher.route(metadata, 59)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster3", matcher.route(metadata, 60)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster3", matcher.route(metadata, 99)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster1", matcher.route(metadata, 100)->routeEntry()->clusterName());
   }
 
-  // Distribute requests using provided total weight
   {
     metadata.setMethodName("method2");
-    EXPECT_EQ("cluster1", matcher.route(metadata, 1993)->routeEntry()->clusterName());
-    EXPECT_EQ("cluster2", matcher.route(metadata, 2018)->routeEntry()->clusterName());
-    EXPECT_EQ("cluster3", matcher.route(metadata, 5001)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster1", matcher.route(metadata, 0)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster1", matcher.route(metadata, 1999)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster2", matcher.route(metadata, 2000)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster2", matcher.route(metadata, 4999)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster3", matcher.route(metadata, 5000)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster3", matcher.route(metadata, 9999)->routeEntry()->clusterName());
+    EXPECT_EQ("cluster1", matcher.route(metadata, 10000)->routeEntry()->clusterName());
   }
-}
-
-TEST(RouteMatcherTest, WeightedClustersSumNotEqualToSpecifiedMax) {
-  const std::string yaml = R"EOF(
-name: config
-routes:
-  - match:
-      method_name: "method2"
-    route:
-      weighted_clusters:
-        clusters:
-          - name: cluster1
-            weight: 20000
-          - name: cluster2
-            weight: 30000
-          - name: cluster3
-            weight: 5000
-        total_weight: 10000
-)EOF";
-
-  const envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
-  EXPECT_THROW_WITH_MESSAGE(RouteMatcher m(config), EnvoyException,
-                            "Sum of weights in the weighted_cluster should add up to 10000");
-}
-
-TEST(RouteMatcherTest, WeightedClustersSumNotEqualToDefaultMax) {
-  const std::string yaml = R"EOF(
-name: config
-routes:
-  - match:
-      method_name: "method2"
-    route:
-      weighted_clusters:
-        clusters:
-          - name: cluster1
-            weight: 20000
-          - name: cluster2
-            weight: 30000
-          - name: cluster3
-            weight: 5000
-)EOF";
-
-  const envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
-  EXPECT_THROW_WITH_MESSAGE(RouteMatcher m(config), EnvoyException,
-                            "Sum of weights in the weighted_cluster should add up to 100");
 }
 
 TEST(RouteMatcherTest, WeightedClusterMissingWeight) {

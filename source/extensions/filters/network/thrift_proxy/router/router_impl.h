@@ -51,7 +51,11 @@ private:
             cluster);
 
     uint64_t clusterWeight() const { return cluster_weight_; }
+
+    // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
+
+    // Router::Route
     const RouteEntry* routeEntry() const override { return this; }
 
   private:
@@ -63,7 +67,7 @@ private:
   const std::string cluster_name_;
   std::vector<Http::HeaderUtility::HeaderData> config_headers_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
-  const uint64_t total_cluster_weight_;
+  uint64_t total_cluster_weight_;
 };
 
 typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
