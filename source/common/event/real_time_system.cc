@@ -25,7 +25,7 @@ private:
 
 } // namespace
 
-SchedulerPtr RealTimeSystem::createScheduler(Libevent::BasePtr& libevent, Dispatcher&) {
+SchedulerPtr RealTimeSystem::createScheduler(Libevent::BasePtr& libevent) {
   return std::make_unique<RealScheduler>(libevent);
 }
 

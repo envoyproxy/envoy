@@ -12,7 +12,6 @@
 namespace Envoy {
 namespace Event {
 
-class Dispatcher;
 class TimerCB;
 
 /**
@@ -64,7 +63,7 @@ public:
    * Creates a timer factory. This indirection enables thread-local timer-queue management,
    * so servers can have a separate timer-factory in each thread.
    */
-  virtual SchedulerPtr createScheduler(Libevent::BasePtr&, Dispatcher& dispatcher) PURE;
+  virtual SchedulerPtr createScheduler(Libevent::BasePtr&) PURE;
 };
 
 } // namespace Event

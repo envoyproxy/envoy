@@ -13,7 +13,7 @@ namespace Event {
 class RealTimeSystem : public TimeSystem {
 public:
   // TimeSystem
-  SchedulerPtr createScheduler(Libevent::BasePtr&, Dispatcher&) override;
+  SchedulerPtr createScheduler(Libevent::BasePtr&) override;
 
   // TimeSource
   SystemTime systemTime() override { return time_source_.systemTime(); }
