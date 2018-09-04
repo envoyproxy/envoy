@@ -476,8 +476,8 @@ message RouteAction {
     repeated RetryHostPredicate retry_host_predicate = 5;
 
     // The maximum number of times host selection will be reattempted before giving up, at which point
-    // the host that was last selected will be routed to.
-    int64 host_selection_retry_max_attempts = 6 [default = 3];
+    // the host that was last selected will be routed to. If unspecified, this will default to 3 attempts.
+    int64 host_selection_retry_max_attempts = 6;
   }
 
   // Specifies the idle timeout for the route. If not specified, there is no per-route idle timeout,
