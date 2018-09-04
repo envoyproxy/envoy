@@ -11,24 +11,19 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Common {
 namespace {
+
 class JwksFetcherImpl : public JwksFetcher,
                         public Logger::Loggable<Logger::Id::filter>,
                         public Http::AsyncClient::Callbacks {
-private:
-  Upstream::ClusterManager& cm_;
-  JwksFetcher::JwksReceiver* receiver_ = nullptr;
-  const ::envoy::api::v2::core::HttpUri* uri_ = nullptr;
-  Http::AsyncClient::Request* request_ = nullptr;
-
 public:
   JwksFetcherImpl(Upstream::ClusterManager& cm) : cm_(cm) { ENVOY_LOG(trace, "{}", __func__); }
 
   void cancel() {
     if (request_) {
       request_->cancel();
-      request_ = nullptr;
       ENVOY_LOG(debug, "fetch pubkey [uri = {}]: canceled", uri_->uri());
     }
+    reset();
   }
 
   void fetch(const ::envoy::api::v2::core::HttpUri& uri, JwksFetcher::JwksReceiver& receiver) {
@@ -47,7 +42,6 @@ public:
   // HTTP async receive methods
   void onSuccess(Http::MessagePtr&& response) {
     ENVOY_LOG(trace, "{}", __func__);
-    request_ = nullptr;
     const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
     if (status_code == enumToInt(Http::Code::OK)) {
       ENVOY_LOG(debug, "{}: fetch pubkey [uri = {}]: success", __func__, uri_->uri());
@@ -72,12 +66,26 @@ public:
                 uri_->uri(), status_code);
       receiver_->onJwksError(JwksFetcher::JwksReceiver::Failure::Network);
     }
+    reset();
   }
 
   void onFailure(Http::AsyncClient::FailureReason reason) {
     ENVOY_LOG(debug, "{}: fetch pubkey [uri = {}]: network error {}", __func__, uri_->uri(),
               enumToInt(reason));
     receiver_->onJwksError(JwksFetcher::JwksReceiver::Failure::Network);
+    reset();
+  }
+
+private:
+  Upstream::ClusterManager& cm_;
+  JwksFetcher::JwksReceiver* receiver_{};
+  const envoy::api::v2::core::HttpUri* uri_{};
+  Http::AsyncClient::Request* request_{};
+
+  void reset() {
+    request_ = nullptr;
+    receiver_ = nullptr;
+    uri_ = nullptr;
   }
 };
 } // namespace
