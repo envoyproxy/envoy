@@ -4,42 +4,34 @@ namespace Envoy {
 namespace {
 
 class BufferIntegrationTest : public HttpProtocolIntegrationTest {
- public:
+public:
   ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config) {
     ProtobufWkt::Struct pfc;
     RELEASE_ASSERT(Protobuf::util::JsonStringToMessage(json_config, &pfc).ok(), "");
 
-    return
-        [pfc](
-            envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
-          auto* config = cfg.mutable_route_config()
-                             ->mutable_virtual_hosts()
-                             ->Mutable(0)
-                             ->mutable_per_filter_config();
+    return [pfc](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+                     cfg) {
+      auto* config = cfg.mutable_route_config()
+                         ->mutable_virtual_hosts()
+                         ->Mutable(0)
+                         ->mutable_per_filter_config();
 
-          (*config)["envoy.buffer"] = pfc;
-        };
+      (*config)["envoy.buffer"] = pfc;
+    };
   }
 
-  ConfigHelper::HttpModifierFunction overrideConfigBufferTimeout(std::chrono::seconds max_request_time) {
+  ConfigHelper::HttpModifierFunction
+  overrideConfigBufferTimeout(std::chrono::seconds max_request_time) {
     // {{ and }} are escaped braces in fmt
     std::string config = fmt::format(R"EOF({{"buffer": {{
       "max_request_time": {{"seconds": {}}}
-    }}}})EOF", max_request_time.count());
+    }}}})EOF",
+                                     max_request_time.count());
 
     return overrideConfig(config);
   }
 
-  AssertionResult runRequestTimeoutTest() {
-    std::chrono::milliseconds test_connection_initiation_timeout = std::chrono::milliseconds(2500); // rename to wait_http_connection_timeout
-    runRequestTimeoutTest(test_connection_initiation_timeout);
-    return fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
-                                                     test_connection_initiation_timeout);
-  }
-
-  void runRequestTimeoutTest(std::chrono::milliseconds test_connection_initiation_timeout,
-                             const char* method ="GET") {
-    (void)(test_connection_initiation_timeout);
+  void setupRequestTimeoutTest(const char* method = "GET") {
     initialize();
 
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
@@ -161,15 +153,19 @@ TEST_P(BufferIntegrationTest, RequestPathTimesOutInBuffer) {
   ConfigHelper::HttpModifierFunction mod = overrideConfigBufferTimeout(buffer_timeout);
   config_helper_.addConfigModifier(mod);
   config_helper_.addFilter(ConfigHelper::SMALL_BUFFER_FILTER);
-  AssertionResult result = runRequestTimeoutTest();
+  setupRequestTimeoutTest();
+
+  AssertionResult result = fake_upstreams_[0]->waitForHttpConnection(
+      *dispatcher_, fake_upstream_connection_, test_connection_initiation_timeout);
 
   EXPECT_FALSE(result);
   // TODO Check stats increments
 }
 
 // TEST_P(BufferIntegrationTest, RequestPathTimesntOutInBuffer) {
-//   std::chrono::seconds buffer_timeout = std::chrono::seconds(1); // Greater than connectiom timeout
-//   std::chrono::milliseconds test_connection_initiation_timeout = std::chrono::milliseconds(2500);
+//   std::chrono::seconds buffer_timeout = std::chrono::seconds(1); // Greater than connectiom
+//   timeout std::chrono::milliseconds test_connection_initiation_timeout =
+//   std::chrono::milliseconds(2500);
 //
 //   ConfigHelper::HttpModifierFunction mod = overrideConfigBufferTimeout(buffer_timeout);
 //   config_helper_.addConfigModifier(mod);
@@ -182,8 +178,6 @@ TEST_P(BufferIntegrationTest, RequestPathTimesOutInBuffer) {
 //   // EXPECT_FALSE(result);
 //   // TODO Check stats increments
 // }
-
-
 
 } // namespace
 } // namespace Envoy
