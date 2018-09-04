@@ -740,6 +740,22 @@ TEST_F(TcpProxyTest, DisconnectBeforeData) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Test that if the downstream connection is closed before the upstream connection
+// is established, the upstream connection is cancelled.
+TEST_F(TcpProxyTest, RemoteClosetBeforeUpstreamConnected) {
+  setup(1);
+  EXPECT_CALL(*conn_pool_handles_.at(0), cancel());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Test that if the downstream connection is closed before the upstream connection
+// is established, the upstream connection is cancelled.
+TEST_F(TcpProxyTest, LocalClosetBeforeUpstreamConnected) {
+  setup(1);
+  EXPECT_CALL(*conn_pool_handles_.at(0), cancel());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
+}
+
 TEST_F(TcpProxyTest, UpstreamConnectFailure) {
   setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
