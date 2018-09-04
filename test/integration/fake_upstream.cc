@@ -250,7 +250,7 @@ AssertionResult FakeConnectionBase::waitForDisconnect(bool ignore_spurious_event
     if (std::chrono::steady_clock::now() >= end_time) {
       return AssertionResult("Timed out waiting for disconnect.");
     }
-    Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, timeout);
+    Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
     // The default behavior of waitForDisconnect is to assume the test cleanly
     // calls waitForData, waitForNewStream, etc. to handle all events on the
     // connection. If the caller explicitly notes that other events should be
@@ -276,13 +276,13 @@ AssertionResult FakeConnectionBase::waitForHalfClose(bool ignore_spurious_events
     if (std::chrono::steady_clock::now() >= end_time) {
       return AssertionFailure() << "Timed out waiting for half close.";
     }
-    connection_event_.waitFor(lock_, timeout); // Safe since CondVar::waitFor won't throw.
+    Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
     // The default behavior of waitForHalfClose is to assume the test cleanly
     // calls waitForData, waitForNewStream, etc. to handle all events on the
     // connection. If the caller explicitly notes that other events should be
     // ignored, continue looping until a disconnect is detected. Otherwise fall
     // through and hit the assert below.
-    if (!ignore_spurious_events) {
+    if (status == Thread::CondVar::WaitStatus::NoTimeout && !ignore_spurious_events) {
       break;
     }
   }
@@ -302,7 +302,7 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
     if (std::chrono::steady_clock::now() >= end_time) {
       return AssertionResult("Timed out waiting for new stream.");
     }
-    Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, timeout);
+    Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
     // As with waitForDisconnect, by default, waitForNewStream returns after the next event.
     // If the caller explicitly notes other events should be ignored, it will instead actually
     // wait for the next new stream, ignoring other events such as onData()
