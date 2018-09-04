@@ -10,6 +10,7 @@
 
 #include "test/integration/ssl_utility.h"
 #include "test/integration/utility.h"
+
 #include "gtest/gtest.h"
 
 using testing::_;
