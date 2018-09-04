@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/type/percent.pb.validate.h"
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -413,14 +414,17 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
 
   if (route_match.runtime_specifier_case() == envoy::api::v2::route::RouteMatch::kRuntimeFraction) {
     envoy::type::FractionalPercent fractional_percent;
-    const std::string& fraction_text =
+    const std::string& fraction_yaml =
         loader_.snapshot().get(route_match.runtime_fraction().runtime_key());
-    if (!Protobuf::TextFormat::ParseFromString(fraction_text, &fractional_percent)) {
-      // Since we failed to parse the textual protobuf, let's load up the default value.
+
+    try {
+      MessageUtil::loadFromYamlAndValidate(fraction_yaml, fractional_percent);
+    } catch (const EnvoyException& ex) {
+      ENVOY_LOG(error, "failed to parse string value for runtime key {}: {}",
+                route_match.runtime_fraction().runtime_key(), ex.what());
       fractional_percent = route_match.runtime_fraction().default_value();
-      ENVOY_LOG(error, "failed to parse string value for runtime key {}",
-                route_match.runtime_fraction().runtime_key());
     }
+
     runtime_data.numerator_val_ = fractional_percent.numerator();
     runtime_data.denominator_val_ =
         ProtobufPercentHelper::fractionalPercentDenominatorToInt(fractional_percent.denominator());

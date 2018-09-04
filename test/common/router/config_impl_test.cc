@@ -1904,7 +1904,7 @@ virtual_hosts:
   ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
 
   const std::string runtime_fraction = R"EOF(
-    this string is nonsense
+    this string is nonsense and should fail parsing
   )EOF";
   EXPECT_CALL(snapshot, get("bogus_key"))
       .Times(testing::AtLeast(1))
