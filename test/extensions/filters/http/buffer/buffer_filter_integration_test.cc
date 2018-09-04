@@ -50,7 +50,7 @@ class BufferIntegrationTest : public HttpProtocolIntegrationTest {
                                                             {":scheme", "http"},
                                                             {":authority", "host"}});
     request_encoder_ = &encoder_decoder.first;
-    auto response = std::move(encoder_decoder.second);
+    response_ = std::move(encoder_decoder.second);
   }
 };
 
