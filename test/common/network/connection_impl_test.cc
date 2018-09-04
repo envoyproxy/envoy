@@ -879,17 +879,20 @@ public:
           return new Buffer::WatermarkBuffer(below_low, above_high);
         }));
 
+    fd_ = socket(AF_INET, SOCK_STREAM, 0);
+    EXPECT_NE(-1, fd_);
+
     file_event_ = new Event::MockFileEvent;
-    EXPECT_CALL(dispatcher_, createFileEvent_(0, _, _, _))
+    EXPECT_CALL(dispatcher_, createFileEvent_(fd_, _, _, _))
         .WillOnce(DoAll(SaveArg<1>(&file_ready_cb_), Return(file_event_)));
     transport_socket_ = new NiceMock<MockTransportSocket>;
     EXPECT_CALL(*transport_socket_, setTransportSocketCallbacks(_))
         .WillOnce(Invoke([this](TransportSocketCallbacks& callbacks) {
           transport_socket_callbacks_ = &callbacks;
         }));
-    connection_.reset(
-        new ConnectionImpl(dispatcher_, std::make_unique<ConnectionSocketImpl>(0, nullptr, nullptr),
-                           TransportSocketPtr(transport_socket_), true));
+    connection_.reset(new ConnectionImpl(
+        dispatcher_, std::make_unique<ConnectionSocketImpl>(fd_, nullptr, nullptr),
+        TransportSocketPtr(transport_socket_), true));
     connection_->addConnectionCallbacks(callbacks_);
   }
 
@@ -903,6 +906,7 @@ public:
     return {PostIoAction::KeepOpen, size, false};
   }
 
+  int fd_;
   std::unique_ptr<ConnectionImpl> connection_;
   Event::MockDispatcher dispatcher_;
   NiceMock<MockConnectionCallbacks> callbacks_;
