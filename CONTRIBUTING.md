@@ -214,3 +214,17 @@ git push origin -f
 
 Note, that in general rewriting history in this way is a hinderance to the review process and this
 should only be done to correct a DCO mistake.
+
+## Triggering CI re-run without making changes
+
+Sometimes CI test runs fail due to obvious resource problems or other issues
+which are not related to your PR. It may be desirable to re-trigger CI without
+making any code changes. Consider adding an alias into your `.gitconfig` file:
+
+```
+[alias]
+    kick-ci = !"git commit -s --allow-empty -m 'Kick CI' && git push"
+```
+
+Once you add this alias you can issue the command `git kick-ci` and the PR
+will be sent back for a retest.
