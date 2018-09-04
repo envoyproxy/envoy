@@ -10,7 +10,6 @@
 
 #include "test/integration/ssl_utility.h"
 #include "test/integration/utility.h"
-#include "test/test_common/logging.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -426,8 +425,9 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
 
 // Test that a downstream disconnect while the upstream connection is not yet connected
 // successfully cleans up the upstream connection.
-TEST_P(TcpProxyIntegrationTest, TestDownstreamDisconnectWithUpstreamConnectionInProgress) {
-  LogLevelSetter setter(spdlog::level::trace);
+// TODO(ggreenway): re-enable this test after tcp_proxy does not readDisable() the downstream
+// during upstream connect
+TEST_P(TcpProxyIntegrationTest, DISABLED_TestDownstreamDisconnectWithUpstreamConnectionInProgress) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     bootstrap.mutable_static_resources()
         ->mutable_listeners(0)
@@ -446,18 +446,7 @@ TEST_P(TcpProxyIntegrationTest, TestDownstreamDisconnectWithUpstreamConnectionIn
   RELEASE_ASSERT(result, result.message());
 
   tcp_client->close();
-  std::string cx_active_stat_name;
-  for (auto& gauge : test_server_->gauges()) {
-    if (std::regex_match(gauge->name(),
-                         std::regex(R"EOF(^listener\..*_0\.downstream_cx_active$)EOF"))) {
-      cx_active_stat_name = gauge->name();
-    }
-  }
-  RELEASE_ASSERT(!cx_active_stat_name.empty(), "Must find the stat we're waiting for");
-  ENVOY_LOG_MISC(debug, "Starting wait for downstream conn closed");
-  test_server_->waitForGaugeEq(cx_active_stat_name, 0);
-  ENVOY_LOG_MISC(debug, "Finished wait for downstream conn closed");
-  // test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 0);
+  test_server_->waitForGaugeEq("cluster.cluster_0.upstream_rq_pending_active", 0);
 
   // This establishes the DELAY_CONNECT connection.
   fake_upstream_connection->write("a", false);

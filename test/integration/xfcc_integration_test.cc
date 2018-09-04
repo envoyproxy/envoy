@@ -121,7 +121,7 @@ void XfccIntegrationTest::initialize() {
   });
 
   if (tls_) {
-    config_helper_.addSslConfig();
+    config_helper_.addTlsListenerConfig();
   }
 
   runtime_.reset(new NiceMock<Runtime::MockLoader>());
