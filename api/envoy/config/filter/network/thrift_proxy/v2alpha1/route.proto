@@ -94,11 +94,9 @@ message WeightedCluster {
     // Name of the upstream cluster.
     string name = 1 [(validate.rules).string.min_bytes = 1];
 
-    // An integer between 0 and :ref:`total_weight
-    // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.WeightedCluster.total_weight>`.
     // When a request matches the route, the choice of an upstream cluster is determined by its
-    // weight. The sum of weights across all entries in the clusters array must add up to the
-    // total weight.
+    // weight. The sum of weights across all entries in the clusters array determines the total
+    // weight.
     google.protobuf.UInt32Value weight = 2 [(validate.rules).uint32.gte = 1];
   }
 
