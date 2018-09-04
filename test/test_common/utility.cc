@@ -32,10 +32,13 @@ using testing::GTEST_FLAG(random_seed);
 
 namespace Envoy {
 
+// The purpose of using the static seed here is to use --test_arg=--gtest_random_seed=[seed]
+// to specify the seed of the problem to replay.
 int32_t getSeed() {
-  return std::chrono::duration_cast<std::chrono::nanoseconds>(
-             std::chrono::system_clock::now().time_since_epoch())
-      .count();
+  static const int32_t seed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                  std::chrono::system_clock::now().time_since_epoch())
+                                  .count();
+  return seed;
 }
 
 TestRandomGenerator::TestRandomGenerator()
