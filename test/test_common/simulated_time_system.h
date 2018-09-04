@@ -2,8 +2,9 @@
 
 #include "envoy/event/timer.h"
 
-#include "common/common/utility.h"
+#include "common/common/lock_guard.h"
 #include "common/common/thread.h"
+#include "common/common/utility.h"
 
 namespace Envoy {
 namespace Event {
@@ -15,7 +16,7 @@ public:
   SimulatedTimeSystem();
 
   // TimeSystem
-  SchedulerPtr createScheduler(Libevent::BasePtr&, Dispatcher& dispatcher) override;
+  SchedulerPtr createScheduler(Libevent::BasePtr&) override;
 
   // TimeSource
   SystemTime systemTime() override;
@@ -36,7 +37,7 @@ public:
   }
 
   int64_t nextIndex();
-  void addAlarm(Alarm*);
+  void addAlarm(Alarm*, const std::chrono::milliseconds& duration);
   void removeAlarm(Alarm*);
 
 private:

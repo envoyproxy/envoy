@@ -52,9 +52,10 @@ public:
     return cmp;
   }
 
+  void setTime(MonotonicTime time) { time_ = time; }
   void run() {
     armed_ = false;
-    std::chrono::milliseconds duration;
+    std::chrono::milliseconds duration = std::chrono::milliseconds::zero();
     TimerImpl::enableTimer(duration);
   }
   MonotonicTime time() const { ASSERT(armed_); return time_; }
@@ -100,7 +101,7 @@ void SimulatedTimeSystem::Alarm::enableTimer(const std::chrono::milliseconds& du
   if (duration.count() == 0) {
     run();
   } else {
-    time_system_.addAlarm(this);
+    time_system_.addAlarm(this, duration);
   }
 }
 
@@ -127,8 +128,9 @@ int64_t SimulatedTimeSystem::nextIndex() {
   return index_++;
 }
 
-void SimulatedTimeSystem::addAlarm(Alarm* alarm) {
+void SimulatedTimeSystem::addAlarm(Alarm* alarm, const std::chrono::milliseconds& duration) {
   Thread::LockGuard lock(mutex_);
+  alarm->setTime(monotonic_time_ + duration);
   alarms_.insert(alarm);
 }
 
@@ -137,7 +139,7 @@ void SimulatedTimeSystem::removeAlarm(Alarm* alarm) {
   alarms_.erase(alarm);
 }
 
-SchedulerPtr SimulatedTimeSystem::createScheduler(Libevent::BasePtr& libevent, Dispatcher&) {
+SchedulerPtr SimulatedTimeSystem::createScheduler(Libevent::BasePtr& libevent) {
   return std::make_unique<SimulatedScheduler>(*this, libevent);
 }
 

@@ -137,6 +137,12 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test(
+    name = "simulated_time_system_test",
+    srcs = ["simulated_time_system_test.cc"],
+    deps = [":simulated_time_system_lib"],
+)
+
 envoy_cc_library(
     name = "tls_utility_lib",
     srcs = ["tls_utility.cc"],
