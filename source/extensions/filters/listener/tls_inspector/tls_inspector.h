@@ -43,8 +43,8 @@ struct TlsStats {
  */
 class Config {
 public:
-  Config(Stats::Scope& scope, std::string stat_prefix,
-         uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
+  Config(Stats::Scope& scope, uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO,
+         const std::string& stat_prefix = "tls_inspector.");
 
   const TlsStats& stats() const { return stats_; }
   bssl::UniquePtr<SSL> newSsl();
