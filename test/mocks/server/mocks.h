@@ -433,14 +433,19 @@ public:
   MockTransportSocketFactoryContext();
   ~MockTransportSocketFactoryContext();
 
+  Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
+
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
-  MOCK_METHOD0(secretManager, Secret::SecretManager&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
   MOCK_METHOD0(stats, Stats::Store&());
+  MOCK_METHOD1(setInitManager, void(Init::Manager&));
+  MOCK_METHOD0(initManager, Init::Manager*());
+
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
 };
 
 class MockListenerFactoryContext : public virtual MockFactoryContext,

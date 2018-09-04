@@ -39,8 +39,9 @@ private:
   friend class DnsResolverImplPeer;
   struct PendingResolution : public ActiveDnsQuery {
     // Network::ActiveDnsQuery
-    PendingResolution(ResolveCb callback, ares_channel channel, const std::string& dns_name)
-        : callback_(callback), channel_(channel), dns_name_(dns_name) {}
+    PendingResolution(ResolveCb callback, Event::Dispatcher& dispatcher, ares_channel channel,
+                      const std::string& dns_name)
+        : callback_(callback), dispatcher_(dispatcher), channel_(channel), dns_name_(dns_name) {}
 
     void cancel() override {
       // c-ares only supports channel-wide cancellation, so we just allow the
@@ -63,6 +64,8 @@ private:
 
     // Caller supplied callback to invoke on query completion or error.
     const ResolveCb callback_;
+    // Dispatcher to post callback_ to.
+    Event::Dispatcher& dispatcher_;
     // Does the object own itself? Resource reclamation occurs via self-deleting
     // on query completion or error.
     bool owned_ = false;

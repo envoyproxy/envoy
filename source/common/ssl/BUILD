@@ -19,6 +19,7 @@ envoy_cc_library(
         ":utility_lib",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/stats:stats_macros",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:minimal_logger_lib",
@@ -34,8 +35,9 @@ envoy_cc_library(
         "ssl",
     ],
     deps = [
-        "//include/envoy/secret:secret_manager_interface",
+        "//include/envoy/secret:secret_callbacks_interface",
         "//include/envoy/secret:secret_provider_interface",
+        "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -79,6 +81,18 @@ envoy_cc_library(
     hdrs = ["tls_certificate_config_impl.h"],
     deps = [
         "//include/envoy/ssl:tls_certificate_config_interface",
+        "//source/common/common:empty_string",
+        "//source/common/config:datasource_lib",
+        "@envoy_api//envoy/api/v2/auth:cert_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "certificate_validation_context_config_impl_lib",
+    srcs = ["certificate_validation_context_config_impl.cc"],
+    hdrs = ["certificate_validation_context_config_impl.h"],
+    deps = [
+        "//include/envoy/ssl:certificate_validation_context_config_interface",
         "//source/common/common:empty_string",
         "//source/common/config:datasource_lib",
         "@envoy_api//envoy/api/v2/auth:cert_cc",

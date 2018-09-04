@@ -251,6 +251,11 @@ protected:
     using StreamImpl::StreamImpl;
 
     // StreamImpl
+    void encodeHeaders(const HeaderMap& headers, bool end_stream) override {
+      // The contract is that client codecs must ensure that :status is present.
+      ASSERT(headers.Status() != nullptr);
+      StreamImpl::encodeHeaders(headers, end_stream);
+    }
     void submitHeaders(const std::vector<nghttp2_nv>& final_headers,
                        nghttp2_data_provider* provider) override;
     void transformUpgradeFromH1toH2(HeaderMap& headers) override {

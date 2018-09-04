@@ -355,6 +355,10 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
 }
 
+INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxySslIntegrationTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
 void TcpProxySslIntegrationTest::initialize() {
   config_helper_.addSslConfig();
   TcpProxyIntegrationTest::initialize();
@@ -383,8 +387,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
   // Set up the SSl client.
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("tcp_proxy"));
-  context_ =
-      Ssl::createClientSslTransportSocketFactory(false, false, *context_manager_, secret_manager_);
+  context_ = Ssl::createClientSslTransportSocketFactory(false, false, *context_manager_);
   ssl_client_ =
       dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                           context_->createTransportSocket(), nullptr);
@@ -451,6 +454,7 @@ TEST_P(TcpProxySslIntegrationTest, DownstreamHalfClose) {
 
   Buffer::OwnedImpl empty_buffer;
   ssl_client_->write(empty_buffer, true);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   ASSERT_TRUE(fake_upstream_connection_->waitForHalfClose());
 
   const std::string data("data");

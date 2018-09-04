@@ -55,9 +55,9 @@ InstanceImpl::InstanceImpl(Options& options, TimeSource& time_source,
       dispatcher_(api_->allocateDispatcher(time_source)),
       singleton_manager_(new Singleton::ManagerImpl()),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
-      random_generator_(std::move(random_generator)), listener_component_factory_(*this),
-      worker_factory_(thread_local_, *api_, hooks, time_source),
-      secret_manager_(new Secret::SecretManagerImpl()),
+      random_generator_(std::move(random_generator)),
+      secret_manager_(std::make_unique<Secret::SecretManagerImpl>()),
+      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks, time_source),
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false) {
 
@@ -97,6 +97,17 @@ InstanceImpl::~InstanceImpl() {
   // Stop logging to file before all the AccessLogManager and its dependencies are
   // destructed to avoid crashing at shutdown.
   file_logger_.reset();
+
+  // Destruct the ListenerManager explicitly, before InstanceImpl's local init_manager_ is
+  // destructed.
+  //
+  // The ListenerManager's DestinationPortsMap contains FilterChainSharedPtrs. There is a rare race
+  // condition where one of these FilterChains contains an HttpConnectionManager, which contains an
+  // RdsRouteConfigProvider, which contains an RdsRouteConfigSubscriptionSharedPtr. Since
+  // RdsRouteConfigSubscription is an Init::Target, ~RdsRouteConfigSubscription triggers a callback
+  // set at initialization, which goes to unregister it from the top-level InitManager, which has
+  // already been destructed (use-after-free) causing a segfault.
+  listener_manager_.reset();
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_->clusterManager(); }

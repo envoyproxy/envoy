@@ -118,10 +118,25 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
   listener_removed.waitReady();
 
   // Now connect. This should fail.
-  RawConnectionDriver connection2(
-      new_listener_port, buffer,
-      [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_);
-  connection2.run();
+  // Allow for a few attempts, in order to handle a race (likely due to lack of
+  // LEV_OPT_CLOSE_ON_FREE, which would break listener reuse)
+  //
+  // In order for this test to work, it must be tagged as "exclusive" in its
+  // build file. Otherwise, it's possible that when the listener is destroyed
+  // above, another test would start listening on the released port, and this
+  // connect would unexpectedly succeed.
+  bool connect_fail = false;
+  for (int i = 0; i < 10; ++i) {
+    RawConnectionDriver connection2(
+        new_listener_port, buffer,
+        [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_);
+    connection2.run(Event::Dispatcher::RunType::NonBlock);
+    if (connection2.connection().state() == Network::Connection::State::Closed) {
+      connect_fail = true;
+      break;
+    }
+  }
+  ASSERT_TRUE(connect_fail);
 }
 
 } // namespace Envoy

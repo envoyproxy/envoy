@@ -91,7 +91,9 @@ void Filter::complete(RateLimit::LimitStatus status, Http::HeaderMapPtr&&) {
   } else if (status == RateLimit::LimitStatus::Error) {
     if (config_->failureModeAllow()) {
       config_->stats().failure_mode_allowed_.inc();
-      filter_callbacks_->continueReading();
+      if (!calling_limit_) {
+        filter_callbacks_->continueReading();
+      }
     } else {
       config_->stats().cx_closed_.inc();
       filter_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
