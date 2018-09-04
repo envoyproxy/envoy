@@ -356,7 +356,7 @@ void ConfigHelper::setClientCodec(
   }
 }
 
-void ConfigHelper::addTlsListenerConfig() {
+void ConfigHelper::addSslConfig() {
   RELEASE_ASSERT(!finalized_, "");
 
   auto* filter_chain =
@@ -379,12 +379,6 @@ void ConfigHelper::addTlsListenerConfig() {
       TestEnvironment::runfilesPath("/test/config/integration/certs/servercert.pem"));
   tls_certificate->mutable_private_key()->set_filename(
       TestEnvironment::runfilesPath("/test/config/integration/certs/serverkey.pem"));
-}
-
-void ConfigHelper::addTlsUpstreamConfig() {
-  RELEASE_ASSERT(!finalized_, "");
-  auto* cluster = bootstrap_.mutable_static_resources()->mutable_clusters(0);
-  cluster->mutable_tls_context()->set_sni("example.com");
 }
 
 void ConfigHelper::renameListener(const std::string& name) {

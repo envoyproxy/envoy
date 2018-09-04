@@ -469,7 +469,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, TcpProxySslIntegrationTest,
                         TestUtility::ipTestParamsToString);
 
 void TcpProxySslIntegrationTest::initialize() {
-  config_helper_.addTlsListenerConfig();
+  config_helper_.addSslConfig();
   TcpProxyIntegrationTest::initialize();
 
   context_manager_.reset(new Ssl::ContextManagerImpl(runtime_));
