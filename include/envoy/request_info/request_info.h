@@ -8,7 +8,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/http/protocol.h"
-#include "envoy/request_info/dynamic_metadata.h"
+#include "envoy/request_info/filter_state.h"
 #include "envoy/upstream/upstream.h"
 
 #include "absl/types/optional.h"
@@ -48,8 +48,10 @@ enum ResponseFlag {
   RateLimited = 0x800,
   // Request was unauthorized by external authorization service.
   UnauthorizedExternalService = 0x1000,
+  // Unable to call Ratelimit service.
+  RateLimitServiceError = 0x2000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = UnauthorizedExternalService
+  LastFlag = RateLimitServiceError
 };
 
 /**
@@ -301,6 +303,25 @@ public:
    * the same key overriding existing.
    */
   virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
+
+  /**
+   * Object on which filters can share data on a per-request basis.
+   * Only one filter can produce a named data object, but it may be
+   * consumed by many other objects.
+   * @return the per-request state associated with this request.
+   */
+  virtual FilterState& perRequestState() PURE;
+  virtual const FilterState& perRequestState() const PURE;
+
+  /**
+   * @param SNI value requested
+   */
+  virtual void setRequestedServerName(const absl::string_view requested_server_name) PURE;
+
+  /**
+   * @return SNI value for downstream host
+   */
+  virtual const std::string& requestedServerName() const PURE;
 };
 
 } // namespace RequestInfo

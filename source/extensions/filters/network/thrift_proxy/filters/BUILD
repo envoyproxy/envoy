@@ -31,12 +31,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "filter_interface",
     hdrs = ["filter.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/network:connection_interface",
-        "//source/extensions/filters/network/thrift_proxy:protocol_interface",
-        "//source/extensions/filters/network/thrift_proxy:transport_interface",
+        "//source/extensions/filters/network/thrift_proxy:decoder_events_lib",
+        "//source/extensions/filters/network/thrift_proxy:thrift_lib",
         "//source/extensions/filters/network/thrift_proxy/router:router_interface",
     ],
 )

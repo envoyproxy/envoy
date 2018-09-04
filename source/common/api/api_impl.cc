@@ -9,8 +9,8 @@
 namespace Envoy {
 namespace Api {
 
-Event::DispatcherPtr Impl::allocateDispatcher() {
-  return Event::DispatcherPtr{new Event::DispatcherImpl()};
+Event::DispatcherPtr Impl::allocateDispatcher(TimeSource& time_source) {
+  return Event::DispatcherPtr{new Event::DispatcherImpl(time_source)};
 }
 
 Impl::Impl(std::chrono::milliseconds file_flush_interval_msec)

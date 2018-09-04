@@ -14,6 +14,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time.h"
 
 #include "spdlog/spdlog.h"
 
@@ -160,6 +161,8 @@ public:
                            const std::vector<std::string>& port_names);
 
   Api::ApiPtr api_;
+  DangerousDeprecatedTestTime test_time_;
+
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
   Event::DispatcherPtr dispatcher_;
 

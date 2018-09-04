@@ -42,20 +42,22 @@
 namespace Envoy {
 namespace Server {
 
-InstanceImpl::InstanceImpl(Options& options, Network::Address::InstanceConstSharedPtr local_address,
-                           TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
+InstanceImpl::InstanceImpl(Options& options, TimeSource& time_source,
+                           Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
+                           HotRestart& restarter, Stats::StoreRoot& store,
                            Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
                            ThreadLocal::Instance& tls)
-    : options_(options), restarter_(restarter), start_time_(time(nullptr)),
-      original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
-      api_(new Api::Impl(options.fileFlushIntervalMsec())), dispatcher_(api_->allocateDispatcher()),
+    : options_(options), time_source_(time_source), restarter_(restarter),
+      start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
+      thread_local_(tls), api_(new Api::Impl(options.fileFlushIntervalMsec())),
+      dispatcher_(api_->allocateDispatcher(time_source)),
       singleton_manager_(new Singleton::ManagerImpl()),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
-      random_generator_(std::move(random_generator)), listener_component_factory_(*this),
-      worker_factory_(thread_local_, *api_, hooks),
-      secret_manager_(new Secret::SecretManagerImpl()),
+      random_generator_(std::move(random_generator)),
+      secret_manager_(std::make_unique<Secret::SecretManagerImpl>()),
+      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks, time_source),
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false) {
 
@@ -95,6 +97,17 @@ InstanceImpl::~InstanceImpl() {
   // Stop logging to file before all the AccessLogManager and its dependencies are
   // destructed to avoid crashing at shutdown.
   file_logger_.reset();
+
+  // Destruct the ListenerManager explicitly, before InstanceImpl's local init_manager_ is
+  // destructed.
+  //
+  // The ListenerManager's DestinationPortsMap contains FilterChainSharedPtrs. There is a rare race
+  // condition where one of these FilterChains contains an HttpConnectionManager, which contains an
+  // RdsRouteConfigProvider, which contains an RdsRouteConfigSubscriptionSharedPtr. Since
+  // RdsRouteConfigSubscription is an Init::Target, ~RdsRouteConfigSubscription triggers a callback
+  // set at initialization, which goes to unregister it from the top-level InitManager, which has
+  // already been destructed (use-after-free) causing a segfault.
+  listener_manager_.reset();
 }
 
 Upstream::ClusterManager& InstanceImpl::clusterManager() { return *config_->clusterManager(); }
@@ -137,7 +150,6 @@ void InstanceImpl::flushStats() {
     server_stats_->total_connections_.set(numConnections() + info.num_connections_);
     server_stats_->days_until_first_cert_expiring_.set(
         sslContextManager().daysUntilFirstCertExpires());
-    server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
     InstanceUtil::flushMetricsToSinks(config_->statsSinks(), stats_store_.source());
     // TODO(ramaraochavali): consider adding different flush interval for histograms.
     if (stat_flush_timer_ != nullptr) {
@@ -214,7 +226,7 @@ void InstanceImpl::initialize(Options& options,
 
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options);
-  bootstrap_config_update_time_ = ProdSystemTimeSource::instance_.currentTime();
+  bootstrap_config_update_time_ = time_source_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
@@ -222,6 +234,9 @@ void InstanceImpl::initialize(Options& options,
 
   server_stats_.reset(
       new ServerStats{ALL_SERVER_STATS(POOL_GAUGE_PREFIX(stats_store_, "server."))});
+
+  server_stats_->concurrency_.set(options_.concurrency());
+  server_stats_->hot_restart_epoch_.set(options_.restartEpoch());
 
   failHealthcheck(false);
 
@@ -255,8 +270,8 @@ void InstanceImpl::initialize(Options& options,
   loadServerFlags(initial_config.flagsPath());
 
   // Workers get created first so they register for thread local updates.
-  listener_manager_.reset(new ListenerManagerImpl(
-      *this, listener_component_factory_, worker_factory_, ProdSystemTimeSource::instance_));
+  listener_manager_.reset(
+      new ListenerManagerImpl(*this, listener_component_factory_, worker_factory_, time_source_));
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -294,8 +309,8 @@ void InstanceImpl::initialize(Options& options,
 
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
-    async_client_manager_ =
-        std::make_unique<Grpc::AsyncClientManagerImpl>(clusterManager(), thread_local_);
+    async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
+        clusterManager(), thread_local_, time_source_);
     hds_delegate_.reset(new Upstream::HdsDelegate(
         bootstrap_.node(), stats(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
@@ -315,8 +330,7 @@ void InstanceImpl::initialize(Options& options,
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_.reset(
-      new Server::GuardDogImpl(stats_store_, *config_, ProdMonotonicTimeSource::instance_));
+  guard_dog_.reset(new Server::GuardDogImpl(stats_store_, *config_, time_source_));
 }
 
 void InstanceImpl::startWorkers() {

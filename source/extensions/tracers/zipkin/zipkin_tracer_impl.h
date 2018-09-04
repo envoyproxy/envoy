@@ -91,7 +91,8 @@ public:
    */
   Driver(const Json::Object& config, Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
          ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
-         const LocalInfo::LocalInfo& localinfo, Runtime::RandomGenerator& random_generator);
+         const LocalInfo::LocalInfo& localinfo, Runtime::RandomGenerator& random_generator,
+         TimeSource& time_source);
 
   /**
    * This function is inherited from the abstract Driver class.
@@ -130,6 +131,7 @@ private:
   ThreadLocal::SlotPtr tls_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
+  TimeSource& time_source_;
 };
 
 /**

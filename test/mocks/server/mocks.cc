@@ -19,6 +19,7 @@ namespace Envoy {
 namespace Server {
 
 MockOptions::MockOptions(const std::string& config_path) : config_path_(config_path) {
+  ON_CALL(*this, concurrency()).WillByDefault(ReturnPointee(&concurrency_));
   ON_CALL(*this, configPath()).WillByDefault(ReturnRef(config_path_));
   ON_CALL(*this, configYaml()).WillByDefault(ReturnRef(config_yaml_));
   ON_CALL(*this, v2ConfigOnly()).WillByDefault(Invoke([this] { return v2_config_only_; }));
@@ -30,6 +31,7 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, logPath()).WillByDefault(ReturnRef(log_path_));
   ON_CALL(*this, maxStats()).WillByDefault(Return(1000));
   ON_CALL(*this, statsOptions()).WillByDefault(ReturnRef(stats_options_));
+  ON_CALL(*this, restartEpoch()).WillByDefault(ReturnPointee(&hot_restart_epoch_));
   ON_CALL(*this, hotRestartDisabled()).WillByDefault(ReturnPointee(&hot_restart_disabled_));
 }
 MockOptions::~MockOptions() {}
@@ -88,6 +90,7 @@ MockListenerManager::MockListenerManager() {}
 MockListenerManager::~MockListenerManager() {}
 
 MockWorkerFactory::MockWorkerFactory() {}
+
 MockWorkerFactory::~MockWorkerFactory() {}
 
 MockWorker::MockWorker() {
@@ -130,6 +133,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
   ON_CALL(*this, singletonManager()).WillByDefault(ReturnRef(*singleton_manager_));
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
+  ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(test_time_.timeSource()));
 }
 
 MockInstance::~MockInstance() {}
@@ -144,7 +148,9 @@ MockMain::MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill)
   ON_CALL(*this, wdMultiKillTimeout()).WillByDefault(Return(wd_multikill_));
 }
 
-MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::ManagerImpl()) {
+MockFactoryContext::MockFactoryContext()
+    : singleton_manager_(new Singleton::ManagerImpl()),
+      time_source_(system_time_source_, monotonic_time_source_) {
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
@@ -160,11 +166,14 @@ MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::Man
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(listener_scope_));
   ON_CALL(*this, systemTimeSource()).WillByDefault(ReturnRef(system_time_source_));
+  ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_source_));
 }
 
 MockFactoryContext::~MockFactoryContext() {}
 
-MockTransportSocketFactoryContext::MockTransportSocketFactoryContext() {}
+MockTransportSocketFactoryContext::MockTransportSocketFactoryContext()
+    : secret_manager_(new Secret::SecretManagerImpl()) {}
+
 MockTransportSocketFactoryContext::~MockTransportSocketFactoryContext() {}
 
 MockListenerFactoryContext::MockListenerFactoryContext() {}
@@ -180,6 +189,9 @@ MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
 }
 
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() {}
+
+MockAdminStream::MockAdminStream() {}
+MockAdminStream::~MockAdminStream() {}
 
 } // namespace Configuration
 } // namespace Server

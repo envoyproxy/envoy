@@ -98,7 +98,13 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
   // Copy the current cached formatted format string, then replace its subseconds part (when it has
   // non-zero width) by correcting its position using prepared subseconds offsets.
   std::string formatted_str = formatted.str;
-  const std::string nanoseconds = fmt::FormatInt(epoch_time_ns.count()).str();
+  std::string nanoseconds = fmt::FormatInt(epoch_time_ns.count()).str();
+  // Special case handling for beginning of time, we should never need to do this outside of
+  // tests or a time machine.
+  if (nanoseconds.size() < 10) {
+    nanoseconds = std::string(10 - nanoseconds.size(), '0') + nanoseconds;
+  }
+
   for (size_t i = 0; i < specifiers_.size(); ++i) {
     const auto& specifier = specifiers_.at(i);
 
@@ -161,8 +167,8 @@ std::string DateFormatter::fromTime(time_t time) const {
   gmtime_r(&time, &current_tm);
 
   std::array<char, 1024> buf;
-  strftime(&buf[0], buf.size(), format_string_.c_str(), &current_tm);
-  return std::string(&buf[0]);
+  const size_t len = strftime(&buf[0], buf.size(), format_string_.c_str(), &current_tm);
+  return std::string(&buf[0], len);
 }
 
 std::string
@@ -179,7 +185,7 @@ DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets&
   for (const auto& specifier : specifiers_) {
     const size_t formatted_length =
         strftime(&buf[0], buf.size(), specifier.segment_.c_str(), &current_tm);
-    absl::StrAppend(&formatted, &buf[0],
+    absl::StrAppend(&formatted, absl::string_view(&buf[0], formatted_length),
                     specifier.second_ ? seconds_str : std::string(specifier.width_, '?'));
 
     // This computes and saves offset of each specifier's pattern to correct its position after the
@@ -200,9 +206,6 @@ std::string DateFormatter::now() {
   time(&current_time_t);
   return fromTime(current_time_t);
 }
-
-ProdSystemTimeSource ProdSystemTimeSource::instance_;
-ProdMonotonicTimeSource ProdMonotonicTimeSource::instance_;
 
 ConstMemoryStreamBuffer::ConstMemoryStreamBuffer(const char* data, size_t size) {
   // std::streambuf won't modify `data`, but the interface still requires a char* for convenience,

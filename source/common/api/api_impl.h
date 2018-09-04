@@ -17,7 +17,7 @@ public:
   Impl(std::chrono::milliseconds file_flush_interval_msec);
 
   // Api::Api
-  Event::DispatcherPtr allocateDispatcher() override;
+  Event::DispatcherPtr allocateDispatcher(TimeSource& time_source) override;
   Filesystem::FileSharedPtr createFile(const std::string& path, Event::Dispatcher& dispatcher,
                                        Thread::BasicLockable& lock,
                                        Stats::Store& stats_store) override;

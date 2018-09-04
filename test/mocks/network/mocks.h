@@ -434,6 +434,8 @@ public:
   MOCK_METHOD2(doWrite, IoResult(Buffer::Instance& buffer, bool end_stream));
   MOCK_METHOD0(onConnected, void());
   MOCK_CONST_METHOD0(ssl, const Ssl::Connection*());
+
+  TransportSocketCallbacks* callbacks_{};
 };
 
 class MockTransportSocketFactory : public TransportSocketFactory {
@@ -443,6 +445,20 @@ public:
 
   MOCK_CONST_METHOD0(implementsSecureTransport, bool());
   MOCK_CONST_METHOD0(createTransportSocket, TransportSocketPtr());
+};
+
+class MockTransportSocketCallbacks : public TransportSocketCallbacks {
+public:
+  MockTransportSocketCallbacks();
+  ~MockTransportSocketCallbacks();
+
+  MOCK_CONST_METHOD0(fd, int());
+  MOCK_METHOD0(connection, Connection&());
+  MOCK_METHOD0(shouldDrainReadBuffer, bool());
+  MOCK_METHOD0(setReadBufferReady, void());
+  MOCK_METHOD1(raiseEvent, void(ConnectionEvent));
+
+  testing::NiceMock<MockConnection> connection_;
 };
 
 } // namespace Network

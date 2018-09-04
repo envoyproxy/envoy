@@ -13,11 +13,12 @@
 #include "test/integration/fake_upstream.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
-#include "test/mocks/secret/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/test_time.h"
 
 using testing::_;
 using testing::Invoke;
@@ -202,7 +203,8 @@ public:
 class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
-      : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {}
+      : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
+        dispatcher_(test_time_.timeSource()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
@@ -274,7 +276,7 @@ public:
     envoy::api::v2::core::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
     fillServiceWideInitialMetadata(config);
-    return std::make_unique<AsyncClientImpl>(cm_, config);
+    return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_.timeSource());
   }
 
   virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() {
@@ -393,6 +395,7 @@ public:
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
+  DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
   DispatcherHelper dispatcher_helper_{dispatcher_};
   Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();
@@ -461,7 +464,7 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     }
-    auto cfg = std::make_unique<Ssl::ClientContextConfigImpl>(tls_context, secret_manager_);
+    auto cfg = std::make_unique<Ssl::ClientContextConfigImpl>(tls_context, factory_context_);
 
     mock_cluster_info_->transport_socket_factory_ = std::make_unique<Ssl::ClientSslSocketFactory>(
         std::move(cfg), context_manager_, *stats_store_);
@@ -491,7 +494,7 @@ public:
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     }
 
-    auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, secret_manager_);
+    auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, factory_context_);
 
     static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
     return std::make_unique<Ssl::ServerSslSocketFactory>(
@@ -499,7 +502,7 @@ public:
   }
 
   bool use_client_cert_{};
-  NiceMock<Secret::MockSecretManager> secret_manager_;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 
 } // namespace
