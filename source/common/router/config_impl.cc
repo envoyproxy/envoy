@@ -9,9 +9,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/type/percent.pb.validate.h"
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/type/percent.pb.validate.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 

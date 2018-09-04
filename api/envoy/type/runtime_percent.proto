@@ -17,7 +17,6 @@ message RuntimeFractionalPercent {
   // Default value if the runtime value's for the numerator/denominator keys are not available.
   envoy.type.FractionalPercent default_value = 1 [(validate.rules).message.required = true];
 
-  // Runtime key for a textual representation of a :ref:`fractional percent
-  // types<envoy_api_enum_type.FractionalPercent`.
+  // Runtime key for a YAML representation of a FractionalPercent.
   string runtime_key = 2;
 }
