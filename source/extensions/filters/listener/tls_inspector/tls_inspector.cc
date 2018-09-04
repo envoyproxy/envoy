@@ -24,7 +24,7 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
 
-Config::Config(Stats::Scope& scope, std::string stat_prefix, uint32_t max_client_hello_size)
+Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size, const std::string& stat_prefix)
     : stats_{TLS_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
       max_client_hello_size_(max_client_hello_size) {
