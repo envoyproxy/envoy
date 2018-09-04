@@ -1,30 +1,31 @@
 #include <chrono>
 
+#include "envoy/event/dispatcher.h"
+
 #include "common/common/assert.h"
 #include "common/common/lock_guard.h"
 #include "common/event/event_impl_base.h"
 #include "common/event/real_time_system.h"
-#include "common/event/timer_impl.h"
+
+#include "test/test_common/simulated_time_system.h"
 
 #include "event2/event.h"
 
 namespace Envoy {
 namespace Event {
-namespace {
-
-class SimulatedTimerFactory;
 
 /**
  * An Alarm is created in the context of a thread's dispatcher.
  */
-class Alarm : public TimerImpl {
+class SimulatedTimeSystem::Alarm : public Timer {
 public:
-  Alarm(SimulatedTimerFactory& time_factory, TimerCb cb, uint64_t index)
-      : time_factory_(time_factory), cb_(cb), time_(0), index_(0) {
+  Alarm(SimulatedTimeSystem& time_system, Dispatcher& dispatcher, TimerCb cb)
+      : time_system_(time_system), dispatcher_(dispatcher), cb_(cb),
+        index_(time_system.nextIndex()), armed_(false) {
     ASSERT(cb_);
   }
 
-  virtual ~Alarm() { ASSERT(time_ == 0); }
+  virtual ~Alarm() { ASSERT(!armed_); }
 
   // Timer
   void disableTimer() override;
@@ -37,74 +38,77 @@ public:
   int Compare(const Alarm* other) const {
     int cmp = 0;
     if (this != other) {
-      if (wakeup_time_us_ < other->wakeup_time_us_) {
+      if (time_ < other->time_) {
         cmp = -1;
-      } else if (wakeup_time_us_ > other->wakeup_time_us_) {
+      } else if (time_ > other->time_) {
         cmp = 1;
       } else if (index_ < other->index_) {
         cmp = -1;
       } else {
-        DCHECK(index_ > other->index_);
+        ASSERT(index_ > other->index_);
         cmp = 1;
       }
     }
     return cmp;
   }
 
+  void run() { armed_ = false; dispatcher_.post(cb_); }
+  MonotonicTime time() const { ASSERT(armed_); return time_; }
+
 private:
-  SimulatedTimerFactory& time_factory_;
+  SimulatedTimeSystem& time_system_;
+  Dispatcher& dispatcher_;
   TimerCb cb_;
   MonotonicTime time_;
   uint64_t index_;
+  bool armed_;
 };
 
-struct CompareAlarms {
-  bool operator()(const Alarm* a, const Alarm* b) const { return a->Compare(b) < 0; }
+bool SimulatedTimeSystem::CompareAlarms::operator()(const Alarm* a, const Alarm* b) const {
+  return a->Compare(b) < 0;
 };
+
+namespace {
 
 // Each scheduler maintains its own timer
 class SimulatedScheduler : public Scheduler {
 public:
-  SimulatedScheduler(Libevent::BasePtr& libevent, SimulaedTimeSystem& time_system)
-      : libevent_(libevent),
-        time_system_(time_system) {}
-  ~SimulatedScheduler() { time_system_.removeScheduler(this); }
+  SimulatedScheduler(SimulatedTimeSystem& time_system, Dispatcher& dispatcher)
+      : time_system_(time_system), dispatcher_(dispatcher) {}
   TimerPtr createTimer(const TimerCb& cb) override {
-    return std::make_unique<TimerImpl>(libevent_, cb);
+    return std::make_unique<SimulatedTimeSystem::Alarm>(time_system_, dispatcher_, cb);
   };
 
-  void removeAlarm(Alarm* alarm) { alarms_.erase(alarm); }
-
-  void addAlarm(Alarm* alarm) { alarms_.insert(alarm); }
-
-private:
-  typedef std::set<Alarm*, CompareAlarms> AlarmSet;
-  AlarmSet alarms_;
-  Libevent::BasePtr& libevent_;
-  SimulatedTimeSystem* time_system_;
+ private:
+  SimulatedTimeSystem& time_system_;
+  Dispatcher& dispatcher_;
 };
 
-void Alarm::disableTimer() {
-  time_factory_->removeAlarm(this);
-  time_ = 0;
+} // namespace
+
+void SimulatedTimeSystem::Alarm::disableTimer() {
+  ASSERT(armed_);
+  time_system_.removeAlarm(this);
+  armed_ = false;
 }
 
-void Alarm::enableTimer(const std::chrono::milliseconds& duration) {
-  if (d.count() == 0) {
-    cb_();
+void SimulatedTimeSystem::Alarm::enableTimer(const std::chrono::milliseconds& duration) {
+  ASSERT(!armed_);
+  armed_ = true;
+  if (duration.count() == 0) {
+    run();
   } else {
-    time_factory_->addAlarm(this);
+    time_system_.addAlarm(this);
   }
 }
-
-} // namespace
 
 // When we initialize our simulated time, we'll start the current time based on
 // the real current time. But thereafter, real-time will not be used, and time
 // will march forward only by calling sleep().
 SimulatedTimeSystem::SimulatedTimeSystem()
     : monotonic_time_(real_time_source_.monotonicTime()),
-      system_time_(real_time_source_.systemTime()) {}
+      system_time_(real_time_source_.systemTime()),
+      index_(0) {}
 
 SystemTime SimulatedTimeSystem::systemTime() {
   Thread::LockGuard lock(mutex_);
@@ -116,21 +120,43 @@ MonotonicTime SimulatedTimeSystem::monotonicTime() {
   return monotonic_time_;
 }
 
-TimerFactoryPtr SimulatedTimeSystem::createScheduler(Libevent::BasePtr& libevent) {
-  auto scheduler = std::make_unique<SimulatedScheduler>(libevent, *this);
-  {
-    Thread::LockGuard lock(mutex_);
-    schedulers_.insert(scheduler.get());
-  }
-  return std::move(scheduler);
-}
-
-void SimulatedTimeSystem::removeScheduler(SimulatedScheduler* scheduler) {
+int64_t SimulatedTimeSystem::nextIndex() {
   Thread::LockGuard lock(mutex_);
-  schedulers_.erase(scheduler);
+  return index_++;
 }
 
-void SimulatedTimeSystem::sleep(std::chrono::duration duration) {
+void SimulatedTimeSystem::addAlarm(Alarm* alarm) {
+  Thread::LockGuard lock(mutex_);
+  alarms_.insert(alarm);
+}
+
+void SimulatedTimeSystem::removeAlarm(Alarm* alarm) {
+  Thread::LockGuard lock(mutex_);
+  alarms_.erase(alarm);
+}
+
+SchedulerPtr SimulatedTimeSystem::createScheduler(Libevent::BasePtr&, Dispatcher& dispatcher) {
+  return std::make_unique<SimulatedScheduler>(*this, dispatcher);
+}
+
+std::vector<SimulatedTimeSystem::Alarm*> SimulatedTimeSystem::findReadyAlarmsLockHeld() {
+  std::vector<Alarm*> ready;
+  while (!alarms_.empty()) {
+    AlarmSet::iterator p = alarms_.begin();
+    Alarm* alarm = *p;
+    if (alarm->time() > monotonic_time_) {
+      break;
+    }
+    alarms_.erase(p);
+    ready.push_back(alarm);  // Don't fine the alarms under lock.
+  }
+  return ready;
+}
+
+void SimulatedTimeSystem::runAlarms(std::vector<Alarm*> ready) {
+  for (Alarm* alarm : ready) {
+    alarm->run();
+  }
 }
 
 } // namespace Event

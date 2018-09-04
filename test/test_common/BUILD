@@ -128,6 +128,15 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "simulated_time_system_lib",
+    srcs = ["simulated_time_system.cc"],
+    hdrs = ["simulated_time_system.h"],
+    deps = [
+        "//source/common/event:real_time_system_lib",
+    ],
+)
+
 envoy_cc_library(
     name = "tls_utility_lib",
     srcs = ["tls_utility.cc"],

@@ -10,27 +10,52 @@ namespace Event {
 
 class SimulatedTimeSystem : public TimeSystem {
 public:
+  class Alarm;
+
+  SimulatedTimeSystem();
+
   // TimeSystem
-  TimerFactoryPtr createScheduler(Libevent::BasePtr&) override;
+  SchedulerPtr createScheduler(Libevent::BasePtr&, Dispatcher& dispatcher) override;
 
   // TimeSource
-  SystemTime systemTime() override { return system_time_; }
-  MonotonicTime monotonicTime() override { return monotonic_time_; }
+  SystemTime systemTime() override;
+  MonotonicTime monotonicTime() override;
 
   // Advances time forward by the specified duration, running any timers
   // that are scheduled to wake up.
-  void sleep(std::chrono::duration);
+  template<class Duration>
+  void sleep(Duration duration) {
+    std::vector<Alarm*> ready;
+    {
+      Thread::LockGuard lock(mutex_);
+      monotonic_time_ += duration;
+      system_time_ += duration;
+      ready = findReadyAlarmsLockHeld();
+    }
+    runAlarms(ready);
+  }
+
+  int64_t nextIndex();
+  void addAlarm(Alarm*);
+  void removeAlarm(Alarm*);
 
 private:
   friend class SimulatedScheduler;
+  struct CompareAlarms {
+    bool operator()(const Alarm* a, const Alarm* b) const;
+  };
+  typedef std::set<Alarm*, CompareAlarms> AlarmSet;
 
-  void removeScheduler(SimulatedScheduler*);
+  std::vector<Alarm*> findReadyAlarmsLockHeld() EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void runAlarms(const std::vector<Alarm*> alarms);
 
-  RealTimeSource real_time_source_ GUARDED_BY(mutex_);
+  RealTimeSource real_time_source_;
   MonotonicTime monotonic_time_ GUARDED_BY(mutex_);
   SystemTime system_time_ GUARDED_BY(mutex_);;
-  std:::unordered_set<SimulatedScheduler*> schedulers_ GUARDED_BY(mutex_);
-  Thread::MutexBasicLockable mutex_;
+  AlarmSet alarms_ GUARDED_BY(mutex_);
+  uint64_t index_ GUARDED_BY(mutex_);
+
+  mutable Thread::MutexBasicLockable mutex_;
 };
 
 } // namespace Event
