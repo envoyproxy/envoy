@@ -25,6 +25,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
+class DirectResponse;
+typedef std::unique_ptr<DirectResponse> DirectResponsePtr;
+
 /**
  * Protocol represents the operations necessary to implement the a generic Thrift protocol.
  * See https://github.com/apache/thrift/blob/master/doc/specs/thrift-protocol-spec.md
@@ -460,6 +463,23 @@ public:
 };
 
 typedef std::unique_ptr<Protocol> ProtocolPtr;
+
+/**
+ * A DirectResponse manipulates a Protocol to directly create a Thrift response message.
+ */
+class DirectResponse {
+public:
+  virtual ~DirectResponse() {}
+
+  /**
+   * Encodes the response via the given Protocol.
+   * @param metadata the MessageMetadata for the request that generated this response
+   * @param proto the Protocol to be used for message encoding
+   * @param buffer the Buffer into which the message should be encoded
+   */
+  virtual void encode(MessageMetadata& metadata, Protocol& proto,
+                      Buffer::Instance& buffer) const PURE;
+};
 
 /**
  * Implemented by each Thrift protocol and registered via Registry::registerFactory or the

@@ -84,27 +84,6 @@ private:
 
 typedef std::shared_ptr<MessageMetadata> MessageMetadataSharedPtr;
 
-class Protocol;
-
-/**
- * A DirectResponse manipulates a Protocol to directly create a Thrift response message.
- */
-class DirectResponse {
-public:
-  virtual ~DirectResponse() {}
-
-  /**
-   * Encodes the response via the given Protocol.
-   * @param metadata the MessageMetadata for the request that generated this response
-   * @param proto the Protocol to be used for message encoding
-   * @param buffer the Buffer into which the message should be encoded
-   */
-  virtual void encode(MessageMetadata& metadata, Protocol& proto,
-                      Buffer::Instance& buffer) const PURE;
-};
-
-typedef std::unique_ptr<DirectResponse> DirectResponsePtr;
-
 } // namespace ThriftProxy
 } // namespace NetworkFilters
 } // namespace Extensions
