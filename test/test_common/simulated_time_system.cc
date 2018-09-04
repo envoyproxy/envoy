@@ -4,8 +4,8 @@
 
 #include "common/common/assert.h"
 #include "common/common/lock_guard.h"
-#include "common/event/event_impl_base.h"
 #include "common/event/real_time_system.h"
+#include "common/event/timer_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
 
@@ -17,12 +17,12 @@ namespace Event {
 /**
  * An Alarm is created in the context of a thread's dispatcher.
  */
-class SimulatedTimeSystem::Alarm : public Timer {
+class SimulatedTimeSystem::Alarm : public TimerImpl {
 public:
-  Alarm(SimulatedTimeSystem& time_system, Dispatcher& dispatcher, TimerCb cb)
-      : time_system_(time_system), dispatcher_(dispatcher), cb_(cb),
-        index_(time_system.nextIndex()), armed_(false) {
-    ASSERT(cb_);
+  Alarm(SimulatedTimeSystem& time_system, Libevent::BasePtr& libevent, TimerCb cb)
+      : TimerImpl(libevent, cb),
+        time_system_(time_system), index_(time_system.nextIndex()),
+        armed_(false) {
   }
 
   virtual ~Alarm() { ASSERT(!armed_); }
@@ -52,13 +52,15 @@ public:
     return cmp;
   }
 
-  void run() { armed_ = false; dispatcher_.post(cb_); }
+  void run() {
+    armed_ = false;
+    std::chrono::milliseconds duration;
+    TimerImpl::enableTimer(duration);
+  }
   MonotonicTime time() const { ASSERT(armed_); return time_; }
 
 private:
   SimulatedTimeSystem& time_system_;
-  Dispatcher& dispatcher_;
-  TimerCb cb_;
   MonotonicTime time_;
   uint64_t index_;
   bool armed_;
@@ -73,15 +75,15 @@ namespace {
 // Each scheduler maintains its own timer
 class SimulatedScheduler : public Scheduler {
 public:
-  SimulatedScheduler(SimulatedTimeSystem& time_system, Dispatcher& dispatcher)
-      : time_system_(time_system), dispatcher_(dispatcher) {}
+  SimulatedScheduler(SimulatedTimeSystem& time_system, Libevent::BasePtr& libevent)
+      : time_system_(time_system), libevent_(libevent) {}
   TimerPtr createTimer(const TimerCb& cb) override {
-    return std::make_unique<SimulatedTimeSystem::Alarm>(time_system_, dispatcher_, cb);
+    return std::make_unique<SimulatedTimeSystem::Alarm>(time_system_, libevent_, cb);
   };
 
  private:
   SimulatedTimeSystem& time_system_;
-  Dispatcher& dispatcher_;
+  Libevent::BasePtr& libevent_;
 };
 
 } // namespace
@@ -135,8 +137,8 @@ void SimulatedTimeSystem::removeAlarm(Alarm* alarm) {
   alarms_.erase(alarm);
 }
 
-SchedulerPtr SimulatedTimeSystem::createScheduler(Libevent::BasePtr&, Dispatcher& dispatcher) {
-  return std::make_unique<SimulatedScheduler>(*this, dispatcher);
+SchedulerPtr SimulatedTimeSystem::createScheduler(Libevent::BasePtr& libevent, Dispatcher&) {
+  return std::make_unique<SimulatedScheduler>(*this, libevent);
 }
 
 std::vector<SimulatedTimeSystem::Alarm*> SimulatedTimeSystem::findReadyAlarmsLockHeld() {
