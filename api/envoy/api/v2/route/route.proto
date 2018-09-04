@@ -457,8 +457,8 @@ message RouteAction {
     google.protobuf.Duration per_try_timeout = 3 [(gogoproto.stdduration) = true];
   }
 
-  // Specifies the idle timeout for the route. If not specified, there is no per-route idle timeout
-  // specified, although the connection manager wide :ref:`stream_idle_timeout
+  // Specifies the idle timeout for the route. If not specified, there is no per-route idle timeout,
+  // although the connection manager wide :ref:`stream_idle_timeout
   // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
   // will still apply. A value of 0 will completely disable the route's idle timeout, even if a
   // connection manager stream idle timeout is configured.
