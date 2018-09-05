@@ -12,7 +12,10 @@ envoy_cc_library(
     name = "ssl_socket_lib",
     srcs = ["ssl_socket.cc"],
     hdrs = ["ssl_socket.h"],
-    external_deps = ["ssl"],
+    external_deps = [
+        "abseil_synchronization",
+        "ssl",
+    ],
     deps = [
         ":context_config_lib",
         ":context_lib",
@@ -23,6 +26,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/common:thread_annotations",
         "//source/common/http:headers_lib",
     ],
 )
