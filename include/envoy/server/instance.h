@@ -6,6 +6,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/event/timer.h"
 #include "envoy/init/init.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/listen_socket.h"
@@ -194,8 +195,9 @@ public:
 
   /**
    * @return the time source used for the server.
+   * TODO(#4160): rename this to timeSystem().
    */
-  virtual TimeSource& timeSource() PURE;
+  virtual Event::TimeSystem& timeSource() PURE;
 
   /**
    * @return the flush interval of stats sinks.

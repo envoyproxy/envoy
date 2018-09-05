@@ -13,7 +13,6 @@
 #include "common/common/lock_guard.h"
 #include "common/event/file_event_impl.h"
 #include "common/event/signal_impl.h"
-#include "common/event/timer_impl.h"
 #include "common/filesystem/watcher_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/dns_impl.h"
@@ -24,14 +23,15 @@
 namespace Envoy {
 namespace Event {
 
-DispatcherImpl::DispatcherImpl(TimeSource& time_source)
-    : DispatcherImpl(time_source, Buffer::WatermarkFactoryPtr{new Buffer::WatermarkBufferFactory}) {
+DispatcherImpl::DispatcherImpl(TimeSystem& time_system)
+    : DispatcherImpl(time_system, Buffer::WatermarkFactoryPtr{new Buffer::WatermarkBufferFactory}) {
   // The dispatcher won't work as expected if libevent hasn't been configured to use threads.
   RELEASE_ASSERT(Libevent::Global::initialized(), "");
 }
 
-DispatcherImpl::DispatcherImpl(TimeSource& time_source, Buffer::WatermarkFactoryPtr&& factory)
-    : time_source_(time_source), buffer_factory_(std::move(factory)), base_(event_base_new()),
+DispatcherImpl::DispatcherImpl(TimeSystem& time_system, Buffer::WatermarkFactoryPtr&& factory)
+    : time_system_(time_system), buffer_factory_(std::move(factory)), base_(event_base_new()),
+      scheduler_(time_system_.createScheduler(base_)),
       deferred_delete_timer_(createTimer([this]() -> void { clearDeferredDeleteList(); })),
       post_timer_(createTimer([this]() -> void { runPostCallbacks(); })),
       current_to_delete_(&to_delete_1_) {
@@ -117,7 +117,7 @@ DispatcherImpl::createListener(Network::Socket& socket, Network::ListenerCallbac
 
 TimerPtr DispatcherImpl::createTimer(TimerCb cb) {
   ASSERT(isThreadSafe());
-  return TimerPtr{new TimerImpl(*this, cb)};
+  return scheduler_->createTimer(cb);
 }
 
 void DispatcherImpl::deferredDelete(DeferredDeletablePtr&& to_delete) {

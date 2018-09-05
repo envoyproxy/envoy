@@ -143,10 +143,10 @@ if __name__ == "__main__":
                                     "Don't use <mutex> or <condition_variable*>")
   errors += fixFileExpectingFailure("condition_variable_any.cc",
                                     "Don't use <mutex> or <condition_variable*>")
-  errors += fixFileExpectingFailure(
-      "prod_system_time.cc", "Don't reference real-time sources from production code; use injection")
-  errors += fixFileExpectingFailure(
-      "prod_monotonic_time.cc", "Don't reference real-time sources from production code; use injection")
+  real_time_inject_error = (
+      "Don't reference real-world time sources from production code; use injection")
+  errors += fixFileExpectingFailure("real_time_source.cc", real_time_inject_error)
+  errors += fixFileExpectingFailure("real_time_system.cc", real_time_inject_error)
 
   errors += fixFileExpectingNoChange("ok_file.cc")
 
@@ -167,10 +167,8 @@ if __name__ == "__main__":
   errors += checkFileExpectingError("bad_envoy_build_sys_ref.BUILD",
                                     "Superfluous '@envoy//' prefix")
   errors += checkFileExpectingError("proto_format.proto", "clang-format check failed")
-  errors += checkFileExpectingError(
-      "prod_system_time.cc", "Don't reference real-time sources from production code; use injection")
-  errors += checkFileExpectingError(
-      "prod_monotonic_time.cc", "Don't reference real-time sources from production code; use injection")
+  errors += checkFileExpectingError("real_time_source.cc", real_time_inject_error)
+  errors += checkFileExpectingError("real_time_system.cc", real_time_inject_error)
 
   errors += checkFileExpectingOK("ok_file.cc")
 

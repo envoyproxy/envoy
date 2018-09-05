@@ -327,7 +327,7 @@ public:
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
-  MOCK_METHOD0(timeSource, TimeSource&());
+  MOCK_METHOD0(timeSource, Event::TimeSystem&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
@@ -405,8 +405,6 @@ public:
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
-  MOCK_METHOD0(systemTimeSource, SystemTimeSource&());
-  MOCK_METHOD0(monotonicTimeSource, MonotonicTimeSource&());
   MOCK_METHOD0(timeSource, TimeSource&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
@@ -423,9 +421,7 @@ public:
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
-  testing::NiceMock<MockSystemTimeSource> system_time_source_;
-  testing::NiceMock<MockMonotonicTimeSource> monotonic_time_source_;
-  TimeSource time_source_;
+  testing::NiceMock<MockTimeSource> time_source_;
 };
 
 class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {

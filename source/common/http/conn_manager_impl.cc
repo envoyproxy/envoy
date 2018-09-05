@@ -7,8 +7,8 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"

@@ -78,6 +78,8 @@ public:
     }
   }
 
+  bool match(const std::string& value) const;
+
   bool match(const ProtobufWkt::Value& value) const override;
 
 private:

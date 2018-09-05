@@ -4,8 +4,10 @@
 
 #include "envoy/common/time.h"
 #include "envoy/common/token_bucket.h"
+#include "envoy/event/timer.h"
 
 #include "common/common/logger.h"
+#include "common/event/real_time_system.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
@@ -35,29 +37,32 @@ public:
   MOCK_METHOD0(ready, void());
 };
 
-class MockSystemTimeSource : public SystemTimeSource {
-public:
-  MockSystemTimeSource();
-  ~MockSystemTimeSource();
-
-  MOCK_METHOD0(currentTime, SystemTime());
-};
-
-class MockMonotonicTimeSource : public MonotonicTimeSource {
-public:
-  MockMonotonicTimeSource();
-  ~MockMonotonicTimeSource();
-
-  MOCK_METHOD0(currentTime, MonotonicTime());
-};
-
 class MockTimeSource : public TimeSource {
 public:
   MockTimeSource();
   ~MockTimeSource();
 
-  MockSystemTimeSource system_;
-  MockMonotonicTimeSource monotonic_;
+  MOCK_METHOD0(systemTime, SystemTime());
+  MOCK_METHOD0(monotonicTime, MonotonicTime());
+};
+
+class MockTimeSystem : public Event::TimeSystem {
+public:
+  MockTimeSystem();
+  ~MockTimeSystem();
+
+  // TODO(#4160): Eliminate all uses of MockTimeSystem, replacing with SimulatedTimeSystem,
+  // where timer callbacks are triggered by the advancement of time. This implementation
+  // matches recent behavior, where real-time timers were created directly in libevent
+  // by dispatcher_impl.cc.
+  Event::SchedulerPtr createScheduler(Event::Libevent::BasePtr& base) override {
+    return real_time_system_.createScheduler(base);
+  }
+  MOCK_METHOD0(systemTime, SystemTime());
+  MOCK_METHOD0(monotonicTime, MonotonicTime());
+
+  Event::RealTimeSystem real_time_system_;
+  MockTimeSource mock_time_source_;
 };
 
 class MockTokenBucket : public TokenBucket {

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/time.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
@@ -35,12 +36,9 @@ public:
   /**
    * Returns a time-source to use with this dispatcher.
    *
-   * TODO(#4160) the implementations currently manage timer events that
-   * ignore the time-source, and thus can't be mocked or faked. So it's
-   * difficult to mock time in an integration test without mocking out
-   * the dispatcher.
+   * TODO(#4160) Rename to timeSystem().
    */
-  virtual TimeSource& timeSource() PURE;
+  virtual TimeSystem& timeSource() PURE;
 
   /**
    * Clear any items in the deferred deletion queue.
@@ -114,10 +112,10 @@ public:
                                               bool hand_off_restored_destination_connections) PURE;
 
   /**
-   * Allocate a timer. @see Event::Timer for docs on how to use the timer.
+   * Allocate a timer. @see Timer for docs on how to use the timer.
    * @param cb supplies the callback to invoke when the timer fires.
    */
-  virtual TimerPtr createTimer(TimerCb cb) PURE;
+  virtual Event::TimerPtr createTimer(TimerCb cb) PURE;
 
   /**
    * Submit an item for deferred delete. @see DeferredDeletable.
