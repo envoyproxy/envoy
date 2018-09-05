@@ -6,12 +6,14 @@ Version history
 * access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>`
   to filter based on the presence of Envoy response flags.
 * access log: added RESPONSE_DURATION and RESPONSE_TX_DURATION.
+* access log: added REQUESTED_SERVER_NAME for SNI to tcp_proxy and http
 * admin: added :http:get:`/hystrix_event_stream` as an endpoint for monitoring envoy's statistics
   through `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
 * grpc-json: added support for building HTTP response from
   `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
 * cluster: added :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>` to merge
   health check/weight/metadata updates within the given duration.
+* config: regex validation added to limit to a maximum of 1024 characters.
 * config: v1 disabled by default. v1 support remains available until October via flipping --v2-config-only=false.
 * config: v1 disabled by default. v1 support remains available until October via setting :option:`--allow-deprecated-v1-api`.
 * fault: added support for fractional percentages in :ref:`FaultDelay <envoy_api_field_config.filter.fault.v2.FaultDelay.percentage>`
@@ -38,7 +40,17 @@ Version history
 * http: added generic :ref:`Upgrade support 
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`.
 * http: better handling of HEAD requests. Now sending transfer-encoding: chunked rather than content-length: 0.
+* http: fixed missing support for appending to predefined inline headers, e.g.
+  *authorization*, in features that interact with request and response headers,
+  e.g. :ref:`request_headers_to_add
+  <envoy_api_field_route.Route.request_headers_to_add>`. For example, a
+  request header *authorization: token1* will appear as *authorization:
+  token1,token2*, after having :ref:`request_headers_to_add
+  <envoy_api_field_route.Route.request_headers_to_add>` with *authorization:
+  token2* applied.
 * http: response filters not applied to early error paths such as http_parser generated 400s.
+* http: restrictions added to reject *:*-prefixed pseudo-headers in :ref:`custom
+  request headers <config_http_conn_man_headers_custom_request_headers>`.
 * http: :ref:`hpack_table_size <envoy_api_field_core.Http2ProtocolOptions.hpack_table_size>` now controls
   dynamic table size of both: encoder and decoder.
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
@@ -54,6 +66,8 @@ Version history
   :ref:`use_data_plane_proto<envoy_api_field_config.ratelimit.v2.RateLimitServiceConfig.use_data_plane_proto>`
   boolean flag in the ratelimit configuration.
   Support for the legacy proto :repo:`source/common/ratelimit/ratelimit.proto` is deprecated and will be removed at the start of the 1.9.0 release cycle.
+* rbac config: added a :ref:`principal_name <envoy_api_field_config.rbac.v2alpha.Principal.Authenticated.principal_name>` field and
+  removed the old `name` field to give more flexibility for matching certificate identity.
 * rbac network filter: a :ref:`role-based access control network filter <config_network_filters_rbac>` has been added.
 * rest-api: added ability to set the :ref:`request timeout <envoy_api_field_core.ApiConfigSource.request_timeout>` for REST API requests.
 * router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
@@ -65,6 +79,9 @@ Version history
 * upstream: require opt-in to use the :ref:`x-envoy-orignal-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` header
   for overriding destination address when using the :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   load balancing policy.
+* ratelimit: added :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in 
+  case of rate limit service error.
+* route checker: Added v2 config support and removed support for v1 configs.
 
 1.7.0
 ===============

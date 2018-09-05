@@ -83,6 +83,8 @@ public:
   spdlog::level::level_enum log_level_{spdlog::level::trace};
   std::string log_path_;
   Stats::StatsOptionsImpl stats_options_;
+  uint32_t concurrency_{1};
+  uint64_t hot_restart_epoch_{};
   bool hot_restart_disabled_{};
 };
 
@@ -325,6 +327,7 @@ public:
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
+  MOCK_METHOD0(timeSource, Event::TimeSystem&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
@@ -349,6 +352,7 @@ public:
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<MockListenerManager> listener_manager_;
   testing::NiceMock<MockOverloadManager> overload_manager_;
+  DangerousDeprecatedTestTime test_time_;
   Singleton::ManagerPtr singleton_manager_;
 };
 
@@ -401,7 +405,7 @@ public:
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
-  MOCK_METHOD0(systemTimeSource, SystemTimeSource&());
+  MOCK_METHOD0(timeSource, TimeSource&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -417,7 +421,7 @@ public:
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
-  testing::NiceMock<MockSystemTimeSource> system_time_source_;
+  testing::NiceMock<MockTimeSource> time_source_;
 };
 
 class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {
@@ -425,14 +429,19 @@ public:
   MockTransportSocketFactoryContext();
   ~MockTransportSocketFactoryContext();
 
+  Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
+
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
-  MOCK_METHOD0(secretManager, Secret::SecretManager&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
   MOCK_METHOD0(stats, Stats::Store&());
+  MOCK_METHOD1(setInitManager, void(Init::Manager&));
+  MOCK_METHOD0(initManager, Init::Manager*());
+
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
 };
 
 class MockListenerFactoryContext : public virtual MockFactoryContext,
@@ -470,6 +479,18 @@ public:
   testing::NiceMock<Envoy::Runtime::MockRandomGenerator> random_;
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
   testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>* event_logger_{};
+};
+
+class MockAdminStream : public AdminStream {
+public:
+  MockAdminStream();
+  ~MockAdminStream();
+
+  MOCK_METHOD1(setEndStreamOnComplete, void(bool));
+  MOCK_METHOD1(addOnDestroyCallback, void(std::function<void()>));
+  MOCK_CONST_METHOD0(getRequestHeaders, Http::HeaderMap&());
+  MOCK_CONST_METHOD0(getDecoderFilterCallbacks,
+                     NiceMock<Http::MockStreamDecoderFilterCallbacks>&());
 };
 
 } // namespace Configuration

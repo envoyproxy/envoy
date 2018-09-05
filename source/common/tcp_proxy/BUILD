@@ -15,8 +15,8 @@ envoy_cc_library(
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/common:time_interface",
         "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/router:router_interface",
@@ -36,6 +36,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/request_info:request_info_lib",
         "//source/common/router:metadatamatchcriteria_lib",
+        "//source/common/upstream:load_balancer_lib",
         "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:tcp_proxy_cc",
     ],
 )

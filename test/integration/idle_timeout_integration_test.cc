@@ -26,12 +26,12 @@ public:
     HttpProtocolIntegrationTest::initialize();
   }
 
-  IntegrationStreamDecoderPtr setupPerStreamIdleTimeoutTest() {
+  IntegrationStreamDecoderPtr setupPerStreamIdleTimeoutTest(const char* method = "GET") {
     initialize();
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
     auto encoder_decoder =
-        codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "GET"},
+        codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", method},
                                                             {":path", "/test/long/url"},
                                                             {":scheme", "http"},
                                                             {":authority", "host"}});
@@ -75,12 +75,25 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
   auto response = setupPerStreamIdleTimeoutTest();
 
   waitForTimeout(*response);
-
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("408", response->headers().Status()->value().c_str());
   EXPECT_EQ("stream timeout", response->body());
+}
+
+// Per-stream idle timeout after having sent downstream head request.
+TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutHeadRequestAfterDownstreamHeadRequest) {
+  auto response = setupPerStreamIdleTimeoutTest("HEAD");
+
+  waitForTimeout(*response);
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("408", response->headers().Status()->value().c_str());
+  EXPECT_STREQ(fmt::format("{}", strlen("stream timeout")).c_str(),
+               response->headers().ContentLength()->value().c_str());
+  EXPECT_EQ("", response->body());
 }
 
 // Global per-stream idle timeout applies if there is no per-stream idle timeout.

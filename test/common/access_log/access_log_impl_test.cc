@@ -813,11 +813,12 @@ filter:
       - FI
       - RL
       - UAEX
+      - RLSE
 config:
   path: /dev/null
   )EOF";
 
-  static_assert(RequestInfo::ResponseFlag::LastFlag == 0x1000,
+  static_assert(RequestInfo::ResponseFlag::LastFlag == 0x2000,
                 "A flag has been added. Fix this code.");
 
   std::vector<RequestInfo::ResponseFlag> all_response_flags = {
@@ -834,6 +835,7 @@ config:
       RequestInfo::ResponseFlag::FaultInjected,
       RequestInfo::ResponseFlag::RateLimited,
       RequestInfo::ResponseFlag::UnauthorizedExternalService,
+      RequestInfo::ResponseFlag::RateLimitServiceError,
   };
 
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV2Yaml(yaml), context_);
@@ -863,7 +865,7 @@ config:
       "Proto constraint validation failed (AccessLogFilterValidationError.ResponseFlagFilter: "
       "[\"embedded message failed validation\"] | caused by "
       "ResponseFlagFilterValidationError.Flags[i]: [\"value must be in list \" [\"LH\" \"UH\" "
-      "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\"]]): "
+      "\"UT\" \"LR\" \"UR\" \"UF\" \"UC\" \"UO\" \"NR\" \"DI\" \"FI\" \"RL\" \"UAEX\" \"RLSE\"]]): "
       "response_flag_filter {\n  flags: \"UnsupportedFlag\"\n}\n");
 }
 

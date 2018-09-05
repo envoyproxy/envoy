@@ -535,6 +535,31 @@ TEST(RouteMatcherTest, TestRoutes) {
   }
 }
 
+TEST(RouteMatcherTest, TestRoutesWithWildcardAndDefaultOnly) {
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: wildcard
+    domains: ["*.solo.io"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: "wildcard" }
+  - name: default
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: "default" }
+  )EOF";
+
+  const auto proto_config = parseRouteConfigurationFromV2Yaml(yaml);
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(proto_config, factory_context, true);
+
+  EXPECT_EQ("wildcard",
+            config.route(genHeaders("gloo.solo.io", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("default",
+            config.route(genHeaders("example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+}
+
 TEST(RouteMatcherTest, TestRoutesWithInvalidRegex) {
   std::string invalid_route = R"EOF(
 virtual_hosts:
@@ -913,6 +938,33 @@ response_headers_to_remove: ["x-global-remove"]
 
   EXPECT_THAT(std::list<Http::LowerCaseString>{Http::LowerCaseString("x-lyft-user-id")},
               ContainerEq(config.internalOnlyHeaders()));
+}
+
+// Validate that we can't add :-prefixed request headers.
+TEST(RouteMatcherTest, TestRequestHeadersToAddNoPseudoHeader) {
+  for (const std::string& header : {":path", ":authority", ":method", ":scheme", ":status",
+                                    ":protocol", ":no-chunks", ":status"}) {
+    const std::string yaml = fmt::format(R"EOF(
+name: foo
+virtual_hosts:
+  - name: www2
+    domains: ["*"]
+    request_headers_to_add:
+      - header:
+          key: {}
+          value: vhost-www2
+        append: false
+)EOF",
+                                         header);
+
+    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+    NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+
+    envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
+
+    EXPECT_THROW_WITH_MESSAGE(TestConfigImpl config(route_config, factory_context, true),
+                              EnvoyException, ":-prefixed headers may not be modified");
+  }
 }
 
 TEST(RouteMatcherTest, Priority) {

@@ -93,6 +93,7 @@ envoy_cc_library(
         ":options_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
+        "//include/envoy/event:timer_interface",
         "//include/envoy/http:query_params_interface",
         "//include/envoy/init:init_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -177,6 +178,7 @@ envoy_cc_library(
     hdrs = ["transport_socket_config.h"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/init:init_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/runtime:runtime_interface",

@@ -4,6 +4,7 @@ import "validate/validate.proto";
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/route/route.proto";
 import "envoy/type/matcher/metadata.proto";
+import "envoy/type/matcher/string.proto";
 
 package envoy.config.rbac.v2alpha;
 option go_package = "v2alpha";
@@ -30,8 +31,12 @@ option go_package = "v2alpha";
 //       permissions:
 //         - any: true
 //       principals:
-//         - authenticated: { name: "cluster.local/ns/default/sa/admin" }
-//         - authenticated: { name: "cluster.local/ns/default/sa/superuser" }
+//         - authenticated:
+//             principal_name:
+//               exact: "cluster.local/ns/default/sa/admin"
+//         - authenticated:
+//             principal_name:
+//               exact: "cluster.local/ns/default/sa/superuser"
 //     "product-viewer":
 //       permissions:
 //           - and_rules:
@@ -135,9 +140,12 @@ message Principal {
 
   // Authentication attributes for a downstream.
   message Authenticated {
-    // The name of the principal. If set, the URI SAN is used from the certificate, otherwise the
+    reserved 1;
+    reserved "name";
+
+    // The name of the principal. If set, The URI SAN is used from the certificate, otherwise the
     // subject field is used. If unset, it applies to any user that is authenticated.
-    string name = 1;
+    envoy.type.matcher.StringMatcher principal_name = 2;
   }
 
   oneof identifier {

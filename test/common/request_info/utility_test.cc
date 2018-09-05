@@ -14,7 +14,7 @@ namespace Envoy {
 namespace RequestInfo {
 
 TEST(ResponseFlagUtilsTest, toShortStringConversion) {
-  static_assert(ResponseFlag::LastFlag == 0x1000, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x2000, "A flag has been added. Fix this code.");
 
   std::vector<std::pair<ResponseFlag, std::string>> expected = {
       std::make_pair(ResponseFlag::FailedLocalHealthCheck, "LH"),
@@ -30,6 +30,7 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
       std::make_pair(ResponseFlag::FaultInjected, "FI"),
       std::make_pair(ResponseFlag::RateLimited, "RL"),
       std::make_pair(ResponseFlag::UnauthorizedExternalService, "UAEX"),
+      std::make_pair(ResponseFlag::RateLimitServiceError, "RLSE"),
   };
 
   for (const auto& test_case : expected) {
@@ -58,7 +59,7 @@ TEST(ResponseFlagUtilsTest, toShortStringConversion) {
 }
 
 TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
-  static_assert(ResponseFlag::LastFlag == 0x1000, "A flag has been added. Fix this code.");
+  static_assert(ResponseFlag::LastFlag == 0x2000, "A flag has been added. Fix this code.");
 
   std::vector<std::pair<std::string, ResponseFlag>> expected = {
       std::make_pair("LH", ResponseFlag::FailedLocalHealthCheck),
@@ -74,6 +75,7 @@ TEST(ResponseFlagsUtilsTest, toResponseFlagConversion) {
       std::make_pair("FI", ResponseFlag::FaultInjected),
       std::make_pair("RL", ResponseFlag::RateLimited),
       std::make_pair("UAEX", ResponseFlag::UnauthorizedExternalService),
+      std::make_pair("RLSE", ResponseFlag::RateLimitServiceError),
   };
 
   EXPECT_FALSE(ResponseFlagUtils::toResponseFlag("NonExistentFlag").has_value());

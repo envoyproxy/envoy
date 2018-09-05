@@ -1543,16 +1543,32 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForUnknownFilter) {
       no_such_filter: { option: value }
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
-                            "Didn't find a registered implementation for name: 'no_such_filter'");
+  EXPECT_THROW_WITH_MESSAGE(
+      makeCluster(yaml), EnvoyException,
+      "Didn't find a registered network or http filter implementation for name: 'no_such_filter'");
 }
 
-class TestFilterConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
+class TestFilterConfigFactoryBase {
 public:
-  TestFilterConfigFactory(
+  TestFilterConfigFactoryBase(
       std::function<ProtobufTypes::MessagePtr()> empty_proto,
       std::function<Upstream::ProtocolOptionsConfigConstSharedPtr(const Protobuf::Message&)> config)
       : empty_proto_(empty_proto), config_(config) {}
+
+  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() { return empty_proto_(); }
+  Upstream::ProtocolOptionsConfigConstSharedPtr
+  createProtocolOptionsConfig(const Protobuf::Message& msg) {
+    return config_(msg);
+  }
+
+  std::function<ProtobufTypes::MessagePtr()> empty_proto_;
+  std::function<Upstream::ProtocolOptionsConfigConstSharedPtr(const Protobuf::Message&)> config_;
+};
+
+class TestNetworkFilterConfigFactory
+    : public Server::Configuration::NamedNetworkFilterConfigFactory {
+public:
+  TestNetworkFilterConfigFactory(TestFilterConfigFactoryBase& parent) : parent_(parent) {}
 
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb createFilterFactory(const Json::Object&,
@@ -1565,29 +1581,63 @@ public:
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override { return empty_proto_(); }
+  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
+    return parent_.createEmptyProtocolOptionsProto();
+  }
   Upstream::ProtocolOptionsConfigConstSharedPtr
   createProtocolOptionsConfig(const Protobuf::Message& msg) override {
-    return config_(msg);
+    return parent_.createProtocolOptionsConfig(msg);
   }
   std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
 
-  std::function<ProtobufTypes::MessagePtr()> empty_proto_;
-  std::function<Upstream::ProtocolOptionsConfigConstSharedPtr(const Protobuf::Message&)> config_;
+  TestFilterConfigFactoryBase& parent_;
 };
 
+class TestHttpFilterConfigFactory : public Server::Configuration::NamedHttpFilterConfigFactory {
+public:
+  TestHttpFilterConfigFactory(TestFilterConfigFactoryBase& parent) : parent_(parent) {}
+
+  // NamedNetworkFilterConfigFactory
+  Http::FilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
+                                            Server::Configuration::FactoryContext&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  Http::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
+                               Server::Configuration::FactoryContext&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  Router::RouteSpecificFilterConfigConstSharedPtr
+  createRouteSpecificFilterConfig(const Protobuf::Message&,
+                                  Server::Configuration::FactoryContext&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  ProtobufTypes::MessagePtr createEmptyProtocolOptionsProto() override {
+    return parent_.createEmptyProtocolOptionsProto();
+  }
+  Upstream::ProtocolOptionsConfigConstSharedPtr
+  createProtocolOptionsConfig(const Protobuf::Message& msg) override {
+    return parent_.createProtocolOptionsConfig(msg);
+  }
+  std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+
+  TestFilterConfigFactoryBase& parent_;
+};
 struct TestFilterProtocolOptionsConfig : public Upstream::ProtocolOptionsConfig {};
 
 // Cluster extension protocol options fails validation when configured for filter that does not
 // support options.
 TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
-  TestFilterConfigFactory factory(
+  TestFilterConfigFactoryBase factoryBase(
       []() -> ProtobufTypes::MessagePtr { return nullptr; },
       [](const Protobuf::Message&) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
         return nullptr;
       });
-  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(factory);
-
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -1598,15 +1648,26 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithoutOptions) {
       envoy.test.filter: { option: value }
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
-                            "filter envoy.test.filter does not support protocol options");
+  {
+    TestNetworkFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
+        factory);
+    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                              "filter envoy.test.filter does not support protocol options");
+  }
+  {
+    TestHttpFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(factory);
+    EXPECT_THROW_WITH_MESSAGE(makeCluster(yaml), EnvoyException,
+                              "filter envoy.test.filter does not support protocol options");
+  }
 }
 
 // Cluster retrieval of typed extension protocol options.
 TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
   auto protocol_options = std::make_shared<TestFilterProtocolOptionsConfig>();
 
-  TestFilterConfigFactory factory(
+  TestFilterConfigFactoryBase factoryBase(
       []() -> ProtobufTypes::MessagePtr { return std::make_unique<ProtobufWkt::Struct>(); },
       [&](const Protobuf::Message& msg) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
         const auto& msg_struct = dynamic_cast<const ProtobufWkt::Struct&>(msg);
@@ -1614,7 +1675,6 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
 
         return protocol_options;
       });
-  Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(factory);
 
   const std::string yaml = R"EOF(
     name: name
@@ -1626,14 +1686,33 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
       envoy.test.filter: { option: "value" }
   )EOF";
 
-  auto cluster = makeCluster(yaml);
+  // This vector is used to gather clusters with extension_protocol_options from the different
+  // types of extension factories (network, http).
+  std::vector<std::unique_ptr<StrictDnsClusterImpl>> clusters;
 
-  std::shared_ptr<const TestFilterProtocolOptionsConfig> stored_options =
-      cluster->info()->extensionProtocolOptionsTyped<TestFilterProtocolOptionsConfig>(
-          factory.name());
-  EXPECT_NE(nullptr, protocol_options);
-  // Same pointer
-  EXPECT_EQ(stored_options.get(), protocol_options.get());
+  {
+    // Get the cluster with extension_protocol_options for a network filter factory.
+    TestNetworkFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedNetworkFilterConfigFactory> registry(
+        factory);
+    clusters.push_back(makeCluster(yaml));
+  }
+  {
+    // Get the cluster with extension_protocol_options for an http filter factory.
+    TestHttpFilterConfigFactory factory(factoryBase);
+    Registry::InjectFactory<Server::Configuration::NamedHttpFilterConfigFactory> registry(factory);
+    clusters.push_back(makeCluster(yaml));
+  }
+
+  // Make sure that the clusters created from both factories are as expected.
+  for (auto&& cluster : clusters) {
+    std::shared_ptr<const TestFilterProtocolOptionsConfig> stored_options =
+        cluster->info()->extensionProtocolOptionsTyped<TestFilterProtocolOptionsConfig>(
+            "envoy.test.filter");
+    EXPECT_NE(nullptr, protocol_options);
+    // Same pointer
+    EXPECT_EQ(stored_options.get(), protocol_options.get());
+  }
 }
 
 // Validate empty singleton for HostsPerLocalityImpl.

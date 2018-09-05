@@ -32,6 +32,8 @@ A logged warning is expected for each deprecated item that is in deprecation win
 * Use of `runtime` in `RouteMatch`, found in
   [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto).
   Set the `runtime_fraction` field instead.
+* Use of the string `user` field in `Authenticated` in [rbac.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/rbac/v2alpha/rbac.proto)
+  is deprecated in favor of the new `StringMatcher` based `principal_name` field.
 
 ## Version 1.7.0
 

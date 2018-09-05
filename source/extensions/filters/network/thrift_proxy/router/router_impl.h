@@ -9,6 +9,8 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "common/common/logger.h"
+#include "common/http/header_utility.h"
+#include "common/upstream/load_balancer_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
@@ -38,9 +40,11 @@ public:
 
 protected:
   RouteConstSharedPtr clusterEntry() const;
+  bool headersMatch(const Http::HeaderMap& headers) const;
 
 private:
   const std::string cluster_name_;
+  std::vector<Http::HeaderUtility::HeaderData> config_headers_;
 };
 
 typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
@@ -86,28 +90,28 @@ private:
 };
 
 class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
-               public Upstream::LoadBalancerContext,
+               public Upstream::LoadBalancerContextBase,
                public ProtocolConverter,
+               public ThriftFilters::DecoderFilter,
                Logger::Loggable<Logger::Id::thrift> {
 public:
   Router(Upstream::ClusterManager& cluster_manager) : cluster_manager_(cluster_manager) {}
 
   ~Router() {}
 
-  // ProtocolConverter
+  // ThriftFilters::DecoderFilter
   void onDestroy() override;
   void setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) override;
   void resetUpstreamConnection() override;
-  ThriftFilters::FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
-  ThriftFilters::FilterStatus transportEnd() override;
-  ThriftFilters::FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
-  ThriftFilters::FilterStatus messageEnd() override;
+
+  // ProtocolConverter
+  FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
+  FilterStatus transportEnd() override;
+  FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
+  FilterStatus messageEnd() override;
 
   // Upstream::LoadBalancerContext
-  absl::optional<uint64_t> computeHashKey() override { return {}; }
-  const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() override { return nullptr; }
   const Network::Connection* downstreamConnection() const override;
-  const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
   // Tcp::ConnectionPool::UpstreamCallbacks
   void onUpstreamData(Buffer::Instance& data, bool end_stream) override;
@@ -118,10 +122,11 @@ public:
 private:
   struct UpstreamRequest : public Tcp::ConnectionPool::Callbacks {
     UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
-                    MessageMetadataSharedPtr& metadata);
+                    MessageMetadataSharedPtr& metadata, TransportType transport_type,
+                    ProtocolType protocol_type);
     ~UpstreamRequest();
 
-    ThriftFilters::FilterStatus start();
+    FilterStatus start();
     void resetStream();
 
     // Tcp::ConnectionPool::Callbacks
@@ -142,8 +147,8 @@ private:
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
     Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
-    TransportPtr transport_;
-    ProtocolType proto_type_{ProtocolType::Auto};
+    TransportType transport_type_;
+    ProtocolType protocol_type_;
 
     bool request_complete_ : 1;
     bool response_started_ : 1;

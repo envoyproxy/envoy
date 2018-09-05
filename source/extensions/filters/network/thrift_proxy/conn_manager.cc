@@ -38,8 +38,8 @@ void ConnectionManager::dispatch() {
   try {
     bool underflow = false;
     while (!underflow) {
-      ThriftFilters::FilterStatus status = decoder_->onData(request_buffer_, underflow);
-      if (status == ThriftFilters::FilterStatus::StopIteration) {
+      FilterStatus status = decoder_->onData(request_buffer_, underflow);
+      if (status == FilterStatus::StopIteration) {
         stopped_ = true;
         break;
       }
@@ -122,7 +122,7 @@ void ConnectionManager::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-ThriftFilters::DecoderFilter& ConnectionManager::newDecoderFilter() {
+DecoderEventHandler& ConnectionManager::newDecoderEventHandler() {
   ENVOY_LOG(trace, "new decoder filter");
 
   ActiveRpcPtr new_rpc(new ActiveRpc(*this));
@@ -141,17 +141,16 @@ bool ConnectionManager::ResponseDecoder::onData(Buffer::Instance& data) {
   return complete_;
 }
 
-ThriftFilters::FilterStatus
-ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSharedPtr metadata) {
+FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
   first_reply_field_ =
       (metadata->hasMessageType() && metadata->messageType() == MessageType::Reply);
   return ProtocolConverter::messageBegin(metadata);
 }
 
-ThriftFilters::FilterStatus ConnectionManager::ResponseDecoder::fieldBegin(absl::string_view name,
-                                                                           FieldType field_type,
-                                                                           int16_t field_id) {
+FilterStatus ConnectionManager::ResponseDecoder::fieldBegin(absl::string_view name,
+                                                            FieldType field_type,
+                                                            int16_t field_id) {
   if (first_reply_field_) {
     // Reply messages contain a struct where field 0 is the call result and fields 1+ are
     // exceptions, if defined. At most one field may be set. Therefore, the very first field we
@@ -163,7 +162,7 @@ ThriftFilters::FilterStatus ConnectionManager::ResponseDecoder::fieldBegin(absl:
   return ProtocolConverter::fieldBegin(name, field_type, field_id);
 }
 
-ThriftFilters::FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
+FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   ASSERT(metadata_ != nullptr);
 
   ConnectionManager& cm = parent_.parent_;
@@ -205,11 +204,12 @@ ThriftFilters::FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
     break;
   }
 
-  return ThriftFilters::FilterStatus::Continue;
+  return FilterStatus::Continue;
 }
 
-ThriftFilters::FilterStatus ConnectionManager::ActiveRpc::transportEnd() {
-  ASSERT(metadata_ != nullptr && metadata_->hasMessageType());
+FilterStatus ConnectionManager::ActiveRpc::transportEnd() {
+  ASSERT(metadata_ != nullptr);
+  ASSERT(metadata_->hasMessageType());
 
   parent_.stats_.request_.inc();
 
@@ -231,6 +231,12 @@ ThriftFilters::FilterStatus ConnectionManager::ActiveRpc::transportEnd() {
   }
 
   return decoder_filter_->transportEnd();
+}
+
+FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr metadata) {
+  metadata_ = metadata;
+
+  return event_handler_->messageBegin(metadata);
 }
 
 void ConnectionManager::ActiveRpc::createFilterChain() {

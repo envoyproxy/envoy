@@ -1,7 +1,7 @@
 REPOSITORY_LOCATIONS = dict(
     boringssl = dict(
         # Use commits from branch "chromium-stable-with-bazel"
-        commit = "372daf7042ffe3da1335743e7c93d78f1399aba7",  # chromium-68.0.3440.75
+        commit = "ab36a84b91b3116bacc85973995504818748d8a9",  # chromium-69.0.3497.81
         remote = "https://github.com/google/boringssl",
     ),
     com_google_absl = dict(
@@ -109,7 +109,7 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "twitter.common.finagle-thrift-0.3.9/src",
     ),
     com_google_googletest = dict(
-        commit = "43863938377a9ea1399c0596269e0890b5c5515a",
+        commit = "3d5612182581df64acc12d2633e473decf5adc47",  # Aug 29, 2018
         remote = "https://github.com/google/googletest",
     ),
     com_google_protobuf = dict(

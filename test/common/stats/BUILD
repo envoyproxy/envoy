@@ -55,9 +55,21 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "symbol_table_test",
+    srcs = ["symbol_table_test.cc"],
+    deps = [
+        "//source/common/stats:symbol_table_lib",
+        "//test/mocks/stats:stats_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "thread_local_store_test",
     srcs = ["thread_local_store_test.cc"],
     deps = [
+        "//source/common/stats:symbol_table_lib",
         "//source/common/stats:thread_local_store_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:server_mocks",

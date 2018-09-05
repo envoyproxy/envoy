@@ -81,7 +81,16 @@ HdsDelegate::sendResponse() {
         if (host->healthy()) {
           endpoint->set_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
         } else {
-          endpoint->set_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
+          if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::TIMEOUT) {
+            endpoint->set_health_status(envoy::api::v2::core::HealthStatus::TIMEOUT);
+          } else if (host->getActiveHealthFailureType() ==
+                     Host::ActiveHealthFailureType::UNHEALTHY) {
+            endpoint->set_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
+          } else if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::UNKNOWN) {
+            endpoint->set_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
+          } else {
+            NOT_REACHED_GCOVR_EXCL_LINE;
+          }
         }
       }
     }
@@ -220,6 +229,7 @@ ClusterInfoConstSharedPtr ProdClusterInfoFactory::createClusterInfo(
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
       ssl_context_manager, *scope, cm, local_info, dispatcher, random, stats);
 
+  // TODO(JimmyCYJ): Support SDS for HDS cluster.
   Network::TransportSocketFactoryPtr socket_factory =
       Upstream::createTransportSocketFactory(cluster, factory_context);
 

@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/event/timer.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
@@ -41,6 +42,7 @@ namespace Server {
 // clang-format off
 #define ALL_SERVER_STATS(GAUGE)                                                                    \
   GAUGE(uptime)                                                                                    \
+  GAUGE(concurrency)                                                                               \
   GAUGE(memory_allocated)                                                                          \
   GAUGE(memory_heap_size)                                                                          \
   GAUGE(live)                                                                                      \
@@ -134,8 +136,9 @@ public:
   /**
    * @throw EnvoyException if initialization fails.
    */
-  InstanceImpl(Options& options, Network::Address::InstanceConstSharedPtr local_address,
-               TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
+  InstanceImpl(Options& options, Event::TimeSystem& time_system,
+               Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
+               HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
                Runtime::RandomGeneratorPtr&& random_generator, ThreadLocal::Instance& tls);
 
@@ -177,6 +180,7 @@ public:
   Tracing::HttpTracer& httpTracer() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
+  Event::TimeSystem& timeSource() override { return time_system_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_->statsFlushInterval();
@@ -193,6 +197,7 @@ private:
   void terminate();
 
   Options& options_;
+  Event::TimeSystem& time_system_;
   HotRestart& restarter_;
   const time_t start_time_;
   time_t original_start_time_;
@@ -206,11 +211,11 @@ private:
   Network::ConnectionHandlerPtr handler_;
   Runtime::RandomGeneratorPtr random_generator_;
   Runtime::LoaderPtr runtime_loader_;
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
   std::unique_ptr<Ssl::ContextManagerImpl> ssl_context_manager_;
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
-  std::unique_ptr<Secret::SecretManager> secret_manager_;
   std::unique_ptr<Configuration::Main> config_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;

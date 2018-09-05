@@ -119,12 +119,23 @@ parseExtensionProtocolOptions(const envoy::api::v2::Cluster& config) {
   for (const auto& iter : config.extension_protocol_options()) {
     const std::string& name = iter.first;
     const ProtobufWkt::Struct& config_struct = iter.second;
+    Server::Configuration::ProtocolOptionsFactory* factory = nullptr;
 
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<
-        Server::Configuration::NamedNetworkFilterConfigFactory>(name);
+    factory = Registry::FactoryRegistry<
+        Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(name);
+    if (factory == nullptr) {
+      factory = Registry::FactoryRegistry<
+          Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(name);
+    }
 
-    auto object = factory.createProtocolOptionsConfig(
-        *Envoy::Config::Utility::translateToFactoryProtocolOptionsConfig(config_struct, factory));
+    if (factory == nullptr) {
+      throw EnvoyException(fmt::format(
+          "Didn't find a registered network or http filter implementation for name: '{}'", name));
+    }
+
+    auto object = factory->createProtocolOptionsConfig(
+        *Envoy::Config::Utility::translateToFactoryProtocolOptionsConfig(config_struct, name,
+                                                                         *factory));
     if (object) {
       options[name] = object;
     }
@@ -362,6 +373,11 @@ ClusterInfoImpl::ClusterInfoImpl(const envoy::api::v2::Cluster& config,
     idle_timeout_ = std::chrono::milliseconds(
         DurationUtil::durationToMilliseconds(config.common_http_protocol_options().idle_timeout()));
   }
+
+  // TODO(htuch): Remove this temporary workaround when we have
+  // https://github.com/lyft/protoc-gen-validate/issues/97 resolved. This just provides early
+  // validation of sanity of fields that we should catch at config ingestion.
+  DurationUtil::durationToMilliseconds(common_lb_config_.update_merge_window());
 }
 
 ProtocolOptionsConfigConstSharedPtr
@@ -497,6 +513,7 @@ ClusterImplBase::ClusterImplBase(
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : runtime_(runtime) {
+  factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
   info_ = std::make_unique<ClusterInfoImpl>(cluster, factory_context.clusterManager().bindConfig(),
                                             runtime, std::move(socket_factory),
@@ -560,6 +577,10 @@ void ClusterImplBase::onPreInitComplete() {
   }
   initialization_started_ = true;
 
+  init_manager_.initialize([this]() { onInitDone(); });
+}
+
+void ClusterImplBase::onInitDone() {
   if (health_checker_ && pending_initialize_health_checks_ == 0) {
     for (auto& host_set : prioritySet().hostSetsPerPriority()) {
       pending_initialize_health_checks_ += host_set->hosts().size();
@@ -1126,7 +1147,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
 
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
-      [this](std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
+      [this](const std::list<Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_query_ = nullptr;
         ENVOY_LOG(debug, "async DNS resolution complete for {}", dns_address_);
         parent_.info_->stats().update_success_.inc();

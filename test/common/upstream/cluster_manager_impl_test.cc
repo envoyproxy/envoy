@@ -141,12 +141,9 @@ public:
                          Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
                          AccessLog::AccessLogManager& log_manager,
                          Event::Dispatcher& main_thread_dispatcher, Server::Admin& admin,
-                         SystemTimeSource& system_time_source,
-                         MonotonicTimeSource& monotonic_time_source,
                          MockLocalClusterUpdate& local_cluster_update)
       : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
-                           main_thread_dispatcher, admin, system_time_source,
-                           monotonic_time_source),
+                           main_thread_dispatcher, admin),
         local_cluster_update_(local_cluster_update) {}
 
 protected:
@@ -166,11 +163,12 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 
 class ClusterManagerImplTest : public testing::Test {
 public:
+  ClusterManagerImplTest() { factory_.dispatcher_.setTimeSystem(time_source_); }
+
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_.reset(new ClusterManagerImpl(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, system_time_source_,
-        monotonic_time_source_));
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_));
   }
 
   void createWithLocalClusterUpdate(const bool enable_merge_window = true) {
@@ -202,8 +200,7 @@ public:
 
     cluster_manager_.reset(new TestClusterManagerImpl(
         bootstrap, factory_, factory_.stats_, factory_.tls_, factory_.runtime_, factory_.random_,
-        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, system_time_source_,
-        monotonic_time_source_, local_cluster_update_));
+        factory_.local_info_, log_manager_, factory_.dispatcher_, admin_, local_cluster_update_));
   }
 
   void checkStats(uint64_t added, uint64_t modified, uint64_t removed, uint64_t active,
@@ -241,8 +238,7 @@ public:
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
-  NiceMock<MockSystemTimeSource> system_time_source_;
-  NiceMock<MockMonotonicTimeSource> monotonic_time_source_;
+  NiceMock<MockTimeSystem> time_source_;
   MockLocalClusterUpdate local_cluster_update_;
 };
 
@@ -293,7 +289,7 @@ TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
 }
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
-  EXPECT_CALL(system_time_source_, currentTime())
+  EXPECT_CALL(time_source_, systemTime())
       .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
 
   const std::string yaml = R"EOF(
@@ -770,7 +766,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
 }
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
-  EXPECT_CALL(system_time_source_, currentTime())
+  EXPECT_CALL(time_source_, systemTime())
       .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
 
   const std::string json = fmt::sprintf(
@@ -989,7 +985,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 }
 
 TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
-  EXPECT_CALL(system_time_source_, currentTime())
+  EXPECT_CALL(time_source_, systemTime())
       .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
 
   const std::string json = R"EOF(

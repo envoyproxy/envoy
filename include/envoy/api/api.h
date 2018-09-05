@@ -3,7 +3,9 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/timer.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
@@ -20,9 +22,10 @@ public:
 
   /**
    * Allocate a dispatcher.
+   * @param time_source the time source.
    * @return Event::DispatcherPtr which is owned by the caller.
    */
-  virtual Event::DispatcherPtr allocateDispatcher() PURE;
+  virtual Event::DispatcherPtr allocateDispatcher(Event::TimeSystem& time_system) PURE;
 
   /**
    * Create/open a local file that supports async appending.

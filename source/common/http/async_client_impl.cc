@@ -35,8 +35,9 @@ AsyncClientImpl::AsyncClientImpl(const Upstream::ClusterInfo& cluster, Stats::St
                                  Upstream::ClusterManager& cm, Runtime::Loader& runtime,
                                  Runtime::RandomGenerator& random,
                                  Router::ShadowWriterPtr&& shadow_writer)
-    : cluster_(cluster), config_("http.async-client.", local_info, stats_store, cm, runtime, random,
-                                 std::move(shadow_writer), true, false, false),
+    : cluster_(cluster),
+      config_("http.async-client.", local_info, stats_store, cm, runtime, random,
+              std::move(shadow_writer), true, false, false, dispatcher.timeSource()),
       dispatcher_(dispatcher) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
@@ -112,6 +113,10 @@ void AsyncStreamImpl::encodeTrailers(HeaderMapPtr&& trailers) {
 }
 
 void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
+  if (Http::Headers::get().MethodValues.Head == headers.Method()->value().c_str()) {
+    is_head_request_ = true;
+  }
+
   is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
   headers.insertEnvoyInternalRequest().value().setReference(
       Headers::get().EnvoyInternalRequestValues.True);

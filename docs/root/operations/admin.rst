@@ -352,6 +352,7 @@ The fields are:
     In Envoy, service unavailable response will cause **outlier detection** - removing a node off the 
     load balancer pool, but requests are not rejected as a result. Therefore, this counter is always 
     set to '0'.
-  * Latency information is currently unavailable.
+  * Latency information represents data since last flush. 
+    Mean latency is currently not available.
   
   

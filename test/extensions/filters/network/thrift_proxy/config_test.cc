@@ -16,30 +16,24 @@ namespace ThriftProxy {
 
 namespace {
 
-std::vector<envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_TransportType>
+std::vector<envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType>
 getTransportTypes() {
-  std::vector<envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_TransportType> v;
-  int transport = envoy::config::filter::network::thrift_proxy::v2alpha1::
-      ThriftProxy_TransportType_TransportType_MIN;
-  while (transport <= envoy::config::filter::network::thrift_proxy::v2alpha1::
-                          ThriftProxy_TransportType_TransportType_MAX) {
-    v.push_back(static_cast<
-                envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_TransportType>(
+  std::vector<envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType> v;
+  int transport = envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType_MIN;
+  while (transport <= envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType_MAX) {
+    v.push_back(static_cast<envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType>(
         transport));
     transport++;
   }
   return v;
 }
 
-std::vector<envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_ProtocolType>
+std::vector<envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType>
 getProtocolTypes() {
-  std::vector<envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_ProtocolType> v;
-  int protocol = envoy::config::filter::network::thrift_proxy::v2alpha1::
-      ThriftProxy_ProtocolType_ProtocolType_MIN;
-  while (protocol <= envoy::config::filter::network::thrift_proxy::v2alpha1::
-                         ThriftProxy_ProtocolType_ProtocolType_MAX) {
-    v.push_back(static_cast<
-                envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_ProtocolType>(
+  std::vector<envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType> v;
+  int protocol = envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType_MIN;
+  while (protocol <= envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType_MAX) {
+    v.push_back(static_cast<envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType>(
         protocol));
     protocol++;
   }
@@ -68,7 +62,7 @@ class ThriftFilterConfigTest : public ThriftFilterConfigTestBase, public testing
 class ThriftFilterTransportConfigTest
     : public ThriftFilterConfigTestBase,
       public testing::TestWithParam<
-          envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_TransportType> {};
+          envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType> {};
 
 INSTANTIATE_TEST_CASE_P(TransportTypes, ThriftFilterTransportConfigTest,
                         testing::ValuesIn(getTransportTypes()));
@@ -76,7 +70,7 @@ INSTANTIATE_TEST_CASE_P(TransportTypes, ThriftFilterTransportConfigTest,
 class ThriftFilterProtocolConfigTest
     : public ThriftFilterConfigTestBase,
       public testing::TestWithParam<
-          envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftProxy_ProtocolType> {};
+          envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType> {};
 
 INSTANTIATE_TEST_CASE_P(ProtocolTypes, ThriftFilterProtocolConfigTest,
                         testing::ValuesIn(getProtocolTypes()));

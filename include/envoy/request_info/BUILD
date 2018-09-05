@@ -13,7 +13,7 @@ envoy_cc_library(
     hdrs = ["request_info.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        ":dynamic_metadata_interface",
+        ":filter_state_interface",
         "//include/envoy/common:time_interface",
         "//include/envoy/http:protocol_interface",
         "//include/envoy/upstream:upstream_interface",
@@ -21,7 +21,7 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "dynamic_metadata_interface",
-    hdrs = ["dynamic_metadata.h"],
+    name = "filter_state_interface",
+    hdrs = ["filter_state.h"],
     external_deps = ["abseil_optional"],
 )

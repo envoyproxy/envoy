@@ -22,6 +22,10 @@ void ContextManagerImpl::removeEmptyContexts() {
 
 ClientContextSharedPtr
 ContextManagerImpl::createSslClientContext(Stats::Scope& scope, const ClientContextConfig& config) {
+  if (!config.isReady()) {
+    return nullptr;
+  }
+
   ClientContextSharedPtr context = std::make_shared<ClientContextImpl>(scope, config);
   removeEmptyContexts();
   contexts_.emplace_back(context);
@@ -31,6 +35,10 @@ ContextManagerImpl::createSslClientContext(Stats::Scope& scope, const ClientCont
 ServerContextSharedPtr
 ContextManagerImpl::createSslServerContext(Stats::Scope& scope, const ServerContextConfig& config,
                                            const std::vector<std::string>& server_names) {
+  if (!config.isReady()) {
+    return nullptr;
+  }
+
   ServerContextSharedPtr context =
       std::make_shared<ServerContextImpl>(scope, config, server_names, runtime_);
   removeEmptyContexts();

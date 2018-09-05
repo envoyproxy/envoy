@@ -75,6 +75,7 @@ public:
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(healthCheckAddress, Network::Address::InstanceConstSharedPtr());
+  MOCK_METHOD1(setHealthCheckAddress, void(Network::Address::InstanceConstSharedPtr));
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_METHOD1(canary, void(bool new_canary));
   MOCK_CONST_METHOD0(metadata, const std::shared_ptr<envoy::api::v2::core::Metadata>());
@@ -127,6 +128,7 @@ public:
 
   MOCK_CONST_METHOD0(address, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(healthCheckAddress, Network::Address::InstanceConstSharedPtr());
+  MOCK_METHOD1(setHealthCheckAddress, void(Network::Address::InstanceConstSharedPtr));
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_METHOD1(canary, void(bool new_canary));
   MOCK_CONST_METHOD0(metadata, const std::shared_ptr<envoy::api::v2::core::Metadata>());
@@ -141,7 +143,9 @@ public:
   MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
   MOCK_METHOD1(healthFlagClear, void(HealthFlag flag));
   MOCK_CONST_METHOD1(healthFlagGet, bool(HealthFlag flag));
+  MOCK_CONST_METHOD0(getActiveHealthFailureType, ActiveHealthFailureType());
   MOCK_METHOD1(healthFlagSet, void(HealthFlag flag));
+  MOCK_METHOD1(setActiveHealthFailureType, void(ActiveHealthFailureType type));
   MOCK_CONST_METHOD0(healthy, bool());
   MOCK_CONST_METHOD0(hostname, const std::string&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());

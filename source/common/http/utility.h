@@ -102,6 +102,11 @@ uint64_t getResponseStatus(const HeaderMap& headers);
 bool isUpgrade(const HeaderMap& headers);
 
 /**
+ * @return true if this is a CONNECT request with a :protocol header present, false otherwise.
+ */
+bool isH2UpgradeRequest(const HeaderMap& headers);
+
+/**
  * Determine whether this is a WebSocket Upgrade request.
  * This function returns true if the following HTTP headers and values are present:
  * - Connection: Upgrade
@@ -131,9 +136,10 @@ Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOption
  * @param response_code supplies the HTTP response code.
  * @param body_text supplies the optional body text which is sent using the text/plain content
  *                  type.
+ * @param is_head_request tells if this is a response to a HEAD request
  */
 void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
-                    Code response_code, const std::string& body_text);
+                    Code response_code, const std::string& body_text, bool is_head_request);
 
 /**
  * Create a locally generated response using the provided lambdas.
@@ -150,7 +156,8 @@ void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const
 void sendLocalReply(bool is_grpc,
                     std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
                     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data,
-                    const bool& is_reset, Code response_code, const std::string& body_text);
+                    const bool& is_reset, Code response_code, const std::string& body_text,
+                    bool is_head_request = false);
 
 struct GetLastAddressFromXffInfo {
   // Last valid address pulled from the XFF header.
@@ -197,6 +204,34 @@ MessagePtr prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_uri);
  * Serialize query-params into a string.
  */
 std::string queryParamsToString(const QueryParams& query_params);
+
+/**
+ * Transforms the supplied headers from an HTTP/1 Upgrade request to an H2 style upgrade.
+ * Changes the method to connection, moves the Upgrade to a :protocol header,
+ * @param headers the headers to convert.
+ */
+void transformUpgradeRequestFromH1toH2(HeaderMap& headers);
+
+/**
+ * Transforms the supplied headers from an HTTP/1 Upgrade response to an H2 style upgrade response.
+ * Changes the 101 upgrade response to a 200 for the CONNECT response.
+ * @param headers the headers to convert.
+ */
+void transformUpgradeResponseFromH1toH2(HeaderMap& headers);
+
+/**
+ * Transforms the supplied headers from an H2 "CONNECT"-with-:protocol-header to an HTTP/1 style
+ * Upgrade response.
+ * @param headers the headers to convert.
+ */
+void transformUpgradeRequestFromH2toH1(HeaderMap& headers);
+
+/**
+ * Transforms the supplied headers from an H2 "CONNECT success" to an HTTP/1 style Upgrade response.
+ * The caller is responsible for ensuring this only happens on upgraded streams.
+ * @param headers the headers to convert.
+ */
+void transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade);
 
 } // namespace Utility
 } // namespace Http

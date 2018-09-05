@@ -120,6 +120,17 @@ public:
   NiceMock<MockPrioritySet> priority_set_;
 };
 
+class MockLoadBalancerContext : public LoadBalancerContext {
+public:
+  MOCK_METHOD0(computeHashKey, absl::optional<uint64_t>());
+  MOCK_METHOD0(metadataMatchCriteria, Router::MetadataMatchCriteria*());
+  MOCK_CONST_METHOD0(downstreamConnection, const Network::Connection*());
+  MOCK_CONST_METHOD0(downstreamHeaders, const Http::HeaderMap*());
+  MOCK_METHOD2(determinePriorityLoad, const PriorityLoad&(const PrioritySet&, const PriorityLoad&));
+  MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host&));
+  MOCK_CONST_METHOD0(hostSelectionRetryCount, uint32_t());
+};
+
 class MockLoadBalancer : public LoadBalancer {
 public:
   MockLoadBalancer();
@@ -196,6 +207,7 @@ public:
   }
 
   ClusterManagerFactory& clusterManagerFactory() override { return cluster_manager_factory_; }
+  TimeSource& timeSource() override { return time_source_; }
 
   // Upstream::ClusterManager
   MOCK_METHOD2(addOrUpdateCluster,
@@ -223,6 +235,9 @@ public:
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
   MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks,
                std::unique_ptr<ClusterUpdateCallbacksHandle>(ClusterUpdateCallbacks& callbacks));
+
+  // TODO(jmarantz): Switch these to using mock-time.
+  RealTimeSource time_source_;
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;

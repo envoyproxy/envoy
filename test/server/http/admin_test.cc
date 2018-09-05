@@ -125,6 +125,7 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                     90.0,
                     95.0,
                     99.0,
+                    99.5,
                     99.9,
                     100.0
                 ],
@@ -159,6 +160,10 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                             {
                                 "interval": null,
                                 "cumulative": 109.9
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.95
                             },
                             {
                                 "interval": null,
@@ -200,6 +205,10 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                             {
                                 "interval": 109.9,
                                 "cumulative": 209.8
+                            },
+                            {
+                                "interval": 109.95,
+                                "cumulative": 209.9
                             },
                             {
                                 "interval": 109.99,
@@ -262,6 +271,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
                     90.0,
                     95.0,
                     99.0,
+                    99.5,
                     99.9,
                     100.0
                 ],
@@ -296,6 +306,10 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
                             {
                                 "interval": 109.9,
                                 "cumulative": 209.8
+                            },
+                            {
+                                "interval": 109.95,
+                                "cumulative": 209.9
                             },
                             {
                                 "interval": 109.99,
@@ -532,17 +546,70 @@ TEST_P(AdminInstanceTest, ConfigDump) {
     return msg;
   });
   const std::string expected_json = R"EOF({
- "configs": {
-  "foo": {
+ "configs": [
+  {
    "@type": "type.googleapis.com/google.protobuf.StringValue",
    "value": "bar"
   }
- }
+ ]
 }
 )EOF";
   EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
   std::string output = response.toString();
   EXPECT_EQ(expected_json, output);
+}
+
+TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
+  // Add configs in random order and validate config_dump dumps in the order.
+  auto bootstrap_entry = admin_.getConfigTracker().add("bootstrap", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("bootstrap_config");
+    return msg;
+  });
+  auto route_entry = admin_.getConfigTracker().add("routes", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("routes_config");
+    return msg;
+  });
+  auto listener_entry = admin_.getConfigTracker().add("listeners", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("listeners_config");
+    return msg;
+  });
+  auto cluster_entry = admin_.getConfigTracker().add("clusters", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("clusters_config");
+    return msg;
+  });
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "bootstrap_config"
+  },
+  {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "clusters_config"
+  },
+  {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "listeners_config"
+  },
+  {
+   "@type": "type.googleapis.com/google.protobuf.StringValue",
+   "value": "routes_config"
+  }
+ ]
+}
+)EOF";
+  // Run it multiple times and validate that order is preserved.
+  for (size_t i = 0; i < 5; i++) {
+    Buffer::OwnedImpl response;
+    Http::HeaderMapImpl header_map;
+    EXPECT_EQ(Http::Code::OK, getCallback("/config_dump", header_map, response));
+    const std::string output = response.toString();
+    EXPECT_EQ(expected_json, output);
+  }
 }
 
 TEST_P(AdminInstanceTest, Runtime) {
@@ -670,9 +737,13 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       Network::Utility::resolveUrl("tcp://1.2.3.4:80");
   ON_CALL(*host, address()).WillByDefault(Return(address));
 
+  // Add stats in random order and validate that they come in order.
   Stats::IsolatedStoreImpl store;
   store.counter("test_counter").add(10);
+  store.counter("rest_counter").add(10);
+  store.counter("arest_counter").add(5);
   store.gauge("test_gauge").set(11);
+  store.gauge("atest_gauge").set(10);
   ON_CALL(*host, gauges()).WillByDefault(Invoke([&store]() { return store.gauges(); }));
   ON_CALL(*host, counters()).WillByDefault(Invoke([&store]() { return store.counters(); }));
 
@@ -709,16 +780,33 @@ TEST_P(AdminInstanceTest, ClustersJson) {
        "port_value": 80
       }
      },
-     "stats": {
-      "test_counter": {
+     "stats": [
+       {
+       "name": "arest_counter",
+       "value": "5",
+       "type": "COUNTER"
+       },
+       {
+       "name": "rest_counter",
        "value": "10",
        "type": "COUNTER"
       },
-      "test_gauge": {
+      {
+       "name": "test_counter",
+       "value": "10",
+       "type": "COUNTER"
+      },
+      {
+       "name": "atest_gauge",
+       "value": "10",
+       "type": "GAUGE"
+      },
+      {
+       "name": "test_gauge",
        "value": "11",
        "type": "GAUGE"
       },
-     },
+     ],
      "health_status": {
       "eds_health_status": "HEALTHY",
       "failed_active_health_check": true,

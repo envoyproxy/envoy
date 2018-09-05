@@ -209,6 +209,12 @@ bool Utility::isUpgrade(const HeaderMap& headers) {
                                            Http::Headers::get().ConnectionValues.Upgrade.c_str()));
 }
 
+bool Utility::isH2UpgradeRequest(const HeaderMap& headers) {
+  return headers.Method() &&
+         headers.Method()->value().c_str() == Http::Headers::get().MethodValues.Connect &&
+         headers.Protocol() && !headers.Protocol()->value().empty();
+}
+
 bool Utility::isWebSocketUpgradeRequest(const HeaderMap& headers) {
   return (isUpgrade(headers) && (0 == StringUtil::caseInsensitiveCompare(
                                           headers.Upgrade()->value().c_str(),
@@ -227,6 +233,7 @@ Utility::parseHttp2Settings(const envoy::api::v2::core::Http2ProtocolOptions& co
   ret.initial_connection_window_size_ =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, initial_connection_window_size,
                                       Http::Http2Settings::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+  ret.allow_connect_ = config.allow_connect();
   return ret;
 }
 
@@ -240,8 +247,8 @@ Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& co
 }
 
 void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks,
-                             const bool& is_reset, Code response_code,
-                             const std::string& body_text) {
+                             const bool& is_reset, Code response_code, const std::string& body_text,
+                             bool is_head_request) {
   sendLocalReply(is_grpc,
                  [&](HeaderMapPtr&& headers, bool end_stream) -> void {
                    callbacks.encodeHeaders(std::move(headers), end_stream);
@@ -249,13 +256,13 @@ void Utility::sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbac
                  [&](Buffer::Instance& data, bool end_stream) -> void {
                    callbacks.encodeData(data, end_stream);
                  },
-                 is_reset, response_code, body_text);
+                 is_reset, response_code, body_text, is_head_request);
 }
 
 void Utility::sendLocalReply(
     bool is_grpc, std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
     std::function<void(Buffer::Instance& data, bool end_stream)> encode_data, const bool& is_reset,
-    Code response_code, const std::string& body_text) {
+    Code response_code, const std::string& body_text, bool is_head_request) {
   // encode_headers() may reset the stream, so the stream must not be reset before calling it.
   ASSERT(!is_reset);
   // Respond with a gRPC trailers-only response if the request is gRPC
@@ -265,7 +272,7 @@ void Utility::sendLocalReply(
         {Headers::get().ContentType, Headers::get().ContentTypeValues.Grpc},
         {Headers::get().GrpcStatus,
          std::to_string(enumToInt(Grpc::Utility::httpToGrpcStatus(enumToInt(response_code))))}}};
-    if (!body_text.empty()) {
+    if (!body_text.empty() && !is_head_request) {
       // TODO: GrpcMessage should be percent-encoded
       response_headers->insertGrpcMessage().value(body_text);
     }
@@ -279,6 +286,12 @@ void Utility::sendLocalReply(
     response_headers->insertContentLength().value(body_text.size());
     response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
   }
+
+  if (is_head_request) {
+    encode_headers(std::move(response_headers), true);
+    return;
+  }
+
   encode_headers(std::move(response_headers), body_text.empty());
   // encode_headers()) may have changed the referenced is_reset so we need to test it
   if (!body_text.empty() && !is_reset) {
@@ -390,6 +403,50 @@ std::string Utility::queryParamsToString(const QueryParams& params) {
     delim = "&";
   }
   return out;
+}
+
+void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
+  ASSERT(Utility::isUpgrade(headers));
+
+  const HeaderString& upgrade = headers.Upgrade()->value();
+  headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Connect);
+  headers.insertProtocol().value().setCopy(upgrade.c_str(), upgrade.size());
+  headers.removeUpgrade();
+  headers.removeConnection();
+}
+
+void Utility::transformUpgradeResponseFromH1toH2(HeaderMap& headers) {
+  if (getResponseStatus(headers) == 101) {
+    headers.insertStatus().value().setInteger(200);
+  }
+  headers.removeUpgrade();
+  headers.removeConnection();
+}
+
+void Utility::transformUpgradeRequestFromH2toH1(HeaderMap& headers) {
+  ASSERT(Utility::isH2UpgradeRequest(headers));
+
+  const HeaderString& protocol = headers.Protocol()->value();
+  headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
+  headers.insertUpgrade().value().setCopy(protocol.c_str(), protocol.size());
+  headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
+  headers.removeProtocol();
+  if (headers.ContentLength() == nullptr) {
+    headers.insertTransferEncoding().value().setReference(
+        Http::Headers::get().TransferEncodingValues.Chunked);
+  }
+}
+
+void Utility::transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade) {
+  if (getResponseStatus(headers) == 200) {
+    headers.insertUpgrade().value().setCopy(upgrade.data(), upgrade.size());
+    headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
+    if (headers.ContentLength() == nullptr) {
+      headers.insertTransferEncoding().value().setReference(
+          Http::Headers::get().TransferEncodingValues.Chunked);
+    }
+    headers.insertStatus().value().setInteger(101);
+  }
 }
 
 } // namespace Http

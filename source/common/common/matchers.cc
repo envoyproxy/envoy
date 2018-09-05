@@ -61,16 +61,19 @@ bool StringMatcher::match(const ProtobufWkt::Value& value) const {
     return false;
   }
 
-  const std::string& s = value.string_value();
+  return match(value.string_value());
+}
+
+bool StringMatcher::match(const std::string& value) const {
   switch (matcher_.match_pattern_case()) {
   case envoy::type::matcher::StringMatcher::kExact:
-    return matcher_.exact() == s;
+    return matcher_.exact() == value;
   case envoy::type::matcher::StringMatcher::kPrefix:
-    return absl::StartsWith(s, matcher_.prefix());
+    return absl::StartsWith(value, matcher_.prefix());
   case envoy::type::matcher::StringMatcher::kSuffix:
-    return absl::EndsWith(s, matcher_.suffix());
+    return absl::EndsWith(value, matcher_.suffix());
   case envoy::type::matcher::StringMatcher::kRegex:
-    return std::regex_match(s, regex_);
+    return std::regex_match(value, regex_);
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

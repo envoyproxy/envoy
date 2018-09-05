@@ -5,6 +5,7 @@
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/grpc/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -27,7 +28,7 @@ public:
   LoadStatsReporterTest()
       : retry_timer_(new Event::MockTimer()), response_timer_(new Event::MockTimer()),
         async_client_(new Grpc::MockAsyncClient()) {
-    node_.set_id("baz");
+    dispatcher_.setTimeSystem(time_system_);
   }
 
   void createLoadStatsReporter() {
@@ -41,13 +42,13 @@ public:
       return response_timer_;
     }));
     load_stats_reporter_.reset(new LoadStatsReporter(
-        node_, cm_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_, time_source_));
+        local_info_, cm_, stats_store_, Grpc::AsyncClientPtr(async_client_), dispatcher_));
   }
 
   void expectSendMessage(
       const std::vector<envoy::api::v2::endpoint::ClusterStats>& expected_cluster_stats) {
     envoy::service::load_stats::v2::LoadStatsRequest expected_request;
-    expected_request.mutable_node()->MergeFrom(node_);
+    expected_request.mutable_node()->MergeFrom(local_info_.node());
     std::copy(expected_cluster_stats.begin(), expected_cluster_stats.end(),
               Protobuf::RepeatedPtrFieldBackInserter(expected_request.mutable_cluster_stats()));
     EXPECT_CALL(async_stream_, sendMessage(ProtoEq(expected_request), false));
@@ -64,7 +65,6 @@ public:
     load_stats_reporter_->onReceiveMessage(std::move(response));
   }
 
-  envoy::api::v2::core::Node node_;
   NiceMock<Upstream::MockClusterManager> cm_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -75,7 +75,8 @@ public:
   Event::TimerCb response_timer_cb_;
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
-  MockMonotonicTimeSource time_source_;
+  MockTimeSystem time_system_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
 // Validate that stream creation results in a timer based retry.
@@ -92,14 +93,14 @@ TEST_F(LoadStatsReporterTest, TestPubSub) {
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessage(_, _));
   createLoadStatsReporter();
-  EXPECT_CALL(time_source_, currentTime());
+  EXPECT_CALL(time_system_, monotonicTime());
   deliverLoadStatsResponse({"foo"});
 
   EXPECT_CALL(async_stream_, sendMessage(_, _));
   EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
   response_timer_cb_();
 
-  EXPECT_CALL(time_source_, currentTime());
+  EXPECT_CALL(time_system_, monotonicTime());
   deliverLoadStatsResponse({"bar"});
 
   EXPECT_CALL(async_stream_, sendMessage(_, _));
@@ -113,7 +114,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   // Initially, we have no clusters to report on.
   expectSendMessage({});
   createLoadStatsReporter();
-  EXPECT_CALL(time_source_, currentTime())
+  EXPECT_CALL(time_system_, monotonicTime())
       .WillOnce(Return(MonotonicTime(std::chrono::microseconds(3))));
   // Start reporting on foo.
   NiceMock<MockCluster> foo_cluster;
@@ -124,7 +125,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   deliverLoadStatsResponse({"foo"});
   // Initial stats report for foo on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
-  EXPECT_CALL(time_source_, currentTime())
+  EXPECT_CALL(time_system_, monotonicTime())
       .WillOnce(Return(MonotonicTime(std::chrono::microseconds(4))));
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
@@ -142,13 +143,13 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
 
   // Start reporting on bar.
-  EXPECT_CALL(time_source_, currentTime())
+  EXPECT_CALL(time_system_, monotonicTime())
       .WillOnce(Return(MonotonicTime(std::chrono::microseconds(6))));
   deliverLoadStatsResponse({"foo", "bar"});
   // Stats report foo/bar on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
-  EXPECT_CALL(time_source_, currentTime())
+  EXPECT_CALL(time_system_, monotonicTime())
       .Times(2)
       .WillRepeatedly(Return(MonotonicTime(std::chrono::microseconds(28))));
   {
@@ -176,7 +177,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   // Stats report for bar on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
-  EXPECT_CALL(time_source_, currentTime())
+  EXPECT_CALL(time_system_, monotonicTime())
       .WillOnce(Return(MonotonicTime(std::chrono::microseconds(33))));
   {
     envoy::api::v2::endpoint::ClusterStats bar_cluster_stats;
@@ -194,13 +195,13 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
 
   // Start tracking foo again, we should forget earlier history for foo.
-  EXPECT_CALL(time_source_, currentTime())
+  EXPECT_CALL(time_system_, monotonicTime())
       .WillOnce(Return(MonotonicTime(std::chrono::microseconds(43))));
   deliverLoadStatsResponse({"foo", "bar"});
   // Stats report foo/bar on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
-  EXPECT_CALL(time_source_, currentTime())
+  EXPECT_CALL(time_system_, monotonicTime())
       .Times(2)
       .WillRepeatedly(Return(MonotonicTime(std::chrono::microseconds(47))));
   {
