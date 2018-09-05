@@ -851,7 +851,7 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& 
 
 const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& headers) const {
   // Fast path the case where we only have a default virtual host.
-  if (virtual_hosts_.empty() && default_virtual_host_) {
+  if (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() && default_virtual_host_) {
     return default_virtual_host_.get();
   }
 

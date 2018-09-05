@@ -23,10 +23,12 @@ PROTO_SUFFIX = (".proto")
 GOOGLE_PROTOBUF_WHITELIST = ("ci/prebuilt", "source/common/protobuf", "api/test")
 REPOSITORIES_BZL = "bazel/repositories.bzl"
 
-# Files matching these exact names can reference prod time. These include the class
-# definitions for prod time, the construction of them in main(), and perf annotation.
+# Files matching these exact names can reference real-world time. These include the class
+# definitions for real-world time, the construction of them in main(), and perf annotation.
 # For now it includes the validation server but that really should be injected too.
-PROD_TIME_WHITELIST = ('./source/common/common/utility.h',
+REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
+                       './source/common/event/real_time_system.cc',
+                       './source/common/event/real_time_system.h',
                        './source/exe/main_common.cc',
                        './source/exe/main_common.h',
                        './source/server/config_validation/server.cc',
@@ -74,11 +76,11 @@ def whitelistedForProtobufDeps(file_path):
   return (file_path.endswith(PROTO_SUFFIX) or file_path.endswith(REPOSITORIES_BZL) or \
           any(path_segment in file_path for path_segment in GOOGLE_PROTOBUF_WHITELIST))
 
-# Production time sources should not be instantiated in the source, except for a few
+# Real-world time sources should not be instantiated in the source, except for a few
 # specific cases. They should be passed down from where they are instantied to where
 # they need to be used, e.g. through the ServerInstance, Dispatcher, or ClusterManager.
-def whitelistedForProdTime(file_path):
-  return file_path in PROD_TIME_WHITELIST or file_path.startswith('./test/')
+def whitelistedForRealTime(file_path):
+  return file_path in REAL_TIME_WHITELIST or file_path.startswith('./test/')
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
@@ -160,9 +162,9 @@ def checkSourceLine(line, file_path, reportError):
     # comments, for example this one.
     reportError("Don't use <mutex> or <condition_variable*>, switch to "
                 "Thread::MutexBasicLockable in source/common/common/thread.h")
-  if not whitelistedForProdTime(file_path):
-    if 'ProdSystemTimeSource' in line or 'ProdMonotonicTimeSource' in line:
-      reportError("Don't reference real-time sources from production code; use injection")
+  if not whitelistedForRealTime(file_path):
+    if 'RealTimeSource' in line or 'RealTimeSystem' in line:
+      reportError("Don't reference real-world time sources from production code; use injection")
 
 def checkBuildLine(line, file_path, reportError):
   if not whitelistedForProtobufDeps(file_path) and '"protobuf"' in line:

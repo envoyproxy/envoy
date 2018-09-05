@@ -46,8 +46,8 @@ message HostStatus {
   // Address of this host.
   envoy.api.v2.core.Address address = 1;
 
-  // Mapping from the name of the statistic to the current value.
-  map<string, SimpleMetric> stats = 2;
+  // List of stats specific to this host.
+  repeated SimpleMetric stats = 2;
 
   // The host's current health status.
   HostHealthStatus health_status = 3;

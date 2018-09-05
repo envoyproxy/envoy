@@ -41,6 +41,11 @@ config_setting(
 )
 
 config_setting(
+    name = "linux_ppc",
+    values = {"cpu": "ppc"},
+)
+
+config_setting(
     name = "windows_opt_build",
     values = {
         "cpu": "x64_windows",

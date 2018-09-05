@@ -535,6 +535,31 @@ TEST(RouteMatcherTest, TestRoutes) {
   }
 }
 
+TEST(RouteMatcherTest, TestRoutesWithWildcardAndDefaultOnly) {
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: wildcard
+    domains: ["*.solo.io"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: "wildcard" }
+  - name: default
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: "default" }
+  )EOF";
+
+  const auto proto_config = parseRouteConfigurationFromV2Yaml(yaml);
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  TestConfigImpl config(proto_config, factory_context, true);
+
+  EXPECT_EQ("wildcard",
+            config.route(genHeaders("gloo.solo.io", "/", "GET"), 0)->routeEntry()->clusterName());
+  EXPECT_EQ("default",
+            config.route(genHeaders("example.com", "/", "GET"), 0)->routeEntry()->clusterName());
+}
+
 TEST(RouteMatcherTest, TestRoutesWithInvalidRegex) {
   std::string invalid_route = R"EOF(
 virtual_hosts:

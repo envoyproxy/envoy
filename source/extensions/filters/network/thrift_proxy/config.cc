@@ -143,10 +143,6 @@ void ConfigImpl::createFilterChain(ThriftFilters::FilterChainFactoryCallbacks& c
   }
 }
 
-DecoderPtr ConfigImpl::createDecoder(DecoderCallbacks& callbacks) {
-  return std::make_unique<Decoder>(createTransport(), createProtocol(), callbacks);
-}
-
 TransportPtr ConfigImpl::createTransport() {
   return NamedTransportConfigFactory::getFactory(transport_).createTransport();
 }

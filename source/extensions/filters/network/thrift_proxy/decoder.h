@@ -2,7 +2,6 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/logger.h"
 
@@ -61,7 +60,7 @@ private:
  * DecoderStateMachine is the Thrift message state machine as described in
  * source/extensions/filters/network/thrift_proxy/docs.
  */
-class DecoderStateMachine {
+class DecoderStateMachine : public Logger::Loggable<Logger::Id::thrift> {
 public:
   DecoderStateMachine(Protocol& proto, MessageMetadataSharedPtr& metadata,
                       DecoderEventHandler& handler)
@@ -183,15 +182,15 @@ public:
 };
 
 /**
- * Decoder encapsulates a configured TransportPtr and ProtocolPtr.
+ * Decoder encapsulates a configured Transport and Protocol and provides the ability to decode
+ * Thrift messages.
  */
 class Decoder : public Logger::Loggable<Logger::Id::thrift> {
 public:
-  Decoder(TransportPtr&& transport, ProtocolPtr&& protocol, DecoderCallbacks& callbacks);
-  Decoder(TransportType transport_type, ProtocolType protocol_type, DecoderCallbacks& callbacks);
+  Decoder(Transport& transport, Protocol& protocol, DecoderCallbacks& callbacks);
 
   /**
-   * Drains data from the given buffer while executing a DecoderStateMachine over the data.
+   * Drains data from the given buffer while executing a state machine over the data.
    *
    * @param data a Buffer containing Thrift protocol data
    * @param buffer_underflow bool set to true if more data is required to continue decoding
@@ -201,8 +200,8 @@ public:
    */
   FilterStatus onData(Buffer::Instance& data, bool& buffer_underflow);
 
-  TransportType transportType() { return transport_->type(); }
-  ProtocolType protocolType() { return protocol_->type(); }
+  TransportType transportType() { return transport_.type(); }
+  ProtocolType protocolType() { return protocol_.type(); }
 
 private:
   struct ActiveRequest {
@@ -214,8 +213,8 @@ private:
 
   void complete();
 
-  TransportPtr transport_;
-  ProtocolPtr protocol_;
+  Transport& transport_;
+  Protocol& protocol_;
   DecoderCallbacks& callbacks_;
   ActiveRequestPtr request_;
   MessageMetadataSharedPtr metadata_;

@@ -124,7 +124,7 @@ envoy_cc_test_library(
     srcs = ["test_time.cc"],
     hdrs = ["test_time.h"],
     deps = [
-        "//source/common/common:utility_lib",
+        "//source/common/event:real_time_system_lib",
     ],
 )
 
