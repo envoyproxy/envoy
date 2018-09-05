@@ -536,7 +536,7 @@ AssertionResult FakeRawConnection::write(const std::string& data, bool end_strea
 Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& data,
                                                             bool end_stream) {
   Thread::LockGuard lock(parent_.lock_);
-  ENVOY_LOG(debug, "got {} bytes", data.length());
+  ENVOY_LOG(debug, "got {} bytes, end_stream {}", data.length(), end_stream);
   parent_.data_.append(data.toString());
   parent_.half_closed_ = end_stream;
   data.drain(data.length());
