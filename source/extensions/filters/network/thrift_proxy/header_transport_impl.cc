@@ -49,7 +49,7 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
   }
 
   // Size of frame, not including the length bytes.
-  const int32_t frame_size = BufferHelper::peekI32(buffer);
+  const int32_t frame_size = buffer.peekBEInt<int32_t>();
 
   // Minimum header frame size is 18 bytes (4 bytes of frame size + 10 bytes of fixed header +
   // minimum 4 bytes of variable header data), so frame_size must be at least 14.
@@ -57,17 +57,17 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
     throw EnvoyException(fmt::format("invalid thrift header transport frame size {}", frame_size));
   }
 
-  int16_t magic = BufferHelper::peekU16(buffer, 4);
+  int16_t magic = buffer.peekBEInt<uint16_t>(4);
   if (!isMagic(magic)) {
     throw EnvoyException(fmt::format("invalid thrift header transport magic {:04x}", magic));
   }
 
   // offset 6: 16 bit flags field, unused
   // offset 8: 32 bit sequence number field
-  int32_t seq_id = BufferHelper::peekI32(buffer, 8);
+  int32_t seq_id = buffer.peekBEInt<int32_t>(8);
 
   // offset 12: 16 bit (remaining) header size / 4 (spec erroneously claims / 32).
-  int16_t raw_header_size = BufferHelper::peekI16(buffer, 12);
+  int16_t raw_header_size = buffer.peekBEInt<int16_t>(12);
   int32_t header_size = static_cast<int32_t>(raw_header_size) * 4;
   if (header_size < 0 || header_size > MaxHeadersSize) {
     throw EnvoyException(fmt::format("invalid thrift header transport header size {} ({:04x})",
@@ -200,7 +200,7 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
   BufferHelper::writeVarIntI32(header_buffer, 0); // num transforms
   if (headers.size() > 0) {
     // Info ID 1
-    BufferHelper::writeI8(header_buffer, 1);
+    header_buffer.writeByte(1);
 
     // Num headers
     BufferHelper::writeVarIntI32(header_buffer, static_cast<int32_t>(headers.size()));
@@ -238,11 +238,12 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
     seq_id = metadata.sequenceId();
   }
 
-  BufferHelper::writeU32(buffer, static_cast<uint32_t>(size));
-  BufferHelper::writeU16(buffer, Magic);
-  BufferHelper::writeU16(buffer, 0); // flags
-  BufferHelper::writeI32(buffer, seq_id);
-  BufferHelper::writeU16(buffer, static_cast<uint16_t>(header_size / 4));
+  buffer.writeBEInt<uint32_t>(static_cast<uint32_t>(size));
+  buffer.writeBEInt<uint16_t>(Magic);
+  buffer.writeBEInt<uint16_t>(0); // flags
+  buffer.writeBEInt<int32_t>(seq_id);
+  buffer.writeBEInt<uint16_t>(static_cast<uint16_t>(header_size / 4));
+
   buffer.move(header_buffer);
   buffer.move(message);
 }
