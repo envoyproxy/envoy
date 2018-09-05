@@ -69,7 +69,7 @@ public:
   Http::MockAsyncClientRequest request_;
   Http::AsyncClient::Callbacks* callbacks_{};
   Event::MockTimer* interval_timer_{};
-  NiceMock<MockTimeSource> time_system_;
+  NiceMock<MockTimeSystem> time_system_;
 };
 
 class RdsImplTest : public RdsTestBase {
@@ -370,7 +370,7 @@ public:
     Upstream::ClusterManager::ClusterInfoMap cluster_map;
     Upstream::MockCluster cluster;
     cluster_map.emplace("foo_cluster", cluster);
-    ON_CALL(factory_context_, timeSource()).WillByDefault(ReturnRef(time_system_));
+    ON_CALL(factory_context_, timeSystem()).WillByDefault(ReturnRef(time_system_));
     EXPECT_CALL(factory_context_.cluster_manager_, clusters()).WillOnce(Return(cluster_map));
     EXPECT_CALL(cluster, info()).Times(2);
     EXPECT_CALL(*cluster.info_, addedViaApi());
@@ -427,7 +427,7 @@ virtual_hosts:
 
   EXPECT_CALL(time_system_, systemTime())
       .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
-  EXPECT_CALL(factory_context_, timeSource()).WillRepeatedly(ReturnRef(time_system_));
+  EXPECT_CALL(factory_context_, timeSystem()).WillRepeatedly(ReturnRef(time_system_));
 
   // Only static route.
   RouteConfigProviderPtr static_config =

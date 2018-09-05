@@ -207,7 +207,7 @@ public:
   }
 
   ClusterManagerFactory& clusterManagerFactory() override { return cluster_manager_factory_; }
-  TimeSource& timeSource() override { return time_source_; }
+  TimeSource& timeSystem() override { return time_source_; }
 
   // Upstream::ClusterManager
   MOCK_METHOD2(addOrUpdateCluster,

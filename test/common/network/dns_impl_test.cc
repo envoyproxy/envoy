@@ -322,7 +322,7 @@ private:
 
 class DnsImplConstructor : public testing::Test {
 protected:
-  DnsImplConstructor() : dispatcher_(test_time_.timeSource()) {}
+  DnsImplConstructor() : dispatcher_(test_time_.timeSystem()) {}
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;
 };
@@ -402,7 +402,7 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
 
 class DnsImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
-  DnsImplTest() : dispatcher_(test_time_.timeSource()) {}
+  DnsImplTest() : dispatcher_(test_time_.timeSystem()) {}
 
   void SetUp() override {
     resolver_ = dispatcher_.createDnsResolver({});

@@ -213,7 +213,7 @@ public:
   /**
    * @return TimeSource& the time-source used with the cluster manager.
    */
-  virtual TimeSource& timeSource() PURE;
+  virtual TimeSource& timeSystem() PURE;
 };
 
 typedef std::unique_ptr<ClusterManager> ClusterManagerPtr;

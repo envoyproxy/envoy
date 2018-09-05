@@ -38,7 +38,7 @@ namespace Zipkin {
 
 class ZipkinDriverTest : public Test {
 public:
-  ZipkinDriverTest() : time_system_(test_time_.timeSource()) {}
+  ZipkinDriverTest() : time_system_(test_time_.timeSystem()) {}
 
   void setup(Json::Object& config, bool init_timer) {
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))

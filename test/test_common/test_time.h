@@ -14,7 +14,7 @@ public:
   DangerousDeprecatedTestTime();
 
   // TODO(#4160) rename this method and all call-sites to timeSystem().
-  Event::TimeSystem& timeSource() { return time_system_; }
+  Event::TimeSystem& timeSystem() { return time_system_; }
 
 private:
   Event::RealTimeSystem time_system_;

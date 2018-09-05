@@ -111,14 +111,14 @@ public:
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
                      config.start_child_span(), config.suppress_envoy_headers(),
-                     context.timeSource()) {
+                     context.timeSystem()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
   }
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
-  TimeSource& timeSource() { return time_system_; }
+  TimeSource& timeSystem() { return time_system_; }
 
   Stats::Scope& scope_;
   const LocalInfo::LocalInfo& local_info_;
@@ -350,7 +350,7 @@ private:
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream);
-  TimeSource& timeSource() { return config_.timeSource(); }
+  TimeSource& timeSystem() { return config_.timeSystem(); }
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};

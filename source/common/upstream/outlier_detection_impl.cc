@@ -25,7 +25,7 @@ DetectorSharedPtr DetectorImplFactory::createForCluster(
     Runtime::Loader& runtime, EventLoggerSharedPtr event_logger) {
   if (cluster_config.has_outlier_detection()) {
     return DetectorImpl::create(cluster, cluster_config.outlier_detection(), dispatcher, runtime,
-                                dispatcher.timeSource(), event_logger);
+                                dispatcher.timeSystem(), event_logger);
   } else {
     return nullptr;
   }
