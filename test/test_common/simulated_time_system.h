@@ -33,15 +33,15 @@ public:
    */
   template<class Duration>
   void sleep(Duration duration) {
-    std::vector<Alarm*> ready;
+    MonotonicTime monotonic_time;
     {
       Thread::LockGuard lock(mutex_);
-      monotonic_time_ += duration;
-      system_time_ += duration;
-      ready = findReadyAlarmsLockHeld();
+      monotonic_time = monotonic_time_ + duration;
     }
-    runAlarms(ready);
+    setMonotonicTime(monotonic_time);
   }
+
+  void setMonotonicTime(MonotonicTime monotonic_time);
 
 private:
   // The simulation keeps a unique ID for each alarm to act as a deterministic
@@ -59,8 +59,9 @@ private:
   };
   typedef std::set<Alarm*, CompareAlarms> AlarmSet;
 
-  std::vector<Alarm*> findReadyAlarmsLockHeld() EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  void runAlarms(const std::vector<Alarm*> alarms);
+  void advanceTimeLockHeld() EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  //std::vector<Alarm*> findReadyAlarmsLockHeld() EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  //void runAlarms(const std::vector<Alarm*> alarms);
 
   RealTimeSource real_time_source_;
   MonotonicTime monotonic_time_ GUARDED_BY(mutex_);
