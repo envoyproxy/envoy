@@ -7,7 +7,6 @@ Types
 
   ../type/http_status.proto
   ../type/percent.proto
-  ../type/runtime_percent.proto
   ../type/range.proto
   ../type/matcher/metadata.proto
   ../type/matcher/number.proto

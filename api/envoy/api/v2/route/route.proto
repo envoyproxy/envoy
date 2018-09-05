@@ -6,7 +6,6 @@ option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/type/range.proto";
-import "envoy/type/runtime_percent.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -300,7 +299,7 @@ message RouteMatch {
     // granularity than the deprecated runtime field) without full code/config deploys. Refer to
     // the :ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting_shift>` docs
     // for additional documentation.
-    envoy.type.RuntimeFractionalPercent runtime_fraction = 8;
+    core.RuntimeFractionalPercent runtime_fraction = 8;
   }
 
   // Specifies a set of headers that the route should match on. The router will
