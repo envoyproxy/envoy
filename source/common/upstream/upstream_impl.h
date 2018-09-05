@@ -42,6 +42,8 @@
 
 #include "server/init_manager_impl.h"
 
+#include "absl/synchronization/mutex.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -91,11 +93,11 @@ public:
   // TODO(rgs1): we should move to absl locks, once there's support for R/W locks. We should
   // also add lock annotations, once they work correctly with R/W locks.
   const std::shared_ptr<envoy::api::v2::core::Metadata> metadata() const override {
-    std::shared_lock<std::shared_timed_mutex> lock(metadata_mutex_);
+    absl::ReaderMutexLock lock(&metadata_mutex_);
     return metadata_;
   }
   virtual void metadata(const envoy::api::v2::core::Metadata& new_metadata) override {
-    std::unique_lock<std::shared_timed_mutex> lock(metadata_mutex_);
+    absl::WriterMutexLock lock(&metadata_mutex_);
     metadata_ = std::make_shared<envoy::api::v2::core::Metadata>(new_metadata);
   }
 
@@ -134,8 +136,8 @@ protected:
   Network::Address::InstanceConstSharedPtr address_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
   std::atomic<bool> canary_;
-  mutable std::shared_timed_mutex metadata_mutex_;
-  std::shared_ptr<envoy::api::v2::core::Metadata> metadata_;
+  mutable absl::Mutex metadata_mutex_;
+  std::shared_ptr<envoy::api::v2::core::Metadata> metadata_ GUARDED_BY(metadata_mutex_);
   const envoy::api::v2::core::Locality locality_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;
