@@ -156,7 +156,7 @@ struct StatNamePtrHash {
 struct StatNamePtrCompare {
   bool operator()(const StatName* a, const StatName* b) const {
     // This extracts the underlying statnames.
-    return (*a == *b);
+    return *a == *b;
   }
 };
 
@@ -167,7 +167,7 @@ struct StatNameUniquePtrHash {
 struct StatNameUniquePtrCompare {
   bool operator()(const StatNamePtr& a, const StatNamePtr& b) const {
     // This extracts the underlying statnames.
-    return (*a == *b);
+    return *a == *b;
   }
 };
 

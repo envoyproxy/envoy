@@ -59,7 +59,7 @@ private:
     size_t operator()(const HeapStatData* a) const { return a->name_ptr_->hash(); }
   };
   struct HeapStatCompare {
-    bool operator()(const HeapStatData* a, const HeapStatData* b) const { return (*a == *b); }
+    bool operator()(const HeapStatData* a, const HeapStatData* b) const { return *a == *b; }
   };
 
   typedef std::unordered_set<HeapStatData*, HeapStatHash, HeapStatCompare> StatSet;
