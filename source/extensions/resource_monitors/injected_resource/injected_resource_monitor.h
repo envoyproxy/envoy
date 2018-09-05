@@ -10,6 +10,12 @@ namespace Extensions {
 namespace ResourceMonitors {
 namespace InjectedResourceMonitor {
 
+/**
+ * A monitor for an injected resource. The resource pressure is read from a text file
+ * specified in the config, which must contain a floating-point number in the range
+ * [0..1] and be updated atomically by a symbolic link swap.
+ * This is intended primarily for integration tests to force Envoy into an overloaded state.
+ */
 class InjectedResourceMonitor : public Server::ResourceMonitor {
 public:
   InjectedResourceMonitor(

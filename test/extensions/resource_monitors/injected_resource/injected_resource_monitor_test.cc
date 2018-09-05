@@ -49,9 +49,13 @@ protected:
   InjectedResourceMonitorTest()
       : dispatcher_(test_time_.timeSource()),
         resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
-        file_updater_(resource_filename_) {}
+        file_updater_(resource_filename_), monitor_(createMonitor()) {}
 
-  void updateResource(const std::string& contents) { file_updater_.update(contents); }
+  void updateResource(const std::string& contents) {
+    file_updater_.update(contents);
+    dispatcher_.run(Event::Dispatcher::RunType::Block);
+    monitor_->updateResourceUsage(cb_);
+  }
 
   void updateResource(double pressure) { updateResource(absl::StrCat(pressure)); }
 
@@ -67,52 +71,35 @@ protected:
   const std::string resource_filename_;
   AtomicFileUpdater file_updater_;
   MockedCallbacks cb_;
+  std::unique_ptr<InjectedResourceMonitor> monitor_;
 };
 
 TEST_F(InjectedResourceMonitorTest, ReportsCorrectPressure) {
-  auto monitor(createMonitor());
-
-  updateResource(0.6);
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
   EXPECT_CALL(cb_, onSuccess(Server::ResourceUsage{.resource_pressure_ = 0.6}));
-  monitor->updateResourceUsage(cb_);
+  updateResource(0.6);
 
-  updateResource(0.7);
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
   EXPECT_CALL(cb_, onSuccess(Server::ResourceUsage{.resource_pressure_ = 0.7}));
-  monitor->updateResourceUsage(cb_);
+  updateResource(0.7);
 }
 
 MATCHER_P(ExceptionContains, rhs, "") { return absl::StrContains(arg.what(), rhs); }
 
 TEST_F(InjectedResourceMonitorTest, ReportsParseError) {
-  auto monitor(createMonitor());
-
-  updateResource("bad content");
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
   EXPECT_CALL(cb_, onFailure(ExceptionContains("failed to parse injected resource pressure")));
-  monitor->updateResourceUsage(cb_);
+  updateResource("bad content");
 }
 
 TEST_F(InjectedResourceMonitorTest, ReportsErrorForOutOfRangePressure) {
-  auto monitor(createMonitor());
-
+  EXPECT_CALL(cb_, onFailure(ExceptionContains("pressure out of range")));
   updateResource(-1);
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
-  EXPECT_CALL(cb_, onFailure(ExceptionContains("pressure out of range")));
-  monitor->updateResourceUsage(cb_);
 
-  updateResource(2);
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
   EXPECT_CALL(cb_, onFailure(ExceptionContains("pressure out of range")));
-  monitor->updateResourceUsage(cb_);
+  updateResource(2);
 }
 
 TEST_F(InjectedResourceMonitorTest, ReportsErrorOnFileRead) {
-  auto monitor(createMonitor());
-
   EXPECT_CALL(cb_, onFailure(ExceptionContains("unable to read file")));
-  monitor->updateResourceUsage(cb_);
+  monitor_->updateResourceUsage(cb_);
 }
 
 } // namespace InjectedResourceMonitor

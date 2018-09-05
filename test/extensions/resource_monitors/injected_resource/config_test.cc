@@ -21,14 +21,14 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   auto factory =
       Registry::FactoryRegistry<Server::Configuration::ResourceMonitorFactory>::getFactory(
           "envoy.resource_monitors.injected_resource");
-  EXPECT_NE(factory, nullptr);
+  ASSERT_NE(factory, nullptr);
 
   envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig config;
   config.set_filename(TestEnvironment::temporaryPath("injected_resource"));
   DangerousDeprecatedTestTime test_time;
   Event::DispatcherImpl dispatcher(test_time.timeSource());
   Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher);
-  auto monitor = factory->createResourceMonitor(config, context);
+  Server::ResourceMonitorPtr monitor = factory->createResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);
 }
 

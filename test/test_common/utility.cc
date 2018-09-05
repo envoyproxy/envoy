@@ -232,9 +232,9 @@ void AtomicFileUpdater::update(const std::string& contents) {
     file << contents;
   }
   int rc = symlink(target.c_str(), new_link_.c_str());
-  EXPECT_EQ(0, rc) << strerror(errno);
+  ASSERT_EQ(0, rc) << strerror(errno);
   rc = rename(new_link_.c_str(), link_.c_str());
-  EXPECT_EQ(0, rc) << strerror(errno);
+  ASSERT_EQ(0, rc) << strerror(errno);
 }
 
 constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
