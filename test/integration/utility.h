@@ -92,7 +92,7 @@ private:
 
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  std::shared_ptr<ConnectionCallbacks> callbacks_;
+  std::unique_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr client_;
 };
 

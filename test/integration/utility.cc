@@ -111,7 +111,7 @@ RawConnectionDriver::RawConnectionDriver(uint32_t port, Buffer::Instance& initia
                                          Network::Address::IpVersion version) {
   api_.reset(new Api::Impl(std::chrono::milliseconds(10000)));
   dispatcher_ = api_->allocateDispatcher(IntegrationUtil::evil_singleton_test_time_.timeSource());
-  callbacks_.reset(new ConnectionCallbacks());
+  callbacks_ = std::make_unique<ConnectionCallbacks>();
   client_ = dispatcher_->createClientConnection(
       Network::Utility::resolveUrl(
           fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version), port)),
