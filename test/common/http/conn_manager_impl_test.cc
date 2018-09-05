@@ -1718,8 +1718,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http1_active_.value());
 
-  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   upstream_callbacks->onEvent(Network::ConnectionEvent::RemoteClose);
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
   EXPECT_EQ(0U, stats_.named_.downstream_cx_websocket_active_.value());
 }
@@ -1764,8 +1764,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyData) {
           Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) { upstream_callbacks = &cb; }));
   conn_pool_.poolReady(upstream_conn_);
 
-  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   upstream_callbacks->onEvent(Network::ConnectionEvent::RemoteClose);
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
 }
 
@@ -1843,8 +1843,8 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyEndStream) {
       .WillOnce(
           Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) { upstream_callbacks = &cb; }));
   conn_pool_.poolReady(upstream_conn_);
-  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   upstream_callbacks->onEvent(Network::ConnectionEvent::RemoteClose);
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
 }
 
