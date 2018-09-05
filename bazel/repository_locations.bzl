@@ -14,7 +14,7 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "thrift-0.11.0",
     ),
     com_github_bombela_backward = dict(
-        commit = "44ae9609e860e3428cd057f7052e505b4819eb84",  # 2018-02-06
+        commit = "84ae4f5e80381aca765a0810d4c811acae3cd7c7",  # v1.4
         remote = "https://github.com/bombela/backward-cpp",
     ),
     com_github_circonus_labs_libcircllhist = dict(
