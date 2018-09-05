@@ -105,6 +105,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":thrift_lib",
+        "//include/envoy/buffer:buffer_interface",
         "//source/common/common:macros",
     ],
 )
@@ -128,14 +129,18 @@ envoy_cc_library(
     ],
     external_deps = ["abseil_optional"],
     deps = [
+        ":conn_state_lib",
         ":decoder_events_lib",
         ":metadata_lib",
         ":thrift_lib",
+        ":thrift_object_interface",
+        ":transport_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/registry",
         "//source/common/common:assert_lib",
         "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
+        "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
     ],
 )
 
@@ -222,11 +227,40 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "conn_state_lib",
+    hdrs = ["conn_state.h"],
+    deps = [
+        "//include/envoy/tcp:conn_pool_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "thrift_lib",
     hdrs = ["thrift.h"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "thrift_object_interface",
+    hdrs = ["thrift_object.h"],
+    deps = [
+        "//include/envoy/buffer:buffer_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "thrift_object_lib",
+    srcs = ["thrift_object_impl.cc"],
+    hdrs = ["thrift_object_impl.h"],
+    deps = [
+        ":decoder_lib",
+        ":thrift_lib",
+        ":thrift_object_interface",
+        ":unframed_transport_lib",
+        "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
     ],
 )
 

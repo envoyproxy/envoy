@@ -213,13 +213,12 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
 FilterStatus Router::messageEnd() {
   ProtocolConverter::messageEnd();
 
-  TransportPtr transport =
-      NamedTransportConfigFactory::getFactory(upstream_request_->transport_type_).createTransport();
   Buffer::OwnedImpl transport_buffer;
 
-  upstream_request_->metadata_->setProtocol(upstream_request_->protocol_type_);
+  upstream_request_->metadata_->setProtocol(upstream_request_->protocol_->type());
 
-  transport->encodeFrame(transport_buffer, *upstream_request_->metadata_, upstream_request_buffer_);
+  upstream_request_->transport_->encodeFrame(transport_buffer, *upstream_request_->metadata_,
+                                             upstream_request_buffer_);
   upstream_request_->conn_data_->connection().write(transport_buffer, false);
   upstream_request_->onRequestComplete();
   return FilterStatus::Continue;
@@ -228,16 +227,32 @@ FilterStatus Router::messageEnd() {
 void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!upstream_request_->response_complete_);
 
-  if (!upstream_request_->response_started_) {
-    callbacks_->startUpstreamResponse(upstream_request_->transport_type_,
-                                      upstream_request_->protocol_type_);
-    upstream_request_->response_started_ = true;
-  }
+  if (upstream_request_->upgrade_response_ != nullptr) {
+    // Handle upgrade response.
+    if (!upstream_request_->upgrade_response_->onData(data)) {
+      // Wait for more data.
+      return;
+    }
 
-  if (callbacks_->upstreamData(data)) {
-    upstream_request_->onResponseComplete();
-    cleanup();
-    return;
+    upstream_request_->protocol_->completeUpgrade(
+        *upstream_request_->conn_data_->connectionStateTyped<ThriftConnectionState>(),
+        *upstream_request_->upgrade_response_);
+
+    upstream_request_->upgrade_response_.reset();
+    upstream_request_->onRequestStart(true);
+  } else {
+    // Handle normal response.
+    if (!upstream_request_->response_started_) {
+      callbacks_->startUpstreamResponse(*upstream_request_->transport_,
+                                        *upstream_request_->protocol_);
+      upstream_request_->response_started_ = true;
+    }
+
+    if (callbacks_->upstreamData(data)) {
+      upstream_request_->onResponseComplete();
+      cleanup();
+      return;
+    }
   }
 
   if (end_stream) {
@@ -284,9 +299,10 @@ void Router::cleanup() { upstream_request_.reset(); }
 Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
                                          MessageMetadataSharedPtr& metadata,
                                          TransportType transport_type, ProtocolType protocol_type)
-    : parent_(parent), conn_pool_(pool), metadata_(metadata), transport_type_(transport_type),
-      protocol_type_(protocol_type), request_complete_(false), response_started_(false),
-      response_complete_(false) {}
+    : parent_(parent), conn_pool_(pool), metadata_(metadata),
+      transport_(NamedTransportConfigFactory::getFactory(transport_type).createTransport()),
+      protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
+      request_complete_(false), response_started_(false), response_complete_(false) {}
 
 Router::UpstreamRequest::~UpstreamRequest() {}
 
@@ -295,6 +311,11 @@ FilterStatus Router::UpstreamRequest::start() {
   if (handle) {
     // Pause while we wait for a connection.
     conn_pool_handle_ = handle;
+    return FilterStatus::StopIteration;
+  }
+
+  if (upgrade_response_ != nullptr) {
+    // Pause while we wait for an upgrade response.
     return FilterStatus::StopIteration;
   }
 
@@ -329,12 +350,28 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
   onUpstreamHostSelected(host);
   conn_data_ = std::move(conn_data);
   conn_data_->addUpstreamCallbacks(parent_);
-
   conn_pool_handle_ = nullptr;
 
-  parent_.initProtocolConverter(
-      NamedProtocolConfigFactory::getFactory(protocol_type_).createProtocol(),
-      parent_.upstream_request_buffer_);
+  ThriftConnectionState* state = conn_data_->connectionStateTyped<ThriftConnectionState>();
+  if (state == nullptr) {
+    conn_data_->setConnectionState(std::make_unique<ThriftConnectionState>());
+    state = conn_data_->connectionStateTyped<ThriftConnectionState>();
+  }
+
+  if (protocol_->supportsUpgrade()) {
+    upgrade_response_ =
+        protocol_->attemptUpgrade(*transport_, *state, parent_.upstream_request_buffer_);
+    if (upgrade_response_ != nullptr) {
+      conn_data_->connection().write(parent_.upstream_request_buffer_, false);
+      return;
+    }
+  }
+
+  onRequestStart(continue_decoding);
+}
+
+void Router::UpstreamRequest::onRequestStart(bool continue_decoding) {
+  parent_.initProtocolConverter(*protocol_, parent_.upstream_request_buffer_);
 
   // TODO(zuercher): need to use an upstream-connection-specific sequence id
   parent_.convertMessageBegin(metadata_);

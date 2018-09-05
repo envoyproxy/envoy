@@ -26,7 +26,9 @@ envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
     external_deps = ["abseil_optional"],
-    deps = [],
+    deps = [
+        "//source/extensions/filters/network/thrift_proxy:metadata_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -46,8 +48,9 @@ envoy_cc_library(
         "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
         "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_converter_lib",
-        "//source/extensions/filters/network/thrift_proxy:protocol_lib",
-        "//source/extensions/filters/network/thrift_proxy:transport_lib",
+        "//source/extensions/filters/network/thrift_proxy:protocol_interface",
+        "//source/extensions/filters/network/thrift_proxy:thrift_object_interface",
+        "//source/extensions/filters/network/thrift_proxy:transport_interface",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
         "@envoy_api//envoy/config/filter/network/thrift_proxy/v2alpha1:thrift_proxy_cc",
     ],
