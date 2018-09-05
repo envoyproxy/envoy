@@ -104,21 +104,21 @@ private:
 
   // Stores the symbol to be used at next insertion. This should exist ahead of insertion time so
   // that if insertion succeeds, the value written is the correct one.
-  Symbol next_symbol_ = 0;
+  Symbol next_symbol_ = 0 GUARDED_BY(lock_);
 
   // If the free pool is exhausted, we monotonically increase this counter.
-  Symbol monotonic_counter_ = 0;
+  Symbol monotonic_counter_ = 0 GUARDED_BY(lock_);
 
   // Bimap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
   // Using absl::string_view lets us only store the complete string once, in the decode map.
-  std::unordered_map<absl::string_view, SharedSymbol, StringViewHash> encode_map_;
-  std::unordered_map<Symbol, std::string> decode_map_;
+  std::unordered_map<absl::string_view, SharedSymbol, StringViewHash> encode_map_ GUARDED_BY(lock_);
+  std::unordered_map<Symbol, std::string> decode_map_ GUARDED_BY(lock_);
 
   // Free pool of symbols for re-use.
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
   // using an Envoy::IntervalSet.
-  std::stack<Symbol> pool_;
+  std::stack<Symbol> pool_ GUARDED_BY(lock_);
 
   // This must be called during both encode() and free().
   mutable Thread::MutexBasicLockable lock_;
