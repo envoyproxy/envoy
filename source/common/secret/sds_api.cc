@@ -13,6 +13,9 @@
 namespace Envoy {
 namespace Secret {
 
+template class Secret::SdsApi<Ssl::TlsCertificateConfig>;
+template class Secret::SdsApi<Ssl::CertificateValidationContextConfig>;
+
 template <class SecretType>
 SdsApi<SecretType>::SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                            Runtime::RandomGenerator& random, Stats::Store& stats,
