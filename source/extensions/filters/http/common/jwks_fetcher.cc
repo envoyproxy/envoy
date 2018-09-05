@@ -28,6 +28,7 @@ public:
 
   void fetch(const ::envoy::api::v2::core::HttpUri& uri, JwksFetcher::JwksReceiver& receiver) {
     ENVOY_LOG(trace, "{}", __func__);
+    ASSERT(!receiver_);
     receiver_ = &receiver;
     uri_ = &uri;
     Http::MessagePtr message = Http::Utility::prepareHeaders(uri);

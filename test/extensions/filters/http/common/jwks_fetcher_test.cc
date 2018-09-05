@@ -78,6 +78,18 @@ public:
         }));
   }
 
+  MockUpstream(Upstream::MockClusterManager& mock_cm, Http::AsyncClient::FailureReason reason)
+      : request_(&mock_cm.async_client_) {
+    ON_CALL(mock_cm.async_client_, send_(testing::_, testing::_, testing::_))
+        .WillByDefault(testing::Invoke(
+            [this, reason](
+                Http::MessagePtr&, Http::AsyncClient::Callbacks& cb,
+                const absl::optional<std::chrono::milliseconds>&) -> Http::AsyncClient::Request* {
+              cb.onFailure(reason);
+              return &request_;
+            }));
+  }
+
   MockUpstream(Upstream::MockClusterManager& mock_cm, Http::MockAsyncClientRequest* request)
       : request_(&mock_cm.async_client_) {
     ON_CALL(mock_cm.async_client_, send_(testing::_, testing::_, testing::_))
@@ -149,6 +161,20 @@ TEST_F(JwksFetcherTest, TestGetInvalidJwks) {
   EXPECT_TRUE(fetcher != nullptr);
   EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
   EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::InvalidJwks)).Times(1);
+
+  // Act
+  fetcher->fetch(uri_, receiver);
+}
+
+TEST_F(JwksFetcherTest, TestHttpFailure) {
+  // Setup
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_,
+                           Http::AsyncClient::FailureReason::Reset);
+  MockJwksReceiver receiver;
+  std::unique_ptr<JwksFetcher> fetcher(JwksFetcher::create(mock_factory_ctx_.cluster_manager_));
+  EXPECT_TRUE(fetcher != nullptr);
+  EXPECT_CALL(receiver, onJwksSuccessImpl(testing::_)).Times(0);
+  EXPECT_CALL(receiver, onJwksError(JwksFetcher::JwksReceiver::Failure::Network)).Times(1);
 
   // Act
   fetcher->fetch(uri_, receiver);

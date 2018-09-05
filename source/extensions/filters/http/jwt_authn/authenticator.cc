@@ -110,10 +110,10 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
     return;
   }
 
-  // TODO: Cross-platform-wise the below unix_timestamp code is wrong as the
+  // TODO(qiwzhang): Cross-platform-wise the below unix_timestamp code is wrong as the
   // epoch is not guaranteed to be defined as the unix epoch. We should use
-  // the abseil time functionality instead.
-  // TODO: We should use the jwt_verify_lib to check the validity of a JWT.
+  // the abseil time functionality instead or use the jwt_verify_lib to check
+  // the validity of a JWT.
   // Check "exp" claim.
   const auto unix_timestamp = std::chrono::duration_cast<std::chrono::seconds>(
                                   std::chrono::system_clock::now().time_since_epoch())
@@ -126,7 +126,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
   }
   // If the exp claim does *not* appear in the JWT then the exp field is defaulted
   // to 0.
-  if (jwt_.exp_ && jwt_.exp_ < unix_timestamp) {
+  if (jwt_.exp_ > 0 && jwt_.exp_ < unix_timestamp) {
     doneWithStatus(Status::JwtExpired);
     return;
   }
@@ -144,7 +144,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
 
   auto jwks_obj = jwks_data_->getJwksObj();
   if (jwks_obj != nullptr && !jwks_data_->isExpired()) {
-    // TODO: It would seem there's a window of error whereby if the JWT issuer
+    // TODO(qiwzhang): It would seem there's a window of error whereby if the JWT issuer
     // has started signing with a new key that's not in our cache, then the
     // verification will fail even though the JWT is valid. A simple fix
     // would be to check the JWS kid header field; if present check we have

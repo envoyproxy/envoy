@@ -24,8 +24,9 @@ public:
   class JwksReceiver {
   public:
     enum class Failure {
-      Unknown,
+      /* A network error occured causing JWKS retrieval failure. */
       Network,
+      /* A failure occured when trying to parse the retrieved JWKS data. */
       InvalidJwks,
     };
 
@@ -46,12 +47,16 @@ public:
   virtual ~JwksFetcher(){};
 
   /*
-   * Cancel any inflight request.
+   * Cancel any in-flight request.
    */
   virtual void cancel() PURE;
 
   /*
    * Retrieve a JWKS resource from a remote HTTP host.
+   * At most one outstanding request may be in-flight,
+   * i.e. from the invocation of `fetch()` until either
+   * a callback or `cancel()` is invoked, no
+   * additional `fetch()` may be issued.
    * @param uri the uri to retrieve the jwks from.
    * @param receiver the receiver of the fetched JWKS or error.
    */
