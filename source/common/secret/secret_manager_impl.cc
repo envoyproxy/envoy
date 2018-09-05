@@ -64,10 +64,10 @@ SecretManagerImpl::createInlineCertificateValidationContextProvider(
       certificate_validation_context);
 }
 
-void SecretManagerImpl::removeDynamicSecretProvider(const std::string& map_key) {
-  ENVOY_LOG(debug, "Unregister secret provider. hash key: {}", map_key);
+void SecretManagerImpl::removeDynamicTlsCertificateProvider(const std::string& map_key) {
+  ENVOY_LOG(debug, "Unregister tls certificate provider. hash key: {}", map_key);
 
-  auto num_deleted = dynamic_secret_providers_.erase(map_key);
+  auto num_deleted = dynamic_tls_certificate_providers_.erase(map_key);
   ASSERT(num_deleted == 1, "");
 }
 
@@ -76,22 +76,59 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertific
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
   const std::string map_key = sds_config_source.SerializeAsString() + config_name;
 
-  TlsCertificateConfigProviderSharedPtr secret_provider = dynamic_secret_providers_[map_key].lock();
+  TlsCertificateConfigProviderSharedPtr secret_provider =
+      dynamic_tls_certificate_providers_[map_key].lock();
   if (!secret_provider) {
     ASSERT(secret_provider_context.initManager() != nullptr);
 
     // SdsApi is owned by ListenerImpl and ClusterInfo which are destroyed before
     // SecretManagerImpl. It is safe to invoke this callback at the destructor of SdsApi.
     std::function<void()> unregister_secret_provider = [map_key, this]() {
-      removeDynamicSecretProvider(map_key);
+      removeDynamicTlsCertificateProvider(map_key);
     };
 
-    secret_provider = std::make_shared<SdsApi>(
+    secret_provider = std::make_shared<TlsCertificateSdsApi>(
         secret_provider_context.localInfo(), secret_provider_context.dispatcher(),
         secret_provider_context.random(), secret_provider_context.stats(),
         secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
         sds_config_source, config_name, unregister_secret_provider);
-    dynamic_secret_providers_[map_key] = secret_provider;
+    dynamic_tls_certificate_providers_[map_key] = secret_provider;
+  }
+
+  return secret_provider;
+}
+
+void SecretManagerImpl::removeDynamicCertificateValidationContextProvider(
+    const std::string& map_key) {
+  ENVOY_LOG(debug, "Unregister certificate validation context provider. hash key: {}", map_key);
+
+  auto num_deleted = dynamic_certificate_validation_context_providers_.erase(map_key);
+  ASSERT(num_deleted == 1, "");
+}
+
+CertificateValidationContextConfigProviderSharedPtr
+SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
+    const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+  const std::string map_key = sds_config_source.SerializeAsString() + config_name;
+
+  CertificateValidationContextConfigProviderSharedPtr secret_provider =
+      dynamic_certificate_validation_context_providers_[map_key].lock();
+  if (!secret_provider) {
+    ASSERT(secret_provider_context.initManager() != nullptr);
+
+    // SdsApi is owned by ListenerImpl and ClusterInfo which are destroyed before
+    // SecretManagerImpl. It is safe to invoke this callback at the destructor of SdsApi.
+    std::function<void()> unregister_secret_provider = [map_key, this]() {
+      removeDynamicCertificateValidationContextProvider(map_key);
+    };
+
+    secret_provider = std::make_shared<CertificateValidationContextSdsApi>(
+        secret_provider_context.localInfo(), secret_provider_context.dispatcher(),
+        secret_provider_context.random(), secret_provider_context.stats(),
+        secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
+        sds_config_source, config_name, unregister_secret_provider);
+    dynamic_certificate_validation_context_providers_[map_key] = secret_provider;
   }
 
   return secret_provider;
