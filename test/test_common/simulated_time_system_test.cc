@@ -1,9 +1,9 @@
-#include "test/test_common/simulated_time_system.h"
-
+#include "common/common/thread.h"
 #include "common/event/libevent.h"
 
-#include "event2/event.h"
+#include "test/test_common/simulated_time_system.h"
 
+#include "event2/event.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -11,77 +11,100 @@ namespace Event {
 namespace Test {
 
 class SimulatedTimeSystemTest : public testing::Test {
- protected:
+protected:
   SimulatedTimeSystemTest()
-      : event_system_1_(event_base_new()),
-        scheduler_1_(sim_.createScheduler(event_system_1_)),
-        event_system_2_(event_base_new()),
-        scheduler_2_(sim_.createScheduler(event_system_2_)),
-        start_time_(sim_.monotonicTime()) {}
+      : event_system_(event_base_new()), scheduler_(sim_.createScheduler(event_system_)),
+        start_monotonic_time_(sim_.monotonicTime()), start_system_time_(sim_.systemTime()) {}
 
-  void addTask(SchedulerPtr& scheduler, int64_t delay_ms, char marker) {
+  void addTask(int64_t delay_ms, char marker) {
     std::chrono::milliseconds delay(delay_ms);
-    TimerPtr timer = scheduler->createTimer(
-        [this, marker, delay]() {
-          output_.append(1, marker);
-          EXPECT_EQ(sim_.monotonicTime(), start_time_ + delay);
-        });
+    TimerPtr timer = scheduler_->createTimer([this, marker, delay]() {
+      output_.append(1, marker);
+      EXPECT_EQ(sim_.monotonicTime(), start_monotonic_time_ + delay);
+    });
     timer->enableTimer(delay);
     timers_.push_back(std::move(timer));
   }
 
-  void sleepAndRunSchedule1(int64_t delay_ms) {
-    sim_.sleep(std::chrono::milliseconds(delay_ms));
-    //event_base_loop(event_system_1_.get(), EVLOOP_NONBLOCK);
+  void sleep(int64_t delay_ms) { sim_.sleep(std::chrono::milliseconds(delay_ms)); }
+
+  void sleepSystem(int64_t delay_ms) {
+    sim_.setSystemTime(sim_.systemTime() + std::chrono::milliseconds(delay_ms));
   }
 
   SimulatedTimeSystem sim_;
-  Libevent::BasePtr event_system_1_;
-  SchedulerPtr scheduler_1_;
-  Libevent::BasePtr event_system_2_;
-  SchedulerPtr scheduler_2_;
+  Libevent::BasePtr event_system_;
+  SchedulerPtr scheduler_;
   std::string output_;
   std::vector<TimerPtr> timers_;
-  MonotonicTime start_time_;
+  MonotonicTime start_monotonic_time_;
+  SystemTime start_system_time_;
 };
 
+TEST_F(SimulatedTimeSystemTest, Sleep) {
+  EXPECT_EQ(start_monotonic_time_, sim_.monotonicTime());
+  EXPECT_EQ(start_system_time_, sim_.systemTime());
+  sleep(5);
+  EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), sim_.monotonicTime());
+  EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), sim_.systemTime());
+}
+
+TEST_F(SimulatedTimeSystemTest, Monotonic) {
+  // Setting time forward works.
+  sim_.setMonotonicTime(start_monotonic_time_ + std::chrono::milliseconds(5));
+  EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), sim_.monotonicTime());
+
+  // But going backward does not.
+  sim_.setMonotonicTime(start_monotonic_time_ + std::chrono::milliseconds(3));
+  EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), sim_.monotonicTime());
+}
+
+TEST_F(SimulatedTimeSystemTest, System) {
+  // Setting time forward works.
+  sim_.setSystemTime(start_system_time_ + std::chrono::milliseconds(5));
+  EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), sim_.systemTime());
+
+  // And going backward works too.
+  sim_.setSystemTime(start_system_time_ + std::chrono::milliseconds(3));
+  EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(3), sim_.systemTime());
+}
+
 TEST_F(SimulatedTimeSystemTest, Ordering) {
-  addTask(scheduler_1_, 5, '5');
-  addTask(scheduler_1_, 3, '3');
-  addTask(scheduler_1_, 6, '6');
+  addTask(5, '5');
+  addTask(3, '3');
+  addTask(6, '6');
   EXPECT_EQ("", output_);
-  sleepAndRunSchedule1(5);
+  sleep(5);
   EXPECT_EQ("35", output_);
-  sleepAndRunSchedule1(1);
+  sleep(1);
   EXPECT_EQ("356", output_);
 }
 
-TEST_F(SimulatedTimeSystemTest, Disable) {
-  addTask(scheduler_1_, 5, '5');
-  addTask(scheduler_1_, 3, '3');
-  addTask(scheduler_1_, 6, '6');
-  timers_[0]->disableTimer();
+TEST_F(SimulatedTimeSystemTest, SystemTimeOrdering) {
+  addTask(5, '5');
+  addTask(3, '3');
+  addTask(6, '6');
   EXPECT_EQ("", output_);
-  sleepAndRunSchedule1(5);
-  EXPECT_EQ("3", output_);
-  sleepAndRunSchedule1(1);
-  EXPECT_EQ("36", output_);
+  sim_.setSystemTime(sim_.systemTime() + std::chrono::milliseconds(5));
+  EXPECT_EQ("35", output_);
+  sim_.setSystemTime(sim_.systemTime() + std::chrono::milliseconds(1));
+  EXPECT_EQ("356", output_);
+  sim_.setSystemTime(start_system_time_ + std::chrono::milliseconds(1));
+  sim_.setSystemTime(start_system_time_ + std::chrono::milliseconds(100));
+  EXPECT_EQ("356", output_); // callbacks don't get replayed.
 }
 
-/*
-TEST_F(SimulatedTimeSystemTest, TwoIndependentSchedulers) {
-  addTask(scheduler_1_, 5, '5');
-  addTask(scheduler_2_, 3, '3');
-  addTask(scheduler_2_, 6, '6');
+TEST_F(SimulatedTimeSystemTest, Disable) {
+  addTask(5, '5');
+  addTask(3, '3');
+  addTask(6, '6');
+  timers_[0]->disableTimer();
   EXPECT_EQ("", output_);
-  sleepAndRunSchedule1(5);
-  EXPECT_EQ("5", output_);
-  sleepAndRunSchedule1(1);
-  EXPECT_EQ("5", output_);
-  event_base_loop(event_system_2_.get(), EVLOOP_NONBLOCK);
-  EXPECT_EQ("536", output_);
+  sleep(5);
+  EXPECT_EQ("3", output_);
+  sleep(1);
+  EXPECT_EQ("36", output_);
 }
-*/
 
 } // namespace Test
 } // namespace Event

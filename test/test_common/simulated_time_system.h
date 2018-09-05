@@ -31,19 +31,35 @@ public:
    *
    * @param duration The amount of time to sleep.
    */
-  template<class Duration>
-  void sleep(Duration duration) {
-    MonotonicTime monotonic_time;
-    {
-      Thread::LockGuard lock(mutex_);
-      monotonic_time = monotonic_time_ + duration;
-    }
-    setMonotonicTime(monotonic_time);
+  template <class Duration> void sleep(const Duration& duration) {
+    mutex_.lock();
+    MonotonicTime monotonic_time = monotonic_time_ + duration;
+    setMonotonicTimeAndUnlock(monotonic_time);
   }
 
-  void setMonotonicTime(MonotonicTime monotonic_time);
+  /**
+   * Sets the time forward monotonically. if the supplied argument moves
+   * backward in time, the call is a no-op.
+   *
+   * @param monotonic_time The desired new current time.
+   */
+  void setMonotonicTime(const MonotonicTime& monotonic_time) {
+    mutex_.lock();
+    setMonotonicTimeAndUnlock(monotonic_time);
+  }
+
+  /**
+   * Sets the system-time forward. if the supplied argument moves
+   * backward in time, the call works, but of course we can't uncall
+   * any fired alarms.
+   *
+   * @param system_time The desired new system time.
+   */
+  void setSystemTime(const SystemTime& system_time);
 
 private:
+  void setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) UNLOCK_FUNCTION(mutex_);
+
   // The simulation keeps a unique ID for each alarm to act as a deterministic
   // tie-breaker for alarm-ordering.
   int64_t nextIndex();
@@ -59,13 +75,10 @@ private:
   };
   typedef std::set<Alarm*, CompareAlarms> AlarmSet;
 
-  void advanceTimeLockHeld() EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  //std::vector<Alarm*> findReadyAlarmsLockHeld() EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  //void runAlarms(const std::vector<Alarm*> alarms);
-
   RealTimeSource real_time_source_;
   MonotonicTime monotonic_time_ GUARDED_BY(mutex_);
-  SystemTime system_time_ GUARDED_BY(mutex_);;
+  SystemTime system_time_ GUARDED_BY(mutex_);
+  ;
   AlarmSet alarms_ GUARDED_BY(mutex_);
   uint64_t index_ GUARDED_BY(mutex_);
 
