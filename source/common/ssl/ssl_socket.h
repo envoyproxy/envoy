@@ -12,8 +12,8 @@
 #include "common/common/logger.h"
 #include "common/ssl/context_impl.h"
 
-#include "openssl/ssl.h"
 #include "absl/synchronization/mutex.h"
+#include "openssl/ssl.h"
 
 namespace Envoy {
 namespace Ssl {
