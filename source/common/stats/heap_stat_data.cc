@@ -15,11 +15,11 @@ HeapStatDataAllocator::~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) {
   // Any expected truncation of name is done at the callsite. No truncation is
   // required to use this allocator.
-  Thread::ReleasableLockGuard lock(mutex_);
   auto data = std::make_unique<HeapStatData>(table_.encode(name));
+  Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data.get());
-  HeapStatData* existing_data = *ret.first;
   lock.release();
+  HeapStatData* existing_data = *ret.first;
 
   if (ret.second) {
     return data.release();

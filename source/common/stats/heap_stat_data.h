@@ -52,10 +52,7 @@ public:
   bool requiresBoundedStatNameSize() const override { return false; }
 
   // SymbolTable
-  StatNamePtr encode(absl::string_view sv) {
-    Thread::LockGuard lock(mutex_);
-    return table_.encode(sv);
-  }
+  StatNamePtr encode(absl::string_view sv) { return table_.encode(sv); }
 
 private:
   struct HeapStatHash {
@@ -73,8 +70,8 @@ private:
   StatSet stats_ GUARDED_BY(mutex_);
   // A locally held symbol table which encodes stat names as StatNamePtrs and decodes StatNamePtrs
   // back into strings.
-  SymbolTable table_ GUARDED_BY(mutex_);
-  // A mutex is needed here to protect both the stats_ object and the table_ object from both
+  SymbolTable table_;
+  // A mutex is needed here to protect both the stats_ object from both
   // alloc() and free() operations. Although alloc() operations are called under existing locking,
   // free() operations are made from the destructors of the individual stat objects, which are not
   // protected by locks.
