@@ -1,5 +1,6 @@
 #include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 
+#include "test/mocks/common.h"
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -98,9 +99,10 @@ class MetricsServiceSinkTest : public testing::Test {};
 
 TEST(MetricsServiceSinkTest, CheckSendCall) {
   NiceMock<Stats::MockSource> source;
+  NiceMock<MockTimeSource> mock_time;
   std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer()};
 
-  MetricsServiceSink sink(streamer_);
+  MetricsServiceSink sink(streamer_, mock_time);
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
@@ -125,9 +127,10 @@ TEST(MetricsServiceSinkTest, CheckSendCall) {
 
 TEST(MetricsServiceSinkTest, CheckStatsCount) {
   NiceMock<Stats::MockSource> source;
+  NiceMock<MockTimeSource> mock_time;
   std::shared_ptr<TestGrpcMetricsStreamer> streamer_{new TestGrpcMetricsStreamer()};
 
-  MetricsServiceSink sink(streamer_);
+  MetricsServiceSink sink(streamer_, mock_time);
 
   auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
   counter->name_ = "test_counter";
