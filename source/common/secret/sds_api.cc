@@ -18,7 +18,7 @@ SdsApi<SecretType>::SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispat
                            Runtime::RandomGenerator& random, Stats::Store& stats,
                            Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
                            const envoy::api::v2::core::ConfigSource& sds_config,
-                           std::string sds_config_name, std::function<void()> destructor_cb)
+                           const std::string& sds_config_name, std::function<void()> destructor_cb)
     : secret_hash_(0), local_info_(local_info), dispatcher_(dispatcher), random_(random),
       stats_(stats), cluster_manager_(cluster_manager), sds_config_(sds_config),
       sds_config_name_(sds_config_name), clean_up_(destructor_cb) {

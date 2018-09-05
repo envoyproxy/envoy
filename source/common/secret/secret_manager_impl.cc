@@ -103,7 +103,7 @@ void SecretManagerImpl::removeDynamicCertificateValidationContextProvider(
   ENVOY_LOG(debug, "Unregister certificate validation context provider. hash key: {}", map_key);
 
   auto num_deleted = dynamic_certificate_validation_context_providers_.erase(map_key);
-  ASSERT(num_deleted == 1, "");
+  ASSERT(num_deleted == 1);
 }
 
 CertificateValidationContextConfigProviderSharedPtr
