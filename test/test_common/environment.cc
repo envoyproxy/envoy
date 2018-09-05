@@ -185,6 +185,11 @@ std::string TestEnvironment::substitute(const std::string& str,
   out_json_string = std::regex_replace(out_json_string, ntop_loopback_address_regex,
                                        Network::Test::getLoopbackAddressString(version));
 
+  // Substitute IP any addresses.
+  const std::regex any_address_regex("\\{\\{ ip_any_address \\}\\}");
+  out_json_string = std::regex_replace(out_json_string, any_address_regex,
+                                       Network::Test::getAnyAddressString(version));
+
   // Substitute dns lookup family.
   const std::regex lookup_family_regex("\\{\\{ dns_lookup_family \\}\\}");
   switch (version) {

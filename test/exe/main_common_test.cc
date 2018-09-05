@@ -45,8 +45,8 @@ namespace Envoy {
 class MainCommonTest : public testing::Test {
 protected:
   MainCommonTest()
-      : config_file_(Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
-                     "/test/config/integration/google_com_proxy_port_0.v2.yaml"),
+      : config_file_(TestEnvironment::temporaryFileSubstitute(
+            "/test/config/integration/google_com_proxy_port_0.v2.yaml", {}, {}, Network::Address::IpVersion::v4)),
         random_string_(fmt::format("{}", computeBaseId())),
         argv_({"envoy-static", "--base-id", random_string_.c_str(), "-c", config_file_.c_str(),
                nullptr}) {}
