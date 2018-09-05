@@ -39,16 +39,28 @@ public:
 
   bool isReady() const override {
     // Either tls_certficate_provider_ is nullptr or
-    // tls_certficate_provider_->secret() is NOT nullptr.
-    return !tls_certficate_provider_ || tls_certficate_provider_->secret() != nullptr;
+    // tls_certficate_provider_->secret() is NOT nullptr and
+    // either certficate_validation_context_provider_ is nullptr or
+    // certficate_validation_context_provider_->secret() is NOT nullptr.
+    return (!tls_certficate_provider_ || tls_certficate_provider_->secret() != nullptr) &&
+           (!certficate_validation_context_provider_ ||
+            certficate_validation_context_provider_->secret() != nullptr);
   }
 
   void setSecretUpdateCallback(std::function<void()> callback) override {
     if (tls_certficate_provider_) {
-      if (secret_update_callback_handle_) {
-        secret_update_callback_handle_->remove();
+      if (tls_certificate_update_callback_handle_) {
+        tls_certificate_update_callback_handle_->remove();
       }
-      secret_update_callback_handle_ = tls_certficate_provider_->addUpdateCallback(callback);
+      tls_certificate_update_callback_handle_ =
+          tls_certficate_provider_->addUpdateCallback(callback);
+    }
+    if (certficate_validation_context_provider_) {
+      if (certificate_validation_context_update_callback_handle_) {
+        certificate_validation_context_update_callback_handle_->remove();
+      }
+      certificate_validation_context_update_callback_handle_ =
+          certficate_validation_context_provider_->addUpdateCallback(callback);
     }
   }
 
@@ -69,9 +81,10 @@ private:
   const std::string cipher_suites_;
   const std::string ecdh_curves_;
   Secret::TlsCertificateConfigProviderSharedPtr tls_certficate_provider_;
-  Common::CallbackHandle* secret_update_callback_handle_;
+  Common::CallbackHandle* tls_certificate_update_callback_handle_;
   Secret::CertificateValidationContextConfigProviderSharedPtr
       certficate_validation_context_provider_;
+  Common::CallbackHandle* certificate_validation_context_update_callback_handle_;
   const unsigned min_protocol_version_;
   const unsigned max_protocol_version_;
 };

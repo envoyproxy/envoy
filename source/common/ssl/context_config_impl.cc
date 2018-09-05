@@ -65,6 +65,9 @@ getCertificateValidationContextConfigProvider(
                                          sds_secret_config.name()));
       }
       return secret_provider;
+    } else {
+      return factory_context.secretManager().findOrCreateCertificateValidationContextProvider(
+          sds_secret_config.sds_config(), sds_secret_config.name(), factory_context);
     }
   }
   return nullptr;
@@ -98,17 +101,21 @@ ContextConfigImpl::ContextConfigImpl(
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), DEFAULT_ECDH_CURVES)),
       tls_certficate_provider_(getTlsCertificateConfigProvider(config, factory_context)),
-      secret_update_callback_handle_(nullptr),
+      tls_certificate_update_callback_handle_(nullptr),
       certficate_validation_context_provider_(
           getCertificateValidationContextConfigProvider(config, factory_context)),
+      certificate_validation_context_update_callback_handle_(nullptr),
       min_protocol_version_(
           tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(), TLS1_VERSION)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 TLS1_2_VERSION)) {}
 
 ContextConfigImpl::~ContextConfigImpl() {
-  if (secret_update_callback_handle_) {
-    secret_update_callback_handle_->remove();
+  if (tls_certificate_update_callback_handle_) {
+    tls_certificate_update_callback_handle_->remove();
+  }
+  if (certificate_validation_context_update_callback_handle_) {
+    certificate_validation_context_update_callback_handle_->remove();
   }
 }
 

@@ -23,7 +23,9 @@ namespace Secret {
 /**
  * SDS API implementation that fetches secrets from SDS server via Subscription.
  */
+template <class SecretType>
 class SdsApi : public Init::Target,
+               public SecretProvider<SecretType>,
                public Config::SubscriptionCallbacks<envoy::api::v2::auth::Secret> {
 public:
   SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
@@ -42,10 +44,19 @@ public:
     return MessageUtil::anyConvert<envoy::api::v2::auth::Secret>(resource).name();
   }
 
+  // SecretProvider
+  const SecretType* secret() const override { return secrets_.get(); }
+
+  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
+    return update_callback_manager_.add(callback);
+  }
+
 protected:
   // Updates local storage of dynamic secrets and invokes callbacks.
-  virtual void updateConfigHelper(const envoy::api::v2::auth::Secret&) {}
+  virtual void updateConfigHelper(const envoy::api::v2::auth::Secret&) PURE;
   uint64_t secret_hash_;
+  std::unique_ptr<SecretType> secrets_;
+  Common::CallbackManager<> update_callback_manager_;
 
 private:
   void runInitializeCallbackIfAny();
@@ -67,7 +78,7 @@ private:
 /**
  * TlsCertificateSdsApi implementation maintains and updates dynamic TLS certificate secrets.
  */
-class TlsCertificateSdsApi : public SdsApi, public TlsCertificateConfigProvider {
+class TlsCertificateSdsApi : public SdsApi<Ssl::TlsCertificateConfig> {
 public:
   TlsCertificateSdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, Stats::Store& stats,
@@ -77,29 +88,16 @@ public:
       : SdsApi(local_info, dispatcher, random, stats, cluster_manager, init_manager, sds_config,
                sds_config_name, destructor_cb) {}
 
-  // SecretProvider
-  const Ssl::TlsCertificateConfig* secret() const override {
-    return tls_certificate_secrets_.get();
-  }
-
-  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
-    return update_callback_manager_.add(callback);
-  }
-
 private:
   // SdsApi
   void updateConfigHelper(const envoy::api::v2::auth::Secret& secret) override;
-
-  Ssl::TlsCertificateConfigPtr tls_certificate_secrets_;
-  Common::CallbackManager<> update_callback_manager_;
 };
 
 /**
  * CertificateValidationContextSdsApi implementation maintains and updates dynamic certificate
  * validation context secrets.
  */
-class CertificateValidationContextSdsApi : public SdsApi,
-                                           public CertificateValidationContextConfigProvider {
+class CertificateValidationContextSdsApi : public SdsApi<Ssl::CertificateValidationContextConfig> {
 public:
   CertificateValidationContextSdsApi(const LocalInfo::LocalInfo& local_info,
                                      Event::Dispatcher& dispatcher,
@@ -112,21 +110,9 @@ public:
       : SdsApi(local_info, dispatcher, random, stats, cluster_manager, init_manager, sds_config,
                sds_config_name, destructor_cb) {}
 
-  // SecretProvider
-  const Ssl::CertificateValidationContextConfig* secret() const override {
-    return certificate_validation_context_secrets_.get();
-  }
-
-  Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) override {
-    return update_callback_manager_.add(callback);
-  }
-
 private:
   // SdsApi
   void updateConfigHelper(const envoy::api::v2::auth::Secret& secret) override;
-
-  Ssl::CertificateValidationContextConfigPtr certificate_validation_context_secrets_;
-  Common::CallbackManager<> update_callback_manager_;
 };
 
 } // namespace Secret
