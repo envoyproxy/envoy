@@ -35,8 +35,6 @@ public:
 
   /**
    * Returns a time-source to use with this dispatcher.
-   *
-   * TODO(#4160) Rename to timeSystem().
    */
   virtual TimeSystem& timeSystem() PURE;
 
