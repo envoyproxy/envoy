@@ -18,7 +18,7 @@ namespace MetricsService {
 
 namespace {
 // TODO(#4160): use TimeSource::systemTime() rather than directly reading the system-clock.
-int64_t getUnixMicrosForNow() {
+int64_t getUnixMillisForNow() {
   return std::chrono::duration_cast<std::chrono::milliseconds>(
              std::chrono::system_clock::now().time_since_epoch())
       .count();
@@ -78,7 +78,7 @@ void MetricsServiceSink::flushCounter(const Stats::Counter& counter) {
   metrics_family->set_type(io::prometheus::client::MetricType::COUNTER);
   metrics_family->set_name(counter.name());
   auto* metric = metrics_family->add_metric();
-  metric->set_timestamp_ms(getUnixMicrosForNow());
+  metric->set_timestamp_ms(getUnixMillisForNow());
   auto* counter_metric = metric->mutable_counter();
   counter_metric->set_value(counter.value());
 }
@@ -88,7 +88,7 @@ void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge) {
   metrics_family->set_type(io::prometheus::client::MetricType::GAUGE);
   metrics_family->set_name(gauge.name());
   auto* metric = metrics_family->add_metric();
-  metric->set_timestamp_ms(getUnixMicrosForNow());
+  metric->set_timestamp_ms(getUnixMillisForNow());
   auto* gauage_metric = metric->mutable_gauge();
   gauage_metric->set_value(gauge.value());
 }
@@ -97,7 +97,7 @@ void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& histogram)
   metrics_family->set_type(io::prometheus::client::MetricType::SUMMARY);
   metrics_family->set_name(histogram.name());
   auto* metric = metrics_family->add_metric();
-  metric->set_timestamp_ms(getUnixMicrosForNow());
+  metric->set_timestamp_ms(getUnixMillisForNow());
   auto* summary_metric = metric->mutable_summary();
   const Stats::HistogramStatistics& hist_stats = histogram.intervalStatistics();
   for (size_t i = 0; i < hist_stats.supportedQuantiles().size(); i++) {
