@@ -11,9 +11,12 @@ message SimpleMetric {
     GAUGE = 1;
   }
 
-  // Type of metric represented.
+  // Type of the metric represented.
   Type type = 1;
 
   // Current metric value.
   uint64 value = 2;
+
+  // Name of the metric.
+  string name = 3;
 }

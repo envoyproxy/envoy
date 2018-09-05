@@ -134,6 +134,8 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
     if (connection2.connection().state() == Network::Connection::State::Closed) {
       connect_fail = true;
       break;
+    } else {
+      connection2.close();
     }
   }
   ASSERT_TRUE(connect_fail);

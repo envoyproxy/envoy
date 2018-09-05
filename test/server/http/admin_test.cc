@@ -737,9 +737,13 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       Network::Utility::resolveUrl("tcp://1.2.3.4:80");
   ON_CALL(*host, address()).WillByDefault(Return(address));
 
+  // Add stats in random order and validate that they come in order.
   Stats::IsolatedStoreImpl store;
   store.counter("test_counter").add(10);
+  store.counter("rest_counter").add(10);
+  store.counter("arest_counter").add(5);
   store.gauge("test_gauge").set(11);
+  store.gauge("atest_gauge").set(10);
   ON_CALL(*host, gauges()).WillByDefault(Invoke([&store]() { return store.gauges(); }));
   ON_CALL(*host, counters()).WillByDefault(Invoke([&store]() { return store.counters(); }));
 
@@ -776,16 +780,33 @@ TEST_P(AdminInstanceTest, ClustersJson) {
        "port_value": 80
       }
      },
-     "stats": {
-      "test_counter": {
+     "stats": [
+       {
+       "name": "arest_counter",
+       "value": "5",
+       "type": "COUNTER"
+       },
+       {
+       "name": "rest_counter",
        "value": "10",
        "type": "COUNTER"
       },
-      "test_gauge": {
+      {
+       "name": "test_counter",
+       "value": "10",
+       "type": "COUNTER"
+      },
+      {
+       "name": "atest_gauge",
+       "value": "10",
+       "type": "GAUGE"
+      },
+      {
+       "name": "test_gauge",
        "value": "11",
        "type": "GAUGE"
       },
-     },
+     ],
      "health_status": {
       "eds_health_status": "HEALTHY",
       "failed_active_health_check": true,
