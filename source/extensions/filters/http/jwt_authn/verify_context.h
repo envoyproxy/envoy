@@ -42,7 +42,7 @@ public:
    *
    * @param elem pointer to a verifier node.
    */
-  virtual void responded(void* elem) PURE;
+  virtual void setResponded(void* elem) PURE;
 
   /**
    * Check to see if a verifier node has responded.
@@ -50,13 +50,6 @@ public:
    * @param elem pointer to a verifier node.
    */
   virtual bool hasResponded(void* elem) const PURE;
-
-  /**
-   * Set count for number of inner verifier node processed to zero.
-   *
-   * @param elem pointer to a verifier node.
-   */
-  virtual void resetCount(void* elem) PURE;
 
   /**
    * Return the number of inner verifier node's count for this context.

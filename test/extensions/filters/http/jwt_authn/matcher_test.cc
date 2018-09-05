@@ -23,11 +23,6 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-class MockExtractor : public Extractor {
-public:
-  MOCK_CONST_METHOD1(extract, std::vector<JwtLocationConstPtr>(const Http::HeaderMap& headers));
-};
-
 class MatcherTest : public ::testing::Test {
 public:
   NiceMock<MockAuthFactory> mock_factory_;

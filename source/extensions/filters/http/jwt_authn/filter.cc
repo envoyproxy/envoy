@@ -24,10 +24,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
   state_ = Calling;
   stopped_ = false;
   // Verify the JWT token, onComplete() will be called when completed.
-  auto matcher = config_->findVerifier(headers);
+  auto matcher = config_->findMatcher(headers);
   context_ = VerifyContext::create(headers, this);
   if (!matcher) {
-    onComplete(Status::Ok, *context_);
+    onComplete(Status::Ok);
   } else {
     matcher->verifier()->verify(*context_);
   }
@@ -40,7 +40,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-void Filter::onComplete(const Status& status, VerifyContext&) {
+void Filter::onComplete(const Status& status) {
   ENVOY_LOG(debug, "Called Filter : check complete {}", int(status));
   // This stream has been reset, abort the callback.
   if (state_ == Responded) {

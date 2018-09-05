@@ -33,7 +33,7 @@ public:
 private:
   // the function for VerifierCallbacks interface.
   // It will be called when its verify() call is completed.
-  void onComplete(const ::google::jwt_verify::Status& status, VerifyContext& context) override;
+  void onComplete(const ::google::jwt_verify::Status& status) override;
 
   // The callback funcion.
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;

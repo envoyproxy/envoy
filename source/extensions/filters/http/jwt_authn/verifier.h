@@ -10,18 +10,6 @@ namespace JwtAuthn {
 
 class Verifier;
 typedef std::unique_ptr<Verifier> VerifierPtr;
-/**
- * Interface for authenticator factory.
- */
-class AuthFactory {
-public:
-  virtual ~AuthFactory() {}
-
-  // Factory method for creating authenticator, and populate it with provider config.
-  virtual AuthenticatorPtr create(const std::vector<std::string>& audiences,
-                                  const absl::optional<std::string>& issuer,
-                                  bool allow_failed) const PURE;
-};
 
 /**
  * Supports verification of JWTs with configured requirments.
@@ -32,9 +20,11 @@ public:
 
   // Verify all tokens on headers, and signal the caller with callback.
   virtual void verify(VerifyContext& context) PURE;
-  // Set the next verifier callback.
-  virtual void registerCallback(VerifierCallbacks* callback) PURE;
-
+  // Set the verifier's parent group verifier.
+  virtual void registerParent(Verifier* parent) PURE;
+  // Check if next verifier should be notified of status, or if no next verifier exists signal
+  // callback in context.
+  virtual void onComplete(const ::google::jwt_verify::Status& status, VerifyContext& context) PURE;
   // Factory method for creating verifiers.
   static VerifierPtr
   create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirement& requirement,

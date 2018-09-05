@@ -23,24 +23,13 @@ public:
   MOCK_CONST_METHOD0(verifier, const VerifierPtr&());
 };
 
-class MockVerifierCallbacks : public VerifierCallbacks {
-public:
-  MOCK_METHOD2(onComplete, void(const Status& status, VerifyContext& context));
-};
-
-class MockVerifier : public Verifier {
-public:
-  MOCK_METHOD1(verify, void(VerifyContext& context));
-  MOCK_METHOD1(registerCallback, void(VerifierCallbacks* callback));
-};
-
 class MockFilterConfig : public FilterConfig {
 public:
   MockFilterConfig(
       const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
       : FilterConfig(proto_config, stats_prefix, context) {}
-  MOCK_CONST_METHOD1(findVerifier, const MatcherConstSharedPtr(const Http::HeaderMap& headers));
+  MOCK_CONST_METHOD1(findMatcher, const MatcherConstSharedPtr(const Http::HeaderMap& headers));
 };
 
 class FilterTest : public ::testing::Test {
@@ -51,7 +40,7 @@ public:
     mock_verifier_ = std::make_unique<MockVerifier>();
     raw_mock_verifier_ = static_cast<MockVerifier*>(mock_verifier_.get());
 
-    EXPECT_CALL(*mock_config_.get(), findVerifier(_)).WillOnce(Invoke([&](const Http::HeaderMap&) {
+    EXPECT_CALL(*mock_config_.get(), findMatcher(_)).WillOnce(Invoke([&](const Http::HeaderMap&) {
       auto mock_matcher = std::make_shared<NiceMock<MockMatcher>>();
       ON_CALL(*mock_matcher.get(), matches(_)).WillByDefault(Invoke([](const Http::HeaderMap&) {
         return true;
@@ -81,7 +70,7 @@ public:
 TEST_F(FilterTest, InlineOK) {
   // A successful authentication completed inline: callback is called inside verify().
   EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([](VerifyContext& context) {
-    context.callback()->onComplete(Status::Ok, context);
+    context.callback()->onComplete(Status::Ok);
   }));
 
   auto headers = Http::TestHeaderMapImpl{};
@@ -98,7 +87,7 @@ TEST_F(FilterTest, InlineOK) {
 TEST_F(FilterTest, InlineFailure) {
   // A failed authentication completed inline: callback is called inside verify().
   EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([](VerifyContext& context) {
-    context.callback()->onComplete(Status::JwtBadFormat, context);
+    context.callback()->onComplete(Status::JwtBadFormat);
   }));
 
   auto headers = Http::TestHeaderMapImpl{};
@@ -127,7 +116,7 @@ TEST_F(FilterTest, OutBoundOK) {
 
   // Callback is called now with OK status.
   auto context = VerifyContext::create(headers, &verifier_callback_);
-  m_cb->onComplete(Status::Ok, *context);
+  m_cb->onComplete(Status::Ok);
 
   EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
@@ -151,14 +140,14 @@ TEST_F(FilterTest, OutBoundFailure) {
 
   auto context = VerifyContext::create(headers, &verifier_callback_);
   // Callback is called now with a failure status.
-  m_cb->onComplete(Status::JwtBadFormat, *context);
+  m_cb->onComplete(Status::JwtBadFormat);
 
   EXPECT_EQ(1U, mock_config_->stats().denied_.value());
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
 
   // Should be OK to call the onComplete() again.
-  m_cb->onComplete(Status::JwtBadFormat, *context);
+  m_cb->onComplete(Status::JwtBadFormat);
 }
 
 // This test verifies Verifier::cancel() is called when Filter::onDestory() is called.

@@ -68,9 +68,9 @@ public:
     });
     extractor_ = Extractor::create(proto_config_);
 
-    for (const auto& it : proto_config_.rules()) {
+    for (const auto& rule : proto_config_.rules()) {
       rule_matchers_.push_back(
-          Matcher::create(it, proto_config_.providers(), *this, getExtractor()));
+          Matcher::create(rule, proto_config_.providers(), *this, getExtractor()));
     }
   }
 
@@ -91,7 +91,7 @@ public:
   const Extractor& getExtractor() const { return *extractor_; }
 
   // Finds the matcher that matched the header
-  virtual const MatcherConstSharedPtr findVerifier(const Http::HeaderMap& headers) const {
+  virtual const MatcherConstSharedPtr findMatcher(const Http::HeaderMap& headers) const {
     for (const auto& matcher : rule_matchers_) {
       if (matcher->matches(headers)) {
         return matcher;

@@ -22,9 +22,8 @@ public:
    * Called on completion of request.
    *
    * @param status the status of the request.
-   * @param context the requesting context.
    */
-  virtual void onComplete(const ::google::jwt_verify::Status& status, VerifyContext& context) PURE;
+  virtual void onComplete(const ::google::jwt_verify::Status& status) PURE;
 };
 
 } // namespace JwtAuthn

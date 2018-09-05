@@ -271,7 +271,7 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
     tokens_.clear();
     ENVOY_LOG(debug, "Jwt authentication completed with: {}",
               ::google::jwt_verify::getStatusString(status));
-    callback_(status);
+    callback_(is_allow_failed_ ? Status::Ok : status);
     return;
   }
   startVerify();

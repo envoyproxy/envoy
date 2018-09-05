@@ -15,25 +15,32 @@ namespace {
 // base verifier for provider_name, provider_and_audiences, and allow_missing_or_failed.
 class BaseVerifierImpl : public Verifier {
 public:
-  void registerCallback(VerifierCallbacks* callback) override { callback_ = callback; }
+  void registerParent(Verifier* parent) override { parent_ = parent; }
 
-  VerifierCallbacks* getCallback(VerifyContext& context) {
-    if (callback_ != nullptr) {
-      return callback_;
+  void onCompleteHelper(Status status, VerifyContext& context) {
+    if (parent_ != nullptr) {
+      return parent_->onComplete(status, context);
     }
-    return context.callback();
+    return context.callback()->onComplete(status);
+  }
+
+  virtual void onComplete(const Status& status, VerifyContext& context) override {
+    if (!context.hasResponded(this)) {
+      context.setResponded(this);
+      onCompleteHelper(status, context);
+    }
   }
 
 protected:
-  // The caller's callback
-  VerifierCallbacks* callback_{};
+  // The parent group verifier.
+  Verifier* parent_{};
 };
 
 // Provider specific verifier
-class ProviderNameVerifierImpl : public BaseVerifierImpl {
+class ProviderVerifierImpl : public BaseVerifierImpl {
 public:
-  ProviderNameVerifierImpl(const std::vector<std::string>& audiences, const AuthFactory& factory,
-                           const JwtProvider& provider)
+  ProviderVerifierImpl(const std::vector<std::string>& audiences, const AuthFactory& factory,
+                       const JwtProvider& provider)
       : audiences_(audiences), auth_factory_(factory),
         extractor_(
             Extractor::create(provider.issuer(), provider.from_headers(), provider.from_params())),
@@ -46,13 +53,6 @@ public:
                  [&](const Status& status) { onComplete(status, context); });
     if (!context.hasResponded(this)) {
       context.addAuth(std::move(auth));
-    }
-  }
-
-  void onComplete(const Status& status, VerifyContext& context) {
-    if (!context.hasResponded(this)) {
-      context.responded(this);
-      getCallback(context)->onComplete(status, context);
     }
   }
 
@@ -79,13 +79,6 @@ public:
     }
   }
 
-  void onComplete(const Status&, VerifyContext& context) {
-    if (!context.hasResponded(this)) {
-      context.responded(this);
-      getCallback(context)->onComplete(Status::Ok, context);
-    }
-  }
-
 private:
   const AuthFactory& auth_factory_;
   const Extractor& extractor_;
@@ -96,7 +89,6 @@ private:
 class BaseGroupVerifierImpl : public BaseVerifierImpl {
 public:
   void verify(VerifyContext& context) override {
-    context.resetCount(this);
     for (const auto& it : verifiers_) {
       if (!context.hasResponded(this)) {
         it->verify(context);
@@ -110,14 +102,14 @@ protected:
 };
 
 // Requires any verifier.
-class AnyVerifierImpl : public BaseGroupVerifierImpl, public VerifierCallbacks {
+class AnyVerifierImpl : public BaseGroupVerifierImpl {
 public:
   AnyVerifierImpl(const JwtRequirementOrList& or_list, const AuthFactory& factory,
                   const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
                   const Extractor& extractor) {
     for (const auto& it : or_list.requirements()) {
       auto verifier = Verifier::create(it, providers, factory, extractor);
-      verifier->registerCallback(this);
+      verifier->registerParent(this);
       verifiers_.push_back(std::move(verifier));
     }
   }
@@ -127,21 +119,21 @@ public:
       return;
     }
     if (context.incrementAndGetCount(this) == verifiers_.size() || Status::Ok == status) {
-      context.responded(this);
-      getCallback(context)->onComplete(status, context);
+      context.setResponded(this);
+      onCompleteHelper(status, context);
     }
   }
 };
 
 // Requires all verifier
-class AllVerifierImpl : public BaseGroupVerifierImpl, public VerifierCallbacks {
+class AllVerifierImpl : public BaseGroupVerifierImpl {
 public:
   AllVerifierImpl(const JwtRequirementAndList& and_list, const AuthFactory& factory,
                   const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
                   const Extractor& extractor) {
     for (const auto& it : and_list.requirements()) {
       auto verifier = Verifier::create(it, providers, factory, extractor);
-      verifier->registerCallback(this);
+      verifier->registerParent(this);
       verifiers_.push_back(std::move(verifier));
     }
   }
@@ -151,8 +143,8 @@ public:
       return;
     }
     if (context.incrementAndGetCount(this) == verifiers_.size() || Status::Ok != status) {
-      context.responded(this);
-      getCallback(context)->onComplete(status, context);
+      context.setResponded(this);
+      onCompleteHelper(status, context);
     }
   }
 };
@@ -160,8 +152,10 @@ public:
 // Match all, for requirement not set
 class AllowAllVerifierImpl : public BaseVerifierImpl {
 public:
-  void verify(VerifyContext& context) override {
-    getCallback(context)->onComplete(Status::Ok, context);
+  void verify(VerifyContext& context) override { onComplete(Status::Ok, context); }
+
+  void onComplete(const Status& status, VerifyContext& context) override {
+    onCompleteHelper(status, context);
   }
 };
 
@@ -201,7 +195,7 @@ VerifierPtr Verifier::create(const JwtRequirement& requirement,
   if (it == providers.end()) {
     throw EnvoyException(fmt::format("Required provider ['{}'] is not configured.", provider_name));
   }
-  return std::make_unique<ProviderNameVerifierImpl>(audiences, factory, it->second);
+  return std::make_unique<ProviderVerifierImpl>(audiences, factory, it->second);
 }
 
 } // namespace JwtAuthn

@@ -45,6 +45,19 @@ public:
          JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager);
 };
 
+/**
+ * Interface for authenticator factory.
+ */
+class AuthFactory {
+public:
+  virtual ~AuthFactory() {}
+
+  // Factory method for creating authenticator, and populate it with provider config.
+  virtual AuthenticatorPtr create(const std::vector<std::string>& audiences,
+                                  const absl::optional<std::string>& issuer,
+                                  bool allow_failed) const PURE;
+};
+
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

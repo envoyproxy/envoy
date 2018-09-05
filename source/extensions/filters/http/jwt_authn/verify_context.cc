@@ -15,13 +15,11 @@ public:
 
   VerifierCallbacks* callback() const override { return callback_; }
 
-  void responded(void* elem) override { responded_set_.insert(elem); }
+  void setResponded(void* elem) override { responded_set_.insert(elem); }
 
   bool hasResponded(void* elem) const override {
     return responded_set_.find(elem) != responded_set_.end();
   }
-
-  void resetCount(void* elem) override { counts_[elem] = 0; }
 
   std::size_t incrementAndGetCount(void* elem) override { return ++counts_[elem]; }
 
@@ -47,6 +45,7 @@ private:
 VerifyContextPtr VerifyContext::create(Http::HeaderMap& headers, VerifierCallbacks* callback) {
   return std::make_unique<VerifyContextImpl>(headers, callback);
 }
+
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions
