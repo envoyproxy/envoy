@@ -14,7 +14,7 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "thrift-0.11.0",
     ),
     com_github_bombela_backward = dict(
-        commit = "44ae9609e860e3428cd057f7052e505b4819eb84",  # 2018-02-06
+        commit = "v1.4",
         remote = "https://github.com/bombela/backward-cpp",
     ),
     com_github_circonus_labs_libcircllhist = dict(
@@ -22,34 +22,32 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/circonus-labs/libcircllhist",
     ),
     com_github_cyan4973_xxhash = dict(
-        commit = "7cc9639699f64b750c0b82333dced9ea77e8436e",  # v0.6.5
+        commit = "v0.6.5",
         remote = "https://github.com/Cyan4973/xxHash",
     ),
     com_github_eile_tclap = dict(
-        commit = "3627d9402e529770df9b0edf2aa8c0e0d6c6bb41",  # tclap-1-2-1-release-final
+        commit = "tclap-1-2-1-release-final",
         remote = "https://github.com/eile/tclap",
     ),
     com_github_fmtlib_fmt = dict(
-        sha256 = "46628a2f068d0e33c716be0ed9dcae4370242df135aed663a180b9fd8e36733d",
-        strip_prefix = "fmt-4.1.0",
-        urls = ["https://github.com/fmtlib/fmt/archive/4.1.0.tar.gz"],
+        commit = "4.1.0",
+        remote = "https://github.com/fmtlib/fmt",
     ),
     com_github_gabime_spdlog = dict(
-        sha256 = "94f74fd1b3344733d1db3de2ec22e6cbeb769f93a8baa0d4a22b1f62dc7369f8",
-        strip_prefix = "spdlog-0.17.0",
-        urls = ["https://github.com/gabime/spdlog/archive/v0.17.0.tar.gz"],
+        commit = "v0.17.0",
+        remote = "https://github.com/gabime/spdlog",
     ),
     com_github_gcovr_gcovr = dict(
-        commit = "c0d77201039c7b119b18bc7fb991564c602dd75d",
+        commit = "3.3",
         remote = "https://github.com/gcovr/gcovr",
     ),
     com_github_google_libprotobuf_mutator = dict(
-        commit = "c3d2faf04a1070b0b852b0efdef81e1a81ba925e",
+        commit = "c3d2faf04a1070b0b852b0efdef81e1a81ba925e",  # 2018-03-06
         remote = "https://github.com/google/libprotobuf-mutator",
     ),
     com_github_grpc_grpc = dict(
-        commit = "3eedb606a07738e5446ba852085f676b134ecca4",  # v1.14.0
-        remote = "https://github.com/grpc/grpc.git",
+        commit = "v1.14.2",
+        remote = "https://github.com/grpc/grpc",
     ),
     com_github_nanopb_nanopb = dict(
         # From: https://github.com/grpc/grpc/blob/v1.14.0/bazel/grpc_deps.bzl#L123
@@ -70,7 +68,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/googleapis",
     ),
     com_github_google_jwt_verify = dict(
-        commit = "4eb9e96485b71e00d43acc7207501caafb085b4a",
+        commit = "4eb9e96485b71e00d43acc7207501caafb085b4a",  # 2018-06-11
         remote = "https://github.com/google/jwt_verify_lib",
     ),
     com_github_nodejs_http_parser = dict(
@@ -82,15 +80,15 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/nodejs/http-parser",
     ),
     com_github_pallets_jinja = dict(
-        commit = "78d2f672149e5b9b7d539c575d2c1bfc12db67a9",  # 2.10
+        commit = "2.10",
         remote = "https://github.com/pallets/jinja",
     ),
     com_github_pallets_markupsafe = dict(
-        commit = "d2a40c41dd1930345628ea9412d97e159f828157",  # 1.0
+        commit = "1.0",
         remote = "https://github.com/pallets/markupsafe",
     ),
     com_github_tencent_rapidjson = dict(
-        commit = "f54b0e47a08782a6131cc3d60f94d038fa6e0a51",  # v1.1.0
+        commit = "v1.1.0",
         remote = "https://github.com/tencent/rapidjson",
     ),
     com_github_twitter_common_lang = dict(
@@ -109,7 +107,7 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "twitter.common.finagle-thrift-0.3.9/src",
     ),
     com_google_googletest = dict(
-        commit = "3d5612182581df64acc12d2633e473decf5adc47",  # Aug 29, 2018
+        commit = "release-1.8.1",
         remote = "https://github.com/google/googletest",
     ),
     com_google_protobuf = dict(
@@ -125,7 +123,7 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
     ),
     io_bazel_rules_go = dict(
-        commit = "0.11.1",
+        commit = "0.11.2",
         remote = "https://github.com/bazelbuild/rules_go",
     ),
     six_archive = dict(
@@ -136,7 +134,7 @@ REPOSITORY_LOCATIONS = dict(
     # I'd love to name this `com_github_google_subpar`, but something in the Subpar
     # code assumes its repository name is just `subpar`.
     subpar = dict(
-        commit = "eb23aa7a5361cabc02464476dd080389340a5522",  # HEAD
+        commit = "1.3.0",
         remote = "https://github.com/google/subpar",
     ),
 )
