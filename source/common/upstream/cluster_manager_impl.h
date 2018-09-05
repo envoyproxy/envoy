@@ -211,7 +211,7 @@ public:
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
 
   ClusterManagerFactory& clusterManagerFactory() override { return factory_; }
-  TimeSource& timeSource() override { return time_source_; }
+  TimeSource& timeSource() override { return time_system_; }
 
 protected:
   virtual void postThreadLocalClusterUpdate(const Cluster& cluster, uint32_t priority,
@@ -435,7 +435,7 @@ private:
   std::string local_cluster_name_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
-  TimeSource& time_source_;
+  TimeSource& time_system_;
   ClusterUpdatesMap updates_map_;
   Event::Dispatcher& dispatcher_;
 };

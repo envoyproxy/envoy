@@ -60,7 +60,7 @@ Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_man
     : cm_(cluster_manager), tracer_stats_{ZIPKIN_TRACER_STATS(
                                 POOL_COUNTER_PREFIX(stats, "tracing.zipkin."))},
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
-      time_source_(time_source) {
+      time_system_(time_source) {
 
   Upstream::ThreadLocalCluster* cluster = cm_.get(config.getString("collector_cluster"));
   if (!cluster) {
@@ -78,7 +78,7 @@ Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_man
   tls_->set([this, collector_endpoint, &random_generator, trace_id_128bit](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     TracerPtr tracer(new Tracer(local_info_.clusterName(), local_info_.address(), random_generator,
-                                trace_id_128bit, time_source_));
+                                trace_id_128bit, time_system_));
     tracer->setReporter(
         ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector_endpoint));
     return ThreadLocal::ThreadLocalObjectSharedPtr{new TlsTracer(std::move(tracer), *this)};

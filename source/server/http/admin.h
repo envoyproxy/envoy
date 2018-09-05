@@ -138,10 +138,10 @@ private:
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return config_; }
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
-    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
+    SystemTime lastUpdated() const override { return time_system_.systemTime(); }
 
     Router::ConfigConstSharedPtr config_;
-    TimeSource& time_source_;
+    TimeSource& time_system_;
   };
 
   friend class AdminStatsTest;

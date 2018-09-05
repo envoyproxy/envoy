@@ -131,7 +131,7 @@ private:
   ThreadLocal::SlotPtr tls_;
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
-  TimeSource& time_source_;
+  TimeSource& time_system_;
 };
 
 /**

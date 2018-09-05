@@ -28,7 +28,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   }
 
   // Create an all-new span, with no parent id
-  SpanPtr span_ptr(new Span(time_source_));
+  SpanPtr span_ptr(new Span(time_system_));
   span_ptr->setName(span_name);
   uint64_t random_number = random_generator_.random();
   span_ptr->setId(random_number);
@@ -37,7 +37,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
     span_ptr->setTraceIdHigh(random_generator_.random());
   }
   int64_t start_time_micro = std::chrono::duration_cast<std::chrono::microseconds>(
-                                 time_source_.monotonicTime().time_since_epoch())
+                                 time_system_.monotonicTime().time_since_epoch())
                                  .count();
   span_ptr->setStartTime(start_time_micro);
 
@@ -57,7 +57,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
 
 SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span_name,
                           SystemTime timestamp, SpanContext& previous_context) {
-  SpanPtr span_ptr(new Span(time_source_));
+  SpanPtr span_ptr(new Span(time_system_));
   Annotation annotation;
   uint64_t timestamp_micro;
 
@@ -114,7 +114,7 @@ SpanPtr Tracer::startSpan(const Tracing::Config& config, const std::string& span
   span_ptr->setSampled(previous_context.sampled());
 
   int64_t start_time_micro = std::chrono::duration_cast<std::chrono::microseconds>(
-                                 time_source_.monotonicTime().time_since_epoch())
+                                 time_system_.monotonicTime().time_since_epoch())
                                  .count();
   span_ptr->setStartTime(start_time_micro);
 

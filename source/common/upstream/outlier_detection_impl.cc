@@ -131,7 +131,7 @@ DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::api::v2::cluster::OutlierDetection& config,
                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                            TimeSource& time_source, EventLoggerSharedPtr event_logger)
-    : config_(config), dispatcher_(dispatcher), runtime_(runtime), time_source_(time_source),
+    : config_(config), dispatcher_(dispatcher), runtime_(runtime), time_system_(time_source),
       stats_(generateStats(cluster.info()->statsScope())),
       interval_timer_(dispatcher.createTimer([this]() -> void { onIntervalTimer(); })),
       event_logger_(event_logger), success_rate_average_(-1), success_rate_ejection_threshold_(-1) {
@@ -268,7 +268,7 @@ void DetectorImpl::ejectHost(HostSharedPtr host, EjectionType type) {
     if (enforceEjection(type)) {
       stats_.ejections_active_.inc();
       updateEnforcedEjectionStats(type);
-      host_monitors_[host]->eject(time_source_.monotonicTime());
+      host_monitors_[host]->eject(time_system_.monotonicTime());
       runCallbacks(host);
 
       if (event_logger_) {
@@ -432,7 +432,7 @@ void DetectorImpl::processSuccessRateEjections() {
 }
 
 void DetectorImpl::onIntervalTimer() {
-  MonotonicTime now = time_source_.monotonicTime();
+  MonotonicTime now = time_system_.monotonicTime();
 
   for (auto host : host_monitors_) {
     checkHostForUneject(host.first, host.second, now);
@@ -486,8 +486,8 @@ void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, Detector& det
     "\"cluster_success_rate_ejection_threshold\": \"{}\"" +
     "}}\n";
   // clang-format on
-  SystemTime now = time_source_.systemTime();
-  MonotonicTime monotonic_now = time_source_.monotonicTime();
+  SystemTime now = time_system_.systemTime();
+  MonotonicTime monotonic_now = time_system_.monotonicTime();
 
   switch (type) {
   case EjectionType::Consecutive5xx:
@@ -522,8 +522,8 @@ void EventLoggerImpl::logUneject(HostDescriptionConstSharedPtr host) {
     "\"num_ejections\": {}" +
     "}}\n";
   // clang-format on
-  SystemTime now = time_source_.systemTime();
-  MonotonicTime monotonic_now = time_source_.monotonicTime();
+  SystemTime now = time_system_.systemTime();
+  MonotonicTime monotonic_now = time_system_.monotonicTime();
   file_->write(fmt::format(
       json, AccessLogDateTimeFormatter::fromTime(now),
       secsSinceLastAction(host->outlierDetector().lastEjectionTime(), monotonic_now),

@@ -102,7 +102,7 @@ public:
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers), shadow_writer_(std::move(shadow_writer)),
-        time_source_(time_source) {}
+        time_system_(time_source) {}
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
@@ -118,7 +118,7 @@ public:
   }
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
-  TimeSource& timeSource() { return time_source_; }
+  TimeSource& timeSource() { return time_system_; }
 
   Stats::Scope& scope_;
   const LocalInfo::LocalInfo& local_info_;
@@ -133,7 +133,7 @@ public:
 
 private:
   ShadowWriterPtr shadow_writer_;
-  TimeSource& time_source_;
+  TimeSource& time_system_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;

@@ -21,7 +21,7 @@ public:
    * @param interval WatchDog timer interval (used after startWatchdog())
    */
   WatchDogImpl(int32_t thread_id, TimeSource& tsource, std::chrono::milliseconds interval)
-      : thread_id_(thread_id), time_source_(tsource),
+      : thread_id_(thread_id), time_system_(tsource),
         latest_touch_time_since_epoch_(tsource.monotonicTime().time_since_epoch()),
         timer_interval_(interval) {}
 
@@ -33,12 +33,12 @@ public:
   // Server::WatchDog
   void startWatchdog(Event::Dispatcher& dispatcher) override;
   void touch() override {
-    latest_touch_time_since_epoch_.store(time_source_.monotonicTime().time_since_epoch());
+    latest_touch_time_since_epoch_.store(time_system_.monotonicTime().time_since_epoch());
   }
 
 private:
   const int32_t thread_id_;
-  TimeSource& time_source_;
+  TimeSource& time_system_;
   std::atomic<std::chrono::steady_clock::duration> latest_touch_time_since_epoch_;
   Event::TimerPtr timer_;
   const std::chrono::milliseconds timer_interval_;

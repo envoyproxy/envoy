@@ -249,7 +249,7 @@ private:
   DetectorConfig config_;
   Event::Dispatcher& dispatcher_;
   Runtime::Loader& runtime_;
-  TimeSource& time_source_;
+  TimeSource& time_system_;
   DetectionStats stats_;
   Event::TimerPtr interval_timer_;
   std::list<ChangeStateCb> callbacks_;
@@ -263,7 +263,7 @@ class EventLoggerImpl : public EventLogger {
 public:
   EventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
                   TimeSource& time_source)
-      : file_(log_manager.createAccessLog(file_name)), time_source_(time_source) {}
+      : file_(log_manager.createAccessLog(file_name)), time_system_(time_source) {}
 
   // Upstream::Outlier::EventLogger
   void logEject(HostDescriptionConstSharedPtr host, Detector& detector, EjectionType type,
@@ -275,7 +275,7 @@ private:
   int secsSinceLastAction(const absl::optional<MonotonicTime>& lastActionTime, MonotonicTime now);
 
   Filesystem::FileSharedPtr file_;
-  TimeSource& time_source_;
+  TimeSource& time_system_;
 };
 
 /**

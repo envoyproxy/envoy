@@ -421,7 +421,7 @@ public:
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
-  testing::NiceMock<MockTimeSource> time_source_;
+  testing::NiceMock<MockTimeSource> time_system_;
 };
 
 class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {

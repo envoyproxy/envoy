@@ -38,7 +38,7 @@ namespace Zipkin {
 
 class ZipkinDriverTest : public Test {
 public:
-  ZipkinDriverTest() : time_source_(test_time_.timeSource()) {}
+  ZipkinDriverTest() : time_system_(test_time_.timeSource()) {}
 
   void setup(Json::Object& config, bool init_timer) {
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
@@ -50,7 +50,7 @@ public:
     }
 
     driver_.reset(
-        new Driver(config, cm_, stats_, tls_, runtime_, local_info_, random_, time_source_));
+        new Driver(config, cm_, stats_, tls_, runtime_, local_info_, random_, time_system_));
   }
 
   void setupValidDriver() {
@@ -67,11 +67,11 @@ public:
     setup(*loader, true);
   }
 
-  // TODO(#4160): Currently time_source_ is initialized from DangerousDeprecatedTestTime, which uses
+  // TODO(#4160): Currently time_system_ is initialized from DangerousDeprecatedTestTime, which uses
   // real time, not mock-time. When that is switched to use mock-time intead, I think
   // generateRandom64() may not be as random as we want, and we'll need to inject entropy
   // appropriate for the test.
-  uint64_t generateRandom64() { return Util::generateRandom64(time_source_); }
+  uint64_t generateRandom64() { return Util::generateRandom64(time_system_); }
 
   const std::string operation_name_{"test"};
   Http::TestHeaderMapImpl request_headers_{
@@ -90,7 +90,7 @@ public:
 
   NiceMock<Tracing::MockConfig> config_;
   DangerousDeprecatedTestTime test_time_;
-  TimeSource& time_source_;
+  TimeSource& time_system_;
 };
 
 TEST_F(ZipkinDriverTest, InitializeDriver) {

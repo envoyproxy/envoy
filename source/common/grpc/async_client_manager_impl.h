@@ -20,7 +20,7 @@ public:
 private:
   Upstream::ClusterManager& cm_;
   const envoy::api::v2::core::GrpcService config_;
-  TimeSource& time_source_;
+  TimeSource& time_system_;
 };
 
 class GoogleAsyncClientFactoryImpl : public AsyncClientFactory {
@@ -52,7 +52,7 @@ private:
   Upstream::ClusterManager& cm_;
   ThreadLocal::Instance& tls_;
   ThreadLocal::SlotPtr google_tls_slot_;
-  TimeSource& time_source_;
+  TimeSource& time_system_;
 };
 
 } // namespace Grpc

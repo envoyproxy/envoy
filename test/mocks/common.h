@@ -62,7 +62,7 @@ public:
   MOCK_METHOD0(monotonicTime, MonotonicTime());
 
   Event::RealTimeSystem real_time_system_;
-  MockTimeSource mock_time_source_;
+  MockTimeSource mock_time_system_;
 };
 
 class MockTokenBucket : public TokenBucket {

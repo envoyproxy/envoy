@@ -874,7 +874,7 @@ void AdminFilter::onComplete() {
 }
 
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
-    : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
+    : config_(new Router::NullConfigImpl()), time_system_(time_source) {}
 
 AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& profile_path,
                      const std::string& address_out_path,

@@ -27,7 +27,7 @@ private:
   const double fill_rate_;
   double tokens_;
   MonotonicTime last_fill_;
-  TimeSource& time_source_;
+  TimeSource& time_system_;
 };
 
 } // namespace Envoy

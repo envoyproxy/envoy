@@ -64,7 +64,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
       stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
-      manager_identifier_(manager_identifier), time_source_(factory_context.timeSource()),
+      manager_identifier_(manager_identifier), time_system_(factory_context.timeSource()),
       last_updated_(factory_context.timeSource().systemTime()) {
   ::Envoy::Config::Utility::checkLocalInfo("rds", factory_context.localInfo());
 
@@ -96,7 +96,7 @@ RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
 
 void RdsRouteConfigSubscription::onConfigUpdate(const ResourceVector& resources,
                                                 const std::string& version_info) {
-  last_updated_ = time_source_.systemTime();
+  last_updated_ = time_system_.systemTime();
 
   if (resources.empty()) {
     ENVOY_LOG(debug, "Missing RouteConfiguration for {} in onConfigUpdate()", route_config_name_);
