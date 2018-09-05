@@ -26,7 +26,7 @@ protected:
     timers_.push_back(std::move(timer));
   }
 
-  void sleep(int64_t delay_ms) { sim_.sleep(std::chrono::milliseconds(delay_ms)); }
+  void sleepMs(int64_t delay_ms) { sim_.sleep(std::chrono::milliseconds(delay_ms)); }
 
   void sleepSystem(int64_t delay_ms) {
     sim_.setSystemTime(sim_.systemTime() + std::chrono::milliseconds(delay_ms));
@@ -44,7 +44,7 @@ protected:
 TEST_F(SimulatedTimeSystemTest, Sleep) {
   EXPECT_EQ(start_monotonic_time_, sim_.monotonicTime());
   EXPECT_EQ(start_system_time_, sim_.systemTime());
-  sleep(5);
+  sleepMs(5);
   EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), sim_.monotonicTime());
   EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), sim_.systemTime());
 }
@@ -74,9 +74,9 @@ TEST_F(SimulatedTimeSystemTest, Ordering) {
   addTask(3, '3');
   addTask(6, '6');
   EXPECT_EQ("", output_);
-  sleep(5);
+  sleepMs(5);
   EXPECT_EQ("35", output_);
-  sleep(1);
+  sleepMs(1);
   EXPECT_EQ("356", output_);
 }
 
@@ -100,9 +100,9 @@ TEST_F(SimulatedTimeSystemTest, Disable) {
   addTask(6, '6');
   timers_[0]->disableTimer();
   EXPECT_EQ("", output_);
-  sleep(5);
+  sleepMs(5);
   EXPECT_EQ("3", output_);
-  sleep(1);
+  sleepMs(1);
   EXPECT_EQ("36", output_);
 }
 

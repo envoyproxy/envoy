@@ -152,16 +152,16 @@ void SimulatedTimeSystem::setMonotonicTimeAndUnlock(const MonotonicTime& monoton
         break;
       }
       ASSERT(alarm->time() >= monotonic_time_);
-      system_time_ += std::chrono::duration_cast<SystemTime::duration>(
-          alarm->time() - monotonic_time_);
+      system_time_ +=
+          std::chrono::duration_cast<SystemTime::duration>(alarm->time() - monotonic_time_);
       monotonic_time_ = alarm->time();
       alarms_.erase(pos);
       mutex_.unlock();
       alarm->run(); // Might throw, exiting function with lock dropped, which is acceptable.
       mutex_.lock();
     }
-    system_time_ += std::chrono::duration_cast<SystemTime::duration>(
-        monotonic_time - monotonic_time_);
+    system_time_ +=
+        std::chrono::duration_cast<SystemTime::duration>(monotonic_time - monotonic_time_);
     monotonic_time_ = monotonic_time;
   }
   mutex_.unlock();
@@ -171,8 +171,8 @@ void SimulatedTimeSystem::setSystemTime(const SystemTime& system_time) {
   mutex_.lock();
   if (system_time > system_time_) {
     MonotonicTime monotonic_time =
-        monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(
-            system_time - system_time_);
+        monotonic_time_ +
+        std::chrono::duration_cast<MonotonicTime::duration>(system_time - system_time_);
     setMonotonicTimeAndUnlock(monotonic_time);
   } else {
     system_time_ = system_time;
