@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/event/timer.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
@@ -135,7 +136,7 @@ public:
   /**
    * @throw EnvoyException if initialization fails.
    */
-  InstanceImpl(Options& options, TimeSource& time_source,
+  InstanceImpl(Options& options, Event::TimeSystem& time_system,
                Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
                HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
@@ -179,7 +180,7 @@ public:
   Tracing::HttpTracer& httpTracer() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return *local_info_; }
-  TimeSource& timeSource() override { return time_source_; }
+  Event::TimeSystem& timeSource() override { return time_system_; }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_->statsFlushInterval();
@@ -196,7 +197,7 @@ private:
   void terminate();
 
   Options& options_;
-  TimeSource time_source_;
+  Event::TimeSystem& time_system_;
   HotRestart& restarter_;
   const time_t start_time_;
   time_t original_start_time_;

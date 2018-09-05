@@ -130,8 +130,8 @@ TEST(DateUtil, All) {
 }
 
 TEST(ProdSystemTimeSourceTest, All) {
-  ProdSystemTimeSource source;
-  source.currentTime();
+  RealTimeSource source;
+  source.systemTime();
 }
 
 TEST(InputConstMemoryStream, All) {

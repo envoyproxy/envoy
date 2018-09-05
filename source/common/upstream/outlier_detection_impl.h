@@ -11,6 +11,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/cluster/outlier_detection.pb.h"
+#include "envoy/common/time.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
 #include "envoy/runtime/runtime.h"
@@ -212,7 +213,7 @@ class DetectorImpl : public Detector, public std::enable_shared_from_this<Detect
 public:
   static std::shared_ptr<DetectorImpl>
   create(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
-         Event::Dispatcher& dispatcher, Runtime::Loader& runtime, MonotonicTimeSource& time_source,
+         Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
          EventLoggerSharedPtr event_logger);
   ~DetectorImpl();
 
@@ -228,8 +229,8 @@ public:
 
 private:
   DetectorImpl(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
-               Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-               MonotonicTimeSource& time_source, EventLoggerSharedPtr event_logger);
+               Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
+               EventLoggerSharedPtr event_logger);
 
   void addHostMonitor(HostSharedPtr host);
   void armIntervalTimer();
@@ -248,7 +249,7 @@ private:
   DetectorConfig config_;
   Event::Dispatcher& dispatcher_;
   Runtime::Loader& runtime_;
-  MonotonicTimeSource& time_source_;
+  TimeSource& time_source_;
   DetectionStats stats_;
   Event::TimerPtr interval_timer_;
   std::list<ChangeStateCb> callbacks_;
@@ -261,9 +262,8 @@ private:
 class EventLoggerImpl : public EventLogger {
 public:
   EventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
-                  SystemTimeSource& time_source, MonotonicTimeSource& monotonic_time_source)
-      : file_(log_manager.createAccessLog(file_name)), time_source_(time_source),
-        monotonic_time_source_(monotonic_time_source) {}
+                  TimeSource& time_source)
+      : file_(log_manager.createAccessLog(file_name)), time_source_(time_source) {}
 
   // Upstream::Outlier::EventLogger
   void logEject(HostDescriptionConstSharedPtr host, Detector& detector, EjectionType type,
@@ -275,8 +275,7 @@ private:
   int secsSinceLastAction(const absl::optional<MonotonicTime>& lastActionTime, MonotonicTime now);
 
   Filesystem::FileSharedPtr file_;
-  SystemTimeSource& time_source_;
-  MonotonicTimeSource& monotonic_time_source_;
+  TimeSource& time_source_;
 };
 
 /**

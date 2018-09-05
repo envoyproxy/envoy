@@ -5,11 +5,11 @@
 #include <functional>
 #include <list>
 
+#include "envoy/common/time.h"
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/event/signal.h"
-#include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/dns.h"
@@ -30,10 +30,10 @@ public:
   MockDispatcher();
   ~MockDispatcher();
 
-  void setTimeSource(TimeSource& time_source) { time_source_ = &time_source; }
+  void setTimeSystem(TimeSystem& time_system) { time_system_ = &time_system; }
 
   // Dispatcher
-  TimeSource& timeSource() override { return *time_source_; }
+  TimeSystem& timeSource() override { return *time_system_; }
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket) override {
@@ -65,7 +65,9 @@ public:
         createListener_(socket, cb, bind_to_port, hand_off_restored_destination_connections)};
   }
 
-  TimerPtr createTimer(TimerCb cb) override { return TimerPtr{createTimer_(cb)}; }
+  Event::TimerPtr createTimer(Event::TimerCb cb) override {
+    return Event::TimerPtr{createTimer_(cb)};
+  }
 
   void deferredDelete(DeferredDeletablePtr&& to_delete) override {
     deferredDelete_(to_delete.get());
@@ -99,7 +101,7 @@ public:
                Network::Listener*(Network::Socket& socket, Network::ListenerCallbacks& cb,
                                   bool bind_to_port,
                                   bool hand_off_restored_destination_connections));
-  MOCK_METHOD1(createTimer_, Timer*(TimerCb cb));
+  MOCK_METHOD1(createTimer_, Timer*(Event::TimerCb cb));
   MOCK_METHOD1(deferredDelete_, void(DeferredDeletable* to_delete));
   MOCK_METHOD0(exit, void());
   MOCK_METHOD2(listenForSignal_, SignalEvent*(int signal_num, SignalCb cb));
@@ -109,7 +111,7 @@ public:
 
   // TODO(jmarantz): Switch these to using mock-time.
   DangerousDeprecatedTestTime test_time_;
-  TimeSource* time_source_;
+  TimeSystem* time_system_;
 
   std::list<DeferredDeletablePtr> to_delete_;
   MockBufferFactory buffer_factory_;
@@ -121,11 +123,11 @@ public:
   MockTimer(MockDispatcher* dispatcher);
   ~MockTimer();
 
-  // Event::Timer
+  // Timer
   MOCK_METHOD0(disableTimer, void());
   MOCK_METHOD1(enableTimer, void(const std::chrono::milliseconds&));
 
-  TimerCb callback_;
+  Event::TimerCb callback_;
 };
 
 class MockSignalEvent : public SignalEvent {

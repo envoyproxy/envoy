@@ -42,22 +42,22 @@
 namespace Envoy {
 namespace Server {
 
-InstanceImpl::InstanceImpl(Options& options, TimeSource& time_source,
+InstanceImpl::InstanceImpl(Options& options, Event::TimeSystem& time_system,
                            Network::Address::InstanceConstSharedPtr local_address, TestHooks& hooks,
                            HotRestart& restarter, Stats::StoreRoot& store,
                            Thread::BasicLockable& access_log_lock,
                            ComponentFactory& component_factory,
                            Runtime::RandomGeneratorPtr&& random_generator,
                            ThreadLocal::Instance& tls)
-    : options_(options), time_source_(time_source), restarter_(restarter),
+    : options_(options), time_system_(time_system), restarter_(restarter),
       start_time_(time(nullptr)), original_start_time_(start_time_), stats_store_(store),
       thread_local_(tls), api_(new Api::Impl(options.fileFlushIntervalMsec())),
-      dispatcher_(api_->allocateDispatcher(time_source)),
+      dispatcher_(api_->allocateDispatcher(time_system)),
       singleton_manager_(new Singleton::ManagerImpl()),
       handler_(new ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       random_generator_(std::move(random_generator)),
       secret_manager_(std::make_unique<Secret::SecretManagerImpl>()),
-      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks, time_source),
+      listener_component_factory_(*this), worker_factory_(thread_local_, *api_, hooks, time_system),
       dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(*api_, *dispatcher_, access_log_lock, store), terminated_(false) {
 
@@ -226,7 +226,7 @@ void InstanceImpl::initialize(Options& options,
 
   // Handle configuration that needs to take place prior to the main configuration load.
   InstanceUtil::loadBootstrapConfig(bootstrap_, options);
-  bootstrap_config_update_time_ = time_source_.systemTime();
+  bootstrap_config_update_time_ = time_system_.systemTime();
 
   // Needs to happen as early as possible in the instantiation to preempt the objects that require
   // stats.
@@ -271,7 +271,7 @@ void InstanceImpl::initialize(Options& options,
 
   // Workers get created first so they register for thread local updates.
   listener_manager_.reset(
-      new ListenerManagerImpl(*this, listener_component_factory_, worker_factory_, time_source_));
+      new ListenerManagerImpl(*this, listener_component_factory_, worker_factory_, time_system_));
 
   // The main thread is also registered for thread local updates so that code that does not care
   // whether it runs on the main thread or on workers can still use TLS.
@@ -310,7 +310,7 @@ void InstanceImpl::initialize(Options& options,
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        clusterManager(), thread_local_, time_source_);
+        clusterManager(), thread_local_, time_system_);
     hds_delegate_.reset(new Upstream::HdsDelegate(
         bootstrap_.node(), stats(),
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config, stats())
@@ -330,7 +330,7 @@ void InstanceImpl::initialize(Options& options,
 
   // GuardDog (deadlock detection) object and thread setup before workers are
   // started and before our own run() loop runs.
-  guard_dog_.reset(new Server::GuardDogImpl(stats_store_, *config_, time_source_));
+  guard_dog_.reset(new Server::GuardDogImpl(stats_store_, *config_, time_system_));
 }
 
 void InstanceImpl::startWorkers() {

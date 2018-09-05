@@ -87,7 +87,7 @@ public:
               absl::string_view description);
 
   /** @return MonotonicTime the current time */
-  MonotonicTime currentTime() { return time_source_.currentTime(); }
+  MonotonicTime currentTime() { return time_source_.monotonicTime(); }
 
   /**
    * Renders the aggregated statistics as a string.
@@ -141,7 +141,7 @@ private:
 #else
   DurationStatsMap duration_stats_map_;
 #endif
-  ProdMonotonicTimeSource time_source_;
+  RealTimeSource time_source_;
 };
 
 /**

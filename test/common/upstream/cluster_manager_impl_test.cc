@@ -163,9 +163,7 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 
 class ClusterManagerImplTest : public testing::Test {
 public:
-  ClusterManagerImplTest() : time_source_(system_time_source_, monotonic_time_source_) {
-    factory_.dispatcher_.setTimeSource(time_source_);
-  }
+  ClusterManagerImplTest() { factory_.dispatcher_.setTimeSystem(time_source_); }
 
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_.reset(new ClusterManagerImpl(
@@ -240,10 +238,8 @@ public:
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
-  NiceMock<MockSystemTimeSource> system_time_source_;
-  NiceMock<MockMonotonicTimeSource> monotonic_time_source_;
+  NiceMock<MockTimeSystem> time_source_;
   MockLocalClusterUpdate local_cluster_update_;
-  TimeSource time_source_;
 };
 
 envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromJson(const std::string& json_string) {
@@ -293,7 +289,7 @@ TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
 }
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
-  EXPECT_CALL(system_time_source_, currentTime())
+  EXPECT_CALL(time_source_, systemTime())
       .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
 
   const std::string yaml = R"EOF(
@@ -770,7 +766,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
 }
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
-  EXPECT_CALL(system_time_source_, currentTime())
+  EXPECT_CALL(time_source_, systemTime())
       .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
 
   const std::string json = fmt::sprintf(
@@ -989,7 +985,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 }
 
 TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
-  EXPECT_CALL(system_time_source_, currentTime())
+  EXPECT_CALL(time_source_, systemTime())
       .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
 
   const std::string json = R"EOF(

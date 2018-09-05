@@ -103,7 +103,7 @@ private:
   std::list<std::string> subscriptions_;
   Event::TimerPtr retry_timer_;
   Runtime::RandomGenerator& random_;
-  TimeSource time_source_;
+  TimeSource& time_source_;
   BackOffStrategyPtr backoff_strategy_;
 };
 

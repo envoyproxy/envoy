@@ -18,8 +18,7 @@ public:
    * @param fill_rate supplies the number of tokens that will return to the bucket on each second.
    * The default is 1.
    */
-  explicit TokenBucketImpl(uint64_t max_tokens, MonotonicTimeSource& time_source,
-                           double fill_rate = 1);
+  explicit TokenBucketImpl(uint64_t max_tokens, TimeSource& time_source, double fill_rate = 1);
 
   bool consume(uint64_t tokens = 1) override;
 
@@ -28,7 +27,7 @@ private:
   const double fill_rate_;
   double tokens_;
   MonotonicTime last_fill_;
-  MonotonicTimeSource& monotonic_time_source_;
+  TimeSource& time_source_;
 };
 
 } // namespace Envoy

@@ -34,10 +34,8 @@ namespace {
 // is provided in [grpc_]subscription_impl_test.cc.
 class GrpcMuxImplTest : public testing::Test {
 public:
-  GrpcMuxImplTest()
-      : async_client_(new Grpc::MockAsyncClient()),
-        mock_time_source_(mock_system_time_, mock_monotonic_time_) {
-    dispatcher_.setTimeSource(mock_time_source_);
+  GrpcMuxImplTest() : async_client_(new Grpc::MockAsyncClient()) {
+    dispatcher_.setTimeSystem(mock_time_system_);
   }
 
   void setup() {
@@ -77,9 +75,7 @@ public:
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcMuxImpl> grpc_mux_;
   NiceMock<MockGrpcMuxCallbacks> callbacks_;
-  NiceMock<MockSystemTimeSource> mock_system_time_;
-  NiceMock<MockMonotonicTimeSource> mock_monotonic_time_;
-  TimeSource mock_time_source_;
+  NiceMock<MockTimeSystem> mock_time_system_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
@@ -361,7 +357,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequests) {
 
   EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(100));
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
-  EXPECT_CALL(mock_monotonic_time_, currentTime())
+  EXPECT_CALL(mock_time_system_, monotonicTime())
       .WillRepeatedly(Return(std::chrono::steady_clock::time_point{}));
 
   const auto onReceiveMessage = [&](uint64_t burst) {
@@ -387,7 +383,7 @@ TEST_F(GrpcMuxImplTest, TooManyRequests) {
                       onReceiveMessage(1));
 
   // Logging limiter waits for 5s, so a second warning message is expected.
-  EXPECT_CALL(mock_monotonic_time_, currentTime())
+  EXPECT_CALL(mock_time_system_, monotonicTime())
       .Times(4)
       .WillOnce(Return(std::chrono::steady_clock::time_point{}))
       .WillOnce(Return(std::chrono::steady_clock::time_point{std::chrono::seconds(5)}))

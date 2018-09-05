@@ -77,8 +77,8 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplDeathTest,
                         TestUtility::ipTestParamsToString);
 
 TEST_P(ConnectionImplDeathTest, BadFd) {
-  MockTimeSource time_source;
-  Event::DispatcherImpl dispatcher(time_source);
+  MockTimeSystem time_system;
+  Event::DispatcherImpl dispatcher(time_system);
   EXPECT_DEATH_LOG_TO_STDERR(
       ConnectionImpl(dispatcher, std::make_unique<ConnectionSocketImpl>(-1, nullptr, nullptr),
                      Network::Test::createRawBufferSocket(), false),
@@ -89,7 +89,7 @@ class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
   void setUpBasicConnection() {
     if (dispatcher_.get() == nullptr) {
-      dispatcher_.reset(new Event::DispatcherImpl(time_source_));
+      dispatcher_.reset(new Event::DispatcherImpl(time_system_));
     }
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
@@ -152,7 +152,7 @@ public:
 
     MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
     dispatcher_.reset(
-        new Event::DispatcherImpl(time_source_, Buffer::WatermarkFactoryPtr{factory}));
+        new Event::DispatcherImpl(time_system_, Buffer::WatermarkFactoryPtr{factory}));
     // The first call to create a client session will get a MockBuffer.
     // Other calls for server sessions will by default get a normal OwnedImpl.
     EXPECT_CALL(*factory, create_(_, _))
@@ -169,7 +169,7 @@ public:
   }
 
 protected:
-  MockTimeSource time_source_;
+  MockTimeSystem time_system_;
   Event::DispatcherPtr dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), nullptr, true};
@@ -233,7 +233,7 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
 }
 
 TEST_P(ConnectionImplTest, ImmediateConnectError) {
-  dispatcher_.reset(new Event::DispatcherImpl(time_source_));
+  dispatcher_.reset(new Event::DispatcherImpl(time_system_));
 
   // Using a broadcast/multicast address as the connection destiantion address causes an
   // immediate error return from connect().
@@ -805,7 +805,7 @@ TEST_P(ConnectionImplTest, BindFailureTest) {
     source_address_ = Network::Address::InstanceConstSharedPtr{
         new Network::Address::Ipv6Instance(address_string, 0)};
   }
-  dispatcher_.reset(new Event::DispatcherImpl(time_source_));
+  dispatcher_.reset(new Event::DispatcherImpl(time_system_));
   listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
   client_connection_ = dispatcher_->createClientConnection(
@@ -1199,7 +1199,7 @@ class ReadBufferLimitTest : public ConnectionImplTest {
 public:
   void readBufferLimitTest(uint32_t read_buffer_limit, uint32_t expected_chunk_size) {
     const uint32_t buffer_size = 256 * 1024;
-    dispatcher_.reset(new Event::DispatcherImpl(time_source_));
+    dispatcher_.reset(new Event::DispatcherImpl(time_system_));
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
     client_connection_ = dispatcher_->createClientConnection(
@@ -1270,8 +1270,8 @@ TEST_P(ReadBufferLimitTest, SomeLimit) {
 
 class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
-  TcpClientConnectionImplTest() : dispatcher_(time_source_) {}
-  MockTimeSource time_source_;
+  TcpClientConnectionImplTest() : dispatcher_(time_system_) {}
+  MockTimeSystem time_system_;
   Event::DispatcherImpl dispatcher_;
 };
 INSTANTIATE_TEST_CASE_P(IpVersions, TcpClientConnectionImplTest,
@@ -1311,8 +1311,8 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
 
 class PipeClientConnectionImplTest : public testing::Test {
 protected:
-  PipeClientConnectionImplTest() : dispatcher_(time_source_) {}
-  MockTimeSource time_source_;
+  PipeClientConnectionImplTest() : dispatcher_(time_system_) {}
+  MockTimeSystem time_system_;
   Event::DispatcherImpl dispatcher_;
   const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};
 };

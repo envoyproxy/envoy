@@ -186,9 +186,8 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v2::Boots
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
     if (!event_log_file_path.empty()) {
-      outlier_event_logger_.reset(new Outlier::EventLoggerImpl(
-          log_manager, event_log_file_path, dispatcher_.timeSource().system(),
-          dispatcher_.timeSource().monotonic()));
+      outlier_event_logger_.reset(
+          new Outlier::EventLoggerImpl(log_manager, event_log_file_path, time_source_));
     }
   }
 
@@ -615,7 +614,7 @@ void ClusterManagerImpl::loadCluster(const envoy::api::v2::Cluster& cluster,
   }
 
   cluster_map[cluster_reference.info()->name()] = std::make_unique<ClusterData>(
-      cluster, version_info, added_via_api, std::move(new_cluster), time_source_.system());
+      cluster, version_info, added_via_api, std::move(new_cluster), time_source_);
   const auto cluster_entry_it = cluster_map.find(cluster_reference.info()->name());
 
   // If an LB is thread aware, create it here. The LB is not initialized until cluster pre-init

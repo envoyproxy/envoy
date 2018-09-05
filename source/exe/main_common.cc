@@ -38,8 +38,7 @@ Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
   return Server::InstanceUtil::createRuntime(server, config);
 }
 
-MainCommonBase::MainCommonBase(OptionsImpl& options)
-    : options_(options), time_source_(system_time_source_, monotonic_time_source_) {
+MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
   ares_library_init(ARES_LIB_INIT_ALL);
   Event::Libevent::Global::initialize();
   RELEASE_ASSERT(Envoy::Server::validateProtoDescriptors(), "");
@@ -66,7 +65,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options)
                                                                  restarter_->statsAllocator());
 
     server_ = std::make_unique<Server::InstanceImpl>(
-        options_, time_source_, local_address, default_test_hooks_, *restarter_, *stats_store_,
+        options_, time_system_, local_address, default_test_hooks_, *restarter_, *stats_store_,
         access_log_lock, component_factory_, std::make_unique<Runtime::RandomGeneratorImpl>(),
         *tls_);
     break;
