@@ -122,6 +122,7 @@ public:
 private:
   GrpcMetricsStreamerSharedPtr grpc_metrics_streamer_;
   envoy::service::metrics::v2::StreamMetricsMessage message_;
+  TimeSource& time_source_;
 };
 
 } // namespace MetricsService
