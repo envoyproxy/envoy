@@ -29,10 +29,10 @@ GrpcMuxImpl::~GrpcMuxImpl() {
   }
 }
 
-void GrpcMuxImpl::noMoreRequestSending() {
+void GrpcMuxImpl::disableSendUpdateAtWatcherDelete() {
   for (const auto& api_state : api_state_) {
     for (auto watch : api_state.second.watches_) {
-      watch->send_update_ = false;
+      watch->send_update_at_delete_ = false;
     }
   }
 }
