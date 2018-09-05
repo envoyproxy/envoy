@@ -77,7 +77,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(base, base * 10, random_);
 
   ENVOY_LOG(debug, "using retry policy {} for URL '{}'", retry_on_,
-            request_headers.Path()->value().c_str());
+      request_headers.Path()->value().getStringView());
 }
 
 RetryStateImpl::~RetryStateImpl() { resetRetry(); }
