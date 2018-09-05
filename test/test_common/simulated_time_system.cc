@@ -25,7 +25,7 @@ public:
       : TimerImpl(libevent, cb), time_system_(time_system), libevent_(libevent),
         index_(time_system.nextIndex()), armed_(false) {}
 
-  virtual ~Alarm() { ASSERT(!armed_); }
+  virtual ~Alarm();
 
   // Timer
   void disableTimer() override;
@@ -84,6 +84,12 @@ private:
   SimulatedTimeSystem& time_system_;
   Libevent::BasePtr& libevent_;
 };
+
+SimulatedTimeSystem::Alarm::~Alarm() {
+  if (armed_) {
+    disableTimer();
+  }
+}
 
 void SimulatedTimeSystem::Alarm::disableTimer() {
   ASSERT(armed_);

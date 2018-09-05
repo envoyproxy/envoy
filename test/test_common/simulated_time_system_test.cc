@@ -94,11 +94,23 @@ TEST_F(SimulatedTimeSystemTest, SystemTimeOrdering) {
   EXPECT_EQ("356", output_); // callbacks don't get replayed.
 }
 
-TEST_F(SimulatedTimeSystemTest, Disable) {
+TEST_F(SimulatedTimeSystemTest, DisableTimer) {
   addTask(5, '5');
   addTask(3, '3');
   addTask(6, '6');
   timers_[0]->disableTimer();
+  EXPECT_EQ("", output_);
+  sleepMs(5);
+  EXPECT_EQ("3", output_);
+  sleepMs(1);
+  EXPECT_EQ("36", output_);
+}
+
+TEST_F(SimulatedTimeSystemTest, DeleteTime) {
+  addTask(5, '5');
+  addTask(3, '3');
+  addTask(6, '6');
+  timers_[0].reset();
   EXPECT_EQ("", output_);
   sleepMs(5);
   EXPECT_EQ("3", output_);
