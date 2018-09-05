@@ -10,12 +10,11 @@ namespace Envoy {
 namespace Event {
 
 // Represents a simulated time system, where time is advanced by calling
-// sleep(). systemTime() and monotonicTime() are computed from the sleeps,
-// and alarms are fired in response to sleep as well.
+// sleep(), setSystemTime(), or setMonotonicTime(). systemTime() and
+// monotonicTime() are maintained in the class, and alarms are fired in response
+// to adjsutments in time.
 class SimulatedTimeSystem : public TimeSystem {
 public:
-  class Alarm;
-
   SimulatedTimeSystem();
 
   // TimeSystem
@@ -58,6 +57,15 @@ public:
   void setSystemTime(const SystemTime& system_time);
 
 private:
+  class SimulatedScheduler;
+  friend class SimulatedScheduler;
+  class Alarm;
+  friend class Alarm;
+  struct CompareAlarms {
+    bool operator()(const Alarm* a, const Alarm* b) const;
+  };
+  typedef std::set<Alarm*, CompareAlarms> AlarmSet;
+
   void setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) UNLOCK_FUNCTION(mutex_);
 
   // The simulation keeps a unique ID for each alarm to act as a deterministic
@@ -68,20 +76,11 @@ private:
   void addAlarm(Alarm*, const std::chrono::milliseconds& duration);
   void removeAlarm(Alarm*);
 
-  friend class SimulatedScheduler;
-  friend Alarm;
-  struct CompareAlarms {
-    bool operator()(const Alarm* a, const Alarm* b) const;
-  };
-  typedef std::set<Alarm*, CompareAlarms> AlarmSet;
-
-  RealTimeSource real_time_source_;
+  RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ GUARDED_BY(mutex_);
   SystemTime system_time_ GUARDED_BY(mutex_);
-  ;
   AlarmSet alarms_ GUARDED_BY(mutex_);
   uint64_t index_ GUARDED_BY(mutex_);
-
   mutable Thread::MutexBasicLockable mutex_;
 };
 
