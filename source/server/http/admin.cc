@@ -284,17 +284,37 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         envoy::admin::v2alpha::HostStatus& host_status = *cluster_status.add_host_statuses();
         Network::Utility::addressToProtobufAddress(*host->address(),
                                                    *host_status.mutable_address());
-
+        std::vector<Stats::CounterSharedPtr> sorted_counters;
         for (const Stats::CounterSharedPtr& counter : host->counters()) {
-          auto& metric = (*host_status.mutable_stats())[counter->name()];
-          metric.set_type(envoy::admin::v2alpha::SimpleMetric::COUNTER);
+          sorted_counters.push_back(counter);
+        }
+        std::sort(
+            sorted_counters.begin(), sorted_counters.end(),
+            [](const Stats::CounterSharedPtr& counter1, const Stats::CounterSharedPtr& counter2) {
+              return counter1->name() < counter2->name();
+            });
+
+        for (const Stats::CounterSharedPtr& counter : sorted_counters) {
+          auto& metric = *host_status.add_stats();
+          metric.set_name(counter->name());
           metric.set_value(counter->value());
+          metric.set_type(envoy::admin::v2alpha::SimpleMetric::COUNTER);
         }
 
+        std::vector<Stats::GaugeSharedPtr> sorted_gauges;
         for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
-          auto& metric = (*host_status.mutable_stats())[gauge->name()];
-          metric.set_type(envoy::admin::v2alpha::SimpleMetric::GAUGE);
+          sorted_gauges.push_back(gauge);
+        }
+        std::sort(sorted_gauges.begin(), sorted_gauges.end(),
+                  [](const Stats::GaugeSharedPtr& gauge1, const Stats::GaugeSharedPtr& gauge2) {
+                    return gauge1->name() < gauge2->name();
+                  });
+
+        for (const Stats::GaugeSharedPtr& gauge : sorted_gauges) {
+          auto& metric = *host_status.add_stats();
+          metric.set_name(gauge->name());
           metric.set_value(gauge->value());
+          metric.set_type(envoy::admin::v2alpha::SimpleMetric::GAUGE);
         }
 
         envoy::admin::v2alpha::HostHealthStatus& health_status =
