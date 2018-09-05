@@ -89,6 +89,7 @@ public:
   bool generateRequestId() override { return generate_request_id_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
+  std::chrono::milliseconds streamRequestTimeout() const override { return stream_request_timeout_; }
   Router::RouteConfigProvider& routeConfigProvider() override { return *route_config_provider_; }
   const std::string& serverName() override { return server_name_; }
   Http::ConnectionManagerStats& stats() override { return stats_; }
@@ -139,6 +140,7 @@ private:
   absl::optional<std::string> user_agent_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   std::chrono::milliseconds stream_idle_timeout_;
+  std::chrono::milliseconds stream_request_timeout_;
   Router::RouteConfigProviderPtr route_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;
@@ -148,6 +150,7 @@ private:
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
+  static const uint64_t StreamRequestTimeoutMs = 5 * 60 * 1000;
 };
 
 } // namespace HttpConnectionManager

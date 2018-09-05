@@ -337,6 +337,10 @@ void ConnectionManagerImpl::onDrainTimeout() {
   checkForDeferredClose();
 }
 
+void ConnectionManagerImpl::onRequestTimeout() {
+  ENVOY_CONN_LOG(debug, "request timeout", read_callbacks_->connection());
+}
+
 void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_reason,
                                                ConnectionManagerTracingStats& tracing_stats) {
   switch (tracing_reason) {
@@ -362,7 +366,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     : connection_manager_(connection_manager),
       snapped_route_config_(connection_manager.config_.routeConfigProvider().config()),
       stream_id_(connection_manager.random_generator_.random()),
-      request_timer_(new Stats::Timespan(connection_manager_.stats_.named_.downstream_rq_time_,
+      request_timespan_(new Stats::Timespan(connection_manager_.stats_.named_.downstream_rq_time_,
                                          connection_manager_.timeSystem())),
       request_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSystem()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
@@ -387,6 +391,14 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
         [this]() -> void { onIdleTimeout(); });
     resetIdleTimer();
   }
+
+  if (connection_manager_.config_.streamRequestTimeout().count()) {
+    request_timeout_ms_ = std::chrono::seconds(200);
+    request_timer_ = connection_manager.read_callbacks_->connection().dispatcher().createTimer(
+        [this]() -> void { onRequestTimeout(); });
+    // resetRequestTimer();
+  }
+
   request_info_.setRequestedServerName(
       connection_manager_.read_callbacks_->connection().requestedServerName());
 }
@@ -437,6 +449,10 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
                        Grpc::Common::hasGrpcContentType(*request_headers_),
                    Http::Code::RequestTimeout, "stream timeout", nullptr, is_head_request_);
   }
+}
+
+void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
+  std::cout << "I am auni";
 }
 
 void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
@@ -1230,7 +1246,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
 void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
   if (end_stream) {
     request_info_.onLastDownstreamTxByteSent();
-    request_timer_->complete();
+    request_timespan_->complete();
     connection_manager_.doEndStream(*this);
   }
 }

@@ -149,8 +149,8 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
 }
 
 TEST_P(BufferIntegrationTest, RequestPathTimesOutInBuffer) {
-  std::chrono::seconds buffer_timeout = std::chrono::seconds(1);
-  std::chrono::milliseconds test_connection_initiation_timeout = std::chrono::milliseconds(1250);
+  std::chrono::milliseconds test_connection_initiation_timeout(1250);
+  std::chrono::seconds buffer_timeout(1);
 
   ConfigHelper::HttpModifierFunction mod = overrideConfigBufferTimeout(buffer_timeout);
   config_helper_.addConfigModifier(mod);
@@ -168,8 +168,8 @@ TEST_P(BufferIntegrationTest, RequestPathTimesOutInBuffer) {
 }
 
 TEST_P(BufferIntegrationTest, RequestPathTimesntOutInBuffer) {
-  std::chrono::seconds buffer_timeout = std::chrono::seconds(5); // Greater than test timeout
-  std::chrono::milliseconds test_connection_initiation_timeout = std::chrono::milliseconds(1250);
+  std::chrono::milliseconds test_connection_initiation_timeout(1250);
+  std::chrono::seconds buffer_timeout(5); // Greater than test timeout
 
   ConfigHelper::HttpModifierFunction mod = overrideConfigBufferTimeout(buffer_timeout);
   config_helper_.addConfigModifier(mod);

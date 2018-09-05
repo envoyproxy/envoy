@@ -205,6 +205,12 @@ public:
   virtual std::chrono::milliseconds streamIdleTimeout() const PURE;
 
   /**
+   * @return per-stream request timeout for incoming connection manager connections. Zero indicates a
+   *         disabled request timeout.
+   */
+  virtual std::chrono::milliseconds streamRequestTimeout() const PURE;
+
+  /**
    * @return Router::RouteConfigProvider& the configuration provider used to acquire a route
    *         config for each request flow.
    */

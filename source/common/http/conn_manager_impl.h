@@ -380,6 +380,8 @@ private:
     void onIdleTimeout();
     // Reset per-stream idle timer.
     void resetIdleTimer();
+    // Per-stream request timeout callback
+    void onRequestTimeout();
 
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
@@ -396,10 +398,13 @@ private:
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
-    Stats::TimespanPtr request_timer_;
+    Stats::TimespanPtr request_timespan_;
     // Per-stream idle timeout.
     Event::TimerPtr idle_timer_;
+    // Per-stream request timeout.
+    Event::TimerPtr request_timer_;
     std::chrono::milliseconds idle_timeout_ms_{};
+    std::chrono::milliseconds request_timeout_ms_{};
     State state_;
     RequestInfo::RequestInfoImpl request_info_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
@@ -435,6 +440,7 @@ private:
   void resetAllStreams();
   void onIdleTimeout();
   void onDrainTimeout();
+  void onRequestTimeout();
   void startDrainSequence();
 
   bool isOldStyleWebSocketConnection() const { return ws_connection_ != nullptr; }
@@ -452,6 +458,7 @@ private:
   UserAgent user_agent_;
   Event::TimerPtr idle_timer_;
   Event::TimerPtr drain_timer_;
+  Event::TimerPtr request_timer_;
   Runtime::RandomGenerator& random_generator_;
   Tracing::HttpTracer& tracer_;
   Runtime::Loader& runtime_;
