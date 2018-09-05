@@ -28,7 +28,8 @@ public:
    * Advances time forward by the specified duration, running any timers
    * along the way that have been scheduled to fire.
    *
-   * @param duration The amount of time to sleep.
+   * @param duration The amount of time to sleep, expressed in any type that
+   * can be added to time.
    */
   template <class Duration> void sleep(const Duration& duration) {
     mutex_.lock();
@@ -38,7 +39,9 @@ public:
 
   /**
    * Sets the time forward monotonically. if the supplied argument moves
-   * backward in time, the call is a no-op.
+   * backward in time, the call is a no-op. If the supplied argument moves
+   * forward, any applicable timers are fired, and system-time is also moved
+   * forward by the same delta.
    *
    * @param monotonic_time The desired new current time.
    */
@@ -48,9 +51,9 @@ public:
   }
 
   /**
-   * Sets the system-time forward. if the supplied argument moves
-   * backward in time, the call works, but of course we can't uncall
-   * any fired alarms.
+   * Sets the system-time, whether forward or backward. If time moves forward,
+   * applicable timers are fired and monotonic time is also increased by the
+   * same delta.
    *
    * @param system_time The desired new system time.
    */
