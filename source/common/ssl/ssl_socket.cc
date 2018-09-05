@@ -422,9 +422,11 @@ Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() cons
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
-  ssl_ctx_mu_.Lock();
-  auto ssl_ctx = ssl_ctx_;
-  ssl_ctx_mu_.Unlock();
+  ClientContextSharedPtr ssl_ctx;
+  {
+    absl::ReaderMutexLock l(&ssl_ctx_mu_);
+    ssl_ctx = ssl_ctx_;
+  }
   if (ssl_ctx) {
     return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Client);
   } else {
@@ -438,9 +440,10 @@ bool ClientSslSocketFactory::implementsSecureTransport() const { return true; }
 
 void ClientSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
-  ssl_ctx_mu_.Lock();
-  ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
-  ssl_ctx_mu_.Unlock();
+  {
+    absl::WriterMutexLock l(&ssl_ctx_mu_);
+    ssl_ctx_ = manager_.createSslClientContext(stats_scope_, *config_);
+  }
   stats_.ssl_context_update_by_sds_.inc();
 }
 
@@ -458,9 +461,11 @@ Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() cons
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
-  ssl_ctx_mu_.Lock();
-  auto ssl_ctx = ssl_ctx_;
-  ssl_ctx_mu_.Unlock();
+  ServerContextSharedPtr ssl_ctx;
+  {
+    absl::ReaderMutexLock l(&ssl_ctx_mu_);
+    ssl_ctx = ssl_ctx_;
+  }
   if (ssl_ctx) {
     return std::make_unique<Ssl::SslSocket>(std::move(ssl_ctx), Ssl::InitialState::Server);
   } else {
@@ -474,9 +479,10 @@ bool ServerSslSocketFactory::implementsSecureTransport() const { return true; }
 
 void ServerSslSocketFactory::onAddOrUpdateSecret() {
   ENVOY_LOG(debug, "Secret is updated.");
-  ssl_ctx_mu_.Lock();
-  ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
-  ssl_ctx_mu_.Unlock();
+  {
+    absl::WriterMutexLock l(&ssl_ctx_mu_);
+    ssl_ctx_ = manager_.createSslServerContext(stats_scope_, *config_, server_names_);
+  }
   stats_.ssl_context_update_by_sds_.inc();
 }
 
