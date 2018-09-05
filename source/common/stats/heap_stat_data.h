@@ -69,7 +69,8 @@ private:
   // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
   StatSet stats_ GUARDED_BY(mutex_);
   // A locally held symbol table which encodes stat names as StatNamePtrs and decodes StatNamePtrs
-  // back into strings.
+  // back into strings. This does not get guarded by mutex_, since it has its own internal mutex to
+  // guarantee thread safety.
   SymbolTable table_;
   // A mutex is needed here to protect both the stats_ object from both
   // alloc() and free() operations. Although alloc() operations are called under existing locking,

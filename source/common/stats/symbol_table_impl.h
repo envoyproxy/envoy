@@ -36,10 +36,17 @@ using StatNamePtr = std::unique_ptr<StatName>;
  */
 class SymbolTable {
 public:
+  SymbolTable() {
+    // Have to be explicitly declared, if we want to use the GUARDED_BY macro
+    next_symbol_ = 0;
+    monotonic_counter_ = 0;
+  }
+
   StatNamePtr encode(absl::string_view name);
 
   // For testing purposes only.
   size_t size() const {
+    Thread::LockGuard lock(lock_);
     ASSERT(encode_map_.size() == decode_map_.size());
     return encode_map_.size();
   }
@@ -52,6 +59,9 @@ private:
     Symbol symbol_;
     uint32_t ref_count_;
   };
+
+  // This must be called during both encode() and free().
+  mutable Thread::MutexBasicLockable lock_;
 
   /**
    * Decodes a vector of symbols back into its period-delimited stat name.
@@ -89,25 +99,19 @@ private:
   absl::string_view fromSymbol(Symbol symbol) const;
 
   // Stages a new symbol for use. To be called after a successful insertion.
-  void newSymbol() {
-    if (pool_.empty()) {
-      next_symbol_ = ++monotonic_counter_;
-    } else {
-      next_symbol_ = pool_.top();
-      pool_.pop();
-    }
-    // This should catch integer overflow for the new symbol.
-    ASSERT(monotonic_counter_ != 0);
-  }
+  void newSymbol();
 
-  Symbol monotonicCounter() { return monotonic_counter_; }
+  Symbol monotonicCounter() {
+    Thread::LockGuard lock(lock_);
+    return monotonic_counter_;
+  }
 
   // Stores the symbol to be used at next insertion. This should exist ahead of insertion time so
   // that if insertion succeeds, the value written is the correct one.
-  Symbol next_symbol_ = 0 GUARDED_BY(lock_);
+  Symbol next_symbol_ GUARDED_BY(lock_);
 
   // If the free pool is exhausted, we monotonically increase this counter.
-  Symbol monotonic_counter_ = 0 GUARDED_BY(lock_);
+  Symbol monotonic_counter_ GUARDED_BY(lock_);
 
   // Bimap implementation.
   // The encode map stores both the symbol and the ref count of that symbol.
@@ -119,9 +123,6 @@ private:
   // TODO(ambuc): There might be an optimization here relating to storing ranges of freed symbols
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
-
-  // This must be called during both encode() and free().
-  mutable Thread::MutexBasicLockable lock_;
 };
 
 /**
