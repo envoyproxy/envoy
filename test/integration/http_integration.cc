@@ -584,6 +584,13 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeRequestComplete(
 
 void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
     ConnectionCreationFunction* create_connection) {
+#ifdef __APPLE__
+  // Skip this test on OS X: we can't detect the early close on OS X, and we
+  // won't clean up the upstream connection until it times out. See #4294.
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    return;
+  }
+#endif
   initialize();
   codec_client_ = makeHttpConnection(
       create_connection ? ((*create_connection)()) : makeClientConnection((lookupPort("http"))));

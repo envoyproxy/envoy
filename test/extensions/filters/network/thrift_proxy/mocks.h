@@ -1,6 +1,7 @@
 #pragma once
 
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
+#include "extensions/filters/network/thrift_proxy/conn_state.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
 #include "extensions/filters/network/thrift_proxy/metadata.h"
 #include "extensions/filters/network/thrift_proxy/protocol.h"
@@ -101,6 +102,12 @@ public:
   MOCK_METHOD2(writeDouble, void(Buffer::Instance& buffer, double value));
   MOCK_METHOD2(writeString, void(Buffer::Instance& buffer, const std::string& value));
   MOCK_METHOD2(writeBinary, void(Buffer::Instance& buffer, const std::string& value));
+  MOCK_METHOD0(supportsUpgrade, bool());
+  MOCK_METHOD0(upgradeRequestDecoder, DecoderEventHandlerSharedPtr());
+  MOCK_METHOD1(upgradeResponse, DirectResponsePtr(const DecoderEventHandler&));
+  MOCK_METHOD3(attemptUpgrade,
+               ThriftObjectPtr(Transport&, ThriftConnectionState&, Buffer::Instance&));
+  MOCK_METHOD2(completeUpgrade, void(ThriftConnectionState&, ThriftObject&));
 
   std::string name_{"mock"};
   ProtocolType type_{ProtocolType::Auto};
@@ -154,6 +161,15 @@ public:
   MOCK_CONST_METHOD3(encode, void(MessageMetadata&, Protocol&, Buffer::Instance&));
 };
 
+class MockThriftObject : public ThriftObject {
+public:
+  MockThriftObject();
+  ~MockThriftObject();
+
+  MOCK_CONST_METHOD0(fields, ThriftFieldPtrList&());
+  MOCK_METHOD1(onData, bool(Buffer::Instance&));
+};
+
 namespace ThriftFilters {
 
 class MockDecoderFilter : public DecoderFilter {
@@ -204,7 +220,7 @@ public:
   MOCK_CONST_METHOD0(downstreamTransportType, TransportType());
   MOCK_CONST_METHOD0(downstreamProtocolType, ProtocolType());
   MOCK_METHOD1(sendLocalReply, void(const DirectResponse&));
-  MOCK_METHOD2(startUpstreamResponse, void(TransportType, ProtocolType));
+  MOCK_METHOD2(startUpstreamResponse, void(Transport&, Protocol&));
   MOCK_METHOD1(upstreamData, bool(Buffer::Instance&));
   MOCK_METHOD0(resetDownstreamConnection, void());
 

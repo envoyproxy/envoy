@@ -16,7 +16,9 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 ConnectionManager::ConnectionManager(Config& config)
-    : config_(config), stats_(config_.stats()), decoder_(config_.createDecoder(*this)) {}
+    : config_(config), stats_(config_.stats()), transport_(config.createTransport()),
+      protocol_(config.createProtocol()),
+      decoder_(std::make_unique<Decoder>(*transport_, *protocol_, *this)) {}
 
 ConnectionManager::~ConnectionManager() {}
 
@@ -67,22 +69,14 @@ void ConnectionManager::dispatch() {
 }
 
 void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response) {
-  // Use the factory to get the concrete protocol from the decoder protocol (as opposed to
-  // potentially pre-detection auto protocol).
-  ProtocolType proto_type = decoder_->protocolType();
-  ProtocolPtr proto = NamedProtocolConfigFactory::getFactory(proto_type).createProtocol();
   Buffer::OwnedImpl buffer;
 
-  response.encode(metadata, *proto, buffer);
-
-  // Same logic as protocol above.
-  TransportPtr transport =
-      NamedTransportConfigFactory::getFactory(decoder_->transportType()).createTransport();
+  response.encode(metadata, *protocol_, buffer);
 
   Buffer::OwnedImpl response_buffer;
 
-  metadata.setProtocol(proto_type);
-  transport->encodeFrame(response_buffer, metadata, buffer);
+  metadata.setProtocol(protocol_->type());
+  transport_->encodeFrame(response_buffer, metadata, buffer);
 
   read_callbacks_->connection().write(response_buffer, false);
 }
@@ -230,11 +224,29 @@ FilterStatus ConnectionManager::ActiveRpc::transportEnd() {
     break;
   }
 
-  return decoder_filter_->transportEnd();
+  FilterStatus status = event_handler_->transportEnd();
+
+  if (metadata_->isProtocolUpgradeMessage()) {
+    ENVOY_CONN_LOG(error, "thrift: sending protocol upgrade response",
+                   parent_.read_callbacks_->connection());
+    sendLocalReply(*parent_.protocol_->upgradeResponse(*upgrade_handler_));
+  }
+
+  return status;
 }
 
 FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
+
+  if (metadata_->isProtocolUpgradeMessage()) {
+    ASSERT(parent_.protocol_->supportsUpgrade());
+
+    ENVOY_CONN_LOG(error, "thrift: decoding protocol upgrade request",
+                   parent_.read_callbacks_->connection());
+    upgrade_handler_ = parent_.protocol_->upgradeRequestDecoder();
+    ASSERT(upgrade_handler_ != nullptr);
+    event_handler_ = upgrade_handler_.get();
+  }
 
   return event_handler_->messageBegin(metadata);
 }
@@ -282,11 +294,10 @@ void ConnectionManager::ActiveRpc::sendLocalReply(const DirectResponse& response
   parent_.doDeferredRpcDestroy(*this);
 }
 
-void ConnectionManager::ActiveRpc::startUpstreamResponse(TransportType transport_type,
-                                                         ProtocolType protocol_type) {
+void ConnectionManager::ActiveRpc::startUpstreamResponse(Transport& transport, Protocol& protocol) {
   ASSERT(response_decoder_ == nullptr);
 
-  response_decoder_ = std::make_unique<ResponseDecoder>(*this, transport_type, protocol_type);
+  response_decoder_ = std::make_unique<ResponseDecoder>(*this, transport, protocol);
 }
 
 bool ConnectionManager::ActiveRpc::upstreamData(Buffer::Instance& buffer) {

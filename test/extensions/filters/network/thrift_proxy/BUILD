@@ -246,6 +246,19 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "thrift_object_impl_test",
+    srcs = ["thrift_object_impl_test.cc"],
+    extension_name = "envoy.filters.network.thrift_proxy",
+    deps = [
+        ":mocks",
+        ":utility_lib",
+        "//source/extensions/filters/network/thrift_proxy:thrift_object_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:registry_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "integration_test",
     srcs = ["integration_test.cc"],
     data = [
