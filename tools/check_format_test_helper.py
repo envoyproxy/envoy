@@ -124,6 +124,8 @@ if __name__ == "__main__":
   shutil.rmtree(tmp, True)
   os.makedirs(tmp)
   os.chdir(tmp)
+  # TODO(akonradi): reorder these by error instead of grouping the fixes
+  # together and checks together
   errors += fixFileExpectingSuccess("over_enthusiastic_spaces.cc")
   errors += fixFileExpectingSuccess("extra_enthusiastic_spaces.cc")
   errors += fixFileExpectingSuccess("angle_bracket_include.cc")
