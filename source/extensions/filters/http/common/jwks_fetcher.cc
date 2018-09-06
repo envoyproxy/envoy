@@ -1,8 +1,8 @@
-#include "extensions/filters/http/common/jwks_fetcher.h"
-
 #include "common/common/enum_to_int.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
+
+#include "extensions/filters/http/common/jwks_fetcher.h"
 
 #include "jwt_verify_lib/status.h"
 
@@ -18,9 +18,7 @@ class JwksFetcherImpl : public JwksFetcher,
 public:
   JwksFetcherImpl(Upstream::ClusterManager& cm) : cm_(cm) { ENVOY_LOG(trace, "{}", __func__); }
 
-  ~JwksFetcherImpl() {
-    cancel();
-  }
+  ~JwksFetcherImpl() { cancel(); }
 
   void cancel() {
     if (request_ && !complete_) {
@@ -86,7 +84,7 @@ public:
 
 private:
   Upstream::ClusterManager& cm_;
-  bool complete_ {};
+  bool complete_{};
   JwksFetcher::JwksReceiver* receiver_{};
   const envoy::api::v2::core::HttpUri* uri_{};
   Http::AsyncClient::Request* request_{};
