@@ -60,6 +60,7 @@ envoy_cc_library(
         "//source/extensions/access_loggers/file:file_access_log_lib",
         "@envoy_api//envoy/admin/v2alpha:clusters_cc",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
+        "@envoy_api//envoy/admin/v2alpha:memory_cc",
     ],
 )
 

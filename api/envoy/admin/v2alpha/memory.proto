@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package envoy.admin.v2alpha;
+
+// [#protodoc-title: Memory]
+
+// Proto representation of the internal memory consumption of an Envoy instance.
+message Memory {
+
+  // The number of bytes allocated by the heap for Envoy.
+  uint64 currently_allocated_bytes = 1;
+
+  // The number of bytes reserved by the heap but not necessarily allocated.
+  uint64 heap_size_bytes = 2;
+}

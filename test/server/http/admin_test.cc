@@ -1,6 +1,7 @@
 #include <fstream>
 #include <unordered_map>
 
+#include "envoy/admin/v2alpha/memory.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -27,10 +28,13 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AllOf;
+using testing::Gt;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Property;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnPointee;
@@ -616,11 +620,12 @@ TEST_P(AdminInstanceTest, Memory) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/memory", header_map, response));
-  const std::string output = response.toString();
-  EXPECT_TRUE(absl::StrContains(output, "generic.current_allocated_bytes: "));
-  EXPECT_FALSE(absl::StrContains(output, "generic.current_allocated_bytes: 0"));
-  EXPECT_TRUE(absl::StrContains(output, "generic.heap_size: "));
-  EXPECT_FALSE(absl::StrContains(output, "generic.heap_size: 0"));
+  std::string output_json = response.toString();
+  envoy::admin::v2alpha::Memory output_proto;
+  MessageUtil::loadFromJson(output_json, output_proto);
+  EXPECT_THAT(output_proto,
+              AllOf(Property(&envoy::admin::v2alpha::Memory::currently_allocated_bytes, Gt(0)),
+                    Property(&envoy::admin::v2alpha::Memory::heap_size_bytes, Gt(0))));
 }
 
 TEST_P(AdminInstanceTest, Runtime) {

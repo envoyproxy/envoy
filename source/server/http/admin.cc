@@ -11,6 +11,7 @@
 
 #include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/admin/v2alpha/memory.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
@@ -495,9 +496,10 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
 
 Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
                                     AdminStream&) {
-  response.add(
-      fmt::format("generic.current_allocated_bytes: {}", Memory::Stats::totalCurrentlyAllocated()));
-  response.add(fmt::format("generic.heap_size: {}", Memory::Stats::totalCurrentlyReserved()));
+  envoy::admin::v2alpha::Memory memory;
+  memory.set_currently_allocated_bytes(Memory::Stats::totalCurrentlyAllocated());
+  memory.set_heap_size_bytes(Memory::Stats::totalCurrentlyReserved());
+  response.add(MessageUtil::getJsonStringFromMessage(memory, true)); // pretty-print
   return Http::Code::OK;
 }
 
