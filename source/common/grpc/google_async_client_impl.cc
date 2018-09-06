@@ -205,7 +205,8 @@ void GoogleAsyncStreamImpl::resetStream() {
 }
 
 void GoogleAsyncStreamImpl::writeQueued() {
-  if (!call_initialized_ || finish_pending_ || write_pending_ || write_pending_queue_.empty()) {
+  if (!call_initialized_ || finish_pending_ || write_pending_ || write_pending_queue_.empty() ||
+      draining_cq_) {
     return;
   }
   write_pending_ = true;
