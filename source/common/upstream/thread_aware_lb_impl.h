@@ -1,7 +1,5 @@
 #pragma once
 
-#include <shared_mutex>
-
 #include "common/upstream/load_balancer_impl.h"
 
 #include "absl/synchronization/mutex.h"
