@@ -348,6 +348,12 @@ public:
         .WillByDefault(SaveArg<0>(&access_log_data_));
   }
 
+  ~TcpProxyTest() {
+    if (filter_ != nullptr) {
+      filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+    }
+  }
+
   void configure(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config) {
     config_.reset(new Config(config, factory_context_));
   }
@@ -734,6 +740,22 @@ TEST_F(TcpProxyTest, DisconnectBeforeData) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Test that if the downstream connection is closed before the upstream connection
+// is established, the upstream connection is cancelled.
+TEST_F(TcpProxyTest, RemoteClosetBeforeUpstreamConnected) {
+  setup(1);
+  EXPECT_CALL(*conn_pool_handles_.at(0), cancel());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Test that if the downstream connection is closed before the upstream connection
+// is established, the upstream connection is cancelled.
+TEST_F(TcpProxyTest, LocalClosetBeforeUpstreamConnected) {
+  setup(1);
+  EXPECT_CALL(*conn_pool_handles_.at(0), cancel());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
+}
+
 TEST_F(TcpProxyTest, UpstreamConnectFailure) {
   setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
@@ -873,6 +895,7 @@ TEST_F(TcpProxyTest, IdleTimeoutWithOutstandingDataFlushed) {
 TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
   setup(1, accessLogConfig("%UPSTREAM_HOST% %UPSTREAM_CLUSTER%"));
   raiseEventUpstreamConnected(0);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "127.0.0.1:80 fake_cluster");
 }
@@ -881,6 +904,7 @@ TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
 TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   setup(1, accessLogConfig("%UPSTREAM_LOCAL_ADDRESS%"));
   raiseEventUpstreamConnected(0);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "2.2.2.2:50000");
 }
@@ -893,6 +917,7 @@ TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
   filter_callbacks_.connection_.remote_address_ =
       Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
   setup(1, accessLogConfig("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% %DOWNSTREAM_LOCAL_ADDRESS%"));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
 }
@@ -1075,6 +1100,9 @@ TEST_F(TcpProxyRoutingTest, NonRoutableConnection) {
 
   EXPECT_EQ(total_cx + 1, config_->stats().downstream_cx_total_.value());
   EXPECT_EQ(non_routable_cx + 1, config_->stats().downstream_cx_no_route_.value());
+
+  // Cleanup
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 TEST_F(TcpProxyRoutingTest, RoutableConnection) {
@@ -1087,7 +1115,8 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _));
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
 

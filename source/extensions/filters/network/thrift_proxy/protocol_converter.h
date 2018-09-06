@@ -19,8 +19,8 @@ public:
   ProtocolConverter() {}
   virtual ~ProtocolConverter() {}
 
-  void initProtocolConverter(ProtocolPtr&& proto, Buffer::Instance& buffer) {
-    proto_ = std::move(proto);
+  void initProtocolConverter(Protocol& proto, Buffer::Instance& buffer) {
+    proto_ = &proto;
     buffer_ = &buffer;
   }
 
@@ -125,7 +125,7 @@ protected:
   ProtocolType protocolType() const { return proto_->type(); }
 
 private:
-  ProtocolPtr proto_;
+  Protocol* proto_;
   Buffer::Instance* buffer_{};
 };
 

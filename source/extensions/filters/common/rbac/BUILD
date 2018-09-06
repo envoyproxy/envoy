@@ -24,6 +24,7 @@ envoy_cc_library(
     name = "matchers_lib",
     srcs = ["matchers.cc"],
     hdrs = ["matchers.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/http:header_map_interface",
         "//include/envoy/network:connection_interface",

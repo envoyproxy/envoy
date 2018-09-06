@@ -1705,6 +1705,10 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
+  Tcp::ConnectionPool::UpstreamCallbacks* upstream_callbacks = nullptr;
+  EXPECT_CALL(*conn_pool_.connection_data_, addUpstreamCallbacks(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) { upstream_callbacks = &cb; }));
   conn_pool_.host_->hostname_ = "newhost";
   conn_pool_.poolReady(upstream_conn_);
 
@@ -1714,6 +1718,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http1_active_.value());
 
+  upstream_callbacks->onEvent(Network::ConnectionEvent::RemoteClose);
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
   EXPECT_EQ(0U, stats_.named_.downstream_cx_websocket_active_.value());
@@ -1753,8 +1758,13 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyData) {
   EXPECT_CALL(upstream_conn_, write(_, false));
   EXPECT_CALL(upstream_conn_, write(BufferEqual(&early_data), false));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
+  Tcp::ConnectionPool::UpstreamCallbacks* upstream_callbacks = nullptr;
+  EXPECT_CALL(*conn_pool_.connection_data_, addUpstreamCallbacks(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) { upstream_callbacks = &cb; }));
   conn_pool_.poolReady(upstream_conn_);
 
+  upstream_callbacks->onEvent(Network::ConnectionEvent::RemoteClose);
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
 }
@@ -1828,7 +1838,12 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyEndStream) {
 
   EXPECT_CALL(upstream_conn_, write(_, false));
   EXPECT_CALL(upstream_conn_, write(_, true)).Times(0);
+  Tcp::ConnectionPool::UpstreamCallbacks* upstream_callbacks = nullptr;
+  EXPECT_CALL(*conn_pool_.connection_data_, addUpstreamCallbacks(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) { upstream_callbacks = &cb; }));
   conn_pool_.poolReady(upstream_conn_);
+  upstream_callbacks->onEvent(Network::ConnectionEvent::RemoteClose);
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
 }

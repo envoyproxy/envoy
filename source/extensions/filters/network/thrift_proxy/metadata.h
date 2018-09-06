@@ -4,7 +4,10 @@
 
 #include <algorithm>
 #include <list>
+#include <memory>
 #include <string>
+
+#include "envoy/buffer/buffer.h"
 
 #include "common/common/macros.h"
 #include "common/http/header_map_impl.h"
@@ -62,6 +65,11 @@ public:
   AppExceptionType appExceptionType() const { return app_ex_type_.value(); }
   const std::string& appExceptionMessage() const { return app_ex_msg_.value(); }
 
+  bool isProtocolUpgradeMessage() const { return protocol_upgrade_message_; }
+  void setProtocolUpgradeMessage(bool upgrade_message) {
+    protocol_upgrade_message_ = upgrade_message;
+  }
+
 private:
   absl::optional<uint32_t> frame_size_{};
   absl::optional<ProtocolType> proto_{};
@@ -71,6 +79,7 @@ private:
   Http::HeaderMapImpl headers_;
   absl::optional<AppExceptionType> app_ex_type_;
   absl::optional<std::string> app_ex_msg_;
+  bool protocol_upgrade_message_{false};
 };
 
 typedef std::shared_ptr<MessageMetadata> MessageMetadataSharedPtr;

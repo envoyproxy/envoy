@@ -334,6 +334,9 @@ ProtocolState DecoderStateMachine::popReturnState() {
 
 ProtocolState DecoderStateMachine::run(Buffer::Instance& buffer) {
   while (state_ != ProtocolState::Done) {
+    ENVOY_LOG(trace, "thrift: state {}, {} bytes available", ProtocolStateNameValues::name(state_),
+              buffer.length());
+
     DecoderStatus s = handleState(buffer);
     if (s.next_state_ == ProtocolState::WaitForData) {
       return ProtocolState::WaitForData;
@@ -350,8 +353,8 @@ ProtocolState DecoderStateMachine::run(Buffer::Instance& buffer) {
   return state_;
 }
 
-Decoder::Decoder(TransportPtr&& transport, ProtocolPtr&& protocol, DecoderCallbacks& callbacks)
-    : transport_(std::move(transport)), protocol_(std::move(protocol)), callbacks_(callbacks) {}
+Decoder::Decoder(Transport& transport, Protocol& protocol, DecoderCallbacks& callbacks)
+    : transport_(transport), protocol_(protocol), callbacks_(callbacks) {}
 
 void Decoder::complete() {
   request_.reset();
@@ -377,22 +380,22 @@ FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_underflow) {
       metadata_ = std::make_shared<MessageMetadata>();
     }
 
-    if (!transport_->decodeFrameStart(data, *metadata_)) {
-      ENVOY_LOG(debug, "thrift: need more data for {} transport start", transport_->name());
+    if (!transport_.decodeFrameStart(data, *metadata_)) {
+      ENVOY_LOG(debug, "thrift: need more data for {} transport start", transport_.name());
       buffer_underflow = true;
       return FilterStatus::Continue;
     }
-    ENVOY_LOG(debug, "thrift: {} transport started", transport_->name());
+    ENVOY_LOG(debug, "thrift: {} transport started", transport_.name());
 
     if (metadata_->hasProtocol()) {
-      if (protocol_->type() == ProtocolType::Auto) {
-        protocol_->setType(metadata_->protocol());
-        ENVOY_LOG(debug, "thrift: {} transport forced {} protocol", transport_->name(),
-                  protocol_->name());
-      } else if (metadata_->protocol() != protocol_->type()) {
+      if (protocol_.type() == ProtocolType::Auto) {
+        protocol_.setType(metadata_->protocol());
+        ENVOY_LOG(debug, "thrift: {} transport forced {} protocol", transport_.name(),
+                  protocol_.name());
+      } else if (metadata_->protocol() != protocol_.type()) {
         throw EnvoyException(fmt::format("transport reports protocol {}, but configured for {}",
                                          ProtocolNames::get().fromType(metadata_->protocol()),
-                                         ProtocolNames::get().fromType(protocol_->type())));
+                                         ProtocolNames::get().fromType(protocol_.type())));
       }
     }
     if (metadata_->hasAppException()) {
@@ -406,7 +409,7 @@ FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_underflow) {
     request_ = std::make_unique<ActiveRequest>(callbacks_.newDecoderEventHandler());
     frame_started_ = true;
     state_machine_ =
-        std::make_unique<DecoderStateMachine>(*protocol_, metadata_, request_->handler_);
+        std::make_unique<DecoderStateMachine>(protocol_, metadata_, request_->handler_);
 
     if (request_->handler_.transportBegin(metadata_) == FilterStatus::StopIteration) {
       return FilterStatus::StopIteration;
@@ -415,7 +418,7 @@ FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_underflow) {
 
   ASSERT(state_machine_ != nullptr);
 
-  ENVOY_LOG(debug, "thrift: protocol {}, state {}, {} bytes available", protocol_->name(),
+  ENVOY_LOG(debug, "thrift: protocol {}, state {}, {} bytes available", protocol_.name(),
             ProtocolStateNameValues::name(state_machine_->currentState()), data.length());
 
   ProtocolState rv = state_machine_->run(data);
@@ -431,8 +434,8 @@ FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_underflow) {
   ASSERT(rv == ProtocolState::Done);
 
   // Message complete, decode end of frame.
-  if (!transport_->decodeFrameEnd(data)) {
-    ENVOY_LOG(debug, "thrift: need more data for {} transport end", transport_->name());
+  if (!transport_.decodeFrameEnd(data)) {
+    ENVOY_LOG(debug, "thrift: need more data for {} transport end", transport_.name());
     buffer_underflow = true;
     return FilterStatus::Continue;
   }
@@ -440,7 +443,7 @@ FilterStatus Decoder::onData(Buffer::Instance& data, bool& buffer_underflow) {
   frame_ended_ = true;
   metadata_.reset();
 
-  ENVOY_LOG(debug, "thrift: {} transport ended", transport_->name());
+  ENVOY_LOG(debug, "thrift: {} transport ended", transport_.name());
   if (request_->handler_.transportEnd() == FilterStatus::StopIteration) {
     return FilterStatus::StopIteration;
   }

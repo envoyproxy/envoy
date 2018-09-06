@@ -248,7 +248,7 @@ AssertionResult FakeConnectionBase::waitForDisconnect(bool ignore_spurious_event
   Thread::LockGuard lock(lock_);
   while (shared_connection_.connected()) {
     if (std::chrono::steady_clock::now() >= end_time) {
-      return AssertionResult("Timed out waiting for disconnect.");
+      return AssertionFailure() << "Timed out waiting for disconnect.";
     }
     Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
     // The default behavior of waitForDisconnect is to assume the test cleanly
@@ -300,7 +300,7 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
   Thread::LockGuard lock(lock_);
   while (new_streams_.empty()) {
     if (std::chrono::steady_clock::now() >= end_time) {
-      return AssertionResult("Timed out waiting for new stream.");
+      return AssertionFailure() << "Timed out waiting for new stream.";
     }
     Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
     // As with waitForDisconnect, by default, waitForNewStream returns after the next event.
@@ -536,7 +536,7 @@ AssertionResult FakeRawConnection::write(const std::string& data, bool end_strea
 Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& data,
                                                             bool end_stream) {
   Thread::LockGuard lock(parent_.lock_);
-  ENVOY_LOG(debug, "got {} bytes", data.length());
+  ENVOY_LOG(debug, "got {} bytes, end_stream {}", data.length(), end_stream);
   parent_.data_.append(data.toString());
   parent_.half_closed_ = end_stream;
   data.drain(data.length());

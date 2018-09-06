@@ -76,13 +76,11 @@ public:
   // Config
   ThriftFilterStats& stats() override { return stats_; }
   ThriftFilters::FilterChainFactory& filterFactory() override { return *this; }
-  DecoderPtr createDecoder(DecoderCallbacks& callbacks) override;
+  TransportPtr createTransport() override;
+  ProtocolPtr createProtocol() override;
   Router::Config& routerConfig() override { return *this; }
 
 private:
-  TransportPtr createTransport();
-  ProtocolPtr createProtocol();
-
   Server::Configuration::FactoryContext& context_;
   const std::string stats_prefix_;
   ThriftFilterStats stats_;

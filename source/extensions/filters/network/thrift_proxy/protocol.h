@@ -11,8 +11,12 @@
 #include "common/config/utility.h"
 #include "common/singleton/const_singleton.h"
 
+#include "extensions/filters/network/thrift_proxy/conn_state.h"
+#include "extensions/filters/network/thrift_proxy/decoder_events.h"
 #include "extensions/filters/network/thrift_proxy/metadata.h"
 #include "extensions/filters/network/thrift_proxy/thrift.h"
+#include "extensions/filters/network/thrift_proxy/thrift_object.h"
+#include "extensions/filters/network/thrift_proxy/transport.h"
 
 #include "absl/strings/string_view.h"
 
@@ -20,6 +24,9 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
+
+class DirectResponse;
+typedef std::unique_ptr<DirectResponse> DirectResponsePtr;
 
 /**
  * Protocol represents the operations necessary to implement the a generic Thrift protocol.
@@ -394,9 +401,85 @@ public:
    * @param value std::string to write
    */
   virtual void writeBinary(Buffer::Instance& buffer, const std::string& value) PURE;
+
+  /**
+   * Indicates whether a protocol uses start-of-connection messages to negotiate protocol options.
+   * If this method returns true, the Protocol must invoke setProtocolUpgradeMessage during
+   * readMessageBegin if it detects an upgrade request.
+   *
+   * @return true for protocols that exchange messages at the start of a connection to negotiate
+   *         protocol upgrade (or options)
+   */
+  virtual bool supportsUpgrade() { return false; }
+
+  /**
+   * Creates an opaque DecoderEventHandlerSharedPtr that can decode a downstream client's upgrade
+   * request. When the request is complete, the decoder is passed back to writeUpgradeResponse
+   * to allow the Protocol to update its internal state and generate a response to the request.
+   *
+   * @return a DecoderEventHandlerSharedPtr that decodes a downstream client's upgrade request
+   */
+  virtual DecoderEventHandlerSharedPtr upgradeRequestDecoder() { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
+  /**
+   * Writes a response to a downstream client's upgrade request.
+   * @param decoder DecoderEventHandlerSharedPtr created by upgradeRequestDecoder
+   * @return DirectResponsePtr containing an upgrade response
+   */
+  virtual DirectResponsePtr upgradeResponse(const DecoderEventHandler& decoder) {
+    UNREFERENCED_PARAMETER(decoder);
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  /**
+   * Checks whether a given upstream connection can be upgraded and generates an upgrade request
+   * message. If this method returns a ThriftObject it will be used to decode the upstream's next
+   * response.
+   *
+   * @param transport the Transport to use for decoding the response
+   * @param state ThriftConnectionState tracking whether upgrade has already been performed
+   * @param buffer Buffer::Instance to modify with an upgrade request
+   * @return a ThriftObject capable of decoding an upgrade response or nullptr if upgrade was
+   *         already completed (successfully or not)
+   */
+  virtual ThriftObjectPtr attemptUpgrade(Transport& transport, ThriftConnectionState& state,
+                                         Buffer::Instance& buffer) {
+    UNREFERENCED_PARAMETER(transport);
+    UNREFERENCED_PARAMETER(state);
+    UNREFERENCED_PARAMETER(buffer);
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
+  /**
+   * Completes an upgrade previously started via attemptUpgrade.
+   * @param response ThriftObject created by attemptUpgrade, after the response has completed
+   *        decoding
+   */
+  virtual void completeUpgrade(ThriftConnectionState& state, ThriftObject& response) {
+    UNREFERENCED_PARAMETER(state);
+    UNREFERENCED_PARAMETER(response);
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 };
 
 typedef std::unique_ptr<Protocol> ProtocolPtr;
+
+/**
+ * A DirectResponse manipulates a Protocol to directly create a Thrift response message.
+ */
+class DirectResponse {
+public:
+  virtual ~DirectResponse() {}
+
+  /**
+   * Encodes the response via the given Protocol.
+   * @param metadata the MessageMetadata for the request that generated this response
+   * @param proto the Protocol to be used for message encoding
+   * @param buffer the Buffer into which the message should be encoded
+   */
+  virtual void encode(MessageMetadata& metadata, Protocol& proto,
+                      Buffer::Instance& buffer) const PURE;
+};
 
 /**
  * Implemented by each Thrift protocol and registered via Registry::registerFactory or the
@@ -443,25 +526,6 @@ protected:
 private:
   const std::string name_;
 };
-
-/**
- * A DirectResponse manipulates a Protocol to directly create a Thrift response message.
- */
-class DirectResponse {
-public:
-  virtual ~DirectResponse() {}
-
-  /**
-   * Encodes the response via the given Protocol.
-   * @param metadata the MessageMetadata for the request that generated this response
-   * @param proto the Protocol to be used for message encoding
-   * @param buffer the Buffer into which the message should be encoded
-   */
-  virtual void encode(MessageMetadata& metadata, Protocol& proto,
-                      Buffer::Instance& buffer) const PURE;
-};
-
-typedef std::unique_ptr<DirectResponse> DirectResponsePtr;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters
