@@ -6,6 +6,7 @@
 
 #include "extensions/filters/http/jwt_authn/authenticator.h"
 #include "extensions/filters/http/jwt_authn/extractor.h"
+#include "extensions/filters/http/jwt_authn/response_data.h"
 #include "extensions/filters/http/jwt_authn/verifier_callbacks.h"
 
 namespace Envoy {
@@ -38,25 +39,11 @@ public:
   virtual VerifierCallbacks* callback() const PURE;
 
   /**
-   * Mark a verifier node as responded.
+   * Get Response data which can be used to check if a verifier node has responded or not.
    *
-   * @param elem pointer to a verifier node.
+   * @param elem verifier node pointer.
    */
-  virtual void setResponded(const void* elem) PURE;
-
-  /**
-   * Check to see if a verifier node has responded.
-   *
-   * @param elem pointer to a verifier node.
-   */
-  virtual bool hasResponded(const void* elem) const PURE;
-
-  /**
-   * Return the number of inner verifier node's count for this context.
-   *
-   * @param elem pointer to a verifier node.
-   */
-  virtual std::size_t incrementAndGetCount(const void* elem) PURE;
+  virtual ResponseData& getResponseData(const void* elem) PURE;
 
   /**
    * Stores an authenticator object for this request.

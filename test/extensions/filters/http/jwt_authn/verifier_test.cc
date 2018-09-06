@@ -170,6 +170,9 @@ TEST_F(VerifierTest, TestRequiresAllBadFormat) {
   context_ = VerifyContext::create(headers, &mock_cb_);
   verifier_->verify(*context_);
   callbacks[0](Status::JwtBadFormat);
+  // can keep invoking callback
+  callbacks[1](Status::Ok);
+  callbacks[0](Status::Ok);
   callbacks[1](Status::Ok);
 }
 
@@ -197,6 +200,9 @@ TEST_F(VerifierTest, TestRequiresAllMissing) {
   verifier_->verify(*context_);
   callbacks[0](Status::Ok);
   callbacks[1](Status::JwtMissed);
+  // can keep invoking callback
+  callbacks[0](Status::Ok);
+  callbacks[1](Status::Ok);
 }
 
 TEST_F(VerifierTest, TestRequiresAllWrongLocations) {

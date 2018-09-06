@@ -99,6 +99,7 @@ envoy_cc_library(
     name = "verify_context_lib",
     srcs = ["verify_context.cc"],
     hdrs = [
+        "response_data.h",
         "verifier_callbacks.h",
         "verify_context.h",
     ],

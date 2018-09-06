@@ -15,13 +15,7 @@ public:
 
   VerifierCallbacks* callback() const override { return callback_; }
 
-  void setResponded(const void* elem) override { responded_set_.insert(elem); }
-
-  bool hasResponded(const void* elem) const override {
-    return responded_set_.find(elem) != responded_set_.end();
-  }
-
-  std::size_t incrementAndGetCount(const void* elem) override { return ++counts_[elem]; }
+  ResponseData& getResponseData(const void* elem) override { return response_data_[elem]; }
 
   void addAuth(AuthenticatorPtr&& auth) override { auths_.push_back(std::move(auth)); }
 
@@ -35,8 +29,7 @@ public:
 private:
   Http::HeaderMap& headers_;
   VerifierCallbacks* callback_;
-  std::unordered_set<const void*> responded_set_;
-  std::unordered_map<const void*, std::size_t> counts_;
+  std::unordered_map<const void*, ResponseData> response_data_;
   std::vector<AuthenticatorPtr> auths_;
 };
 

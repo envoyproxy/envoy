@@ -26,8 +26,9 @@ public:
   // Check if next verifier should be notified of status, or if no next verifier exists signal
   // callback in context.
   virtual void onComplete(const Status& status, VerifyContext& context) const {
-    if (!context.hasResponded(this)) {
-      context.setResponded(this);
+    auto& response_data = context.getResponseData(this);
+    if (!response_data.has_responded_) {
+      response_data.has_responded_ = true;
       onCompleteHelper(status, context);
     }
   }
@@ -59,7 +60,7 @@ public:
     auth->sanitizePayloadHeaders(context.headers());
     auth->verify(context.headers(), extractor_->extract(context.headers()),
                  [&](const Status& status) { onComplete(status, context); });
-    if (!context.hasResponded(this)) {
+    if (!context.getResponseData(this).has_responded_) {
       context.addAuth(std::move(auth));
     }
   }
@@ -84,7 +85,7 @@ public:
     auth->sanitizePayloadHeaders(context.headers());
     auth->verify(context.headers(), extractor_.extract(context.headers()),
                  [&](const Status& status) { onComplete(status, context); });
-    if (!context.hasResponded(this)) {
+    if (!context.getResponseData(this).has_responded_) {
       context.addAuth(std::move(auth));
     }
   }
@@ -102,7 +103,7 @@ public:
 
   void verify(VerifyContext& context) const override {
     for (const auto& it : verifiers_) {
-      if (!context.hasResponded(this)) {
+      if (!context.getResponseData(this).has_responded_) {
         it->verify(context);
       }
     }
@@ -127,11 +128,12 @@ public:
   }
 
   void onComplete(const Status& status, VerifyContext& context) const override {
-    if (context.hasResponded(this)) {
+    auto& response_data = context.getResponseData(this);
+    if (response_data.has_responded_) {
       return;
     }
-    if (context.incrementAndGetCount(this) == verifiers_.size() || Status::Ok == status) {
-      context.setResponded(this);
+    if (++response_data.count_ == verifiers_.size() || Status::Ok == status) {
+      response_data.has_responded_ = true;
       onCompleteHelper(status, context);
     }
   }
@@ -151,11 +153,12 @@ public:
   }
 
   void onComplete(const Status& status, VerifyContext& context) const override {
-    if (context.hasResponded(this)) {
+    auto& response_data = context.getResponseData(this);
+    if (response_data.has_responded_) {
       return;
     }
-    if (context.incrementAndGetCount(this) == verifiers_.size() || Status::Ok != status) {
-      context.setResponded(this);
+    if (++response_data.count_ == verifiers_.size() || Status::Ok != status) {
+      response_data.has_responded_ = true;
       onCompleteHelper(status, context);
     }
   }
