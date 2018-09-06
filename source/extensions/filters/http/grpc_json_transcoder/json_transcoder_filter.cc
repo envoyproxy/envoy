@@ -322,6 +322,12 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& h
 
   response_headers_ = &headers;
 
+  // if the client connection was http/1 then Trailer headers are prohibited
+  // (unless the transfer encoding is chunked, which it isn't), remove them
+  if (encoder_callbacks_->requestInfo().protocol() < Http::Protocol::Http2) {
+    response_headers_->remove(Http::LowerCaseString("trailer"));
+  }
+
   if (end_stream) {
     // In gRPC wire protocol, headers frame with end_stream is a trailers-only response.
     // The return value from encodeTrailers is ignored since it is always continue.
