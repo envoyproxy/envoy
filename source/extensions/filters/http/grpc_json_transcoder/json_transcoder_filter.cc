@@ -322,12 +322,6 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& h
 
   response_headers_ = &headers;
 
-  // remove Trailer headers if the client connection was http/1
-  if (encoder_callbacks_->requestInfo().protocol() != Http::Protocol::Http2) {
-    static const Http::LowerCaseString trailerKey = Http::LowerCaseString("trailer");
-    response_headers_->remove(trailerKey);
-  }
-
   if (end_stream) {
     // In gRPC wire protocol, headers frame with end_stream is a trailers-only response.
     // The return value from encodeTrailers is ignored since it is always continue.
@@ -402,6 +396,12 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   const Http::HeaderEntry* grpc_message_header = trailers.GrpcMessage();
   if (grpc_message_header) {
     response_headers_->insertGrpcMessage().value(*grpc_message_header);
+  }
+
+  // remove Trailer headers if the client connection was http/1
+  if (encoder_callbacks_->requestInfo().protocol() != Http::Protocol::Http2) {
+    static const Http::LowerCaseString trailerKey = Http::LowerCaseString("trailer");
+    response_headers_->remove(trailerKey);
   }
 
   response_headers_->insertContentLength().value(
