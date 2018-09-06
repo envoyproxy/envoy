@@ -1,5 +1,10 @@
 #include "common/ssl/utility.h"
 
+#include "common/common/assert.h"
+
+#include "openssl/bytestring.h"
+#include "openssl/ssl.h"
+
 namespace Envoy {
 namespace Ssl {
 

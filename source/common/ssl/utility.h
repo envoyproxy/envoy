@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/stats/stats_macros.h"
+
 #include "openssl/ssl.h"
 
 namespace Envoy {

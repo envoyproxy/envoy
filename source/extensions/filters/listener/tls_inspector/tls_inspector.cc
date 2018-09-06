@@ -24,8 +24,8 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace TlsInspector {
 
-Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
-    : stats_{ALL_TLS_INSPECTOR_STATS(POOL_COUNTER_PREFIX(scope, "tls_inspector."))},
+Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size, const std::string& stat_prefix)
+    : stats_{TLS_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
       max_client_hello_size_(max_client_hello_size) {
 
@@ -42,14 +42,14 @@ Config::Config(Stats::Scope& scope, uint32_t max_client_hello_size)
         size_t len;
         if (SSL_early_callback_ctx_extension_get(
                 client_hello, TLSEXT_TYPE_application_layer_protocol_negotiation, &data, &len)) {
-          Filter* filter = static_cast<Filter*>(SSL_get_app_data(client_hello->ssl));
+          TlsFilterBase* filter = static_cast<TlsFilterBase*>(SSL_get_app_data(client_hello->ssl));
           filter->onALPN(data, len);
         }
         return ssl_select_cert_success;
       });
   SSL_CTX_set_tlsext_servername_callback(
       ssl_ctx_.get(), [](SSL* ssl, int* out_alert, void*) -> int {
-        Filter* filter = static_cast<Filter*>(SSL_get_app_data(ssl));
+        TlsFilterBase* filter = static_cast<TlsFilterBase*>(SSL_get_app_data(ssl));
         filter->onServername(SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name));
 
         // Return an error to stop the handshake; we have what we wanted already.
@@ -63,10 +63,16 @@ bssl::UniquePtr<SSL> Config::newSsl() { return bssl::UniquePtr<SSL>{SSL_new(ssl_
 thread_local uint8_t Filter::buf_[Config::TLS_MAX_CLIENT_HELLO];
 
 Filter::Filter(const ConfigSharedPtr config) : config_(config), ssl_(config_->newSsl()) {
-  RELEASE_ASSERT(sizeof(buf_) >= config_->maxClientHelloSize(), "");
+  initializeSsl(config->maxClientHelloSize(), sizeof(buf_), ssl_,
+                static_cast<TlsFilterBase*>(this));
+}
 
-  SSL_set_app_data(ssl_.get(), this);
-  SSL_set_accept_state(ssl_.get());
+void Filter::initializeSsl(uint32_t maxClientHelloSize, size_t bufSize,
+                           const bssl::UniquePtr<SSL>& ssl, void* appData) {
+  RELEASE_ASSERT(bufSize >= maxClientHelloSize, "");
+
+  SSL_set_app_data(ssl.get(), appData);
+  SSL_set_accept_state(ssl.get());
 }
 
 Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
@@ -100,6 +106,16 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 }
 
 void Filter::onALPN(const unsigned char* data, unsigned int len) {
+  doOnALPN(data, len,
+           [&](std::vector<absl::string_view> protocols) {
+             cb_->socket().setRequestedApplicationProtocols(protocols);
+           },
+           alpn_found_);
+}
+
+void Filter::doOnALPN(const unsigned char* data, unsigned int len,
+                      std::function<void(std::vector<absl::string_view> protocols)> onAlpnCb,
+                      bool& alpn_found) {
   CBS wire, list;
   CBS_init(&wire, reinterpret_cast<const uint8_t*>(data), static_cast<size_t>(len));
   if (!CBS_get_u16_length_prefixed(&wire, &list) || CBS_len(&wire) != 0 || CBS_len(&list) < 2) {
@@ -115,19 +131,28 @@ void Filter::onALPN(const unsigned char* data, unsigned int len) {
     }
     protocols.emplace_back(reinterpret_cast<const char*>(CBS_data(&name)), CBS_len(&name));
   }
-  cb_->socket().setRequestedApplicationProtocols(protocols);
-  alpn_found_ = true;
+  onAlpnCb(protocols);
+  alpn_found = true;
 }
 
-void Filter::onServername(absl::string_view name) {
+void Filter::onServername(absl::string_view servername) {
+  ENVOY_LOG(debug, "tls:onServerName(), requestedServerName: {}", servername);
+  doOnServername(
+      servername, config_->stats(),
+      [&](absl::string_view name) -> void { cb_->socket().setRequestedServerName(name); },
+      clienthello_success_);
+}
+
+void Filter::doOnServername(absl::string_view name, const TlsStats& stats,
+                            std::function<void(absl::string_view name)> onServernameCb,
+                            bool& clienthello_success) {
   if (!name.empty()) {
-    config_->stats().sni_found_.inc();
-    cb_->socket().setRequestedServerName(name);
-    ENVOY_LOG(debug, "tls:onServerName(), requestedServerName: {}", name);
+    stats.sni_found_.inc();
+    onServernameCb(name);
   } else {
-    config_->stats().sni_not_found_.inc();
+    stats.sni_not_found_.inc();
   }
-  clienthello_success_ = true;
+  clienthello_success = true;
 }
 
 void Filter::onRead() {
@@ -162,7 +187,13 @@ void Filter::onRead() {
     const uint8_t* data = buf_ + read_;
     const size_t len = result.rc_ - read_;
     read_ = result.rc_;
-    parseClientHello(data, len);
+    parseClientHello(data, len, ssl_, read_, config_->maxClientHelloSize(), config_->stats(),
+                     [&](bool success) -> void { done(success); }, alpn_found_,
+                     clienthello_success_,
+                     [&]() -> void {
+                       cb_->socket().setDetectedTransportProtocol(
+                           TransportSockets::TransportSocketNames::get().Tls);
+                     });
   }
 }
 
@@ -179,41 +210,44 @@ void Filter::done(bool success) {
   cb_->continueFilterChain(success);
 }
 
-void Filter::parseClientHello(const void* data, size_t len) {
-  // Ownership is passed to ssl_ in SSL_set_bio()
+void Filter::parseClientHello(const void* data, size_t len, bssl::UniquePtr<SSL>& ssl,
+                              uint64_t read, uint32_t maxClientHelloSize, const TlsStats& stats,
+                              std::function<void(bool)> done, bool& alpn_found,
+                              bool& clienthello_success, std::function<void()> onSuccess) {
+  // Ownership is passed to ssl in SSL_set_bio()
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(data, len));
 
   // Make the mem-BIO return that there is more data
   // available beyond it's end
   BIO_set_mem_eof_return(bio.get(), -1);
 
-  SSL_set_bio(ssl_.get(), bio.get(), bio.get());
+  SSL_set_bio(ssl.get(), bio.get(), bio.get());
   bio.release();
 
-  int ret = SSL_do_handshake(ssl_.get());
+  int ret = SSL_do_handshake(ssl.get());
 
   // This should never succeed because an error is always returned from the SNI callback.
   ASSERT(ret <= 0);
-  switch (SSL_get_error(ssl_.get(), ret)) {
+  switch (SSL_get_error(ssl.get(), ret)) {
   case SSL_ERROR_WANT_READ:
-    if (read_ == config_->maxClientHelloSize()) {
+    if (read == maxClientHelloSize) {
       // We've hit the specified size limit. This is an unreasonably large ClientHello;
       // indicate failure.
-      config_->stats().client_hello_too_large_.inc();
+      stats.client_hello_too_large_.inc();
       done(false);
     }
     break;
   case SSL_ERROR_SSL:
-    if (clienthello_success_) {
-      config_->stats().tls_found_.inc();
-      if (alpn_found_) {
-        config_->stats().alpn_found_.inc();
+    if (clienthello_success) {
+      stats.tls_found_.inc();
+      if (alpn_found) {
+        stats.alpn_found_.inc();
       } else {
-        config_->stats().alpn_not_found_.inc();
+        stats.alpn_not_found_.inc();
       }
-      cb_->socket().setDetectedTransportProtocol(TransportSockets::TransportSocketNames::get().Tls);
+      onSuccess();
     } else {
-      config_->stats().tls_not_found_.inc();
+      stats.tls_not_found_.inc();
     }
     done(true);
     break;
