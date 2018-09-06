@@ -4,7 +4,6 @@
 // but can't measure its test coverage.
 //
 // TODO(issues/2580): Fix coverage tests when MainCommonTest is enabled.
-// TODO(issues/2649): This test needs to be parameterized on IP versions.
 #ifndef ENVOY_CONFIG_COVERAGE
 
 #include <unistd.h>
@@ -38,15 +37,12 @@ namespace Envoy {
  * unique --base-id setting based on the pid and a random number. Maintains
  * an argv array that is terminated with nullptr. Identifies the config
  * file relative to $TEST_RUNDIR.
- *
- * TODO(jmarantz): Make these tests work with ipv6. See
- * https://github.com/envoyproxy/envoy/issues/2649
  */
-class MainCommonTest : public testing::Test {
+class MainCommonTest : public testing::TestWithParam<Network::Address::IpVersion> {
 protected:
   MainCommonTest()
-      : config_file_(Envoy::TestEnvironment::getCheckedEnvVar("TEST_RUNDIR") +
-                     "/test/config/integration/google_com_proxy_port_0.v2.yaml"),
+      : config_file_(TestEnvironment::temporaryFileSubstitute(
+            "/test/config/integration/google_com_proxy_port_0.v2.yaml", {}, {}, GetParam())),
         random_string_(fmt::format("{}", computeBaseId())),
         argv_({"envoy-static", "--base-id", random_string_.c_str(), "-c", config_file_.c_str(),
                nullptr}) {}
@@ -95,27 +91,18 @@ protected:
 };
 
 // Exercise the codepath to instantiate MainCommon and destruct it, with hot restart.
-TEST_F(MainCommonTest, ConstructDestructHotRestartEnabled) {
-  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
-    return;
-  }
+TEST_P(MainCommonTest, ConstructDestructHotRestartEnabled) {
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 }
 
 // Exercise the codepath to instantiate MainCommon and destruct it, without hot restart.
-TEST_F(MainCommonTest, ConstructDestructHotRestartDisabled) {
-  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
-    return;
-  }
+TEST_P(MainCommonTest, ConstructDestructHotRestartDisabled) {
   addArg("--disable-hot-restart");
   VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
 }
 
 // Exercise init_only explicitly.
-TEST_F(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
-  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
-    return;
-  }
+TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   addArg("--disable-hot-restart");
   initOnly();
   MainCommon main_common(argc(), argv());
@@ -123,11 +110,7 @@ TEST_F(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
 }
 
 // Ensurees that existing users of main_common() can link.
-TEST_F(MainCommonTest, LegacyMain) {
-  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
-    return;
-  }
-
+TEST_P(MainCommonTest, LegacyMain) {
 #ifdef ENVOY_HANDLE_SIGNALS
   // Enabled by default. Control with "bazel --define=signal_trace=disabled"
   Envoy::SignalAction handle_sigs;
@@ -149,6 +132,10 @@ TEST_F(MainCommonTest, LegacyMain) {
   }
   EXPECT_EQ(EXIT_SUCCESS, return_code);
 }
+
+INSTANTIATE_TEST_CASE_P(IpVersions, MainCommonTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 class AdminRequestTest : public MainCommonTest {
 protected:
@@ -223,10 +210,7 @@ protected:
   bool pause_after_run_;
 };
 
-TEST_F(AdminRequestTest, AdminRequestGetStatsAndQuit) {
-  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
-    return;
-  }
+TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
   startEnvoy();
   started_.WaitForNotification();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
@@ -236,10 +220,7 @@ TEST_F(AdminRequestTest, AdminRequestGetStatsAndQuit) {
 
 // This test is identical to the above one, except that instead of using an admin /quitquitquit,
 // we send ourselves a SIGTERM, which should have the same effect.
-TEST_F(AdminRequestTest, AdminRequestGetStatsAndKill) {
-  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
-    return;
-  }
+TEST_P(AdminRequestTest, AdminRequestGetStatsAndKill) {
   startEnvoy();
   started_.WaitForNotification();
   EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("filesystem.reopen_failed"));
@@ -247,10 +228,7 @@ TEST_F(AdminRequestTest, AdminRequestGetStatsAndKill) {
   EXPECT_TRUE(waitForEnvoyToExit());
 }
 
-TEST_F(AdminRequestTest, AdminRequestBeforeRun) {
-  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
-    return;
-  }
+TEST_P(AdminRequestTest, AdminRequestBeforeRun) {
   // Induce the situation where the Envoy thread is active, and main_common_ is constructed,
   // but run() hasn't been issued yet. AdminRequests will not finish immediately, but will
   // do so at some point after run() is allowed to start.
@@ -297,10 +275,7 @@ private:
   std::atomic<uint64_t>& destroy_count_;
 };
 
-TEST_F(AdminRequestTest, AdminRequestAfterRun) {
-  if (!Envoy::TestEnvironment::shouldRunTestForIpVersion(Network::Address::IpVersion::v4)) {
-    return;
-  }
+TEST_P(AdminRequestTest, AdminRequestAfterRun) {
   startEnvoy();
   started_.WaitForNotification();
   // Induce the situation where Envoy is no longer in run(), but hasn't been
@@ -335,6 +310,10 @@ TEST_F(AdminRequestTest, AdminRequestAfterRun) {
   EXPECT_FALSE(admin_handler_was_called);
   EXPECT_EQ(1, lambda_destroy_count);
 }
+
+INSTANTIATE_TEST_CASE_P(IpVersions, AdminRequestTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
 
 } // namespace Envoy
 

@@ -97,6 +97,13 @@ const std::string getAnyAddressUrlString(const Address::IpVersion version) {
   return std::string("0.0.0.0");
 }
 
+const std::string getAnyAddressString(const Address::IpVersion version) {
+  if (version == Address::IpVersion::v6) {
+    return std::string("::");
+  }
+  return std::string("0.0.0.0");
+}
+
 const std::string addressVersionAsString(const Address::IpVersion version) {
   if (version == Address::IpVersion::v4) {
     return std::string("v4");
