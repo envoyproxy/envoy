@@ -120,8 +120,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
 
   if (completed_) {
     if (!cancelled_) {
-      dispatcher_.post(
-          [callback = callback_, al = std::move(address_list)] { callback(std::move(al)); });
+      callback_(std::move(address_list));
     }
     if (owned_) {
       delete this;
@@ -186,7 +185,7 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
   // failed intial call to getHostbyName followed by a synchronous IPv4
   // resolution.
   std::unique_ptr<PendingResolution> pending_resolution(
-      new PendingResolution(callback, dispatcher_, channel_, dns_name));
+      new PendingResolution(callback, channel_, dns_name));
   if (dns_lookup_family == DnsLookupFamily::Auto) {
     pending_resolution->fallback_if_failed_ = true;
   }
