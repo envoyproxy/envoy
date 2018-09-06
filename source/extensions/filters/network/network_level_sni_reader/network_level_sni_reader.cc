@@ -35,10 +35,11 @@ Network::FilterStatus NetworkLevelSniReaderFilter::onData(Buffer::Instance& data
 
   size_t freeSpaceInBuf = sizeof(buf_) - read_;
   size_t lenToRead = (data.length() < freeSpaceInBuf) ? data.length() : freeSpaceInBuf;
-  data.copyOut(0, lenToRead, buf_ + read_);
+  uint8_t* bufToParse = buf_ + read_;
+  data.copyOut(0, lenToRead, bufToParse);
   read_ += lenToRead;
   Extensions::ListenerFilters::TlsInspector::Filter::parseClientHello(
-      buf_ + read_, lenToRead, ssl_, read_, config_->maxClientHelloSize(), config_->stats(),
+      bufToParse, lenToRead, ssl_, read_, config_->maxClientHelloSize(), config_->stats(),
       [&](bool success) -> void { done(success); }, alpn_found_, clienthello_success_,
       []() -> void {});
 
