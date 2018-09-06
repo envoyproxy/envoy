@@ -324,7 +324,7 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::HeaderMap& h
 
   // remove Trailer headers if the client connection was http/1
   if (encoder_callbacks_->requestInfo().protocol() != Http::Protocol::Http2) {
-    const Http::LowerCaseString trailerKey = Http::LowerCaseString("trailer");
+    static const Http::LowerCaseString trailerKey = Http::LowerCaseString("trailer");
     response_headers_->remove(trailerKey);
   }
 
