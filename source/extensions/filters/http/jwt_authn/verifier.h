@@ -19,12 +19,8 @@ public:
   virtual ~Verifier() {}
 
   // Verify all tokens on headers, and signal the caller with callback.
-  virtual void verify(VerifyContext& context) PURE;
-  // Set the verifier's parent group verifier.
-  virtual void registerParent(Verifier* parent) PURE;
-  // Check if next verifier should be notified of status, or if no next verifier exists signal
-  // callback in context.
-  virtual void onComplete(const ::google::jwt_verify::Status& status, VerifyContext& context) PURE;
+  virtual void verify(VerifyContext& context) const PURE;
+
   // Factory method for creating verifiers.
   static VerifierPtr
   create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirement& requirement,

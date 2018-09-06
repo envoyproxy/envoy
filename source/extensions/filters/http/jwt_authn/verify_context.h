@@ -42,21 +42,21 @@ public:
    *
    * @param elem pointer to a verifier node.
    */
-  virtual void setResponded(void* elem) PURE;
+  virtual void setResponded(const void* elem) PURE;
 
   /**
    * Check to see if a verifier node has responded.
    *
    * @param elem pointer to a verifier node.
    */
-  virtual bool hasResponded(void* elem) const PURE;
+  virtual bool hasResponded(const void* elem) const PURE;
 
   /**
    * Return the number of inner verifier node's count for this context.
    *
    * @param elem pointer to a verifier node.
    */
-  virtual std::size_t incrementAndGetCount(void* elem) PURE;
+  virtual std::size_t incrementAndGetCount(const void* elem) PURE;
 
   /**
    * Stores an authenticator object for this request.

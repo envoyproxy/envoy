@@ -36,9 +36,7 @@ public:
 
 class MockVerifier : public Verifier {
 public:
-  MOCK_METHOD1(verify, void(VerifyContext& context));
-  MOCK_METHOD1(registerParent, void(Verifier* callback));
-  MOCK_METHOD2(onComplete, void(const Status& status, VerifyContext& context));
+  MOCK_CONST_METHOD1(verify, void(VerifyContext& context));
 };
 
 class MockExtractor : public Extractor {
