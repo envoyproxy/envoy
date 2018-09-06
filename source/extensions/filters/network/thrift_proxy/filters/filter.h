@@ -68,10 +68,10 @@ public:
 
   /**
    * Indicates the start of an upstream response. May only be called once.
-   * @param transport_type TransportType the upstream is using
-   * @param protocol_type ProtocolType the upstream is using
+   * @param transport the transport used by the upstream response
+   * @param protocol the protocol used by the upstream response
    */
-  virtual void startUpstreamResponse(TransportType transport_type, ProtocolType protocol_type) PURE;
+  virtual void startUpstreamResponse(Transport& transport, Protocol& protocol) PURE;
 
   /**
    * Called with upstream response data.

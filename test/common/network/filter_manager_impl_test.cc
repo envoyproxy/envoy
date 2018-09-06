@@ -214,6 +214,8 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   EXPECT_CALL(upstream_connection, write(BufferEqual(&buffer), _));
   read_buffer_.add("hello");
   manager.onRead();
+
+  connection.raiseEvent(ConnectionEvent::RemoteClose);
 }
 
 } // namespace Network
