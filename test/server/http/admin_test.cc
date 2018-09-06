@@ -620,12 +620,11 @@ TEST_P(AdminInstanceTest, Memory) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/memory", header_map, response));
-  std::string output_json = response.toString();
+  const std::string output_json = response.toString();
   envoy::admin::v2alpha::Memory output_proto;
   MessageUtil::loadFromJson(output_json, output_proto);
-  EXPECT_THAT(output_proto,
-              AllOf(Property(&envoy::admin::v2alpha::Memory::currently_allocated_bytes, Ge(0)),
-                    Property(&envoy::admin::v2alpha::Memory::heap_size_bytes, Ge(0))));
+  EXPECT_THAT(output_proto, AllOf(Property(&envoy::admin::v2alpha::Memory::allocated, Ge(0)),
+                                  Property(&envoy::admin::v2alpha::Memory::heap_size, Ge(0))));
 }
 
 TEST_P(AdminInstanceTest, Runtime) {
