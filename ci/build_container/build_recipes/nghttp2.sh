@@ -4,7 +4,8 @@ set -e
 
 VERSION=1.33.0
 
-curl https://github.com/nghttp2/nghttp2/releases/download/v"$VERSION"/nghttp2-"$VERSION".tar.gz -sLo nghttp2-"$VERSION".tar.gz
+curl https://github.com/nghttp2/nghttp2/releases/download/v"$VERSION"/nghttp2-"$VERSION".tar.gz -sLo nghttp2-"$VERSION".tar.gz \
+  && echo '42fff7f290100c02234ac3b0095852e4392e6bfd95ebed900ca8bd630850d88c' nghttp2-"$VERSION".tar.gz | sha256sum --check
 tar xf nghttp2-"$VERSION".tar.gz
 cd nghttp2-"$VERSION"
 
