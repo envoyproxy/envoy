@@ -41,8 +41,9 @@ TEST_F(SdsApiTest, BasicTest) {
   auto google_grpc = grpc_service->mutable_google_grpc();
   google_grpc->set_target_uri("fake_address");
   google_grpc->set_stat_prefix("test");
-  SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                 server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+  TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
+                               server.stats(), server.clusterManager(), init_manager, config_source,
+                               "abc.com", []() {});
 
   NiceMock<Grpc::MockAsyncClient>* grpc_client{new NiceMock<Grpc::MockAsyncClient>()};
   NiceMock<Grpc::MockAsyncClientFactory>* factory{new NiceMock<Grpc::MockAsyncClientFactory>()};
@@ -62,8 +63,9 @@ TEST_F(SdsApiTest, SecretUpdateSuccess) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
-  SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                 server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+  TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
+                               server.stats(), server.clusterManager(), init_manager, config_source,
+                               "abc.com", []() {});
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
@@ -101,8 +103,9 @@ TEST_F(SdsApiTest, EmptyResource) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
-  SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                 server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+  TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
+                               server.stats(), server.clusterManager(), init_manager, config_source,
+                               "abc.com", []() {});
 
   Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
 
@@ -115,8 +118,9 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
-  SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                 server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+  TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
+                               server.stats(), server.clusterManager(), init_manager, config_source,
+                               "abc.com", []() {});
 
   std::string yaml =
       R"EOF(
@@ -144,8 +148,9 @@ TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
-  SdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-                 server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+  TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
+                               server.stats(), server.clusterManager(), init_manager, config_source,
+                               "abc.com", []() {});
 
   std::string yaml =
       R"EOF(
