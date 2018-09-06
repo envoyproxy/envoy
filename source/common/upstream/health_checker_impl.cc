@@ -221,7 +221,10 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
 
   // If there is an active request it will get reset, so make sure we ignore the reset.
   expect_reset_ = true;
-  client_->close();
+
+  if (client_) {
+    client_->close();
+  }
 }
 
 Http::CodecClient::Type HttpHealthCheckerImpl::codecClientType(bool use_http2) {

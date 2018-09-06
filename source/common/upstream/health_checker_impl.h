@@ -47,7 +47,7 @@ public:
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
-private:
+protected:
   struct HttpActiveHealthCheckSession : public ActiveHealthCheckSession,
                                         public Http::StreamDecoder,
                                         public Http::StreamCallbacks {
