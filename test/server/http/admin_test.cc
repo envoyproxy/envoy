@@ -612,6 +612,17 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
   }
 }
 
+TEST_P(AdminInstanceTest, Memory) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(Http::Code::OK, getCallback("/memory", header_map, response));
+  const std::string output = response.toString();
+  EXPECT_TRUE(absl::StrContains(output, "generic.current_allocated_bytes: "));
+  EXPECT_FALSE(absl::StrContains(output, "generic.current_allocated_bytes: 0"));
+  EXPECT_TRUE(absl::StrContains(output, "generic.heap_size: "));
+  EXPECT_FALSE(absl::StrContains(output, "generic.heap_size: 0"));
+}
+
 TEST_P(AdminInstanceTest, Runtime) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
