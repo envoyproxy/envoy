@@ -29,7 +29,7 @@
 
 using testing::_;
 using testing::AllOf;
-using testing::Gt;
+using testing::Ge;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
@@ -624,8 +624,8 @@ TEST_P(AdminInstanceTest, Memory) {
   envoy::admin::v2alpha::Memory output_proto;
   MessageUtil::loadFromJson(output_json, output_proto);
   EXPECT_THAT(output_proto,
-              AllOf(Property(&envoy::admin::v2alpha::Memory::currently_allocated_bytes, Gt(0)),
-                    Property(&envoy::admin::v2alpha::Memory::heap_size_bytes, Gt(0))));
+              AllOf(Property(&envoy::admin::v2alpha::Memory::currently_allocated_bytes, Ge(0)),
+                    Property(&envoy::admin::v2alpha::Memory::heap_size_bytes, Ge(0))));
 }
 
 TEST_P(AdminInstanceTest, Runtime) {
