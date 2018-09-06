@@ -279,9 +279,8 @@ message UpstreamTlsContext {
   //   TLS renegotiation is considered insecure and shouldn't be used unless absolutely necessary.
   bool allow_renegotiation = 3;
 
-  // If true, the SNI from the downstream connection is forwarded to the upstream connection.
-  //
-  // TODO: handle oneof with the sni
+  // If true, the SNI from the downstream connection, if received,
+  // is forwarded to the upstream connection.
   bool forward_original_sni = 4;
 }
 
