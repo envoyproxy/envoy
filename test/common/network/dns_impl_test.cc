@@ -554,6 +554,29 @@ TEST_P(DnsImplTest, DnsIpAddressVersionV6) {
   EXPECT_TRUE(hasAddress(address_list, "1::2"));
 }
 
+// Validate exception behavior during c-ares callbacks.
+TEST_P(DnsImplTest, CallbackException) {
+  // Force immediate resolution, which will trigger a c-ares exception unsafe
+  // state providing regression coverage for #4307.
+  EXPECT_EQ(nullptr, resolver_->resolve(
+                         "1.2.3.4", DnsLookupFamily::V4Only,
+                         [&](const std::list<Address::InstanceConstSharedPtr> &&
+                             /*results*/) -> void { throw EnvoyException("Envoy exception"); }));
+  EXPECT_THROW_WITH_MESSAGE(dispatcher_.run(Event::Dispatcher::RunType::Block), EnvoyException,
+                            "Envoy exception");
+  EXPECT_EQ(nullptr, resolver_->resolve(
+                         "1.2.3.4", DnsLookupFamily::V4Only,
+                         [&](const std::list<Address::InstanceConstSharedPtr> &&
+                             /*results*/) -> void { throw std::runtime_error("runtime error"); }));
+  EXPECT_THROW_WITH_MESSAGE(dispatcher_.run(Event::Dispatcher::RunType::Block), EnvoyException,
+                            "runtime error");
+  EXPECT_EQ(nullptr, resolver_->resolve("1.2.3.4", DnsLookupFamily::V4Only,
+                                        [&](const std::list<Address::InstanceConstSharedPtr> &&
+                                            /*results*/) -> void { throw std::string(); }));
+  EXPECT_THROW_WITH_MESSAGE(dispatcher_.run(Event::Dispatcher::RunType::Block), EnvoyException,
+                            "unknown");
+}
+
 TEST_P(DnsImplTest, DnsIpAddressVersion) {
   std::list<Address::InstanceConstSharedPtr> address_list;
   server_->addHosts("some.good.domain", {"1.2.3.4"}, A);
