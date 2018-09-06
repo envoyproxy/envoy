@@ -79,6 +79,7 @@ void AuthenticatorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
 }
 
 void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callbacks* callback) {
+  ASSERT(!callback_);
   headers_ = &headers;
   callback_ = callback;
 
@@ -160,7 +161,9 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
   // of using the same jwks comes. The request 2 will trigger another remote fetching for the
   // jwks. This can be optimized; the same remote jwks fetching can be shared by two requrests.
   if (jwks_data_->getJwtProvider().has_remote_jwks()) {
-    fetcher_ = createJwksFetcherCb_(config_->cm());
+    if (!fetcher_) {
+      fetcher_ = createJwksFetcherCb_(config_->cm());
+    }
     fetcher_->fetch(jwks_data_->getJwtProvider().remote_jwks().http_uri(), *this);
   } else {
     // No valid keys for this issuer. This may happen as a result of incorrect local
@@ -183,7 +186,6 @@ void AuthenticatorImpl::onJwksError(Failure) { doneWithStatus(Status::JwksFetchF
 void AuthenticatorImpl::onDestroy() {
   if (fetcher_) {
     fetcher_->cancel();
-    fetcher_.reset(nullptr);
   }
 }
 
