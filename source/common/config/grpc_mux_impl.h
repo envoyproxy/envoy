@@ -29,6 +29,9 @@ public:
               Runtime::RandomGenerator& random);
   ~GrpcMuxImpl();
 
+  // Not to send any update requests when watchers are removed.
+  void disableSendUpdateAtWatcherDelete();
+
   void start() override;
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::vector<std::string>& resources,
                             GrpcMuxCallbacks& callbacks) override;
@@ -56,14 +59,14 @@ private:
     GrpcMuxWatchImpl(const std::vector<std::string>& resources, GrpcMuxCallbacks& callbacks,
                      const std::string& type_url, GrpcMuxImpl& parent)
         : resources_(resources), callbacks_(callbacks), type_url_(type_url), parent_(parent),
-          inserted_(true) {
+          inserted_(true), send_update_at_delete_(true) {
       entry_ = parent.api_state_[type_url].watches_.emplace(
           parent.api_state_[type_url].watches_.begin(), this);
     }
     ~GrpcMuxWatchImpl() override {
       if (inserted_) {
         parent_.api_state_[type_url_].watches_.erase(entry_);
-        if (!resources_.empty()) {
+        if (send_update_at_delete_ && !resources_.empty()) {
           parent_.sendDiscoveryRequest(type_url_);
         }
       }
@@ -74,6 +77,7 @@ private:
     GrpcMuxImpl& parent_;
     std::list<GrpcMuxWatchImpl*>::iterator entry_;
     bool inserted_;
+    bool send_update_at_delete_;
   };
 
   // Per muxed API state.

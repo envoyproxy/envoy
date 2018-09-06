@@ -19,6 +19,7 @@ public:
                        const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats)
       : grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random),
         grpc_mux_subscription_(grpc_mux_, stats) {}
+  ~GrpcSubscriptionImpl() { grpc_mux_.disableSendUpdateAtWatcherDelete(); }
 
   // Config::Subscription
   void start(const std::vector<std::string>& resources,
