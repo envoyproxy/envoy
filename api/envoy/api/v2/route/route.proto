@@ -476,7 +476,7 @@ message RouteAction {
 
     // The maximum number of times host selection will be reattempted before giving up, at which
     // point the host that was last selected will be routed to. If unspecified, this will default to
-    // 3 attempts.
+    // retrying once.
     int64 host_selection_retry_max_attempts = 6;
   }
 
