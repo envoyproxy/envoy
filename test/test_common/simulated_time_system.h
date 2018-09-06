@@ -29,11 +29,12 @@ public:
    * along the way that have been scheduled to fire.
    *
    * @param duration The amount of time to sleep, expressed in any type that
-   * can be added to time.
+   * can be added to duration-cast to MonotonicTime::duration.
    */
   template <class Duration> void sleep(const Duration& duration) {
     mutex_.lock();
-    MonotonicTime monotonic_time = monotonic_time_ + duration;
+    MonotonicTime monotonic_time =
+        monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
     setMonotonicTimeAndUnlock(monotonic_time);
   }
 
