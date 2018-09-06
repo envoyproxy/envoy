@@ -78,13 +78,10 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
                                                             hostent* hostent) {
   // We receive ARES_EDESTRUCTION when destructing with pending queries.
   if (status == ARES_EDESTRUCTION) {
-    ASSERT(owned_);
     delete this;
     return;
   }
-  if (!fallback_if_failed_) {
-    completed_ = true;
-  }
+  bool completed = !fallback_if_failed_;
 
   std::list<Address::InstanceConstSharedPtr> address_list;
   if (status == ARES_SUCCESS) {
@@ -110,7 +107,7 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
       }
     }
     if (!address_list.empty()) {
-      completed_ = true;
+      completed = true;
     }
   }
 
@@ -118,23 +115,16 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
     ENVOY_LOG(debug, "DNS request timed out {} times", timeouts);
   }
 
-  if (completed_) {
-    if (!cancelled_) {
-      dispatcher_.post(
-          [callback = callback_, al = std::move(address_list)] { callback(std::move(al)); });
-    }
-    if (owned_) {
+  if (completed) {
+    dispatcher_.post([this, al = std::move(address_list)] {
+      if (!cancelled_) {
+        callback_(std::move(al));
+      }
       delete this;
-      return;
-    }
-  }
-
-  if (!completed_ && fallback_if_failed_) {
+    });
+  } else if (fallback_if_failed_) {
     fallback_if_failed_ = false;
     getHostByName(AF_INET);
-    // Note: Nothing can follow this call to getHostByName due to deletion of this
-    // object upon synchronous resolution.
-    return;
   }
 }
 
@@ -197,19 +187,16 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
     pending_resolution->getHostByName(AF_INET6);
   }
 
-  if (pending_resolution->completed_) {
-    // Resolution does not need asynchronous behavior or network events. For
-    // example, localhost lookup.
-    return nullptr;
-  } else {
-    // Enable timer to wake us up if the request times out.
-    updateAresTimer();
+  // Enable timer to wake us up if there is a timeout set so we can detect when
+  // therequest times out.
+  updateAresTimer();
 
-    // The PendingResolution will self-delete when the request completes
-    // (including if cancelled or if ~DnsResolverImpl() happens).
-    pending_resolution->owned_ = true;
-    return pending_resolution.release();
-  }
+  // The PendingResolution will self-delete when the request completes
+  // (including if cancelled or if ~DnsResolverImpl() happens). We always
+  // return an ActiveDnsQuery, since even synchronous resolution, for example
+  // localhost lookup, involves a dispatcher post and deferred callback due to
+  // #4307.
+  return pending_resolution.release();
 }
 
 void DnsResolverImpl::PendingResolution::getHostByName(int family) {

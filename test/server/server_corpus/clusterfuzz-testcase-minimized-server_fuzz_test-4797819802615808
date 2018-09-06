@@ -1,0 +1,99 @@
+static_resources {
+  clusters {
+    name: "i"
+    type: STRICT_DNS
+    connect_timeout {
+      nanos: 65535
+    }
+    hosts {
+      pipe {
+        path: "i"
+      }
+    }
+    tls_context {
+      common_tls_context {
+        validation_context {
+          verify_certificate_hash: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      }
+    }
+    dns_lookup_family: V4_ONLY
+  }
+}
+cluster_manager {
+  load_stats_config {
+    api_type: GRPC
+    grpc_services {
+      google_grpc {
+        target_uri: "["
+        call_credentials {
+          service_account_jwt_access {
+            json_key: "[]"
+            token_lifetime_seconds: 1
+          }
+        }
+        call_credentials {
+          access_token: "["
+        }
+        call_credentials {
+          google_iam {
+            authorization_token: "/"
+          }
+        }
+        call_credentials {
+          service_account_jwt_access {
+            json_key: "[]"
+            token_lifetime_seconds: 1
+          }
+        }
+        call_credentials {
+          access_token: "["
+        }
+        call_credentials {
+          google_iam {
+            authorization_token: "/"
+          }
+        }
+        call_credentials {
+          service_account_jwt_access {
+            json_key: "[["
+            token_lifetime_seconds: 1
+          }
+        }
+        call_credentials {
+          access_token: "/"
+        }
+        call_credentials {
+          service_account_jwt_access {
+            json_key: "[["
+            token_lifetime_seconds: 3
+          }
+        }
+        call_credentials {
+          access_token: "["
+        }
+        call_credentials {
+          google_iam {
+            authorization_token: "/"
+          }
+        }
+        call_credentials {
+          service_account_jwt_access {
+            json_key: "/"
+            token_lifetime_seconds: 1
+          }
+        }
+        stat_prefix: "`"
+      }
+    }
+  }
+}
+flags_path: ",istener_9223372036854775808"
+admin {
+  access_log_path: "@@"
+  address {
+    pipe {
+      path: "R"
+    }
+  }
+}
