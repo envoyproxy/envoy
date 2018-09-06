@@ -46,7 +46,8 @@ public:
                        Network::TransportSocketFactoryPtr&& transport_socket_factory);
 
   // Network::TransportSocketFactory
-  Network::TransportSocketPtr createTransportSocket() const override;
+  Network::TransportSocketPtr
+  createTransportSocket(const Network::ConnectionSocket::OptionsSharedPtr& options) const override;
   bool implementsSecureTransport() const override;
 
 private:

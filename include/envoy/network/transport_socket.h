@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/ssl/connection.h"
+#include "envoy/network/listen_socket.h"
 
 namespace Envoy {
 namespace Network {
@@ -150,8 +151,10 @@ public:
 
   /**
    * @return Network::TransportSocketPtr a transport socket to be passed to connection.
+   * @param options specify options for the socket
    */
-  virtual TransportSocketPtr createTransportSocket() const PURE;
+  virtual TransportSocketPtr
+  createTransportSocket(const Network::ConnectionSocket::OptionsSharedPtr& options) const PURE;
 };
 
 typedef std::unique_ptr<TransportSocketFactory> TransportSocketFactoryPtr;

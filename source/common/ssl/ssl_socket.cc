@@ -418,7 +418,8 @@ ClientSslSocketFactory::ClientSslSocketFactory(ClientContextConfigPtr config,
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
-Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket() const {
+Network::TransportSocketPtr ClientSslSocketFactory::createTransportSocket(
+    const Network::ConnectionSocket::OptionsSharedPtr&) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
@@ -450,7 +451,8 @@ ServerSslSocketFactory::ServerSslSocketFactory(ServerContextConfigPtr config,
   config_->setSecretUpdateCallback([this]() { onAddOrUpdateSecret(); });
 }
 
-Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket() const {
+Network::TransportSocketPtr ServerSslSocketFactory::createTransportSocket(
+    const Network::ConnectionSocket::OptionsSharedPtr&) const {
   // onAddOrUpdateSecret() could be invoked in the middle of checking the existence of ssl_ctx and
   // creating SslSocket using ssl_ctx. Capture ssl_ctx_ into a local variable so that we check and
   // use the same ssl_ctx to create SslSocket.
