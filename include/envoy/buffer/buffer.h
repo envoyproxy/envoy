@@ -246,16 +246,11 @@ public:
 
     const auto extension =
         std::is_signed<T>::value && Size < sizeof(T) && bytes[most_significant_read_byte] < 0
-            ? Endianness == ByteOrder::BigEndian
-                  ? static_cast<T>(
-                        static_cast<typename std::make_unsigned<T>::type>(all_bits_enabled) >>
-                        (Size * CHAR_BIT))
-                  : static_cast<T>(
-                        static_cast<typename std::make_unsigned<T>::type>(all_bits_enabled)
-                        << (Size * CHAR_BIT))
+            ? static_cast<T>(static_cast<typename std::make_unsigned<T>::type>(all_bits_enabled)
+                             << (Size * CHAR_BIT))
             : static_cast<T>(0);
 
-    return fromEndianness<Endianness>(static_cast<T>(result | extension));
+    return fromEndianness<Endianness>(static_cast<T>(result)) | extension;
   }
 
   /**
