@@ -101,21 +101,19 @@ ContextConfigImpl::ContextConfigImpl(
       ecdh_curves_(StringUtil::nonEmptyStringOrDefault(
           RepeatedPtrUtil::join(config.tls_params().ecdh_curves(), ":"), DEFAULT_ECDH_CURVES)),
       tls_certficate_provider_(getTlsCertificateConfigProvider(config, factory_context)),
-      tls_certificate_update_callback_handle_(nullptr),
       certficate_validation_context_provider_(
           getCertificateValidationContextConfigProvider(config, factory_context)),
-      certificate_validation_context_update_callback_handle_(nullptr),
       min_protocol_version_(
           tlsVersionFromProto(config.tls_params().tls_minimum_protocol_version(), TLS1_VERSION)),
       max_protocol_version_(tlsVersionFromProto(config.tls_params().tls_maximum_protocol_version(),
                                                 TLS1_2_VERSION)) {}
 
 ContextConfigImpl::~ContextConfigImpl() {
-  if (tls_certificate_update_callback_handle_) {
-    tls_certificate_update_callback_handle_->remove();
+  if (tc_update_callback_handle_) {
+    tc_update_callback_handle_->remove();
   }
-  if (certificate_validation_context_update_callback_handle_) {
-    certificate_validation_context_update_callback_handle_->remove();
+  if (cvc_update_callback_handle_) {
+    cvc_update_callback_handle_->remove();
   }
 }
 

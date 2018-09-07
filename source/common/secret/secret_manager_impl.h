@@ -42,8 +42,13 @@ public:
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
 private:
-  // Remove dynamic secret provider which has been deleted.
+  // Removes dynamic secret provider which has been deleted.
   void removeDynamicSecretProvider(const std::string& map_key);
+  // Finds or creates SdsApi object.
+  SdsApiSharedPtr innerFindOrCreate(
+      const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
+      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      std::function<SdsApiSharedPtr(std::function<void()> unregister_secret_provider)> create_fn);
 
   // Manages pairs of secret name and TlsCertificateConfigProviderSharedPtr.
   std::unordered_map<std::string, TlsCertificateConfigProviderSharedPtr>
