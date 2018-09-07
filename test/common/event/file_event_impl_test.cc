@@ -16,7 +16,7 @@ namespace Event {
 
 class FileEventImplTest : public testing::Test {
 public:
-  FileEventImplTest() : dispatcher_(test_time_.timeSource()) {}
+  FileEventImplTest() : dispatcher_(test_time_.timeSystem()) {}
 
   void SetUp() override {
     int rc = socketpair(AF_UNIX, SOCK_DGRAM, 0, fds_);
@@ -53,7 +53,7 @@ TEST_P(FileEventImplActivateTest, Activate) {
   ASSERT_NE(-1, fd);
 
   DangerousDeprecatedTestTime test_time;
-  DispatcherImpl dispatcher(test_time.timeSource());
+  DispatcherImpl dispatcher(test_time.timeSystem());
   ReadyWatcher read_event;
   EXPECT_CALL(read_event, ready()).Times(1);
   ReadyWatcher write_event;

@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "extensions/filters/network/thrift_proxy/metadata.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

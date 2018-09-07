@@ -30,7 +30,7 @@ void ThreadAwareLoadBalancerBase::refresh() {
   }
 
   {
-    std::unique_lock<std::shared_timed_mutex> lock(factory_->mutex_);
+    absl::WriterMutexLock lock(&factory_->mutex_);
     factory_->per_priority_load_ = per_priority_load;
     factory_->per_priority_state_ = per_priority_state_vector;
   }
@@ -64,7 +64,7 @@ LoadBalancerPtr ThreadAwareLoadBalancerBase::LoadBalancerFactoryImpl::create() {
 
   // We must protect current_lb_ via a RW lock since it is accessed and written to by multiple
   // threads. All complex processing has already been precalculated however.
-  std::shared_lock<std::shared_timed_mutex> lock(mutex_);
+  absl::ReaderMutexLock lock(&mutex_);
   lb->per_priority_load_ = per_priority_load_;
   lb->per_priority_state_ = per_priority_state_;
 

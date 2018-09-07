@@ -12,6 +12,7 @@
 #include "common/common/logger.h"
 #include "common/ssl/context_impl.h"
 
+#include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -101,7 +102,8 @@ private:
   Stats::Scope& stats_scope_;
   SslSocketFactoryStats stats_;
   ClientContextConfigPtr config_;
-  ClientContextSharedPtr ssl_ctx_;
+  mutable absl::Mutex ssl_ctx_mu_;
+  ClientContextSharedPtr ssl_ctx_ GUARDED_BY(ssl_ctx_mu_);
 };
 
 class ServerSslSocketFactory : public Network::TransportSocketFactory,
@@ -123,7 +125,8 @@ private:
   SslSocketFactoryStats stats_;
   ServerContextConfigPtr config_;
   const std::vector<std::string> server_names_;
-  ServerContextSharedPtr ssl_ctx_;
+  mutable absl::Mutex ssl_ctx_mu_;
+  ServerContextSharedPtr ssl_ctx_ GUARDED_BY(ssl_ctx_mu_);
 };
 
 } // namespace Ssl

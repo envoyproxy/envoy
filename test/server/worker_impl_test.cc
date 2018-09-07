@@ -31,7 +31,7 @@ public:
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(test_time.timeSource());
+  Event::DispatcherImpl* dispatcher_ = new Event::DispatcherImpl(test_time.timeSystem());
   Network::MockConnectionHandler* handler_ = new Network::MockConnectionHandler();
   NiceMock<MockGuardDog> guard_dog_;
   DefaultTestHooks hooks_;

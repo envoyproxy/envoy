@@ -251,8 +251,13 @@ AssertionResult FakeConnectionBase::waitForDisconnect(bool ignore_spurious_event
   auto end_time = time_system_.monotonicTime() + timeout;
   Thread::LockGuard lock(lock_);
   while (shared_connection_.connected()) {
+<<<<<<< HEAD
     if (time_system_.monotonicTime() >= end_time) {
       return AssertionResult("Timed out waiting for disconnect.");
+=======
+    if (std::chrono::steady_clock::now() >= end_time) {
+      return AssertionFailure() << "Timed out waiting for disconnect.";
+>>>>>>> master
     }
     Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
     // The default behavior of waitForDisconnect is to assume the test cleanly
@@ -363,7 +368,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
                            Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type,
                            bool enable_half_close)
     : http_type_(type), socket_(std::move(listen_socket)), api_(new Api::Impl(milliseconds(10000))),
-      dispatcher_(api_->allocateDispatcher(test_time_.timeSource())),
+      dispatcher_(api_->allocateDispatcher(test_time_.timeSystem())),
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close), listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {
@@ -542,7 +547,7 @@ AssertionResult FakeRawConnection::write(const std::string& data, bool end_strea
 Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& data,
                                                             bool end_stream) {
   Thread::LockGuard lock(parent_.lock_);
-  ENVOY_LOG(debug, "got {} bytes", data.length());
+  ENVOY_LOG(debug, "got {} bytes, end_stream {}", data.length(), end_stream);
   parent_.data_.append(data.toString());
   parent_.half_closed_ = end_stream;
   data.drain(data.length());
