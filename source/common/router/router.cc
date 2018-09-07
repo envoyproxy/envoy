@@ -469,6 +469,9 @@ void Filter::onUpstreamReset(UpstreamResetType type,
 
   // We don't retry on a global timeout or if we already started the response.
   if (type != UpstreamResetType::GlobalTimeout && !downstream_response_started_ && retry_state_) {
+    // Notify retry modifiers about the attempted host.
+    retry_state_->onHostAttempted(upstream_host);
+
     RetryStatus retry_status =
         retry_state_->shouldRetry(nullptr, reset_reason, [this]() -> void { doRetry(); });
     if (retry_status == RetryStatus::Yes && setupRetry(true)) {
@@ -589,6 +592,9 @@ void Filter::onUpstreamHeaders(const uint64_t response_code, Http::HeaderMapPtr&
   }
 
   if (retry_state_) {
+    // Notify retry modifiers about the attempted host.
+    retry_state_->onHostAttempted(upstream_request_->upstream_host_);
+
     RetryStatus retry_status = retry_state_->shouldRetry(
         headers.get(), absl::optional<Http::StreamResetReason>(), [this]() -> void { doRetry(); });
     // Capture upstream_host since setupRetry() in the following line will clear
@@ -744,6 +750,7 @@ bool Filter::setupRetry(bool end_stream) {
 }
 
 void Filter::doRetry() {
+  is_retry_ = true;
   Http::ConnectionPool::Instance* conn_pool = getConnPool();
   if (!conn_pool) {
     sendNoHealthyUpstreamResponse();

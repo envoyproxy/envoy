@@ -179,6 +179,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test_library(
+    name = "test_host_predicate_lib",
+    srcs = [
+        "test_host_predicate_config.h",
+        "test_host_predicate_config.cc",
+        "test_host_predicate.h",
+        ],
+    deps = [
+        "//include/envoy/upstream:retry_interface",
+        "//include/envoy/registry",
+    ],
+)
+
+envoy_cc_test_library(
     name = "add_trailers_filter_config_lib",
     srcs = [
         "add_trailers_filter.cc",
@@ -205,6 +218,7 @@ envoy_cc_test_library(
     deps = [
         ":add_trailers_filter_config_lib",
         ":integration_lib",
+        ":test_host_predicate_lib",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/upstream:utility_lib",
