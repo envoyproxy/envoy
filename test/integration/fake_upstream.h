@@ -545,7 +545,7 @@ public:
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
   void set_allow_unexpected_disconnects(bool value) { allow_unexpected_disconnects_ = value; }
 
-  Event::TimeSystem& timeSystem() { return dispatcher_->timeSource(); }
+  Event::TimeSystem& timeSystem() { return dispatcher_->timeSystem(); }
 
   // Stops the dispatcher loop and joins the listening thread.
   void cleanUp();

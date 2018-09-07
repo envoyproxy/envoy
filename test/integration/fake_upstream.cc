@@ -251,13 +251,8 @@ AssertionResult FakeConnectionBase::waitForDisconnect(bool ignore_spurious_event
   auto end_time = time_system_.monotonicTime() + timeout;
   Thread::LockGuard lock(lock_);
   while (shared_connection_.connected()) {
-<<<<<<< HEAD
     if (time_system_.monotonicTime() >= end_time) {
-      return AssertionResult("Timed out waiting for disconnect.");
-=======
-    if (std::chrono::steady_clock::now() >= end_time) {
       return AssertionFailure() << "Timed out waiting for disconnect.";
->>>>>>> master
     }
     Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
     // The default behavior of waitForDisconnect is to assume the test cleanly
@@ -309,7 +304,7 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
   Thread::LockGuard lock(lock_);
   while (new_streams_.empty()) {
     if (time_system_.monotonicTime() >= end_time) {
-      return AssertionResult("Timed out waiting for new stream.");
+      return AssertionFailure() << "Timed out waiting for new stream.";
     }
     Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
     // As with waitForDisconnect, by default, waitForNewStream returns after the next event.
@@ -445,7 +440,7 @@ AssertionResult
 FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                     std::vector<std::unique_ptr<FakeUpstream>>& upstreams,
                                     FakeHttpConnectionPtr& connection, milliseconds timeout) {
-  Event::TimeSystem& time_system = client_dispatcher.timeSource();
+  Event::TimeSystem& time_system = client_dispatcher.timeSystem();
   auto end_time = time_system.monotonicTime() + timeout;
   while (time_system.monotonicTime() < end_time) {
     for (auto it = upstreams.begin(); it != upstreams.end(); ++it) {
