@@ -96,10 +96,8 @@ SdsApiSharedPtr SecretManagerImpl::innerFindOrCreate(
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(
     const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
-  std::function<SdsApiSharedPtr(std::function<void()> unregister_secret_provider)> create_fn =
-      [&sds_config_source, &config_name, &secret_provider_context](
-          std::function<void()> unregister_secret_provider) -> SdsApiSharedPtr {
-    return std::make_shared<TlsCertificateSdsApi>(
+  auto create_fn = [&](std::function<void()> unregister_secret_provider) -> SdsApiSharedPtr {
+    return TlsCertificateSdsApi::create(
         secret_provider_context.localInfo(), secret_provider_context.dispatcher(),
         secret_provider_context.random(), secret_provider_context.stats(),
         secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
@@ -115,10 +113,8 @@ CertificateValidationContextConfigProviderSharedPtr
 SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
     const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
-  std::function<SdsApiSharedPtr(std::function<void()> unregister_secret_provider)> create_fn =
-      [&sds_config_source, &config_name, &secret_provider_context](
-          std::function<void()> unregister_secret_provider) -> SdsApiSharedPtr {
-    return std::make_shared<CertificateValidationContextSdsApi>(
+  auto create_fn = [&](std::function<void()> unregister_secret_provider) -> SdsApiSharedPtr {
+    return CertificateValidationContextSdsApi::create(
         secret_provider_context.localInfo(), secret_provider_context.dispatcher(),
         secret_provider_context.random(), secret_provider_context.stats(),
         secret_provider_context.clusterManager(), *secret_provider_context.initManager(),

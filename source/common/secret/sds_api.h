@@ -72,11 +72,23 @@ typedef std::shared_ptr<SdsApi> SdsApiSharedPtr;
  */
 class TlsCertificateSdsApi : public SdsApi, public TlsCertificateConfigProvider {
 public:
+  static SdsApiSharedPtr create(const LocalInfo::LocalInfo& local_info,
+                                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                                Stats::Store& stats, Upstream::ClusterManager& cluster_manager,
+                                Init::Manager& init_manager,
+                                const envoy::api::v2::core::ConfigSource& sds_config,
+                                const std::string& sds_config_name,
+                                std::function<void()> destructor_cb) {
+    return std::make_shared<TlsCertificateSdsApi>(local_info, dispatcher, random, stats,
+                                                  cluster_manager, init_manager, sds_config,
+                                                  sds_config_name, destructor_cb);
+  }
+
   TlsCertificateSdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, Stats::Store& stats,
                        Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
                        const envoy::api::v2::core::ConfigSource& sds_config,
-                       std::string sds_config_name, std::function<void()> destructor_cb)
+                       const std::string& sds_config_name, std::function<void()> destructor_cb)
       : SdsApi(local_info, dispatcher, random, stats, cluster_manager, init_manager, sds_config,
                sds_config_name, destructor_cb) {}
 
@@ -102,6 +114,17 @@ private:
 class CertificateValidationContextSdsApi : public SdsApi,
                                            public CertificateValidationContextConfigProvider {
 public:
+  static SdsApiSharedPtr create(const LocalInfo::LocalInfo& local_info,
+                                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
+                                Stats::Store& stats, Upstream::ClusterManager& cluster_manager,
+                                Init::Manager& init_manager,
+                                const envoy::api::v2::core::ConfigSource& sds_config,
+                                const std::string& sds_config_name,
+                                std::function<void()> destructor_cb) {
+    return std::make_shared<CertificateValidationContextSdsApi>(
+        local_info, dispatcher, random, stats, cluster_manager, init_manager, sds_config,
+        sds_config_name, destructor_cb);
+  }
   CertificateValidationContextSdsApi(const LocalInfo::LocalInfo& local_info,
                                      Event::Dispatcher& dispatcher,
                                      Runtime::RandomGenerator& random, Stats::Store& stats,
