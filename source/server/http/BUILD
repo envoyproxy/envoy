@@ -47,6 +47,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/http/http1:codec_lib",
+        "//source/common/memory:stats_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:raw_buffer_socket_lib",
         "//source/common/network:utility_lib",
@@ -59,6 +60,7 @@ envoy_cc_library(
         "//source/extensions/access_loggers/file:file_access_log_lib",
         "@envoy_api//envoy/admin/v2alpha:clusters_cc",
         "@envoy_api//envoy/admin/v2alpha:config_dump_cc",
+        "@envoy_api//envoy/admin/v2alpha:memory_cc",
     ],
 )
 

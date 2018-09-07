@@ -257,6 +257,7 @@ envoy_cc_library(
     name = "thread_aware_lb_lib",
     srcs = ["thread_aware_lb_impl.cc"],
     hdrs = ["thread_aware_lb_impl.h"],
+    external_deps = ["abseil_synchronization"],
     deps = [
         ":load_balancer_lib",
     ],
@@ -383,6 +384,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "upstream_includes",
     hdrs = ["upstream_impl.h"],
+    external_deps = ["abseil_synchronization"],
     deps = [
         ":load_balancer_lib",
         ":outlier_detection_lib",

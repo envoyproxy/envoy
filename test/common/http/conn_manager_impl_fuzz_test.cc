@@ -55,7 +55,7 @@ public:
   };
 
   FuzzConfig()
-      : route_config_provider_(test_time_.timeSource()),
+      : route_config_provider_(test_time_.timeSystem()),
         stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                         POOL_HISTOGRAM(fake_stats_))},
                "",

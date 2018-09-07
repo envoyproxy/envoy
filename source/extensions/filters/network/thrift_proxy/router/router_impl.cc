@@ -21,17 +21,58 @@ RouteEntryImplBase::RouteEntryImplBase(
   for (const auto& header_map : route.match().headers()) {
     config_headers_.push_back(header_map);
   }
+
+  if (route.route().cluster_specifier_case() ==
+      envoy::config::filter::network::thrift_proxy::v2alpha1::RouteAction::kWeightedClusters) {
+
+    total_cluster_weight_ = 0UL;
+    for (const auto& cluster : route.route().weighted_clusters().clusters()) {
+      std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(cluster));
+      weighted_clusters_.emplace_back(std::move(cluster_entry));
+      total_cluster_weight_ += weighted_clusters_.back()->clusterWeight();
+    }
+  }
 }
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
 const RouteEntry* RouteEntryImplBase::routeEntry() const { return this; }
 
-RouteConstSharedPtr RouteEntryImplBase::clusterEntry() const { return shared_from_this(); }
+RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value) const {
+  if (weighted_clusters_.empty()) {
+    return shared_from_this();
+  }
+
+  uint64_t selected_value = random_value % total_cluster_weight_;
+  uint64_t begin = 0UL;
+  uint64_t end = 0UL;
+
+  // Find the right cluster to route to based on the interval in which
+  // the selected value falls. The intervals are determined as
+  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
+  for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
+    end = begin + cluster->clusterWeight();
+    ASSERT(end <= total_cluster_weight_);
+
+    if (selected_value >= begin && selected_value < end) {
+      return cluster;
+    }
+
+    begin = end;
+  }
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
 
 bool RouteEntryImplBase::headersMatch(const Http::HeaderMap& headers) const {
   return Http::HeaderUtility::matchHeaders(headers, config_headers_);
 }
+
+RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
+    const envoy::config::filter::network::thrift_proxy::v2alpha1::WeightedCluster_ClusterWeight&
+        cluster)
+    : cluster_name_(cluster.name()),
+      cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)) {}
 
 MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
@@ -42,13 +83,14 @@ MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
   }
 }
 
-RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
+RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata,
+                                                      uint64_t random_value) const {
   if (RouteEntryImplBase::headersMatch(metadata.headers())) {
     bool matches =
         method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
 
     if (matches ^ invert_) {
-      return clusterEntry();
+      return clusterEntry(random_value);
     }
   }
 
@@ -70,14 +112,15 @@ ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
   }
 }
 
-RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
+RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata,
+                                                       uint64_t random_value) const {
   if (RouteEntryImplBase::headersMatch(metadata.headers())) {
     bool matches = service_name_.empty() ||
                    (metadata.hasMethodName() &&
                     StringUtil::startsWith(metadata.methodName().c_str(), service_name_));
 
     if (matches ^ invert_) {
-      return clusterEntry();
+      return clusterEntry(random_value);
     }
   }
 
@@ -102,9 +145,10 @@ RouteMatcher::RouteMatcher(
   }
 }
 
-RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata) const {
+RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata,
+                                        uint64_t random_value) const {
   for (const auto& route : routes_) {
-    RouteConstSharedPtr route_entry = route->matches(metadata);
+    RouteConstSharedPtr route_entry = route->matches(metadata, random_value);
     if (nullptr != route_entry) {
       return route_entry;
     }

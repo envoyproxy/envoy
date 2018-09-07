@@ -163,7 +163,7 @@ envoy::config::bootstrap::v2::Bootstrap parseBootstrapFromV2Yaml(const std::stri
 
 class ClusterManagerImplTest : public testing::Test {
 public:
-  ClusterManagerImplTest() { factory_.dispatcher_.setTimeSystem(time_source_); }
+  ClusterManagerImplTest() { factory_.dispatcher_.setTimeSystem(time_system_); }
 
   void create(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     cluster_manager_.reset(new ClusterManagerImpl(
@@ -238,7 +238,7 @@ public:
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
-  NiceMock<MockTimeSystem> time_source_;
+  NiceMock<MockTimeSystem> time_system_;
   MockLocalClusterUpdate local_cluster_update_;
 };
 
@@ -289,7 +289,7 @@ TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
 }
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
-  EXPECT_CALL(time_source_, systemTime())
+  EXPECT_CALL(time_system_, systemTime())
       .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
 
   const std::string yaml = R"EOF(
@@ -766,7 +766,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
 }
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
-  EXPECT_CALL(time_source_, systemTime())
+  EXPECT_CALL(time_system_, systemTime())
       .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
 
   const std::string json = fmt::sprintf(
@@ -985,7 +985,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 }
 
 TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
-  EXPECT_CALL(time_source_, systemTime())
+  EXPECT_CALL(time_system_, systemTime())
       .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
 
   const std::string json = R"EOF(

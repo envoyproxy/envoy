@@ -75,7 +75,7 @@ public:
   };
 
   HttpConnectionManagerImplTest()
-      : route_config_provider_(test_time_.timeSource()), access_log_path_("dummy_path"),
+      : route_config_provider_(test_time_.timeSystem()), access_log_path_("dummy_path"),
         access_logs_{
             AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
                 access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),

@@ -14,7 +14,7 @@ GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClie
                          const Protobuf::MethodDescriptor& service_method,
                          Runtime::RandomGenerator& random)
     : local_info_(local_info), async_client_(std::move(async_client)),
-      service_method_(service_method), random_(random), time_source_(dispatcher.timeSource()) {
+      service_method_(service_method), random_(random), time_source_(dispatcher.timeSystem()) {
   Config::Utility::checkLocalInfo("ads", local_info);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
