@@ -16,6 +16,8 @@
 
 #include "common/common/callback_impl.h"
 #include "common/common/cleanup.h"
+#include "common/ssl/certificate_validation_context_config_impl.h"
+#include "common/ssl/tls_certificate_config_impl.h"
 
 namespace Envoy {
 namespace Secret {
@@ -30,7 +32,8 @@ public:
          Runtime::RandomGenerator& random, Stats::Store& stats,
          Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
          const envoy::api::v2::core::ConfigSource& sds_config, const std::string& sds_config_name,
-         std::function<void()> destructor_cb);
+         std::function<void()> destructor_cb,
+         std::function<void(const uint64_t, const envoy::api::v2::auth::Secret&)> create_secrets);
 
   // Init::Target
   void initialize(std::function<void()> callback) override;
@@ -43,10 +46,8 @@ public:
   }
 
 protected:
-  // Updates local storage of dynamic secrets and invokes callbacks.
-  virtual void updateConfigHelper(const envoy::api::v2::auth::Secret&) PURE;
-  uint64_t secret_hash_;
   Common::CallbackManager<> update_callback_manager_;
+  uint64_t secret_hash_;
 
 private:
   void runInitializeCallbackIfAny();
@@ -63,6 +64,7 @@ private:
   const std::string sds_config_name_;
 
   Cleanup clean_up_;
+  std::function<void(const uint64_t new_hash, const envoy::api::v2::auth::Secret&)> create_secrets_;
 };
 
 typedef std::shared_ptr<SdsApi> SdsApiSharedPtr;
@@ -90,7 +92,17 @@ public:
                        const envoy::api::v2::core::ConfigSource& sds_config,
                        const std::string& sds_config_name, std::function<void()> destructor_cb)
       : SdsApi(local_info, dispatcher, random, stats, cluster_manager, init_manager, sds_config,
-               sds_config_name, destructor_cb) {}
+               sds_config_name, destructor_cb,
+               [this](const uint64_t new_hash, const envoy::api::v2::auth::Secret& secret) {
+                 if (new_hash != secret_hash_ &&
+                     secret.type_case() ==
+                         envoy::api::v2::auth::Secret::TypeCase::kTlsCertificate) {
+                   secret_hash_ = new_hash;
+                   tls_certificate_secrets_ =
+                       std::make_unique<Ssl::TlsCertificateConfigImpl>(secret.tls_certificate());
+                   update_callback_manager_.runCallbacks();
+                 }
+               }) {}
 
   // SecretProvider
   const Ssl::TlsCertificateConfig* secret() const override {
@@ -101,9 +113,6 @@ public:
   }
 
 private:
-  // SdsApi
-  void updateConfigHelper(const envoy::api::v2::auth::Secret& secret) override;
-
   Ssl::TlsCertificateConfigPtr tls_certificate_secrets_;
 };
 
@@ -134,7 +143,18 @@ public:
                                      std::string sds_config_name,
                                      std::function<void()> destructor_cb)
       : SdsApi(local_info, dispatcher, random, stats, cluster_manager, init_manager, sds_config,
-               sds_config_name, destructor_cb) {}
+               sds_config_name, destructor_cb,
+               [this](const uint64_t new_hash, const envoy::api::v2::auth::Secret& secret) {
+                 if (new_hash != secret_hash_ &&
+                     secret.type_case() ==
+                         envoy::api::v2::auth::Secret::TypeCase::kValidationContext) {
+                   secret_hash_ = new_hash;
+                   certificate_validation_context_secrets_ =
+                       std::make_unique<Ssl::CertificateValidationContextConfigImpl>(
+                           secret.validation_context());
+                   update_callback_manager_.runCallbacks();
+                 }
+               }) {}
 
   // SecretProvider
   const Ssl::CertificateValidationContextConfig* secret() const override {
@@ -145,9 +165,6 @@ public:
   }
 
 private:
-  // SdsApi
-  void updateConfigHelper(const envoy::api::v2::auth::Secret& secret) override;
-
   Ssl::CertificateValidationContextConfigPtr certificate_validation_context_secrets_;
 };
 
