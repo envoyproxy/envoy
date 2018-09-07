@@ -387,7 +387,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
                             0x0b, 0x00, 0x01,                           // begin string field
                         });
   write_buffer_.writeBEInt<uint32_t>(err.length());
-  addString(write_buffer_, err);
+  write_buffer_.add(err);
   addSeq(write_buffer_, {
                             0x08, 0x00, 0x02,       // begin i32 field
                             0x00, 0x00, 0x00, 0x07, // protocol error
@@ -396,7 +396,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
 
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
-        EXPECT_EQ(bufferToString(write_buffer_), bufferToString(buffer));
+        EXPECT_EQ(write_buffer_.toString(), buffer.toString());
       }));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
@@ -449,7 +449,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) 
                             0x0b, 0x00, 0x01,       // begin string field
                         });
   write_buffer_.writeBEInt<int32_t>(err.length());
-  addString(write_buffer_, err);
+  write_buffer_.add(err);
   addSeq(write_buffer_, {
                             0x08, 0x00, 0x02,       // begin i32 field
                             0x00, 0x00, 0x00, 0x05, // missing result
@@ -458,7 +458,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) 
 
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
-        EXPECT_EQ(bufferToString(write_buffer_), bufferToString(buffer));
+        EXPECT_EQ(write_buffer_.toString(), buffer.toString());
       }));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 

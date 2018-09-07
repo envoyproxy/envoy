@@ -93,7 +93,7 @@ TEST_F(AutoProtocolTest, ReadMessageBegin) {
     buffer.writeByte(0);
     buffer.writeByte(MessageType::Call);
     buffer.writeBEInt<int32_t>(8);
-    addString(buffer, "the_name");
+    buffer.add("the_name");
     buffer.writeBEInt<int32_t>(1);
 
     EXPECT_TRUE(proto.readMessageBegin(buffer, metadata_));
@@ -112,7 +112,7 @@ TEST_F(AutoProtocolTest, ReadMessageBegin) {
     buffer.writeBEInt<int16_t>(0x8221);
     buffer.writeBEInt<int16_t>(0x8202); // 0x0102
     buffer.writeByte(8);
-    addString(buffer, "the_name");
+    buffer.add("the_name");
 
     EXPECT_TRUE(proto.readMessageBegin(buffer, metadata_));
     expectMetadata("the_name", MessageType::Call, 0x0102);

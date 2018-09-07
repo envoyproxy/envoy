@@ -148,7 +148,7 @@ TEST_F(CompactProtocolTest, ReadMessageBegin) {
     buffer.writeBEInt<int16_t>(0x8221);
     buffer.writeByte(32);
     buffer.writeByte(10);
-    addString(buffer, "partial");
+    buffer.add("partial");
 
     EXPECT_FALSE(proto.readMessageBegin(buffer, metadata_));
     expectDefaultMetadata();
@@ -207,7 +207,7 @@ TEST_F(CompactProtocolTest, ReadMessageBegin) {
     buffer.writeBEInt<int16_t>(0x8221);
     buffer.writeBEInt<int16_t>(0x8202); // 0x0102
     buffer.writeByte(8);
-    addString(buffer, "the_name");
+    buffer.add("the_name");
 
     EXPECT_TRUE(proto.readMessageBegin(buffer, metadata_));
     expectMetadata("the_name", MessageType::Call, 0x102);
@@ -976,7 +976,7 @@ TEST_F(CompactProtocolTest, ReadString) {
     std::string value = "-";
 
     buffer.writeByte(0x06);
-    addString(buffer, "string");
+    buffer.add("string");
 
     EXPECT_TRUE(proto.readString(buffer, value));
     EXPECT_EQ(value, "string");
@@ -991,7 +991,7 @@ TEST_F(CompactProtocolTest, ReadBinary) {
   std::string value = "-";
 
   buffer.writeByte(0x06);
-  addString(buffer, "string");
+  buffer.add("string");
 
   EXPECT_TRUE(proto.readBinary(buffer, value));
   EXPECT_EQ(value, "string");

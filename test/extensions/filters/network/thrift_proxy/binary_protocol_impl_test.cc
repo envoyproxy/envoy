@@ -122,7 +122,7 @@ TEST_F(BinaryProtocolTest, ReadMessageBegin) {
     buffer.writeByte('x');
     buffer.writeByte(MessageType::Call);
     buffer.writeBEInt<int32_t>(4); // name length
-    addString(buffer, "abcd");
+    buffer.add("abcd");
 
     EXPECT_FALSE(proto.readMessageBegin(buffer, metadata_));
     expectDefaultMetadata();
@@ -138,7 +138,7 @@ TEST_F(BinaryProtocolTest, ReadMessageBegin) {
     buffer.writeByte(0);
     buffer.writeByte(MessageType::Call);
     buffer.writeBEInt<int32_t>(8);
-    addString(buffer, "the_name");
+    buffer.add("the_name");
     buffer.writeBEInt<int32_t>(5678);
 
     EXPECT_TRUE(proto.readMessageBegin(buffer, metadata_));
@@ -604,7 +604,7 @@ TEST_F(BinaryProtocolTest, ReadString) {
     std::string value = "-";
 
     buffer.writeBEInt<int32_t>(6);
-    addString(buffer, "string");
+    buffer.add("string");
 
     EXPECT_TRUE(proto.readString(buffer, value));
     EXPECT_EQ(value, "string");
@@ -619,7 +619,7 @@ TEST_F(BinaryProtocolTest, ReadBinary) {
   std::string value = "-";
 
   buffer.writeBEInt<int32_t>(6);
-  addString(buffer, "binary");
+  buffer.add("binary");
 
   EXPECT_TRUE(proto.readBinary(buffer, value));
   EXPECT_EQ(value, "binary");
@@ -970,7 +970,7 @@ TEST_F(LaxBinaryProtocolTest, ReadMessageBegin) {
     resetMetadata();
 
     buffer.writeBEInt<int32_t>(8);
-    addString(buffer, "the_name");
+    buffer.add("the_name");
     buffer.writeByte(MessageType::Call);
     buffer.writeBEInt<int32_t>(5678);
 

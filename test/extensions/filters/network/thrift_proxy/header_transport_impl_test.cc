@@ -409,7 +409,7 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
     buffer.writeBEInt<int16_t>(2); // size 8
     addSeq(buffer, {0, 0, 1, 1});  // 0 = binary proto, 0 = num transforms, 1 key-value, 1 = num kvs
     buffer.writeByte(4);           // exceeds specified header size
-    addString(buffer, "key_");
+    buffer.add("key_");
 
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "unable to read header transport header key: header too small");
@@ -428,7 +428,7 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
     buffer.writeBEInt<int16_t>(2); // size 8
     addSeq(buffer, {0, 0, 1, 1});  // 0 = binary proto, 0 = num transforms, 1 key-value, 1 = num kvs
     buffer.writeByte(3);           // head ends with key, no room for value
-    addString(buffer, "abc");
+    buffer.add("abc");
     buffer.writeByte(0);
 
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
@@ -449,13 +449,13 @@ TEST(HeaderTransportTest, InfoBlock) {
   buffer.writeBEInt<int16_t>(38); // size 152
   addSeq(buffer, {0, 0, 1, 3}); // 0 = binary proto, 0 = num transforms, 1 = key value, 3 = num kvs
   buffer.writeByte(3);
-  addString(buffer, "key");
+  buffer.add("key");
   buffer.writeByte(5);
-  addString(buffer, "value");
+  buffer.add("value");
   buffer.writeByte(4);
-  addString(buffer, "key2");
+  buffer.add("key2");
   addSeq(buffer, {0x80, 0x01}); // var int 128
-  addString(buffer, std::string(128, 'x'));
+  buffer.add(std::string(128, 'x'));
   buffer.writeByte(0); // empty key
   buffer.writeByte(0); // empty value
   buffer.writeByte(0); // padding

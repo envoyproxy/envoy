@@ -93,7 +93,32 @@ TEST(BufferHelperTest, PeekLEI64) {
     EXPECT_EQ(buffer.peekLEInt<int64_t>(1), 0xFF07060504030201);
     EXPECT_EQ(buffer.peekLEInt<int64_t>(2), 0xFFFF070605040302);
     EXPECT_EQ(buffer.peekLEInt<int64_t>(8), -1);
+
     EXPECT_EQ(buffer.length(), 16);
+
+    // partial
+    EXPECT_EQ((buffer.peekLEInt<int64_t, 4>()), 0x03020100);
+    EXPECT_EQ((buffer.peekLEInt<int64_t, 4>(1)), 0x04030201);
+    EXPECT_EQ((buffer.peekLEInt<int64_t, 2>()), 0x0100);
+    EXPECT_EQ((buffer.peekLEInt<int64_t, 2>(1)), 0x0201);
+  }
+
+  {
+    // signed
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFE, 0xFF, 0xFF});
+    EXPECT_EQ((buffer.peekLEInt<int64_t, 2>()), -1);
+    EXPECT_EQ((buffer.peekLEInt<int64_t, 2>(2)), 255);  // 0x00FF
+    EXPECT_EQ((buffer.peekLEInt<int64_t, 2>(3)), -256); // 0xFF00
+    EXPECT_EQ((buffer.peekLEInt<int64_t, 3>(5)), -2);   // 0xFFFFFE
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF});
+    EXPECT_THROW_WITH_MESSAGE(
+        (buffer.peekLEInt<int64_t, sizeof(int64_t)>(buffer.length() - sizeof(int64_t) + 1)),
+        EnvoyException, "buffer underflow");
   }
 
   {
@@ -234,6 +259,30 @@ TEST(BufferHelperTest, PeekBEI64) {
     EXPECT_EQ(buffer.peekBEInt<int64_t>(2), 0x020304050607FFFF);
     EXPECT_EQ(buffer.peekBEInt<int64_t>(8), -1);
     EXPECT_EQ(buffer.length(), 16);
+
+    // partial
+    EXPECT_EQ((buffer.peekBEInt<int64_t, 4>()), 0x00010203);
+    EXPECT_EQ((buffer.peekBEInt<int64_t, 4>(1)), 0x01020304);
+    EXPECT_EQ((buffer.peekBEInt<int64_t, 2>()), 0x0001);
+    EXPECT_EQ((buffer.peekBEInt<int64_t, 2>(1)), 0x0102);
+  }
+
+  {
+    // signed
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0xFF, 0xFF, 0xFF, 0x00, 0xFF, 0xFF, 0xFF, 0xFE});
+    EXPECT_EQ((buffer.peekBEInt<int64_t, 2>()), -1);
+    EXPECT_EQ((buffer.peekBEInt<int64_t, 2>(2)), -256); // 0xFF00
+    EXPECT_EQ((buffer.peekBEInt<int64_t, 2>(3)), 255);  // 0x00FF
+    EXPECT_EQ((buffer.peekBEInt<int64_t, 3>(5)), -2);   // 0xFFFFFE
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF});
+    EXPECT_THROW_WITH_MESSAGE(
+        (buffer.peekBEInt<int64_t, sizeof(int64_t)>(buffer.length() - sizeof(int64_t) + 1)),
+        EnvoyException, "buffer underflow");
   }
 
   {
@@ -329,82 +378,82 @@ TEST(BufferHelperTest, DrainI8) {
 TEST(BufferHelperTest, DrainLEI16) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF});
-  EXPECT_EQ(buffer.drainLEIntOut<int16_t>(), 0x0100);
-  EXPECT_EQ(buffer.drainLEIntOut<int16_t>(), 0x0302);
-  EXPECT_EQ(buffer.drainLEIntOut<int16_t>(), -1);
+  EXPECT_EQ(buffer.drainLEInt<int16_t>(), 0x0100);
+  EXPECT_EQ(buffer.drainLEInt<int16_t>(), 0x0302);
+  EXPECT_EQ(buffer.drainLEInt<int16_t>(), -1);
   EXPECT_EQ(buffer.length(), 0);
 }
 
 TEST(BufferHelperTest, DrainLEI32) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
-  EXPECT_EQ(buffer.drainLEIntOut<int32_t>(), 0x03020100);
-  EXPECT_EQ(buffer.drainLEIntOut<int32_t>(), -1);
+  EXPECT_EQ(buffer.drainLEInt<int32_t>(), 0x03020100);
+  EXPECT_EQ(buffer.drainLEInt<int32_t>(), -1);
   EXPECT_EQ(buffer.length(), 0);
 }
 
 TEST(BufferHelperTest, DrainLEI64) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
-  EXPECT_EQ(buffer.drainLEIntOut<int64_t>(), 0x0706050403020100);
-  EXPECT_EQ(buffer.drainLEIntOut<int64_t>(), -1);
+  EXPECT_EQ(buffer.drainLEInt<int64_t>(), 0x0706050403020100);
+  EXPECT_EQ(buffer.drainLEInt<int64_t>(), -1);
   EXPECT_EQ(buffer.length(), 0);
 }
 
 TEST(BufferHelperTest, DrainLEU32) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
-  EXPECT_EQ(buffer.drainLEIntOut<uint32_t>(), 0x03020100);
-  EXPECT_EQ(buffer.drainLEIntOut<uint32_t>(), 0xFFFFFFFF);
+  EXPECT_EQ(buffer.drainLEInt<uint32_t>(), 0x03020100);
+  EXPECT_EQ(buffer.drainLEInt<uint32_t>(), 0xFFFFFFFF);
   EXPECT_EQ(buffer.length(), 0);
 }
 
 TEST(BufferHelperTest, DrainLEU64) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
-  EXPECT_EQ(buffer.drainLEIntOut<uint64_t>(), 0x0706050403020100);
-  EXPECT_EQ(buffer.drainLEIntOut<uint64_t>(), 0xFFFFFFFFFFFFFFFF);
+  EXPECT_EQ(buffer.drainLEInt<uint64_t>(), 0x0706050403020100);
+  EXPECT_EQ(buffer.drainLEInt<uint64_t>(), 0xFFFFFFFFFFFFFFFF);
   EXPECT_EQ(buffer.length(), 0);
 }
 
 TEST(BufferHelperTest, DrainBEI16) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF});
-  EXPECT_EQ(buffer.drainBEIntOut<int16_t>(), 1);
-  EXPECT_EQ(buffer.drainBEIntOut<int16_t>(), 0x0203);
-  EXPECT_EQ(buffer.drainBEIntOut<int16_t>(), -1);
+  EXPECT_EQ(buffer.drainBEInt<int16_t>(), 1);
+  EXPECT_EQ(buffer.drainBEInt<int16_t>(), 0x0203);
+  EXPECT_EQ(buffer.drainBEInt<int16_t>(), -1);
   EXPECT_EQ(buffer.length(), 0);
 }
 
 TEST(BufferHelperTest, DrainBEI32) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
-  EXPECT_EQ(buffer.drainBEIntOut<int32_t>(), 0x00010203);
-  EXPECT_EQ(buffer.drainBEIntOut<int32_t>(), -1);
+  EXPECT_EQ(buffer.drainBEInt<int32_t>(), 0x00010203);
+  EXPECT_EQ(buffer.drainBEInt<int32_t>(), -1);
   EXPECT_EQ(buffer.length(), 0);
 }
 
 TEST(BufferHelperTest, DrainBEI64) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
-  EXPECT_EQ(buffer.drainBEIntOut<int64_t>(), 0x0001020304050607);
-  EXPECT_EQ(buffer.drainBEIntOut<int64_t>(), -1);
+  EXPECT_EQ(buffer.drainBEInt<int64_t>(), 0x0001020304050607);
+  EXPECT_EQ(buffer.drainBEInt<int64_t>(), -1);
   EXPECT_EQ(buffer.length(), 0);
 }
 
 TEST(BufferHelperTest, DrainBEU32) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 0xFF, 0xFF, 0xFF, 0xFF});
-  EXPECT_EQ(buffer.drainBEIntOut<uint32_t>(), 0x00010203);
-  EXPECT_EQ(buffer.drainBEIntOut<uint32_t>(), 0xFFFFFFFF);
+  EXPECT_EQ(buffer.drainBEInt<uint32_t>(), 0x00010203);
+  EXPECT_EQ(buffer.drainBEInt<uint32_t>(), 0xFFFFFFFF);
   EXPECT_EQ(buffer.length(), 0);
 }
 
 TEST(BufferHelperTest, DrainBEU64) {
   Buffer::OwnedImpl buffer;
   addSeq(buffer, {0, 1, 2, 3, 4, 5, 6, 7, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF});
-  EXPECT_EQ(buffer.drainBEIntOut<uint64_t>(), 0x0001020304050607);
-  EXPECT_EQ(buffer.drainBEIntOut<uint64_t>(), 0xFFFFFFFFFFFFFFFF);
+  EXPECT_EQ(buffer.drainBEInt<uint64_t>(), 0x0001020304050607);
+  EXPECT_EQ(buffer.drainBEInt<uint64_t>(), 0xFFFFFFFFFFFFFFFF);
   EXPECT_EQ(buffer.length(), 0);
 }
 

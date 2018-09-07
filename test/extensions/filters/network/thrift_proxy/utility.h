@@ -25,8 +25,6 @@ namespace {
 
 using Envoy::Buffer::addRepeated;
 using Envoy::Buffer::addSeq;
-using Envoy::Buffer::addString;
-using Envoy::Buffer::bufferToString;
 
 inline std::string fieldTypeToString(const FieldType& field_type) {
   switch (field_type) {

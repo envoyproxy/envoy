@@ -19,7 +19,7 @@ double BufferHelper::drainBEDouble(Buffer::Instance& buffer) {
   // 3. Using memcpy may be undefined, but probably reliable, and can be optimized to the
   //    same instructions as 1 and 2.
   // 4. Implementation of last resort is to manually copy from i to d via unsigned char*.
-  uint64_t i = buffer.drainBEIntOut<uint64_t>();
+  uint64_t i = buffer.drainBEInt<uint64_t>();
   double d;
   std::memcpy(&d, &i, 8);
   return d;

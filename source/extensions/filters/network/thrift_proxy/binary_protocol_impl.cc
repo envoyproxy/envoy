@@ -58,7 +58,7 @@ bool BinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetad
     metadata.setMethodName("");
   }
   metadata.setMessageType(type);
-  metadata.setSequenceId(buffer.drainBEIntOut<int32_t>());
+  metadata.setSequenceId(buffer.drainBEInt<int32_t>());
 
   return true;
 }
@@ -200,7 +200,7 @@ bool BinaryProtocolImpl::readInt16(Buffer::Instance& buffer, int16_t& value) {
   if (buffer.length() < 2) {
     return false;
   }
-  value = buffer.drainBEIntOut<int16_t>();
+  value = buffer.drainBEInt<int16_t>();
   return true;
 }
 
@@ -208,7 +208,7 @@ bool BinaryProtocolImpl::readInt32(Buffer::Instance& buffer, int32_t& value) {
   if (buffer.length() < 4) {
     return false;
   }
-  value = buffer.drainBEIntOut<int32_t>();
+  value = buffer.drainBEInt<int32_t>();
   return true;
 }
 
@@ -216,7 +216,7 @@ bool BinaryProtocolImpl::readInt64(Buffer::Instance& buffer, int64_t& value) {
   if (buffer.length() < 8) {
     return false;
   }
-  value = buffer.drainBEIntOut<int64_t>();
+  value = buffer.drainBEInt<int64_t>();
   return true;
 }
 

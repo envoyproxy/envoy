@@ -40,26 +40,6 @@ template <ByteOrder Endianness, typename T> inline T fromEndianness(T value) {
   return EndiannessConverter<Endianness, T>::from(value);
 }
 
-// convenience function that converts a host byte-order integer to little endian byte-order
-template <typename T> inline T toLittleEndian(T value) {
-  return EndiannessConverter<ByteOrder::LittleEndian, T>::to(value);
-}
-
-// convenience function that converts a little endian byte-order integer to host byte-order
-template <typename T> inline T fromLittleEndian(T value) {
-  return EndiannessConverter<ByteOrder::LittleEndian, T>::from(value);
-}
-
-// convenience function that converts a host byte-order integer to big endian byte-order
-template <typename T> inline T toBigEndian(T value) {
-  return EndiannessConverter<ByteOrder::BigEndian, T>::to(value);
-}
-
-// convenience function that converts a big endian byte-order integer to host byte-order
-template <typename T> inline T fromBigEndian(T value) {
-  return EndiannessConverter<ByteOrder::BigEndian, T>::from(value);
-}
-
 // Implementation details below
 
 // implementation details of EndiannessConverter for 8-bit host endianness integers
