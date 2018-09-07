@@ -41,9 +41,9 @@ TEST_F(SdsApiTest, BasicTest) {
   auto google_grpc = grpc_service->mutable_google_grpc();
   google_grpc->set_target_uri("fake_address");
   google_grpc->set_stat_prefix("test");
-  auto sds_api = TlsCertificateSdsApi::create(
-      server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {});
+  TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
+                               server.stats(), server.clusterManager(), init_manager, config_source,
+                               "abc.com", []() {});
 
   NiceMock<Grpc::MockAsyncClient>* grpc_client{new NiceMock<Grpc::MockAsyncClient>()};
   NiceMock<Grpc::MockAsyncClientFactory>* factory{new NiceMock<Grpc::MockAsyncClientFactory>()};
@@ -64,13 +64,13 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
-  auto sds_api = std::static_pointer_cast<TlsCertificateSdsApi>(TlsCertificateSdsApi::create(
-      server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {}));
+  TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
+                               server.stats(), server.clusterManager(), init_manager, config_source,
+                               "abc.com", []() {});
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
-      sds_api->addUpdateCallback([&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+      sds_api.addUpdateCallback([&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
 
   std::string yaml =
       R"EOF(
@@ -86,15 +86,15 @@ TEST_F(SdsApiTest, DynamicTlsCertificateUpdateSuccess) {
   auto secret_config = secret_resources.Add();
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config);
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
-  sds_api->onConfigUpdate(secret_resources, "");
+  sds_api.onConfigUpdate(secret_resources, "");
 
   const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
-            sds_api->secret()->certificateChain());
+            sds_api.secret()->certificateChain());
 
   const std::string key_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_key.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(key_pem)),
-            sds_api->secret()->privateKey());
+            sds_api.secret()->privateKey());
 
   handle->remove();
 }
@@ -105,14 +105,13 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
-  auto sds_api = std::static_pointer_cast<CertificateValidationContextSdsApi>(
-      CertificateValidationContextSdsApi::create(
-          server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-          server.clusterManager(), init_manager, config_source, "abc.com", []() {}));
+  CertificateValidationContextSdsApi sds_api(
+      server.localInfo(), server.dispatcher(), server.random(), server.stats(),
+      server.clusterManager(), init_manager, config_source, "abc.com", []() {});
 
   NiceMock<Secret::MockSecretCallbacks> secret_callback;
   auto handle =
-      sds_api->addUpdateCallback([&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+      sds_api.addUpdateCallback([&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
 
   std::string yaml =
       R"EOF(
@@ -126,11 +125,11 @@ TEST_F(SdsApiTest, DynamicCertificateValidationContextUpdateSuccess) {
   auto secret_config = secret_resources.Add();
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config);
   EXPECT_CALL(secret_callback, onAddOrUpdateSecret());
-  sds_api->onConfigUpdate(secret_resources, "");
+  sds_api.onConfigUpdate(secret_resources, "");
 
   const std::string ca_cert = "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
-            sds_api->secret()->caCert());
+            sds_api.secret()->caCert());
 
   handle->remove();
 }
@@ -140,13 +139,13 @@ TEST_F(SdsApiTest, EmptyResource) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
-  auto sds_api = std::static_pointer_cast<TlsCertificateSdsApi>(TlsCertificateSdsApi::create(
-      server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {}));
+  TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
+                               server.stats(), server.clusterManager(), init_manager, config_source,
+                               "abc.com", []() {});
 
   Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
 
-  EXPECT_THROW_WITH_MESSAGE(sds_api->onConfigUpdate(secret_resources, ""), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(sds_api.onConfigUpdate(secret_resources, ""), EnvoyException,
                             "Missing SDS resources for abc.com in onConfigUpdate()");
 }
 
@@ -155,9 +154,9 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
-  auto sds_api = std::static_pointer_cast<TlsCertificateSdsApi>(TlsCertificateSdsApi::create(
-      server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {}));
+  TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
+                               server.stats(), server.clusterManager(), init_manager, config_source,
+                               "abc.com", []() {});
 
   std::string yaml =
       R"EOF(
@@ -175,7 +174,7 @@ TEST_F(SdsApiTest, SecretUpdateWrongSize) {
   auto secret_config_2 = secret_resources.Add();
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config_2);
 
-  EXPECT_THROW_WITH_MESSAGE(sds_api->onConfigUpdate(secret_resources, ""), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(sds_api.onConfigUpdate(secret_resources, ""), EnvoyException,
                             "Unexpected SDS secrets length: 2");
 }
 
@@ -185,9 +184,9 @@ TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
   NiceMock<Server::MockInstance> server;
   NiceMock<Init::MockManager> init_manager;
   envoy::api::v2::core::ConfigSource config_source;
-  auto sds_api = std::static_pointer_cast<TlsCertificateSdsApi>(TlsCertificateSdsApi::create(
-      server.localInfo(), server.dispatcher(), server.random(), server.stats(),
-      server.clusterManager(), init_manager, config_source, "abc.com", []() {}));
+  TlsCertificateSdsApi sds_api(server.localInfo(), server.dispatcher(), server.random(),
+                               server.stats(), server.clusterManager(), init_manager, config_source,
+                               "abc.com", []() {});
 
   std::string yaml =
       R"EOF(
@@ -203,7 +202,7 @@ TEST_F(SdsApiTest, SecretUpdateWrongSecretName) {
   auto secret_config = secret_resources.Add();
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config);
 
-  EXPECT_THROW_WITH_MESSAGE(sds_api->onConfigUpdate(secret_resources, ""), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(sds_api.onConfigUpdate(secret_resources, ""), EnvoyException,
                             "Unexpected SDS secret (expecting abc.com): wrong.name.com");
 }
 

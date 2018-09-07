@@ -97,11 +97,8 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertific
     const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
   auto create_fn = [&](std::function<void()> unregister_secret_provider) -> SdsApiSharedPtr {
-    return TlsCertificateSdsApi::create(
-        secret_provider_context.localInfo(), secret_provider_context.dispatcher(),
-        secret_provider_context.random(), secret_provider_context.stats(),
-        secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
-        sds_config_source, config_name, unregister_secret_provider);
+    return TlsCertificateSdsApi::create(secret_provider_context, sds_config_source, config_name,
+                                        unregister_secret_provider);
   };
   SdsApiSharedPtr secret_provider =
       innerFindOrCreate(sds_config_source, config_name, secret_provider_context, create_fn);
@@ -114,11 +111,8 @@ SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
     const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
   auto create_fn = [&](std::function<void()> unregister_secret_provider) -> SdsApiSharedPtr {
-    return CertificateValidationContextSdsApi::create(
-        secret_provider_context.localInfo(), secret_provider_context.dispatcher(),
-        secret_provider_context.random(), secret_provider_context.stats(),
-        secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
-        sds_config_source, config_name, unregister_secret_provider);
+    return CertificateValidationContextSdsApi::create(secret_provider_context, sds_config_source,
+                                                      config_name, unregister_secret_provider);
   };
   SdsApiSharedPtr secret_provider =
       innerFindOrCreate(sds_config_source, config_name, secret_provider_context, create_fn);

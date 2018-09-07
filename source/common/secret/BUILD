@@ -46,6 +46,7 @@ envoy_cc_library(
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/secret:secret_provider_interface",
+        "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:callback_impl_lib",
         "//source/common/common:cleanup_lib",

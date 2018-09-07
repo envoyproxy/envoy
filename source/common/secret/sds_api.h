@@ -11,6 +11,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/secret/secret_callbacks.h"
 #include "envoy/secret/secret_provider.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -74,16 +75,15 @@ typedef std::shared_ptr<SdsApi> SdsApiSharedPtr;
  */
 class TlsCertificateSdsApi : public SdsApi, public TlsCertificateConfigProvider {
 public:
-  static SdsApiSharedPtr create(const LocalInfo::LocalInfo& local_info,
-                                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                                Stats::Store& stats, Upstream::ClusterManager& cluster_manager,
-                                Init::Manager& init_manager,
-                                const envoy::api::v2::core::ConfigSource& sds_config,
-                                const std::string& sds_config_name,
-                                std::function<void()> destructor_cb) {
-    return std::make_shared<TlsCertificateSdsApi>(local_info, dispatcher, random, stats,
-                                                  cluster_manager, init_manager, sds_config,
-                                                  sds_config_name, destructor_cb);
+  static SdsApiSharedPtr
+  create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+         const envoy::api::v2::core::ConfigSource& sds_config, const std::string& sds_config_name,
+         std::function<void()> destructor_cb) {
+    return std::make_shared<TlsCertificateSdsApi>(
+        secret_provider_context.localInfo(), secret_provider_context.dispatcher(),
+        secret_provider_context.random(), secret_provider_context.stats(),
+        secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
+        sds_config, sds_config_name, destructor_cb);
   }
 
   TlsCertificateSdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
@@ -123,16 +123,15 @@ private:
 class CertificateValidationContextSdsApi : public SdsApi,
                                            public CertificateValidationContextConfigProvider {
 public:
-  static SdsApiSharedPtr create(const LocalInfo::LocalInfo& local_info,
-                                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                                Stats::Store& stats, Upstream::ClusterManager& cluster_manager,
-                                Init::Manager& init_manager,
-                                const envoy::api::v2::core::ConfigSource& sds_config,
-                                const std::string& sds_config_name,
-                                std::function<void()> destructor_cb) {
+  static SdsApiSharedPtr
+  create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+         const envoy::api::v2::core::ConfigSource& sds_config, const std::string& sds_config_name,
+         std::function<void()> destructor_cb) {
     return std::make_shared<CertificateValidationContextSdsApi>(
-        local_info, dispatcher, random, stats, cluster_manager, init_manager, sds_config,
-        sds_config_name, destructor_cb);
+        secret_provider_context.localInfo(), secret_provider_context.dispatcher(),
+        secret_provider_context.random(), secret_provider_context.stats(),
+        secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
+        sds_config, sds_config_name, destructor_cb);
   }
   CertificateValidationContextSdsApi(const LocalInfo::LocalInfo& local_info,
                                      Event::Dispatcher& dispatcher,
