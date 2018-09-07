@@ -108,8 +108,8 @@ public:
    * Expectations and assertions should be made on onJwksSuccessImpl in place
    * of onJwksSuccess.
    */
-  void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) { onJwksSuccessImpl(jwks); }
-  MOCK_METHOD1(onJwksSuccessImpl, void(google::jwt_verify::JwksPtr& jwks));
+  void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) { onJwksSuccessImpl(jwks.get()); }
+  MOCK_METHOD1(onJwksSuccessImpl, void(const google::jwt_verify::Jwks* jwks));
   MOCK_METHOD1(onJwksError, void(JwksFetcher::JwksReceiver::Failure reason));
 };
 
