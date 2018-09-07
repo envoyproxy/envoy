@@ -30,9 +30,8 @@ class AuthenticatorImpl : public Logger::Loggable<Logger::Id::filter>,
 public:
   AuthenticatorImpl(const std::vector<std::string>& audiences,
                     const absl::optional<std::string> issuer, bool allow_failed,
-                    const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
                     JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager)
-      : providers_(providers), jwks_cache_(jwks_cache), cm_(cluster_manager), issuer_opt_(issuer),
+      : jwks_cache_(jwks_cache), cm_(cluster_manager), issuer_opt_(issuer),
         is_allow_failed_(allow_failed) {
     if (!audiences.empty()) {
       audiences_ = std::make_unique<::google::jwt_verify::CheckAudience>(audiences);
@@ -41,9 +40,8 @@ public:
 
   // Following functions are for Authenticator interface
   void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
-              std::function<void(const Status& status)>&& callback) override;
+              AuthenticatorCallback callback) override;
   void onDestroy() override;
-  void sanitizePayloadHeaders(Http::HeaderMap& headers) const override;
 
 private:
   // Fetch a remote public key.
@@ -66,9 +64,9 @@ private:
   // verify with key.
   void startVerify();
 
-  // The config object.
-  const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers_;
+  // The jwks cache object.
   JwksCache& jwks_cache_;
+  // the cluster manager object.
   Upstream::ClusterManager& cm_;
 
   // The token data
@@ -82,7 +80,7 @@ private:
   // The HTTP request headers
   Http::HeaderMap* headers_{};
   // The on_done function.
-  std::function<void(const Status& status)> callback_;
+  AuthenticatorCallback callback_;
 
   // The pending uri_, only used for logging.
   std::string uri_;
@@ -95,16 +93,8 @@ private:
   const bool is_allow_failed_;
 };
 
-void AuthenticatorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
-  for (const auto& it : providers_) {
-    const auto& provider = it.second;
-    if (!provider.forward_payload_header().empty()) {
-      headers.remove(Http::LowerCaseString(provider.forward_payload_header()));
-    }
-  }
-}
 void AuthenticatorImpl::verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
-                               std::function<void(const Status& status)>&& callback) {
+                               AuthenticatorCallback callback) {
   headers_ = &headers;
   tokens_ = std::move(tokens);
   callback_ = std::move(callback);
@@ -279,12 +269,11 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 
 } // namespace
 
-AuthenticatorPtr
-Authenticator::create(const std::vector<std::string>& audiences,
-                      const absl::optional<std::string>& issuer, bool allow_failed,
-                      const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                      JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager) {
-  return std::make_unique<AuthenticatorImpl>(audiences, issuer, allow_failed, providers, jwks_cache,
+AuthenticatorPtr Authenticator::create(const std::vector<std::string>& audiences,
+                                       const absl::optional<std::string>& issuer, bool allow_failed,
+                                       JwksCache& jwks_cache,
+                                       Upstream::ClusterManager& cluster_manager) {
+  return std::make_unique<AuthenticatorImpl>(audiences, issuer, allow_failed, jwks_cache,
                                              cluster_manager);
 }
 

@@ -4,39 +4,27 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
-namespace {
 
-class VerifyContextImpl : public VerifyContext {
-public:
-  VerifyContextImpl(Http::HeaderMap& headers, VerifierCallbacks* callback)
-      : headers_(headers), callback_(callback) {}
+Http::HeaderMap& VerifyContext::headers() const { return headers_; }
 
-  Http::HeaderMap& headers() const override { return headers_; }
+VerifierCallbacks* VerifyContext::callback() const { return callback_; }
 
-  VerifierCallbacks* callback() const override { return callback_; }
+CompletionState& VerifyContext::getCompletionState(const Verifier* verifier) {
+  return completion_states_[verifier];
+}
 
-  ResponseData& getResponseData(const void* elem) override { return response_data_[elem]; }
+void VerifyContext::storeAuth(AuthenticatorPtr&& auth) { auths_.emplace_back(std::move(auth)); }
 
-  void addAuth(AuthenticatorPtr&& auth) override { auths_.push_back(std::move(auth)); }
-
-  void cancel() override {
-    for (const auto& it : auths_) {
-      it->onDestroy();
-    }
-    auths_.clear();
+void VerifyContext::cancel() {
+  for (const auto& it : auths_) {
+    it->onDestroy();
   }
+  auths_.clear();
+}
 
-private:
-  Http::HeaderMap& headers_;
-  VerifierCallbacks* callback_;
-  std::unordered_map<const void*, ResponseData> response_data_;
-  std::vector<AuthenticatorPtr> auths_;
-};
-
-} // namespace
-
-VerifyContextPtr VerifyContext::create(Http::HeaderMap& headers, VerifierCallbacks* callback) {
-  return std::make_unique<VerifyContextImpl>(headers, callback);
+VerifyContextSharedPtr VerifyContext::create(Http::HeaderMap& headers,
+                                             VerifierCallbacks* callback) {
+  return std::make_shared<VerifyContext>(headers, callback);
 }
 
 } // namespace JwtAuthn

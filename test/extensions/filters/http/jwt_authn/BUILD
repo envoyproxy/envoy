@@ -3,6 +3,7 @@ licenses(["notice"])  # Apache 2
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
+    "envoy_cc_mock",
     "envoy_package",
 )
 load(
@@ -17,16 +18,15 @@ envoy_cc_library(
     hdrs = ["test_common.h"],
 )
 
-envoy_cc_library(
+envoy_cc_mock(
     name = "mock_lib",
     hdrs = ["mock.h"],
+    deps = ["//test/mocks/server:server_mocks"],
 )
 
 envoy_extension_cc_test(
     name = "extractor_test",
-    srcs = [
-        "extractor_test.cc",
-    ],
+    srcs = ["extractor_test.cc"],
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         "//source/extensions/filters/http/jwt_authn:extractor_lib",
@@ -36,9 +36,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "filter_test",
-    srcs = [
-        "filter_test.cc",
-    ],
+    srcs = ["filter_test.cc"],
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         ":mock_lib",
@@ -50,9 +48,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "filter_factory_test",
-    srcs = [
-        "filter_factory_test.cc",
-    ],
+    srcs = ["filter_factory_test.cc"],
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         ":test_common_lib",
@@ -64,9 +60,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "jwks_cache_test",
-    srcs = [
-        "jwks_cache_test.cc",
-    ],
+    srcs = ["jwks_cache_test.cc"],
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         ":test_common_lib",
@@ -77,9 +71,7 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "authenticator_test",
-    srcs = [
-        "authenticator_test.cc",
-    ],
+    srcs = ["authenticator_test.cc"],
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         ":mock_lib",
@@ -117,13 +109,29 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
-    name = "verifier_test",
-    srcs = ["verifier_test.cc"],
+    name = "group_verifier_test",
+    srcs = ["group_verifier_test.cc"],
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         ":mock_lib",
         ":test_common_lib",
         "//source/extensions/filters/http/jwt_authn:verifier_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "verifier_test",
+    srcs = [
+        "all_verifier_test.cc",
+        "provider_verifier_test.cc",
+    ],
+    extension_name = "envoy.filters.http.jwt_authn",
+    deps = [
+        ":mock_lib",
+        ":test_common_lib",
+        "//source/extensions/filters/http/jwt_authn:filter_config_interface",
+        "//source/extensions/filters/http/jwt_authn:matchers_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
     ],

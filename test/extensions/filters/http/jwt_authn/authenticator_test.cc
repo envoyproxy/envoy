@@ -7,7 +7,6 @@
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/mocks/server/mocks.h"
-#include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -33,7 +32,6 @@ public:
   void CreateAuthenticator(bool allow_failed = false) {
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
     auth_ = Authenticator::create({}, absl::nullopt, allow_failed,
-                                  filter_config_->getProtoConfig().providers(),
                                   filter_config_->getCache().getJwksCache(), filter_config_->cm());
   }
 
@@ -41,32 +39,6 @@ public:
   FilterConfigSharedPtr filter_config_;
   std::unique_ptr<Authenticator> auth_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
-};
-
-// A mock HTTP upstream with response body.
-class MockUpstream {
-public:
-  MockUpstream(Upstream::MockClusterManager& mock_cm, const std::string& response_body)
-      : request_(&mock_cm.async_client_), response_body_(response_body) {
-    ON_CALL(mock_cm.async_client_, send_(_, _, _))
-        .WillByDefault(Invoke([this](Http::MessagePtr&, Http::AsyncClient::Callbacks& cb,
-                                     const absl::optional<std::chrono::milliseconds>&)
-                                  -> Http::AsyncClient::Request* {
-          Http::MessagePtr response_message(new Http::ResponseMessageImpl(
-              Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
-          response_message->body().reset(new Buffer::OwnedImpl(response_body_));
-          cb.onSuccess(std::move(response_message));
-          called_count_++;
-          return &request_;
-        }));
-  }
-
-  int called_count() const { return called_count_; }
-
-private:
-  Http::MockAsyncClientRequest request_;
-  std::string response_body_;
-  int called_count_{};
 };
 
 // This test validates a good JWT authentication with a remote Jwks.

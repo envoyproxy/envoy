@@ -8,7 +8,6 @@
 #include "envoy/http/header_map.h"
 
 #include "common/common/logger.h"
-#include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -76,12 +75,20 @@ public:
   virtual std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers) const PURE;
 
   /**
+   * Remove headers that configured to send JWT payloads.
+   *
+   * @param headers is the HTTP request headers.
+   */
+  virtual void sanitizePayloadHeaders(Http::HeaderMap& headers) const PURE;
+
+  /**
    * Create an instance of Extractor for a given config.
    * @param the JwtAuthentication config.
    * @return the extractor object.
    */
   static ExtractorConstPtr
   create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config);
+
   /**
    * Create an instance of Extractor for a given config.
    * @param from_headers header location config.
@@ -89,10 +96,7 @@ public:
    * @return the extractor object.
    */
   static ExtractorConstPtr
-  create(const std::string& issuer,
-         const Protobuf::RepeatedPtrField<
-             ::envoy::config::filter::http::jwt_authn::v2alpha::JwtHeader>& from_headers,
-         const Protobuf::RepeatedPtrField<ProtobufTypes::String>& from_params);
+  create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider& provider);
 };
 
 } // namespace JwtAuthn

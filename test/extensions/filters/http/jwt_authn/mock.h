@@ -1,5 +1,7 @@
 #include "extensions/filters/http/jwt_authn/authenticator.h"
 
+#include "test/mocks/upstream/mocks.h"
+
 #include "gmock/gmock.h"
 
 using ::google::jwt_verify::Status;
@@ -21,12 +23,11 @@ public:
                               std::function<void(const ::google::jwt_verify::Status&)> callback));
 
   void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
-              std::function<void(const ::google::jwt_verify::Status&)>&& callback) {
+              AuthenticatorCallback callback) {
     doVerify(headers, &tokens, std::move(callback));
   }
 
   MOCK_METHOD0(onDestroy, void());
-  MOCK_CONST_METHOD1(sanitizePayloadHeaders, void(Http::HeaderMap& headers));
 };
 
 class MockVerifierCallbacks : public VerifierCallbacks {
@@ -36,12 +37,39 @@ public:
 
 class MockVerifier : public Verifier {
 public:
-  MOCK_CONST_METHOD1(verify, void(VerifyContext& context));
+  MOCK_CONST_METHOD1(verify, void(VerifyContextSharedPtr context));
 };
 
 class MockExtractor : public Extractor {
 public:
   MOCK_CONST_METHOD1(extract, std::vector<JwtLocationConstPtr>(const Http::HeaderMap& headers));
+  MOCK_CONST_METHOD1(sanitizePayloadHeaders, void(Http::HeaderMap& headers));
+};
+
+// A mock HTTP upstream with response body.
+class MockUpstream {
+public:
+  MockUpstream(Upstream::MockClusterManager& mock_cm, const std::string& response_body)
+      : request_(&mock_cm.async_client_), response_body_(response_body) {
+    ON_CALL(mock_cm.async_client_, send_(_, _, _))
+        .WillByDefault(Invoke([this](Http::MessagePtr&, Http::AsyncClient::Callbacks& cb,
+                                     const absl::optional<std::chrono::milliseconds>&)
+                                  -> Http::AsyncClient::Request* {
+          Http::MessagePtr response_message(new Http::ResponseMessageImpl(
+              Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+          response_message->body().reset(new Buffer::OwnedImpl(response_body_));
+          cb.onSuccess(std::move(response_message));
+          called_count_++;
+          return &request_;
+        }));
+  }
+
+  int called_count() const { return called_count_; }
+
+private:
+  Http::MockAsyncClientRequest request_;
+  std::string response_body_;
+  int called_count_{};
 };
 
 } // namespace JwtAuthn

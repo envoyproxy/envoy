@@ -177,6 +177,7 @@ providers:
         uri: https://pubkey_server/pubkey_path
         cluster: pubkey_cluster
     from_params: ["jwt_a"]
+    forward_payload_header: example-auth-userinfo
   other_provider:
     issuer: https://other.com
     audiences:
@@ -186,6 +187,7 @@ providers:
         uri: https://pubkey_server/pubkey_path
         cluster: pubkey_cluster
     from_params: ["jwt_b"]
+    forward_payload_header: other-auth-userinfo
 rules:
 - match:
     path: "/requires-all"
@@ -213,6 +215,7 @@ providers:
       value_prefix: "Bearer "
     - name: b
       value_prefix: "Bearer "
+    forward_payload_header: example-auth-userinfo
   other_provider:
     issuer: https://other.com
     audiences:
@@ -226,6 +229,7 @@ providers:
       value_prefix: "Bearer "
     - name: b
       value_prefix: "Bearer "
+    forward_payload_header: other-auth-userinfo
 rules:
 - match:
     path: "/requires-any"

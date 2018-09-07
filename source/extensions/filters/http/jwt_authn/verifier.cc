@@ -16,19 +16,19 @@ class BaseVerifierImpl : public Verifier {
 public:
   BaseVerifierImpl(const BaseVerifierImpl* parent) : parent_(parent) {}
 
-  void onCompleteHelper(Status status, VerifyContext& context) const {
+  void onCompleteHelper(Status status, VerifyContextSharedPtr context) const {
     if (parent_ != nullptr) {
       return parent_->onComplete(status, context);
     }
-    return context.callback()->onComplete(status);
+    return context->callback()->onComplete(status);
   }
 
   // Check if next verifier should be notified of status, or if no next verifier exists signal
   // callback in context.
-  virtual void onComplete(const Status& status, VerifyContext& context) const {
-    auto& response_data = context.getResponseData(this);
-    if (!response_data.has_responded_) {
-      response_data.has_responded_ = true;
+  virtual void onComplete(const Status& status, VerifyContextSharedPtr context) const {
+    auto& completion_state = context->getCompletionState(this);
+    if (!completion_state.is_completed_) {
+      completion_state.is_completed_ = true;
       onCompleteHelper(status, context);
     }
   }
@@ -51,17 +51,15 @@ public:
   ProviderVerifierImpl(const std::vector<std::string>& audiences, const AuthFactory& factory,
                        const JwtProvider& provider, const BaseVerifierImpl* parent)
       : BaseVerifierImpl(parent), audiences_(audiences), auth_factory_(factory),
-        extractor_(
-            Extractor::create(provider.issuer(), provider.from_headers(), provider.from_params())),
-        issuer_(provider.issuer()) {}
+        extractor_(Extractor::create(provider)), issuer_(provider.issuer()) {}
 
-  void verify(VerifyContext& context) const override {
+  void verify(VerifyContextSharedPtr context) const override {
     auto auth = auth_factory_.create(audiences_, absl::optional<std::string>{issuer_}, false);
-    auth->sanitizePayloadHeaders(context.headers());
-    auth->verify(context.headers(), extractor_->extract(context.headers()),
-                 [&](const Status& status) { onComplete(status, context); });
-    if (!context.getResponseData(this).has_responded_) {
-      context.addAuth(std::move(auth));
+    extractor_->sanitizePayloadHeaders(context->headers());
+    auth->verify(context->headers(), extractor_->extract(context->headers()),
+                 [=](const Status& status) { onComplete(status, context); });
+    if (!context->getCompletionState(this).is_completed_) {
+      context->storeAuth(std::move(auth));
     }
   }
 
@@ -80,13 +78,13 @@ public:
       : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(extractor),
         allow_failed_(allow_failed) {}
 
-  void verify(VerifyContext& context) const override {
+  void verify(VerifyContextSharedPtr context) const override {
     auto auth = auth_factory_.create({}, absl::nullopt, allow_failed_);
-    auth->sanitizePayloadHeaders(context.headers());
-    auth->verify(context.headers(), extractor_.extract(context.headers()),
-                 [&](const Status& status) { onComplete(status, context); });
-    if (!context.getResponseData(this).has_responded_) {
-      context.addAuth(std::move(auth));
+    extractor_.sanitizePayloadHeaders(context->headers());
+    auth->verify(context->headers(), extractor_.extract(context->headers()),
+                 [=](const Status& status) { onComplete(status, context); });
+    if (!context->getCompletionState(this).is_completed_) {
+      context->storeAuth(std::move(auth));
     }
   }
 
@@ -101,11 +99,12 @@ class BaseGroupVerifierImpl : public BaseVerifierImpl {
 public:
   BaseGroupVerifierImpl(const BaseVerifierImpl* parent) : BaseVerifierImpl(parent) {}
 
-  void verify(VerifyContext& context) const override {
+  void verify(VerifyContextSharedPtr context) const override {
     for (const auto& it : verifiers_) {
-      if (!context.getResponseData(this).has_responded_) {
-        it->verify(context);
+      if (context->getCompletionState(this).is_completed_) {
+        return;
       }
+      it->verify(context);
     }
   }
 
@@ -122,18 +121,18 @@ public:
                   const Extractor& extractor, const BaseVerifierImpl* parent)
       : BaseGroupVerifierImpl(parent) {
     for (const auto& it : or_list.requirements()) {
-      auto verifier = innerCreate(it, providers, factory, extractor, this);
-      verifiers_.push_back(std::move(verifier));
+      verifiers_.emplace_back(innerCreate(it, providers, factory, extractor, this));
     }
   }
 
-  void onComplete(const Status& status, VerifyContext& context) const override {
-    auto& response_data = context.getResponseData(this);
-    if (response_data.has_responded_) {
+  void onComplete(const Status& status, VerifyContextSharedPtr context) const override {
+    auto& completion_state = context->getCompletionState(this);
+    if (completion_state.is_completed_) {
       return;
     }
-    if (++response_data.count_ == verifiers_.size() || Status::Ok == status) {
-      response_data.has_responded_ = true;
+    if (++completion_state.number_completed_children_ == verifiers_.size() ||
+        Status::Ok == status) {
+      completion_state.is_completed_ = true;
       onCompleteHelper(status, context);
     }
   }
@@ -147,18 +146,18 @@ public:
                   const Extractor& extractor, const BaseVerifierImpl* parent)
       : BaseGroupVerifierImpl(parent) {
     for (const auto& it : and_list.requirements()) {
-      auto verifier = innerCreate(it, providers, factory, extractor, this);
-      verifiers_.push_back(std::move(verifier));
+      verifiers_.emplace_back(innerCreate(it, providers, factory, extractor, this));
     }
   }
 
-  void onComplete(const Status& status, VerifyContext& context) const override {
-    auto& response_data = context.getResponseData(this);
-    if (response_data.has_responded_) {
+  void onComplete(const Status& status, VerifyContextSharedPtr context) const override {
+    auto& completion_state = context->getCompletionState(this);
+    if (completion_state.is_completed_) {
       return;
     }
-    if (++response_data.count_ == verifiers_.size() || Status::Ok != status) {
-      response_data.has_responded_ = true;
+    if (++completion_state.number_completed_children_ == verifiers_.size() ||
+        Status::Ok != status) {
+      completion_state.is_completed_ = true;
       onCompleteHelper(status, context);
     }
   }
@@ -169,9 +168,9 @@ class AllowAllVerifierImpl : public BaseVerifierImpl {
 public:
   AllowAllVerifierImpl(const BaseVerifierImpl* parent) : BaseVerifierImpl(parent) {}
 
-  void verify(VerifyContext& context) const override { onComplete(Status::Ok, context); }
+  void verify(VerifyContextSharedPtr context) const override { onComplete(Status::Ok, context); }
 
-  void onComplete(const Status& status, VerifyContext& context) const override {
+  void onComplete(const Status& status, VerifyContextSharedPtr context) const override {
     onCompleteHelper(status, context);
   }
 };

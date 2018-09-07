@@ -47,7 +47,7 @@ private:
   // Filter config object.
   FilterConfigSharedPtr config_;
   // Verify context for current.
-  VerifyContextPtr context_;
+  VerifyContextSharedPtr context_;
 };
 
 } // namespace JwtAuthn

@@ -19,7 +19,7 @@ public:
   virtual ~Verifier() {}
 
   // Verify all tokens on headers, and signal the caller with callback.
-  virtual void verify(VerifyContext& context) const PURE;
+  virtual void verify(VerifyContextSharedPtr context) const PURE;
 
   // Factory method for creating verifiers.
   static VerifierPtr
@@ -28,6 +28,21 @@ public:
                              ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider>&
              providers,
          const AuthFactory& factory, const Extractor& extractor);
+};
+
+/**
+ * Handle for notifying Verifier callers of request completion.
+ */
+class VerifierCallbacks {
+public:
+  virtual ~VerifierCallbacks() {}
+
+  /**
+   * Called on completion of request.
+   *
+   * @param status the status of the request.
+   */
+  virtual void onComplete(const ::google::jwt_verify::Status& status) PURE;
 };
 
 } // namespace JwtAuthn

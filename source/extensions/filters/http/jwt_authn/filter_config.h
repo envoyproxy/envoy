@@ -104,8 +104,7 @@ public:
   AuthenticatorPtr create(const std::vector<std::string>& audiences,
                           const absl::optional<std::string>& issuer,
                           bool allow_failed) const override {
-    return Authenticator::create(audiences, issuer, allow_failed, proto_config_.providers(),
-                                 getCache().getJwksCache(), cm());
+    return Authenticator::create(audiences, issuer, allow_failed, getCache().getJwksCache(), cm());
   }
 
 private:
