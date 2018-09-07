@@ -44,6 +44,7 @@
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
@@ -518,18 +519,23 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
   Http::Code rc = Http::Code::OK;
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
 
-  const bool show_all = params.find("usedonly") == params.end();
+  const bool used_only = params.find("usedonly") != params.end();
   const bool has_format = !(params.find("format") == params.end());
+  const bool has_filter_string = params.find("filter") != params.end();
+  const absl::optional<std::string> filter_string =
+      has_filter_string ? absl::optional<std::string>{params.at("filter")} : absl::nullopt;
 
   std::map<std::string, uint64_t> all_stats;
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
-    if (show_all || counter->used()) {
+    if ((!used_only || counter->used()) &&
+        (!has_filter_string || absl::StrContains(counter->name(), filter_string.value()))) {
       all_stats.emplace(counter->name(), counter->value());
     }
   }
 
   for (const Stats::GaugeSharedPtr& gauge : server_.stats().gauges()) {
-    if (show_all || gauge->used()) {
+    if ((!used_only || gauge->used()) &&
+        (!has_filter_string || absl::StrContains(gauge->name(), filter_string.value()))) {
       all_stats.emplace(gauge->name(), gauge->value());
     }
   }
@@ -539,7 +545,8 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     if (format_value == "json") {
       response_headers.insertContentType().value().setReference(
           Http::Headers::get().ContentTypeValues.Json);
-      response.add(AdminImpl::statsAsJson(all_stats, server_.stats().histograms(), show_all));
+      response.add(AdminImpl::statsAsJson(all_stats, server_.stats().histograms(), used_only,
+                                          filter_string));
     } else if (format_value == "prometheus") {
       return handlerPrometheusStats(url, response_headers, response, admin_stream);
     } else {
@@ -556,7 +563,8 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     // implemented this can be switched back to a normal map.
     std::multimap<std::string, std::string> all_histograms;
     for (const Stats::ParentHistogramSharedPtr& histogram : server_.stats().histograms()) {
-      if (show_all || histogram->used()) {
+      if ((!used_only || histogram->used()) &&
+          (!has_filter_string || absl::StrContains(histogram->name(), filter_string.value()))) {
         all_histograms.emplace(histogram->name(), histogram->summary());
       }
     }
@@ -627,7 +635,8 @@ PrometheusStatsFormatter::statsAsPrometheus(const std::vector<Stats::CounterShar
 std::string
 AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                        const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                       const bool show_all, const bool pretty_print) {
+                       const bool used_only, const absl::optional<std::string> filter_string,
+                       const bool pretty_print) {
   rapidjson::Document document;
   document.SetObject();
   rapidjson::Value stats_array(rapidjson::kArrayType);
@@ -654,7 +663,9 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
   rapidjson::Value histogram_array(rapidjson::kArrayType);
 
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
-    if (show_all || histogram->used()) {
+    if ((!used_only || histogram->used()) &&
+        (!filter_string.has_value() ||
+         absl::StrContains(histogram->name(), filter_string.value()))) {
       if (!found_used_histogram) {
         // It is not possible for the supported quantiles to differ across histograms, so it is ok
         // to send them once.
