@@ -66,7 +66,7 @@ private:
   std::unique_ptr<envoy::service::load_stats::v2::LoadStatsResponse> message_;
   // Map from cluster name to start of measurement interval.
   std::unordered_map<std::string, std::chrono::steady_clock::duration> clusters_;
-  TimeSource& time_system_;
+  TimeSource& time_source_;
 };
 
 typedef std::unique_ptr<LoadStatsReporter> LoadStatsReporterPtr;

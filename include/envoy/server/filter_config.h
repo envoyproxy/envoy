@@ -133,7 +133,7 @@ public:
   /**
    * @return TimeSource& a reference to the time source.
    */
-  virtual TimeSource& timeSystem() PURE;
+  virtual TimeSource& timeSource() PURE;
 };
 
 class ListenerFactoryContext : public FactoryContext {

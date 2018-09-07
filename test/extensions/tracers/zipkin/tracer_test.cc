@@ -37,17 +37,17 @@ private:
 
 class ZipkinTracerTest : public testing::Test {
 protected:
-  ZipkinTracerTest() : time_system_(test_time_.timeSystem()) {}
+  ZipkinTracerTest() : time_source_(test_time_.timeSystem()) {}
 
   DangerousDeprecatedTestTime test_time_;
-  TimeSource& time_system_;
+  TimeSource& time_source_;
 };
 
 TEST_F(ZipkinTracerTest, spanCreation) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator, false, time_system_);
+  Tracer tracer("my_service_name", addr, random_generator, false, time_source_);
   NiceMock<MockTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.systemTime();
 
@@ -314,7 +314,7 @@ TEST_F(ZipkinTracerTest, finishNotSampledSpan) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator, false, time_system_);
+  Tracer tracer("my_service_name", addr, random_generator, false, time_source_);
   NiceMock<MockTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.systemTime();
 
@@ -343,7 +343,7 @@ TEST_F(ZipkinTracerTest, SpanSampledPropagatedToChild) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator, false, time_system_);
+  Tracer tracer("my_service_name", addr, random_generator, false, time_source_);
   NiceMock<MockTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.systemTime();
 
@@ -372,7 +372,7 @@ TEST_F(ZipkinTracerTest, RootSpan128bitTraceId) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator, true, time_system_);
+  Tracer tracer("my_service_name", addr, random_generator, true, time_source_);
   NiceMock<MockTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.systemTime();
 

@@ -102,7 +102,7 @@ public:
         random_(random), stats_{ALL_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix))},
         emit_dynamic_stats_(emit_dynamic_stats), start_child_span_(start_child_span),
         suppress_envoy_headers_(suppress_envoy_headers), shadow_writer_(std::move(shadow_writer)),
-        time_system_(time_source) {}
+        time_source_(time_source) {}
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
@@ -111,14 +111,14 @@ public:
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
                      config.start_child_span(), config.suppress_envoy_headers(),
-                     context.timeSystem()) {
+                     context.timeSource()) {
     for (const auto& upstream_log : config.upstream_log()) {
       upstream_logs_.push_back(AccessLog::AccessLogFactory::fromProto(upstream_log, context));
     }
   }
 
   ShadowWriter& shadowWriter() { return *shadow_writer_; }
-  TimeSource& timeSystem() { return time_system_; }
+  TimeSource& timeSource() { return time_source_; }
 
   Stats::Scope& scope_;
   const LocalInfo::LocalInfo& local_info_;
@@ -133,7 +133,7 @@ public:
 
 private:
   ShadowWriterPtr shadow_writer_;
-  TimeSource& time_system_;
+  TimeSource& time_source_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
@@ -350,7 +350,7 @@ private:
   // Called immediately after a non-5xx header is received from upstream, performs stats accounting
   // and handle difference between gRPC and non-gRPC requests.
   void handleNon5xxResponseHeaders(const Http::HeaderMap& headers, bool end_stream);
-  TimeSource& timeSystem() { return config_.timeSystem(); }
+  TimeSource& timeSource() { return config_.timeSource(); }
 
   FilterConfig& config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};

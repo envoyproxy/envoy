@@ -31,7 +31,7 @@ private:
   const std::string remote_cluster_name_;
   const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue> initial_metadata_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
-  TimeSource& time_system_;
+  TimeSource& time_source_;
 
   friend class AsyncRequestImpl;
   friend class AsyncStreamImpl;

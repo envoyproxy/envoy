@@ -388,7 +388,7 @@ GoogleAsyncRequestImpl::GoogleAsyncRequestImpl(
       callbacks_(callbacks) {
   current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
                                          "async " + parent.stat_prefix_ + " egress",
-                                         parent.timeSystem().systemTime());
+                                         parent.timeSource().systemTime());
   current_span_->setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, parent.stat_prefix_);
   current_span_->setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY);
 }

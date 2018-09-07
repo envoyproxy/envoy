@@ -121,7 +121,7 @@ public:
   void stopWorkers() override;
 
   Instance& server_;
-  TimeSource& time_system_;
+  TimeSource& time_source_;
   ListenerComponentFactory& factory_;
 
 private:
@@ -273,7 +273,7 @@ public:
   const envoy::api::v2::core::Metadata& listenerMetadata() const override {
     return config_.metadata();
   };
-  TimeSource& timeSystem() override { return parent_.time_system_; }
+  TimeSource& timeSource() override { return parent_.time_source_; }
   void ensureSocketOptions() {
     if (!listen_socket_options_) {
       listen_socket_options_ =

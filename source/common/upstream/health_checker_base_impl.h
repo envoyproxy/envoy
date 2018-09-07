@@ -134,7 +134,7 @@ class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {
 public:
   HealthCheckEventLoggerImpl(AccessLog::AccessLogManager& log_manager, TimeSource& time_source,
                              const std::string& file_name)
-      : time_system_(time_source), file_(log_manager.createAccessLog(file_name)) {}
+      : time_source_(time_source), file_(log_manager.createAccessLog(file_name)) {}
 
   void logEjectUnhealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
                          const HostDescriptionConstSharedPtr& host,
@@ -143,7 +143,7 @@ public:
                      const HostDescriptionConstSharedPtr& host, bool first_check) override;
 
 private:
-  TimeSource& time_system_;
+  TimeSource& time_source_;
   Filesystem::FileSharedPtr file_;
 };
 

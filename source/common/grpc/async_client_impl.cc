@@ -14,7 +14,7 @@ AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
                                  const envoy::api::v2::core::GrpcService& config,
                                  TimeSource& time_source)
     : cm_(cm), remote_cluster_name_(config.envoy_grpc().cluster_name()),
-      initial_metadata_(config.initial_metadata()), time_system_(time_source) {}
+      initial_metadata_(config.initial_metadata()), time_source_(time_source) {}
 
 AsyncClientImpl::~AsyncClientImpl() {
   while (!active_streams_.empty()) {
@@ -208,7 +208,7 @@ AsyncRequestImpl::AsyncRequestImpl(AsyncClientImpl& parent,
 
   current_span_ = parent_span.spawnChild(Tracing::EgressConfig::get(),
                                          "async " + parent.remote_cluster_name_ + " egress",
-                                         parent.time_system_.systemTime());
+                                         parent.time_source_.systemTime());
   current_span_->setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, parent.remote_cluster_name_);
   current_span_->setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY);
 }

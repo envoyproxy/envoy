@@ -779,7 +779,7 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
   if (parent_.config_.start_child_span_) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         parent_.callbacks_->tracingConfig(), "router " + parent.cluster_->name() + " egress",
-        parent.timeSystem().systemTime());
+        parent.timeSource().systemTime());
     span_->setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY);
   }
 

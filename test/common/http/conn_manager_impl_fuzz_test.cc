@@ -43,14 +43,14 @@ namespace Http {
 class FuzzConfig : public ConnectionManagerConfig {
 public:
   struct RouteConfigProvider : public Router::RouteConfigProvider {
-    RouteConfigProvider(TimeSource& time_source) : time_system_(time_source) {}
+    RouteConfigProvider(TimeSource& time_source) : time_source_(time_source) {}
 
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return route_config_; }
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
-    SystemTime lastUpdated() const override { return time_system_.systemTime(); }
+    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
 
-    TimeSource& time_system_;
+    TimeSource& time_source_;
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   };
 

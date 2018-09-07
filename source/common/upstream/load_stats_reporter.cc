@@ -16,7 +16,7 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")),
-      time_system_(dispatcher.timeSystem()) {
+      time_source_(dispatcher.timeSystem()) {
   request_.mutable_node()->MergeFrom(local_info.node());
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
@@ -77,7 +77,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     }
     cluster_stats->set_total_dropped_requests(
         cluster.info()->loadReportStats().upstream_rq_dropped_.latch());
-    const auto now = time_system_.monotonicTime().time_since_epoch();
+    const auto now = time_source_.monotonicTime().time_since_epoch();
     const auto measured_interval = now - cluster_name_and_timestamp.second;
     cluster_stats->mutable_load_report_interval()->MergeFrom(
         Protobuf::util::TimeUtil::MicrosecondsToDuration(
@@ -136,7 +136,7 @@ void LoadStatsReporter::startLoadReportPeriod() {
   for (const std::string& cluster_name : message_->clusters()) {
     clusters_.emplace(cluster_name, existing_clusters.count(cluster_name) > 0
                                         ? existing_clusters[cluster_name]
-                                        : time_system_.monotonicTime().time_since_epoch());
+                                        : time_source_.monotonicTime().time_since_epoch());
     auto cluster_info_map = cm_.clusters();
     auto it = cluster_info_map.find(cluster_name);
     if (it == cluster_info_map.end()) {
