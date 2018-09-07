@@ -31,7 +31,7 @@ public:
   FilterConfigSharedPtr filter_config_;
   VerifierPtr verifier_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
-  VerifyContextSharedPtr context_;
+  ContextSharedPtr context_;
   MockVerifierCallbacks mock_cb_;
 };
 
@@ -44,10 +44,10 @@ TEST_F(AllVerifierTest, TestAllAllow) {
     ASSERT_EQ(status, Status::Ok);
   }));
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer a"}};
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
   headers = Http::TestHeaderMapImpl{};
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
 }
 
@@ -73,7 +73,7 @@ TEST_F(AllVerifierTest, TestAllowFailedTrue) {
       {"b", "Prefix " + std::string(InvalidAudToken)},
       {"c", "Prefix "},
   };
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("a"));
   EXPECT_TRUE(headers.has("b"));
@@ -94,10 +94,10 @@ TEST_F(AllVerifierTest, TestAllowFailedFalse) {
   auto headers = Http::TestHeaderMapImpl{
       {"Authorization", "Bearer " + std::string(ExpiredToken)},
   };
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
   headers = Http::TestHeaderMapImpl{};
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
 }
 

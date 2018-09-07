@@ -86,20 +86,10 @@ envoy_cc_library(
     srcs = ["verifier.cc"],
     hdrs = ["verifier.h"],
     deps = [
-        ":verify_context_lib",
-        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:jwt_authn_cc",
-    ],
-)
-
-envoy_cc_library(
-    name = "verify_context_lib",
-    srcs = ["verify_context.cc"],
-    hdrs = ["verify_context.h"],
-    external_deps = ["jwt_verify_lib"],
-    deps = [
         ":authenticator_lib",
         ":extractor_lib",
         "//include/envoy/http:header_map_interface",
+        "@envoy_api//envoy/config/filter/http/jwt_authn/v2alpha:jwt_authn_cc",
     ],
 )
 

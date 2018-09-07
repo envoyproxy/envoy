@@ -30,14 +30,14 @@ public:
   MOCK_METHOD0(onDestroy, void());
 };
 
-class MockVerifierCallbacks : public VerifierCallbacks {
+class MockVerifierCallbacks : public Verifier::Callbacks {
 public:
   MOCK_METHOD1(onComplete, void(const Status& status));
 };
 
 class MockVerifier : public Verifier {
 public:
-  MOCK_CONST_METHOD1(verify, void(VerifyContextSharedPtr context));
+  MOCK_CONST_METHOD1(verify, void(ContextSharedPtr context));
 };
 
 class MockExtractor : public Extractor {

@@ -28,7 +28,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) 
   if (!matcher) {
     onComplete(Status::Ok);
   } else {
-    context_ = VerifyContext::create(headers, this);
+    context_ = Verifier::createContext(headers, this);
     matcher->verifier()->verify(context_);
   }
 

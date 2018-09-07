@@ -69,7 +69,7 @@ public:
 // All functions should return Continue.
 TEST_F(FilterTest, InlineOK) {
   // A successful authentication completed inline: callback is called inside verify().
-  EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([](VerifyContextSharedPtr context) {
+  EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {
     context->callback()->onComplete(Status::Ok);
   }));
 
@@ -86,7 +86,7 @@ TEST_F(FilterTest, InlineOK) {
 // All functions should return Continue except decodeHeaders(), it returns StopIteraton.
 TEST_F(FilterTest, InlineFailure) {
   // A failed authentication completed inline: callback is called inside verify().
-  EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([](VerifyContextSharedPtr context) {
+  EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {
     context->callback()->onComplete(Status::JwtBadFormat);
   }));
 
@@ -101,10 +101,11 @@ TEST_F(FilterTest, InlineFailure) {
 
 // This test verifies Verifier::Callback is called with OK status after verify().
 TEST_F(FilterTest, OutBoundOK) {
-  VerifierCallbacks* m_cb;
+  Verifier::Callbacks* m_cb;
   // callback is saved, not called right
-  EXPECT_CALL(*raw_mock_verifier_, verify(_))
-      .WillOnce(Invoke([&m_cb](VerifyContextSharedPtr context) { m_cb = context->callback(); }));
+  EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([&m_cb](ContextSharedPtr context) {
+    m_cb = context->callback();
+  }));
 
   auto headers = Http::TestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
@@ -114,7 +115,7 @@ TEST_F(FilterTest, OutBoundOK) {
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(headers));
 
   // Callback is called now with OK status.
-  auto context = VerifyContext::create(headers, &verifier_callback_);
+  auto context = Verifier::createContext(headers, &verifier_callback_);
   m_cb->onComplete(Status::Ok);
 
   EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
@@ -124,10 +125,11 @@ TEST_F(FilterTest, OutBoundOK) {
 
 // This test verifies Verifier::Callback is called with a failure after verify().
 TEST_F(FilterTest, OutBoundFailure) {
-  VerifierCallbacks* m_cb;
+  Verifier::Callbacks* m_cb;
   // callback is saved, not called right
-  EXPECT_CALL(*raw_mock_verifier_, verify(_))
-      .WillOnce(Invoke([&m_cb](VerifyContextSharedPtr context) { m_cb = context->callback(); }));
+  EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([&m_cb](ContextSharedPtr context) {
+    m_cb = context->callback();
+  }));
 
   auto headers = Http::TestHeaderMapImpl{};
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
@@ -136,7 +138,7 @@ TEST_F(FilterTest, OutBoundFailure) {
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark, filter_->decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::StopIteration, filter_->decodeTrailers(headers));
 
-  auto context = VerifyContext::create(headers, &verifier_callback_);
+  auto context = Verifier::createContext(headers, &verifier_callback_);
   // Callback is called now with a failure status.
   m_cb->onComplete(Status::JwtBadFormat);
 
@@ -146,18 +148,6 @@ TEST_F(FilterTest, OutBoundFailure) {
 
   // Should be OK to call the onComplete() again.
   m_cb->onComplete(Status::JwtBadFormat);
-}
-
-// This test verifies Verifier::cancel() is called when Filter::onDestory() is called.
-TEST_F(FilterTest, VerifyCancel) {
-  EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([](VerifyContextSharedPtr context) {
-    auto auth = std::make_unique<MockAuthenticator>();
-    EXPECT_CALL(*auth.get(), onDestroy()).Times(1);
-    context->storeAuth(std::move(auth));
-  }));
-  auto headers = Http::TestHeaderMapImpl{};
-  filter_->decodeHeaders(headers, false);
-  filter_->onDestroy();
 }
 
 } // namespace JwtAuthn

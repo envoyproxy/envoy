@@ -30,7 +30,7 @@ public:
   FilterConfigSharedPtr filter_config_;
   VerifierPtr verifier_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
-  VerifyContextSharedPtr context_;
+  ContextSharedPtr context_;
   MockVerifierCallbacks mock_cb_;
 };
 
@@ -47,7 +47,7 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
       {"Authorization", "Bearer " + std::string(GoodToken)},
       {"sec-istio-auth-userinfo", ""},
   };
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_EQ(ExpectedPayloadValue, headers.get_("sec-istio-auth-userinfo"));
 }
@@ -61,7 +61,7 @@ TEST_F(ProviderVerifierTest, TestMissedJWT) {
   }));
 
   auto headers = Http::TestHeaderMapImpl{{"sec-istio-auth-userinfo", ""}};
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("sec-istio-auth-userinfo"));
 }
@@ -102,7 +102,7 @@ rules:
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
   };
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_TRUE(headers.has("example-auth-userinfo"));
   EXPECT_FALSE(headers.has("other-auth-userinfo"));

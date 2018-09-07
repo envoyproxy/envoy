@@ -33,7 +33,7 @@ public:
   std::vector<std::unique_ptr<MockAuthenticator>> mock_auths_;
   int idx = 0;
   NiceMock<MockAuthFactory> mock_factory_;
-  VerifyContextSharedPtr context_;
+  ContextSharedPtr context_;
 };
 
 // Deeply nested anys that ends in provider name
@@ -82,7 +82,7 @@ rules:
       {":path", "/match?jwta=" + std::string(GoodToken) + "&jwtb=" + std::string(ExpiredToken)},
       {"sec-istio-auth-userinfo", ""},
   };
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("sec-istio-auth-userinfo"));
 }
@@ -120,7 +120,7 @@ rules:
     ASSERT_EQ(status, Status::Ok);
   }));
   auto headers = Http::TestHeaderMapImpl{{":path", "/match"}};
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
 }
 
@@ -145,7 +145,7 @@ TEST_F(GroupVerifierTest, TestRequiresAll) {
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
   };
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("example-auth-userinfo"));
   EXPECT_FALSE(headers.has("other-auth-userinfo"));
@@ -173,7 +173,7 @@ TEST_F(GroupVerifierTest, TestRequiresAllBadFormat) {
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
   };
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
   callbacks[0](Status::JwtBadFormat);
   // can keep invoking callback
@@ -207,7 +207,7 @@ TEST_F(GroupVerifierTest, TestRequiresAllMissing) {
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
   };
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
   callbacks[0](Status::Ok);
   callbacks[1](Status::JwtMissed);
@@ -237,7 +237,7 @@ TEST_F(GroupVerifierTest, TestRequiresAllWrongLocations) {
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
   };
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("example-auth-userinfo"));
   EXPECT_TRUE(headers.has("other-auth-userinfo"));
@@ -279,7 +279,7 @@ TEST_F(GroupVerifierTest, TestRequiresAny) {
       {"other-auth-userinfo", ""},
       {":path", "/requires-any"},
   };
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("example-auth-userinfo"));
   EXPECT_TRUE(headers.has("other-auth-userinfo"));
@@ -291,7 +291,7 @@ TEST_F(GroupVerifierTest, TestRequiresAny) {
       {"other-auth-userinfo", ""},
       {":path", "/requires-any"},
   };
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("example-auth-userinfo"));
   EXPECT_FALSE(headers.has("other-auth-userinfo"));
@@ -303,7 +303,7 @@ TEST_F(GroupVerifierTest, TestRequiresAny) {
       {"other-auth-userinfo", ""},
       {":path", "/requires-any"},
   };
-  context_ = VerifyContext::create(headers, &mock_cb_);
+  context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("example-auth-userinfo"));
   EXPECT_FALSE(headers.has("other-auth-userinfo"));

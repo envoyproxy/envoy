@@ -1,7 +1,6 @@
 #pragma once
 
 #include "extensions/filters/http/jwt_authn/authenticator.h"
-#include "extensions/filters/http/jwt_authn/verify_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,8 +17,50 @@ class Verifier {
 public:
   virtual ~Verifier() {}
 
+  /**
+   * Handle for notifying Verifier callers of request completion.
+   */
+  class Callbacks {
+  public:
+    virtual ~Callbacks() {}
+
+    /**
+     * Called on completion of request.
+     *
+     * @param status the status of the request.
+     */
+    virtual void onComplete(const ::google::jwt_verify::Status& status) PURE;
+  };
+
+  // Context object to hold data needed for verifier.
+  class Context {
+  public:
+    virtual ~Context() {}
+
+    /**
+     * Returns the request headers wrapped in this context.
+     *
+     * @return the request headers.
+     */
+    virtual Http::HeaderMap& headers() const PURE;
+
+    /**
+     * Returns the request callback wrapped in this context.
+     *
+     * @returns the request callback.
+     */
+    virtual Callbacks* callback() const PURE;
+
+    /**
+     * Cancel any pending reuqets for this context.
+     */
+    virtual void cancel() PURE;
+  };
+
+  typedef std::shared_ptr<Context> ContextSharedPtr;
+
   // Verify all tokens on headers, and signal the caller with callback.
-  virtual void verify(VerifyContextSharedPtr context) const PURE;
+  virtual void verify(ContextSharedPtr context) const PURE;
 
   // Factory method for creating verifiers.
   static VerifierPtr
@@ -28,22 +69,11 @@ public:
                              ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider>&
              providers,
          const AuthFactory& factory, const Extractor& extractor);
+
+  static ContextSharedPtr createContext(Http::HeaderMap& headers, Callbacks* callback);
 };
 
-/**
- * Handle for notifying Verifier callers of request completion.
- */
-class VerifierCallbacks {
-public:
-  virtual ~VerifierCallbacks() {}
-
-  /**
-   * Called on completion of request.
-   *
-   * @param status the status of the request.
-   */
-  virtual void onComplete(const ::google::jwt_verify::Status& status) PURE;
-};
+typedef std::shared_ptr<Verifier::Context> ContextSharedPtr;
 
 } // namespace JwtAuthn
 } // namespace HttpFilters

@@ -11,22 +11,63 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
+/**
+ * Struct to keep track of verifier completed and responded state for a request.
+ */
+struct CompletionState {
+  // if verifier node has responded to a request or not.
+  bool is_completed_{false};
+  // number of completed inner verifier for an any/all verifier.
+  std::size_t number_completed_children_{0};
+};
+
+class ContextImpl : public Verifier::Context {
+public:
+  ContextImpl(Http::HeaderMap& headers, Verifier::Callbacks* callback)
+      : headers_(headers), callback_(callback) {}
+
+  Http::HeaderMap& headers() const override { return headers_; }
+
+  Verifier::Callbacks* callback() const override { return callback_; }
+
+  void cancel() override {
+    for (const auto& it : auths_) {
+      it->onDestroy();
+    }
+    auths_.clear();
+  }
+
+  // Get Response data which can be used to check if a verifier node has responded or not.
+  CompletionState& getCompletionState(const Verifier* verifier) {
+    return completion_states_[verifier];
+  }
+
+  // Stores an authenticator object for this request.
+  void storeAuth(AuthenticatorPtr&& auth) { auths_.emplace_back(std::move(auth)); }
+
+private:
+  Http::HeaderMap& headers_;
+  Verifier::Callbacks* callback_;
+  std::unordered_map<const Verifier*, CompletionState> completion_states_;
+  std::vector<AuthenticatorPtr> auths_;
+};
+
 // base verifier for provider_name, provider_and_audiences, and allow_missing_or_failed.
 class BaseVerifierImpl : public Verifier {
 public:
   BaseVerifierImpl(const BaseVerifierImpl* parent) : parent_(parent) {}
 
-  void onCompleteHelper(Status status, VerifyContextSharedPtr context) const {
+  void onCompleteHelper(Status status, ContextImpl& context) const {
     if (parent_ != nullptr) {
       return parent_->onComplete(status, context);
     }
-    return context->callback()->onComplete(status);
+    return context.callback()->onComplete(status);
   }
 
   // Check if next verifier should be notified of status, or if no next verifier exists signal
   // callback in context.
-  virtual void onComplete(const Status& status, VerifyContextSharedPtr context) const {
-    auto& completion_state = context->getCompletionState(this);
+  virtual void onComplete(const Status& status, ContextImpl& context) const {
+    auto& completion_state = context.getCompletionState(this);
     if (!completion_state.is_completed_) {
       completion_state.is_completed_ = true;
       onCompleteHelper(status, context);
@@ -53,13 +94,15 @@ public:
       : BaseVerifierImpl(parent), audiences_(audiences), auth_factory_(factory),
         extractor_(Extractor::create(provider)), issuer_(provider.issuer()) {}
 
-  void verify(VerifyContextSharedPtr context) const override {
+  void verify(ContextSharedPtr context) const override {
+    auto& ctximpl = static_cast<ContextImpl&>(*context);
     auto auth = auth_factory_.create(audiences_, absl::optional<std::string>{issuer_}, false);
-    extractor_->sanitizePayloadHeaders(context->headers());
-    auth->verify(context->headers(), extractor_->extract(context->headers()),
-                 [=](const Status& status) { onComplete(status, context); });
-    if (!context->getCompletionState(this).is_completed_) {
-      context->storeAuth(std::move(auth));
+    extractor_->sanitizePayloadHeaders(ctximpl.headers());
+    auth->verify(
+        ctximpl.headers(), extractor_->extract(ctximpl.headers()),
+        [=](const Status& status) { onComplete(status, static_cast<ContextImpl&>(*context)); });
+    if (!ctximpl.getCompletionState(this).is_completed_) {
+      ctximpl.storeAuth(std::move(auth));
     }
   }
 
@@ -78,13 +121,15 @@ public:
       : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(extractor),
         allow_failed_(allow_failed) {}
 
-  void verify(VerifyContextSharedPtr context) const override {
+  void verify(ContextSharedPtr context) const override {
+    auto& ctximpl = static_cast<ContextImpl&>(*context);
     auto auth = auth_factory_.create({}, absl::nullopt, allow_failed_);
-    extractor_.sanitizePayloadHeaders(context->headers());
-    auth->verify(context->headers(), extractor_.extract(context->headers()),
-                 [=](const Status& status) { onComplete(status, context); });
-    if (!context->getCompletionState(this).is_completed_) {
-      context->storeAuth(std::move(auth));
+    extractor_.sanitizePayloadHeaders(ctximpl.headers());
+    auth->verify(
+        ctximpl.headers(), extractor_.extract(ctximpl.headers()),
+        [=](const Status& status) { onComplete(status, static_cast<ContextImpl&>(*context)); });
+    if (!ctximpl.getCompletionState(this).is_completed_) {
+      ctximpl.storeAuth(std::move(auth));
     }
   }
 
@@ -99,9 +144,10 @@ class BaseGroupVerifierImpl : public BaseVerifierImpl {
 public:
   BaseGroupVerifierImpl(const BaseVerifierImpl* parent) : BaseVerifierImpl(parent) {}
 
-  void verify(VerifyContextSharedPtr context) const override {
+  void verify(ContextSharedPtr context) const override {
+    auto& ctximpl = static_cast<ContextImpl&>(*context);
     for (const auto& it : verifiers_) {
-      if (context->getCompletionState(this).is_completed_) {
+      if (ctximpl.getCompletionState(this).is_completed_) {
         return;
       }
       it->verify(context);
@@ -125,8 +171,8 @@ public:
     }
   }
 
-  void onComplete(const Status& status, VerifyContextSharedPtr context) const override {
-    auto& completion_state = context->getCompletionState(this);
+  void onComplete(const Status& status, ContextImpl& context) const override {
+    auto& completion_state = context.getCompletionState(this);
     if (completion_state.is_completed_) {
       return;
     }
@@ -150,8 +196,8 @@ public:
     }
   }
 
-  void onComplete(const Status& status, VerifyContextSharedPtr context) const override {
-    auto& completion_state = context->getCompletionState(this);
+  void onComplete(const Status& status, ContextImpl& context) const override {
+    auto& completion_state = context.getCompletionState(this);
     if (completion_state.is_completed_) {
       return;
     }
@@ -168,14 +214,20 @@ class AllowAllVerifierImpl : public BaseVerifierImpl {
 public:
   AllowAllVerifierImpl(const BaseVerifierImpl* parent) : BaseVerifierImpl(parent) {}
 
-  void verify(VerifyContextSharedPtr context) const override { onComplete(Status::Ok, context); }
+  void verify(ContextSharedPtr context) const override {
+    onComplete(Status::Ok, static_cast<ContextImpl&>(*context));
+  }
 
-  void onComplete(const Status& status, VerifyContextSharedPtr context) const override {
+  void onComplete(const Status& status, ContextImpl& context) const override {
     onCompleteHelper(status, context);
   }
 };
 
 } // namespace
+
+ContextSharedPtr Verifier::createContext(Http::HeaderMap& headers, Callbacks* callback) {
+  return std::make_shared<ContextImpl>(headers, callback);
+}
 
 VerifierPtr Verifier::create(const JwtRequirement& requirement,
                              const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
