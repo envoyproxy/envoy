@@ -43,7 +43,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gabime/spdlog/archive/v0.17.0.tar.gz"],
     ),
     com_github_gcovr_gcovr = dict(
-        sha256 = "1c52a71f245adfe1b45e30fbe5015337fe66546f17f40038b3969b7b42acceed",
+        sha256 = "8a60ba6242d67a58320e9e16630d80448ef6d5284fda5fb3eff927b63c8b04a2",
         strip_prefix = "gcovr-3.3",
         urls = ["https://github.com/gcovr/gcovr/archive/3.3.tar.gz"],
     ),
