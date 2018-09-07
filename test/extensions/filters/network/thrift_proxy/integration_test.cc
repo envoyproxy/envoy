@@ -260,6 +260,7 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyClose) {
   tcp_client->close();
 
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
+  expected_upstream->set_allow_unexpected_disconnects(true);
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
 
