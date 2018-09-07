@@ -47,7 +47,7 @@ public:
 class InjectedResourceMonitorTest : public testing::Test {
 protected:
   InjectedResourceMonitorTest()
-      : dispatcher_(test_time_.timeSource()),
+      : dispatcher_(test_time_.timeSystem()),
         resource_filename_(TestEnvironment::temporaryPath("injected_resource")),
         file_updater_(resource_filename_), monitor_(createMonitor()) {}
 
