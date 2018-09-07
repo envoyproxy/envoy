@@ -11,16 +11,14 @@
 namespace Envoy {
 namespace Secret {
 
-SdsApi::SdsApi(
-    const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-    Runtime::RandomGenerator& random, Stats::Store& stats,
-    Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
-    const envoy::api::v2::core::ConfigSource& sds_config, const std::string& sds_config_name,
-    std::function<void()> destructor_cb,
-    std::function<void(const uint64_t, const envoy::api::v2::auth::Secret&)> create_secrets)
+SdsApi::SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+               Runtime::RandomGenerator& random, Stats::Store& stats,
+               Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
+               const envoy::api::v2::core::ConfigSource& sds_config,
+               const std::string& sds_config_name, std::function<void()> destructor_cb)
     : secret_hash_(0), local_info_(local_info), dispatcher_(dispatcher), random_(random),
       stats_(stats), cluster_manager_(cluster_manager), sds_config_(sds_config),
-      sds_config_name_(sds_config_name), clean_up_(destructor_cb), create_secrets_(create_secrets) {
+      sds_config_name_(sds_config_name), clean_up_(destructor_cb) {
   // TODO(JimmyCYJ): Implement chained_init_manager, so that multiple init_manager
   // can be chained together to behave as one init_manager. In that way, we let
   // two listeners which share same SdsApi to register at separate init managers, and
@@ -61,7 +59,11 @@ void SdsApi::onConfigUpdate(const ResourceVector& resources, const std::string&)
   }
 
   const uint64_t new_hash = MessageUtil::hash(secret);
-  create_secrets_(new_hash, secret);
+  if (new_hash != secret_hash_) {
+    secret_hash_ = new_hash;
+    set_secret(secret);
+    update_callback_manager_.runCallbacks();
+  }
 
   runInitializeCallbackIfAny();
 }
