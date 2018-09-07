@@ -22,8 +22,8 @@ namespace Event {
 class SimulatedTimeSystem::Alarm : public TimerImpl {
 public:
   Alarm(SimulatedTimeSystem& time_system, Libevent::BasePtr& libevent, TimerCb cb)
-      : TimerImpl(libevent, cb), time_system_(time_system), libevent_(libevent),
-        index_(time_system.nextIndex()), armed_(false) {}
+      : TimerImpl(libevent, cb), time_system_(time_system), index_(time_system.nextIndex()),
+        armed_(false) {}
 
   virtual ~Alarm();
 
@@ -32,25 +32,26 @@ public:
   void enableTimer(const std::chrono::milliseconds& duration) override;
 
   void setTime(MonotonicTime time) { time_ = time; }
-  void run() {
+
+  /**
+   * Activates the timer so it will be run the next time the libevent loop is run,
+   * typiically via Dispatcher::run().
+   */
+  void activate() {
     armed_ = false;
     std::chrono::milliseconds duration = std::chrono::milliseconds::zero();
     TimerImpl::enableTimer(duration);
-
-    // Proper locking occurs in the libevent library, but it will issue
-    // a benign warning if there's another concurrent loop running:
-    // https://github.com/libevent/libevent/blob/29cc8386a2f7911eaa9336692a2c5544d8b4734f/event.c#L1920
-    event_base_loop(libevent_.get(), EVLOOP_NONBLOCK);
   }
+
   MonotonicTime time() const {
     ASSERT(armed_);
     return time_;
   }
+
   uint64_t index() const { return index_; }
 
 private:
   SimulatedTimeSystem& time_system_;
-  Libevent::BasePtr& libevent_;
   MonotonicTime time_;
   uint64_t index_;
   bool armed_;
@@ -101,7 +102,7 @@ void SimulatedTimeSystem::Alarm::enableTimer(const std::chrono::milliseconds& du
   ASSERT(!armed_);
   armed_ = true;
   if (duration.count() == 0) {
-    run();
+    activate();
   } else {
     time_system_.addAlarm(this, duration);
   }
@@ -148,7 +149,7 @@ void SimulatedTimeSystem::setMonotonicTimeAndUnlock(const MonotonicTime& monoton
   // We don't have a convenient LockGuard construct that allows temporarily
   // dropping the lock to run a callback. The main issue here is that we must
   // be careful not to be holding mutex_ when an exception can be thrown.
-  // That can only happen here in alarm->run(), which is run with the mutex
+  // That can only happen here in alarm->activate(), which is run with the mutex
   // released.
   if (monotonic_time >= monotonic_time_) {
     while (!alarms_.empty()) {
@@ -163,7 +164,10 @@ void SimulatedTimeSystem::setMonotonicTimeAndUnlock(const MonotonicTime& monoton
       monotonic_time_ = alarm->time();
       alarms_.erase(pos);
       mutex_.unlock();
-      alarm->run(); // Might throw, exiting function with lock dropped, which is acceptable.
+      // We don't want to activate the alarm under lock, as it will make a libevent call,
+      // and libevent itself uses locks:
+      // https://github.com/libevent/libevent/blob/29cc8386a2f7911eaa9336692a2c5544d8b4734f/event.c#L1917
+      alarm->activate();
       mutex_.lock();
     }
     system_time_ +=

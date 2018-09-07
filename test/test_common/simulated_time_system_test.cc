@@ -20,16 +20,20 @@ protected:
     std::chrono::milliseconds delay(delay_ms);
     TimerPtr timer = scheduler_->createTimer([this, marker, delay]() {
       output_.append(1, marker);
-      EXPECT_EQ(sim_.monotonicTime(), start_monotonic_time_ + delay);
+      EXPECT_GE(sim_.monotonicTime(), start_monotonic_time_ + delay);
     });
     timer->enableTimer(delay);
     timers_.push_back(std::move(timer));
   }
 
-  void sleepMs(int64_t delay_ms) { sim_.sleep(std::chrono::milliseconds(delay_ms)); }
+  void sleepMsAndLoop(int64_t delay_ms) {
+    sim_.sleep(std::chrono::milliseconds(delay_ms));
+    event_base_loop(event_system_.get(), EVLOOP_NONBLOCK);
+  }
 
-  void sleepSystem(int64_t delay_ms) {
+  void advanceSystemMsAndLoop(int64_t delay_ms) {
     sim_.setSystemTime(sim_.systemTime() + std::chrono::milliseconds(delay_ms));
+    event_base_loop(event_system_.get(), EVLOOP_NONBLOCK);
   }
 
   SimulatedTimeSystem sim_;
@@ -44,7 +48,7 @@ protected:
 TEST_F(SimulatedTimeSystemTest, Sleep) {
   EXPECT_EQ(start_monotonic_time_, sim_.monotonicTime());
   EXPECT_EQ(start_system_time_, sim_.systemTime());
-  sleepMs(5);
+  sleepMsAndLoop(5);
   EXPECT_EQ(start_monotonic_time_ + std::chrono::milliseconds(5), sim_.monotonicTime());
   EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), sim_.systemTime());
 }
@@ -74,9 +78,9 @@ TEST_F(SimulatedTimeSystemTest, Ordering) {
   addTask(3, '3');
   addTask(6, '6');
   EXPECT_EQ("", output_);
-  sleepMs(5);
+  sleepMsAndLoop(5);
   EXPECT_EQ("35", output_);
-  sleepMs(1);
+  sleepMsAndLoop(1);
   EXPECT_EQ("356", output_);
 }
 
@@ -85,9 +89,9 @@ TEST_F(SimulatedTimeSystemTest, SystemTimeOrdering) {
   addTask(3, '3');
   addTask(6, '6');
   EXPECT_EQ("", output_);
-  sim_.setSystemTime(sim_.systemTime() + std::chrono::milliseconds(5));
+  advanceSystemMsAndLoop(5);
   EXPECT_EQ("35", output_);
-  sim_.setSystemTime(sim_.systemTime() + std::chrono::milliseconds(1));
+  advanceSystemMsAndLoop(1);
   EXPECT_EQ("356", output_);
   sim_.setSystemTime(start_system_time_ + std::chrono::milliseconds(1));
   sim_.setSystemTime(start_system_time_ + std::chrono::milliseconds(100));
@@ -100,9 +104,9 @@ TEST_F(SimulatedTimeSystemTest, DisableTimer) {
   addTask(6, '6');
   timers_[0]->disableTimer();
   EXPECT_EQ("", output_);
-  sleepMs(5);
+  sleepMsAndLoop(5);
   EXPECT_EQ("3", output_);
-  sleepMs(1);
+  sleepMsAndLoop(1);
   EXPECT_EQ("36", output_);
 }
 
@@ -112,9 +116,9 @@ TEST_F(SimulatedTimeSystemTest, DeleteTime) {
   addTask(6, '6');
   timers_[0].reset();
   EXPECT_EQ("", output_);
-  sleepMs(5);
+  sleepMsAndLoop(5);
   EXPECT_EQ("3", output_);
-  sleepMs(1);
+  sleepMsAndLoop(1);
   EXPECT_EQ("36", output_);
 }
 
