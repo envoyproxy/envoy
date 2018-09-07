@@ -1,7 +1,6 @@
 #include "common/ssl/context_manager_impl.h"
 
 #include <functional>
-#include <shared_mutex>
 
 #include "envoy/stats/scope.h"
 
