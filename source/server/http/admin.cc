@@ -11,6 +11,7 @@
 
 #include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/admin/v2alpha/memory.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
@@ -35,6 +36,7 @@
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/json/json_loader.h"
+#include "common/memory/stats.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 #include "common/profiler/profiler.h"
@@ -492,6 +494,16 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
   return rc;
 }
 
+// TODO(ambuc): Add more tcmalloc stats, export proto details based on allocator.
+Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
+                                    AdminStream&) {
+  envoy::admin::v2alpha::Memory memory;
+  memory.set_allocated(Memory::Stats::totalCurrentlyAllocated());
+  memory.set_heap_size(Memory::Stats::totalCurrentlyReserved());
+  response.add(MessageUtil::getJsonStringFromMessage(memory, true)); // pretty-print
+  return Http::Code::OK;
+}
+
 Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
                                            Buffer::Instance& response, AdminStream&) {
   for (const Stats::CounterSharedPtr& counter : server_.stats().counters()) {
@@ -905,6 +917,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
            MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false, false},
           {"/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false,
            true},
+          {"/memory", "print current allocation/heap usage", MAKE_ADMIN_HANDLER(handlerMemory),
+           false, false},
           {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false,
            true},
           {"/reset_counters", "reset all counters to zero",
