@@ -15,13 +15,13 @@ TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
 
   EXPECT_EQ(0ULL, buffer.pendingSpans());
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
-  EXPECT_FALSE(buffer.addSpan(Span(test_time.timeSource())));
+  EXPECT_FALSE(buffer.addSpan(Span(test_time.timeSystem())));
 
   buffer.allocateBuffer(2);
   EXPECT_EQ(0ULL, buffer.pendingSpans());
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
 
-  buffer.addSpan(Span(test_time.timeSource()));
+  buffer.addSpan(Span(test_time.timeSystem()));
   EXPECT_EQ(1ULL, buffer.pendingSpans());
   std::string expected_json_array_string = "[{"
                                            R"("traceId":"0000000000000000",)"
@@ -36,8 +36,8 @@ TEST(ZipkinSpanBufferTest, defaultConstructorEndToEnd) {
   EXPECT_EQ(0ULL, buffer.pendingSpans());
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
 
-  buffer.addSpan(Span(test_time.timeSource()));
-  buffer.addSpan(Span(test_time.timeSource()));
+  buffer.addSpan(Span(test_time.timeSystem()));
+  buffer.addSpan(Span(test_time.timeSystem()));
   expected_json_array_string = "["
                                "{"
                                R"("traceId":"0000000000000000",)"
@@ -69,7 +69,7 @@ TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
   EXPECT_EQ(0ULL, buffer.pendingSpans());
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
 
-  buffer.addSpan(Span(test_time.timeSource()));
+  buffer.addSpan(Span(test_time.timeSystem()));
   EXPECT_EQ(1ULL, buffer.pendingSpans());
   std::string expected_json_array_string = "[{"
                                            R"("traceId":"0000000000000000",)"
@@ -84,8 +84,8 @@ TEST(ZipkinSpanBufferTest, sizeConstructorEndtoEnd) {
   EXPECT_EQ(0ULL, buffer.pendingSpans());
   EXPECT_EQ("[]", buffer.toStringifiedJsonArray());
 
-  buffer.addSpan(Span(test_time.timeSource()));
-  buffer.addSpan(Span(test_time.timeSource()));
+  buffer.addSpan(Span(test_time.timeSystem()));
+  buffer.addSpan(Span(test_time.timeSystem()));
   expected_json_array_string = "["
                                "{"
                                R"("traceId":"0000000000000000",)"

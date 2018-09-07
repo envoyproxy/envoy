@@ -262,7 +262,7 @@ TEST_F(CodecClientTest, WatermarkPassthrough) {
 class CodecNetworkTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   CodecNetworkTest() {
-    dispatcher_.reset(new Event::DispatcherImpl(test_time_.timeSource()));
+    dispatcher_.reset(new Event::DispatcherImpl(test_time_.timeSystem()));
     upstream_listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
         socket_.localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
