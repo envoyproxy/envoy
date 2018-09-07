@@ -202,6 +202,11 @@ The fields are:
   Outputs statistics that Envoy has updated (counters incremented at least once, gauges changed at
   least once, and histograms added to at least once).
 
+  .. http:get:: /stats?filter=value
+
+  Filters the returned stats to those with names containing `value`. Does not support regex.
+  Compatible with `usedonly`.
+
 .. http:get:: /stats?format=json
 
   Outputs /stats in JSON format. This can be used for programmatic access of stats. Counters and Gauges
