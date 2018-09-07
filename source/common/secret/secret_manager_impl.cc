@@ -64,10 +64,10 @@ SecretManagerImpl::createInlineCertificateValidationContextProvider(
       certificate_validation_context);
 }
 
-void SecretManagerImpl::removeDynamicTlsCertificateProvider(const std::string& map_key) {
+void SecretManagerImpl::removeDynamicSecretProvider(const std::string& map_key) {
   ENVOY_LOG(debug, "Unregister tls certificate provider. hash key: {}", map_key);
 
-  auto num_deleted = dynamic_tls_certificate_providers_.erase(map_key);
+  auto num_deleted = dynamic_secret_providers_.erase(map_key);
   ASSERT(num_deleted == 1, "");
 }
 
@@ -76,15 +76,14 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertific
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
   const std::string map_key = sds_config_source.SerializeAsString() + config_name;
 
-  TlsCertificateConfigProviderSharedPtr secret_provider =
-      dynamic_tls_certificate_providers_[map_key].lock();
+  SdsApiSharedPtr secret_provider = dynamic_secret_providers_[map_key].lock();
   if (!secret_provider) {
     ASSERT(secret_provider_context.initManager() != nullptr);
 
     // SdsApi is owned by ListenerImpl and ClusterInfo which are destroyed before
     // SecretManagerImpl. It is safe to invoke this callback at the destructor of SdsApi.
     std::function<void()> unregister_secret_provider = [map_key, this]() {
-      removeDynamicTlsCertificateProvider(map_key);
+      removeDynamicSecretProvider(map_key);
     };
 
     secret_provider = std::make_shared<TlsCertificateSdsApi>(
@@ -92,18 +91,10 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertific
         secret_provider_context.random(), secret_provider_context.stats(),
         secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
         sds_config_source, config_name, unregister_secret_provider);
-    dynamic_tls_certificate_providers_[map_key] = secret_provider;
+    dynamic_secret_providers_[map_key] = secret_provider;
   }
 
-  return secret_provider;
-}
-
-void SecretManagerImpl::removeDynamicCertificateValidationContextProvider(
-    const std::string& map_key) {
-  ENVOY_LOG(debug, "Unregister certificate validation context provider. hash key: {}", map_key);
-
-  auto num_deleted = dynamic_certificate_validation_context_providers_.erase(map_key);
-  ASSERT(num_deleted == 1);
+  return std::dynamic_pointer_cast<TlsCertificateConfigProvider>(secret_provider);
 }
 
 CertificateValidationContextConfigProviderSharedPtr
@@ -112,15 +103,14 @@ SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
   const std::string map_key = sds_config_source.SerializeAsString() + config_name;
 
-  CertificateValidationContextConfigProviderSharedPtr secret_provider =
-      dynamic_certificate_validation_context_providers_[map_key].lock();
+  SdsApiSharedPtr secret_provider = dynamic_secret_providers_[map_key].lock();
   if (!secret_provider) {
     ASSERT(secret_provider_context.initManager() != nullptr);
 
     // SdsApi is owned by ListenerImpl and ClusterInfo which are destroyed before
     // SecretManagerImpl. It is safe to invoke this callback at the destructor of SdsApi.
     std::function<void()> unregister_secret_provider = [map_key, this]() {
-      removeDynamicCertificateValidationContextProvider(map_key);
+      removeDynamicSecretProvider(map_key);
     };
 
     secret_provider = std::make_shared<CertificateValidationContextSdsApi>(
@@ -128,10 +118,10 @@ SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
         secret_provider_context.random(), secret_provider_context.stats(),
         secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
         sds_config_source, config_name, unregister_secret_provider);
-    dynamic_certificate_validation_context_providers_[map_key] = secret_provider;
+    dynamic_secret_providers_[map_key] = secret_provider;
   }
 
-  return secret_provider;
+  return std::dynamic_pointer_cast<CertificateValidationContextConfigProvider>(secret_provider);
 }
 
 } // namespace Secret

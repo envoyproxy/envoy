@@ -13,15 +13,11 @@
 namespace Envoy {
 namespace Secret {
 
-template class Secret::SdsApi<Ssl::TlsCertificateConfig>;
-template class Secret::SdsApi<Ssl::CertificateValidationContextConfig>;
-
-template <class SecretType>
-SdsApi<SecretType>::SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-                           Runtime::RandomGenerator& random, Stats::Store& stats,
-                           Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
-                           const envoy::api::v2::core::ConfigSource& sds_config,
-                           const std::string& sds_config_name, std::function<void()> destructor_cb)
+SdsApi::SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
+               Runtime::RandomGenerator& random, Stats::Store& stats,
+               Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
+               const envoy::api::v2::core::ConfigSource& sds_config,
+               const std::string& sds_config_name, std::function<void()> destructor_cb)
     : secret_hash_(0), local_info_(local_info), dispatcher_(dispatcher), random_(random),
       stats_(stats), cluster_manager_(cluster_manager), sds_config_(sds_config),
       sds_config_name_(sds_config_name), clean_up_(destructor_cb) {
@@ -32,7 +28,7 @@ SdsApi<SecretType>::SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispat
   init_manager.registerTarget(*this);
 }
 
-template <class SecretType> void SdsApi<SecretType>::initialize(std::function<void()> callback) {
+void SdsApi::initialize(std::function<void()> callback) {
   initialize_callback_ = callback;
 
   subscription_ = Envoy::Config::SubscriptionFactory::subscriptionFromConfigSource<
@@ -46,8 +42,7 @@ template <class SecretType> void SdsApi<SecretType>::initialize(std::function<vo
   subscription_->start({sds_config_name_}, *this);
 }
 
-template <class SecretType>
-void SdsApi<SecretType>::onConfigUpdate(const ResourceVector& resources, const std::string&) {
+void SdsApi::onConfigUpdate(const ResourceVector& resources, const std::string&) {
   if (resources.empty()) {
     throw EnvoyException(
         fmt::format("Missing SDS resources for {} in onConfigUpdate()", sds_config_name_));
@@ -70,12 +65,12 @@ void SdsApi<SecretType>::onConfigUpdate(const ResourceVector& resources, const s
   runInitializeCallbackIfAny();
 }
 
-template <class SecretType> void SdsApi<SecretType>::onConfigUpdateFailed(const EnvoyException*) {
+void SdsApi::onConfigUpdateFailed(const EnvoyException*) {
   // We need to allow server startup to continue, even if we have a bad config.
   runInitializeCallbackIfAny();
 }
 
-template <class SecretType> void SdsApi<SecretType>::runInitializeCallbackIfAny() {
+void SdsApi::runInitializeCallbackIfAny() {
   if (initialize_callback_) {
     initialize_callback_();
     initialize_callback_ = nullptr;
@@ -87,7 +82,8 @@ void TlsCertificateSdsApi::updateConfigHelper(const envoy::api::v2::auth::Secret
   if (new_hash != secret_hash_ &&
       secret.type_case() == envoy::api::v2::auth::Secret::TypeCase::kTlsCertificate) {
     secret_hash_ = new_hash;
-    secrets_ = std::make_unique<Ssl::TlsCertificateConfigImpl>(secret.tls_certificate());
+    tls_certificate_secrets_ =
+        std::make_unique<Ssl::TlsCertificateConfigImpl>(secret.tls_certificate());
 
     update_callback_manager_.runCallbacks();
   }
@@ -99,7 +95,7 @@ void CertificateValidationContextSdsApi::updateConfigHelper(
   if (new_hash != secret_hash_ &&
       secret.type_case() == envoy::api::v2::auth::Secret::TypeCase::kValidationContext) {
     secret_hash_ = new_hash;
-    secrets_ =
+    certificate_validation_context_secrets_ =
         std::make_unique<Ssl::CertificateValidationContextConfigImpl>(secret.validation_context());
 
     update_callback_manager_.runCallbacks();
