@@ -494,6 +494,7 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
   return rc;
 }
 
+// TODO(ambuc): Add more tcmalloc stats, export proto details based on allocator.
 Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
                                     AdminStream&) {
   envoy::admin::v2alpha::Memory memory;
