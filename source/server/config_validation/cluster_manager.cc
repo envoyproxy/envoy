@@ -40,7 +40,7 @@ ValidationClusterManager::ValidationClusterManager(
     Server::Admin& admin)
     : ClusterManagerImpl(bootstrap, factory, stats, tls, runtime, random, local_info, log_manager,
                          main_thread_dispatcher, admin),
-      async_client_(main_thread_dispatcher.timeSource()) {}
+      async_client_(main_thread_dispatcher.timeSystem()) {}
 
 Http::ConnectionPool::Instance*
 ValidationClusterManager::httpConnPoolForCluster(const std::string&, ResourcePriority,

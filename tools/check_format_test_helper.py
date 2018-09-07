@@ -124,6 +124,8 @@ if __name__ == "__main__":
   shutil.rmtree(tmp, True)
   os.makedirs(tmp)
   os.chdir(tmp)
+  # TODO(akonradi): reorder these by error instead of grouping the fixes
+  # together and checks together
   errors += fixFileExpectingSuccess("over_enthusiastic_spaces.cc")
   errors += fixFileExpectingSuccess("extra_enthusiastic_spaces.cc")
   errors += fixFileExpectingSuccess("angle_bracket_include.cc")
@@ -143,6 +145,9 @@ if __name__ == "__main__":
                                     "Don't use <mutex> or <condition_variable*>")
   errors += fixFileExpectingFailure("condition_variable_any.cc",
                                     "Don't use <mutex> or <condition_variable*>")
+  errors += checkFileExpectingError("shared_mutex.cc", "shared_mutex")
+  errors += fixFileExpectingFailure("shared_mutex.cc", "shared_mutex")
+
   real_time_inject_error = (
       "Don't reference real-world time sources from production code; use injection")
   errors += fixFileExpectingFailure("real_time_source.cc", real_time_inject_error)

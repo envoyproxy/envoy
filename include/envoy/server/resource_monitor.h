@@ -10,6 +10,10 @@ namespace Server {
 
 // Struct for reporting usage for a particular resource.
 struct ResourceUsage {
+  bool operator==(const ResourceUsage& rhs) const {
+    return resource_pressure_ == rhs.resource_pressure_;
+  }
+
   // Fraction of (resource usage)/(resource limit).
   double resource_pressure_;
 };

@@ -130,7 +130,12 @@ TEST_P(EchoIntegrationTest, AddRemoveListener) {
     RawConnectionDriver connection2(
         new_listener_port, buffer,
         [&](Network::ClientConnection&, const Buffer::Instance&) -> void { FAIL(); }, version_);
-    connection2.run(Event::Dispatcher::RunType::NonBlock);
+    while (connection2.connecting()) {
+      // Don't busy loop, but OS X often needs a moment to decide this connection isn't happening.
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+      connection2.run(Event::Dispatcher::RunType::NonBlock);
+    }
     if (connection2.connection().state() == Network::Connection::State::Closed) {
       connect_fail = true;
       break;
