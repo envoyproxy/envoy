@@ -26,7 +26,7 @@ TEST(InjectedResourceMonitorFactoryTest, CreateMonitor) {
   envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig config;
   config.set_filename(TestEnvironment::temporaryPath("injected_resource"));
   DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl dispatcher(test_time.timeSource());
+  Event::DispatcherImpl dispatcher(test_time.timeSystem());
   Server::Configuration::ResourceMonitorFactoryContextImpl context(dispatcher);
   Server::ResourceMonitorPtr monitor = factory->createResourceMonitor(config, context);
   EXPECT_NE(monitor, nullptr);
