@@ -66,6 +66,7 @@ Version history
 * upstream: require opt-in to use the :ref:`x-envoy-orignal-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` header
   for overriding destination address when using the :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   load balancing policy.
+* jwt-authn filter: add support for per route JWT requirements.
 
 1.7.0
 ===============

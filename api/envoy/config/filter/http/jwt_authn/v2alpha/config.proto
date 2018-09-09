@@ -30,7 +30,6 @@ import "validate/validate.proto";
 //       cache_duration:
 //         seconds: 300
 //
-// [#not-implemented-hide:]
 message JwtProvider {
   // Identifies the principal that issued the JWT. See `here
   //  <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_. Usually a URL or an email address.
@@ -350,7 +349,6 @@ message RequirementRule {
 //              - provider_name: "provider1"
 //              - provider_name: "provider2"
 //
-// [#not-implemented-hide:]
 message JwtAuthentication {
   // Map of provider names to JwtProviders.
   //

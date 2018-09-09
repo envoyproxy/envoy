@@ -29,9 +29,9 @@ class AuthenticatorImpl : public Logger::Loggable<Logger::Id::filter>,
                           public Http::AsyncClient::Callbacks {
 public:
   AuthenticatorImpl(const std::vector<std::string>& audiences,
-                    const absl::optional<std::string> issuer, bool allow_failed,
+                    const absl::optional<std::string>& issuer, bool allow_failed,
                     JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager)
-      : jwks_cache_(jwks_cache), cm_(cluster_manager), issuer_opt_(issuer),
+      : jwks_cache_(jwks_cache), cm_(cluster_manager), issuer_(issuer),
         is_allow_failed_(allow_failed) {
     if (!audiences.empty()) {
       audiences_ = std::make_unique<::google::jwt_verify::CheckAudience>(audiences);
@@ -89,7 +89,7 @@ private:
   // Check audience object for overriding the providers.
   ::google::jwt_verify::CheckAudiencePtr audiences_;
   // specific issuer or not.
-  const absl::optional<std::string> issuer_opt_;
+  const absl::optional<std::string> issuer_;
   const bool is_allow_failed_;
 };
 
@@ -121,7 +121,7 @@ void AuthenticatorImpl::startVerify() {
 
     // Check if token extracted from the location contains the issuer specified by config.
     const bool matched_issuer =
-        issuer_opt_ ? jwt_.iss_ == issuer_opt_.value() : curr_token_->isIssuerSpecified(jwt_.iss_);
+        issuer_ ? jwt_.iss_ == issuer_.value() : curr_token_->isIssuerSpecified(jwt_.iss_);
     if (!matched_issuer) {
       ENVOY_LOG(debug, "Jwt issuer {} does not match required", jwt_.iss_);
       status = Status::JwtUnknownIssuer;
