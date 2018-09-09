@@ -19,13 +19,13 @@ namespace Envoy {
 namespace Http {
 
 Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequestHeaders(
-    Http::HeaderMap& request_headers, Protocol protocol, Network::Connection& connection,
+    Http::HeaderMap& request_headers, Network::Connection& connection,
     ConnectionManagerConfig& config, const Router::Config& route_config,
     Runtime::RandomGenerator& random, Runtime::Loader& runtime,
     const LocalInfo::LocalInfo& local_info) {
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
-  if (protocol == Protocol::Http11 && Utility::isUpgrade(request_headers)) {
+  if (Utility::isUpgrade(request_headers)) {
     // The current WebSocket implementation re-uses the HTTP1 codec to send upgrade headers to
     // the upstream host. This adds the "transfer-encoding: chunked" request header if the stream
     // has not ended and content-length does not exist. In HTTP1.1, if transfer-encoding and

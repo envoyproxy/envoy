@@ -102,6 +102,11 @@ uint64_t getResponseStatus(const HeaderMap& headers);
 bool isUpgrade(const HeaderMap& headers);
 
 /**
+ * @return true if this is a CONNECT request with a :protocol header present, false otherwise.
+ */
+bool isH2UpgradeRequest(const HeaderMap& headers);
+
+/**
  * Determine whether this is a WebSocket Upgrade request.
  * This function returns true if the following HTTP headers and values are present:
  * - Connection: Upgrade
@@ -199,6 +204,34 @@ MessagePtr prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_uri);
  * Serialize query-params into a string.
  */
 std::string queryParamsToString(const QueryParams& query_params);
+
+/**
+ * Transforms the supplied headers from an HTTP/1 Upgrade request to an H2 style upgrade.
+ * Changes the method to connection, moves the Upgrade to a :protocol header,
+ * @param headers the headers to convert.
+ */
+void transformUpgradeRequestFromH1toH2(HeaderMap& headers);
+
+/**
+ * Transforms the supplied headers from an HTTP/1 Upgrade response to an H2 style upgrade response.
+ * Changes the 101 upgrade response to a 200 for the CONNECT response.
+ * @param headers the headers to convert.
+ */
+void transformUpgradeResponseFromH1toH2(HeaderMap& headers);
+
+/**
+ * Transforms the supplied headers from an H2 "CONNECT"-with-:protocol-header to an HTTP/1 style
+ * Upgrade response.
+ * @param headers the headers to convert.
+ */
+void transformUpgradeRequestFromH2toH1(HeaderMap& headers);
+
+/**
+ * Transforms the supplied headers from an H2 "CONNECT success" to an HTTP/1 style Upgrade response.
+ * The caller is responsible for ensuring this only happens on upgraded streams.
+ * @param headers the headers to convert.
+ */
+void transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade);
 
 } // namespace Utility
 } // namespace Http

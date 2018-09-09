@@ -17,8 +17,8 @@ HistogramStatisticsImpl::HistogramStatisticsImpl(const histogram_t* histogram_pt
 }
 
 const std::vector<double>& HistogramStatisticsImpl::supportedQuantiles() const {
-  static const std::vector<double> supported_quantiles = {0,    0.25, 0.5,   0.75, 0.90,
-                                                          0.95, 0.99, 0.999, 1};
+  static const std::vector<double> supported_quantiles = {0,    0.25, 0.5,   0.75,  0.90,
+                                                          0.95, 0.99, 0.995, 0.999, 1};
   return supported_quantiles;
 }
 

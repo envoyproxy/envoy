@@ -30,6 +30,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 
@@ -42,18 +43,20 @@ namespace Http {
 class FuzzConfig : public ConnectionManagerConfig {
 public:
   struct RouteConfigProvider : public Router::RouteConfigProvider {
+    RouteConfigProvider(TimeSource& time_source) : time_source_(time_source) {}
+
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return route_config_; }
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
-    SystemTime lastUpdated() const override {
-      return ProdSystemTimeSource::instance_.currentTime();
-    }
+    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
 
+    TimeSource& time_source_;
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   };
 
   FuzzConfig()
-      : stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
+      : route_config_provider_(test_time_.timeSystem()),
+        stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                         POOL_HISTOGRAM(fake_stats_))},
                "",
                fake_stats_},
@@ -114,6 +117,7 @@ public:
   MockStreamEncoderFilter* encoder_filter_{};
   NiceMock<MockFilterChainFactory> filter_factory_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
+  DangerousDeprecatedTestTime test_time_;
   RouteConfigProvider route_config_provider_;
   std::string server_name_;
   Stats::IsolatedStoreImpl fake_stats_;
@@ -286,10 +290,10 @@ public:
                       const test::common::http::ResponseAction& response_action) {
     const bool end_stream = response_action.end_stream();
     switch (response_action.response_action_selector_case()) {
-    case test::common::http::ResponseAction::kContinue100Headers: {
+    case test::common::http::ResponseAction::kContinueHeaders: {
       if (state == StreamState::PendingHeaders) {
         auto headers = std::make_unique<TestHeaderMapImpl>(
-            Fuzz::fromHeaders(response_action.continue_100_headers()));
+            Fuzz::fromHeaders(response_action.continue_headers()));
         headers->setReferenceKey(Headers::get().Status, "100");
         decoder_filter_->callbacks_->encode100ContinueHeaders(std::move(headers));
       }
@@ -297,9 +301,16 @@ public:
     }
     case test::common::http::ResponseAction::kHeaders: {
       if (state == StreamState::PendingHeaders) {
-        decoder_filter_->callbacks_->encodeHeaders(
-            std::make_unique<TestHeaderMapImpl>(Fuzz::fromHeaders(response_action.headers())),
-            end_stream);
+        auto headers =
+            std::make_unique<TestHeaderMapImpl>(Fuzz::fromHeaders(response_action.headers()));
+        // The client codec will ensure we always have a valid :status.
+        // Similarly, local replies should always contain this.
+        try {
+          Utility::getResponseStatus(*headers);
+        } catch (const CodecClientException&) {
+          headers->setReferenceKey(Headers::get().Status, "200");
+        }
+        decoder_filter_->callbacks_->encodeHeaders(std::move(headers), end_stream);
         state = end_stream ? StreamState::Closed : StreamState::PendingDataOrTrailers;
       }
       break;
@@ -364,9 +375,12 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
   std::unique_ptr<Ssl::MockConnection> ssl_connection;
+  bool connection_alive = true;
 
   ON_CALL(filter_callbacks.connection_, ssl()).WillByDefault(Return(ssl_connection.get()));
   ON_CALL(Const(filter_callbacks.connection_), ssl()).WillByDefault(Return(ssl_connection.get()));
+  ON_CALL(filter_callbacks.connection_, close(_))
+      .WillByDefault(InvokeWithoutArgs([&connection_alive] { connection_alive = false; }));
   filter_callbacks.connection_.local_address_ =
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1");
   filter_callbacks.connection_.remote_address_ =
@@ -380,6 +394,11 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
 
   for (const auto& action : input.actions()) {
     ENVOY_LOG_MISC(trace, "action {} with {} streams", action.DebugString(), streams.size());
+    if (!connection_alive) {
+      ENVOY_LOG_MISC(trace, "skipping due to dead connection");
+      break;
+    }
+
     switch (action.action_selector_case()) {
     case test::common::http::Action::kNewStream: {
       streams.emplace_back(new FuzzStream(conn_manager, config,

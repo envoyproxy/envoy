@@ -6,7 +6,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
 #include "test/mocks/runtime/mocks.h"
-#include "test/mocks/secret/mocks.h"
+#include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -56,7 +56,7 @@ private:
   Network::TransportSocketFactoryPtr client_tls_ssl_ctx_;
   Network::TransportSocketFactoryPtr client_mtls_ssl_ctx_;
   Network::TransportSocketFactoryPtr upstream_ssl_ctx_;
-  testing::NiceMock<Secret::MockSecretManager> secret_manager_;
+  testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context_;
 };
 } // namespace Xfcc
 } // namespace Envoy

@@ -158,6 +158,10 @@ modify different aspects of the server:
   Enable/disable different logging levels on different subcomponents. Generally only used during
   development.
 
+.. http:post:: /memory
+
+  Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all `/stats` and filtering to get the memory-related statistics.
+
 .. http:post:: /quitquitquit
 
   Cleanly exit the server.
@@ -352,6 +356,7 @@ The fields are:
     In Envoy, service unavailable response will cause **outlier detection** - removing a node off the 
     load balancer pool, but requests are not rejected as a result. Therefore, this counter is always 
     set to '0'.
-  * Latency information is currently unavailable.
+  * Latency information represents data since last flush. 
+    Mean latency is currently not available.
   
   

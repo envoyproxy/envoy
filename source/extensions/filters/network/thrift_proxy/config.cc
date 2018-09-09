@@ -8,15 +8,15 @@
 
 #include "common/config/utility.h"
 
+#include "extensions/filters/network/thrift_proxy/auto_protocol_impl.h"
+#include "extensions/filters/network/thrift_proxy/auto_transport_impl.h"
 #include "extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
 #include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
 #include "extensions/filters/network/thrift_proxy/decoder.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter_config.h"
 #include "extensions/filters/network/thrift_proxy/filters/well_known_names.h"
 #include "extensions/filters/network/thrift_proxy/framed_transport_impl.h"
-#include "extensions/filters/network/thrift_proxy/protocol_impl.h"
 #include "extensions/filters/network/thrift_proxy/stats.h"
-#include "extensions/filters/network/thrift_proxy/transport_impl.h"
 #include "extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
 
 namespace Envoy {
@@ -105,8 +105,9 @@ Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFrom
     Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Config> filter_config(new ConfigImpl(proto_config, context));
 
-  return [filter_config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<ConnectionManager>(*filter_config));
+  return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(
+        std::make_shared<ConnectionManager>(*filter_config, context.random()));
   };
 }
 
@@ -140,10 +141,6 @@ void ConfigImpl::createFilterChain(ThriftFilters::FilterChainFactoryCallbacks& c
   for (const ThriftFilters::FilterFactoryCb& factory : filter_factories_) {
     factory(callbacks);
   }
-}
-
-DecoderPtr ConfigImpl::createDecoder(DecoderCallbacks& callbacks) {
-  return std::make_unique<Decoder>(createTransport(), createProtocol(), callbacks);
 }
 
 TransportPtr ConfigImpl::createTransport() {
