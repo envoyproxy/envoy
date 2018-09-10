@@ -5,6 +5,7 @@
 #include "envoy/upstream/thread_local_cluster.h"
 
 #include "common/common/utility.h"
+#include "common/router/metadatamatchcriteria_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -30,6 +31,14 @@ RouteEntryImplBase::RouteEntryImplBase(
       std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(cluster));
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_cluster_weight_ += weighted_clusters_.back()->clusterWeight();
+    }
+  }
+
+  if (route.route().has_metadata_match()) {
+    const auto filter_it = route.route().metadata_match().filter_metadata().find(
+        Envoy::Config::MetadataFilters::get().ENVOY_LB);
+    if (filter_it != route.route().metadata_match().filter_metadata().end()) {
+      metadata_match_criteria_.reset(new Envoy::Router::MetadataMatchCriteriaImpl(filter_it->second));
     }
   }
 }

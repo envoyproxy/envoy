@@ -27,6 +27,8 @@ envoy_cc_library(
     hdrs = ["router.h"],
     external_deps = ["abseil_optional"],
     deps = [
+        "//include/envoy/router:router_interface",
+        "//source/common/router:metadatamatchcriteria_lib",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
     ],
 )
