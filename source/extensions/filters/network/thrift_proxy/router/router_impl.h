@@ -37,15 +37,38 @@ public:
   // Router::Route
   const RouteEntry* routeEntry() const override;
 
-  virtual RouteConstSharedPtr matches(const MessageMetadata& metadata) const PURE;
+  virtual RouteConstSharedPtr matches(const MessageMetadata& metadata,
+                                      uint64_t random_value) const PURE;
 
 protected:
-  RouteConstSharedPtr clusterEntry() const;
+  RouteConstSharedPtr clusterEntry(uint64_t random_value) const;
   bool headersMatch(const Http::HeaderMap& headers) const;
 
 private:
+  class WeightedClusterEntry : public RouteEntry, public Route {
+  public:
+    WeightedClusterEntry(
+        const envoy::config::filter::network::thrift_proxy::v2alpha1::WeightedCluster_ClusterWeight&
+            cluster);
+
+    uint64_t clusterWeight() const { return cluster_weight_; }
+
+    // Router::RouteEntry
+    const std::string& clusterName() const override { return cluster_name_; }
+
+    // Router::Route
+    const RouteEntry* routeEntry() const override { return this; }
+
+  private:
+    const std::string cluster_name_;
+    const uint64_t cluster_weight_;
+  };
+  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
+
   const std::string cluster_name_;
   std::vector<Http::HeaderUtility::HeaderData> config_headers_;
+  std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
+  uint64_t total_cluster_weight_;
 };
 
 typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
@@ -58,7 +81,8 @@ public:
   const std::string& methodName() const { return method_name_; }
 
   // RouteEntryImplBase
-  RouteConstSharedPtr matches(const MessageMetadata& metadata) const override;
+  RouteConstSharedPtr matches(const MessageMetadata& metadata,
+                              uint64_t random_value) const override;
 
 private:
   const std::string method_name_;
@@ -73,7 +97,8 @@ public:
   const std::string& serviceName() const { return service_name_; }
 
   // RouteEntryImplBase
-  RouteConstSharedPtr matches(const MessageMetadata& metadata) const override;
+  RouteConstSharedPtr matches(const MessageMetadata& metadata,
+                              uint64_t random_value) const override;
 
 private:
   std::string service_name_;
@@ -84,7 +109,7 @@ class RouteMatcher {
 public:
   RouteMatcher(const envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration&);
 
-  RouteConstSharedPtr route(const MessageMetadata& metadata) const;
+  RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
 
 private:
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;

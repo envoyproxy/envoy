@@ -24,7 +24,7 @@ static void errorCallbackTest(Address::IpVersion version) {
   // test in the forked process to avoid confusion when the fork happens.
   Stats::IsolatedStoreImpl stats_store;
   DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl dispatcher(test_time.timeSource());
+  Event::DispatcherImpl dispatcher(test_time.timeSystem());
 
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
                                   true);
@@ -79,7 +79,7 @@ protected:
       : version_(GetParam()),
         alt_address_(Network::Test::findOrCheckFreePort(
             Network::Test::getCanonicalLoopbackAddress(version_), Address::SocketType::Stream)),
-        dispatcher_(test_time_.timeSource()) {}
+        dispatcher_(test_time_.timeSystem()) {}
 
   const Address::IpVersion version_;
   const Address::InstanceConstSharedPtr alt_address_;

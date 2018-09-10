@@ -6,8 +6,8 @@
 #include "envoy/local_info/local_info.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/stats/scope.h"
+#include "envoy/upstream/locality.h"
 
-#include "common/upstream/locality.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {

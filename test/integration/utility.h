@@ -62,6 +62,7 @@ public:
                       Network::Address::IpVersion version);
   ~RawConnectionDriver();
   const Network::Connection& connection() { return *client_; }
+  bool connecting() { return callbacks_->connecting_; }
   void run(Event::Dispatcher::RunType run_type = Event::Dispatcher::RunType::Block);
   void close();
 
@@ -81,8 +82,17 @@ private:
     ReadCallback data_callback_;
   };
 
+  struct ConnectionCallbacks : public Network::ConnectionCallbacks {
+    void onEvent(Network::ConnectionEvent) override { connecting_ = false; }
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
+
+    bool connecting_{true};
+  };
+
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  std::unique_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr client_;
 };
 

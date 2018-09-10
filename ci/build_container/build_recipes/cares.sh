@@ -3,6 +3,7 @@
 set -e
 
 VERSION=cares-1_14_0
+SHA256=62dd12f0557918f89ad6f5b759f0bf4727174ae9979499f5452c02be38d9d3e8
 
 # cares is fussy over whether -D appears inside CFLAGS vs. CPPFLAGS, oss-fuzz
 # sets CFLAGS with -D, so we need to impedance match here. In turn, OS X automake
@@ -10,7 +11,8 @@ VERSION=cares-1_14_0
 CPPFLAGS="$(for f in $CXXFLAGS; do if [[ $f =~ -D.* ]]; then echo $f; fi; done | tr '\n' ' ')"
 CFLAGS="$(for f in $CXXFLAGS; do if [[ ! $f =~ -D.* ]]; then echo $f; fi; done | tr '\n' ' ')"
 
-curl https://github.com/c-ares/c-ares/archive/"$VERSION".tar.gz -sLo c-ares-"$VERSION".tar.gz
+curl https://github.com/c-ares/c-ares/archive/"$VERSION".tar.gz -sLo c-ares-"$VERSION".tar.gz \
+  && echo "$SHA256" c-ares-"$VERSION".tar.gz | sha256sum --check
 tar xf c-ares-"$VERSION".tar.gz
 cd c-ares-"$VERSION"
 
