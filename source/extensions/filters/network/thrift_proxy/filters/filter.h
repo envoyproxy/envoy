@@ -19,6 +19,12 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace ThriftFilters {
 
+enum class ResponseStatus {
+  MoreData = 0, // The upstream response requires more data.
+  Complete = 1, // The upstream response is complete.
+  Reset = 2,    // The upstream response is invalid and its connection must be reset.
+};
+
 /**
  * Decoder filter callbacks add additional callbacks.
  */
@@ -63,8 +69,9 @@ public:
   /**
    * Create a locally generated response using the provided response object.
    * @param response DirectResponse the response to send to the downstream client
+   * @param end_stream if true, the downstream connection should be closed after this response
    */
-  virtual void sendLocalReply(const ThriftProxy::DirectResponse& response) PURE;
+  virtual void sendLocalReply(const ThriftProxy::DirectResponse& response, bool end_stream) PURE;
 
   /**
    * Indicates the start of an upstream response. May only be called once.
@@ -76,9 +83,10 @@ public:
   /**
    * Called with upstream response data.
    * @param data supplies the upstream's data
-   * @return true if the upstream response is complete; false if more data is expected
+   * @return ResponseStatus indicating if the upstream response requires more data, is complete,
+   *         or if an error occurred requiring the upstream connection to be reset.
    */
-  virtual bool upstreamData(Buffer::Instance& data) PURE;
+  virtual ResponseStatus upstreamData(Buffer::Instance& data) PURE;
 
   /**
    * Reset the downstream connection.
@@ -109,11 +117,6 @@ public:
    * filter should use. Callbacks will not be invoked by the filter after onDestroy() is called.
    */
   virtual void setDecoderFilterCallbacks(DecoderFilterCallbacks& callbacks) PURE;
-
-  /**
-   * Resets the upstream connection.
-   */
-  virtual void resetUpstreamConnection() PURE;
 };
 
 typedef std::shared_ptr<DecoderFilter> DecoderFilterSharedPtr;

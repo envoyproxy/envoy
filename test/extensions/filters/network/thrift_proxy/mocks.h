@@ -4,6 +4,7 @@
 
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "extensions/filters/network/thrift_proxy/conn_state.h"
+#include "extensions/filters/network/thrift_proxy/filters/factory_base.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
 #include "extensions/filters/network/thrift_proxy/metadata.h"
 #include "extensions/filters/network/thrift_proxy/protocol.h"
@@ -137,20 +138,20 @@ public:
   MOCK_METHOD1(structBegin, FilterStatus(const absl::string_view name));
   MOCK_METHOD0(structEnd, FilterStatus());
   MOCK_METHOD3(fieldBegin,
-               FilterStatus(const absl::string_view name, FieldType msg_type, int16_t field_id));
+               FilterStatus(const absl::string_view name, FieldType& msg_type, int16_t& field_id));
   MOCK_METHOD0(fieldEnd, FilterStatus());
-  MOCK_METHOD1(boolValue, FilterStatus(bool value));
-  MOCK_METHOD1(byteValue, FilterStatus(uint8_t value));
-  MOCK_METHOD1(int16Value, FilterStatus(int16_t value));
-  MOCK_METHOD1(int32Value, FilterStatus(int32_t value));
-  MOCK_METHOD1(int64Value, FilterStatus(int64_t value));
-  MOCK_METHOD1(doubleValue, FilterStatus(double value));
+  MOCK_METHOD1(boolValue, FilterStatus(bool& value));
+  MOCK_METHOD1(byteValue, FilterStatus(uint8_t& value));
+  MOCK_METHOD1(int16Value, FilterStatus(int16_t& value));
+  MOCK_METHOD1(int32Value, FilterStatus(int32_t& value));
+  MOCK_METHOD1(int64Value, FilterStatus(int64_t& value));
+  MOCK_METHOD1(doubleValue, FilterStatus(double& value));
   MOCK_METHOD1(stringValue, FilterStatus(absl::string_view value));
-  MOCK_METHOD3(mapBegin, FilterStatus(FieldType key_type, FieldType value_type, uint32_t size));
+  MOCK_METHOD3(mapBegin, FilterStatus(FieldType& key_type, FieldType& value_type, uint32_t& size));
   MOCK_METHOD0(mapEnd, FilterStatus());
-  MOCK_METHOD2(listBegin, FilterStatus(FieldType elem_type, uint32_t size));
+  MOCK_METHOD2(listBegin, FilterStatus(FieldType& elem_type, uint32_t& size));
   MOCK_METHOD0(listEnd, FilterStatus());
-  MOCK_METHOD2(setBegin, FilterStatus(FieldType elem_type, uint32_t size));
+  MOCK_METHOD2(setBegin, FilterStatus(FieldType& elem_type, uint32_t& size));
   MOCK_METHOD0(setEnd, FilterStatus());
 };
 
@@ -190,23 +191,23 @@ public:
   MOCK_METHOD0(transportEnd, FilterStatus());
   MOCK_METHOD1(messageBegin, FilterStatus(MessageMetadataSharedPtr metadata));
   MOCK_METHOD0(messageEnd, FilterStatus());
-  MOCK_METHOD1(structBegin, FilterStatus(const absl::string_view name));
+  MOCK_METHOD1(structBegin, FilterStatus(absl::string_view name));
   MOCK_METHOD0(structEnd, FilterStatus());
   MOCK_METHOD3(fieldBegin,
-               FilterStatus(const absl::string_view name, FieldType msg_type, int16_t field_id));
+               FilterStatus(absl::string_view name, FieldType& msg_type, int16_t& field_id));
   MOCK_METHOD0(fieldEnd, FilterStatus());
-  MOCK_METHOD1(boolValue, FilterStatus(bool value));
-  MOCK_METHOD1(byteValue, FilterStatus(uint8_t value));
-  MOCK_METHOD1(int16Value, FilterStatus(int16_t value));
-  MOCK_METHOD1(int32Value, FilterStatus(int32_t value));
-  MOCK_METHOD1(int64Value, FilterStatus(int64_t value));
-  MOCK_METHOD1(doubleValue, FilterStatus(double value));
+  MOCK_METHOD1(boolValue, FilterStatus(bool& value));
+  MOCK_METHOD1(byteValue, FilterStatus(uint8_t& value));
+  MOCK_METHOD1(int16Value, FilterStatus(int16_t& value));
+  MOCK_METHOD1(int32Value, FilterStatus(int32_t& value));
+  MOCK_METHOD1(int64Value, FilterStatus(int64_t& value));
+  MOCK_METHOD1(doubleValue, FilterStatus(double& value));
   MOCK_METHOD1(stringValue, FilterStatus(absl::string_view value));
-  MOCK_METHOD3(mapBegin, FilterStatus(FieldType key_type, FieldType value_type, uint32_t size));
+  MOCK_METHOD3(mapBegin, FilterStatus(FieldType& key_type, FieldType& value_type, uint32_t& size));
   MOCK_METHOD0(mapEnd, FilterStatus());
-  MOCK_METHOD2(listBegin, FilterStatus(FieldType elem_type, uint32_t size));
+  MOCK_METHOD2(listBegin, FilterStatus(FieldType& elem_type, uint32_t& size));
   MOCK_METHOD0(listEnd, FilterStatus());
-  MOCK_METHOD2(setBegin, FilterStatus(FieldType elem_type, uint32_t size));
+  MOCK_METHOD2(setBegin, FilterStatus(FieldType& elem_type, uint32_t& size));
   MOCK_METHOD0(setEnd, FilterStatus());
 };
 
@@ -222,13 +223,28 @@ public:
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
   MOCK_CONST_METHOD0(downstreamTransportType, TransportType());
   MOCK_CONST_METHOD0(downstreamProtocolType, ProtocolType());
-  MOCK_METHOD1(sendLocalReply, void(const DirectResponse&));
+  MOCK_METHOD2(sendLocalReply, void(const DirectResponse&, bool));
   MOCK_METHOD2(startUpstreamResponse, void(Transport&, Protocol&));
-  MOCK_METHOD1(upstreamData, bool(Buffer::Instance&));
+  MOCK_METHOD1(upstreamData, ResponseStatus(Buffer::Instance&));
   MOCK_METHOD0(resetDownstreamConnection, void());
 
   uint64_t stream_id_{1};
   NiceMock<Network::MockConnection> connection_;
+};
+
+class MockFilterConfigFactory : public ThriftFilters::FactoryBase<ProtobufWkt::Struct> {
+public:
+  MockFilterConfigFactory();
+  ~MockFilterConfigFactory();
+
+  ThriftFilters::FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const ProtobufWkt::Struct& proto_config,
+                                    const std::string& stat_prefix,
+                                    Server::Configuration::FactoryContext& context) override;
+
+  std::shared_ptr<MockDecoderFilter> mock_filter_;
+  ProtobufWkt::Struct config_struct_;
+  std::string config_stat_prefix_;
 };
 
 } // namespace ThriftFilters
