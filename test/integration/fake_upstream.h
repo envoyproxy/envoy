@@ -360,7 +360,7 @@ public:
   virtual testing::AssertionResult initialize() {
     initialized_ = true;
     disconnect_callback_handle_ =
-        shared_connection_.addDisconnectCallback([this] {  connection_event_.notifyOne(); });
+        shared_connection_.addDisconnectCallback([this] { connection_event_.notifyOne(); });
     return testing::AssertionSuccess();
   }
   ABSL_MUST_USE_RESULT

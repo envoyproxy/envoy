@@ -245,7 +245,8 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   }
 }
 
-uint64_t HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index, uint64_t second_upstream_index) {
+uint64_t HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index,
+                                                         uint64_t second_upstream_index) {
   uint64_t upstream_with_request = upstream_index;
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
@@ -776,9 +777,9 @@ void HttpIntegrationTest::testRetryHostPredicateFilter() {
 
   // We want to work with a cluster with two hosts.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      auto* new_host = bootstrap.mutable_static_resources()->mutable_clusters(0)->add_hosts();
-      new_host->MergeFrom(bootstrap.static_resources().clusters(0).hosts(0));
-      });
+    auto* new_host = bootstrap.mutable_static_resources()->mutable_clusters(0)->add_hosts();
+    new_host->MergeFrom(bootstrap.static_resources().clusters(0).hosts(0));
+  });
   fake_upstreams_count_ = 2;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -797,7 +798,8 @@ void HttpIntegrationTest::testRetryHostPredicateFilter() {
 
   if (fake_upstreams_[upstream_idx]->httpType() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-    ASSERT_TRUE(fake_upstreams_[upstream_idx]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstreams_[upstream_idx]->waitForHttpConnection(*dispatcher_,
+                                                                     fake_upstream_connection_));
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }

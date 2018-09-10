@@ -1718,7 +1718,8 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
   router_.decodeHeaders(headers, false);
 
   // The router should accept any host at this point, since we're not in a retry.
-  EXPECT_FALSE(router_.shouldSelectAnotherHost(*dynamic_cast<Upstream::Host*>(cm_.conn_pool_.host_.get())));
+  EXPECT_FALSE(
+      router_.shouldSelectAnotherHost(*dynamic_cast<Upstream::Host*>(cm_.conn_pool_.host_.get())));
 
   Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
   EXPECT_CALL(*router_.retry_state_, enabled()).WillOnce(Return(true));
@@ -1751,7 +1752,8 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
   router_.retry_state_->callback_();
 
   // Now that we're triggered a retry, we should see the router reject hosts.
-  EXPECT_TRUE(router_.shouldSelectAnotherHost(*dynamic_cast<Upstream::Host*>(cm_.conn_pool_.host_.get())));
+  EXPECT_TRUE(
+      router_.shouldSelectAnotherHost(*dynamic_cast<Upstream::Host*>(cm_.conn_pool_.host_.get())));
 
   // Normal response.
   EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).WillOnce(Return(RetryStatus::No));

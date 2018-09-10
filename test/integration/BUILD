@@ -181,13 +181,13 @@ envoy_cc_test(
 envoy_cc_test_library(
     name = "test_host_predicate_lib",
     srcs = [
-        "test_host_predicate_config.h",
-        "test_host_predicate_config.cc",
         "test_host_predicate.h",
-        ],
+        "test_host_predicate_config.cc",
+        "test_host_predicate_config.h",
+    ],
     deps = [
-        "//include/envoy/upstream:retry_interface",
         "//include/envoy/registry",
+        "//include/envoy/upstream:retry_interface",
     ],
 )
 

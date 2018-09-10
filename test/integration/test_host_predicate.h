@@ -11,7 +11,7 @@ namespace Envoy {
 class TestHostPredicate : public Upstream::RetryHostPredicate {
   bool shouldSelectAnotherHost(const Upstream::Host& candidate_host) override {
     return !first_host_address_ || *first_host_address_ != candidate_host.address()->asString();
-  } 
+  }
 
   void onHostAttempted(Upstream::HostDescriptionConstSharedPtr attempted_host) override {
     if (!first_host_address_) {
@@ -21,4 +21,4 @@ class TestHostPredicate : public Upstream::RetryHostPredicate {
 
   absl::optional<std::string> first_host_address_;
 };
-}
+} // namespace Envoy
