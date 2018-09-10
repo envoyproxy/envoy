@@ -70,9 +70,9 @@ bool SimulatedTimeSystem::CompareAlarms::operator()(const Alarm* a, const Alarm*
 };
 
 // Each timer is maintained and ordered by a common TimeSystem, but is
-// associated with a scheduler. The scheduler associates the timers it creates
-// with a libevent context, so that the timer callbacks are executed in via
-// Dispatcher::run() in the proper thread.
+// associated with a scheduler. The scheduler creates the timers with a libevent
+// context, so that the timer callbacks can be executed via Dispatcher::run() in
+// the expected thread.
 class SimulatedTimeSystem::SimulatedScheduler : public Scheduler {
 public:
   SimulatedScheduler(SimulatedTimeSystem& time_system, Libevent::BasePtr& libevent)
