@@ -58,6 +58,13 @@ const std::string getLoopbackAddressString(const Address::IpVersion version);
 const std::string getAnyAddressUrlString(const Address::IpVersion version);
 
 /**
+ * Get an IP any address as a string.
+ * @param version IP address version of any address.
+ * @return std::string any address as a string.
+ */
+const std::string getAnyAddressString(const Address::IpVersion version);
+
+/**
  * Return a string version of enum IpVersion version.
  * @param version IP address version.
  * @return std::string string version of IpVersion.

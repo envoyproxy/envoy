@@ -85,6 +85,19 @@ void TestEnvironment::createParentPath(const std::string& path) {
   RELEASE_ASSERT(::system(("mkdir -p $(dirname " + path + ")").c_str()) == 0, "");
 #endif
 }
+
+void TestEnvironment::removePath(const std::string& path) {
+  RELEASE_ASSERT(StringUtil::startsWith(path.c_str(), TestEnvironment::temporaryDirectory()), "");
+#ifdef __cpp_lib_experimental_filesystem
+  // We don't want to rely on rm etc. if we can avoid it, since it might not
+  // exist in some environments such as ClusterFuzz.
+  std::experimental::filesystem::remove_all(std::experimental::filesystem::path(path));
+#else
+  // No support on this system for std::experimental::filesystem.
+  RELEASE_ASSERT(::system(("rm -rf " + path).c_str()) == 0, "");
+#endif
+}
+
 absl::optional<std::string> TestEnvironment::getOptionalEnvVar(const std::string& var) {
   const char* path = ::getenv(var.c_str());
   if (path == nullptr) {
@@ -171,6 +184,11 @@ std::string TestEnvironment::substitute(const std::string& str,
   const std::regex ntop_loopback_address_regex("\\{\\{ ntop_ip_loopback_address \\}\\}");
   out_json_string = std::regex_replace(out_json_string, ntop_loopback_address_regex,
                                        Network::Test::getLoopbackAddressString(version));
+
+  // Substitute IP any addresses.
+  const std::regex any_address_regex("\\{\\{ ip_any_address \\}\\}");
+  out_json_string = std::regex_replace(out_json_string, any_address_regex,
+                                       Network::Test::getAnyAddressString(version));
 
   // Substitute dns lookup family.
   const std::regex lookup_family_regex("\\{\\{ dns_lookup_family \\}\\}");

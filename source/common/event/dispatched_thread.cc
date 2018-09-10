@@ -2,8 +2,8 @@
 
 #include <chrono>
 
+#include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
 #include "envoy/server/configuration.h"
 
 #include "common/common/thread.h"

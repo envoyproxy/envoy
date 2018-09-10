@@ -65,3 +65,12 @@ envoy_cc_library(
     hdrs = ["shadow_writer.h"],
     deps = ["//include/envoy/http:message_interface"],
 )
+
+envoy_cc_library(
+    name = "string_accessor_interface",
+    hdrs = ["string_accessor.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//include/envoy/request_info:filter_state_interface",
+    ],
+)

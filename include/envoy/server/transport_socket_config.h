@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/init/init.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/runtime/runtime.h"
@@ -63,6 +64,18 @@ public:
    * @return the server-wide stats store.
    */
   virtual Stats::Store& stats() PURE;
+
+  /**
+   * Pass an init manager to register dynamic secret provider.
+   * @param init_manager instance of init manager.
+   */
+  virtual void setInitManager(Init::Manager& init_manager) PURE;
+
+  /**
+   * @return a pointer pointing to the instance of an init manager, or nullptr
+   * if not set.
+   */
+  virtual Init::Manager* initManager() PURE;
 };
 
 class TransportSocketConfigFactory {

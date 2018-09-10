@@ -19,6 +19,8 @@ PerTestEnvironment::PerTestEnvironment()
   TestEnvironment::createPath(test_tmpdir_);
 }
 
+PerTestEnvironment::~PerTestEnvironment() { TestEnvironment::removePath(test_tmpdir_); }
+
 void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum default_log_level) {
   Event::Libevent::Global::initialize();
 

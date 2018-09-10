@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/event/real_time_system.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
 
@@ -49,6 +50,7 @@ public:
 protected:
   Envoy::OptionsImpl& options_;
   ProdComponentFactory component_factory_;
+  Event::RealTimeSystem time_system_;
   DefaultTestHooks default_test_hooks_;
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   std::unique_ptr<Server::HotRestart> restarter_;

@@ -100,6 +100,7 @@ envoy_cc_library(
         ":raw_stat_data_lib",
         ":source_impl_lib",
         ":stats_options_lib",
+        ":symbol_table_lib",
         ":tag_extractor_lib",
         ":utility_lib",
         "//include/envoy/common:time_interface",
@@ -114,6 +115,18 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
         "@envoy_api//envoy/config/metrics/v2:stats_cc",
+    ],
+)
+
+envoy_cc_library(
+    name = "symbol_table_lib",
+    srcs = ["symbol_table_impl.cc"],
+    hdrs = ["symbol_table_impl.h"],
+    external_deps = ["abseil_base"],
+    deps = [
+        "//include/envoy/stats:symbol_table_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:utility_lib",
     ],
 )
 

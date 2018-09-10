@@ -7,7 +7,6 @@
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/network/thrift_proxy/buffer_helper.h"
-#include "extensions/filters/network/thrift_proxy/transport_impl.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -38,6 +38,7 @@
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -62,18 +63,19 @@ namespace Http {
 class HttpConnectionManagerImplTest : public Test, public ConnectionManagerConfig {
 public:
   struct RouteConfigProvider : public Router::RouteConfigProvider {
+    RouteConfigProvider(TimeSource& time_source) : time_source_(time_source) {}
+
     // Router::RouteConfigProvider
     Router::ConfigConstSharedPtr config() override { return route_config_; }
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
-    SystemTime lastUpdated() const override {
-      return ProdSystemTimeSource::instance_.currentTime();
-    }
+    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
 
+    TimeSource& time_source_;
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
   };
 
   HttpConnectionManagerImplTest()
-      : access_log_path_("dummy_path"),
+      : route_config_provider_(test_time_.timeSystem()), access_log_path_("dummy_path"),
         access_logs_{
             AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
                 access_log_path_, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
@@ -275,6 +277,8 @@ public:
   bool proxy100Continue() const override { return proxy_100_continue_; }
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
 
+  DangerousDeprecatedTestTime test_time_;
+  RouteConfigProvider route_config_provider_;
   NiceMock<Tracing::MockHttpTracer> tracer_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
@@ -300,7 +304,6 @@ public:
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::unique_ptr<Ssl::MockConnection> ssl_connection_;
-  RouteConfigProvider route_config_provider_;
   TracingConnectionManagerConfigPtr tracing_config_;
   SlowDateProviderImpl date_provider_;
   MockStream stream_;
@@ -1702,6 +1705,10 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 
+  Tcp::ConnectionPool::UpstreamCallbacks* upstream_callbacks = nullptr;
+  EXPECT_CALL(*conn_pool_.connection_data_, addUpstreamCallbacks(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) { upstream_callbacks = &cb; }));
   conn_pool_.host_->hostname_ = "newhost";
   conn_pool_.poolReady(upstream_conn_);
 
@@ -1711,6 +1718,7 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketPrefixAndAutoHostRewrite) {
   EXPECT_EQ(1U, stats_.named_.downstream_cx_websocket_total_.value());
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http1_active_.value());
 
+  upstream_callbacks->onEvent(Network::ConnectionEvent::RemoteClose);
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
   EXPECT_EQ(0U, stats_.named_.downstream_cx_websocket_active_.value());
@@ -1750,8 +1758,13 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyData) {
   EXPECT_CALL(upstream_conn_, write(_, false));
   EXPECT_CALL(upstream_conn_, write(BufferEqual(&early_data), false));
   EXPECT_CALL(filter_callbacks_.connection_, readDisable(false));
+  Tcp::ConnectionPool::UpstreamCallbacks* upstream_callbacks = nullptr;
+  EXPECT_CALL(*conn_pool_.connection_data_, addUpstreamCallbacks(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) { upstream_callbacks = &cb; }));
   conn_pool_.poolReady(upstream_conn_);
 
+  upstream_callbacks->onEvent(Network::ConnectionEvent::RemoteClose);
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
 }
@@ -1825,7 +1838,12 @@ TEST_F(HttpConnectionManagerImplTest, WebSocketEarlyEndStream) {
 
   EXPECT_CALL(upstream_conn_, write(_, false));
   EXPECT_CALL(upstream_conn_, write(_, true)).Times(0);
+  Tcp::ConnectionPool::UpstreamCallbacks* upstream_callbacks = nullptr;
+  EXPECT_CALL(*conn_pool_.connection_data_, addUpstreamCallbacks(_))
+      .WillOnce(
+          Invoke([&](Tcp::ConnectionPool::UpstreamCallbacks& cb) { upstream_callbacks = &cb; }));
   conn_pool_.poolReady(upstream_conn_);
+  upstream_callbacks->onEvent(Network::ConnectionEvent::RemoteClose);
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
 }

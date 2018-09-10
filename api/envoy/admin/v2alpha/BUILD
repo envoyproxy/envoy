@@ -31,3 +31,9 @@ api_proto_library_internal(
     srcs = ["metrics.proto"],
     visibility = ["//visibility:public"],
 )
+
+api_proto_library_internal(
+    name = "memory",
+    srcs = ["memory.proto"],
+    visibility = ["//visibility:public"],
+)

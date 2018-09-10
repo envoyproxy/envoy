@@ -29,6 +29,8 @@ private:
   Network::TransportSocketCallbacks& parent_;
 };
 
+typedef std::unique_ptr<NoOpTransportSocketCallbacks> NoOpTransportSocketCallbacksPtr;
+
 } // namespace Alts
 } // namespace TransportSockets
 } // namespace Extensions

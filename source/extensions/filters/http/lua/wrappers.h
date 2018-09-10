@@ -192,6 +192,9 @@ private:
    */
   DECLARE_LUA_FUNCTION(RequestInfoWrapper, luaDynamicMetadata);
 
+  // Envoy::Lua::BaseLuaObject
+  void onMarkDead() override { dynamic_metadata_wrapper_.reset(); }
+
   RequestInfo::RequestInfo& request_info_;
   Filters::Common::Lua::LuaDeathRef<DynamicMetadataMapWrapper> dynamic_metadata_wrapper_;
 

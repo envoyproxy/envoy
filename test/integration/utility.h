@@ -11,9 +11,11 @@
 #include "envoy/network/filter.h"
 
 #include "common/common/assert.h"
+#include "common/common/utility.h"
 #include "common/http/codec_client.h"
 
 #include "test/test_common/printers.h"
+#include "test/test_common/test_time.h"
 
 namespace Envoy {
 /**
@@ -59,7 +61,9 @@ public:
   RawConnectionDriver(uint32_t port, Buffer::Instance& initial_data, ReadCallback data_callback,
                       Network::Address::IpVersion version);
   ~RawConnectionDriver();
-  void run();
+  const Network::Connection& connection() { return *client_; }
+  bool connecting() { return callbacks_->connecting_; }
+  void run(Event::Dispatcher::RunType run_type = Event::Dispatcher::RunType::Block);
   void close();
 
 private:
@@ -78,8 +82,17 @@ private:
     ReadCallback data_callback_;
   };
 
+  struct ConnectionCallbacks : public Network::ConnectionCallbacks {
+    void onEvent(Network::ConnectionEvent) override { connecting_ = false; }
+    void onAboveWriteBufferHighWatermark() override {}
+    void onBelowWriteBufferLowWatermark() override {}
+
+    bool connecting_{true};
+  };
+
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
+  std::unique_ptr<ConnectionCallbacks> callbacks_;
   Network::ClientConnectionPtr client_;
 };
 
@@ -123,6 +136,9 @@ public:
                     const std::string& body, Http::CodecClient::Type type,
                     Network::Address::IpVersion ip_version, const std::string& host = "host",
                     const std::string& content_type = "");
+
+  // TODO(jmarantz): this should be injectable.
+  static DangerousDeprecatedTestTime evil_singleton_test_time_;
 };
 
 // A set of connection callbacks which tracks connection state.

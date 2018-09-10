@@ -35,14 +35,10 @@ void SslIntegrationTest::initialize() {
   context_manager_.reset(new ContextManagerImpl(*runtime_));
 
   registerTestServerPorts({"http"});
-  client_ssl_ctx_plain_ =
-      createClientSslTransportSocketFactory(false, false, *context_manager_, secret_manager_);
-  client_ssl_ctx_alpn_ =
-      createClientSslTransportSocketFactory(true, false, *context_manager_, secret_manager_);
-  client_ssl_ctx_san_ =
-      createClientSslTransportSocketFactory(false, true, *context_manager_, secret_manager_);
-  client_ssl_ctx_alpn_san_ =
-      createClientSslTransportSocketFactory(true, true, *context_manager_, secret_manager_);
+  client_ssl_ctx_plain_ = createClientSslTransportSocketFactory(false, false, *context_manager_);
+  client_ssl_ctx_alpn_ = createClientSslTransportSocketFactory(true, false, *context_manager_);
+  client_ssl_ctx_san_ = createClientSslTransportSocketFactory(false, true, *context_manager_);
+  client_ssl_ctx_alpn_san_ = createClientSslTransportSocketFactory(true, true, *context_manager_);
 }
 
 void SslIntegrationTest::TearDown() {
@@ -158,6 +154,13 @@ TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
 }
 
 TEST_P(SslIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
+#ifdef __APPLE__
+  // Skip this test on OS X: we can't detect the early close on OS X, and we
+  // won't clean up the upstream connection until it times out. See #4294.
+  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+    return;
+  }
+#endif
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(false, false);
   };

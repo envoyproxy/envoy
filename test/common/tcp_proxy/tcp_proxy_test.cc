@@ -28,6 +28,7 @@
 
 using testing::_;
 using testing::Invoke;
+using testing::InvokeWithoutArgs;
 using testing::MatchesRegex;
 using testing::NiceMock;
 using testing::Return;
@@ -347,6 +348,12 @@ public:
         .WillByDefault(SaveArg<0>(&access_log_data_));
   }
 
+  ~TcpProxyTest() {
+    if (filter_ != nullptr) {
+      filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+    }
+  }
+
   void configure(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config) {
     config_.reset(new Config(config, factory_context_));
   }
@@ -420,15 +427,18 @@ public:
           .WillRepeatedly(Return(nullptr));
     }
 
-    filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
-    EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
-    EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
-    filter_->initializeReadFilterCallbacks(filter_callbacks_);
-    EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+    {
+      testing::InSequence sequence;
+      filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
+      EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
+      EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
+      filter_->initializeReadFilterCallbacks(filter_callbacks_);
+      EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
-    EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
-    EXPECT_EQ(&filter_callbacks_.connection_, filter_->downstreamConnection());
-    EXPECT_EQ(nullptr, filter_->metadataMatchCriteria());
+      EXPECT_EQ(absl::optional<uint64_t>(), filter_->computeHashKey());
+      EXPECT_EQ(&filter_callbacks_.connection_, filter_->downstreamConnection());
+      EXPECT_EQ(nullptr, filter_->metadataMatchCriteria());
+    }
   }
 
   void setup(uint32_t connections) { setup(connections, defaultConfig()); }
@@ -730,6 +740,22 @@ TEST_F(TcpProxyTest, DisconnectBeforeData) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Test that if the downstream connection is closed before the upstream connection
+// is established, the upstream connection is cancelled.
+TEST_F(TcpProxyTest, RemoteClosetBeforeUpstreamConnected) {
+  setup(1);
+  EXPECT_CALL(*conn_pool_handles_.at(0), cancel());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Test that if the downstream connection is closed before the upstream connection
+// is established, the upstream connection is cancelled.
+TEST_F(TcpProxyTest, LocalClosetBeforeUpstreamConnected) {
+  setup(1);
+  EXPECT_CALL(*conn_pool_handles_.at(0), cancel());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::LocalClose);
+}
+
 TEST_F(TcpProxyTest, UpstreamConnectFailure) {
   setup(1, accessLogConfig("%RESPONSE_FLAGS%"));
 
@@ -816,10 +842,60 @@ TEST_F(TcpProxyTest, IdleTimerDisabledUpstreamClose) {
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Tests that flushing data during an idle timeout doesn't cause problems.
+TEST_F(TcpProxyTest, IdleTimeoutWithOutstandingDataFlushed) {
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+  config.mutable_idle_timeout()->set_seconds(1);
+  setup(1, config);
+
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  raiseEventUpstreamConnected(0);
+
+  Buffer::OwnedImpl buffer("hello");
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  filter_->onData(buffer, false);
+
+  buffer.add("hello2");
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  filter_callbacks_.connection_.raiseBytesSentCallbacks(1);
+
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000)));
+  upstream_connections_.at(0)->raiseBytesSentCallbacks(2);
+
+  // Mark the upstream connection as blocked.
+  // This should read-disable the downstream connection.
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(_));
+  upstream_connections_.at(0)->runHighWatermarkCallbacks();
+
+  // When Envoy has an idle timeout, the following happens.
+  // Envoy closes the downstream connection
+  // Envoy closes the upstream connection.
+  // When closing the upstream connection with ConnectionCloseType::NoFlush,
+  // if there is data in the buffer, Envoy does a best-effort flush.
+  // If the write succeeds, Envoy may go under the flow control limit and start
+  // the callbacks to read-enable the already-closed downstream connection.
+  //
+  // In this case we expect readDisable to not be called on the already closed
+  // connection.
+  EXPECT_CALL(filter_callbacks_.connection_, readDisable(true)).Times(0);
+  EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush))
+      .WillOnce(InvokeWithoutArgs(
+          [&]() -> void { upstream_connections_.at(0)->runLowWatermarkCallbacks(); }));
+
+  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*idle_timer, disableTimer());
+  idle_timer->callback_();
+}
+
 // Test that access log fields %UPSTREAM_HOST% and %UPSTREAM_CLUSTER% are correctly logged.
 TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
   setup(1, accessLogConfig("%UPSTREAM_HOST% %UPSTREAM_CLUSTER%"));
   raiseEventUpstreamConnected(0);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "127.0.0.1:80 fake_cluster");
 }
@@ -828,6 +904,7 @@ TEST_F(TcpProxyTest, AccessLogUpstreamHost) {
 TEST_F(TcpProxyTest, AccessLogUpstreamLocalAddress) {
   setup(1, accessLogConfig("%UPSTREAM_LOCAL_ADDRESS%"));
   raiseEventUpstreamConnected(0);
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "2.2.2.2:50000");
 }
@@ -840,6 +917,7 @@ TEST_F(TcpProxyTest, AccessLogDownstreamAddress) {
   filter_callbacks_.connection_.remote_address_ =
       Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
   setup(1, accessLogConfig("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% %DOWNSTREAM_LOCAL_ADDRESS%"));
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
   EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
 }
@@ -1022,6 +1100,9 @@ TEST_F(TcpProxyRoutingTest, NonRoutableConnection) {
 
   EXPECT_EQ(total_cx + 1, config_->stats().downstream_cx_total_.value());
   EXPECT_EQ(non_routable_cx + 1, config_->stats().downstream_cx_no_route_.value());
+
+  // Cleanup
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
 TEST_F(TcpProxyRoutingTest, RoutableConnection) {
@@ -1034,7 +1115,8 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
 
   // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _));
+  EXPECT_CALL(factory_context_.cluster_manager_, tcpConnPoolForCluster("fake_cluster", _, _))
+      .WillOnce(Return(nullptr));
 
   filter_->onNewConnection();
 

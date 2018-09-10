@@ -103,6 +103,8 @@ GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitSe
 
   // TODO(junr03): legacy rate limit is deprecated. Remove this warning after 1.8.0.
   if (!use_data_plane_proto_) {
+    // Force link time dependency on deprecated message type.
+    pb::lyft::ratelimit::RateLimit _ignore;
     ENVOY_LOG_MISC(warn, "legacy rate limit client is deprecated, update your service to support "
                          "the data-plane-api defined rate limit service");
   }

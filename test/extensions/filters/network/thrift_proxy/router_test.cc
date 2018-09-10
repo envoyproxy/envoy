@@ -21,6 +21,7 @@
 
 using testing::_;
 using testing::ContainsRegex;
+using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Ref;
@@ -37,14 +38,6 @@ namespace ThriftProxy {
 namespace Router {
 
 namespace {
-
-envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration
-parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
-  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration route_config;
-  MessageUtil::loadFromYaml(yaml, route_config);
-  MessageUtil::validate(route_config);
-  return route_config;
-}
 
 class TestNamedTransportConfigFactory : public NamedTransportConfigFactory {
 public:
@@ -71,8 +64,22 @@ public:
 class ThriftRouterTestBase {
 public:
   ThriftRouterTestBase()
-      : transport_factory_([&]() -> MockTransport* { return transport_; }),
-        protocol_factory_([&]() -> MockProtocol* { return protocol_; }),
+      : transport_factory_([&]() -> MockTransport* {
+          ASSERT(transport_ == nullptr);
+          transport_ = new NiceMock<MockTransport>();
+          if (mock_transport_cb_) {
+            mock_transport_cb_(transport_);
+          }
+          return transport_;
+        }),
+        protocol_factory_([&]() -> MockProtocol* {
+          ASSERT(protocol_ == nullptr);
+          protocol_ = new NiceMock<MockProtocol>();
+          if (mock_protocol_cb_) {
+            mock_protocol_cb_(protocol_);
+          }
+          return protocol_;
+        }),
         transport_register_(transport_factory_), protocol_register_(protocol_factory_) {}
 
   void initializeRouter() {
@@ -96,7 +103,7 @@ public:
   }
 
   void startRequest(MessageType msg_type) {
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->transportBegin(metadata_));
+    EXPECT_EQ(FilterStatus::Continue, router_->transportBegin(metadata_));
 
     EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
     EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
@@ -106,7 +113,7 @@ public:
 
     EXPECT_CALL(callbacks_, downstreamTransportType()).WillOnce(Return(TransportType::Framed));
     EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Binary));
-    EXPECT_EQ(ThriftFilters::FilterStatus::StopIteration, router_->messageBegin(metadata_));
+    EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
 
     NiceMock<Network::MockClientConnection> connection;
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection));
@@ -124,9 +131,6 @@ public:
           upstream_callbacks_ = &cb;
         }));
 
-    protocol_ = new NiceMock<MockProtocol>();
-
-    ON_CALL(*protocol_, type()).WillByDefault(Return(ProtocolType::Binary));
     EXPECT_CALL(*protocol_, writeMessageBegin(_, _))
         .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
           EXPECT_EQ(metadata_->methodName(), metadata.methodName());
@@ -141,7 +145,7 @@ public:
   }
 
   void startRequestWithExistingConnection(MessageType msg_type) {
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->transportBegin({}));
+    EXPECT_EQ(FilterStatus::Continue, router_->transportBegin({}));
 
     EXPECT_CALL(callbacks_, route()).WillOnce(Return(route_ptr_));
     EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
@@ -165,15 +169,16 @@ public:
 
     EXPECT_CALL(callbacks_, downstreamTransportType()).WillOnce(Return(TransportType::Framed));
     EXPECT_CALL(callbacks_, downstreamProtocolType()).WillOnce(Return(ProtocolType::Binary));
-    protocol_ = new NiceMock<MockProtocol>();
-    ON_CALL(*protocol_, type()).WillByDefault(Return(ProtocolType::Binary));
-    EXPECT_CALL(*protocol_, writeMessageBegin(_, _))
-        .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
-          EXPECT_EQ(metadata_->methodName(), metadata.methodName());
-          EXPECT_EQ(metadata_->messageType(), metadata.messageType());
-          EXPECT_EQ(metadata_->sequenceId(), metadata.sequenceId());
-        }));
 
+    mock_protocol_cb_ = [&](MockProtocol* protocol) -> void {
+      ON_CALL(*protocol, type()).WillByDefault(Return(ProtocolType::Binary));
+      EXPECT_CALL(*protocol, writeMessageBegin(_, _))
+          .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
+            EXPECT_EQ(metadata_->methodName(), metadata.methodName());
+            EXPECT_EQ(metadata_->messageType(), metadata.messageType());
+            EXPECT_EQ(metadata_->sequenceId(), metadata.sequenceId());
+          }));
+    };
     EXPECT_CALL(callbacks_, continueDecoding()).Times(0);
     EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, newConnection(_))
         .WillOnce(
@@ -183,56 +188,56 @@ public:
               return nullptr;
             }));
 
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->messageBegin(metadata_));
+    EXPECT_EQ(FilterStatus::Continue, router_->messageBegin(metadata_));
     EXPECT_NE(nullptr, upstream_callbacks_);
   }
 
   void sendTrivialStruct(FieldType field_type) {
     EXPECT_CALL(*protocol_, writeStructBegin(_, ""));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->structBegin({}));
+    EXPECT_EQ(FilterStatus::Continue, router_->structBegin({}));
 
     EXPECT_CALL(*protocol_, writeFieldBegin(_, "", field_type, 1));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->fieldBegin({}, field_type, 1));
+    EXPECT_EQ(FilterStatus::Continue, router_->fieldBegin({}, field_type, 1));
 
     sendTrivialValue(field_type);
 
     EXPECT_CALL(*protocol_, writeFieldEnd(_));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->fieldEnd());
+    EXPECT_EQ(FilterStatus::Continue, router_->fieldEnd());
 
     EXPECT_CALL(*protocol_, writeFieldBegin(_, "", FieldType::Stop, 0));
     EXPECT_CALL(*protocol_, writeStructEnd(_));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->structEnd());
+    EXPECT_EQ(FilterStatus::Continue, router_->structEnd());
   }
 
   void sendTrivialValue(FieldType field_type) {
     switch (field_type) {
     case FieldType::Bool:
       EXPECT_CALL(*protocol_, writeBool(_, true));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->boolValue(true));
+      EXPECT_EQ(FilterStatus::Continue, router_->boolValue(true));
       break;
     case FieldType::Byte:
       EXPECT_CALL(*protocol_, writeByte(_, 2));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->byteValue(2));
+      EXPECT_EQ(FilterStatus::Continue, router_->byteValue(2));
       break;
     case FieldType::I16:
       EXPECT_CALL(*protocol_, writeInt16(_, 3));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->int16Value(3));
+      EXPECT_EQ(FilterStatus::Continue, router_->int16Value(3));
       break;
     case FieldType::I32:
       EXPECT_CALL(*protocol_, writeInt32(_, 4));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->int32Value(4));
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(4));
       break;
     case FieldType::I64:
       EXPECT_CALL(*protocol_, writeInt64(_, 5));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->int64Value(5));
+      EXPECT_EQ(FilterStatus::Continue, router_->int64Value(5));
       break;
     case FieldType::Double:
       EXPECT_CALL(*protocol_, writeDouble(_, 6.0));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->doubleValue(6.0));
+      EXPECT_EQ(FilterStatus::Continue, router_->doubleValue(6.0));
       break;
     case FieldType::String:
       EXPECT_CALL(*protocol_, writeString(_, "seven"));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->stringValue("seven"));
+      EXPECT_EQ(FilterStatus::Continue, router_->stringValue("seven"));
       break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
@@ -240,8 +245,6 @@ public:
   }
 
   void completeRequest() {
-    transport_ = new NiceMock<MockTransport>();
-
     EXPECT_CALL(*protocol_, writeMessageEnd(_));
     EXPECT_CALL(*transport_, encodeFrame(_, _, _));
     EXPECT_CALL(upstream_connection_, write(_, false));
@@ -250,14 +253,14 @@ public:
       EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, released(Ref(upstream_connection_)));
     }
 
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->messageEnd());
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->transportEnd());
+    EXPECT_EQ(FilterStatus::Continue, router_->messageEnd());
+    EXPECT_EQ(FilterStatus::Continue, router_->transportEnd());
   }
 
   void returnResponse() {
     Buffer::OwnedImpl buffer;
 
-    EXPECT_CALL(callbacks_, startUpstreamResponse(TransportType::Framed, ProtocolType::Binary));
+    EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
 
     EXPECT_CALL(callbacks_, upstreamData(Ref(buffer))).WillOnce(Return(false));
     upstream_callbacks_->onUpstreamData(buffer, false);
@@ -276,6 +279,9 @@ public:
   TestNamedProtocolConfigFactory protocol_factory_;
   Registry::InjectFactory<NamedTransportConfigFactory> transport_register_;
   Registry::InjectFactory<NamedProtocolConfigFactory> protocol_register_;
+
+  std::function<void(MockTransport*)> mock_transport_cb_{};
+  std::function<void(MockProtocol*)> mock_protocol_cb_{};
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
   NiceMock<ThriftFilters::MockDecoderFilterCallbacks> callbacks_;
@@ -404,7 +410,7 @@ TEST_F(ThriftRouterTest, NoRoute) {
         EXPECT_EQ(AppExceptionType::UnknownMethod, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no route.*"));
       }));
-  EXPECT_EQ(ThriftFilters::FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
 }
 
 TEST_F(ThriftRouterTest, NoCluster) {
@@ -421,7 +427,7 @@ TEST_F(ThriftRouterTest, NoCluster) {
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*unknown cluster.*"));
       }));
-  EXPECT_EQ(ThriftFilters::FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
 }
 
 TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
@@ -440,7 +446,7 @@ TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*maintenance mode.*"));
       }));
-  EXPECT_EQ(ThriftFilters::FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
 }
 
 TEST_F(ThriftRouterTest, NoHealthyHosts) {
@@ -460,7 +466,7 @@ TEST_F(ThriftRouterTest, NoHealthyHosts) {
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no healthy upstream.*"));
       }));
 
-  EXPECT_EQ(ThriftFilters::FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
 }
 
 TEST_F(ThriftRouterTest, TruncatedResponse) {
@@ -472,7 +478,7 @@ TEST_F(ThriftRouterTest, TruncatedResponse) {
 
   Buffer::OwnedImpl buffer;
 
-  EXPECT_CALL(callbacks_, startUpstreamResponse(TransportType::Framed, ProtocolType::Binary));
+  EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
   EXPECT_CALL(callbacks_, upstreamData(Ref(buffer))).WillOnce(Return(false));
   EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, released(Ref(upstream_connection_)));
   EXPECT_CALL(callbacks_, resetDownstreamConnection());
@@ -531,7 +537,7 @@ TEST_F(ThriftRouterTest, UpstreamDataTriggersReset) {
 
   Buffer::OwnedImpl buffer;
 
-  EXPECT_CALL(callbacks_, startUpstreamResponse(TransportType::Framed, ProtocolType::Binary));
+  EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
   EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
       .WillOnce(Invoke([&](Buffer::Instance&) -> bool {
         router_->resetUpstreamConnection();
@@ -590,6 +596,100 @@ TEST_F(ThriftRouterTest, UnexpectedRouterDestroy) {
   destroyRouter();
 }
 
+TEST_F(ThriftRouterTest, ProtocolUpgrade) {
+  initializeRouter();
+  startRequest(MessageType::Call);
+
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
+      .WillOnce(Invoke(
+          [&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void { upstream_callbacks_ = &cb; }));
+
+  Tcp::ConnectionPool::ConnectionStatePtr conn_state;
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, connectionState())
+      .WillRepeatedly(
+          Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state.get(); }));
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, setConnectionState_(_))
+      .WillOnce(Invoke(
+          [&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void { conn_state.swap(cs); }));
+
+  EXPECT_CALL(*protocol_, supportsUpgrade()).WillOnce(Return(true));
+
+  MockThriftObject* upgrade_response = new NiceMock<MockThriftObject>();
+
+  EXPECT_CALL(*protocol_, attemptUpgrade(_, _, _))
+      .WillOnce(Invoke(
+          [&](Transport&, ThriftConnectionState&, Buffer::Instance& buffer) -> ThriftObjectPtr {
+            buffer.add("upgrade request");
+            return ThriftObjectPtr{upgrade_response};
+          }));
+  EXPECT_CALL(upstream_connection_, write(_, false))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
+        EXPECT_EQ("upgrade request", buffer.toString());
+      }));
+
+  context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
+  EXPECT_NE(nullptr, upstream_callbacks_);
+
+  Buffer::OwnedImpl buffer;
+  EXPECT_CALL(*upgrade_response, onData(Ref(buffer))).WillOnce(Return(false));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+
+  EXPECT_CALL(*upgrade_response, onData(Ref(buffer))).WillOnce(Return(true));
+  EXPECT_CALL(*protocol_, completeUpgrade(_, Ref(*upgrade_response)));
+  EXPECT_CALL(callbacks_, continueDecoding());
+  EXPECT_CALL(*protocol_, writeMessageBegin(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
+        EXPECT_EQ(metadata_->methodName(), metadata.methodName());
+        EXPECT_EQ(metadata_->messageType(), metadata.messageType());
+        EXPECT_EQ(metadata_->sequenceId(), metadata.sequenceId());
+      }));
+  upstream_callbacks_->onUpstreamData(buffer, false);
+
+  // Then the actual request...
+  sendTrivialStruct(FieldType::String);
+  completeRequest();
+  returnResponse();
+  destroyRouter();
+}
+
+TEST_F(ThriftRouterTest, ProtocolUpgradeSkippedOnExistingConnection) {
+  initializeRouter();
+  startRequest(MessageType::Call);
+
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, addUpstreamCallbacks(_))
+      .WillOnce(Invoke(
+          [&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void { upstream_callbacks_ = &cb; }));
+
+  Tcp::ConnectionPool::ConnectionStatePtr conn_state = std::make_unique<ThriftConnectionState>();
+  EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, connectionState())
+      .WillRepeatedly(
+          Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state.get(); }));
+
+  EXPECT_CALL(*protocol_, supportsUpgrade()).WillOnce(Return(true));
+
+  // Protocol determines that connection state shows upgrade already occurred
+  EXPECT_CALL(*protocol_, attemptUpgrade(_, _, _))
+      .WillOnce(Invoke([&](Transport&, ThriftConnectionState&,
+                           Buffer::Instance&) -> ThriftObjectPtr { return nullptr; }));
+
+  EXPECT_CALL(*protocol_, writeMessageBegin(_, _))
+      .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
+        EXPECT_EQ(metadata_->methodName(), metadata.methodName());
+        EXPECT_EQ(metadata_->messageType(), metadata.messageType());
+        EXPECT_EQ(metadata_->sequenceId(), metadata.sequenceId());
+      }));
+  EXPECT_CALL(callbacks_, continueDecoding());
+
+  context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
+  EXPECT_NE(nullptr, upstream_callbacks_);
+
+  // Then the actual request...
+  sendTrivialStruct(FieldType::String);
+  completeRequest();
+  returnResponse();
+  destroyRouter();
+}
+
 TEST_P(ThriftRouterFieldTypeTest, OneWay) {
   FieldType field_type = GetParam();
 
@@ -631,334 +731,58 @@ TEST_P(ThriftRouterContainerTest, DecoderFilterCallbacks) {
   connectUpstream();
 
   EXPECT_CALL(*protocol_, writeStructBegin(_, ""));
-  EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->structBegin({}));
+  EXPECT_EQ(FilterStatus::Continue, router_->structBegin({}));
 
   EXPECT_CALL(*protocol_, writeFieldBegin(_, "", field_type, 1));
-  EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->fieldBegin({}, field_type, 1));
+  EXPECT_EQ(FilterStatus::Continue, router_->fieldBegin({}, field_type, 1));
 
   switch (field_type) {
   case FieldType::Map:
     EXPECT_CALL(*protocol_, writeMapBegin(_, FieldType::I32, FieldType::I32, 2));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue,
-              router_->mapBegin(FieldType::I32, FieldType::I32, 2));
+    EXPECT_EQ(FilterStatus::Continue, router_->mapBegin(FieldType::I32, FieldType::I32, 2));
     for (int i = 0; i < 2; i++) {
       EXPECT_CALL(*protocol_, writeInt32(_, i));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->int32Value(i));
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i));
       EXPECT_CALL(*protocol_, writeInt32(_, i + 100));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->int32Value(i + 100));
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i + 100));
     }
     EXPECT_CALL(*protocol_, writeMapEnd(_));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->mapEnd());
+    EXPECT_EQ(FilterStatus::Continue, router_->mapEnd());
     break;
   case FieldType::List:
     EXPECT_CALL(*protocol_, writeListBegin(_, FieldType::I32, 3));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->listBegin(FieldType::I32, 3));
+    EXPECT_EQ(FilterStatus::Continue, router_->listBegin(FieldType::I32, 3));
     for (int i = 0; i < 3; i++) {
       EXPECT_CALL(*protocol_, writeInt32(_, i));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->int32Value(i));
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i));
     }
     EXPECT_CALL(*protocol_, writeListEnd(_));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->listEnd());
+    EXPECT_EQ(FilterStatus::Continue, router_->listEnd());
     break;
   case FieldType::Set:
     EXPECT_CALL(*protocol_, writeSetBegin(_, FieldType::I32, 4));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->setBegin(FieldType::I32, 4));
+    EXPECT_EQ(FilterStatus::Continue, router_->setBegin(FieldType::I32, 4));
     for (int i = 0; i < 4; i++) {
       EXPECT_CALL(*protocol_, writeInt32(_, i));
-      EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->int32Value(i));
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i));
     }
     EXPECT_CALL(*protocol_, writeSetEnd(_));
-    EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->setEnd());
+    EXPECT_EQ(FilterStatus::Continue, router_->setEnd());
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   EXPECT_CALL(*protocol_, writeFieldEnd(_));
-  EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->fieldEnd());
+  EXPECT_EQ(FilterStatus::Continue, router_->fieldEnd());
 
   EXPECT_CALL(*protocol_, writeFieldBegin(_, _, FieldType::Stop, 0));
   EXPECT_CALL(*protocol_, writeStructEnd(_));
-  EXPECT_EQ(ThriftFilters::FilterStatus::Continue, router_->structEnd());
+  EXPECT_EQ(FilterStatus::Continue, router_->structEnd());
 
   completeRequest();
   destroyRouter();
 }
-
-TEST(RouteMatcherTest, RouteByMethodNameWithNoInversion) {
-  const std::string yaml = R"EOF(
-name: config
-routes:
-  - match:
-      method_name: "method1"
-    route:
-      cluster: "cluster1"
-  - match:
-      method_name: "method2"
-    route:
-      cluster: "cluster2"
-)EOF";
-
-  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
-
-  RouteMatcher matcher(config);
-  MessageMetadata metadata;
-  EXPECT_EQ(nullptr, matcher.route(metadata));
-  metadata.setMethodName("unknown");
-  EXPECT_EQ(nullptr, matcher.route(metadata));
-  metadata.setMethodName("METHOD1");
-  EXPECT_EQ(nullptr, matcher.route(metadata));
-
-  metadata.setMethodName("method1");
-  RouteConstSharedPtr route = matcher.route(metadata);
-  EXPECT_NE(nullptr, route);
-  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
-
-  metadata.setMethodName("method2");
-  RouteConstSharedPtr route2 = matcher.route(metadata);
-  EXPECT_NE(nullptr, route2);
-  EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
-}
-
-TEST(RouteMatcherTest, RouteByMethodNameWithInversion) {
-  const std::string yaml = R"EOF(
-name: config
-routes:
-  - match:
-      method_name: "method1"
-    route:
-      cluster: "cluster1"
-  - match:
-      method_name: "method2"
-      invert: true
-    route:
-      cluster: "cluster2"
-)EOF";
-
-  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
-
-  RouteMatcher matcher(config);
-  MessageMetadata metadata;
-  RouteConstSharedPtr route = matcher.route(metadata);
-  EXPECT_NE(nullptr, route);
-  EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
-
-  metadata.setMethodName("unknown");
-  route = matcher.route(metadata);
-  EXPECT_NE(nullptr, route);
-  EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
-
-  metadata.setMethodName("METHOD1");
-  route = matcher.route(metadata);
-  EXPECT_NE(nullptr, route);
-  EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
-
-  metadata.setMethodName("method1");
-  route = matcher.route(metadata);
-  EXPECT_NE(nullptr, route);
-  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
-
-  metadata.setMethodName("method2");
-  route = matcher.route(metadata);
-  EXPECT_EQ(nullptr, route);
-}
-
-TEST(RouteMatcherTest, RouteByAnyMethodNameWithNoInversion) {
-  const std::string yaml = R"EOF(
-name: config
-routes:
-  - match:
-      method_name: "method1"
-    route:
-      cluster: "cluster1"
-  - match:
-      method_name: ""
-    route:
-      cluster: "cluster2"
-)EOF";
-
-  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
-
-  RouteMatcher matcher(config);
-
-  {
-    MessageMetadata metadata;
-    metadata.setMethodName("method1");
-    RouteConstSharedPtr route = matcher.route(metadata);
-    EXPECT_NE(nullptr, route);
-    EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
-
-    metadata.setMethodName("anything");
-    RouteConstSharedPtr route2 = matcher.route(metadata);
-    EXPECT_NE(nullptr, route2);
-    EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
-  }
-
-  {
-    MessageMetadata metadata;
-    RouteConstSharedPtr route2 = matcher.route(metadata);
-    EXPECT_NE(nullptr, route2);
-    EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
-  }
-}
-
-TEST(RouteMatcherTest, RouteByAnyMethodNameWithInversion) {
-  const std::string yaml = R"EOF(
-name: config
-routes:
-  - match:
-      method_name: ""
-      invert: true
-    route:
-      cluster: "cluster2"
-)EOF";
-
-  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
-
-  EXPECT_THROW(new RouteMatcher(config), EnvoyException);
-}
-
-TEST(RouteMatcherTest, RouteByServiceNameWithNoInversion) {
-  const std::string yaml = R"EOF(
-name: config
-routes:
-  - match:
-      method_name: "method1"
-    route:
-      cluster: "cluster1"
-  - match:
-      service_name: "service2"
-    route:
-      cluster: "cluster2"
-)EOF";
-
-  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
-
-  RouteMatcher matcher(config);
-  MessageMetadata metadata;
-  EXPECT_EQ(nullptr, matcher.route(metadata));
-  metadata.setMethodName("unknown");
-  EXPECT_EQ(nullptr, matcher.route(metadata));
-  metadata.setMethodName("METHOD1");
-  EXPECT_EQ(nullptr, matcher.route(metadata));
-
-  metadata.setMethodName("service2:method1");
-  RouteConstSharedPtr route = matcher.route(metadata);
-  EXPECT_NE(nullptr, route);
-  EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
-
-  metadata.setMethodName("service2:method2");
-  RouteConstSharedPtr route2 = matcher.route(metadata);
-  EXPECT_NE(nullptr, route2);
-  EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
-}
-
-TEST(RouteMatcherTest, RouteByServiceNameWithInversion) {
-  const std::string yaml = R"EOF(
-name: config
-routes:
-  - match:
-      method_name: "method1"
-    route:
-      cluster: "cluster1"
-  - match:
-      service_name: "service2"
-      invert: true
-    route:
-      cluster: "cluster2"
-)EOF";
-
-  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
-
-  RouteMatcher matcher(config);
-  MessageMetadata metadata;
-  RouteConstSharedPtr route = matcher.route(metadata);
-  EXPECT_NE(nullptr, route);
-  EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
-
-  metadata.setMethodName("unknown");
-  route = matcher.route(metadata);
-  EXPECT_NE(nullptr, route);
-  EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
-
-  metadata.setMethodName("METHOD1");
-  route = matcher.route(metadata);
-  EXPECT_NE(nullptr, route);
-  EXPECT_EQ("cluster2", route->routeEntry()->clusterName());
-
-  metadata.setMethodName("method1");
-  route = matcher.route(metadata);
-  EXPECT_NE(nullptr, route);
-  EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
-
-  metadata.setMethodName("service2:method1");
-  route = matcher.route(metadata);
-  EXPECT_EQ(nullptr, route);
-}
-
-TEST(RouteMatcherTest, RouteByAnyServiceNameWithNoInversion) {
-  const std::string yaml = R"EOF(
-name: config
-routes:
-  - match:
-      method_name: "method1"
-    route:
-      cluster: "cluster1"
-  - match:
-      service_name: ""
-    route:
-      cluster: "cluster2"
-)EOF";
-
-  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
-
-  RouteMatcher matcher(config);
-
-  {
-    MessageMetadata metadata;
-    metadata.setMethodName("method1");
-    RouteConstSharedPtr route = matcher.route(metadata);
-    EXPECT_NE(nullptr, route);
-    EXPECT_EQ("cluster1", route->routeEntry()->clusterName());
-
-    metadata.setMethodName("anything");
-    RouteConstSharedPtr route2 = matcher.route(metadata);
-    EXPECT_NE(nullptr, route2);
-    EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
-  }
-
-  {
-    MessageMetadata metadata;
-    RouteConstSharedPtr route2 = matcher.route(metadata);
-    EXPECT_NE(nullptr, route2);
-    EXPECT_EQ("cluster2", route2->routeEntry()->clusterName());
-  }
-}
-
-TEST(RouteMatcherTest, RouteByAnyServiceNameWithInversion) {
-  const std::string yaml = R"EOF(
-name: config
-routes:
-  - match:
-      service_name: ""
-      invert: true
-    route:
-      cluster: "cluster2"
-)EOF";
-
-  envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
-      parseRouteConfigurationFromV2Yaml(yaml);
-
-  EXPECT_THROW(new RouteMatcher(config), EnvoyException);
-}
-
 } // namespace Router
 } // namespace ThriftProxy
 } // namespace NetworkFilters

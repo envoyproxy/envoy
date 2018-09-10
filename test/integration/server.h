@@ -19,6 +19,7 @@
 #include "server/test_hooks.h"
 
 #include "test/integration/server_stats.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -237,7 +238,6 @@ public:
   }
   void start(const Network::Address::IpVersion version,
              std::function<void()> pre_worker_start_test_steps, bool deterministic);
-  void start();
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
     while (counter(name) == nullptr || counter(name)->value() < value) {
@@ -301,12 +301,14 @@ private:
   Thread::CondVar listeners_cv_;
   Thread::MutexBasicLockable listeners_mutex_;
   uint64_t pending_listeners_;
+  DangerousDeprecatedTestTime test_time_;
   ConditionalInitializer server_set_;
   std::unique_ptr<Server::InstanceImpl> server_;
   Server::TestDrainManager* drain_manager_{};
   Stats::Store* stat_store_{};
   std::function<void()> on_worker_listener_added_cb_;
   std::function<void()> on_worker_listener_removed_cb_;
+  Network::Address::InstanceConstSharedPtr admin_address_;
 };
 
 } // namespace Envoy

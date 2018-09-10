@@ -2,6 +2,11 @@
 
 set -e
 
+# Add non-g prefixed coreutils installed sha256sum to the path
+# allowing us to check the sha of dependencies downloaded in
+# ci/build_container/build_recipes/*.sh
+export PATH="/usr/local/opt/coreutils/libexec/gnubin:$PATH"
+
 . "$(dirname "$0")"/setup_gcs_cache.sh
 
 BAZEL_BUILD_OPTIONS="--curses=no --show_task_finish --verbose_failures ${BAZEL_BUILD_EXTRA_OPTIONS}"

@@ -131,9 +131,9 @@ public:
   virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
 
   /**
-   * @return SystemTimeSource& a reference to the top-level SystemTime source.
+   * @return TimeSource& a reference to the time source.
    */
-  virtual SystemTimeSource& systemTimeSource() PURE;
+  virtual TimeSource& timeSource() PURE;
 };
 
 class ListenerFactoryContext : public FactoryContext {

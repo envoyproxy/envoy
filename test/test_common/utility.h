@@ -103,6 +103,15 @@ private:
 class TestUtility {
 public:
   /**
+   * Compare 2 HeaderMaps.
+   * @param lhs supplies HeaderMaps 1.
+   * @param rhs supplies HeaderMaps 2.
+   * @return TRUE if the HeaderMapss are equal, ignoring the order of the
+   * headers, false if not.
+   */
+  static bool headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs, const Http::HeaderMap& rhs);
+
+  /**
    * Compare 2 buffers.
    * @param lhs supplies buffer 1.
    * @param rhs supplies buffer 2.
@@ -311,6 +320,23 @@ private:
   int fd_;
 };
 
+/**
+ * A utility class for atomically updating a file using symbolic link swap.
+ */
+class AtomicFileUpdater {
+public:
+  AtomicFileUpdater(const std::string& filename);
+
+  void update(const std::string& contents);
+
+private:
+  const std::string link_;
+  const std::string new_link_;
+  const std::string target1_;
+  const std::string target2_;
+  bool use_target1_;
+};
+
 namespace Http {
 
 /**
@@ -404,6 +430,11 @@ public:
 };
 
 } // namespace Stats
+
+MATCHER_P(HeaderMapEqualIgnoreOrder, rhs, "") {
+  *result_listener << *rhs << " is not equal to " << *arg;
+  return TestUtility::headerMapEqualIgnoreOrder(*arg, *rhs);
+}
 
 MATCHER_P(ProtoEq, rhs, "") { return TestUtility::protoEqual(arg, rhs); }
 
