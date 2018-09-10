@@ -891,7 +891,9 @@ TEST_P(ConnectionImplTest, EmptyReadOnCloseTest) {
 TEST_P(ConnectionImplTest, FlushWriteCloseTest) {
   setUpBasicConnection();
   connect();
-  server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(500));
+  // Set a very high timeout value to prevent flaking. We are testing the common case where the
+  // timeout does not trigger.
+  server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(50000));
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
   client_connection_->addReadFilter(client_read_filter);
@@ -962,7 +964,9 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTimeoutTest) {
 TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
   setUpBasicConnection();
   connect();
-  server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(500));
+  // Set a very high timeout value to prevent flaking. We are testing the common case where the
+  // timeout does not trigger.
+  server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(50000));
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
   client_connection_->addReadFilter(client_read_filter);
