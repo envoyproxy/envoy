@@ -18,8 +18,11 @@ namespace {
 const char AllWithAny[] = R"(
 providers:
   provider_1:
+    issuer: iss_1
   provider_2:
+    issuer: iss_2
   provider_3:
+    issuer: iss_3
 rules:
 - match: { path: "/" }
   requires:
@@ -35,9 +38,13 @@ rules:
 const char AnyWithAll[] = R"(
 providers:
   provider_1:
+    issuer: iss_1
   provider_2:
+    issuer: iss_2
   provider_3:
+    issuer: iss_3
   provider_4:
+    issuer: iss_4
 rules:
 - match: { path: "/" }
   requires:
@@ -53,22 +60,51 @@ rules:
             - provider_name: "provider_4"
 )";
 
+typedef std::unordered_map<std::string, const Status&> StatusMap;
+
 class GroupVerifierTest : public ::testing::Test {
 public:
   void createVerifier() {
     ON_CALL(mock_factory_, create(_, _, _))
         .WillByDefault(
-            Invoke([&](const std::vector<std::string>&, const absl::optional<std::string>&, bool) {
-              return std::move(mock_auths_[idx++]);
-            }));
+            Invoke([&](const std::vector<std::string>&, const absl::optional<std::string>& issuer,
+                       bool) { return std::move(mock_auths_[issuer.value()]); }));
     verifier_ = Verifier::create(proto_config_.rules()[0].requires(), proto_config_.providers(),
                                  mock_factory_, NiceMock<MockExtractor>());
   }
+  void createSyncMockAuthsAndVerifier(const StatusMap& statuses) {
+    for (const auto& it : statuses) {
+      auto mock_auth = std::make_unique<MockAuthenticator>();
+      EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
+          .WillOnce(
+              Invoke([status = it.second](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
+                                          AuthenticatorCallback callback) { callback(status); }));
+      mock_auths_[it.first] = std::move(mock_auth);
+    }
+    createVerifier();
+  }
+
+  std::unordered_map<std::string, AuthenticatorCallback>
+  createAsyncMockAuthsAndVerifier(const std::vector<std::string>& issuers) {
+    std::unordered_map<std::string, AuthenticatorCallback> callbacks;
+    for (std::size_t i = 0; i < issuers.size(); ++i) {
+      auto mock_auth = std::make_unique<MockAuthenticator>();
+      EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
+          .WillOnce(Invoke([&callbacks, iss = issuers[i]](Http::HeaderMap&,
+                                                          std::vector<JwtLocationConstPtr>*,
+                                                          AuthenticatorCallback callback) {
+            callbacks[iss] = std::move(callback);
+          }));
+      mock_auths_[issuers[i]] = std::move(mock_auth);
+    }
+    createVerifier();
+    return callbacks;
+  }
+
   JwtAuthentication proto_config_;
   VerifierPtr verifier_;
   MockVerifierCallbacks mock_cb_;
-  std::vector<std::unique_ptr<MockAuthenticator>> mock_auths_;
-  int idx = 0;
+  std::unordered_map<std::string, std::unique_ptr<MockAuthenticator>> mock_auths_;
   NiceMock<MockAuthFactory> mock_factory_;
   ContextSharedPtr context_;
 };
@@ -104,13 +140,7 @@ rules:
               - provider_name: "example_provider"
 )";
   MessageUtil::loadFromYaml(config, proto_config_);
-  createVerifier();
-
-  auto mock_auth = std::make_unique<MockAuthenticator>();
-  EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-      .WillOnce(Invoke([](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                          AuthenticatorCallback callback) { callback(Status::Ok); }));
-  mock_auths_.push_back(std::move(mock_auth));
+  createSyncMockAuthsAndVerifier(StatusMap{{"https://example.com", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
@@ -146,11 +176,10 @@ rules:
       - requires_all:
 )";
   MessageUtil::loadFromYaml(config, proto_config_);
-  createVerifier();
-
   auto mock_auth = std::make_unique<MockAuthenticator>();
   EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _)).Times(0);
-  mock_auths_.push_back(std::move(mock_auth));
+  mock_auths_["https://example.com"] = std::move(mock_auth);
+  createVerifier();
 
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
@@ -160,17 +189,11 @@ rules:
   verifier_->verify(context_);
 }
 
+// test requires all with both auth returning OK
 TEST_F(GroupVerifierTest, TestRequiresAll) {
   MessageUtil::loadFromYaml(RequiresAllConfig, proto_config_);
-
-  for (int i = 0; i < 2; ++i) {
-    auto mock_auth = std::make_unique<MockAuthenticator>();
-    EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-        .WillRepeatedly(Invoke([](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                                  AuthenticatorCallback callback) { callback(Status::Ok); }));
-    mock_auths_.push_back(std::move(mock_auth));
-  }
-  createVerifier();
+  createSyncMockAuthsAndVerifier(
+      StatusMap{{"https://example.com", Status::Ok}, {"https://other.com", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
@@ -188,16 +211,8 @@ TEST_F(GroupVerifierTest, TestRequiresAll) {
 // test requires all with first auth returning bad format
 TEST_F(GroupVerifierTest, TestRequiresAllBadFormat) {
   MessageUtil::loadFromYaml(RequiresAllConfig, proto_config_);
-  std::vector<AuthenticatorCallback> callbacks;
-  for (int i = 0; i < 2; ++i) {
-    auto mock_auth = std::make_unique<MockAuthenticator>();
-    EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-        .WillRepeatedly(Invoke(
-            [&](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                AuthenticatorCallback callback) { callbacks.push_back(std::move(callback)); }));
-    mock_auths_.push_back(std::move(mock_auth));
-  }
-  createVerifier();
+  auto callbacks = createAsyncMockAuthsAndVerifier(
+      std::vector<std::string>{"https://example.com", "https://other.com"});
 
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::JwtBadFormat);
@@ -208,11 +223,11 @@ TEST_F(GroupVerifierTest, TestRequiresAllBadFormat) {
   };
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
-  callbacks[0](Status::JwtBadFormat);
+  callbacks["https://example.com"](Status::JwtBadFormat);
   // can keep invoking callback
-  callbacks[1](Status::Ok);
-  callbacks[0](Status::Ok);
-  callbacks[1](Status::Ok);
+  callbacks["https://other.com"](Status::Ok);
+  callbacks["https://example.com"](Status::Ok);
+  callbacks["https://other.com"](Status::Ok);
   EXPECT_FALSE(headers.has("example-auth-userinfo"));
   EXPECT_FALSE(headers.has("other-auth-userinfo"));
 }
@@ -220,16 +235,8 @@ TEST_F(GroupVerifierTest, TestRequiresAllBadFormat) {
 // test requires all with second auth returning missing jwt
 TEST_F(GroupVerifierTest, TestRequiresAllMissing) {
   MessageUtil::loadFromYaml(RequiresAllConfig, proto_config_);
-  std::vector<AuthenticatorCallback> callbacks;
-  for (int i = 0; i < 2; ++i) {
-    auto mock_auth = std::make_unique<MockAuthenticator>();
-    EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-        .WillRepeatedly(Invoke(
-            [&](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                AuthenticatorCallback callback) { callbacks.push_back(std::move(callback)); }));
-    mock_auths_.push_back(std::move(mock_auth));
-  }
-  createVerifier();
+  auto callbacks = createAsyncMockAuthsAndVerifier(
+      std::vector<std::string>{"https://example.com", "https://other.com"});
 
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::JwtMissed);
@@ -240,24 +247,20 @@ TEST_F(GroupVerifierTest, TestRequiresAllMissing) {
   };
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
-  callbacks[0](Status::Ok);
-  callbacks[1](Status::JwtMissed);
+  callbacks["https://example.com"](Status::Ok);
+  callbacks["https://other.com"](Status::JwtMissed);
   // can keep invoking callback
-  callbacks[0](Status::Ok);
-  callbacks[1](Status::Ok);
+  callbacks["https://example.com"](Status::Ok);
+  callbacks["https://other.com"](Status::Ok);
   EXPECT_FALSE(headers.has("example-auth-userinfo"));
   EXPECT_FALSE(headers.has("other-auth-userinfo"));
 }
 
-TEST_F(GroupVerifierTest, TestRequiresAllWrongLocations) {
+// Test requrires all and mock auths simulate cache misses and async return of failure statuses.
+TEST_F(GroupVerifierTest, TestRequiresAllBothFailed) {
   MessageUtil::loadFromYaml(RequiresAllConfig, proto_config_);
-  auto mock_auth = std::make_unique<MockAuthenticator>();
-  EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-      .WillRepeatedly(
-          Invoke([](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                    AuthenticatorCallback callback) { callback(Status::JwtUnknownIssuer); }));
-  mock_auths_.push_back(std::move(mock_auth));
-  createVerifier();
+  auto callbacks = createAsyncMockAuthsAndVerifier(
+      std::vector<std::string>{"https://example.com", "https://other.com"});
 
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::JwtUnknownIssuer);
@@ -269,17 +272,16 @@ TEST_F(GroupVerifierTest, TestRequiresAllWrongLocations) {
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
   EXPECT_FALSE(headers.has("example-auth-userinfo"));
-  EXPECT_TRUE(headers.has("other-auth-userinfo"));
+  EXPECT_FALSE(headers.has("other-auth-userinfo"));
+  callbacks["https://example.com"](Status::JwtUnknownIssuer);
+  callbacks["https://other.com"](Status::JwtUnknownIssuer);
 }
 
+// Test requires any with first auth returning OK.
 TEST_F(GroupVerifierTest, TestRequiresAnyFirstAuthOK) {
   MessageUtil::loadFromYaml(RequiresAnyConfig, proto_config_);
-  auto mock_auth = std::make_unique<MockAuthenticator>();
-  EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-      .WillRepeatedly(Invoke([](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                                AuthenticatorCallback callback) { callback(Status::Ok); }));
-  mock_auths_.push_back(std::move(mock_auth));
-  createVerifier();
+  createSyncMockAuthsAndVerifier(StatusMap{{"https://example.com", Status::Ok}});
+
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
   }));
@@ -293,20 +295,12 @@ TEST_F(GroupVerifierTest, TestRequiresAnyFirstAuthOK) {
   EXPECT_TRUE(headers.has("other-auth-userinfo"));
 }
 
+// Test requires any with last auth returning OK.
 TEST_F(GroupVerifierTest, TestRequiresAnyLastAuthOk) {
   MessageUtil::loadFromYaml(RequiresAnyConfig, proto_config_);
-  auto mock_auth = std::make_unique<MockAuthenticator>();
-  EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-      .WillRepeatedly(
-          Invoke([](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                    AuthenticatorCallback callback) { callback(Status::JwtUnknownIssuer); }));
-  mock_auths_.push_back(std::move(mock_auth));
-  mock_auth = std::make_unique<MockAuthenticator>();
-  EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-      .WillRepeatedly(Invoke([](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                                AuthenticatorCallback callback) { callback(Status::Ok); }));
-  mock_auths_.push_back(std::move(mock_auth));
-  createVerifier();
+  createSyncMockAuthsAndVerifier(StatusMap{{"https://example.com", Status::JwtUnknownIssuer},
+                                           {"https://other.com", Status::Ok}});
+
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
   }));
@@ -320,21 +314,13 @@ TEST_F(GroupVerifierTest, TestRequiresAnyLastAuthOk) {
   EXPECT_FALSE(headers.has("other-auth-userinfo"));
 }
 
+// Test requires any with both auth returning error. Requires any returns the error last recieved
+// back to the caller.
 TEST_F(GroupVerifierTest, TestRequiresAnyAllAuthFailed) {
   MessageUtil::loadFromYaml(RequiresAnyConfig, proto_config_);
   auto mock_auth = std::make_unique<MockAuthenticator>();
-  EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-      .WillRepeatedly(
-          Invoke([](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                    AuthenticatorCallback callback) { callback(Status::JwtHeaderBadKid); }));
-  mock_auths_.push_back(std::move(mock_auth));
-  mock_auth = std::make_unique<MockAuthenticator>();
-  EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-      .WillRepeatedly(
-          Invoke([](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                    AuthenticatorCallback callback) { callback(Status::JwtUnknownIssuer); }));
-  mock_auths_.push_back(std::move(mock_auth));
-  createVerifier();
+  createSyncMockAuthsAndVerifier(StatusMap{{"https://example.com", Status::JwtHeaderBadKid},
+                                           {"https://other.com", Status::JwtUnknownIssuer}});
 
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::JwtUnknownIssuer);
@@ -353,14 +339,8 @@ TEST_F(GroupVerifierTest, TestRequiresAnyAllAuthFailed) {
 // Test simulates first require any is OK and proivder_name is OK.
 TEST_F(GroupVerifierTest, TestAnyInAllFirstAnyIsOk) {
   MessageUtil::loadFromYaml(AllWithAny, proto_config_);
-  for (int i = 0; i < 2; ++i) {
-    auto mock_auth = std::make_unique<MockAuthenticator>();
-    EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-        .WillRepeatedly(Invoke([&](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                                   AuthenticatorCallback callback) { callback(Status::Ok); }));
-    mock_auths_.push_back(std::move(mock_auth));
-  }
-  createVerifier();
+  createSyncMockAuthsAndVerifier(StatusMap{{"iss_1", Status::Ok}, {"iss_3", Status::Ok}});
+
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
   }));
@@ -373,20 +353,9 @@ TEST_F(GroupVerifierTest, TestAnyInAllFirstAnyIsOk) {
 // Test simulates first require any is OK and proivder_name is OK.
 TEST_F(GroupVerifierTest, TestAnyInAllLastAnyIsOk) {
   MessageUtil::loadFromYaml(AllWithAny, proto_config_);
-  auto mock_auth = std::make_unique<MockAuthenticator>();
-  EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-      .WillRepeatedly(
-          Invoke([&](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                     AuthenticatorCallback callback) { callback(Status::JwtUnknownIssuer); }));
-  mock_auths_.push_back(std::move(mock_auth));
-  for (int i = 0; i < 2; ++i) {
-    mock_auth = std::make_unique<MockAuthenticator>();
-    EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-        .WillRepeatedly(Invoke([&](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                                   AuthenticatorCallback callback) { callback(Status::Ok); }));
-    mock_auths_.push_back(std::move(mock_auth));
-  }
-  createVerifier();
+  createSyncMockAuthsAndVerifier(
+      StatusMap{{"iss_1", Status::JwtUnknownIssuer}, {"iss_2", Status::Ok}, {"iss_3", Status::Ok}});
+
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
   }));
@@ -399,135 +368,107 @@ TEST_F(GroupVerifierTest, TestAnyInAllLastAnyIsOk) {
 // Test simulates all require any OK and proivder_name is OK.
 TEST_F(GroupVerifierTest, TestAnyInAllBothInRequireAnyIsOk) {
   MessageUtil::loadFromYaml(AllWithAny, proto_config_);
-  std::vector<AuthenticatorCallback> callbacks;
-  for (int i = 0; i < 3; ++i) {
-    auto mock_auth = std::make_unique<MockAuthenticator>();
-    EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-        .WillRepeatedly(Invoke(
-            [&](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                AuthenticatorCallback callback) { callbacks.push_back(std::move(callback)); }));
-    mock_auths_.push_back(std::move(mock_auth));
-  }
-  createVerifier();
+  auto callbacks =
+      createAsyncMockAuthsAndVerifier(std::vector<std::string>{"iss_1", "iss_2", "iss_3"});
+
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
   }));
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
-  for (const auto callback : callbacks) {
-    callback(Status::Ok);
-  }
+  callbacks["iss_1"](Status::Ok);
+  callbacks["iss_2"](Status::Ok);
+  callbacks["iss_3"](Status::Ok);
 }
 
 // Test contains a 2 provider_name in a require any along with another provider_name in require all.
 // Test simulates all require any failed and proivder_name is OK.
 TEST_F(GroupVerifierTest, TestAnyInAllBothInRequireAnyFailed) {
   MessageUtil::loadFromYaml(AllWithAny, proto_config_);
-  std::vector<AuthenticatorCallback> callbacks;
-  for (int i = 0; i < 3; ++i) {
-    auto mock_auth = std::make_unique<MockAuthenticator>();
-    EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-        .WillRepeatedly(Invoke(
-            [&](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                AuthenticatorCallback callback) { callbacks.push_back(std::move(callback)); }));
-    mock_auths_.push_back(std::move(mock_auth));
-  }
-  createVerifier();
+  auto callbacks =
+      createAsyncMockAuthsAndVerifier(std::vector<std::string>{"iss_1", "iss_2", "iss_3"});
+
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::JwksFetchFail);
   }));
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
-  callbacks[0](Status::JwksFetchFail);
-  callbacks[1](Status::JwksFetchFail);
-  callbacks[2](Status::Ok);
+  callbacks["iss_1"](Status::JwksFetchFail);
+  callbacks["iss_2"](Status::JwksFetchFail);
+  callbacks["iss_3"](Status::Ok);
 }
 
+// Test contains a requires any which in turn has 2 requires all. Mock auths simulate JWKs cache
+// hits and inline return of errors. Requires any returns the error last recieved back to the
+// caller.
 TEST_F(GroupVerifierTest, TestAllInAnyBothRequireAllFailed) {
   MessageUtil::loadFromYaml(AnyWithAll, proto_config_);
-  std::vector<AuthenticatorCallback> callbacks;
-  for (int i = 0; i < 4; ++i) {
-    auto mock_auth = std::make_unique<MockAuthenticator>();
-    EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-        .WillRepeatedly(Invoke(
-            [&](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                AuthenticatorCallback callback) { callbacks.push_back(std::move(callback)); }));
-    mock_auths_.push_back(std::move(mock_auth));
-  }
-  createVerifier();
+  createSyncMockAuthsAndVerifier(
+      StatusMap{{"iss_1", Status::JwksFetchFail}, {"iss_3", Status::JwtExpired}});
+
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::JwtExpired);
   }));
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
-  callbacks[2](Status::JwksFetchFail);
-  callbacks[1](Status::JwtExpired);
 }
 
+// Test contains a requires any which in turn has 2 requires all. The first inner requires all is
+// completed with OKs. Mock auths simulate JWKs cache misses and async return of OKs.
 TEST_F(GroupVerifierTest, TestAllInAnyFirstAllIsOk) {
   MessageUtil::loadFromYaml(AnyWithAll, proto_config_);
-  std::vector<AuthenticatorCallback> callbacks;
-  for (int i = 0; i < 4; ++i) {
-    auto mock_auth = std::make_unique<MockAuthenticator>();
-    EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-        .WillRepeatedly(Invoke(
-            [&](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                AuthenticatorCallback callback) { callbacks.push_back(std::move(callback)); }));
-    mock_auths_.push_back(std::move(mock_auth));
-  }
-  createVerifier();
+  auto callbacks =
+      createAsyncMockAuthsAndVerifier(std::vector<std::string>{"iss_1", "iss_2", "iss_3", "iss_4"});
+
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
   }));
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
-  callbacks[1](Status::Ok);
-  callbacks[0](Status::Ok);
+  callbacks["iss_2"](Status::Ok);
+  callbacks["iss_3"](Status::JwtMissed);
+  callbacks["iss_1"](Status::Ok);
 }
 
+// Test contains a requires any which in turn has 2 requires all. The last inner requires all is
+// completed with OKs. Mock auths simulate JWKs cache misses and async return of OKs.
 TEST_F(GroupVerifierTest, TestAllInAnyLastAllIsOk) {
   MessageUtil::loadFromYaml(AnyWithAll, proto_config_);
-  std::vector<AuthenticatorCallback> callbacks;
-  for (int i = 0; i < 4; ++i) {
-    auto mock_auth = std::make_unique<MockAuthenticator>();
-    EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-        .WillRepeatedly(Invoke(
-            [&](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                AuthenticatorCallback callback) { callbacks.push_back(std::move(callback)); }));
-    mock_auths_.push_back(std::move(mock_auth));
-  }
-  createVerifier();
+  auto callbacks =
+      createAsyncMockAuthsAndVerifier(std::vector<std::string>{"iss_1", "iss_2", "iss_3", "iss_4"});
+
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
   }));
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
-  callbacks[2](Status::Ok);
-  callbacks[3](Status::Ok);
-  callbacks[1](Status::JwtExpired);
+  callbacks["iss_3"](Status::Ok);
+  callbacks["iss_4"](Status::Ok);
+  callbacks["iss_2"](Status::JwtExpired);
 }
 
+// Test contains a requires any which in turn has 2 requires all. The both inner requires all are
+// completed with OKs. Mock auths simulate JWKs cache misses and async return of OKs.
 TEST_F(GroupVerifierTest, TestAllInAnyBothRequireAllAreOk) {
   MessageUtil::loadFromYaml(AnyWithAll, proto_config_);
-  for (int i = 0; i < 4; ++i) {
-    auto mock_auth = std::make_unique<MockAuthenticator>();
-    EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
-        .WillRepeatedly(Invoke([&](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
-                                   AuthenticatorCallback callback) { callback(Status::Ok); }));
-    mock_auths_.push_back(std::move(mock_auth));
-  }
-  createVerifier();
+  auto callbacks =
+      createAsyncMockAuthsAndVerifier(std::vector<std::string>{"iss_1", "iss_2", "iss_3", "iss_4"});
+
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
   }));
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
+  callbacks["iss_1"](Status::Ok);
+  callbacks["iss_2"](Status::Ok);
+  callbacks["iss_3"](Status::Ok);
+  callbacks["iss_4"](Status::Ok);
 }
 
 } // namespace

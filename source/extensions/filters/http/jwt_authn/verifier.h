@@ -68,7 +68,7 @@ public:
          const Protobuf::Map<ProtobufTypes::String,
                              ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider>&
              providers,
-         const AuthFactory& factory, const Extractor& extractor);
+         const AuthFactory& factory, const Extractor& extractor_for_allow_fail);
 
   static ContextSharedPtr createContext(Http::HeaderMap& headers, Callbacks* callback);
 };

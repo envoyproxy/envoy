@@ -10,6 +10,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+namespace {
 
 /**
  * Struct to keep track of verifier completed and responded state for a request.
@@ -57,7 +58,7 @@ class BaseVerifierImpl : public Verifier {
 public:
   BaseVerifierImpl(const BaseVerifierImpl* parent) : parent_(parent) {}
 
-  void onCompleteHelper(Status status, ContextImpl& context) const {
+  void completeWithStatus(Status status, ContextImpl& context) const {
     if (parent_ != nullptr) {
       return parent_->onComplete(status, context);
     }
@@ -70,7 +71,7 @@ public:
     auto& completion_state = context.getCompletionState(this);
     if (!completion_state.is_completed_) {
       completion_state.is_completed_ = true;
-      onCompleteHelper(status, context);
+      completeWithStatus(status, context);
     }
   }
 
@@ -78,13 +79,6 @@ protected:
   // The parent group verifier.
   const BaseVerifierImpl* const parent_;
 };
-
-VerifierPtr innerCreate(const JwtRequirement& requirement,
-                        const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                        const AuthFactory& factory, const Extractor& extractor,
-                        const BaseVerifierImpl* parent);
-
-namespace {
 
 // Provider specific verifier
 class ProviderVerifierImpl : public BaseVerifierImpl {
@@ -139,6 +133,11 @@ private:
   const bool allow_failed_;
 };
 
+VerifierPtr innerCreate(const JwtRequirement& requirement,
+                        const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
+                        const AuthFactory& factory, const Extractor& extractor,
+                        const BaseVerifierImpl* parent);
+
 // Base verifier for requires all or any.
 class BaseGroupVerifierImpl : public BaseVerifierImpl {
 public:
@@ -164,10 +163,10 @@ class AnyVerifierImpl : public BaseGroupVerifierImpl {
 public:
   AnyVerifierImpl(const JwtRequirementOrList& or_list, const AuthFactory& factory,
                   const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                  const Extractor& extractor, const BaseVerifierImpl* parent)
+                  const Extractor& extractor_for_allow_fail, const BaseVerifierImpl* parent)
       : BaseGroupVerifierImpl(parent) {
     for (const auto& it : or_list.requirements()) {
-      verifiers_.emplace_back(innerCreate(it, providers, factory, extractor, this));
+      verifiers_.emplace_back(innerCreate(it, providers, factory, extractor_for_allow_fail, this));
     }
   }
 
@@ -179,7 +178,7 @@ public:
     if (++completion_state.number_completed_children_ == verifiers_.size() ||
         Status::Ok == status) {
       completion_state.is_completed_ = true;
-      onCompleteHelper(status, context);
+      completeWithStatus(status, context);
     }
   }
 };
@@ -189,10 +188,10 @@ class AllVerifierImpl : public BaseGroupVerifierImpl {
 public:
   AllVerifierImpl(const JwtRequirementAndList& and_list, const AuthFactory& factory,
                   const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                  const Extractor& extractor, const BaseVerifierImpl* parent)
+                  const Extractor& extractor_for_allow_fail, const BaseVerifierImpl* parent)
       : BaseGroupVerifierImpl(parent) {
     for (const auto& it : and_list.requirements()) {
-      verifiers_.emplace_back(innerCreate(it, providers, factory, extractor, this));
+      verifiers_.emplace_back(innerCreate(it, providers, factory, extractor_for_allow_fail, this));
     }
   }
 
@@ -204,7 +203,7 @@ public:
     if (++completion_state.number_completed_children_ == verifiers_.size() ||
         Status::Ok != status) {
       completion_state.is_completed_ = true;
-      onCompleteHelper(status, context);
+      completeWithStatus(status, context);
     }
   }
 };
@@ -219,25 +218,13 @@ public:
   }
 
   void onComplete(const Status& status, ContextImpl& context) const override {
-    onCompleteHelper(status, context);
+    completeWithStatus(status, context);
   }
 };
 
-} // namespace
-
-ContextSharedPtr Verifier::createContext(Http::HeaderMap& headers, Callbacks* callback) {
-  return std::make_shared<ContextImpl>(headers, callback);
-}
-
-VerifierPtr Verifier::create(const JwtRequirement& requirement,
-                             const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                             const AuthFactory& factory, const Extractor& extractor) {
-  return innerCreate(requirement, providers, factory, extractor, nullptr);
-}
-
 VerifierPtr innerCreate(const JwtRequirement& requirement,
                         const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
-                        const AuthFactory& factory, const Extractor& extractor,
+                        const AuthFactory& factory, const Extractor& extractor_for_allow_fail,
                         const BaseVerifierImpl* parent) {
   std::string provider_name;
   std::vector<std::string> audiences;
@@ -253,13 +240,13 @@ VerifierPtr innerCreate(const JwtRequirement& requirement,
     break;
   case JwtRequirement::RequiresTypeCase::kRequiresAny:
     return std::make_unique<AnyVerifierImpl>(requirement.requires_any(), factory, providers,
-                                             extractor, parent);
+                                             extractor_for_allow_fail, parent);
   case JwtRequirement::RequiresTypeCase::kRequiresAll:
     return std::make_unique<AllVerifierImpl>(requirement.requires_all(), factory, providers,
-                                             extractor, parent);
+                                             extractor_for_allow_fail, parent);
   case JwtRequirement::RequiresTypeCase::kAllowMissingOrFailed:
     return std::make_unique<AllowFailedVerifierImpl>(
-        factory, extractor, requirement.allow_missing_or_failed().value(), parent);
+        factory, extractor_for_allow_fail, requirement.allow_missing_or_failed().value(), parent);
   case JwtRequirement::RequiresTypeCase::REQUIRES_TYPE_NOT_SET:
     return std::make_unique<AllowAllVerifierImpl>(parent);
   default:
@@ -271,6 +258,19 @@ VerifierPtr innerCreate(const JwtRequirement& requirement,
     throw EnvoyException(fmt::format("Required provider ['{}'] is not configured.", provider_name));
   }
   return std::make_unique<ProviderVerifierImpl>(audiences, factory, it->second, parent);
+}
+
+} // namespace
+
+ContextSharedPtr Verifier::createContext(Http::HeaderMap& headers, Callbacks* callback) {
+  return std::make_shared<ContextImpl>(headers, callback);
+}
+
+VerifierPtr Verifier::create(const JwtRequirement& requirement,
+                             const Protobuf::Map<ProtobufTypes::String, JwtProvider>& providers,
+                             const AuthFactory& factory,
+                             const Extractor& extractor_for_allow_fail) {
+  return innerCreate(requirement, providers, factory, extractor_for_allow_fail, nullptr);
 }
 
 } // namespace JwtAuthn
