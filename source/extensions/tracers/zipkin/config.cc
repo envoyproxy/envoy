@@ -20,7 +20,7 @@ Tracing::HttpTracerPtr ZipkinTracerFactory::createHttpTracer(const Json::Object&
 
   Tracing::DriverPtr zipkin_driver(
       new Zipkin::Driver(json_config, server.clusterManager(), server.stats(), server.threadLocal(),
-                         server.runtime(), server.localInfo(), rand, server.timeSource()));
+                         server.runtime(), server.localInfo(), rand, server.timeSystem()));
 
   return Tracing::HttpTracerPtr(
       new Tracing::HttpTracerImpl(std::move(zipkin_driver), server.localInfo()));

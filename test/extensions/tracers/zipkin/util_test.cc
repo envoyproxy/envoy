@@ -11,7 +11,7 @@ namespace Zipkin {
 
 TEST(ZipkinUtilTest, utilTests) {
   DangerousDeprecatedTestTime time;
-  EXPECT_EQ(typeid(uint64_t).name(), typeid(Util::generateRandom64(time.timeSource())).name());
+  EXPECT_EQ(typeid(uint64_t).name(), typeid(Util::generateRandom64(time.timeSystem())).name());
 
   // Test JSON merging
 

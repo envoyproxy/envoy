@@ -409,10 +409,9 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
           ASSERT(!nghttp2_session_check_server_session(session_));
           stream->waiting_for_non_informational_headers_ = false;
 
-          // This can only happen in the client case in a response, when we received a 1xx to
-          // start out with. In this case, raise as headers. nghttp2 message checking guarantees
-          // proper flow here.
-          ASSERT(!stream->headers_->Status() || stream->headers_->Status()->value() != "100");
+          // Even if we have :status 100 in the client case in a response, when
+          // we received a 1xx to start out with, nghttp2 message checking
+          // guarantees proper flow here.
           stream->decodeHeaders();
         }
       }

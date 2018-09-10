@@ -120,8 +120,18 @@ void DnsResolverImpl::PendingResolution::onAresHostCallback(int status, int time
 
   if (completed_) {
     if (!cancelled_) {
-      dispatcher_.post(
-          [callback = callback_, al = std::move(address_list)] { callback(std::move(al)); });
+      try {
+        callback_(std::move(address_list));
+      } catch (const EnvoyException& e) {
+        ENVOY_LOG(critical, "EnvoyException in c-ares callback");
+        dispatcher_.post([e] { throw e; });
+      } catch (const std::exception& e) {
+        ENVOY_LOG(critical, "std::exception in c-ares callback");
+        dispatcher_.post([s = std::string(e.what())] { throw EnvoyException(s); });
+      } catch (...) {
+        ENVOY_LOG(critical, "Unknown exception in c-ares callback");
+        dispatcher_.post([] { throw EnvoyException("unknown"); });
+      }
     }
     if (owned_) {
       delete this;

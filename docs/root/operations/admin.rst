@@ -158,6 +158,10 @@ modify different aspects of the server:
   Enable/disable different logging levels on different subcomponents. Generally only used during
   development.
 
+.. http:post:: /memory
+
+  Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all `/stats` and filtering to get the memory-related statistics.
+
 .. http:post:: /quitquitquit
 
   Cleanly exit the server.
