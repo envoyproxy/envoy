@@ -12,7 +12,7 @@ namespace Event {
 // Represents a simulated time system, where time is advanced by calling
 // sleep(), setSystemTime(), or setMonotonicTime(). systemTime() and
 // monotonicTime() are maintained in the class, and alarms are fired in response
-// to adjsutments in time.
+// to adjustments in time.
 class SimulatedTimeSystem : public TimeSystem {
 public:
   SimulatedTimeSystem();
@@ -29,7 +29,7 @@ public:
    * along the way that have been scheduled to fire.
    *
    * @param duration The amount of time to sleep, expressed in any type that
-   * can be added to duration-cast to MonotonicTime::duration.
+   * can be duration_casted to MonotonicTime::duration.
    */
   template <class Duration> void sleep(const Duration& duration) {
     mutex_.lock();
@@ -39,7 +39,7 @@ public:
   }
 
   /**
-   * Sets the time forward monotonically. if the supplied argument moves
+   * Sets the time forward monotonically. If the supplied argument moves
    * backward in time, the call is a no-op. If the supplied argument moves
    * forward, any applicable timers are fired, and system-time is also moved
    * forward by the same delta.

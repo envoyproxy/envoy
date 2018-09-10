@@ -16,9 +16,8 @@ namespace Event {
 
 // Our simulated alarm inherits from TimerImpl so that the same dispatching
 // mechanism used in RealTimeSystem timers is employed for simulated alarms.
-// using libevent's event_active(). Note that libevent is placed into
-// thread-safe mode due to the call to evthread_use_pthreads() in
-// source/common/event/libevent.cc.
+// Note that libevent is placed into thread-safe mode due to the call to
+// evthread_use_pthreads() in source/common/event/libevent.cc.
 class SimulatedTimeSystem::Alarm : public TimerImpl {
 public:
   Alarm(SimulatedTimeSystem& time_system, Libevent::BasePtr& libevent, TimerCb cb)
@@ -35,7 +34,7 @@ public:
 
   /**
    * Activates the timer so it will be run the next time the libevent loop is run,
-   * typiically via Dispatcher::run().
+   * typically via Dispatcher::run().
    */
   void activate() {
     armed_ = false;
@@ -59,8 +58,6 @@ private:
 
 // Compare two alarms, based on wakeup time and insertion order. Returns true if
 // a comes before b.
-
-// like strcmp (<0 for a < b, >0 for a > b), based on wakeup time and index.
 bool SimulatedTimeSystem::CompareAlarms::operator()(const Alarm* a, const Alarm* b) const {
   if (a != b) {
     if (a->time() < b->time()) {
@@ -72,7 +69,10 @@ bool SimulatedTimeSystem::CompareAlarms::operator()(const Alarm* a, const Alarm*
   return false;
 };
 
-// Each scheduler maintains its own timer
+// Each timer is maintained and ordered by a common TimeSystem, but is
+// associated with a scheduler. The scheduler associates the timers it creates
+// with a libevent context, so that the timer callbacks are executed in via
+// Dispatcher::run() in the proper thread.
 class SimulatedTimeSystem::SimulatedScheduler : public Scheduler {
 public:
   SimulatedScheduler(SimulatedTimeSystem& time_system, Libevent::BasePtr& libevent)
