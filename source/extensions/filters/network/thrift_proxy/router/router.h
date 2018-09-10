@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/router/router.h"
+
 #include "extensions/filters/network/thrift_proxy/metadata.h"
 
 namespace Envoy {
