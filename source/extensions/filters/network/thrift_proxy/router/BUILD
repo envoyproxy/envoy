@@ -28,7 +28,6 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/router:router_interface",
-        "//source/common/router:metadatamatchcriteria_lib",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
     ],
 )
@@ -45,6 +44,7 @@ envoy_cc_library(
         "//include/envoy/upstream:thread_local_cluster_interface",
         "//source/common/common:logger_lib",
         "//source/common/http:header_utility_lib",
+        "//source/common/router:metadatamatchcriteria_lib",
         "//source/common/upstream:load_balancer_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/thrift_proxy:app_exception_lib",
