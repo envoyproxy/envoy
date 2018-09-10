@@ -598,6 +598,37 @@ routes:
   EXPECT_THROW(RouteMatcher m(config), EnvoyException);
 }
 
+TEST(RouteMatcherTest, RouteActionMetadataMatch) {
+  const std::string yaml = R"EOF(
+name: config
+routes:
+  - match:
+      method_name: "method1"
+    route:
+      cluster: cluster1
+      metadata_match:
+        filter_metadata:
+          envoy.lb:
+            k1: v1
+            k2: v2
+)EOF";
+
+  const envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
+      parseRouteConfigurationFromV2Yaml(yaml);
+  RouteMatcher matcher(config);
+  MessageMetadata metadata;
+
+  metadata.setMethodName("method1");
+  RouteConstSharedPtr route = matcher.route(metadata, 0);
+  EXPECT_NE(nullptr, route);
+}
+
+TEST(RouteMatcherTest, WeightedClusterMetadataMatch) {
+}
+
+TEST(RouteMatcherTest, WeightedClusterRouteActionMetadataMatchMerged) {
+}
+
 } // namespace
 } // namespace Router
 } // namespace ThriftProxy
