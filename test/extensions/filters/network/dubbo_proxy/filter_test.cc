@@ -289,14 +289,14 @@ TEST_F(DubboFilterTest, OnDataHandlesRequestEvent) {
 TEST_F(DubboFilterTest, OnDataHandlesMessageSplitAcrossBuffers) {
   initializeFilter();
   writePartialHessianRequestMessage(buffer_, false, false, 0x0F, true);
-  std::string expected_contents = bufferToString(buffer_);
+  std::string expected_contents = buffer_.toString();
   uint64_t len = buffer_.length();
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::Continue);
 
   // Filter passes on the partial buffer, up to the last 6 bytes which it needs to resume the
   // decoder on the next call.
-  std::string contents = bufferToString(buffer_);
+  std::string contents = buffer_.toString();
   EXPECT_EQ(16, buffer_.length());
   EXPECT_EQ(len - 6, buffer_.length());
   EXPECT_EQ(expected_contents.substr(0, len - 6), contents);
@@ -304,13 +304,13 @@ TEST_F(DubboFilterTest, OnDataHandlesMessageSplitAcrossBuffers) {
 
   // Complete the buffer
   writePartialHessianRequestMessage(buffer_, false, false, 0x0F, false);
-  expected_contents = expected_contents.substr(len - 6) + bufferToString(buffer_);
+  expected_contents = expected_contents.substr(len - 6) + buffer_.toString();
   len = buffer_.length();
 
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::Continue);
 
   // Filter buffered bytes from end of first buffer and passes them on now.
-  contents = bufferToString(buffer_);
+  contents = buffer_.toString();
   EXPECT_EQ(len + 6, buffer_.length());
   EXPECT_EQ(expected_contents, contents);
 
@@ -428,14 +428,14 @@ TEST_F(DubboFilterTest, OnWriteHandlesFrameSplitAcrossBuffers) {
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::Continue);
 
   writePartialHessianResponseMessage(write_buffer_, false, 1, true);
-  std::string expected_contents = bufferToString(write_buffer_);
+  std::string expected_contents = write_buffer_.toString();
   uint64_t len = write_buffer_.length();
 
   EXPECT_EQ(filter_->onWrite(write_buffer_, false), Network::FilterStatus::Continue);
 
   // Filter passes on the partial buffer, up to the last 1 bytes which it needs to resume the
   // decoder on the next call.
-  std::string contents = bufferToString(write_buffer_);
+  std::string contents = write_buffer_.toString();
   EXPECT_EQ(len - 1, write_buffer_.length());
   EXPECT_EQ(expected_contents.substr(0, len - 1), contents);
 
@@ -443,13 +443,13 @@ TEST_F(DubboFilterTest, OnWriteHandlesFrameSplitAcrossBuffers) {
 
   // Complete the buffer
   writePartialHessianResponseMessage(write_buffer_, false, 1, false);
-  expected_contents = expected_contents.substr(len - 1) + bufferToString(write_buffer_);
+  expected_contents = expected_contents.substr(len - 1) + write_buffer_.toString();
   len = write_buffer_.length();
 
   EXPECT_EQ(filter_->onWrite(write_buffer_, false), Network::FilterStatus::Continue);
 
   // Filter buffered bytes from end of first buffer and passes them on now.
-  contents = bufferToString(write_buffer_);
+  contents = write_buffer_.toString();
   EXPECT_EQ(len + 1, write_buffer_.length());
   EXPECT_EQ(expected_contents, contents);
 

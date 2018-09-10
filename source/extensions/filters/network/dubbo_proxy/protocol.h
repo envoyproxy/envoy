@@ -94,8 +94,7 @@ public:
  */
 class Protocol {
 public:
-  class Context {
-  public:
+  struct Context {
     bool is_request_ = false;
     size_t body_size_ = 0;
   };

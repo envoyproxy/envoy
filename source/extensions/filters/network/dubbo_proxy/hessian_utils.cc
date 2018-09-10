@@ -1,5 +1,7 @@
 #include "extensions/filters/network/dubbo_proxy/hessian_utils.h"
 
+#include <type_traits>
+
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 
@@ -9,6 +11,20 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
+
+namespace {
+
+template <typename T>
+typename std::enable_if<std::is_signed<T>::value, T>::type leftShift(T left, uint16_t bit_number) {
+  if (left < 0) {
+    left = left * -1;
+    return -1 * (left << bit_number);
+  }
+
+  return left << bit_number;
+}
+
+} // namespace
 
 char* WriteIntoString(std::string* str, size_t length) {
   str->reserve(length);
@@ -166,7 +182,7 @@ long HessianUtils::peekLong(Buffer::Instance& buffer, size_t* size, uint64_t off
       throw EnvoyException("buffer underflow");
     }
 
-    result = ((code - 0xf8) << 8) + BufferHelper::peekU8(buffer, offset + 1);
+    result = leftShift<int16_t>(code - 0xf8, 8) + BufferHelper::peekU8(buffer, offset + 1);
     *size = 2;
     return result;
 
@@ -183,7 +199,7 @@ long HessianUtils::peekLong(Buffer::Instance& buffer, size_t* size, uint64_t off
       throw EnvoyException("buffer underflow");
     }
 
-    result = ((code - 0x3c) << 16) + (BufferHelper::peekU8(buffer, offset + 1) << 8) +
+    result = leftShift<int32_t>(code - 0x3c, 16) + (BufferHelper::peekU8(buffer, offset + 1) << 8) +
              BufferHelper::peekU8(buffer, offset + 2);
     *size = 3;
     return result;
@@ -277,7 +293,7 @@ int HessianUtils::peekInt(Buffer::Instance& buffer, size_t* size, uint64_t offse
       throw EnvoyException("buffer underflow");
     }
 
-    result = ((code - 0xc8) << 8) + BufferHelper::peekU8(buffer, offset + 1);
+    result = leftShift<int16_t>(code - 0xc8, 8) + BufferHelper::peekU8(buffer, offset + 1);
     *size = 2;
     return result;
 
@@ -292,7 +308,7 @@ int HessianUtils::peekInt(Buffer::Instance& buffer, size_t* size, uint64_t offse
     if (offset + 3 > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
-    result = ((code - 0xd4) << 16) + (BufferHelper::peekU8(buffer, offset + 1) << 8) +
+    result = leftShift<int32_t>(code - 0xd4, 16) + (BufferHelper::peekU8(buffer, offset + 1) << 8) +
              BufferHelper::peekU8(buffer, offset + 2);
     *size = 3;
     return result;

@@ -97,7 +97,7 @@ bool DubboProtocolImpl::decode(Buffer::Instance& buffer, Protocol::Context* cont
     callbacks_.onResponseMessage(std::move(res));
   }
 
-  buffer.drain(16);
+  buffer.drain(MessageSize);
   return true;
 }
 

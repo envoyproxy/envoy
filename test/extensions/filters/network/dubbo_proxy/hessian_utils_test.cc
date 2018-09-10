@@ -23,6 +23,46 @@ TEST(HessianUtilsTest, peekString) {
                               "buffer underflow");
   }
 
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x30});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekString(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x30, 't'});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekString(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x53, 't'});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekString(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x53, 't', 'e'});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekString(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x52, 't'});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekString(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
   // Incorrect type
   {
     Buffer::OwnedImpl buffer;
@@ -88,6 +128,15 @@ TEST(HessianUtilsTest, peekString) {
                  HessianUtils::peekString(buffer, &size).c_str());
     EXPECT_EQ(256 + 0x01 + 2, size);
   }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addInt8(buffer, 0x31);
+    addInt8(buffer, 0x01);
+    addRepeated(buffer, 256 + 0x01, 't');
+    EXPECT_STREQ(std::string(256 + 0x01, 't').c_str(), HessianUtils::readString(buffer).c_str());
+    EXPECT_EQ(0, buffer.length());
+  }
 }
 
 TEST(HessianUtilsTest, peekLong) {
@@ -95,6 +144,30 @@ TEST(HessianUtilsTest, peekLong) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0xf0});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekLong(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x38, '1'});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekLong(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x59, '1'});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekLong(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x4c, '1'});
     size_t size;
     EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekLong(buffer, &size), EnvoyException,
                               "buffer underflow");
@@ -217,6 +290,13 @@ TEST(HessianUtilsTest, peekLong) {
     EXPECT_EQ(300, HessianUtils::peekLong(buffer, &size));
     EXPECT_EQ(9, size);
   }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x4c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x2c});
+    EXPECT_EQ(300, HessianUtils::readLong(buffer));
+    EXPECT_EQ(0, buffer.length());
+  }
 }
 
 TEST(HessianUtilsTest, peekBool) {
@@ -244,6 +324,13 @@ TEST(HessianUtilsTest, peekBool) {
     EXPECT_FALSE(HessianUtils::peekBool(buffer, &size));
     EXPECT_EQ(1, size);
   }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {'F'});
+    EXPECT_FALSE(HessianUtils::readBool(buffer));
+    EXPECT_EQ(0, buffer.length());
+  }
 }
 
 TEST(HessianUtilsTest, peekInt) {
@@ -251,6 +338,22 @@ TEST(HessianUtilsTest, peekInt) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0xc1});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekInt(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0xd0});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekInt(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x49});
     size_t size;
     EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekInt(buffer, &size), EnvoyException,
                               "buffer underflow");
@@ -364,6 +467,13 @@ TEST(HessianUtilsTest, peekInt) {
     EXPECT_EQ(300, HessianUtils::peekInt(buffer, &size));
     EXPECT_EQ(5, size);
   }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x49, 0x00, 0x00, 0x01, 0x2c});
+    EXPECT_EQ(300, HessianUtils::readInt(buffer));
+    EXPECT_EQ(0, buffer.length());
+  }
 }
 
 TEST(HessianUtilsTest, peekDouble) {
@@ -371,6 +481,30 @@ TEST(HessianUtilsTest, peekDouble) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0x5d});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekDouble(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x5e});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekDouble(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x5f});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekDouble(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x44});
     size_t size;
     EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekDouble(buffer, &size), EnvoyException,
                               "buffer underflow");
@@ -474,6 +608,13 @@ TEST(HessianUtilsTest, peekDouble) {
     EXPECT_DOUBLE_EQ(12.25, HessianUtils::peekDouble(buffer, &size));
     EXPECT_EQ(9, size);
   }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x5f, 0x00, 0x00, 0x00, 0x00});
+    EXPECT_DOUBLE_EQ(0.0, HessianUtils::readDouble(buffer));
+    EXPECT_EQ(0, buffer.length());
+  }
 }
 
 TEST(HessianUtilsTest, peekNull) {
@@ -493,6 +634,13 @@ TEST(HessianUtilsTest, peekNull) {
     HessianUtils::peekNull(buffer, &size);
     EXPECT_EQ(1, size);
   }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x4e});
+    HessianUtils::readNull(buffer);
+    EXPECT_EQ(0, buffer.length());
+  }
 }
 
 TEST(HessianUtilsTest, peekDate) {
@@ -500,6 +648,14 @@ TEST(HessianUtilsTest, peekDate) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0x4a});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekDate(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x4b});
     size_t size;
     EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekDate(buffer, &size), EnvoyException,
                               "buffer underflow");
@@ -523,6 +679,15 @@ TEST(HessianUtilsTest, peekDate) {
     // Time zone was UTC
     EXPECT_EQ(894621091000, t.count());
   }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x4a, 0x00, 0x00, 0x00, 0xd0, 0x4b, 0x92, 0x84, 0xb8});
+    auto t = HessianUtils::readDate(buffer);
+    // Time zone was UTC
+    EXPECT_EQ(894621091000, t.count());
+    EXPECT_EQ(0, buffer.length());
+  }
 }
 
 TEST(HessianUtilsTest, peekByte) {
@@ -530,6 +695,30 @@ TEST(HessianUtilsTest, peekByte) {
   {
     Buffer::OwnedImpl buffer;
     addSeq(buffer, {0x23});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekByte(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x42});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekByte(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x42, 't', 'e'});
+    size_t size;
+    EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekByte(buffer, &size), EnvoyException,
+                              "buffer underflow");
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x41, 't'});
     size_t size;
     EXPECT_THROW_WITH_MESSAGE(HessianUtils::peekByte(buffer, &size), EnvoyException,
                               "buffer underflow");
@@ -583,6 +772,13 @@ TEST(HessianUtilsTest, peekByte) {
     std::string expect_string = std::string(0x04 * 256, 't') + "\x1\x2\x3";
     EXPECT_STREQ(expect_string.c_str(), HessianUtils::peekByte(buffer, &size).c_str());
     EXPECT_EQ(3 + 0x04 * 256 + 4, size);
+  }
+
+  {
+    Buffer::OwnedImpl buffer;
+    addSeq(buffer, {0x23, 0x01, 0x02, 0x03});
+    EXPECT_STREQ("\x1\x2\x3", HessianUtils::readByte(buffer).c_str());
+    EXPECT_EQ(0, buffer.length());
   }
 }
 

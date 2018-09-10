@@ -113,12 +113,8 @@ void Filter::onEvent(Network::ConnectionEvent event) {
 }
 
 void Filter::onRequestMessage(RequestMessagePtr&& message) {
-  if (!message) {
-    throw EnvoyException("unexpected request onRequestMessage callback");
-  }
-  if (message->messageType() != MessageType::Request) {
-    throw EnvoyException("unexpected message type");
-  }
+  ASSERT(message);
+  ASSERT(message->messageType() == MessageType::Request);
 
   switch (message->serializationType()) {
   case SerializationType::Json:
@@ -147,12 +143,8 @@ void Filter::onRequestMessage(RequestMessagePtr&& message) {
 }
 
 void Filter::onResponseMessage(ResponseMessagePtr&& message) {
-  if (!message) {
-    throw EnvoyException("unexpected reponse onResponseMessage callback");
-  }
-  if (message->messageType() != MessageType::Response) {
-    throw EnvoyException("unexpected message type");
-  }
+  ASSERT(message);
+  ASSERT(message->messageType() == MessageType::Response);
 
   auto itor = active_call_map_.find(message->requestId());
   if (itor == active_call_map_.end()) {
