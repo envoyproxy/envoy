@@ -55,7 +55,7 @@ public:
   };
 
   FuzzConfig()
-      : route_config_provider_(test_time_.timeSource()),
+      : route_config_provider_(test_time_.timeSystem()),
         stats_{{ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(fake_stats_), POOL_GAUGE(fake_stats_),
                                         POOL_HISTOGRAM(fake_stats_))},
                "",
@@ -155,6 +155,9 @@ public:
         .WillOnce(InvokeWithoutArgs([this, &request_headers, end_stream] {
           decoder_ = &conn_manager_.newStream(encoder_);
           auto headers = std::make_unique<TestHeaderMapImpl>(request_headers);
+          if (headers->Method() == nullptr) {
+            headers->setReferenceKey(Headers::get().Method, "GET");
+          }
           decoder_->decodeHeaders(std::move(headers), end_stream);
         }));
     fakeOnData();

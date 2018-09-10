@@ -2,12 +2,11 @@
 
 set -e
 
-# Use master branch, which contains a fix for the spurious limit of 100 concurrent streams:
-# https://github.com/nghttp2/nghttp2/commit/2ba1389993729fcb6ee5794ac512f2b67b29952e
-# TODO(PiotrSikora): switch back to releases once v1.33.0 is out.
-VERSION=e5b3f9addd49bca27e2f99c5c65a564eb5c0cf6d  # 2018-06-09
+VERSION=1.33.0
+SHA256=42fff7f290100c02234ac3b0095852e4392e6bfd95ebed900ca8bd630850d88c
 
-curl https://github.com/nghttp2/nghttp2/archive/"$VERSION".tar.gz -sLo nghttp2-"$VERSION".tar.gz
+curl https://github.com/nghttp2/nghttp2/releases/download/v"$VERSION"/nghttp2-"$VERSION".tar.gz -sLo nghttp2-"$VERSION".tar.gz \
+  && echo "$SHA256" nghttp2-"$VERSION".tar.gz | sha256sum --check
 tar xf nghttp2-"$VERSION".tar.gz
 cd nghttp2-"$VERSION"
 

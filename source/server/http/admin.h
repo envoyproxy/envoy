@@ -202,6 +202,8 @@ private:
                                  AdminStream&);
   Http::Code handlerLogging(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response, AdminStream&);
+  Http::Code handlerMemory(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                           Buffer::Instance& response, AdminStream&);
   Http::Code handlerMain(const std::string& path, Buffer::Instance& response, AdminStream&);
   Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
                                  Http::HeaderMap& response_headers, Buffer::Instance& response,

@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <list>
 #include <stdexcept>
@@ -25,6 +26,7 @@
 
 #include "test/test_common/printers.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 
@@ -216,6 +218,29 @@ void ConditionalInitializer::waitReady() {
 
 ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
 ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
+
+AtomicFileUpdater::AtomicFileUpdater(const std::string& filename)
+    : link_(filename), new_link_(absl::StrCat(filename, ".new")),
+      target1_(absl::StrCat(filename, ".target1")), target2_(absl::StrCat(filename, ".target2")),
+      use_target1_(true) {
+  unlink(link_.c_str());
+  unlink(new_link_.c_str());
+  unlink(target1_.c_str());
+  unlink(target2_.c_str());
+}
+
+void AtomicFileUpdater::update(const std::string& contents) {
+  const std::string target = use_target1_ ? target1_ : target2_;
+  use_target1_ = !use_target1_;
+  {
+    std::ofstream file(target);
+    file << contents;
+  }
+  int rc = symlink(target.c_str(), new_link_.c_str());
+  ASSERT_EQ(0, rc) << strerror(errno);
+  rc = rename(new_link_.c_str(), link_.c_str());
+  ASSERT_EQ(0, rc) << strerror(errno);
+}
 
 constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
 

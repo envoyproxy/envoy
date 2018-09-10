@@ -165,7 +165,7 @@ public:
   AsyncStream* start(const Protobuf::MethodDescriptor& service_method,
                      AsyncStreamCallbacks& callbacks) override;
 
-  TimeSource& timeSource() { return dispatcher_.timeSource(); }
+  TimeSource& timeSource() { return dispatcher_.timeSystem(); }
 
 private:
   static std::shared_ptr<grpc::Channel>
