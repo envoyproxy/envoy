@@ -15,7 +15,14 @@ public:
   /**
    * @return int32_t the next Thrift sequence id to use for this connection.
    */
-  int32_t nextSequenceId() { return next_sequence_id_++; }
+  int32_t nextSequenceId() {
+    if (next_sequence_id_ == std::numeric_limits<int32_t>::max()) {
+      next_sequence_id_ = 0;
+      return std::numeric_limits<int32_t>::max();
+    }
+
+    return next_sequence_id_++;
+  }
 
   /**
    * @return true if this upgrade has been attempted on this connection.
@@ -41,6 +48,11 @@ public:
     upgrade_attempted_ = true;
     upgraded_ = false;
   }
+
+  /**
+   * Specifies the next sequence id to be returned for testing.
+   */
+  void setNextSequenceIdForTest(int32_t next) { next_sequence_id_ = next; }
 
 private:
   int32_t next_sequence_id_{0};

@@ -734,9 +734,7 @@ TEST_F(ThriftRouterTest, CallWithExistingConnection) {
 
   // Simulate previous sequence id usage.
   ThriftConnectionState* cs = new ThriftConnectionState();
-  cs->nextSequenceId();
-  cs->nextSequenceId();
-  cs->nextSequenceId();
+  cs->setNextSequenceIdForTest(3);
   conn_state_.reset(cs);
 
   startRequestWithExistingConnection(MessageType::Call);
@@ -810,6 +808,7 @@ TEST_P(ThriftRouterContainerTest, DecoderFilterCallbacks) {
   completeRequest();
   destroyRouter();
 }
+
 } // namespace Router
 } // namespace ThriftProxy
 } // namespace NetworkFilters
