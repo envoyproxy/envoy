@@ -12,4 +12,4 @@ class TestHostPredicateFactory : public Upstream::RetryHostPredicateFactory {
     callbacks.addHostPredicate(std::make_shared<TestHostPredicate>());
   }
 };
-}
+} // namespace Envoy
