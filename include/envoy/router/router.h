@@ -16,6 +16,7 @@
 #include "envoy/http/websocket.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/resource_manager.h"
+#include "envoy/upstream/retry.h"
 
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"

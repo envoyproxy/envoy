@@ -42,7 +42,8 @@ class MainCommonTest : public testing::TestWithParam<Network::Address::IpVersion
 protected:
   MainCommonTest()
       : config_file_(TestEnvironment::temporaryFileSubstitute(
-            "/test/config/integration/google_com_proxy_port_0.v2.yaml", {}, {}, GetParam())),
+            "/test/config/integration/google_com_proxy_port_0.v2.yaml", TestEnvironment::ParamMap(),
+            TestEnvironment::PortMap(), GetParam())),
         random_string_(fmt::format("{}", computeBaseId())),
         argv_({"envoy-static", "--base-id", random_string_.c_str(), "-c", config_file_.c_str(),
                nullptr}) {}
