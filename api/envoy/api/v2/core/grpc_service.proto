@@ -53,6 +53,11 @@ message GrpcService {
 
         // https://grpc.io/grpc/cpp/namespacegrpc.html#a6beb3ac70ff94bd2ebbd89b8f21d1f61
         google.protobuf.Empty google_default = 2;
+
+        // Use local channel credentials. Currently only UDS is supported.
+        // See
+        // https://github.com/grpc/grpc/blob/782e5c2b8dc6973b6fc0959ba08da0f5b9db2f6f/include/grpcpp/security/credentials.h#L239
+        bool local_channel_credentials = 3;
       }
     }
 
