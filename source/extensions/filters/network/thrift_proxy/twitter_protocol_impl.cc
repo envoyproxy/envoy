@@ -114,6 +114,7 @@ public:
   ClientId(const std::string& name) : name_(name) {}
   ClientId(const ThriftStructValue& value) {
     for (const auto& field : value.fields()) {
+      // Unknown field id are ignored, to allow for future additional fields.
       if (field->fieldId() == NameFieldId) {
         name_ = field->getValue().getValueTyped<std::string>();
       }
@@ -201,6 +202,7 @@ public:
   RequestContext(const std::string& key, const std::string& value) : key_(key), value_(value) {}
   RequestContext(const ThriftStructValue& value) {
     for (const auto& field : value.fields()) {
+      // Unknown field id are ignored, to allow for future additional fields.
       switch (field->fieldId()) {
       case 1:
         key_ = field->getValue().getValueTyped<std::string>();
@@ -248,6 +250,7 @@ public:
   Delegation(const std::string& src, const std::string& dst) : src_(src), dst_(dst) {}
   Delegation(const ThriftStructValue& value) {
     for (const auto& field : value.fields()) {
+      // Unknown field id are ignored, to allow for future additional fields.
       switch (field->fieldId()) {
       case SrcFieldId:
         src_ = field->getValue().getValueTyped<std::string>();
@@ -295,6 +298,7 @@ class RequestHeader {
 public:
   RequestHeader(const ThriftObject& header) {
     for (const auto& field : header.fields()) {
+      // Unknown field id are ignored, to allow for future additional fields.
       switch (field->fieldId()) {
       case TraceIdFieldId:
         trace_id_ = field->getValue().getValueTyped<int64_t>();
@@ -521,6 +525,7 @@ class ResponseHeader {
 public:
   ResponseHeader(const ThriftObject& header) {
     for (const auto& field : header.fields()) {
+      // Unknown field id are ignored, to allow for future additional fields.
       switch (field->fieldId()) {
       case SpansFieldId:
         readSpans(field->getValue().getValueTyped<ThriftListValue>());
@@ -614,6 +619,7 @@ private:
 
   void readSpan(Span& span, const ThriftStructValue& thrift_struct) {
     for (const auto& field : thrift_struct.fields()) {
+      // Unknown field id are ignored, to allow for future additional fields.
       switch (field->fieldId()) {
       case SpanTraceIdFieldId:
         span.trace_id_ = field->getValue().getValueTyped<int64_t>();
@@ -707,6 +713,7 @@ private:
 
   void readAnnotation(Annotation& annotation, const ThriftStructValue& thrift_struct) {
     for (const auto& field : thrift_struct.fields()) {
+      // Unknown field id are ignored, to allow for future additional fields.
       switch (field->fieldId()) {
       case AnnotationTimestampFieldId:
         annotation.timestamp_ = field->getValue().getValueTyped<int64_t>();
@@ -760,6 +767,7 @@ private:
 
   void readBinaryAnnotation(BinaryAnnotation& annotation, const ThriftStructValue& thrift_struct) {
     for (const auto& field : thrift_struct.fields()) {
+      // Unknown field id are ignored, to allow for future additional fields.
       switch (field->fieldId()) {
       case BinaryAnnotationKeyFieldId:
         annotation.key_ = field->getValue().getValueTyped<std::string>();
@@ -814,6 +822,7 @@ private:
 
   void readEndpoint(Endpoint& endpoint, const ThriftStructValue& thrift_struct) {
     for (const auto& field : thrift_struct.fields()) {
+      // Unknown field id are ignored, to allow for future additional fields.
       switch (field->fieldId()) {
       case 1:
         endpoint.ipv4_ = field->getValue().getValueTyped<int32_t>();
