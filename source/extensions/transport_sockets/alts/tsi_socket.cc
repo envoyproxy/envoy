@@ -38,14 +38,7 @@ Network::PostIoAction TsiSocket::doHandshake() {
   ASSERT(!handshake_complete_);
   ENVOY_CONN_LOG(debug, "TSI: doHandshake", callbacks_->connection());
 
-  if (!handshaker_) {
-    handshaker_ = handshaker_factory_(callbacks_->connection().dispatcher(),
-                                      callbacks_->connection().localAddress(),
-                                      callbacks_->connection().remoteAddress());
-    handshaker_->setHandshakerCallbacks(*this);
-  }
-
-  if (!handshaker_next_calling_) {
+  if (!handshaker_next_calling_ && raw_read_buffer_.length() > 0) {
     doHandshakeNext();
   }
   return Network::PostIoAction::KeepOpen;
@@ -54,6 +47,14 @@ Network::PostIoAction TsiSocket::doHandshake() {
 void TsiSocket::doHandshakeNext() {
   ENVOY_CONN_LOG(debug, "TSI: doHandshake next: received: {}", callbacks_->connection(),
                  raw_read_buffer_.length());
+
+  if (!handshaker_) {
+    handshaker_ = handshaker_factory_(callbacks_->connection().dispatcher(),
+                                      callbacks_->connection().localAddress(),
+                                      callbacks_->connection().remoteAddress());
+    handshaker_->setHandshakerCallbacks(*this);
+  }
+
   handshaker_next_calling_ = true;
   Buffer::OwnedImpl handshaker_buffer;
   handshaker_buffer.move(raw_read_buffer_);
@@ -212,12 +213,16 @@ Network::IoResult TsiSocket::doWrite(Buffer::Instance& buffer, bool end_stream) 
 }
 
 void TsiSocket::closeSocket(Network::ConnectionEvent) {
+  ENVOY_CONN_LOG(debug, "TSI: closing socket", callbacks_->connection());
   if (handshaker_) {
     handshaker_.release()->deferredDelete();
   }
 }
 
-void TsiSocket::onConnected() { ASSERT(!handshake_complete_); }
+void TsiSocket::onConnected() {
+  ASSERT(!handshake_complete_);
+  doHandshakeNext();
+}
 
 void TsiSocket::onNextDone(NextResultPtr&& result) {
   handshaker_next_calling_ = false;
