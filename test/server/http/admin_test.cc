@@ -1,4 +1,5 @@
 #include <fstream>
+#include <regex>
 #include <unordered_map>
 
 #include "envoy/json/json_object.h"
@@ -49,9 +50,8 @@ public:
   static std::string
   statsAsJsonHandler(std::map<std::string, uint64_t>& all_stats,
                      const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                     const bool used_only,
-                     const absl::optional<std::string> filter_string = absl::nullopt) {
-    return AdminImpl::statsAsJson(all_stats, all_histograms, used_only, filter_string,
+                     const bool used_only, const absl::optional<std::regex> regex = absl::nullopt) {
+    return AdminImpl::statsAsJson(all_stats, all_histograms, used_only, regex,
                                   true /*pretty_print*/);
   }
 
@@ -359,8 +359,8 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
 
   std::map<std::string, uint64_t> all_stats;
 
-  std::string actual_json =
-      statsAsJsonHandler(all_stats, store_->histograms(), false, absl::optional<std::string>{"h1"});
+  std::string actual_json = statsAsJsonHandler(
+      all_stats, store_->histograms(), false, absl::optional<std::regex>{std::regex(".*[a-z]1.*")});
 
   // Because this is a filter case, we don't expect to see any stats except for those containing
   // "h1" in their name.
@@ -469,7 +469,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
   std::map<std::string, uint64_t> all_stats;
 
   std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), true,
-                                               absl::optional<std::string>{"matches"});
+                                               absl::optional<std::regex>{std::regex("h[12].*")});
 
   // Expected JSON should not have h2 values as it is not used, and should not have h3 values as
   // they are used but do not match.
