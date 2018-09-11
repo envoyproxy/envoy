@@ -23,6 +23,15 @@ RouteEntryImplBase::RouteEntryImplBase(
     config_headers_.push_back(header_map);
   }
 
+  if (route.route().has_metadata_match()) {
+    const auto filter_it = route.route().metadata_match().filter_metadata().find(
+        Envoy::Config::MetadataFilters::get().ENVOY_LB);
+    if (filter_it != route.route().metadata_match().filter_metadata().end()) {
+      metadata_match_criteria_.reset(
+          new Envoy::Router::MetadataMatchCriteriaImpl(filter_it->second));
+    }
+  }
+
   if (route.route().cluster_specifier_case() ==
       envoy::config::filter::network::thrift_proxy::v2alpha1::RouteAction::kWeightedClusters) {
 
@@ -31,15 +40,6 @@ RouteEntryImplBase::RouteEntryImplBase(
       std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(this, cluster));
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_cluster_weight_ += weighted_clusters_.back()->clusterWeight();
-    }
-  }
-
-  if (route.route().has_metadata_match()) {
-    const auto filter_it = route.route().metadata_match().filter_metadata().find(
-        Envoy::Config::MetadataFilters::get().ENVOY_LB);
-    if (filter_it != route.route().metadata_match().filter_metadata().end()) {
-      metadata_match_criteria_.reset(
-          new Envoy::Router::MetadataMatchCriteriaImpl(filter_it->second));
     }
   }
 }
