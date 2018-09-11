@@ -451,6 +451,10 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
         fmt::format("too many connections to '{}'", upstream_host_->address()->asString())));
     break;
   case Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+    // Should only happen if we closed the connection, due to an error condition, in which case
+    // we've already handled any possible downstream response.
+    parent_.callbacks_->resetDownstreamConnection();
+    break;
   case Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
   case Tcp::ConnectionPool::PoolFailureReason::Timeout:
     // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
