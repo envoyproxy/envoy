@@ -57,7 +57,7 @@ message GrpcService {
         // Use local channel credentials. Currently only UDS is supported.
         // See
         // https://github.com/grpc/grpc/blob/782e5c2b8dc6973b6fc0959ba08da0f5b9db2f6f/include/grpcpp/security/credentials.h#L239
-        bool local_credentail = 3;
+        google.protobuf.Empty local_credentail = 3;
       }
     }
 

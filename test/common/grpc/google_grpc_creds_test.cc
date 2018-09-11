@@ -20,7 +20,7 @@ TEST(CredsUtility, SslChannelCredentials) {
   EXPECT_EQ(nullptr, CredsUtility::sslChannelCredentials(config));
   creds->mutable_ssl_credentials();
   EXPECT_NE(nullptr, CredsUtility::sslChannelCredentials(config));
-  creds->set_local_credentail(true);
+  creds->mutable_local_credentail();
   EXPECT_NE(nullptr, CredsUtility::sslChannelCredentials(config));
 }
 
