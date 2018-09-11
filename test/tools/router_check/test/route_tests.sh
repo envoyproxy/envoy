@@ -26,8 +26,8 @@ BAD_CONFIG_OUTPUT=$(("${PATH_BIN}" "${PATH_CONFIG}/Redirect.golden.json" "${PATH
 
 # Failure test case
 echo testing failure test case
-FAILURE_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/TestRoutes.yaml" "${PATH_CONFIG}/Weighted.golden.json" "--details") ||
+FAILURE_OUTPUT=$("${PATH_BIN}" "${PATH_CONFIG}/TestRoutes.yaml" "${PATH_CONFIG}/Weighted.golden.json" "--details" 2>&1) ||
 echo ${FAILURE_OUTPUT}
-  if [[ "${FAILURE_OUTPUT}" != *"cluster1 instant-server cluster_name"* ]]; then
+  if [[ "${FAILURE_OUTPUT}" != *"expected: [cluster1], actual: [instant-server], test type: cluster_name"* ]]; then
     exit 1
   fi
