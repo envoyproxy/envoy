@@ -929,6 +929,8 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTimeoutTest) {
         return new Buffer::WatermarkBuffer(below_low, above_high);
       }));
 
+  // This timer will be returned to the ConnectionImpl when createTimer() is called to allocate the
+  // delayed close timer.
   auto timer = new Event::MockTimer(&dispatcher);
   EXPECT_CALL(*timer, enableTimer(_)).Times(1);
   EXPECT_CALL(*timer, disableTimer()).Times(1);
@@ -942,7 +944,10 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTimeoutTest) {
   std::unique_ptr<Network::ConnectionImpl> server_connection(new Network::ConnectionImpl(
       dispatcher, std::make_unique<ConnectionSocketImpl>(0, nullptr, nullptr),
       TransportSocketPtr(transport_socket), true));
-  server_connection->setDelayedCloseTimeout(std::chrono::milliseconds(500));
+
+  // Enable delayed connection close processing by setting a non-zero timeout value. The actual
+  // value (> 0) doesn't matter since the callback is triggered below.
+  server_connection->setDelayedCloseTimeout(std::chrono::milliseconds(100));
 
   NiceMockConnectionStats stats;
   server_connection->setConnectionStats(stats.toBufferStats());
@@ -1004,7 +1009,9 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
 TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTimerTriggerTest) {
   setUpBasicConnection();
   connect();
-  server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(500));
+  // This timer should always trigger since the client connection does not issue a close() during
+  // this test.
+  server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(50));
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
   client_connection_->addReadFilter(client_read_filter);
