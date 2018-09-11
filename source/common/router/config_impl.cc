@@ -295,7 +295,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       request_headers_parser_(HeaderParser::configure(route.request_headers_to_add())),
       response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
                                                        route.response_headers_to_remove())),
-      opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
+      match_grpc_(route.match().is_grpc()), opaque_config_(parseOpaqueConfig(route)),
+      decorator_(parseDecorator(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route)),
       per_filter_configs_(route.per_filter_config(), factory_context) {
@@ -365,6 +366,10 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
   if (runtime_) {
     matches &= loader_.snapshot().featureEnabled(runtime_.value().key_, runtime_.value().default_,
                                                  random_value);
+  }
+
+  if (match_grpc_) {
+    matches &= Grpc::Common::hasGrpcContentType(headers);
   }
 
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
