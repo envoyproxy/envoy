@@ -13,7 +13,9 @@
 
 #include "gtest/gtest.h"
 
+using ::testing::HasSubstr;
 using ::testing::MatchesRegex;
+
 namespace Envoy {
 
 INSTANTIATE_TEST_CASE_P(IpVersions, Http2IntegrationTest,
@@ -398,7 +400,7 @@ TEST_P(Http2IntegrationTest, DelayedCloseAfterBadFrame) {
       version_);
 
   connection.run();
-  EXPECT_TRUE(response.find("SETTINGS expected") != std::string::npos);
+  EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
   // Due to the multiple dispatchers involved (one for the RawConnectionDriver and another for the
   // Envoy server), it's possible the delayed close timer could fire and close the server socket
   // prior to the data callback above firing. Therefore, we may either still be connected, or have
@@ -429,7 +431,7 @@ TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
       version_);
 
   connection.run();
-  EXPECT_TRUE(response.find("SETTINGS expected") != std::string::npos);
+  EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
   // Due to the multiple dispatchers involved (one for the RawConnectionDriver and another for the
   // Envoy server), it's possible for the 'connection' to receive the data and exit the dispatcher
   // prior to the FIN being received from the server.

@@ -33,7 +33,6 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Return;
-using testing::ReturnNew;
 using testing::SaveArg;
 using testing::Sequence;
 using testing::StrictMock;
@@ -962,6 +961,12 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTimeoutTest) {
 // Test that a FlushWriteAndDelay close causes Envoy to flush the write and wait for the client/peer
 // to close (until a configured timeout which is not expected to trigger in this test).
 TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
+#ifdef __APPLE__
+  // libevent does not provide early close notifications on the currently supported macOS builds, so
+  // the server connection is never notified of the close. For now, we have chosen to disable tests
+  // that rely on this behavior on macOS (see https://github.com/envoyproxy/envoy/pull/4299).
+  return;
+#endif
   setUpBasicConnection();
   connect();
   // Set a very high timeout value to prevent flaking. We are testing the common case where the

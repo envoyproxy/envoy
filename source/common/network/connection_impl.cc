@@ -116,7 +116,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
                        type == ConnectionCloseType::FlushWriteAndDelay,
                    "");
     delayed_close_ = true;
-    bool delayed_close_timeout_set = delayedCloseTimeout().count();
+    bool delayed_close_timeout_set = delayedCloseTimeout().count() > 0;
 
     // All close types that follow do not actually close() the socket immediately so that buffered
     // data can be written. However, we do want to stop reading to apply TCP backpressure.
@@ -124,13 +124,13 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
     // Force a closeSocket() after the write buffer is flushed if the close_type calls for it or if
     // no delayed close timeout is set.
-    close_after_flush_ = type == ConnectionCloseType::FlushWrite || !delayed_close_timeout_set;
+    close_after_flush_ = !delayed_close_timeout_set || type == ConnectionCloseType::FlushWrite;
 
     // Create and activate a timer which will immediately close the connection if triggered.
     // A config value of 0 disables the timeout.
     if (delayed_close_timeout_set) {
       delayed_close_timer_ = dispatcher_.createTimer([this]() -> void { onDelayedCloseTimeout(); });
-      ENVOY_CONN_LOG(debug, "setting delayed close timer with timeout {}", *this,
+      ENVOY_CONN_LOG(debug, "setting delayed close timer with timeout {} ms", *this,
                      delayedCloseTimeout().count());
       delayed_close_timer_->enableTimer(delayedCloseTimeout());
     }
