@@ -2,7 +2,7 @@
 
 # Run a CI build/test target, e.g. docs, asan.
 
-function dump_cc_version {
+function dump_version {
     local XCC="${CC:-gcc}"
 
     if [[ $(uname -s) == "Linux" ]]; then
@@ -12,7 +12,7 @@ function dump_cc_version {
     else
         local XCC_VERSION=$(clang -v 2>&1 | head -n 1)
     fi
-    echo "running do_ci.sh with ${XCC_VERSION}"
+    echo "running do_ci.sh with ${XCC} @ ${XCC_VERSION}"
 }
 
 set -e
@@ -29,7 +29,7 @@ echo "building using ${NUM_CPUS} CPUs"
 
 function bazel_release_binary_build() {
   echo "Building..."
-  dump_cc_version
+  dump_version
   cd "${ENVOY_CI_DIR}"
   bazel build ${BAZEL_BUILD_OPTIONS} -c opt //source/exe:envoy-static
   # Copy the envoy-static binary somewhere that we can access outside of the
@@ -48,7 +48,7 @@ function bazel_release_binary_build() {
 
 function bazel_debug_binary_build() {
   echo "Building..."
-  dump_cc_version
+  dump_version
   cd "${ENVOY_CI_DIR}"
   bazel build ${BAZEL_BUILD_OPTIONS} -c dbg //source/exe:envoy-static
   # Copy the envoy-static binary somewhere that we can access outside of the
@@ -106,7 +106,7 @@ elif [[ "$1" == "bazel.debug.server_only" ]]; then
 elif [[ "$1" == "bazel.asan" ]]; then
   setup_clang_toolchain
   echo "bazel ASAN/UBSAN debug build with tests..."
-  dump_cc_version
+  dump_version
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   echo "Building and testing..."
   bazel test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan @envoy//test/... \
@@ -115,7 +115,7 @@ elif [[ "$1" == "bazel.asan" ]]; then
 elif [[ "$1" == "bazel.tsan" ]]; then
   setup_clang_toolchain
   echo "bazel TSAN debug build with tests..."
-  dump_cc_version
+  dump_version
   cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   echo "Building and testing..."
   bazel test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan @envoy//test/... \
@@ -152,7 +152,7 @@ elif [[ "$1" == "bazel.ipv6_tests" ]]; then
 
   setup_clang_toolchain
   echo "Testing..."
-  dump_cc_version
+  dump_version
   cd "${ENVOY_CI_DIR}"
   bazel test ${BAZEL_TEST_OPTIONS} -c fastbuild //test/integration/... //test/common/network/...
   exit 0
