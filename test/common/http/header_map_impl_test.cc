@@ -902,6 +902,8 @@ TEST(HeaderMapImplTest, PseudoHeaderOrder) {
   }
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wself-assign"
 // Validate that TestHeaderMapImpl copy construction and assignment works. This is a
 // regression for where we were missing a valid copy constructor and had the
 // default (dangerous) move semantics takeover.
@@ -916,6 +918,7 @@ TEST(HeaderMapImplTest, TestHeaderMapImplyCopy) {
   baz = baz;
   EXPECT_STREQ("bar", baz.get(LowerCaseString("foo"))->value().c_str());
 }
+#pragma GCC diagnostic pop
 
 } // namespace Http
 } // namespace Envoy
