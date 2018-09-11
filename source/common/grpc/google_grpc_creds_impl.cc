@@ -11,15 +11,19 @@ namespace Grpc {
 
 std::shared_ptr<grpc::ChannelCredentials> CredsUtility::sslChannelCredentials(
     const envoy::api::v2::core::GrpcService::GoogleGrpc& google_grpc) {
-  if (google_grpc.has_channel_credentials() &&
-      google_grpc.channel_credentials().has_ssl_credentials()) {
-    const auto& ssl_credentials = google_grpc.channel_credentials().ssl_credentials();
-    const grpc::SslCredentialsOptions ssl_credentials_options = {
-        .pem_root_certs = Config::DataSource::read(ssl_credentials.root_certs(), true),
-        .pem_private_key = Config::DataSource::read(ssl_credentials.private_key(), true),
-        .pem_cert_chain = Config::DataSource::read(ssl_credentials.cert_chain(), true),
-    };
-    return grpc::SslCredentials(ssl_credentials_options);
+  if (google_grpc.has_channel_credentials()) {
+    if (google_grpc.channel_credentials().has_ssl_credentials()) {
+      const auto& ssl_credentials = google_grpc.channel_credentials().ssl_credentials();
+      const grpc::SslCredentialsOptions ssl_credentials_options = {
+          .pem_root_certs = Config::DataSource::read(ssl_credentials.root_certs(), true),
+          .pem_private_key = Config::DataSource::read(ssl_credentials.private_key(), true),
+          .pem_cert_chain = Config::DataSource::read(ssl_credentials.cert_chain(), true),
+      };
+      return grpc::SslCredentials(ssl_credentials_options);
+    }
+    if (google_grpc.channel_credentials().local_credentail()) {
+      return grpc::experimental::LocalCredentials(UDS);
+    }
   }
   return nullptr;
 }
