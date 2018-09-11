@@ -29,6 +29,7 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
   dispatch();
 
   if (end_stream && stopped_) {
+    ASSERT(!rpcs_.empty());
     MessageMetadata& metadata = *(*rpcs_.begin())->metadata_;
     ASSERT(metadata.hasMessageType());
     if (metadata.messageType() != MessageType::Oneway) {
