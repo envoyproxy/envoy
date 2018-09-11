@@ -773,7 +773,7 @@ routes:
             metadata_match:
               filter_metadata:
                 envoy.lb:
-                  k3: v3
+                  k2: v3
 )EOF";
 
   const envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration config =
@@ -832,7 +832,7 @@ routes:
 
   // match with weighted cluster metadata and route action metadata merged
   {
-    RouteConstSharedPtr route = matcher.route(metadata, 2001);
+    RouteConstSharedPtr route = matcher.route(metadata, 5001);
     EXPECT_NE(nullptr, route);
     EXPECT_NE(nullptr, route->routeEntry());
 
