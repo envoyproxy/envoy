@@ -12,7 +12,8 @@ namespace Grpc {
 std::shared_ptr<grpc::ChannelCredentials> CredsUtility::sslChannelCredentials(
     const envoy::api::v2::core::GrpcService::GoogleGrpc& google_grpc) {
   if (google_grpc.has_channel_credentials()) {
-    if (google_grpc.channel_credentials().has_ssl_credentials()) {
+    switch (google_grpc.channel_credentials().credential_specifier_case()) {
+    case envoy::api::v2::core::GrpcService::GoogleGrpc::ChannelCredentials::kSslCredentials: {
       const auto& ssl_credentials = google_grpc.channel_credentials().ssl_credentials();
       const grpc::SslCredentialsOptions ssl_credentials_options = {
           .pem_root_certs = Config::DataSource::read(ssl_credentials.root_certs(), true),
@@ -21,8 +22,11 @@ std::shared_ptr<grpc::ChannelCredentials> CredsUtility::sslChannelCredentials(
       };
       return grpc::SslCredentials(ssl_credentials_options);
     }
-    if (google_grpc.channel_credentials().local_credentail()) {
+    case envoy::api::v2::core::GrpcService::GoogleGrpc::ChannelCredentials::kLocalCredentail: {
       return grpc::experimental::LocalCredentials(UDS);
+    }
+    default:
+      return nullptr;
     }
   }
   return nullptr;
