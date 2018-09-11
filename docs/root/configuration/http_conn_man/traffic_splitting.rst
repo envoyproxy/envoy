@@ -31,7 +31,7 @@ section describes this scenario in more detail.
 Traffic shifting between two upstreams
 --------------------------------------
 
-The :ref:`runtime <config_http_conn_man_route_table_route_runtime>` object
+The :ref:`runtime <envoy_api_field_route.RouteMatch.runtime>` object
 in the route configuration determines the probability of selecting a
 particular route (and hence its cluster). By using the runtime
 configuration, traffic to a particular route in a virtual host can be
@@ -69,7 +69,7 @@ envoy configuration file.
 
 Envoy matches routes with a :ref:`first match <config_http_conn_man_route_table_route_matching>` policy.
 If the route has a runtime object, the request will be additionally matched based on the runtime
-:ref:`value <config_http_conn_man_route_table_route_runtime_default>`
+:ref:`value <envoy_api_field_route.RouteMatch.runtime>`
 (or the default, if no value is specified). Thus, by placing routes
 back-to-back in the above example and specifying a runtime object in the
 first route, traffic shifting can be accomplished by changing the runtime
@@ -103,8 +103,8 @@ v3) instead of two. To split traffic evenly across the three versions
 specify the weight for each upstream cluster.
 
 Unlike the previous example, a **single** :ref:`route
-<config_http_conn_man_route_table_route>` entry is sufficient. The
-:ref:`weighted_clusters <config_http_conn_man_route_table_route_weighted_clusters>`
+<envoy_api_msg_route.Route>` entry is sufficient. The
+:ref:`weighted_clusters <envoy_api_field_route.RouteAction.weighted_clusters>`
 configuration block in a route can be used to specify multiple upstream clusters
 along with weights that indicate the **percentage** of traffic to be sent
 to each upstream cluster.

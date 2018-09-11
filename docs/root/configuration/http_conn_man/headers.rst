@@ -14,10 +14,10 @@ is being received) as well as during encoding (when the response is being sent).
 user-agent
 ----------
 
-The *user-agent* header may be set by the connection manager during decoding if the
-:ref:`add_user_agent <config_http_conn_man_add_user_agent>` option is enabled. The header is only
-modified if it is not already set. If the connection manager does set the header, the value is
-determined by the :option:`--service-cluster` command line option.
+The *user-agent* header may be set by the connection manager during decoding if the :ref:`add_user_agent
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.add_user_agent>` option is
+enabled. The header is only modified if it is not already set. If the connection manager does set the header, the value
+is determined by the :option:`--service-cluster` command line option.
 
 .. _config_http_conn_man_headers_server:
 
@@ -25,7 +25,7 @@ server
 ------
 
 The *server* header will be set during encoding to the value in the :ref:`server_name
-<config_http_conn_man_server_name>` option.
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.server_name>` option.
 
 .. _config_http_conn_man_headers_x-client-trace-id:
 
@@ -49,7 +49,7 @@ that in the current implementation, this should be considered a hint as it is se
 could be easily spoofed by any internal entity. In the future Envoy will support a mutual
 authentication TLS mesh which will make this header fully secure. Like *user-agent*, the value
 is determined by the :option:`--service-cluster` command line option. In order to enable this
-feature you need to set the :ref:`user_agent <config_http_conn_man_add_user_agent>` option to true.
+feature you need to set the :ref:`user_agent <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.add_user_agent>` option to true.
 
 .. _config_http_conn_man_headers_downstream-service-node:
 
@@ -148,9 +148,10 @@ Some examples of the XFCC header are:
 3. For one client certificate with both URI type and DNS type Subject Alternative Name: ``x-forwarded-client-cert: By=http://frontend.lyft.com;Hash=468ed33be74eee6556d90c0149c1309e9ba61d6425303443c0748a02dd8de688;Subject="/C=US/ST=CA/L=San Francisco/OU=Lyft/CN=Test Client";URI=http://testclient.lyft.com;DNS=lyft.com;DNS=www.lyft.com``
 
 How Envoy processes XFCC is specified by the
-:ref:`forward_client_cert<config_http_conn_man_forward_client_cert>` and the
-:ref:`set_current_client_cert_details<config_http_conn_man_set_current_client_cert_details>` HTTP
-connection manager options. If *forward_client_cert* is unset, the XFCC header will be sanitized by
+:ref:`forward_client_cert_details<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.forward_client_cert_details>`
+and the
+:ref:`set_current_client_cert_details<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.set_current_client_cert_details>`
+HTTP connection manager options. If *forward_client_cert_details* is unset, the XFCC header will be sanitized by
 default.
 
 .. _config_http_conn_man_headers_x-forwarded-for:
@@ -316,7 +317,7 @@ A few very important notes about XFF:
 
    * **NOTE**: If an internal service proxies an external request to another internal service, and
      includes the original XFF header, Envoy will append to it on egress if
-     :ref:`use_remote_address <config_http_conn_man_use_remote_address>` is set. This will cause
+     :ref:`use_remote_address <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.use_remote_address>` is set. This will cause
      the other side to think the request is external. Generally, this is what is intended if XFF is
      being forwarded. If it is not intended, do not forward XFF, and forward
      :ref:`config_http_conn_man_headers_x-envoy-internal` instead.

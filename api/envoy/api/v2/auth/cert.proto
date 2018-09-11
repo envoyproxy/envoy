@@ -245,8 +245,9 @@ message CommonTlsContext {
 
   // Supplies the list of ALPN protocols that the listener should expose. In
   // practice this is likely to be set to one of two values (see the
-  // :ref:`codec_type <config_http_conn_man_codec_type>` parameter in the HTTP connection
-  // manager for more information):
+  // :ref:`codec_type
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.codec_type>`
+  // parameter in the HTTP connection manager for more information):
   //
   // * "h2,http/1.1" If the listener is going to support both HTTP/2 and HTTP/1.1.
   // * "http/1.1" If the listener is only going to support HTTP/1.1.

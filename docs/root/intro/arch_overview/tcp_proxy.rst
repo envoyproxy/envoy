@@ -10,7 +10,7 @@ such as the :ref:`MongoDB filter <arch_overview_mongo>` or the :ref:`rate limit
 <config_network_filters_rate_limit>` filter.
 
 The TCP proxy filter will respect the
-:ref:`connection limits <config_cluster_manager_cluster_circuit_breakers_max_connections>`
+:ref:`connection limits <envoy_api_field_cluster.CircuitBreakers.Thresholds.max_connections>`
 imposed by each upstream cluster's global resource manager. The TCP proxy filter checks with the
 upstream cluster's resource manager if it can create a connection without going over that cluster's
 maximum number of connections, if it can't the TCP proxy will not make the connection.
