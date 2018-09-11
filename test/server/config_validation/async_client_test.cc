@@ -17,7 +17,7 @@ TEST(ValidationAsyncClientTest, MockedMethods) {
   MockAsyncClientStreamCallbacks stream_callbacks;
 
   DangerousDeprecatedTestTime test_time;
-  ValidationAsyncClient client(test_time.timeSource());
+  ValidationAsyncClient client(test_time.timeSystem());
   EXPECT_EQ(nullptr, client.send(std::move(message), callbacks,
                                  absl::optional<std::chrono::milliseconds>()));
   EXPECT_EQ(nullptr,

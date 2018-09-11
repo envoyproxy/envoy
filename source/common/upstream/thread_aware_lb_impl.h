@@ -1,8 +1,8 @@
 #pragma once
 
-#include <shared_mutex>
-
 #include "common/upstream/load_balancer_impl.h"
+
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -69,13 +69,10 @@ private:
 
     ClusterStats& stats_;
     Runtime::RandomGenerator& random_;
-    std::shared_timed_mutex mutex_;
-    // TOOD(mattklein123): Added GUARDED_BY(mutex_) to to the following variables. OSX clang
-    // seems to not like them with shared mutexes so we need to ifdef them out on OSX. I don't
-    // have time to do this right now.
-    std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
+    absl::Mutex mutex_;
+    std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_ GUARDED_BY(mutex_);
     // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriorirty can be reused.
-    std::shared_ptr<std::vector<uint32_t>> per_priority_load_;
+    std::shared_ptr<std::vector<uint32_t>> per_priority_load_ GUARDED_BY(mutex_);
   };
 
   virtual HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set) PURE;

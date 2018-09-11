@@ -99,7 +99,8 @@ public:
       config_->protocol_ = custom_protocol_;
     }
 
-    filter_.reset(new ConnectionManager(*config_));
+    ON_CALL(random_, random()).WillByDefault(Return(42));
+    filter_.reset(new ConnectionManager(*config_, random_));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 
@@ -292,7 +293,7 @@ public:
   Buffer::OwnedImpl write_buffer_;
   std::unique_ptr<ConnectionManager> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
-
+  NiceMock<Runtime::MockRandomGenerator> random_;
   MockTransport* custom_transport_{};
   MockProtocol* custom_protocol_{};
 };
@@ -331,6 +332,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftOneWay) {
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
   initializeFilter();
+
   writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
 
   ThriftFilters::DecoderFilterCallbacks* callbacks{};
@@ -346,7 +348,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesStopIterationAndResume) {
   // Nothing further happens: we're stopped.
   EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
 
-  EXPECT_EQ(1, callbacks->streamId());
+  EXPECT_EQ(42, callbacks->streamId());
   EXPECT_EQ(TransportType::Framed, callbacks->downstreamTransportType());
   EXPECT_EQ(ProtocolType::Binary, callbacks->downstreamProtocolType());
   EXPECT_EQ(&filter_callbacks_.connection_, callbacks->connection());
@@ -842,6 +844,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
 
 TEST_F(ThriftConnectionManagerTest, PipelinedRequestAndResponse) {
   initializeFilter();
+
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x01);
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x02);
 
