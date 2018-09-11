@@ -155,6 +155,9 @@ public:
         .WillOnce(InvokeWithoutArgs([this, &request_headers, end_stream] {
           decoder_ = &conn_manager_.newStream(encoder_);
           auto headers = std::make_unique<TestHeaderMapImpl>(request_headers);
+          if (headers->Method() == nullptr) {
+            headers->setReferenceKey(Headers::get().Method, "GET");
+          }
           decoder_->decodeHeaders(std::move(headers), end_stream);
         }));
     fakeOnData();

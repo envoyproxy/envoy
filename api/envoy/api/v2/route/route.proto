@@ -455,6 +455,32 @@ message RouteAction {
     //   retry policy, a request that times out will not be retried as the total timeout budget
     //   would have been exhausted.
     google.protobuf.Duration per_try_timeout = 3 [(gogoproto.stdduration) = true];
+
+    message RetryPriority {
+      string name = 1 [(validate.rules).string.min_bytes = 1];
+      google.protobuf.Struct config = 2;
+    }
+
+    // [#not-implemented-hide:]
+    // Specifies an implementation of a RetryPriority which is used to determine the
+    // distribution of load across priorities used for retries.
+    RetryPriority retry_priority = 4;
+
+    message RetryHostPredicate {
+      string name = 1 [(validate.rules).string.min_bytes = 1];
+      google.protobuf.Struct config = 2;
+    }
+
+    // [#not-implemented-hide:]
+    // Specifies a collection of RetryHostPredicates that will be consulted when selecting a host
+    // for retries. If any of the predicates reject the host, host selection will be reattempted.
+    repeated RetryHostPredicate retry_host_predicate = 5;
+
+    // [#not-implemented-hide:]
+    // The maximum number of times host selection will be reattempted before giving up, at which
+    // point the host that was last selected will be routed to. If unspecified, this will default to
+    // retrying once.
+    int64 host_selection_retry_max_attempts = 6;
   }
 
   // Specifies the idle timeout for the route. If not specified, there is no per-route idle timeout,
