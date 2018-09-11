@@ -21,7 +21,7 @@ std::shared_ptr<grpc::ChannelCredentials> CredsUtility::sslChannelCredentials(
       };
       return grpc::SslCredentials(ssl_credentials_options);
     }
-    if (google_grpc.channel_credentials().local_channel_credentials()) {
+    if (google_grpc.channel_credentials().local_credentail()) {
       return grpc::experimental::LocalCredentials(UDS);
     }
   }
