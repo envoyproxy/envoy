@@ -926,24 +926,26 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTimeoutTest) {
   EXPECT_CALL(dispatcher.buffer_factory_, create_(_, _))
       .WillRepeatedly(Invoke([](std::function<void()> below_low,
                                 std::function<void()> above_high) -> Buffer::Instance* {
+        // ConnectionImpl calls Envoy::MockBufferFactory::create(), which calls create_() and wraps
+        // the returned raw pointer below with a unique_ptr.
         return new Buffer::WatermarkBuffer(below_low, above_high);
       }));
 
-  // This timer will be returned to the ConnectionImpl when createTimer() is called to allocate the
-  // delayed close timer.
+  // This timer will be returned (transferring ownership) to the ConnectionImpl when createTimer()
+  // is called to allocate the delayed close timer.
   auto timer = new Event::MockTimer(&dispatcher);
   EXPECT_CALL(*timer, enableTimer(_)).Times(1);
   EXPECT_CALL(*timer, disableTimer()).Times(1);
 
-  auto file_event = new NiceMock<Event::MockFileEvent>;
-  EXPECT_CALL(dispatcher, createFileEvent_(0, _, _, _)).WillOnce(Return(file_event));
+  auto file_event = std::make_unique<NiceMock<Event::MockFileEvent>>();
+  EXPECT_CALL(dispatcher, createFileEvent_(0, _, _, _)).WillOnce(Return(file_event.release()));
 
-  auto transport_socket = new NiceMock<MockTransportSocket>;
+  auto transport_socket = std::make_unique<NiceMock<MockTransportSocket>>();
   EXPECT_CALL(*transport_socket, canFlushClose()).WillOnce(Return(true));
 
-  std::unique_ptr<Network::ConnectionImpl> server_connection(new Network::ConnectionImpl(
+  auto server_connection = std::make_unique<Network::ConnectionImpl>(
       dispatcher, std::make_unique<ConnectionSocketImpl>(0, nullptr, nullptr),
-      TransportSocketPtr(transport_socket), true));
+      std::move(transport_socket), true);
 
   // Enable delayed connection close processing by setting a non-zero timeout value. The actual
   // value (> 0) doesn't matter since the callback is triggered below.

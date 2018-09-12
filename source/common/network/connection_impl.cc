@@ -112,9 +112,8 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
     closeSocket(ConnectionEvent::LocalClose);
   } else {
-    RELEASE_ASSERT(type == ConnectionCloseType::FlushWrite ||
-                       type == ConnectionCloseType::FlushWriteAndDelay,
-                   "");
+    ASSERT(type == ConnectionCloseType::FlushWrite ||
+           type == ConnectionCloseType::FlushWriteAndDelay);
     delayed_close_ = true;
     bool delayed_close_timeout_set = delayedCloseTimeout().count() > 0;
 
