@@ -15,8 +15,12 @@ envoy_package()
 
 envoy_cc_test_library(
     name = "mock_lib",
-    srcs = ["mock.cc"],
-    hdrs = ["mock.h"],
+    srcs = [
+        "mock.cc",
+    ],
+    hdrs = [
+        "mock.h",
+    ],
     deps = [
         "//source/extensions/filters/http/common:jwks_fetcher_lib",
         "//test/mocks/server:server_mocks",
