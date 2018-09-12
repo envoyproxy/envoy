@@ -20,6 +20,7 @@ SdsApi::SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispat
     : local_info_(local_info), dispatcher_(dispatcher), random_(random), stats_(stats),
       cluster_manager_(cluster_manager), sds_config_(sds_config), sds_config_name_(sds_config_name),
       secret_hash_(0), clean_up_(destructor_cb) {
+  Config::Utility::checkLocalInfo("sds", local_info_);
   // TODO(JimmyCYJ): Implement chained_init_manager, so that multiple init_manager
   // can be chained together to behave as one init_manager. In that way, we let
   // two listeners which share same SdsApi to register at separate init managers, and
@@ -36,7 +37,6 @@ void SdsApi::initialize(std::function<void()> callback) {
       /* rest_legacy_constructor */ nullptr,
       "envoy.service.discovery.v2.SecretDiscoveryService.FetchSecrets",
       "envoy.service.discovery.v2.SecretDiscoveryService.StreamSecrets");
-  Config::Utility::checkLocalInfo("sds", local_info_);
 
   subscription_->start({sds_config_name_}, *this);
 }

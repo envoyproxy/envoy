@@ -347,12 +347,6 @@ TEST_F(ThriftRouterTest, PoolLocalConnectionFailure) {
 
   startRequest(MessageType::Call);
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_))
-      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
-        auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-      }));
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
 }
@@ -507,12 +501,6 @@ TEST_F(ThriftRouterTest, UpstreamLocalCloseMidResponse) {
   startRequest(MessageType::Call);
   connectUpstream();
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_))
-      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
-        auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-      }));
   upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
   destroyRouter();
 }

@@ -18,6 +18,7 @@
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/load_balancer_type.h"
+#include "envoy/upstream/locality.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/resource_manager.h"
 
@@ -159,6 +160,11 @@ typedef std::shared_ptr<const Host> HostConstSharedPtr;
 typedef std::vector<HostSharedPtr> HostVector;
 typedef std::shared_ptr<HostVector> HostVectorSharedPtr;
 typedef std::shared_ptr<const HostVector> HostVectorConstSharedPtr;
+
+typedef std::unique_ptr<HostVector> HostListPtr;
+typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
+    LocalityWeightsMap;
+typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
 
 /**
  * Bucket hosts by locality.
