@@ -320,6 +320,23 @@ private:
   int fd_;
 };
 
+/**
+ * A utility class for atomically updating a file using symbolic link swap.
+ */
+class AtomicFileUpdater {
+public:
+  AtomicFileUpdater(const std::string& filename);
+
+  void update(const std::string& contents);
+
+private:
+  const std::string link_;
+  const std::string new_link_;
+  const std::string target1_;
+  const std::string target2_;
+  bool use_target1_;
+};
+
 namespace Http {
 
 /**

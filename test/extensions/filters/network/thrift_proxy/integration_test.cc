@@ -250,6 +250,27 @@ TEST_P(ThriftConnManagerIntegrationTest, Exception) {
   EXPECT_EQ(1U, counter->value());
 }
 
+TEST_P(ThriftConnManagerIntegrationTest, EarlyClose) {
+  initializeCall(DriverMode::Success);
+
+  std::string partial_request = request_bytes_.toString().substr(0, request_bytes_.length() - 5);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->write(partial_request);
+  tcp_client->close();
+
+  FakeUpstream* expected_upstream = getExpectedUpstream(false);
+  expected_upstream->set_allow_unexpected_disconnects(true);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
+
+  test_server_->waitForCounterGe("thrift.thrift_stats.cx_destroy_remote_with_active_rq", 1);
+
+  Stats::CounterSharedPtr counter =
+      test_server_->counter("thrift.thrift_stats.cx_destroy_remote_with_active_rq");
+  EXPECT_EQ(1U, counter->value());
+}
+
 TEST_P(ThriftConnManagerIntegrationTest, Oneway) {
   initializeOneway();
 

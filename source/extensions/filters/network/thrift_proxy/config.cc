@@ -105,8 +105,9 @@ Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFrom
     Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Config> filter_config(new ConfigImpl(proto_config, context));
 
-  return [filter_config](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(std::make_shared<ConnectionManager>(*filter_config));
+  return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
+    filter_manager.addReadFilter(
+        std::make_shared<ConnectionManager>(*filter_config, context.random()));
   };
 }
 
@@ -140,10 +141,6 @@ void ConfigImpl::createFilterChain(ThriftFilters::FilterChainFactoryCallbacks& c
   for (const ThriftFilters::FilterFactoryCb& factory : filter_factories_) {
     factory(callbacks);
   }
-}
-
-DecoderPtr ConfigImpl::createDecoder(DecoderCallbacks& callbacks) {
-  return std::make_unique<Decoder>(createTransport(), createProtocol(), callbacks);
 }
 
 TransportPtr ConfigImpl::createTransport() {

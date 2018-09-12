@@ -31,16 +31,16 @@ message VirtualHost {
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // A list of domains (host/authority header) that will be matched to this
-  // virtual host. Wildcard hosts are supported in the form of “*.foo.com” or
-  // “*-bar.foo.com”.
+  // virtual host. Wildcard hosts are supported in the form of ``*.foo.com`` or
+  // ``*-bar.foo.com``.
   //
   // .. note::
   //
   //   The wildcard will not match the empty string.
-  //   e.g. “*-bar.foo.com” will match “baz-bar.foo.com” but not “-bar.foo.com”.
-  //   Additionally, a special entry “*” is allowed which will match any
+  //   e.g. ``*-bar.foo.com`` will match ``baz-bar.foo.com`` but not ``-bar.foo.com``.
+  //   Additionally, a special entry ``*`` is allowed which will match any
   //   host/authority header. Only a single virtual host in the entire route
-  //   configuration can match on “*”. A domain must be unique across all virtual
+  //   configuration can match on ``*``. A domain must be unique across all virtual
   //   hosts or the config will fail to load.
   repeated string domains = 2 [(validate.rules).repeated .min_items = 1];
 
@@ -472,6 +472,32 @@ message RouteAction {
     //   retry policy, a request that times out will not be retried as the total timeout budget
     //   would have been exhausted.
     google.protobuf.Duration per_try_timeout = 3 [(gogoproto.stdduration) = true];
+
+    message RetryPriority {
+      string name = 1 [(validate.rules).string.min_bytes = 1];
+      google.protobuf.Struct config = 2;
+    }
+
+    // [#not-implemented-hide:]
+    // Specifies an implementation of a RetryPriority which is used to determine the
+    // distribution of load across priorities used for retries.
+    RetryPriority retry_priority = 4;
+
+    message RetryHostPredicate {
+      string name = 1 [(validate.rules).string.min_bytes = 1];
+      google.protobuf.Struct config = 2;
+    }
+
+    // [#not-implemented-hide:]
+    // Specifies a collection of RetryHostPredicates that will be consulted when selecting a host
+    // for retries. If any of the predicates reject the host, host selection will be reattempted.
+    repeated RetryHostPredicate retry_host_predicate = 5;
+
+    // [#not-implemented-hide:]
+    // The maximum number of times host selection will be reattempted before giving up, at which
+    // point the host that was last selected will be routed to. If unspecified, this will default to
+    // retrying once.
+    int64 host_selection_retry_max_attempts = 6;
   }
 
   // Specifies the idle timeout for the route. If not specified, there is no per-route idle timeout,
@@ -602,6 +628,27 @@ message RouteAction {
       // Connection properties hash policy.
       ConnectionProperties connection_properties = 3;
     }
+
+    // The flag that shortcircuits the hash computing. This field provides a
+    // 'fallback' style of configuration: "if a terminal policy doesn't work,
+    // fallback to rest of the policy list", it saves time when the terminal
+    // policy works.
+    //
+    // If true, and there is already a hash computed, ignore rest of the
+    // list of hash polices.
+    // For example, if the following hash methods are configured:
+    //
+    //  ========= ========
+    //  specifier terminal
+    //  ========= ========
+    //  Header A  true
+    //  Header B  false
+    //  Header C  false
+    //  ========= ========
+    //
+    // The generateHash process ends if policy "header A" generates a hash, as
+    // it's a terminal policy.
+    bool terminal = 4;
   }
 
   // Specifies a list of hash policies to use for ring hash load balancing. Each
@@ -613,7 +660,9 @@ message RouteAction {
   // hash policies fail to generate a hash, no hash will be produced for
   // the route. In this case, the behavior is the same as if no hash policies
   // were specified (i.e. the ring hash load balancer will choose a random
-  // backend).
+  // backend). If a hash policy has the "terminal" attribute set to true, and
+  // there is already a hash generated, the hash is returned immediately,
+  // ignoring the rest of the hash policy list.
   repeated HashPolicy hash_policy = 15;
 
   // Indicates that a HTTP/1.1 client connection to this particular route is allowed to

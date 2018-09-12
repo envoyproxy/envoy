@@ -234,6 +234,9 @@ public:
     virtual absl::optional<uint64_t> evaluate(const Network::Address::Instance* downstream_addr,
                                               const Http::HeaderMap& headers,
                                               const AddCookieCallback add_cookie) const PURE;
+
+    // If the method is a terminal method, ignore rest of the hash policy chain.
+    virtual bool terminal() const PURE;
   };
 
   typedef std::unique_ptr<HashMethod> HashMethodPtr;

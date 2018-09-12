@@ -64,7 +64,7 @@ private:
 
     // Caller supplied callback to invoke on query completion or error.
     const ResolveCb callback_;
-    // Dispatcher to post callback_ to.
+    // Dispatcher to post any callback_ exceptions to.
     Event::Dispatcher& dispatcher_;
     // Does the object own itself? Resource reclamation occurs via self-deleting
     // on query completion or error.

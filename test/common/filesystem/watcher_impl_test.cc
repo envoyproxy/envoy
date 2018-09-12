@@ -16,7 +16,7 @@ namespace Filesystem {
 
 class WatcherImplTest : public testing::Test {
 protected:
-  WatcherImplTest() : dispatcher_(test_time_.timeSource()) {}
+  WatcherImplTest() : dispatcher_(test_time_.timeSystem()) {}
 
   DangerousDeprecatedTestTime test_time_;
   Event::DispatcherImpl dispatcher_;

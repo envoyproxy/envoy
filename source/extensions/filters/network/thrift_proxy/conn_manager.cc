@@ -15,8 +15,11 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-ConnectionManager::ConnectionManager(Config& config)
-    : config_(config), stats_(config_.stats()), decoder_(config_.createDecoder(*this)) {}
+ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator)
+    : config_(config), stats_(config_.stats()), transport_(config.createTransport()),
+      protocol_(config.createProtocol()),
+      decoder_(std::make_unique<Decoder>(*transport_, *protocol_, *this)),
+      random_generator_(random_generator) {}
 
 ConnectionManager::~ConnectionManager() {}
 
@@ -25,6 +28,21 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
 
   request_buffer_.move(data);
   dispatch();
+
+  if (end_stream && stopped_) {
+    ASSERT(!rpcs_.empty());
+    MessageMetadata& metadata = *(*rpcs_.begin())->metadata_;
+    ASSERT(metadata.hasMessageType());
+    if (metadata.messageType() != MessageType::Oneway) {
+      // Downstream has closed, so unless we're still processing a oneway request, close. By
+      // writing an empty buffer with end_stream set, we allow a remote close event to be
+      // triggered, which maintains accurate bookkeeping of which end of the connection closed
+      // during an active request.
+      ENVOY_CONN_LOG(trace, "downstream half-closed", read_callbacks_->connection());
+      Buffer::OwnedImpl empty;
+      read_callbacks_->connection().write(empty, true);
+    }
+  }
 
   return Network::FilterStatus::StopIteration;
 }
@@ -67,22 +85,14 @@ void ConnectionManager::dispatch() {
 }
 
 void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response) {
-  // Use the factory to get the concrete protocol from the decoder protocol (as opposed to
-  // potentially pre-detection auto protocol).
-  ProtocolType proto_type = decoder_->protocolType();
-  ProtocolPtr proto = NamedProtocolConfigFactory::getFactory(proto_type).createProtocol();
   Buffer::OwnedImpl buffer;
 
-  response.encode(metadata, *proto, buffer);
-
-  // Same logic as protocol above.
-  TransportPtr transport =
-      NamedTransportConfigFactory::getFactory(decoder_->transportType()).createTransport();
+  response.encode(metadata, *protocol_, buffer);
 
   Buffer::OwnedImpl response_buffer;
 
-  metadata.setProtocol(proto_type);
-  transport->encodeFrame(response_buffer, metadata, buffer);
+  metadata.setProtocol(protocol_->type());
+  transport_->encodeFrame(response_buffer, metadata, buffer);
 
   read_callbacks_->connection().write(response_buffer, false);
 }
@@ -113,8 +123,10 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
 void ConnectionManager::onEvent(Network::ConnectionEvent event) {
   if (!rpcs_.empty()) {
     if (event == Network::ConnectionEvent::RemoteClose) {
+      ENVOY_CONN_LOG(debug, "remote close with active request", read_callbacks_->connection());
       stats_.cx_destroy_remote_with_active_rq_.inc();
     } else if (event == Network::ConnectionEvent::LocalClose) {
+      ENVOY_CONN_LOG(debug, "local close with active request", read_callbacks_->connection());
       stats_.cx_destroy_local_with_active_rq_.inc();
     }
 
@@ -230,11 +242,29 @@ FilterStatus ConnectionManager::ActiveRpc::transportEnd() {
     break;
   }
 
-  return decoder_filter_->transportEnd();
+  FilterStatus status = event_handler_->transportEnd();
+
+  if (metadata_->isProtocolUpgradeMessage()) {
+    ENVOY_CONN_LOG(error, "thrift: sending protocol upgrade response",
+                   parent_.read_callbacks_->connection());
+    sendLocalReply(*parent_.protocol_->upgradeResponse(*upgrade_handler_));
+  }
+
+  return status;
 }
 
 FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
+
+  if (metadata_->isProtocolUpgradeMessage()) {
+    ASSERT(parent_.protocol_->supportsUpgrade());
+
+    ENVOY_CONN_LOG(error, "thrift: decoding protocol upgrade request",
+                   parent_.read_callbacks_->connection());
+    upgrade_handler_ = parent_.protocol_->upgradeRequestDecoder();
+    ASSERT(upgrade_handler_ != nullptr);
+    event_handler_ = upgrade_handler_.get();
+  }
 
   return event_handler_->messageBegin(metadata);
 }
@@ -267,7 +297,8 @@ void ConnectionManager::ActiveRpc::continueDecoding() { parent_.continueDecoding
 Router::RouteConstSharedPtr ConnectionManager::ActiveRpc::route() {
   if (!cached_route_) {
     if (metadata_ != nullptr) {
-      Router::RouteConstSharedPtr route = parent_.config_.routerConfig().route(*metadata_);
+      Router::RouteConstSharedPtr route =
+          parent_.config_.routerConfig().route(*metadata_, stream_id_);
       cached_route_ = std::move(route);
     } else {
       cached_route_ = nullptr;
@@ -282,11 +313,10 @@ void ConnectionManager::ActiveRpc::sendLocalReply(const DirectResponse& response
   parent_.doDeferredRpcDestroy(*this);
 }
 
-void ConnectionManager::ActiveRpc::startUpstreamResponse(TransportType transport_type,
-                                                         ProtocolType protocol_type) {
+void ConnectionManager::ActiveRpc::startUpstreamResponse(Transport& transport, Protocol& protocol) {
   ASSERT(response_decoder_ == nullptr);
 
-  response_decoder_ = std::make_unique<ResponseDecoder>(*this, transport_type, protocol_type);
+  response_decoder_ = std::make_unique<ResponseDecoder>(*this, transport, protocol);
 }
 
 bool ConnectionManager::ActiveRpc::upstreamData(Buffer::Instance& buffer) {

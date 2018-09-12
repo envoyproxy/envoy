@@ -90,7 +90,7 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
 
   DangerousDeprecatedTestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                           test_time.timeSource().systemTime().time_since_epoch())
+                           test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
   ann.setTimestamp(timestamp);
   EXPECT_EQ(timestamp, ann.timestamp());
@@ -149,7 +149,7 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
   Endpoint ep(std::string("my_service"), addr);
   DangerousDeprecatedTestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                           test_time.timeSource().systemTime().time_since_epoch())
+                           test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
 
@@ -174,7 +174,7 @@ TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
   Endpoint ep(std::string("my_service"), addr);
   DangerousDeprecatedTestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                           test_time.timeSource().systemTime().time_since_epoch())
+                           test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
   Annotation ann2(ann);
@@ -192,7 +192,7 @@ TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
   Endpoint ep(std::string("my_service"), addr);
   DangerousDeprecatedTestTime test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                           test_time.timeSource().systemTime().time_since_epoch())
+                           test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
   Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
   Annotation ann2 = ann;
@@ -290,7 +290,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, assignmentOperator) {
 
 TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   DangerousDeprecatedTestTime test_time;
-  Span span(test_time.timeSource());
+  Span span(test_time.timeSystem());
 
   EXPECT_EQ(0ULL, span.id());
   EXPECT_EQ(0ULL, span.traceId());
@@ -310,40 +310,40 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
             R"("annotations":[],"binaryAnnotations":[]})",
             span.toJson());
 
-  uint64_t id = Util::generateRandom64(test_time.timeSource());
+  uint64_t id = Util::generateRandom64(test_time.timeSystem());
   std::string id_hex = Hex::uint64ToHex(id);
   span.setId(id);
   EXPECT_EQ(id, span.id());
   EXPECT_EQ(id_hex, span.idAsHexString());
 
-  id = Util::generateRandom64(test_time.timeSource());
+  id = Util::generateRandom64(test_time.timeSystem());
   id_hex = Hex::uint64ToHex(id);
   span.setParentId(id);
   EXPECT_EQ(id, span.parentId());
   EXPECT_EQ(id_hex, span.parentIdAsHexString());
   EXPECT_TRUE(span.isSetParentId());
 
-  id = Util::generateRandom64(test_time.timeSource());
+  id = Util::generateRandom64(test_time.timeSystem());
   id_hex = Hex::uint64ToHex(id);
   span.setTraceId(id);
   EXPECT_EQ(id, span.traceId());
   EXPECT_EQ(id_hex, span.traceIdAsHexString());
 
-  id = Util::generateRandom64(test_time.timeSource());
+  id = Util::generateRandom64(test_time.timeSystem());
   id_hex = Hex::uint64ToHex(id);
   span.setTraceIdHigh(id);
   EXPECT_EQ(id, span.traceIdHigh());
   EXPECT_TRUE(span.isSetTraceIdHigh());
 
   int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          test_time.timeSource().systemTime().time_since_epoch())
+                          test_time.timeSystem().systemTime().time_since_epoch())
                           .count();
   span.setTimestamp(timestamp);
   EXPECT_EQ(timestamp, span.timestamp());
   EXPECT_TRUE(span.isSetTimestamp());
 
   int64_t start_time = std::chrono::duration_cast<std::chrono::microseconds>(
-                           test_time.timeSource().monotonicTime().time_since_epoch())
+                           test_time.timeSystem().monotonicTime().time_since_epoch())
                            .count();
   span.setStartTime(start_time);
   EXPECT_EQ(start_time, span.startTime());
@@ -491,15 +491,15 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
 
 TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
   DangerousDeprecatedTestTime test_time;
-  Span span(test_time.timeSource());
+  Span span(test_time.timeSystem());
 
-  uint64_t id = Util::generateRandom64(test_time.timeSource());
+  uint64_t id = Util::generateRandom64(test_time.timeSystem());
   std::string id_hex = Hex::uint64ToHex(id);
   span.setId(id);
   span.setParentId(id);
   span.setTraceId(id);
   int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          test_time.timeSource().systemTime().time_since_epoch())
+                          test_time.timeSystem().systemTime().time_since_epoch())
                           .count();
   span.setTimestamp(timestamp);
   span.setDuration(3000LL);
@@ -528,15 +528,15 @@ TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
 
 TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
   DangerousDeprecatedTestTime test_time;
-  Span span(test_time.timeSource());
+  Span span(test_time.timeSystem());
 
-  uint64_t id = Util::generateRandom64(test_time.timeSource());
+  uint64_t id = Util::generateRandom64(test_time.timeSystem());
   std::string id_hex = Hex::uint64ToHex(id);
   span.setId(id);
   span.setParentId(id);
   span.setTraceId(id);
   int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          test_time.timeSource().systemTime().time_since_epoch())
+                          test_time.timeSystem().systemTime().time_since_epoch())
                           .count();
   span.setTimestamp(timestamp);
   span.setDuration(3000LL);
@@ -565,7 +565,7 @@ TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
 
 TEST(ZipkinCoreTypesSpanTest, setTag) {
   DangerousDeprecatedTestTime test_time;
-  Span span(test_time.timeSource());
+  Span span(test_time.timeSystem());
 
   span.setTag("key1", "value1");
   span.setTag("key2", "value2");

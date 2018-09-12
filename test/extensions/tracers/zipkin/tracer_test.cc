@@ -37,7 +37,7 @@ private:
 
 class ZipkinTracerTest : public testing::Test {
 protected:
-  ZipkinTracerTest() : time_source_(test_time_.timeSource()) {}
+  ZipkinTracerTest() : time_source_(test_time_.timeSystem()) {}
 
   DangerousDeprecatedTestTime test_time_;
   TimeSource& time_source_;
@@ -184,7 +184,7 @@ TEST_F(ZipkinTracerTest, spanCreation) {
   // ==============
 
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
-  const uint generated_parent_id = Util::generateRandom64(test_time_.timeSource());
+  const uint generated_parent_id = Util::generateRandom64(test_time_.timeSystem());
   SpanContext modified_root_span_context(root_span_context.trace_id_high(),
                                          root_span_context.trace_id(), root_span_context.id(),
                                          generated_parent_id, root_span_context.sampled());
@@ -230,7 +230,7 @@ TEST_F(ZipkinTracerTest, finishSpan) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator, false, test_time_.timeSource());
+  Tracer tracer("my_service_name", addr, random_generator, false, test_time_.timeSystem());
   NiceMock<MockTimeSource> mock_start_time;
   SystemTime timestamp = mock_start_time.systemTime();
 

@@ -12,11 +12,11 @@ upgrades as well. The new style of upgrades pass both the HTTP headers and the u
 through an HTTP filter chain. One may configure the
 :ref:`upgrade_configs <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`
 in one of two ways. If only the
-`upgrade_type <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.UpgradeConfigs.upgrade_type>`
+:ref:`upgrade_type <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.UpgradeConfig.upgrade_type>`
 is specified, both the upgrade headers, any request and response body, and WebSocket payload will
 pass through the default HTTP filter chain. To avoid the use of HTTP-only filters for upgrade payload,
 one can set up custom
-`filters <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.UpgradeConfigs.upgrade_type>`
+:ref:`filters <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.UpgradeConfig.filters>`
 for the given upgrade type, up to and including only using the router filter to send the WebSocket
 data upstream.
 

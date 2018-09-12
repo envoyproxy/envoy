@@ -116,8 +116,8 @@ TEST(ThreadLocalInstanceImplDispatcherTest, Dispatcher) {
   InstanceImpl tls;
 
   DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl main_dispatcher(test_time.timeSource());
-  Event::DispatcherImpl thread_dispatcher(test_time.timeSource());
+  Event::DispatcherImpl main_dispatcher(test_time.timeSystem());
+  Event::DispatcherImpl thread_dispatcher(test_time.timeSystem());
 
   tls.registerThread(main_dispatcher, true);
   tls.registerThread(thread_dispatcher, false);

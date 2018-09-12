@@ -4,6 +4,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/stats/timespan.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -31,7 +32,8 @@ public:
 
   virtual ThriftFilters::FilterChainFactory& filterFactory() PURE;
   virtual ThriftFilterStats& stats() PURE;
-  virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
+  virtual TransportPtr createTransport() PURE;
+  virtual ProtocolPtr createProtocol() PURE;
   virtual Router::Config& routerConfig() PURE;
 };
 
@@ -54,7 +56,7 @@ class ConnectionManager : public Network::ReadFilter,
                           public DecoderCallbacks,
                           Logger::Loggable<Logger::Id::thrift> {
 public:
-  ConnectionManager(Config& config);
+  ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator);
   ~ConnectionManager();
 
   // Network::ReadFilter
@@ -74,18 +76,10 @@ private:
   struct ActiveRpc;
 
   struct ResponseDecoder : public DecoderCallbacks, public ProtocolConverter {
-    ResponseDecoder(ActiveRpc& parent, TransportType transport_type, ProtocolType protocol_type)
-        : parent_(parent),
-          decoder_(std::make_unique<Decoder>(
-              NamedTransportConfigFactory::getFactory(transport_type).createTransport(),
-              NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol(), *this)),
+    ResponseDecoder(ActiveRpc& parent, Transport& transport, Protocol& protocol)
+        : parent_(parent), decoder_(std::make_unique<Decoder>(transport, protocol, *this)),
           complete_(false), first_reply_field_(false) {
-      // Use the factory to get the concrete protocol from the decoder protocol (as opposed to
-      // potentially pre-detection auto protocol).
-      initProtocolConverter(
-          NamedProtocolConfigFactory::getFactory(parent_.parent_.decoder_->protocolType())
-              .createProtocol(),
-          parent_.response_buffer_);
+      initProtocolConverter(*parent_.parent_.protocol_, parent_.response_buffer_);
     }
 
     bool onData(Buffer::Instance& data);
@@ -121,7 +115,7 @@ private:
                      public ThriftFilters::FilterChainFactoryCallbacks {
     ActiveRpc(ConnectionManager& parent)
         : parent_(parent), request_timer_(new Stats::Timespan(parent_.stats_.request_time_ms_)),
-          stream_id_(parent_.stream_id_++) {
+          stream_id_(parent_.random_generator_.random()) {
       parent_.stats_.request_active_.inc();
     }
     ~ActiveRpc() {
@@ -149,7 +143,7 @@ private:
       return parent_.decoder_->protocolType();
     }
     void sendLocalReply(const DirectResponse& response) override;
-    void startUpstreamResponse(TransportType transport_type, ProtocolType protocol_type) override;
+    void startUpstreamResponse(Transport& transport, Protocol& protocol) override;
     bool upstreamData(Buffer::Instance& buffer) override;
     void resetDownstreamConnection() override;
 
@@ -170,6 +164,7 @@ private:
     uint64_t stream_id_;
     MessageMetadataSharedPtr metadata_;
     ThriftFilters::DecoderFilterSharedPtr decoder_filter_;
+    DecoderEventHandlerSharedPtr upgrade_handler_;
     ResponseDecoderPtr response_decoder_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     Buffer::OwnedImpl response_buffer_;
@@ -188,10 +183,12 @@ private:
 
   Network::ReadFilterCallbacks* read_callbacks_{};
 
+  TransportPtr transport_;
+  ProtocolPtr protocol_;
   DecoderPtr decoder_;
   std::list<ActiveRpcPtr> rpcs_;
   Buffer::OwnedImpl request_buffer_;
-  uint64_t stream_id_{1};
+  Runtime::RandomGenerator& random_generator_;
   bool stopped_{false};
 };
 
