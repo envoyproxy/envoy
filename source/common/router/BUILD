@@ -10,6 +10,7 @@ envoy_package()
 
 envoy_cc_library(
     name = "metadatamatchcriteria_lib",
+    srcs = ["metadatamatchcriteria_impl.cc"],
     hdrs = ["metadatamatchcriteria_impl.h"],
     deps = [
         "//include/envoy/router:router_interface",
