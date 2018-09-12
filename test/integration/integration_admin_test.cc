@@ -158,20 +158,22 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
+  // Testing a fitler with no matches
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?filter=foo", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
-  response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/stats?filter=.*server.*", "", downstreamProtocol(), version_);
+  // Testing a fitler with matches
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats?filter=server",
+                                                "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
   EXPECT_STREQ("text/plain; charset=UTF-8", ContentType(response));
 
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
-                                                "/stats?filter=.*server.*&usedonly", "",
+                                                "/stats?filter=server&usedonly", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
@@ -200,8 +202,19 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   // Filtering stats by a regex with one match should return just that match.
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
-                                                "/stats?format=json&filter=.*server\\.version.*",
-                                                "", downstreamProtocol(), version_);
+                                                "/stats?format=json&filter=^server\\.version$", "",
+                                                downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("application/json", ContentType(response));
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  validateStatsJson(response->body(), 0);
+  EXPECT_THAT(response->body(),
+              testing::Eq("{\"stats\":[{\"name\":\"server.version\",\"value\":0}]}"));
+
+  // Filtering stats by a non-full-string regex should also return just that match.
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
+                                                "/stats?format=json&filter=server\\.version", "",
+                                                downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("application/json", ContentType(response));
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
@@ -211,9 +224,9 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   // Filtering stats by a regex with no matches (".*not_intended_to_appear.*") should return a
   // valid, empty, stats array.
-  response = IntegrationUtil::makeSingleRequest(
-      lookupPort("admin"), "GET", "/stats?format=json&filter=.*not_intended_to_appear.*", "",
-      downstreamProtocol(), version_);
+  response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET",
+                                                "/stats?format=json&filter=not_intended_to_appear",
+                                                "", downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_STREQ("application/json", ContentType(response));
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
