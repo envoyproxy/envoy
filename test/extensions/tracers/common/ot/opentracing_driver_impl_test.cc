@@ -73,7 +73,7 @@ TEST_F(OpenTracingDriverTest, FlushSpanWithTag) {
   first_span->setTag("abc", "123");
   first_span->finishSpan();
 
-  const std::unordered_map<std::string, opentracing::Value> expected_tags = {
+  const std::map<std::string, opentracing::Value> expected_tags = {
       {"abc", std::string{"123"}},
       {opentracing::ext::span_kind, std::string{opentracing::ext::span_kind_rpc_server}}};
 
@@ -88,7 +88,7 @@ TEST_F(OpenTracingDriverTest, TagSamplingFalseByDecision) {
                                                    start_time_, {Tracing::Reason::Sampling, false});
   first_span->finishSpan();
 
-  const std::unordered_map<std::string, opentracing::Value> expected_tags = {
+  const std::map<std::string, opentracing::Value> expected_tags = {
       {opentracing::ext::sampling_priority, 0},
       {opentracing::ext::span_kind, std::string{opentracing::ext::span_kind_rpc_server}}};
 
@@ -104,7 +104,7 @@ TEST_F(OpenTracingDriverTest, TagSamplingFalseByFlag) {
   first_span->setSampled(false);
   first_span->finishSpan();
 
-  const std::unordered_map<std::string, opentracing::Value> expected_tags = {
+  const std::map<std::string, opentracing::Value> expected_tags = {
       {opentracing::ext::sampling_priority, 0},
       {opentracing::ext::span_kind, std::string{opentracing::ext::span_kind_rpc_server}}};
 
@@ -121,7 +121,7 @@ TEST_F(OpenTracingDriverTest, TagSpanKindClient) {
                                                    start_time_, {Tracing::Reason::Sampling, true});
   first_span->finishSpan();
 
-  const std::unordered_map<std::string, opentracing::Value> expected_tags = {
+  const std::map<std::string, opentracing::Value> expected_tags = {
       {opentracing::ext::span_kind, std::string{opentracing::ext::span_kind_rpc_client}}};
 
   EXPECT_EQ(1, driver_->recorder().spans().size());
@@ -137,7 +137,7 @@ TEST_F(OpenTracingDriverTest, TagSpanKindServer) {
                                                    start_time_, {Tracing::Reason::Sampling, true});
   first_span->finishSpan();
 
-  const std::unordered_map<std::string, opentracing::Value> expected_tags = {
+  const std::map<std::string, opentracing::Value> expected_tags = {
       {opentracing::ext::span_kind, std::string{opentracing::ext::span_kind_rpc_server}}};
 
   EXPECT_EQ(1, driver_->recorder().spans().size());

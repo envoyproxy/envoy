@@ -130,6 +130,14 @@ public:
           upstream_callbacks_ = &cb;
         }));
 
+    conn_state_.reset();
+    EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, connectionState())
+        .WillRepeatedly(
+            Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
+    EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, setConnectionState_(_))
+        .WillOnce(Invoke(
+            [&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void { conn_state_.swap(cs); }));
+
     EXPECT_CALL(*protocol_, writeMessageBegin(_, _))
         .WillOnce(Invoke([&](Buffer::Instance&, const MessageMetadata& metadata) -> void {
           EXPECT_EQ(metadata_->methodName(), metadata.methodName());
@@ -138,8 +146,8 @@ public:
         }));
 
     EXPECT_CALL(callbacks_, continueDecoding());
-
     context_.cluster_manager_.tcp_conn_pool_.poolReady(upstream_connection_);
+
     EXPECT_NE(nullptr, upstream_callbacks_);
   }
 
@@ -157,8 +165,16 @@ public:
           upstream_callbacks_ = &cb;
         }));
 
-    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
-    EXPECT_EQ(&connection_, router_->downstreamConnection());
+    if (!conn_state_) {
+      conn_state_.reset(new ThriftConnectionState());
+    }
+    EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, connectionState())
+        .WillRepeatedly(
+            Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
+
+    NiceMock<Network::MockClientConnection> connection;
+    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection));
+    EXPECT_EQ(&connection, router_->downstreamConnection());
 
     // Not yet implemented:
     EXPECT_EQ(absl::optional<uint64_t>(), router_->computeHashKey());
@@ -289,6 +305,7 @@ public:
   NiceMock<MockRoute>* route_{};
   NiceMock<MockRouteEntry> route_entry_;
   NiceMock<Upstream::MockHostDescription>* host_{};
+  Tcp::ConnectionPool::ConnectionStatePtr conn_state_;
 
   RouteConstSharedPtr route_ptr_;
   std::unique_ptr<Router> router_;
@@ -346,12 +363,6 @@ TEST_F(ThriftRouterTest, PoolLocalConnectionFailure) {
 
   startRequest(MessageType::Call);
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_))
-      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
-        auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-      }));
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
 }
@@ -506,12 +517,6 @@ TEST_F(ThriftRouterTest, UpstreamLocalCloseMidResponse) {
   startRequest(MessageType::Call);
   connectUpstream();
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_))
-      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
-        auto& app_ex = dynamic_cast<const AppException&>(response);
-        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
-        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
-      }));
   upstream_callbacks_->onEvent(Network::ConnectionEvent::LocalClose);
   destroyRouter();
 }
@@ -603,13 +608,13 @@ TEST_F(ThriftRouterTest, ProtocolUpgrade) {
       .WillOnce(Invoke(
           [&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void { upstream_callbacks_ = &cb; }));
 
-  Tcp::ConnectionPool::ConnectionStatePtr conn_state;
+  conn_state_.reset();
   EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, connectionState())
       .WillRepeatedly(
-          Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state.get(); }));
+          Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
   EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, setConnectionState_(_))
       .WillOnce(Invoke(
-          [&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void { conn_state.swap(cs); }));
+          [&](Tcp::ConnectionPool::ConnectionStatePtr& cs) -> void { conn_state_.swap(cs); }));
 
   EXPECT_CALL(*protocol_, supportsUpgrade()).WillOnce(Return(true));
 
@@ -659,10 +664,10 @@ TEST_F(ThriftRouterTest, ProtocolUpgradeSkippedOnExistingConnection) {
       .WillOnce(Invoke(
           [&](Tcp::ConnectionPool::UpstreamCallbacks& cb) -> void { upstream_callbacks_ = &cb; }));
 
-  Tcp::ConnectionPool::ConnectionStatePtr conn_state = std::make_unique<ThriftConnectionState>();
+  conn_state_ = std::make_unique<ThriftConnectionState>();
   EXPECT_CALL(*context_.cluster_manager_.tcp_conn_pool_.connection_data_, connectionState())
       .WillRepeatedly(
-          Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state.get(); }));
+          Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
 
   EXPECT_CALL(*protocol_, supportsUpgrade()).WillOnce(Return(true));
 
@@ -714,9 +719,16 @@ TEST_P(ThriftRouterFieldTypeTest, Call) {
 
 TEST_F(ThriftRouterTest, CallWithExistingConnection) {
   initializeRouter();
+
+  // Simulate previous sequence id usage.
+  conn_state_.reset(new ThriftConnectionState(3));
+
   startRequestWithExistingConnection(MessageType::Call);
   sendTrivialStruct(FieldType::I32);
   completeRequest();
+
+  EXPECT_EQ(3, metadata_->sequenceId());
+
   returnResponse();
   destroyRouter();
 }
@@ -782,6 +794,7 @@ TEST_P(ThriftRouterContainerTest, DecoderFilterCallbacks) {
   completeRequest();
   destroyRouter();
 }
+
 } // namespace Router
 } // namespace ThriftProxy
 } // namespace NetworkFilters
