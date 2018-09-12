@@ -34,7 +34,6 @@ then
     COMMIT_MSG=$(git -C "$API_WORKING_DIR" log --format=%B -n 1)
     QUALIFIED_COMMIT_MSG=$(echo -e "$COMMIT_MSG\n\n$MIRROR_MSG @ $sha")
     rsync -acv --delete --exclude "ci/" --exclude ".*" --exclude LICENSE \
-      --exclude WORKSPACE \
       "$API_WORKING_DIR"/api/ "$CHECKOUT_DIR"/
     git -C "$CHECKOUT_DIR" add .
     git -C "$CHECKOUT_DIR" commit -m "$QUALIFIED_COMMIT_MSG"
