@@ -29,6 +29,21 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
   request_buffer_.move(data);
   dispatch();
 
+  if (end_stream && stopped_) {
+    ASSERT(!rpcs_.empty());
+    MessageMetadata& metadata = *(*rpcs_.begin())->metadata_;
+    ASSERT(metadata.hasMessageType());
+    if (metadata.messageType() != MessageType::Oneway) {
+      // Downstream has closed, so unless we're still processing a oneway request, close. By
+      // writing an empty buffer with end_stream set, we allow a remote close event to be
+      // triggered, which maintains accurate bookkeeping of which end of the connection closed
+      // during an active request.
+      ENVOY_CONN_LOG(trace, "downstream half-closed", read_callbacks_->connection());
+      Buffer::OwnedImpl empty;
+      read_callbacks_->connection().write(empty, true);
+    }
+  }
+
   return Network::FilterStatus::StopIteration;
 }
 
@@ -108,8 +123,10 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
 void ConnectionManager::onEvent(Network::ConnectionEvent event) {
   if (!rpcs_.empty()) {
     if (event == Network::ConnectionEvent::RemoteClose) {
+      ENVOY_CONN_LOG(debug, "remote close with active request", read_callbacks_->connection());
       stats_.cx_destroy_remote_with_active_rq_.inc();
     } else if (event == Network::ConnectionEvent::LocalClose) {
+      ENVOY_CONN_LOG(debug, "local close with active request", read_callbacks_->connection());
       stats_.cx_destroy_local_with_active_rq_.inc();
     }
 
