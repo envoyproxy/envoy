@@ -22,7 +22,7 @@ std::shared_ptr<grpc::ChannelCredentials> CredsUtility::sslChannelCredentials(
       };
       return grpc::SslCredentials(ssl_credentials_options);
     }
-    case envoy::api::v2::core::GrpcService::GoogleGrpc::ChannelCredentials::kLocalCredentail: {
+    case envoy::api::v2::core::GrpcService::GoogleGrpc::ChannelCredentials::kLocalCredentials: {
       return grpc::experimental::LocalCredentials(UDS);
     }
     default:
