@@ -18,7 +18,8 @@ namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
-    : cluster_name_(route.route().cluster()) {
+    : cluster_name_(route.route().cluster()),
+      timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, 15000)) {
   for (const auto& header_map : route.match().headers()) {
     config_headers_.push_back(header_map);
   }

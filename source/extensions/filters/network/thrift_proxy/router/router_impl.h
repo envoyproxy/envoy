@@ -45,6 +45,8 @@ public:
   virtual RouteConstSharedPtr matches(const MessageMetadata& metadata,
                                       uint64_t random_value) const PURE;
 
+  std::chrono::milliseconds timeout() const { return timeout_; }
+
 protected:
   RouteConstSharedPtr clusterEntry(uint64_t random_value) const;
   bool headersMatch(const Http::HeaderMap& headers) const;
@@ -83,8 +85,8 @@ private:
   const std::string cluster_name_;
   std::vector<Http::HeaderUtility::HeaderData> config_headers_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
-  uint64_t total_cluster_weight_;
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
+  const std::chrono::milliseconds timeout_;
 };
 
 typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
