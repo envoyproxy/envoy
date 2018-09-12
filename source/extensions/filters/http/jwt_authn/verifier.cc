@@ -83,7 +83,7 @@ protected:
 // Provider specific verifier
 class ProviderVerifierImpl : public BaseVerifierImpl {
 public:
-  ProviderVerifierImpl(const std::vector<std::string>& audiences, const AuthFactory& factory,
+  ProviderVerifierImpl(const CheckAudienceConstSharedPtr audiences, const AuthFactory& factory,
                        const JwtProvider& provider, const BaseVerifierImpl* parent)
       : BaseVerifierImpl(parent), audiences_(audiences), auth_factory_(factory),
         extractor_(Extractor::create(provider)), issuer_(provider.issuer()) {}
@@ -101,7 +101,7 @@ public:
   }
 
 private:
-  const std::vector<std::string> audiences_;
+  const CheckAudienceConstSharedPtr audiences_;
   const AuthFactory& auth_factory_;
   const ExtractorConstPtr extractor_;
   const std::string issuer_;
@@ -110,14 +110,13 @@ private:
 // Allow missing or failed verifier
 class AllowFailedVerifierImpl : public BaseVerifierImpl {
 public:
-  AllowFailedVerifierImpl(const AuthFactory& factory, const Extractor& extractor, bool allow_failed,
+  AllowFailedVerifierImpl(const AuthFactory& factory, const Extractor& extractor,
                           const BaseVerifierImpl* parent)
-      : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(extractor),
-        allow_failed_(allow_failed) {}
+      : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(extractor) {}
 
   void verify(ContextSharedPtr context) const override {
     auto& ctximpl = static_cast<ContextImpl&>(*context);
-    auto auth = auth_factory_.create({}, absl::nullopt, allow_failed_);
+    auto auth = auth_factory_.create({}, absl::nullopt, true);
     extractor_.sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), extractor_.extract(ctximpl.headers()),
@@ -130,7 +129,6 @@ public:
 private:
   const AuthFactory& auth_factory_;
   const Extractor& extractor_;
-  const bool allow_failed_;
 };
 
 VerifierPtr innerCreate(const JwtRequirement& requirement,
@@ -245,8 +243,7 @@ VerifierPtr innerCreate(const JwtRequirement& requirement,
     return std::make_unique<AllVerifierImpl>(requirement.requires_all(), factory, providers,
                                              extractor_for_allow_fail, parent);
   case JwtRequirement::RequiresTypeCase::kAllowMissingOrFailed:
-    return std::make_unique<AllowFailedVerifierImpl>(
-        factory, extractor_for_allow_fail, requirement.allow_missing_or_failed().value(), parent);
+    return std::make_unique<AllowFailedVerifierImpl>(factory, extractor_for_allow_fail, parent);
   case JwtRequirement::RequiresTypeCase::REQUIRES_TYPE_NOT_SET:
     return std::make_unique<AllowAllVerifierImpl>(parent);
   default:
@@ -257,7 +254,12 @@ VerifierPtr innerCreate(const JwtRequirement& requirement,
   if (it == providers.end()) {
     throw EnvoyException(fmt::format("Required provider ['{}'] is not configured.", provider_name));
   }
-  return std::make_unique<ProviderVerifierImpl>(audiences, factory, it->second, parent);
+  if (audiences.empty()) {
+    return std::make_unique<ProviderVerifierImpl>(nullptr, factory, it->second, parent);
+  }
+  return std::make_unique<ProviderVerifierImpl>(
+      std::make_shared<const ::google::jwt_verify::CheckAudience>(audiences), factory, it->second,
+      parent);
 }
 
 } // namespace

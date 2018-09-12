@@ -8,7 +8,6 @@
 #include "common/http/message_impl.h"
 #include "common/http/utility.h"
 
-#include "jwt_verify_lib/check_audience.h"
 #include "jwt_verify_lib/jwt.h"
 #include "jwt_verify_lib/verify.h"
 
@@ -22,21 +21,17 @@ namespace JwtAuthn {
 namespace {
 
 /**
- * Object to implement Authenticator interface. It only processes one token.
+ * Object to implement Authenticator interface.
  */
 class AuthenticatorImpl : public Logger::Loggable<Logger::Id::filter>,
                           public Authenticator,
                           public Http::AsyncClient::Callbacks {
 public:
-  AuthenticatorImpl(const std::vector<std::string>& audiences,
+  AuthenticatorImpl(const CheckAudienceConstSharedPtr audiences,
                     const absl::optional<std::string>& issuer, bool allow_failed,
                     JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager)
-      : jwks_cache_(jwks_cache), cm_(cluster_manager), issuer_(issuer),
-        is_allow_failed_(allow_failed) {
-    if (!audiences.empty()) {
-      audiences_ = std::make_unique<::google::jwt_verify::CheckAudience>(audiences);
-    }
-  }
+      : jwks_cache_(jwks_cache), cm_(cluster_manager), audiences_(audiences), issuer_(issuer),
+        is_allow_failed_(allow_failed) {}
 
   // Following functions are for Authenticator interface
   void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
@@ -60,8 +55,8 @@ private:
   // Calls the callback with status.
   void doneWithStatus(const Status& status);
 
-  // Start verification process. It will continue to eliminate bad tokens until it finds one to
-  // verify with key.
+  // Start verification process. It will continue to eliminate tokens with invalid claims until it
+  // finds one to verify with key.
   void startVerify();
 
   // The jwks cache object.
@@ -87,7 +82,7 @@ private:
   // The pending remote request so it can be canceled.
   Http::AsyncClient::Request* request_{};
   // Check audience object for overriding the providers.
-  ::google::jwt_verify::CheckAudiencePtr audiences_;
+  const CheckAudienceConstSharedPtr audiences_;
   // specific issuer or not.
   const absl::optional<std::string> issuer_;
   const bool is_allow_failed_;
@@ -269,7 +264,7 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 
 } // namespace
 
-AuthenticatorPtr Authenticator::create(const std::vector<std::string>& audiences,
+AuthenticatorPtr Authenticator::create(const CheckAudienceConstSharedPtr audiences,
                                        const absl::optional<std::string>& issuer, bool allow_failed,
                                        JwksCache& jwks_cache,
                                        Upstream::ClusterManager& cluster_manager) {

@@ -62,15 +62,20 @@ rules:
 
 typedef std::unordered_map<std::string, const Status&> StatusMap;
 
+constexpr auto allowfailed = "_allow_failed_";
+
 class GroupVerifierTest : public ::testing::Test {
 public:
   void createVerifier() {
     ON_CALL(mock_factory_, create(_, _, _))
-        .WillByDefault(
-            Invoke([&](const std::vector<std::string>&, const absl::optional<std::string>& issuer,
-                       bool) { return std::move(mock_auths_[issuer.value()]); }));
+        .WillByDefault(Invoke(
+            [&](const CheckAudienceConstSharedPtr, const absl::optional<std::string>& issuer,
+                bool) { return std::move(mock_auths_[issuer ? issuer.value() : allowfailed]); }));
     verifier_ = Verifier::create(proto_config_.rules()[0].requires(), proto_config_.providers(),
-                                 mock_factory_, NiceMock<MockExtractor>());
+                                 mock_factory_, mock_extractor_);
+    ON_CALL(mock_extractor_, extract(_)).WillByDefault(Invoke([](const Http::HeaderMap&) {
+      return std::vector<JwtLocationConstPtr>{};
+    }));
   }
   void createSyncMockAuthsAndVerifier(const StatusMap& statuses) {
     for (const auto& it : statuses) {
@@ -107,6 +112,7 @@ public:
   std::unordered_map<std::string, std::unique_ptr<MockAuthenticator>> mock_auths_;
   NiceMock<MockAuthFactory> mock_factory_;
   ContextSharedPtr context_;
+  NiceMock<MockExtractor> mock_extractor_;
 };
 
 // Deeply nested anys that ends in provider name
@@ -469,6 +475,35 @@ TEST_F(GroupVerifierTest, TestAllInAnyBothRequireAllAreOk) {
   callbacks["iss_2"](Status::Ok);
   callbacks["iss_3"](Status::Ok);
   callbacks["iss_4"](Status::Ok);
+}
+
+// Test require any with additional allow all
+TEST_F(GroupVerifierTest, TestRequiresAnyWithAllowAll) {
+  MessageUtil::loadFromYaml(RequiresAnyConfig, proto_config_);
+  proto_config_.mutable_rules(0)
+      ->mutable_requires()
+      ->mutable_requires_any()
+      ->add_requirements()
+      ->mutable_allow_missing_or_failed();
+
+  auto callbacks = createAsyncMockAuthsAndVerifier(
+      std::vector<std::string>{"https://example.com", "https://other.com"});
+  auto mock_auth = std::make_unique<MockAuthenticator>();
+  EXPECT_CALL(*mock_auth.get(), doVerify(_, _, _))
+      .WillOnce(Invoke(
+          [&](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*, AuthenticatorCallback callback) {
+            callbacks[allowfailed] = std::move(callback);
+          }));
+  mock_auths_[allowfailed] = std::move(mock_auth);
+  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
+    ASSERT_EQ(status, Status::Ok);
+  }));
+
+  auto headers = Http::TestHeaderMapImpl{};
+  context_ = Verifier::createContext(headers, &mock_cb_);
+  verifier_->verify(context_);
+  callbacks[allowfailed](Status::Ok);
+  // with requires any, if any inner verifier returns OK the whole any verifier should return OK.
 }
 
 } // namespace

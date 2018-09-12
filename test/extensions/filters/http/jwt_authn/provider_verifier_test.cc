@@ -108,6 +108,36 @@ rules:
   EXPECT_FALSE(headers.has("other-auth-userinfo"));
 }
 
+// This test verifies that JWT requirement can override audiences
+TEST_F(ProviderVerifierTest, TestRequiresProviderWithAudiences) {
+  MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
+  auto* requires =
+      proto_config_.mutable_rules(0)->mutable_requires()->mutable_provider_and_audiences();
+  requires->set_provider_name("example_provider");
+  requires->add_audiences("invalid_service");
+  createVerifier();
+  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
+
+  EXPECT_CALL(mock_cb_, onComplete(_))
+      .WillOnce(
+          Invoke([](const Status& status) { ASSERT_EQ(status, Status::JwtAudienceNotAllowed); }))
+      .WillOnce(Invoke([](const Status& status) { ASSERT_EQ(status, Status::Ok); }));
+
+  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  verifier_->verify(Verifier::createContext(headers, &mock_cb_));
+  headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(InvalidAudToken)}};
+  verifier_->verify(Verifier::createContext(headers, &mock_cb_));
+}
+
+// This test verifies that requirement referencing nonexistent provider will throw exception
+TEST_F(ProviderVerifierTest, TestRequiresNonexistentProvider) {
+  MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
+  proto_config_.mutable_rules(0)->mutable_requires()->set_provider_name("nosuchprovider");
+
+  EXPECT_THROW(::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_),
+               EnvoyException);
+}
+
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

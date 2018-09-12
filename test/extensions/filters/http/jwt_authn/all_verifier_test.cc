@@ -51,8 +51,8 @@ TEST_F(AllVerifierTest, TestAllAllow) {
   verifier_->verify(context_);
 }
 
-// tests requires allow missing or failed is true
-TEST_F(AllVerifierTest, TestAllowFailedTrue) {
+// tests requires allow missing or failed
+TEST_F(AllVerifierTest, TestAllowFailed) {
   std::vector<std::string> names{"a", "b", "c"};
   for (const auto& it : names) {
     auto header =
@@ -60,8 +60,7 @@ TEST_F(AllVerifierTest, TestAllowFailedTrue) {
     header->set_name(it);
     header->set_value_prefix("Prefix ");
   }
-  proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed()->set_value(
-      true);
+  proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed();
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
 
@@ -70,7 +69,7 @@ TEST_F(AllVerifierTest, TestAllowFailedTrue) {
   }));
   auto headers = Http::TestHeaderMapImpl{
       {"a", "Prefix " + std::string(GoodToken)},
-      {"b", "Prefix " + std::string(InvalidAudToken)},
+      {"b", "Prefix " + std::string(NonExistKidToken)},
       {"c", "Prefix "},
   };
   context_ = Verifier::createContext(headers, &mock_cb_);
@@ -78,27 +77,6 @@ TEST_F(AllVerifierTest, TestAllowFailedTrue) {
   EXPECT_FALSE(headers.has("a"));
   EXPECT_TRUE(headers.has("b"));
   EXPECT_TRUE(headers.has("c"));
-}
-
-// test requires allow missing or failed is false
-TEST_F(AllVerifierTest, TestAllowFailedFalse) {
-  proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed()->set_value(
-      false);
-  createVerifier();
-  MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
-
-  EXPECT_CALL(mock_cb_, onComplete(_))
-      .Times(2)
-      .WillOnce(Invoke([](const Status& status) { ASSERT_EQ(status, Status::JwtExpired); }))
-      .WillOnce(Invoke([](const Status& status) { ASSERT_EQ(status, Status::JwtMissed); }));
-  auto headers = Http::TestHeaderMapImpl{
-      {"Authorization", "Bearer " + std::string(ExpiredToken)},
-  };
-  context_ = Verifier::createContext(headers, &mock_cb_);
-  verifier_->verify(context_);
-  headers = Http::TestHeaderMapImpl{};
-  context_ = Verifier::createContext(headers, &mock_cb_);
-  verifier_->verify(context_);
 }
 
 } // namespace JwtAuthn

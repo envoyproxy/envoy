@@ -40,6 +40,11 @@ public:
     mock_verifier_ = std::make_unique<MockVerifier>();
     raw_mock_verifier_ = static_cast<MockVerifier*>(mock_verifier_.get());
 
+    filter_ = std::make_unique<Filter>(mock_config_);
+    filter_->setDecoderFilterCallbacks(filter_callbacks_);
+  }
+
+  void setupMockConfig() {
     EXPECT_CALL(*mock_config_.get(), findMatcher(_)).WillOnce(Invoke([&](const Http::HeaderMap&) {
       auto mock_matcher = std::make_shared<NiceMock<MockMatcher>>();
       ON_CALL(*mock_matcher.get(), matches(_)).WillByDefault(Invoke([](const Http::HeaderMap&) {
@@ -50,9 +55,6 @@ public:
       }));
       return mock_matcher;
     }));
-
-    filter_ = std::make_unique<Filter>(mock_config_);
-    filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 
   JwtAuthentication proto_config_;
@@ -68,6 +70,7 @@ public:
 // This test verifies Verifier::Callback is called inline with OK status.
 // All functions should return Continue.
 TEST_F(FilterTest, InlineOK) {
+  setupMockConfig();
   // A successful authentication completed inline: callback is called inside verify().
   EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {
     context->callback()->onComplete(Status::Ok);
@@ -85,6 +88,7 @@ TEST_F(FilterTest, InlineOK) {
 // This test verifies Verifier::Callback is called inline with a failure status.
 // All functions should return Continue except decodeHeaders(), it returns StopIteraton.
 TEST_F(FilterTest, InlineFailure) {
+  setupMockConfig();
   // A failed authentication completed inline: callback is called inside verify().
   EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([](ContextSharedPtr context) {
     context->callback()->onComplete(Status::JwtBadFormat);
@@ -101,6 +105,7 @@ TEST_F(FilterTest, InlineFailure) {
 
 // This test verifies Verifier::Callback is called with OK status after verify().
 TEST_F(FilterTest, OutBoundOK) {
+  setupMockConfig();
   Verifier::Callbacks* m_cb;
   // callback is saved, not called right
   EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([&m_cb](ContextSharedPtr context) {
@@ -125,6 +130,7 @@ TEST_F(FilterTest, OutBoundOK) {
 
 // This test verifies Verifier::Callback is called with a failure after verify().
 TEST_F(FilterTest, OutBoundFailure) {
+  setupMockConfig();
   Verifier::Callbacks* m_cb;
   // callback is saved, not called right
   EXPECT_CALL(*raw_mock_verifier_, verify(_)).WillOnce(Invoke([&m_cb](ContextSharedPtr context) {
@@ -148,6 +154,21 @@ TEST_F(FilterTest, OutBoundFailure) {
 
   // Should be OK to call the onComplete() again.
   m_cb->onComplete(Status::JwtBadFormat);
+}
+
+// Test verifies that if no route matched requirement, then request is allowed.
+TEST_F(FilterTest, TestNoRouteMatched) {
+  EXPECT_CALL(*mock_config_.get(), findMatcher(_)).WillOnce(Invoke([&](const Http::HeaderMap&) {
+    return nullptr;
+  }));
+
+  auto headers = Http::TestHeaderMapImpl{};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
+
+  Buffer::OwnedImpl data("");
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
+  EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
 }
 
 } // namespace JwtAuthn

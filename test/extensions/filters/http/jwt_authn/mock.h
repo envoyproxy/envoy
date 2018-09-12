@@ -13,7 +13,7 @@ namespace JwtAuthn {
 
 class MockAuthFactory : public AuthFactory {
 public:
-  MOCK_CONST_METHOD3(create, AuthenticatorPtr(const std::vector<std::string>&,
+  MOCK_CONST_METHOD3(create, AuthenticatorPtr(const CheckAudienceConstSharedPtr,
                                               const absl::optional<std::string>&, bool));
 };
 
