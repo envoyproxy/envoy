@@ -700,7 +700,7 @@ routes:
   v3.set_string_value("v3");
   HashedValue hv1(v1), hv2(v2), hv3(v3);
 
-  // match with multiple weighted cluster metatada criterions defined
+  // match with multiple weighted cluster metadata criterions defined
   {
     RouteConstSharedPtr route = matcher.route(metadata, 0);
     EXPECT_NE(nullptr, route);
