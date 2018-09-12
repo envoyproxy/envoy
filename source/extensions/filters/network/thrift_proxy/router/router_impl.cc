@@ -278,9 +278,8 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
       return;
     }
 
-    upstream_request_->protocol_->completeUpgrade(
-        *upstream_request_->conn_data_->connectionStateTyped<ThriftConnectionState>(),
-        *upstream_request_->upgrade_response_);
+    upstream_request_->protocol_->completeUpgrade(*upstream_request_->conn_state_,
+                                                  *upstream_request_->upgrade_response_);
 
     upstream_request_->upgrade_response_.reset();
     upstream_request_->onRequestStart(true);
@@ -372,6 +371,7 @@ void Router::UpstreamRequest::resetStream() {
   }
 
   if (conn_data_ != nullptr) {
+    conn_state_ = nullptr;
     conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
     conn_data_.reset();
   }
@@ -396,15 +396,15 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
   conn_data_->addUpstreamCallbacks(parent_);
   conn_pool_handle_ = nullptr;
 
-  ThriftConnectionState* state = conn_data_->connectionStateTyped<ThriftConnectionState>();
-  if (state == nullptr) {
+  conn_state_ = conn_data_->connectionStateTyped<ThriftConnectionState>();
+  if (conn_state_ == nullptr) {
     conn_data_->setConnectionState(std::make_unique<ThriftConnectionState>());
-    state = conn_data_->connectionStateTyped<ThriftConnectionState>();
+    conn_state_ = conn_data_->connectionStateTyped<ThriftConnectionState>();
   }
 
   if (protocol_->supportsUpgrade()) {
     upgrade_response_ =
-        protocol_->attemptUpgrade(*transport_, *state, parent_.upstream_request_buffer_);
+        protocol_->attemptUpgrade(*transport_, *conn_state_, parent_.upstream_request_buffer_);
     if (upgrade_response_ != nullptr) {
       conn_data_->connection().write(parent_.upstream_request_buffer_, false);
       return;
@@ -417,7 +417,7 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
 void Router::UpstreamRequest::onRequestStart(bool continue_decoding) {
   parent_.initProtocolConverter(*protocol_, parent_.upstream_request_buffer_);
 
-  // TODO(zuercher): need to use an upstream-connection-specific sequence id
+  metadata_->setSequenceId(conn_state_->nextSequenceId());
   parent_.convertMessageBegin(metadata_);
 
   if (continue_decoding) {
@@ -429,6 +429,7 @@ void Router::UpstreamRequest::onRequestComplete() { request_complete_ = true; }
 
 void Router::UpstreamRequest::onResponseComplete() {
   response_complete_ = true;
+  conn_state_ = nullptr;
   conn_data_.reset();
 }
 
