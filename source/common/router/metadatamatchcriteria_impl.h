@@ -5,19 +5,6 @@
 namespace Envoy {
 namespace Router {
 
-class MetadataMatchCriterionImpl : public MetadataMatchCriterion {
-public:
-  MetadataMatchCriterionImpl(const std::string& name, const HashedValue& value)
-      : name_(name), value_(value) {}
-
-  const std::string& name() const override { return name_; }
-  const HashedValue& value() const override { return value_; }
-
-private:
-  const std::string name_;
-  const HashedValue value_;
-};
-
 class MetadataMatchCriteriaImpl;
 typedef std::unique_ptr<const MetadataMatchCriteriaImpl> MetadataMatchCriteriaImplConstPtr;
 
@@ -46,6 +33,19 @@ private:
                                const ProtobufWkt::Struct& metadata_matches);
 
   const std::vector<MetadataMatchCriterionConstSharedPtr> metadata_match_criteria_;
+};
+
+class MetadataMatchCriterionImpl : public MetadataMatchCriterion {
+public:
+  MetadataMatchCriterionImpl(const std::string& name, const HashedValue& value)
+      : name_(name), value_(value) {}
+
+  const std::string& name() const override { return name_; }
+  const HashedValue& value() const override { return value_; }
+
+private:
+  const std::string name_;
+  const HashedValue value_;
 };
 
 } // namespace Router
