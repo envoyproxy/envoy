@@ -53,7 +53,7 @@ private:
   class WeightedClusterEntry : public RouteEntry, public Route {
   public:
     WeightedClusterEntry(
-        const RouteEntryImplBase* parent,
+        const RouteEntryImplBase& parent,
         const envoy::config::filter::network::thrift_proxy::v2alpha1::WeightedCluster_ClusterWeight&
             cluster);
 
@@ -66,14 +66,14 @@ private:
         return metadata_match_criteria_.get();
       }
 
-      return parent_->metadataMatchCriteria();
+      return parent_.metadataMatchCriteria();
     }
 
     // Router::Route
     const RouteEntry* routeEntry() const override { return this; }
 
   private:
-    const RouteEntryImplBase* parent_;
+    const RouteEntryImplBase& parent_;
     const std::string cluster_name_;
     const uint64_t cluster_weight_;
     Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;

@@ -37,7 +37,7 @@ RouteEntryImplBase::RouteEntryImplBase(
 
     total_cluster_weight_ = 0UL;
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
-      std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(this, cluster));
+      std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(*this, cluster));
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_cluster_weight_ += weighted_clusters_.back()->clusterWeight();
     }
@@ -79,7 +79,7 @@ bool RouteEntryImplBase::headersMatch(const Http::HeaderMap& headers) const {
 }
 
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
-    const RouteEntryImplBase* parent,
+    const RouteEntryImplBase& parent,
     const envoy::config::filter::network::thrift_proxy::v2alpha1::WeightedCluster_ClusterWeight&
         cluster)
     : parent_(parent), cluster_name_(cluster.name()),
@@ -88,9 +88,9 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     const auto filter_it = cluster.metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
     if (filter_it != cluster.metadata_match().filter_metadata().end()) {
-      if (parent->metadata_match_criteria_) {
+      if (parent.metadata_match_criteria_) {
         metadata_match_criteria_ =
-            parent->metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
+            parent.metadata_match_criteria_->mergeMatchCriteria(filter_it->second);
       } else {
         metadata_match_criteria_.reset(
             new Envoy::Router::MetadataMatchCriteriaImpl(filter_it->second));
