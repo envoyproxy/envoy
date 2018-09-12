@@ -610,7 +610,7 @@ TEST(ServerContextConfigImplTest, MultipleTlsCertificates) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl client_context_config(tls_context, factory_context), EnvoyException,
-      "Missing tls_certificates specification for server context");
+      "No TLS certificates found for server context");
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   EXPECT_THROW_WITH_MESSAGE(
@@ -623,7 +623,7 @@ TEST(ServerContextConfigImplTest, TlsCertificatesAndSdsConfig) {
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
   EXPECT_THROW_WITH_MESSAGE(
       ServerContextConfigImpl server_context_config(tls_context, factory_context), EnvoyException,
-      "Missing tls_certificates specification for server context");
+      "No TLS certificates found for server context");
   tls_context.mutable_common_tls_context()->add_tls_certificates();
   tls_context.mutable_common_tls_context()->add_tls_certificate_sds_secret_configs();
   EXPECT_THROW_WITH_MESSAGE(
