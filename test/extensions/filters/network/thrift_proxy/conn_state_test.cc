@@ -9,16 +9,21 @@ namespace ThriftProxy {
 
 // Test behavior of nextSequenceId()
 TEST(ThriftConnectionStateTest, NextSequenceId) {
-  ThriftConnectionState cs;
+  // Default sequence ids
+  {
+    ThriftConnectionState cs;
 
-  EXPECT_EQ(0, cs.nextSequenceId());
-  EXPECT_EQ(1, cs.nextSequenceId());
+    EXPECT_EQ(0, cs.nextSequenceId());
+    EXPECT_EQ(1, cs.nextSequenceId());
+  }
 
-  cs.setNextSequenceIdForTest(std::numeric_limits<int32_t>::max());
+  // Overflow is handled without producing negative values.
+  {
+    ThriftConnectionState cs(std::numeric_limits<int32_t>::max());
 
-  // Wraps around without producing negative values.
-  EXPECT_EQ(std::numeric_limits<int32_t>::max(), cs.nextSequenceId());
-  EXPECT_EQ(0, cs.nextSequenceId());
+    EXPECT_EQ(std::numeric_limits<int32_t>::max(), cs.nextSequenceId());
+    EXPECT_EQ(0, cs.nextSequenceId());
+  }
 }
 
 // Test how markUpgraded/upgradedAttempts/isUpgraded when upgrade is successful.

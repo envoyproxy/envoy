@@ -721,9 +721,7 @@ TEST_F(ThriftRouterTest, CallWithExistingConnection) {
   initializeRouter();
 
   // Simulate previous sequence id usage.
-  ThriftConnectionState* cs = new ThriftConnectionState();
-  cs->setNextSequenceIdForTest(3);
-  conn_state_.reset(cs);
+  conn_state_.reset(new ThriftConnectionState(3));
 
   startRequestWithExistingConnection(MessageType::Call);
   sendTrivialStruct(FieldType::I32);
