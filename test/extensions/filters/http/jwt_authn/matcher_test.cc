@@ -137,6 +137,29 @@ TEST_F(MatcherTest, TestMatchHeader) {
   EXPECT_FALSE(matcher->verifier() == nullptr);
 }
 
+TEST_F(MatcherTest, TestMatchPathAndHeader) {
+  const char config[] = R"(match:
+  path: "/boo"
+  query_parameters:
+  - name: foo
+    value: bar)";
+  RequirementRule rule;
+  MessageUtil::loadFromYaml(config, rule);
+  MatcherConstSharedPtr matcher = Matcher::create(
+      rule, Protobuf::Map<ProtobufTypes::String, JwtProvider>(), mock_factory_, extractor_);
+  auto headers = TestHeaderMapImpl{{":path", "/boo?foo=bar"}};
+  EXPECT_TRUE(matcher->matches(headers));
+  headers = TestHeaderMapImpl{{":path", "/boo?ok=bye"}};
+  EXPECT_FALSE(matcher->matches(headers));
+  headers = TestHeaderMapImpl{{":path", "/foo?bar=bar"}};
+  EXPECT_FALSE(matcher->matches(headers));
+  headers = TestHeaderMapImpl{{":path", "/boo?foo"}};
+  EXPECT_FALSE(matcher->matches(headers));
+  headers = TestHeaderMapImpl{{":path", "/boo?bar=foo"}};
+  EXPECT_FALSE(matcher->matches(headers));
+  EXPECT_FALSE(matcher->verifier() == nullptr);
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters

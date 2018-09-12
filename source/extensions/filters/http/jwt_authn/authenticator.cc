@@ -104,7 +104,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, std::vector<JwtLocation
 }
 
 void AuthenticatorImpl::startVerify() {
-  Status status;
+  Status status = Status::JwtVerificationFail;
   while (!tokens_.empty()) {
     curr_token_ = std::move(tokens_.back());
     tokens_.pop_back();
