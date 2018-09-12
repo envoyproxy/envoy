@@ -89,6 +89,13 @@ virtual_hosts:
           prefix_rewrite: /oranGES
           cluster: instant-server
       - match:
+          regex: "^/v1/posts/([^/]+?)/upvote/?"
+        route:
+          regex_rewrite:
+            pattern: "^/v1/posts/([^/]+?)/(.*)$"
+            substitution: "/public/v1/blog_posts/$1/$2"
+          cluster: instant-server
+      - match:
           prefix: /customheaders
         route:
           cluster: ats

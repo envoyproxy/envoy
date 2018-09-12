@@ -239,6 +239,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        Server::Configuration::FactoryContext& factory_context)
     : case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)),
       prefix_rewrite_(route.route().prefix_rewrite()), host_rewrite_(route.route().host_rewrite()),
+      path_rewriter_(RewriteBuilder::build(route)),
       vhost_(vhost),
       auto_host_rewrite_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), auto_host_rewrite, false)),
       websocket_config_([&]() -> TcpProxy::ConfigSharedPtr {
@@ -252,7 +253,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), idle_timeout)),
       max_grpc_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), max_grpc_timeout)),
-      runtime_(loadRuntimeData(route.match())), loader_(factory_context.runtime()),
+      runtime_(loadRuntimeData(route.match())),
+      loader_(factory_context.runtime()),
       host_redirect_(route.redirect().host_redirect()),
       path_redirect_(route.redirect().path_redirect()),
       https_redirect_(route.redirect().https_redirect()),
@@ -377,10 +379,7 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
     headers.Host()->value(host_rewrite_);
   }
 
-  // Handle path rewrite
-  if (!getPathRewrite().empty()) {
-    rewritePathHeader(headers, insert_envoy_original_path);
-  }
+  rewritePathHeader(headers, insert_envoy_original_path);
 }
 
 void RouteEntryImplBase::finalizeResponseHeaders(
@@ -410,17 +409,19 @@ RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& rou
 void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
                                             const std::string& matched_path,
                                             bool insert_envoy_original_path) const {
-  const auto& rewrite = getPathRewrite();
-  if (rewrite.empty()) {
-    return;
-  }
 
-  std::string path = headers.Path()->value().c_str();
-  if (insert_envoy_original_path) {
-    headers.insertEnvoyOriginalPath().value(*headers.Path());
+  const PathRewriter& path_rewriter = getPathRewriter();
+
+  if (!path_rewriter.apply()) {
+    return;
+  } else {
+    std::string path = headers.Path()->value().c_str();
+    if (insert_envoy_original_path) {
+      headers.insertEnvoyOriginalPath().value(*headers.Path());
+    }
+
+    path_rewriter.rewrite(path, matched_path, case_sensitive_);
   }
-  ASSERT(StringUtil::startsWith(path.c_str(), matched_path, case_sensitive_));
-  headers.Path()->value(path.replace(0, matched_path.size(), rewrite));
 }
 
 std::string RouteEntryImplBase::newPath(const Http::HeaderMap& headers) const {

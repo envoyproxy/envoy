@@ -304,5 +304,16 @@
         }
       ]
     }
+  },
+  {
+    "test_name": "RegexPathRewrite",
+    "input": {
+      ":authority": "api.lyft.com",
+      ":path": "/v1/posts/123/upvote?foo=bar",
+      ":method": "GET"
+    },
+    "validate": {
+      "path_rewrite": "/public/v1/blog_posts/123/upvote?foo=bar"
+    }
   }
 ]

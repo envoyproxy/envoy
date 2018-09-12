@@ -333,7 +333,7 @@ message CorsPolicy {
   google.protobuf.BoolValue enabled = 7;
 }
 
-// [#comment:next free field: 25]
+// [#comment:next free field: 26]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -381,34 +381,49 @@ message RouteAction {
   // provided there taking precedence. The filter name should be specified as *envoy.lb*.
   core.Metadata metadata_match = 4;
 
-  // Indicates that during forwarding, the matched prefix (or path) should be
-  // swapped with this value. This option allows application URLs to be rooted
-  // at a different path from those exposed at the reverse proxy layer. The router filter will
-  // place the original path before rewrite into the :ref:`x-envoy-original-path
-  // <config_http_filters_router_x-envoy-original-path>` header.
-  //
-  // .. attention::
-  //
-  //   Pay careful attention to the use of trailing slashes in the
-  //   :ref:`route's match <envoy_api_field_route.Route.match>` prefix value.
-  //   Stripping a prefix from a path requires multiple Routes to handle all cases. For example,
-  //   rewriting */prefix* to */* and */prefix/etc* to */etc* cannot be done in a single
-  //   :ref:`Route <envoy_api_msg_route.Route>`, as shown by the below config entries:
-  //
-  //   .. code-block:: yaml
-  //
-  //     - match:
-  //         prefix: "/prefix/"
-  //       route:
-  //         prefix_rewrite: "/"
-  //     - match:
-  //         prefix: "/prefix"
-  //       route:
-  //         prefix_rewrite: "/"
-  //
-  //   Having above entries in the config, requests to */prefix* will be stripped to */*, while
-  //   requests to */prefix/etc* will be stripped to */etc*.
-  string prefix_rewrite = 5;
+  oneof path_rewrite_specifier {
+    // Indicates that during forwarding, the matched prefix (or path) should be
+    // swapped with this value. This option allows application URLs to be rooted
+    // at a different path from those exposed at the reverse proxy layer. The router filter will
+    // place the original path before rewrite into the :ref:`x-envoy-original-path
+    // <config_http_filters_router_x-envoy-original-path>` header.
+    //
+    // .. attention::
+    //
+    //   Pay careful attention to the use of trailing slashes in the
+    //   :ref:`route's match <envoy_api_field_route.Route.match>` prefix value.
+    //   Stripping a prefix from a path requires multiple Routes to handle all cases. For example,
+    //   rewriting */prefix* to */* and */prefix/etc* to */etc* cannot be done in a single
+    //   :ref:`Route <envoy_api_msg_route.Route>`, as shown by the below config entries:
+    //
+    //   .. code-block:: yaml
+    //
+    //     - match:
+    //         prefix: "/prefix/"
+    //       route:
+    //         prefix_rewrite: "/"
+    //     - match:
+    //         prefix: "/prefix"
+    //       route:
+    //         prefix_rewrite: "/"
+    //
+    //   Having above entries in the config, requests to */prefix* will be stripped to */*, while
+    //   requests to */prefix/etc* will be stripped to */etc*.
+    string prefix_rewrite = 5;
+
+    // Indicates that during forwarding, paths that match the pattern should be
+    // rewritten, interpolating capture groups from the path pattern into the new path as specified by
+    // the rewrite pattern.
+    // This option allows application URLs to be rewritten at the reverse proxy layer in a way that is
+    // aware of segments with variable contents like IDs.
+    // The router filter will place the original path before rewrite into the
+    // :ref:`x-envoy-original-path // <config_http_filters_router_x-envoy-original-path>` header.
+    // Examples:
+    //
+    // * The path pattern *^/foo/(bar)/(.*)$ paired with rewrite pattern */$1/$2* would transform
+    // */foo/bar/baz/bang* into */bar/baz/bang*.
+    RegexRewrite regex_rewrite = 25;
+  }
 
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
@@ -434,6 +449,18 @@ message RouteAction {
   //   :ref:`config_http_filters_router_x-envoy-upstream-rq-per-try-timeout-ms`, and the
   //   :ref:`retry overview <arch_overview_http_routing_retry>`.
   google.protobuf.Duration timeout = 8 [(gogoproto.stdduration) = true];
+
+  message RegexRewrite {
+    // Represents a regular expression that the path must match in order for the substitution
+    // to be applied. The regular expression may include capture groups to be interpolated into the
+    // substitution.
+    string pattern = 1;
+
+    // Represents the subsitution used to build the final path of the request if the initial path matches
+    // the pattern. The substitution may include references to capture groups defined in the
+    // pattern which will be interpolated into the final path.
+    string substitution = 2;
+  }
 
   // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
   message RetryPolicy {

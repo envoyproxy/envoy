@@ -273,7 +273,86 @@ private:
   const std::string operation_;
 };
 
+
 /**
+ * Base implementation for path rewriters
+ */
+class PathRewriter {
+  public:
+    virtual bool apply() const = 0;
+    virtual std::string rewrite(std::string path, const std::string& matched_path, bool case_sensitive) const = 0;
+    virtual ~PathRewriter() {};
+};
+
+/**
+ * Path rewrite through prefix replacement
+ */
+class PrefixPathRewriter: public PathRewriter {
+  public:
+    PrefixPathRewriter(std::string prefix):PathRewriter(),
+      prefix_(prefix) {}
+
+    bool apply() const {
+      return !prefix_.empty();
+    }
+
+    std::string rewrite(std::string path, const std::string& matched_path, bool case_sensitive) const {
+      ASSERT(StringUtil::startsWith(path.c_str(), matched_path, case_sensitive));
+      return path.replace(0, matched_path.size(), prefix_);
+    }
+
+    ~PrefixPathRewriter() {};
+
+  private:
+    std::string prefix_;
+};
+
+/**
+ * Path rewrite via regex
+ */
+class RegexPathRewriter: public PathRewriter {
+  public:
+    RegexPathRewriter(std::string pattern, std::string substitution):PathRewriter(),
+      pattern_(pattern),
+      substitution_(substitution) {}
+
+    bool apply() const {
+      return !substitution_.empty();
+    }
+
+    std::string rewrite(std::string path __attribute__((unused)), const std::string& matched_path, bool case_sensitive __attribute__((unused))) const {
+      return std::regex_replace(matched_path, pattern_, substitution_);
+    }
+
+    ~RegexPathRewriter() {};
+
+  private:
+    std::regex pattern_;
+    std::string substitution_;
+};
+
+
+/**
+ * Construct a path rewriter
+ */
+class RewriteBuilder {
+  public:
+    static PathRewriter& build(const envoy::api::v2::route::Route& route) {
+      if (!route.redirect().prefix_rewrite().empty()) {
+        static PrefixPathRewriter p(route.redirect().prefix_rewrite());
+        return p;
+      }
+      if (!route.route().prefix_rewrite().empty()) {
+        static PrefixPathRewriter p(route.route().prefix_rewrite());
+        return p;
+      }
+      static RegexPathRewriter p(route.route().regex_rewrite().pattern(), route.route().regex_rewrite().substitution());
+      return p;
+    };
+};
+
+
+/*
  * Base implementation for all route entries.
  */
 class RouteEntryImplBase : public RouteEntry,
@@ -360,15 +439,16 @@ protected:
   const bool case_sensitive_;
   const std::string prefix_rewrite_;
   const std::string host_rewrite_;
+  const PathRewriter& path_rewriter_;
   bool include_vh_rate_limits_;
 
   RouteConstSharedPtr clusterEntry(const Http::HeaderMap& headers, uint64_t random_value) const;
 
   /**
-   * returns the correct path rewrite string for this route.
+   * returns the path rewriter instance for the route
    */
-  const std::string& getPathRewrite() const {
-    return (isRedirect()) ? prefix_rewrite_redirect_ : prefix_rewrite_;
+  const PathRewriter& getPathRewriter() const {
+    return path_rewriter_;
   }
 
   void finalizePathHeader(Http::HeaderMap& headers, const std::string& matched_path,

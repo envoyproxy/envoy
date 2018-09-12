@@ -49,6 +49,13 @@ const std::string& Json::ToolSchema::routerCheckSchema() {
               "virtual_host_name": {"type": "string"},
               "host_rewrite": {"type": "string"},
               "path_rewrite": {"type": "string"},
+              "regex_rewrite" : {
+                "type" : "object",
+                "properties" : {
+                  "pattern": {"type" : "string"},
+                  "substitution" : {"type" : "integer"}
+                }
+              },
               "path_redirect": {"type": "string"},
               "header_fields": {
                 "type": "array",
