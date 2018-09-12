@@ -164,8 +164,8 @@ private:
   void writeClustersAsJson(Buffer::Instance& response);
   void writeClustersAsText(Buffer::Instance& response);
 
-  static bool shouldLogMetric(const std::shared_ptr<Stats::Metric> metric, const bool used_only,
-                              const absl::optional<std::regex> regex) {
+  static bool shouldShowMetric(const std::shared_ptr<Stats::Metric> metric, const bool used_only,
+                               const absl::optional<std::regex> regex) {
     return ((!used_only || metric->used()) &&
             (!regex.has_value() || std::regex_match(metric->name(), regex.value())));
   }
