@@ -27,11 +27,11 @@ class AuthenticatorImpl : public Logger::Loggable<Logger::Id::filter>,
                           public Authenticator,
                           public Http::AsyncClient::Callbacks {
 public:
-  AuthenticatorImpl(const CheckAudienceConstSharedPtr audiences,
-                    const absl::optional<std::string>& issuer, bool allow_failed,
-                    JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager)
-      : jwks_cache_(jwks_cache), cm_(cluster_manager), audiences_(audiences), issuer_(issuer),
-        is_allow_failed_(allow_failed) {}
+  AuthenticatorImpl(const AudienceCheckerSupplier& audience_checker_suppiler,
+                    const absl::optional<std::string>& provider, JwksCache& jwks_cache,
+                    Upstream::ClusterManager& cluster_manager)
+      : jwks_cache_(jwks_cache), cm_(cluster_manager),
+        audience_checker_suppiler_(audience_checker_suppiler), provider_(provider) {}
 
   // Following functions are for Authenticator interface
   void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
@@ -81,11 +81,10 @@ private:
   std::string uri_;
   // The pending remote request so it can be canceled.
   Http::AsyncClient::Request* request_{};
-  // Check audience object for overriding the providers.
-  const CheckAudienceConstSharedPtr audiences_;
-  // specific issuer or not.
-  const absl::optional<std::string> issuer_;
-  const bool is_allow_failed_;
+  // audience checker suppiler.
+  const AudienceCheckerSupplier& audience_checker_suppiler_;
+  // specific provider or not when it is allow missing or failed.
+  const absl::optional<std::string> provider_;
 };
 
 void AuthenticatorImpl::verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
@@ -115,9 +114,7 @@ void AuthenticatorImpl::startVerify() {
     }
 
     // Check if token extracted from the location contains the issuer specified by config.
-    const bool matched_issuer =
-        issuer_ ? jwt_.iss_ == issuer_.value() : curr_token_->isIssuerSpecified(jwt_.iss_);
-    if (!matched_issuer) {
+    if (!curr_token_->isIssuerSpecified(jwt_.iss_)) {
       ENVOY_LOG(debug, "Jwt issuer {} does not match required", jwt_.iss_);
       status = Status::JwtUnknownIssuer;
       continue;
@@ -135,15 +132,20 @@ void AuthenticatorImpl::startVerify() {
     }
 
     // Check the issuer is configured or not.
-    jwks_data_ = jwks_cache_.findByIssuer(jwt_.iss_);
+    if (provider_) {
+      jwks_data_ = jwks_cache_.findByProvider(provider_.value());
+    } else {
+      jwks_data_ = jwks_cache_.findByIssuer(jwt_.iss_);
+    }
     // isIssuerSpecified() check already make sure the issuer is in the cache.
     ASSERT(jwks_data_ != nullptr);
 
-    // Check if audience is allowed
-    bool allowed = audiences_ ? audiences_->areAudiencesAllowed(jwt_.audiences_)
-                              : jwks_data_->areAudiencesAllowed(jwt_.audiences_);
+    const AudienceChecker& audience_checker =
+        provider_ ? audience_checker_suppiler_.getAudienceCheckerByProvider(provider_.value())
+                  : audience_checker_suppiler_.getAudienceCheckerByIssuer(jwt_.iss_);
 
-    if (!allowed) {
+    // Check if audience is allowed
+    if (!audience_checker.areAudiencesAllowed(jwt_.audiences_)) {
       status = Status::JwtAudienceNotAllowed;
       continue;
     }
@@ -252,11 +254,11 @@ void AuthenticatorImpl::verifyKey() {
 
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
   // if on allow missing or failed this should verify all tokens, otherwise stop on ok.
-  if ((Status::Ok == status && !is_allow_failed_) || tokens_.empty()) {
+  if ((Status::Ok == status && provider_) || tokens_.empty()) {
     tokens_.clear();
     ENVOY_LOG(debug, "Jwt authentication completed with: {}",
               ::google::jwt_verify::getStatusString(status));
-    callback_(is_allow_failed_ ? Status::Ok : status);
+    callback_(!provider_ ? Status::Ok : status);
     return;
   }
   startVerify();
@@ -264,11 +266,11 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 
 } // namespace
 
-AuthenticatorPtr Authenticator::create(const CheckAudienceConstSharedPtr audiences,
-                                       const absl::optional<std::string>& issuer, bool allow_failed,
+AuthenticatorPtr Authenticator::create(const AudienceCheckerSupplier& audience_checker_suppiler,
+                                       const absl::optional<std::string>& provider,
                                        JwksCache& jwks_cache,
                                        Upstream::ClusterManager& cluster_manager) {
-  return std::make_unique<AuthenticatorImpl>(audiences, issuer, allow_failed, jwks_cache,
+  return std::make_unique<AuthenticatorImpl>(audience_checker_suppiler, provider, jwks_cache,
                                              cluster_manager);
 }
 

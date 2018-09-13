@@ -98,21 +98,56 @@ public:
   JwksCacheImpl(const JwtAuthentication& config) {
     for (const auto& it : config.providers()) {
       const auto& provider = it.second;
-      jwks_data_map_.emplace(provider.issuer(), provider);
+      jwks_data_map_.emplace(it.first, provider);
+      if (issuer_ptr_map_.find(provider.issuer()) == issuer_ptr_map_.end()) {
+        issuer_ptr_map_.emplace(provider.issuer(), findByProviderHelper(it.first));
+      }
     }
   }
 
-  JwksData* findByIssuer(const std::string& name) override {
-    auto it = jwks_data_map_.find(name);
+  JwksData* findByIssuer(const std::string& issuer) const override {
+    const auto it = issuer_ptr_map_.find(issuer);
+    if (it == issuer_ptr_map_.end()) {
+      return nullptr;
+    }
+    return it->second;
+  }
+
+  JwksData* findByProvider(const std::string& provider) override {
+    return findByProviderHelper(provider);
+  }
+
+  const AudienceChecker& getAudienceCheckerByProvider(const std::string& provider) const override {
+    const auto verifier = findByProviderHelper(provider);
+    ASSERT(verifier != nullptr);
+    return *verifier;
+  }
+
+  // get provider data by provider name. Returns nullptr if issuer is not found.
+  const AudienceChecker& getAudienceCheckerByIssuer(const std::string& issuer) const override {
+    const auto verifier = findByIssuer(issuer);
+    ASSERT(verifier != nullptr);
+    return *verifier;
+  }
+
+private:
+  JwksDataImpl* findByProviderHelper(const std::string& provider) {
+    return const_cast<JwksDataImpl*>(
+        static_cast<const JwksCacheImpl*>(this)->findByProviderHelper(provider));
+  }
+
+  const JwksDataImpl* findByProviderHelper(const std::string& provider) const {
+    const auto it = jwks_data_map_.find(provider);
     if (it == jwks_data_map_.end()) {
       return nullptr;
     }
     return &it->second;
   }
 
-private:
-  // The Jwks data map indexed by issuer.
+  // The Jwks data map indexed by provider.
   std::unordered_map<std::string, JwksDataImpl> jwks_data_map_;
+  // The Jwks data pointer map indexed by issuer.
+  std::unordered_map<std::string, JwksDataImpl*> issuer_ptr_map_;
 };
 
 } // namespace

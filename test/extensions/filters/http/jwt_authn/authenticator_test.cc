@@ -29,9 +29,10 @@ public:
     CreateAuthenticator();
   }
 
-  void CreateAuthenticator(bool allow_failed = false) {
+  void CreateAuthenticator(
+      const absl::optional<std::string>& provider = absl::optional<std::string>{ProviderName}) {
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
-    auth_ = Authenticator::create({}, absl::nullopt, allow_failed,
+    auth_ = Authenticator::create(filter_config_->getCache().getJwksCache(), provider,
                                   filter_config_->getCache().getJwksCache(), filter_config_->cm());
   }
 
@@ -411,7 +412,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleTokens) {
       {"c", "Bearer " + std::string(InvalidAudToken)},
       {":path", "/"},
   };
-  CreateAuthenticator(true);
+  CreateAuthenticator(absl::nullopt);
   std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
   };
@@ -460,7 +461,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleIssuers) {
       {"other-auth", "Bearer " + std::string(OtherGoodToken)},
       {":path", "/"},
   };
-  CreateAuthenticator(true);
+  CreateAuthenticator(absl::nullopt);
   std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
   };

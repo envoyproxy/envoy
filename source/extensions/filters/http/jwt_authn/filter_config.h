@@ -101,10 +101,13 @@ public:
   }
 
   // methods for AuthFactory interface. Factory method to help create authenticators.
-  AuthenticatorPtr create(const CheckAudienceConstSharedPtr audiences,
-                          const absl::optional<std::string>& issuer,
-                          bool allow_failed) const override {
-    return Authenticator::create(audiences, issuer, allow_failed, getCache().getJwksCache(), cm());
+  AuthenticatorPtr create(const AudienceCheckerSupplier* supplier,
+                          const absl::optional<std::string>& provider) const override {
+    if (supplier != nullptr) {
+      return Authenticator::create(*supplier, provider, getCache().getJwksCache(), cm());
+    }
+    return Authenticator::create(getCache().getJwksCache(), provider, getCache().getJwksCache(),
+                                 cm());
   }
 
 private:
