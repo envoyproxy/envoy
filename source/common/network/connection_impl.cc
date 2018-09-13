@@ -141,7 +141,6 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     // Create and activate a timer which will immediately close the connection if triggered.
     // A config value of 0 disables the timeout.
     if (delayed_close_timeout_set) {
-      ASSERT(connection_stats_->delayed_close_timeouts_ != nullptr);
       delayed_close_timer_ = dispatcher_.createTimer([this]() -> void { onDelayedCloseTimeout(); });
       ENVOY_CONN_LOG(debug, "setting delayed close timer with timeout {} ms", *this,
                      delayedCloseTimeout().count());
@@ -575,7 +574,9 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 
 void ConnectionImpl::onDelayedCloseTimeout() {
   ENVOY_CONN_LOG(debug, "triggered delayed close", *this);
-  connection_stats_->delayed_close_timeouts_->inc();
+  if (connection_stats_->delayed_close_timeouts_ != nullptr) {
+    connection_stats_->delayed_close_timeouts_->inc();
+  }
   closeSocket(ConnectionEvent::LocalClose);
 }
 
