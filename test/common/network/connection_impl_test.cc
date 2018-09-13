@@ -1449,8 +1449,8 @@ public:
     Buffer::OwnedImpl data(std::string(buffer_size, 'a'));
     client_connection_->write(data, false);
     dispatcher_->run(Event::Dispatcher::RunType::Block);
-  } // namespace Network
-};  // namespace Envoy
+  }
+};
 
 INSTANTIATE_TEST_CASE_P(IpVersions, ReadBufferLimitTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
