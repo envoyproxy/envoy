@@ -9,6 +9,7 @@
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/grpc/common.h"
+#include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
 #include "common/router/router.h"
@@ -177,7 +178,7 @@ bool HttpHealthCheckerImpl::HttpActiveHealthCheckSession::isHealthCheckSucceeded
   ENVOY_CONN_LOG(debug, "hc response={} health_flags={}", *client_, response_code,
                  HostUtility::healthFlagsToString(*host_));
 
-  if (response_code != enumToInt(Http::Code::OK)) {
+  if (!(Http::CodeUtility::is2xx(response_code) || Http::CodeUtility::is3xx(response_code))) {
     return false;
   }
 
