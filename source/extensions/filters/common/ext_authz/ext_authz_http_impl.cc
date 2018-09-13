@@ -16,26 +16,26 @@ namespace {
 const Http::HeaderMap& getZeroContentLengthHeader() {
   static const Http::HeaderMap* header_map =
       new Http::HeaderMapImpl{{Http::Headers::get().ContentLength, std::to_string(0)}};
-  return header_map;
+  return *header_map;
 }
 
 const Response& getErrorResponse() {
   static const Response* response =
       new Response{CheckStatus::Error, Http::HeaderVector{}, Http::HeaderVector{}, std::string{},
                    Http::Code::Forbidden};
-  return response;
+  return *response;
 }
 
 const Response& getDeniedResponse() {
   static const Response* response =
       new Response{CheckStatus::Denied, Http::HeaderVector{}, Http::HeaderVector{}, std::string{}};
-  return response;
+  return *response;
 }
 
 const Response& getOkResponse() {
   static const Response* response = new Response{
       CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{}, std::string{}, Http::Code::OK};
-  return response;
+  return *response;
 }
 } // namespace
 
