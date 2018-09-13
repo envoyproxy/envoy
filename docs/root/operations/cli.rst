@@ -234,3 +234,7 @@ following are the command line options that Envoy supports.
 
   *(optional)* This flag disables Envoy hot restart for builds that have it enabled. By default, hot
   restart is enabled.
+
+.. option:: --disable-stats
+
+  *(optional)* This flag disables stats collection within Envoy entirely. By default, stats collection is enabled.

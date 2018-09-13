@@ -115,6 +115,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                                              cmd);
   TCLAP::SwitchArg disable_hot_restart("", "disable-hot-restart",
                                        "Disable hot restart functionality", cmd, false);
+  TCLAP::SwitchArg disable_stats("", "disable-stats", "Disable stats-collecting functionality", cmd,
+                                 false);
 
   cmd.setExceptionHandling(false);
   try {
@@ -202,6 +204,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   parent_shutdown_time_ = std::chrono::seconds(parent_shutdown_time_s.getValue());
   max_stats_ = max_stats.getValue();
   stats_options_.max_obj_name_length_ = max_obj_name_len.getValue();
+  stats_options_.stats_disabled_ = disable_stats.getValue();
 
   if (hot_restart_version_option.getValue()) {
     std::cerr << hot_restart_version_cb(max_stats.getValue(), stats_options_.maxNameLength(),
