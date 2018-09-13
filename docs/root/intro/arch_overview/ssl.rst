@@ -64,6 +64,9 @@ Example configuration
       hosts: [{ socket_address: { address: 127.0.0.2, port_value: 1234 }}]
       tls_context:
         common_tls_context:
+          tls_certificates:
+            certificate_chain: { "filename": "/cert.crt" }
+            private_key: { "filename": "/cert.key" }
           validation_context:
             trusted_ca:
               filename: /etc/ssl/certs/ca-certificates.crt

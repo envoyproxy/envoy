@@ -210,7 +210,8 @@ bool RouterCheckTool::compareResults(const std::string& actual, const std::strin
 
   // Output failure details to stdout if details_ flag is set to true
   if (details_) {
-    std::cout << expected << " " << actual << " " << test_type << std::endl;
+    std::cerr << "expected: [" << expected << "], actual: [" << actual
+              << "], test type: " << test_type << std::endl;
   }
   return false;
 }

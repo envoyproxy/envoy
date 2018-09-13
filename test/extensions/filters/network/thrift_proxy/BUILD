@@ -81,6 +81,17 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "conn_state_test",
+    srcs = ["conn_state_test.cc"],
+    extension_name = "envoy.filters.network.thrift_proxy",
+    deps = [
+        "//source/extensions/filters/network/thrift_proxy:conn_state_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "auto_transport_impl_test",
     srcs = ["auto_transport_impl_test.cc"],
     extension_name = "envoy.filters.network.thrift_proxy",
