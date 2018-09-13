@@ -7,8 +7,8 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
-    "envoy_extension_cc_test",
     "envoy_cc_test_library",
+    "envoy_extension_cc_test",
 )
 
 envoy_package()
