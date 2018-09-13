@@ -6,7 +6,8 @@
 
 namespace Envoy {
 class TestHostPredicateFactory : public Upstream::RetryHostPredicateFactory {
-  std::string name() override { return "test-host-predicate"; }
+public:
+  std::string name() override { return "envoy.test_host_predicate"; }
 
   void createHostPredicate(Upstream::RetryHostPredicateFactoryCallbacks& callbacks) override {
     callbacks.addHostPredicate(std::make_shared<TestHostPredicate>());

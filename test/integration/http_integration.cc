@@ -22,9 +22,11 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
+#include "test/integration/test_host_predicate_config.h"
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/registry.h"
 #include "test/test_common/network_utility.h"
 
 #include "gtest/gtest.h"
@@ -245,8 +247,9 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   }
 }
 
-uint64_t HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index,
-                                                         uint64_t second_upstream_index) {
+uint64_t
+HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index,
+                                                absl::optional<uint64_t> second_upstream_index) {
   uint64_t upstream_with_request = upstream_index;
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
@@ -254,9 +257,9 @@ uint64_t HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index
         *dispatcher_, fake_upstream_connection_);
 
     // If we didn't get a connection against the first upstream, try the next one.
-    if (!result && upstream_index != second_upstream_index) {
-      upstream_with_request = second_upstream_index;
-      result = fake_upstreams_[second_upstream_index]->waitForHttpConnection(
+    if (!result && second_upstream_index) {
+      upstream_with_request = *second_upstream_index;
+      result = fake_upstreams_[*second_upstream_index]->waitForHttpConnection(
           *dispatcher_, fake_upstream_connection_);
     }
     RELEASE_ASSERT(result, result.message());
@@ -767,8 +770,11 @@ void HttpIntegrationTest::testGrpcRetry() {
 // the same host. With a total of two upstream hosts, this should result in us continuously sending
 // requests to the same host.
 void HttpIntegrationTest::testRetryHostPredicateFilter() {
+  TestHostPredicateFactory predicate_factory;
+  Registry::InjectFactory<Upstream::RetryHostPredicateFactory> inject_factory(predicate_factory);
+
   envoy::api::v2::route::RouteAction::RetryPolicy retry_policy;
-  retry_policy.add_retry_host_predicate()->set_name("test-host-predicate");
+  retry_policy.add_retry_host_predicate()->set_name(predicate_factory.name());
 
   // Add route with custom retry policy
   config_helper_.addRoute("host", "/test_retry", "cluster_0", false,

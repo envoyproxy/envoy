@@ -182,11 +182,9 @@ envoy_cc_test_library(
     name = "test_host_predicate_lib",
     srcs = [
         "test_host_predicate.h",
-        "test_host_predicate_config.cc",
         "test_host_predicate_config.h",
     ],
     deps = [
-        "//include/envoy/registry",
         "//include/envoy/upstream:retry_interface",
     ],
 )
@@ -222,6 +220,7 @@ envoy_cc_test_library(
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/upstream:utility_lib",
+        "//test/test_common:registry_lib",
     ],
 )
 
