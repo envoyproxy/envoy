@@ -67,7 +67,6 @@ void GrpcClientImpl::onSuccess(
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
-  ENVOY_LOG(warn, "ext_authz gRPC client failed to call the authorization server.");
   ASSERT(status != Grpc::Status::GrpcStatus::Ok);
   Response response{};
   response.status = CheckStatus::Error;
