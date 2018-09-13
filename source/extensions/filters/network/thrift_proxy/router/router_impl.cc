@@ -279,6 +279,7 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
       return;
     }
 
+    ENVOY_STREAM_LOG(debug, "upgrade response complete", *callbacks_);
     upstream_request_->protocol_->completeUpgrade(*upstream_request_->conn_state_,
                                                   *upstream_request_->upgrade_response_);
 
