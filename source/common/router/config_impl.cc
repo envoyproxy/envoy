@@ -54,6 +54,12 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
         host_predicate.name())
         ->createHostPredicate(*this, host_predicate.config());
   }
+
+  const auto retry_priority = config.retry_policy().retry_priority();
+  if (!retry_priority.name().empty()) {
+    Registry::FactoryRegistry<Upstream::RetryPriorityFactory>::getFactory(retry_priority.name())
+        ->createRetryPriority(*this, retry_priority.config());
+  }
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) {
