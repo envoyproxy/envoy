@@ -28,7 +28,7 @@ typedef FilesystemSubscriptionImpl<envoy::api::v2::ClusterLoadAssignment>
 class FilesystemSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
   FilesystemSubscriptionTestHarness()
-      : path_(TestEnvironment::temporaryPath("eds.json")), dispatcher_(test_time_.timeSource()),
+      : path_(TestEnvironment::temporaryPath("eds.json")), dispatcher_(test_time_.timeSystem()),
         subscription_(dispatcher_, path_, stats_) {}
 
   ~FilesystemSubscriptionTestHarness() { EXPECT_EQ(0, ::unlink(path_.c_str())); }

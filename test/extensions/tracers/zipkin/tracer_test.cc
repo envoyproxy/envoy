@@ -37,10 +37,10 @@ private:
 
 class ZipkinTracerTest : public testing::Test {
 protected:
-  ZipkinTracerTest() : time_source_(test_time_.timeSource()) {}
+  ZipkinTracerTest() : time_source_(test_time_.timeSystem()) {}
 
   DangerousDeprecatedTestTime test_time_;
-  TimeSource time_source_;
+  TimeSource& time_source_;
 };
 
 TEST_F(ZipkinTracerTest, spanCreation) {
@@ -48,8 +48,8 @@ TEST_F(ZipkinTracerTest, spanCreation) {
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
   Tracer tracer("my_service_name", addr, random_generator, false, time_source_);
-  NiceMock<MockSystemTimeSource> mock_start_time;
-  SystemTime timestamp = mock_start_time.currentTime();
+  NiceMock<MockTimeSource> mock_start_time;
+  SystemTime timestamp = mock_start_time.systemTime();
 
   NiceMock<Tracing::MockConfig> config;
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
@@ -184,7 +184,7 @@ TEST_F(ZipkinTracerTest, spanCreation) {
   // ==============
 
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
-  const uint generated_parent_id = Util::generateRandom64(test_time_.timeSource());
+  const uint generated_parent_id = Util::generateRandom64(test_time_.timeSystem());
   SpanContext modified_root_span_context(root_span_context.trace_id_high(),
                                          root_span_context.trace_id(), root_span_context.id(),
                                          generated_parent_id, root_span_context.sampled());
@@ -230,9 +230,9 @@ TEST_F(ZipkinTracerTest, finishSpan) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator, false, test_time_.timeSource());
-  NiceMock<MockSystemTimeSource> mock_start_time;
-  SystemTime timestamp = mock_start_time.currentTime();
+  Tracer tracer("my_service_name", addr, random_generator, false, test_time_.timeSystem());
+  NiceMock<MockTimeSource> mock_start_time;
+  SystemTime timestamp = mock_start_time.systemTime();
 
   // ==============
   // Test finishing a span containing a CS annotation
@@ -315,8 +315,8 @@ TEST_F(ZipkinTracerTest, finishNotSampledSpan) {
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
   Tracer tracer("my_service_name", addr, random_generator, false, time_source_);
-  NiceMock<MockSystemTimeSource> mock_start_time;
-  SystemTime timestamp = mock_start_time.currentTime();
+  NiceMock<MockTimeSource> mock_start_time;
+  SystemTime timestamp = mock_start_time.systemTime();
 
   // ==============
   // Test finishing a span that is marked as not sampled
@@ -344,8 +344,8 @@ TEST_F(ZipkinTracerTest, SpanSampledPropagatedToChild) {
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
   Tracer tracer("my_service_name", addr, random_generator, false, time_source_);
-  NiceMock<MockSystemTimeSource> mock_start_time;
-  SystemTime timestamp = mock_start_time.currentTime();
+  NiceMock<MockTimeSource> mock_start_time;
+  SystemTime timestamp = mock_start_time.systemTime();
 
   NiceMock<Tracing::MockConfig> config;
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));
@@ -373,8 +373,8 @@ TEST_F(ZipkinTracerTest, RootSpan128bitTraceId) {
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
   Tracer tracer("my_service_name", addr, random_generator, true, time_source_);
-  NiceMock<MockSystemTimeSource> mock_start_time;
-  SystemTime timestamp = mock_start_time.currentTime();
+  NiceMock<MockTimeSource> mock_start_time;
+  SystemTime timestamp = mock_start_time.systemTime();
 
   NiceMock<Tracing::MockConfig> config;
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Egress));

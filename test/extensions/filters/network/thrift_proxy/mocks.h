@@ -1,6 +1,7 @@
 #pragma once
 
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
+#include "extensions/filters/network/thrift_proxy/conn_state.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
 #include "extensions/filters/network/thrift_proxy/metadata.h"
 #include "extensions/filters/network/thrift_proxy/protocol.h"
@@ -101,6 +102,12 @@ public:
   MOCK_METHOD2(writeDouble, void(Buffer::Instance& buffer, double value));
   MOCK_METHOD2(writeString, void(Buffer::Instance& buffer, const std::string& value));
   MOCK_METHOD2(writeBinary, void(Buffer::Instance& buffer, const std::string& value));
+  MOCK_METHOD0(supportsUpgrade, bool());
+  MOCK_METHOD0(upgradeRequestDecoder, DecoderEventHandlerSharedPtr());
+  MOCK_METHOD1(upgradeResponse, DirectResponsePtr(const DecoderEventHandler&));
+  MOCK_METHOD3(attemptUpgrade,
+               ThriftObjectPtr(Transport&, ThriftConnectionState&, Buffer::Instance&));
+  MOCK_METHOD2(completeUpgrade, void(ThriftConnectionState&, ThriftObject&));
 
   std::string name_{"mock"};
   ProtocolType type_{ProtocolType::Auto};
@@ -112,7 +119,55 @@ public:
   ~MockDecoderCallbacks();
 
   // ThriftProxy::DecoderCallbacks
-  MOCK_METHOD0(newDecoderFilter, ThriftFilters::DecoderFilter&());
+  MOCK_METHOD0(newDecoderEventHandler, DecoderEventHandler&());
+};
+
+class MockDecoderEventHandler : public DecoderEventHandler {
+public:
+  MockDecoderEventHandler();
+  ~MockDecoderEventHandler();
+
+  // ThriftProxy::DecoderEventHandler
+  MOCK_METHOD1(transportBegin, FilterStatus(MessageMetadataSharedPtr metadata));
+  MOCK_METHOD0(transportEnd, FilterStatus());
+  MOCK_METHOD1(messageBegin, FilterStatus(MessageMetadataSharedPtr metadata));
+  MOCK_METHOD0(messageEnd, FilterStatus());
+  MOCK_METHOD1(structBegin, FilterStatus(const absl::string_view name));
+  MOCK_METHOD0(structEnd, FilterStatus());
+  MOCK_METHOD3(fieldBegin,
+               FilterStatus(const absl::string_view name, FieldType msg_type, int16_t field_id));
+  MOCK_METHOD0(fieldEnd, FilterStatus());
+  MOCK_METHOD1(boolValue, FilterStatus(bool value));
+  MOCK_METHOD1(byteValue, FilterStatus(uint8_t value));
+  MOCK_METHOD1(int16Value, FilterStatus(int16_t value));
+  MOCK_METHOD1(int32Value, FilterStatus(int32_t value));
+  MOCK_METHOD1(int64Value, FilterStatus(int64_t value));
+  MOCK_METHOD1(doubleValue, FilterStatus(double value));
+  MOCK_METHOD1(stringValue, FilterStatus(absl::string_view value));
+  MOCK_METHOD3(mapBegin, FilterStatus(FieldType key_type, FieldType value_type, uint32_t size));
+  MOCK_METHOD0(mapEnd, FilterStatus());
+  MOCK_METHOD2(listBegin, FilterStatus(FieldType elem_type, uint32_t size));
+  MOCK_METHOD0(listEnd, FilterStatus());
+  MOCK_METHOD2(setBegin, FilterStatus(FieldType elem_type, uint32_t size));
+  MOCK_METHOD0(setEnd, FilterStatus());
+};
+
+class MockDirectResponse : public DirectResponse {
+public:
+  MockDirectResponse();
+  ~MockDirectResponse();
+
+  // ThriftProxy::DirectResponse
+  MOCK_CONST_METHOD3(encode, void(MessageMetadata&, Protocol&, Buffer::Instance&));
+};
+
+class MockThriftObject : public ThriftObject {
+public:
+  MockThriftObject();
+  ~MockThriftObject();
+
+  MOCK_CONST_METHOD0(fields, ThriftFieldPtrList&());
+  MOCK_METHOD1(onData, bool(Buffer::Instance&));
 };
 
 namespace ThriftFilters {
@@ -126,6 +181,8 @@ public:
   MOCK_METHOD0(onDestroy, void());
   MOCK_METHOD1(setDecoderFilterCallbacks, void(DecoderFilterCallbacks& callbacks));
   MOCK_METHOD0(resetUpstreamConnection, void());
+
+  // ThriftProxy::DecoderEventHandler
   MOCK_METHOD1(transportBegin, FilterStatus(MessageMetadataSharedPtr metadata));
   MOCK_METHOD0(transportEnd, FilterStatus());
   MOCK_METHOD1(messageBegin, FilterStatus(MessageMetadataSharedPtr metadata));
@@ -163,7 +220,7 @@ public:
   MOCK_CONST_METHOD0(downstreamTransportType, TransportType());
   MOCK_CONST_METHOD0(downstreamProtocolType, ProtocolType());
   MOCK_METHOD1(sendLocalReply, void(const DirectResponse&));
-  MOCK_METHOD2(startUpstreamResponse, void(TransportType, ProtocolType));
+  MOCK_METHOD2(startUpstreamResponse, void(Transport&, Protocol&));
   MOCK_METHOD1(upstreamData, bool(Buffer::Instance&));
   MOCK_METHOD0(resetDownstreamConnection, void());
 

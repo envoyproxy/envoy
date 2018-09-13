@@ -87,7 +87,7 @@ MockThreadLocalCluster::MockThreadLocalCluster() {
 
 MockThreadLocalCluster::~MockThreadLocalCluster() {}
 
-MockClusterManager::MockClusterManager() : time_source_(system_time_, monotonic_time_) {
+MockClusterManager::MockClusterManager() {
   ON_CALL(*this, httpConnPoolForCluster(_, _, _, _)).WillByDefault(Return(&conn_pool_));
   ON_CALL(*this, tcpConnPoolForCluster(_, _, _)).WillByDefault(Return(&tcp_conn_pool_));
   ON_CALL(*this, httpAsyncClientForCluster(_)).WillByDefault(ReturnRef(async_client_));

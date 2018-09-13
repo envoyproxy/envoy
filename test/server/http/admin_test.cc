@@ -1,6 +1,7 @@
 #include <fstream>
 #include <unordered_map>
 
+#include "envoy/admin/v2alpha/memory.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -27,10 +28,13 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AllOf;
+using testing::Ge;
 using testing::HasSubstr;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
+using testing::Property;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnPointee;
@@ -125,6 +129,7 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                     90.0,
                     95.0,
                     99.0,
+                    99.5,
                     99.9,
                     100.0
                 ],
@@ -159,6 +164,10 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                             {
                                 "interval": null,
                                 "cumulative": 109.9
+                            },
+                            {
+                                "interval": null,
+                                "cumulative": 109.95
                             },
                             {
                                 "interval": null,
@@ -200,6 +209,10 @@ TEST_P(AdminStatsTest, StatsAsJson) {
                             {
                                 "interval": 109.9,
                                 "cumulative": 209.8
+                            },
+                            {
+                                "interval": 109.95,
+                                "cumulative": 209.9
                             },
                             {
                                 "interval": 109.99,
@@ -262,6 +275,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
                     90.0,
                     95.0,
                     99.0,
+                    99.5,
                     99.9,
                     100.0
                 ],
@@ -296,6 +310,10 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
                             {
                                 "interval": 109.9,
                                 "cumulative": 209.8
+                            },
+                            {
+                                "interval": 109.95,
+                                "cumulative": 209.9
                             },
                             {
                                 "interval": 109.99,
@@ -598,6 +616,17 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
   }
 }
 
+TEST_P(AdminInstanceTest, Memory) {
+  Http::HeaderMapImpl header_map;
+  Buffer::OwnedImpl response;
+  EXPECT_EQ(Http::Code::OK, getCallback("/memory", header_map, response));
+  const std::string output_json = response.toString();
+  envoy::admin::v2alpha::Memory output_proto;
+  MessageUtil::loadFromJson(output_json, output_proto);
+  EXPECT_THAT(output_proto, AllOf(Property(&envoy::admin::v2alpha::Memory::allocated, Ge(0)),
+                                  Property(&envoy::admin::v2alpha::Memory::heap_size, Ge(0))));
+}
+
 TEST_P(AdminInstanceTest, Runtime) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
@@ -723,9 +752,13 @@ TEST_P(AdminInstanceTest, ClustersJson) {
       Network::Utility::resolveUrl("tcp://1.2.3.4:80");
   ON_CALL(*host, address()).WillByDefault(Return(address));
 
+  // Add stats in random order and validate that they come in order.
   Stats::IsolatedStoreImpl store;
   store.counter("test_counter").add(10);
+  store.counter("rest_counter").add(10);
+  store.counter("arest_counter").add(5);
   store.gauge("test_gauge").set(11);
+  store.gauge("atest_gauge").set(10);
   ON_CALL(*host, gauges()).WillByDefault(Invoke([&store]() { return store.gauges(); }));
   ON_CALL(*host, counters()).WillByDefault(Invoke([&store]() { return store.counters(); }));
 
@@ -762,16 +795,33 @@ TEST_P(AdminInstanceTest, ClustersJson) {
        "port_value": 80
       }
      },
-     "stats": {
-      "test_counter": {
+     "stats": [
+       {
+       "name": "arest_counter",
+       "value": "5",
+       "type": "COUNTER"
+       },
+       {
+       "name": "rest_counter",
        "value": "10",
        "type": "COUNTER"
       },
-      "test_gauge": {
+      {
+       "name": "test_counter",
+       "value": "10",
+       "type": "COUNTER"
+      },
+      {
+       "name": "atest_gauge",
+       "value": "10",
+       "type": "GAUGE"
+      },
+      {
+       "name": "test_gauge",
        "value": "11",
        "type": "GAUGE"
       },
-     },
+     ],
      "health_status": {
       "eds_health_status": "HEALTHY",
       "failed_active_health_check": true,

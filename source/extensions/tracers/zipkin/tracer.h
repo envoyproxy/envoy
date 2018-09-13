@@ -116,7 +116,7 @@ private:
   ReporterPtr reporter_;
   Runtime::RandomGenerator& random_generator_;
   const bool trace_id_128bit_;
-  TimeSource time_source_;
+  TimeSource& time_source_;
 };
 
 typedef std::unique_ptr<Tracer> TracerPtr;

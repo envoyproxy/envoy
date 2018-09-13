@@ -11,6 +11,7 @@
 
 #include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/admin/v2alpha/memory.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
@@ -35,6 +36,7 @@
 #include "common/http/headers.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/json/json_loader.h"
+#include "common/memory/stats.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 #include "common/profiler/profiler.h"
@@ -284,17 +286,37 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
         envoy::admin::v2alpha::HostStatus& host_status = *cluster_status.add_host_statuses();
         Network::Utility::addressToProtobufAddress(*host->address(),
                                                    *host_status.mutable_address());
-
+        std::vector<Stats::CounterSharedPtr> sorted_counters;
         for (const Stats::CounterSharedPtr& counter : host->counters()) {
-          auto& metric = (*host_status.mutable_stats())[counter->name()];
-          metric.set_type(envoy::admin::v2alpha::SimpleMetric::COUNTER);
+          sorted_counters.push_back(counter);
+        }
+        std::sort(
+            sorted_counters.begin(), sorted_counters.end(),
+            [](const Stats::CounterSharedPtr& counter1, const Stats::CounterSharedPtr& counter2) {
+              return counter1->name() < counter2->name();
+            });
+
+        for (const Stats::CounterSharedPtr& counter : sorted_counters) {
+          auto& metric = *host_status.add_stats();
+          metric.set_name(counter->name());
           metric.set_value(counter->value());
+          metric.set_type(envoy::admin::v2alpha::SimpleMetric::COUNTER);
         }
 
+        std::vector<Stats::GaugeSharedPtr> sorted_gauges;
         for (const Stats::GaugeSharedPtr& gauge : host->gauges()) {
-          auto& metric = (*host_status.mutable_stats())[gauge->name()];
-          metric.set_type(envoy::admin::v2alpha::SimpleMetric::GAUGE);
+          sorted_gauges.push_back(gauge);
+        }
+        std::sort(sorted_gauges.begin(), sorted_gauges.end(),
+                  [](const Stats::GaugeSharedPtr& gauge1, const Stats::GaugeSharedPtr& gauge2) {
+                    return gauge1->name() < gauge2->name();
+                  });
+
+        for (const Stats::GaugeSharedPtr& gauge : sorted_gauges) {
+          auto& metric = *host_status.add_stats();
+          metric.set_name(gauge->name());
           metric.set_value(gauge->value());
+          metric.set_type(envoy::admin::v2alpha::SimpleMetric::GAUGE);
         }
 
         envoy::admin::v2alpha::HostHealthStatus& health_status =
@@ -470,6 +492,16 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
 
   response.add("\n");
   return rc;
+}
+
+// TODO(ambuc): Add more tcmalloc stats, export proto details based on allocator.
+Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
+                                    AdminStream&) {
+  envoy::admin::v2alpha::Memory memory;
+  memory.set_allocated(Memory::Stats::totalCurrentlyAllocated());
+  memory.set_heap_size(Memory::Stats::totalCurrentlyReserved());
+  response.add(MessageUtil::getJsonStringFromMessage(memory, true)); // pretty-print
+  return Http::Code::OK;
 }
 
 Http::Code AdminImpl::handlerResetCounters(absl::string_view, Http::HeaderMap&,
@@ -865,7 +897,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
-      route_config_provider_(server.timeSource()),
+      route_config_provider_(server.timeSystem()),
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
           {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false, false},
@@ -885,6 +917,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
            MAKE_ADMIN_HANDLER(handlerHotRestartVersion), false, false},
           {"/logging", "query/change logging levels", MAKE_ADMIN_HANDLER(handlerLogging), false,
            true},
+          {"/memory", "print current allocation/heap usage", MAKE_ADMIN_HANDLER(handlerMemory),
+           false, false},
           {"/quitquitquit", "exit the server", MAKE_ADMIN_HANDLER(handlerQuitQuitQuit), false,
            true},
           {"/reset_counters", "reset all counters to zero",

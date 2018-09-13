@@ -342,5 +342,41 @@ config:
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 }
 
+// Should survive from 30 calls when calling requestInfo():dynamicMetadata(). This is a regression
+// test for #4305.
+TEST_P(LuaIntegrationTest, SurviveMultipleCalls) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: envoy.lua
+config:
+  inline_code: |
+    function envoy_on_request(request_handle)
+      request_handle:requestInfo():dynamicMetadata()
+    end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"x-forwarded-for", "10.0.0.1"}};
+
+  for (uint32_t i = 0; i < 30; ++i) {
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+    waitForNextUpstreamRequest();
+    upstream_request_->encodeHeaders(default_response_headers_, true);
+    response->waitForEndStream();
+
+    EXPECT_TRUE(response->complete());
+    EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  }
+
+  cleanup();
+}
+
 } // namespace
 } // namespace Envoy

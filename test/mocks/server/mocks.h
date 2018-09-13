@@ -327,7 +327,7 @@ public:
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
-  MOCK_METHOD0(timeSource, TimeSource&());
+  MOCK_METHOD0(timeSystem, Event::TimeSystem&());
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
 
   std::unique_ptr<Secret::SecretManager> secret_manager_;
@@ -405,8 +405,6 @@ public:
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_CONST_METHOD0(listenerMetadata, const envoy::api::v2::core::Metadata&());
-  MOCK_METHOD0(systemTimeSource, SystemTimeSource&());
-  MOCK_METHOD0(monotonicTimeSource, MonotonicTimeSource&());
   MOCK_METHOD0(timeSource, TimeSource&());
 
   testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
@@ -423,9 +421,7 @@ public:
   Singleton::ManagerPtr singleton_manager_;
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
-  testing::NiceMock<MockSystemTimeSource> system_time_source_;
-  testing::NiceMock<MockMonotonicTimeSource> monotonic_time_source_;
-  TimeSource time_source_;
+  testing::NiceMock<MockTimeSource> time_source_;
 };
 
 class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {
@@ -433,14 +429,19 @@ public:
   MockTransportSocketFactoryContext();
   ~MockTransportSocketFactoryContext();
 
+  Secret::SecretManager& secretManager() override { return *(secret_manager_.get()); }
+
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
-  MOCK_METHOD0(secretManager, Secret::SecretManager&());
   MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
   MOCK_METHOD0(stats, Stats::Store&());
+  MOCK_METHOD1(setInitManager, void(Init::Manager&));
+  MOCK_METHOD0(initManager, Init::Manager*());
+
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
 };
 
 class MockListenerFactoryContext : public virtual MockFactoryContext,

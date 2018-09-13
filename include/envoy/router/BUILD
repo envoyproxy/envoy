@@ -44,6 +44,7 @@ envoy_cc_library(
         "//include/envoy/http:websocket_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:resource_manager_interface",
+        "//include/envoy/upstream:retry_interface",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2:rds_cc",
@@ -64,4 +65,13 @@ envoy_cc_library(
     name = "shadow_writer_interface",
     hdrs = ["shadow_writer.h"],
     deps = ["//include/envoy/http:message_interface"],
+)
+
+envoy_cc_library(
+    name = "string_accessor_interface",
+    hdrs = ["string_accessor.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//include/envoy/request_info:filter_state_interface",
+    ],
 )

@@ -135,13 +135,8 @@ Filter::~Filter() {
     access_log->log(nullptr, nullptr, nullptr, getRequestInfo());
   }
 
-  if (upstream_handle_) {
-    upstream_handle_->cancel();
-  }
-
-  if (upstream_conn_data_) {
-    upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
-  }
+  ASSERT(upstream_handle_ == nullptr);
+  ASSERT(upstream_conn_data_ == nullptr);
 }
 
 TcpProxyStats Config::SharedConfig::generateStats(Stats::Scope& scope) {
@@ -200,6 +195,12 @@ void Filter::readDisableUpstream(bool disable) {
 }
 
 void Filter::readDisableDownstream(bool disable) {
+  if (read_callbacks_->connection().state() != Network::Connection::State::Open) {
+    // During idle timeouts, we close both upstream and downstream with NoFlush.
+    // Envoy still does a best-effort flush which can case readDisableDownstream to be called
+    // despite the downstream connection being closed.
+    return;
+  }
   read_callbacks_->connection().readDisable(disable);
 
   if (disable) {
@@ -406,16 +407,28 @@ void Filter::onDownstreamEvent(Network::ConnectionEvent event) {
     if (event == Network::ConnectionEvent::RemoteClose) {
       upstream_conn_data_->connection().close(Network::ConnectionCloseType::FlushWrite);
 
-      if (upstream_conn_data_ != nullptr &&
-          upstream_conn_data_->connection().state() != Network::Connection::State::Closed) {
-        config_->drainManager().add(config_->sharedConfig(), std::move(upstream_conn_data_),
-                                    std::move(upstream_callbacks_), std::move(idle_timer_),
-                                    read_callbacks_->upstreamHost());
+      // Events raised from the previous line may cause upstream_conn_data_ to be NULL if
+      // it was able to immediately flush all data.
+
+      if (upstream_conn_data_ != nullptr) {
+        if (upstream_conn_data_->connection().state() != Network::Connection::State::Closed) {
+          config_->drainManager().add(config_->sharedConfig(), std::move(upstream_conn_data_),
+                                      std::move(upstream_callbacks_), std::move(idle_timer_),
+                                      read_callbacks_->upstreamHost());
+        } else {
+          upstream_conn_data_.reset();
+        }
       }
     } else if (event == Network::ConnectionEvent::LocalClose) {
       upstream_conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
       upstream_conn_data_.reset();
       disableIdleTimer();
+    }
+  } else if (upstream_handle_) {
+    if (event == Network::ConnectionEvent::LocalClose ||
+        event == Network::ConnectionEvent::RemoteClose) {
+      upstream_handle_->cancel();
+      upstream_handle_ = nullptr;
     }
   }
 }
@@ -461,6 +474,10 @@ void Filter::onUpstreamEvent(Network::ConnectionEvent event) {
     read_callbacks_->upstreamHost()->outlierDetector().putResult(
         Upstream::Outlier::Result::SUCCESS);
     onConnectionSuccess();
+
+    getRequestInfo().setRequestedServerName(read_callbacks_->connection().requestedServerName());
+    ENVOY_LOG(debug, "TCP:onUpstreamEvent(), requestedServerName: {}",
+              getRequestInfo().requestedServerName());
 
     if (config_->idleTimeout()) {
       // The idle_timer_ can be moved to a Drainer, so related callbacks call into

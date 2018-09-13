@@ -167,8 +167,8 @@ std::string DateFormatter::fromTime(time_t time) const {
   gmtime_r(&time, &current_tm);
 
   std::array<char, 1024> buf;
-  strftime(&buf[0], buf.size(), format_string_.c_str(), &current_tm);
-  return std::string(&buf[0]);
+  const size_t len = strftime(&buf[0], buf.size(), format_string_.c_str(), &current_tm);
+  return std::string(&buf[0], len);
 }
 
 std::string
@@ -185,7 +185,7 @@ DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets&
   for (const auto& specifier : specifiers_) {
     const size_t formatted_length =
         strftime(&buf[0], buf.size(), specifier.segment_.c_str(), &current_tm);
-    absl::StrAppend(&formatted, &buf[0],
+    absl::StrAppend(&formatted, absl::string_view(&buf[0], formatted_length),
                     specifier.second_ ? seconds_str : std::string(specifier.width_, '?'));
 
     // This computes and saves offset of each specifier's pattern to correct its position after the

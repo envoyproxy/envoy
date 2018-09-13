@@ -12,6 +12,9 @@ envoy_cc_mock(
     name = "http_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
+    external_deps = [
+        "abseil_strings",
+    ],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",

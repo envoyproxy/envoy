@@ -6,6 +6,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
+#include "envoy/event/timer.h"
 #include "envoy/init/init.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/listen_socket.h"
@@ -193,9 +194,9 @@ public:
   virtual const LocalInfo::LocalInfo& localInfo() PURE;
 
   /**
-   * @return the time source used for the server.
+   * @return the time system used for the server.
    */
-  virtual TimeSource& timeSource() PURE;
+  virtual Event::TimeSystem& timeSystem() PURE;
 
   /**
    * @return the flush interval of stats sinks.

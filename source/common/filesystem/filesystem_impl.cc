@@ -11,8 +11,8 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"

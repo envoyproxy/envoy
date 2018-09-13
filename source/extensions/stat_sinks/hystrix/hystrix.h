@@ -18,6 +18,10 @@ namespace Hystrix {
 typedef std::vector<uint64_t> RollingWindow;
 typedef std::map<const std::string, RollingWindow> RollingStatsMap;
 
+using QuantileLatencyMap = std::unordered_map<double, double>;
+static const std::vector<double> hystrix_quantiles = {0,    0.25, 0.5,   0.75, 0.90,
+                                                      0.95, 0.99, 0.995, 1};
+
 struct {
   const std::string AllowHeadersHystrix{"Accept, Cache-Control, X-Requested-With, Last-Event-ID"};
 } AccessControlAllowHeadersValue;
@@ -74,7 +78,8 @@ public:
   void addClusterStatsToStream(ClusterStatsCache& cluster_stats_cache,
                                absl::string_view cluster_name, uint64_t max_concurrent_requests,
                                uint64_t reporting_hosts,
-                               std::chrono::milliseconds rolling_window_ms, std::stringstream& ss);
+                               std::chrono::milliseconds rolling_window_ms,
+                               const QuantileLatencyMap& histogram, std::stringstream& ss);
 
   /**
    * Calculate values needed to create the stream and write into the map.
@@ -96,33 +101,44 @@ public:
    */
   uint64_t getRollingValue(RollingWindow rolling_window);
 
-private:
+  /**
+   * Format the given key and value to "key"=value, and adding to the stringstream.
+   */
+  static void addInfoToStream(absl::string_view key, absl::string_view value,
+                              std::stringstream& info, bool is_first = false);
+
+  /**
+   * Format the given key and double value to "key"=<string of uint64_t>, and adding to the
+   * stringstream.
+   */
+  static void addDoubleToStream(absl::string_view key, double value, std::stringstream& info,
+                                bool is_first);
+
   /**
    * Format the given key and absl::string_view value to "key"="value", and adding to the
    * stringstream.
    */
-  void addStringToStream(absl::string_view key, absl::string_view value, std::stringstream& info,
-                         bool is_first = false);
+  static void addStringToStream(absl::string_view key, absl::string_view value,
+                                std::stringstream& info, bool is_first = false);
 
   /**
    * Format the given key and uint64_t value to "key"=<string of uint64_t>, and adding to the
    * stringstream.
    */
-  void addIntToStream(absl::string_view key, uint64_t value, std::stringstream& info,
-                      bool is_first = false);
+  static void addIntToStream(absl::string_view key, uint64_t value, std::stringstream& info,
+                             bool is_first = false);
 
-  /**
-   * Format the given key and value to "key"=value, and adding to the stringstream.
-   */
-  void addInfoToStream(absl::string_view key, absl::string_view value, std::stringstream& info,
-                       bool is_first = false);
+  static void addHistogramToStream(const QuantileLatencyMap& latency_map, absl::string_view key,
+                                   std::stringstream& ss);
 
+private:
   /**
    * Generate HystrixCommand event stream.
    */
   void addHystrixCommand(ClusterStatsCache& cluster_stats_cache, absl::string_view cluster_name,
                          uint64_t max_concurrent_requests, uint64_t reporting_hosts,
-                         std::chrono::milliseconds rolling_window_ms, std::stringstream& ss);
+                         std::chrono::milliseconds rolling_window_ms,
+                         const QuantileLatencyMap& histogram, std::stringstream& ss);
 
   /**
    * Generate HystrixThreadPool event stream.

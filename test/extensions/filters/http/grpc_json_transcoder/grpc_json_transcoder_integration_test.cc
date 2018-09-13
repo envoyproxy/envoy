@@ -100,6 +100,8 @@ protected:
         response_headers.insertGrpcMessage().value(grpc_status.error_message());
         upstream_request_->encodeHeaders(response_headers, true);
       } else {
+        response_headers.addCopy(Http::LowerCaseString("trailer"), "Grpc-Status");
+        response_headers.addCopy(Http::LowerCaseString("trailer"), "Grpc-Message");
         upstream_request_->encodeHeaders(response_headers, false);
         for (const auto& response_message_str : grpc_response_messages) {
           ResponseType response_message;
@@ -119,6 +121,14 @@ protected:
 
     response->waitForEndStream();
     EXPECT_TRUE(response->complete());
+
+    if (response->headers().get(Http::LowerCaseString("transfer-encoding")) == nullptr ||
+        strncmp(
+            response->headers().get(Http::LowerCaseString("transfer-encoding"))->value().c_str(),
+            "chunked", strlen("chunked")) != 0) {
+      EXPECT_EQ(response->headers().get(Http::LowerCaseString("trailer")), nullptr);
+    }
+
     response_headers.iterate(
         [](const Http::HeaderEntry& entry, void* context) -> Http::HeaderMap::Iterate {
           IntegrationStreamDecoder* response = static_cast<IntegrationStreamDecoder*>(context);

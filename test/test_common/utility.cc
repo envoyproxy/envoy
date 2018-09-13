@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <list>
 #include <stdexcept>
@@ -25,6 +26,7 @@
 
 #include "test/test_common/printers.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
 
@@ -32,16 +34,49 @@ using testing::GTEST_FLAG(random_seed);
 
 namespace Envoy {
 
-static const int32_t SEED = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                std::chrono::system_clock::now().time_since_epoch())
-                                .count();
+// The purpose of using the static seed here is to use --test_arg=--gtest_random_seed=[seed]
+// to specify the seed of the problem to replay.
+int32_t getSeed() {
+  static const int32_t seed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                  std::chrono::system_clock::now().time_since_epoch())
+                                  .count();
+  return seed;
+}
 
 TestRandomGenerator::TestRandomGenerator()
-    : seed_(GTEST_FLAG(random_seed) == 0 ? SEED : GTEST_FLAG(random_seed)), generator_(seed_) {
+    : seed_(GTEST_FLAG(random_seed) == 0 ? getSeed() : GTEST_FLAG(random_seed)), generator_(seed_) {
   std::cerr << "TestRandomGenerator running with seed " << seed_ << "\n";
 }
 
 uint64_t TestRandomGenerator::random() { return generator_(); }
+
+bool TestUtility::headerMapEqualIgnoreOrder(const Http::HeaderMap& lhs,
+                                            const Http::HeaderMap& rhs) {
+  if (lhs.size() != rhs.size()) {
+    return false;
+  }
+
+  struct State {
+    const Http::HeaderMap& lhs;
+    bool equal;
+  };
+
+  State state{lhs, true};
+  rhs.iterate(
+      [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
+        State* state = static_cast<State*>(context);
+        const Http::HeaderEntry* entry =
+            state->lhs.get(Http::LowerCaseString(std::string(header.key().c_str())));
+        if (entry == nullptr || (entry->value() != header.value().c_str())) {
+          state->equal = false;
+          return Http::HeaderMap::Iterate::Break;
+        }
+        return Http::HeaderMap::Iterate::Continue;
+      },
+      &state);
+
+  return state.equal;
+}
 
 bool TestUtility::buffersEqual(const Buffer::Instance& lhs, const Buffer::Instance& rhs) {
   if (lhs.length() != rhs.length()) {
@@ -183,6 +218,29 @@ void ConditionalInitializer::waitReady() {
 
 ScopedFdCloser::ScopedFdCloser(int fd) : fd_(fd) {}
 ScopedFdCloser::~ScopedFdCloser() { ::close(fd_); }
+
+AtomicFileUpdater::AtomicFileUpdater(const std::string& filename)
+    : link_(filename), new_link_(absl::StrCat(filename, ".new")),
+      target1_(absl::StrCat(filename, ".target1")), target2_(absl::StrCat(filename, ".target2")),
+      use_target1_(true) {
+  unlink(link_.c_str());
+  unlink(new_link_.c_str());
+  unlink(target1_.c_str());
+  unlink(target2_.c_str());
+}
+
+void AtomicFileUpdater::update(const std::string& contents) {
+  const std::string target = use_target1_ ? target1_ : target2_;
+  use_target1_ = !use_target1_;
+  {
+    std::ofstream file(target);
+    file << contents;
+  }
+  int rc = symlink(target.c_str(), new_link_.c_str());
+  ASSERT_EQ(0, rc) << strerror(errno);
+  rc = rename(new_link_.c_str(), link_.c_str());
+  ASSERT_EQ(0, rc) << strerror(errno);
+}
 
 constexpr std::chrono::milliseconds TestUtility::DefaultTimeout;
 

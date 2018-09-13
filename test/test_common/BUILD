@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_basic_cc_library",
     "envoy_cc_library",
+    "envoy_cc_test",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -92,6 +93,14 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test(
+    name = "utility_test",
+    srcs = ["utility_test.cc"],
+    deps = [
+        ":utility_lib",
+    ],
+)
+
 envoy_cc_test_library(
     name = "logging_lib",
     srcs = ["logging.cc"],
@@ -115,7 +124,7 @@ envoy_cc_test_library(
     srcs = ["test_time.cc"],
     hdrs = ["test_time.h"],
     deps = [
-        "//source/common/common:utility_lib",
+        "//source/common/event:real_time_system_lib",
     ],
 )
 

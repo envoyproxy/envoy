@@ -27,11 +27,21 @@ MockProtocol::MockProtocol() {
   ON_CALL(*this, setType(_)).WillByDefault(Invoke([&](ProtocolType type) -> void {
     type_ = type;
   }));
+  ON_CALL(*this, supportsUpgrade()).WillByDefault(Return(false));
 }
 MockProtocol::~MockProtocol() {}
 
 MockDecoderCallbacks::MockDecoderCallbacks() {}
 MockDecoderCallbacks::~MockDecoderCallbacks() {}
+
+MockDecoderEventHandler::MockDecoderEventHandler() {}
+MockDecoderEventHandler::~MockDecoderEventHandler() {}
+
+MockDirectResponse::MockDirectResponse() {}
+MockDirectResponse::~MockDirectResponse() {}
+
+MockThriftObject::MockThriftObject() {}
+MockThriftObject::~MockThriftObject() {}
 
 namespace ThriftFilters {
 

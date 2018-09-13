@@ -7,8 +7,8 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
@@ -379,6 +379,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
         [this]() -> void { onIdleTimeout(); });
     resetIdleTimer();
   }
+  request_info_.setRequestedServerName(
+      connection_manager_.read_callbacks_->connection().requestedServerName());
 }
 
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
@@ -580,7 +582,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   // Modify the downstream remote address depending on configuration and headers.
   request_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
-      *request_headers_, protocol, connection_manager_.read_callbacks_->connection(),
+      *request_headers_, connection_manager_.read_callbacks_->connection(),
       connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
       connection_manager_.runtime_, connection_manager_.local_info_));
   ASSERT(request_info_.downstreamRemoteAddress() != nullptr);
