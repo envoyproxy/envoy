@@ -263,6 +263,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       }
 
       if (!streams_.empty() && streams_.front()->state_.remote_complete_ &&
+
           !isOldStyleWebSocketConnection()) {
         read_callbacks_->connection().readDisable(true);
       }
@@ -330,15 +331,21 @@ void ConnectionManagerImpl::onIdleTimeout() {
   }
 }
 
+void ConnectionManagerImpl::onRequestTimeout() {
+  ENVOY_CONN_LOG(debug, "request timeout", read_callbacks_->connection());
+  // TODO stats_.named_.downstream_cx_idle_timeout_.inc();
+  if (!codec_) {
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  } else if (drain_state_ == DrainState::NotDraining) {
+    startDrainSequence();
+  }
+}
+
 void ConnectionManagerImpl::onDrainTimeout() {
   ASSERT(drain_state_ != DrainState::NotDraining);
   codec_->goAway();
   drain_state_ = DrainState::Closing;
   checkForDeferredClose();
-}
-
-void ConnectionManagerImpl::onRequestTimeout() {
-  ENVOY_CONN_LOG(debug, "request timeout", read_callbacks_->connection());
 }
 
 void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_reason,
@@ -393,10 +400,10 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
   }
 
   if (connection_manager_.config_.streamRequestTimeout().count()) {
-    request_timeout_ms_ = std::chrono::seconds(200);
+    request_timeout_ms_ = connection_manager_.config_.streamRequestTimeout();
     request_timer_ = connection_manager.read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onRequestTimeout(); });
-    // resetRequestTimer();
+    request_timer_->enableTimer(request_timeout_ms_);
   }
 
   request_info_.setRequestedServerName(
@@ -452,7 +459,14 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
 }
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
-  std::cout << "I am auni";
+  std::cerr << "I am a stream timing out\n";
+  if (response_headers_ != nullptr) {
+    connection_manager_.doEndStream(*this);
+  } else {
+    sendLocalReply(request_headers_ != nullptr &&
+                       Grpc::Common::hasGrpcContentType(*request_headers_),
+                   Http::Code::RequestTimeout, "request timeout", nullptr, is_head_request_);
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(
@@ -895,6 +909,11 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(HeaderMapPtr&& trailers
 
 void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilter* filter,
                                                          HeaderMap& trailers) {
+
+  // TODO disarm request timer in three points, Maybe in
+  // decodeTrailers/decodeHeaders/decodeBody (dependent on
+  // request_info->complete). Def in encode and encode100.
+
   // See decodeData() above for why we check local_complete_ here.
   if (state_.local_complete_) {
     return;
@@ -985,6 +1004,8 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     ActiveStreamEncoderFilter* filter, HeaderMap& headers) {
   resetIdleTimer();
+  if (request_timer_) request_timer_->disableTimer();
+
   ASSERT(connection_manager_.config_.proxy100Continue());
   // Make sure commonContinue continues encode100ContinueHeaders.
   has_continue_headers_ = true;
@@ -1022,6 +1043,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
                                                         HeaderMap& headers, bool end_stream) {
   resetIdleTimer();
+  if (request_timer_) request_timer_->disableTimer();
 
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   std::list<ActiveStreamEncoderFilterPtr>::iterator continue_data_entry = encoder_filters_.end();
