@@ -21,6 +21,10 @@ const char AutonomousStream::RESPONSE_SIZE_BYTES[] = "response_size_bytes";
 const char AutonomousStream::EXPECT_REQUEST_SIZE_BYTES[] = "expect_request_size_bytes";
 const char AutonomousStream::RESET_AFTER_REQUEST[] = "reset_after_request";
 
+AutonomousStream::AutonomousStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
+                                   AutonomousUpstream& upstream)
+    : FakeStream(parent, encoder, upstream.timeSystem()), upstream_(upstream) {}
+
 // For now, assert all streams which are started are completed.
 // Support for incomplete streams can be added when needed.
 AutonomousStream::~AutonomousStream() { RELEASE_ASSERT(complete(), ""); }
@@ -55,6 +59,12 @@ void AutonomousStream::sendResponse() {
   encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
   encodeData(response_body_length, true);
 }
+
+AutonomousHttpConnection::AutonomousHttpConnection(SharedConnectionWrapper& shared_connection,
+                                                   Stats::Store& store, Type type,
+                                                   AutonomousUpstream& upstream)
+    : FakeHttpConnection(shared_connection, store, type, upstream.timeSystem()),
+      upstream_(upstream) {}
 
 Http::StreamDecoder& AutonomousHttpConnection::newStream(Http::StreamEncoder& response_encoder) {
   auto stream = new AutonomousStream(*this, response_encoder, upstream_);

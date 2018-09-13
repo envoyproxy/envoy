@@ -13,8 +13,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::Property;
-
 namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {

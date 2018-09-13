@@ -168,6 +168,7 @@ private:
     ResponseDecoderPtr response_decoder_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     Buffer::OwnedImpl response_buffer_;
+    int32_t original_sequence_id_{0};
   };
 
   typedef std::unique_ptr<ActiveRpc> ActiveRpcPtr;
