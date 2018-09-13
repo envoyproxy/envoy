@@ -26,8 +26,8 @@
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
-#include "test/test_common/registry.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/registry.h"
 
 #include "gtest/gtest.h"
 
