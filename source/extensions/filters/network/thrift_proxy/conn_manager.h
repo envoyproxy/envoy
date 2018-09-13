@@ -191,6 +191,7 @@ private:
   Buffer::OwnedImpl request_buffer_;
   Runtime::RandomGenerator& random_generator_;
   bool stopped_{false};
+  bool half_closed_{false};
 };
 
 } // namespace ThriftProxy

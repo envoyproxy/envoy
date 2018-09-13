@@ -24,24 +24,29 @@ ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& r
 ConnectionManager::~ConnectionManager() {}
 
 Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end_stream) {
-  UNREFERENCED_PARAMETER(end_stream);
-
   request_buffer_.move(data);
   dispatch();
 
-  if (end_stream && stopped_) {
-    ASSERT(!rpcs_.empty());
-    MessageMetadata& metadata = *(*rpcs_.begin())->metadata_;
-    ASSERT(metadata.hasMessageType());
-    if (metadata.messageType() != MessageType::Oneway) {
-      // Downstream has closed, so unless we're still processing a oneway request, close. By
-      // writing an empty buffer with end_stream set, we allow a remote close event to be
-      // triggered, which maintains accurate bookkeeping of which end of the connection closed
-      // during an active request.
-      ENVOY_CONN_LOG(trace, "downstream half-closed", read_callbacks_->connection());
-      Buffer::OwnedImpl empty;
-      read_callbacks_->connection().write(empty, true);
+  if (end_stream) {
+    ENVOY_CONN_LOG(trace, "downstream half-closed", read_callbacks_->connection());
+
+    // Downstream has closed. Unless we're waiting for an upstream connection to complete a oneway
+    // request, close. The special case for oneway requests allows them to complete before the
+    // ConnectionManager is destroyed.
+    if (stopped_) {
+      ASSERT(!rpcs_.empty());
+      MessageMetadata& metadata = *(*rpcs_.begin())->metadata_;
+      ASSERT(metadata.hasMessageType());
+      if (metadata.messageType() == MessageType::Oneway) {
+        ENVOY_CONN_LOG(trace, "waiting for one-way completion", read_callbacks_->connection());
+        half_closed_ = true;
+        return Network::FilterStatus::StopIteration;
+      }
     }
+
+    // Make sure a remote event is counted.
+    onEvent(Network::ConnectionEvent::RemoteClose);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 
   return Network::FilterStatus::StopIteration;
@@ -101,6 +106,13 @@ void ConnectionManager::continueDecoding() {
   ENVOY_CONN_LOG(debug, "thrift filter continued", read_callbacks_->connection());
   stopped_ = false;
   dispatch();
+
+  if (!stopped_ && half_closed_) {
+    // If we're half closed, but not stopped waiting for an upstream, close the connection, making
+    // sure a remote event is counted.
+    onEvent(Network::ConnectionEvent::RemoteClose);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  }
 }
 
 void ConnectionManager::doDeferredRpcDestroy(ConnectionManager::ActiveRpc& rpc) {
