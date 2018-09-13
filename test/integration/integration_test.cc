@@ -444,7 +444,8 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
       [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
-        hcm.mutable_delayed_close_timeout()->set_nanos(500000000);
+        // 200ms.
+        hcm.mutable_delayed_close_timeout()->set_nanos(200000000);
       });
 
   initialize();
@@ -465,7 +466,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
 
   response->waitForEndStream();
   // The delayed close timeout should trigger since client is not closing the connection.
-  EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(750)));
+  EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(2000)));
   EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             1);
