@@ -172,9 +172,8 @@ public:
         .WillRepeatedly(
             Invoke([&]() -> Tcp::ConnectionPool::ConnectionState* { return conn_state_.get(); }));
 
-    NiceMock<Network::MockClientConnection> connection;
-    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection));
-    EXPECT_EQ(&connection, router_->downstreamConnection());
+    EXPECT_CALL(callbacks_, connection()).WillRepeatedly(Return(&connection_));
+    EXPECT_EQ(&connection_, router_->downstreamConnection());
 
     // Not yet implemented:
     EXPECT_EQ(absl::optional<uint64_t>(), router_->computeHashKey());
