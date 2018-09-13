@@ -202,7 +202,6 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder)
   if (read_callbacks_->connection().aboveHighWatermark()) {
     new_stream->callHighWatermarkCallbacks();
   }
-
   new_stream->moveIntoList(std::move(new_stream), streams_);
   return **streams_.begin();
 }
