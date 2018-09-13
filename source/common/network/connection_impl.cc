@@ -73,7 +73,6 @@ ConnectionImpl::~ConnectionImpl() {
   if (delayed_close_timer_) {
     // It's ok to disable even if the timer has already fired.
     delayed_close_timer_->disableTimer();
-    delayed_close_timer_.reset();
   }
 
   // In general we assume that owning code has called close() previously to the destructor being
@@ -114,8 +113,22 @@ void ConnectionImpl::close(ConnectionCloseType type) {
   } else {
     ASSERT(type == ConnectionCloseType::FlushWrite ||
            type == ConnectionCloseType::FlushWriteAndDelay);
+
+    // No need to continue if a FlushWrite/FlushWriteAndDelay has already been issued and there is a
+    // pending delayed close.
+    if (delayed_close_) {
+      return;
+    }
+
     delayed_close_ = true;
     bool delayed_close_timeout_set = delayedCloseTimeout().count() > 0;
+
+    // NOTE: the delayed close timeout (if set) affects both FlushWrite and FlushWriteAndDelay
+    // closes:
+    //   1. For FlushWrite, the timeout sets an upper bound on how long to wait for the flush to
+    //   complete before the connection is locally closed.
+    //   2. For FlushWriteAndDelay, the timeout specifies an upper bound on how long to wait for the
+    //   flush to complete and the peer to close the connection before it is locally closed.
 
     // All close types that follow do not actually close() the socket immediately so that buffered
     // data can be written. However, we do want to stop reading to apply TCP backpressure.
@@ -128,6 +141,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
     // Create and activate a timer which will immediately close the connection if triggered.
     // A config value of 0 disables the timeout.
     if (delayed_close_timeout_set) {
+      ASSERT(connection_stats_->delayed_close_timeouts_ != nullptr);
       delayed_close_timer_ = dispatcher_.createTimer([this]() -> void { onDelayedCloseTimeout(); });
       ENVOY_CONN_LOG(debug, "setting delayed close timer with timeout {} ms", *this,
                      delayedCloseTimeout().count());
@@ -561,7 +575,6 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 
 void ConnectionImpl::onDelayedCloseTimeout() {
   ENVOY_CONN_LOG(debug, "triggered delayed close", *this);
-  ASSERT(connection_stats_->delayed_close_timeouts_);
   connection_stats_->delayed_close_timeouts_->inc();
   closeSocket(ConnectionEvent::LocalClose);
 }

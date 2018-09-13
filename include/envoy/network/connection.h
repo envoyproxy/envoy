@@ -88,7 +88,7 @@ public:
     Stats::Gauge& write_current_;
     // Counter* as this is an optional counter. Bind errors will not be tracked if this is nullptr.
     Stats::Counter* bind_errors_;
-    // Optional counter. Delayed close semantics are only used by HTTP connections.
+    // Optional counter. Delayed close timeouts will not be tracked if this is nullptr.
     Stats::Counter* delayed_close_timeouts_;
   };
 
@@ -240,7 +240,6 @@ public:
 
   /**
    * Set the timeout for delayed connection close()s.
-   * This is only used for downstream connections processing HTTP/1 and HTTP/2.
    * @param timeout The timeout value in milliseconds
    */
   virtual void setDelayedCloseTimeout(std::chrono::milliseconds timeout) PURE;

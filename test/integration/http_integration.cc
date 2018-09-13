@@ -149,18 +149,24 @@ IntegrationCodecClient::startRequest(const Http::HeaderMap& headers) {
   return {encoder, std::move(response)};
 }
 
-bool IntegrationCodecClient::waitForDisconnect(uint32_t time_to_wait) {
+bool IntegrationCodecClient::waitForDisconnect(std::chrono::milliseconds time_to_wait) {
   Event::TimerPtr wait_timer;
   bool wait_timer_triggered = false;
-  if (time_to_wait) {
+  if (time_to_wait.count()) {
     wait_timer = connection_->dispatcher().createTimer([this, &wait_timer_triggered] {
       connection_->dispatcher().exit();
       wait_timer_triggered = true;
     });
-    wait_timer->enableTimer(std::chrono::milliseconds(time_to_wait));
+    wait_timer->enableTimer(time_to_wait);
   }
 
   connection_->dispatcher().run(Event::Dispatcher::RunType::Block);
+
+  // Disable the timer if it was created. This call is harmless if the timer already triggered.
+  if (wait_timer) {
+    wait_timer->disableTimer();
+  }
+
   if (wait_timer_triggered && !disconnected_) {
     return false;
   }

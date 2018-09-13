@@ -393,7 +393,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownOnGracefulClose) {
   EXPECT_STREQ("413", response->headers().Status()->value().c_str());
   // With no delayed close processing, Envoy will close the connection immediately after flushing
   // and this should instead return true.
-  EXPECT_FALSE(codec_client_->waitForDisconnect(500));
+  EXPECT_FALSE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
 
   // Issue a local close and check that the client did not pick up a remote close which can happen
   // when delayed close semantics are disabled.
@@ -434,7 +434,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownConfig) {
   // close may also lose data (Envoy is susceptible to this).
   // Therefore, avoid checking response code/payload here and instead simply look for the remote
   // close.
-  EXPECT_TRUE(codec_client_->waitForDisconnect(500));
+  EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(500)));
   EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
 }
 
@@ -465,7 +465,7 @@ TEST_P(IntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
 
   response->waitForEndStream();
   // The delayed close timeout should trigger since client is not closing the connection.
-  EXPECT_TRUE(codec_client_->waitForDisconnect(750));
+  EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(750)));
   EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
   EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
             1);

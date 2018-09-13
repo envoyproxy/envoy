@@ -34,7 +34,7 @@ public:
   void sendReset(Http::StreamEncoder& encoder);
   std::pair<Http::StreamEncoder&, IntegrationStreamDecoderPtr>
   startRequest(const Http::HeaderMap& headers);
-  bool waitForDisconnect(uint32_t time_to_wait = 0);
+  bool waitForDisconnect(std::chrono::milliseconds time_to_wait = std::chrono::milliseconds(0));
   Network::ClientConnection* connection() const { return connection_.get(); }
   Network::ConnectionEvent last_connection_event() const { return last_connection_event_; }
 
