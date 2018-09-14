@@ -6,8 +6,8 @@ namespace Grpc {
 MockAsyncRequest::MockAsyncRequest() {}
 MockAsyncRequest::~MockAsyncRequest() {}
 
-MockAsyncStream::MockAsyncStream();
-MockAsyncStream::~MockAsyncStream();
+MockAsyncStream::MockAsyncStream() {}
+MockAsyncStream::~MockAsyncStream() {}
 
 MockAsyncClientFactory::MockAsyncClientFactory() {}
 MockAsyncClientFactory::~MockAsyncClientFactory() {}
