@@ -1513,7 +1513,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutTriggers) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
-  // EXPECT_EQ(1U, stats_.named_.downstream_rq_idle_timeout_.value());
+  EXPECT_EQ(1U, stats_.named_.downstream_rq_path_timeout_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnEncodeHeaders) {
