@@ -58,6 +58,8 @@ OverloadAction::OverloadAction(const envoy::config::overload::v2alpha::OverloadA
           fmt::format("Duplicate trigger resource for overload action {}", config.name()));
     }
   }
+
+  active_gauge_.set(0);
 }
 
 bool OverloadAction::updateResourcePressure(const std::string& name, double pressure) {

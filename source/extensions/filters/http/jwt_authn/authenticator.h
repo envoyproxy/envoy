@@ -1,5 +1,7 @@
 #pragma once
+#include <functional>
 
+#include "extensions/filters/http/common/jwks_fetcher.h"
 #include "extensions/filters/http/jwt_authn/filter_config.h"
 
 #include "jwt_verify_lib/status.h"
@@ -13,9 +15,13 @@ class Authenticator;
 typedef std::unique_ptr<Authenticator> AuthenticatorPtr;
 
 /**
+ *  CreateJwksFetcherCb is a callback interface for creating a JwksFetcher instance.
+ */
+typedef std::function<Common::JwksFetcherPtr(Upstream::ClusterManager&)> CreateJwksFetcherCb;
+
+/**
  *  Authenticator object to handle all JWT authentication flow.
  */
-
 class Authenticator {
 public:
   virtual ~Authenticator() {}
@@ -35,7 +41,8 @@ public:
   virtual void sanitizePayloadHeaders(Http::HeaderMap& headers) const PURE;
 
   // Authenticator factory function.
-  static AuthenticatorPtr create(FilterConfigSharedPtr config);
+  static AuthenticatorPtr create(FilterConfigSharedPtr config,
+                                 CreateJwksFetcherCb createJwksFetcherCb);
 };
 
 } // namespace JwtAuthn
