@@ -62,14 +62,20 @@ public:
 
 private:
   class SimulatedScheduler;
-  friend class SimulatedScheduler;
   class Alarm;
-  friend class Alarm;
   struct CompareAlarms {
     bool operator()(const Alarm* a, const Alarm* b) const;
   };
-  typedef std::set<Alarm*, CompareAlarms> AlarmSet;
+  using AlarmSet = std::set<Alarm*, CompareAlarms>;
 
+  /**
+   * Sets the time forward monotonically. If the supplied argument moves
+   * backward in time, the call is a no-op. If the supplied argument moves
+   * forward, any applicable timers are fired, and system-time is also moved
+   * forward by the same delta.
+   *
+   * @param monotonic_time The desired new current time.
+   */
   void setMonotonicTimeAndUnlock(const MonotonicTime& monotonic_time) UNLOCK_FUNCTION(mutex_);
 
   // The simulation keeps a unique ID for each alarm to act as a deterministic

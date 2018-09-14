@@ -152,6 +152,10 @@ void SimulatedTimeSystem::setMonotonicTimeAndUnlock(const MonotonicTime& monoton
   // That can only happen here in alarm->activate(), which is run with the mutex
   // released.
   if (monotonic_time >= monotonic_time_) {
+    // Alarms is a std::set ordered by wakeup time, so pulling off begin() each
+    // iteration gives you wakeup order. Also note that alarms may be added
+    // or removed during the call to activate() so it would not be correct to
+    // range-iterate over the set.
     while (!alarms_.empty()) {
       AlarmSet::iterator pos = alarms_.begin();
       Alarm* alarm = *pos;
