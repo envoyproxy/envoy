@@ -40,9 +40,8 @@ protected:
         }
       )EOF",
                                                            injected_resource_filename_);
-      const bool success = Protobuf::TextFormat::ParseFromString(
-          overload_config, bootstrap.mutable_overload_manager());
-      ASSERT(success);
+      ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(overload_config,
+                                                        bootstrap.mutable_overload_manager()));
     });
     updateResource(0);
     HttpIntegrationTest::initialize();
