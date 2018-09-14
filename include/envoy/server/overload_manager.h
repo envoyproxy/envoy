@@ -98,7 +98,10 @@ public:
 
   /**
    * Convenience method to get a statically allocated reference to the inactive overload
-   * action state.
+   * action state. Useful for code that needs to initialize a reference either to an
+   * entry in the ThreadLocalOverloadState map (if overload behavior is enabled) or to
+   * some other static memory location set to the inactive state (if overload behavior
+   * is disabled).
    */
   static const OverloadActionState& getInactiveState() {
     CONSTRUCT_ON_FIRST_USE(OverloadActionState, OverloadActionState::Inactive);

@@ -419,7 +419,6 @@ TEST_F(HttpConnectionManagerImplTest, 100ContinueResponse) {
   StreamDecoder* decoder = nullptr;
   NiceMock<MockStreamEncoder> encoder;
   EXPECT_CALL(*codec_, dispatch(_))
-      .Times(1)
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
         decoder = &conn_manager_->newStream(encoder);
 
@@ -1116,7 +1115,6 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutNotConfigured) {
 
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, createTimer_(_)).Times(0);
   EXPECT_CALL(*codec_, dispatch(_))
-      .Times(1)
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
         StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
 
@@ -1139,7 +1137,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutGlobal) {
   stream_idle_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
-  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
     Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
     EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(10)));
     conn_manager_->newStream(response_encoder_);
@@ -1174,7 +1172,6 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteOverride) {
       .WillByDefault(Return(std::chrono::milliseconds(30)));
 
   EXPECT_CALL(*codec_, dispatch(_))
-      .Times(1)
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
         Event::MockTimer* idle_timer =
             new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
@@ -1203,7 +1200,6 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteZeroOverride) {
       .WillByDefault(Return(std::chrono::milliseconds(0)));
 
   EXPECT_CALL(*codec_, dispatch(_))
-      .Times(1)
       .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> void {
         Event::MockTimer* idle_timer =
             new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
@@ -1874,8 +1870,8 @@ TEST_F(HttpConnectionManagerImplTest, FooUpgradeDrainClose) {
         EXPECT_STREQ("upgrade", headers.Connection()->value().c_str());
       }));
 
-  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_)).Times(1);
-  EXPECT_CALL(*filter, setEncoderFilterCallbacks(_)).Times(1);
+  EXPECT_CALL(*filter, setDecoderFilterCallbacks(_));
+  EXPECT_CALL(*filter, setEncoderFilterCallbacks(_));
 
   EXPECT_CALL(filter_factory_, createUpgradeFilterChain(_, _))
       .WillRepeatedly(
@@ -2681,7 +2677,7 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
   // Mimic the upstream connection backing up. The router would call
   // onDecoderFilterAboveWriteBufferHighWatermark which should readDisable the stream and increment
   // stats.
-  EXPECT_CALL(response_encoder_, getStream()).Times(1).WillOnce(ReturnRef(stream_));
+  EXPECT_CALL(response_encoder_, getStream()).WillOnce(ReturnRef(stream_));
   EXPECT_CALL(stream_, readDisable(true));
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
@@ -2689,14 +2685,14 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
 
   // Resume the flow of data. When the router buffer drains it calls
   // onDecoderFilterBelowWriteBufferLowWatermark which should re-enable reads on the stream.
-  EXPECT_CALL(response_encoder_, getStream()).Times(1).WillOnce(ReturnRef(stream_));
+  EXPECT_CALL(response_encoder_, getStream()).WillOnce(ReturnRef(stream_));
   EXPECT_CALL(stream_, readDisable(false));
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   decoder_filters_[0]->callbacks_->onDecoderFilterBelowWriteBufferLowWatermark();
   EXPECT_EQ(1U, stats_.named_.downstream_flow_control_resumed_reading_total_.value());
 
   // Backup upstream once again.
-  EXPECT_CALL(response_encoder_, getStream()).Times(1).WillOnce(ReturnRef(stream_));
+  EXPECT_CALL(response_encoder_, getStream()).WillOnce(ReturnRef(stream_));
   EXPECT_CALL(stream_, readDisable(true));
   ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
   decoder_filters_[0]->callbacks_->onDecoderFilterAboveWriteBufferHighWatermark();
