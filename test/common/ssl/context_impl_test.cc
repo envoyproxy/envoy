@@ -455,6 +455,11 @@ TEST(ClientContextConfigImplTest, SecretNotReady) {
   ClientContextConfigImpl client_context_config(tls_context, factory_context);
   // When sds secret is not downloaded, config is not ready.
   EXPECT_FALSE(client_context_config.isReady());
+  // Set various callbacks to config.
+  NiceMock<Secret::MockSecretCallbacks> secret_callback;
+  client_context_config.setSecretUpdateCallback(
+      [&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+  client_context_config.setSecretUpdateCallback([]() {});
 }
 
 // Validate that client context config with static TLS certificates is created successfully.
@@ -653,6 +658,11 @@ TEST(ServerContextConfigImplTest, SecretNotReady) {
   ServerContextConfigImpl server_context_config(tls_context, factory_context);
   // When sds secret is not downloaded, config is not ready.
   EXPECT_FALSE(server_context_config.isReady());
+  // Set various callbacks to config.
+  NiceMock<Secret::MockSecretCallbacks> secret_callback;
+  server_context_config.setSecretUpdateCallback(
+      [&secret_callback]() { secret_callback.onAddOrUpdateSecret(); });
+  server_context_config.setSecretUpdateCallback([]() {});
 }
 
 // TlsCertificate messages must have a cert for servers.

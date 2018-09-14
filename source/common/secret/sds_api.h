@@ -47,9 +47,8 @@ public:
 
 protected:
   // Creates new secrets.
-  virtual void set_secret(const envoy::api::v2::auth::Secret&) PURE;
+  virtual void setSecret(const envoy::api::v2::auth::Secret&) PURE;
   Common::CallbackManager<> update_callback_manager_;
-  uint64_t secret_hash_;
 
 private:
   void runInitializeCallbackIfAny();
@@ -65,6 +64,7 @@ private:
   std::function<void()> initialize_callback_;
   const std::string sds_config_name_;
 
+  uint64_t secret_hash_;
   Cleanup clean_up_;
 };
 
@@ -103,7 +103,7 @@ public:
   }
 
 protected:
-  void set_secret(const envoy::api::v2::auth::Secret& secret) override {
+  void setSecret(const envoy::api::v2::auth::Secret& secret) override {
     tls_certificate_secrets_ =
         std::make_unique<Ssl::TlsCertificateConfigImpl>(secret.tls_certificate());
   }
@@ -149,7 +149,7 @@ public:
   }
 
 protected:
-  void set_secret(const envoy::api::v2::auth::Secret& secret) override {
+  void setSecret(const envoy::api::v2::auth::Secret& secret) override {
     certificate_validation_context_secrets_ =
         std::make_unique<Ssl::CertificateValidationContextConfigImpl>(secret.validation_context());
   }
