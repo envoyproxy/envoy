@@ -441,7 +441,6 @@ private:
   void resetAllStreams();
   void onIdleTimeout();
   void onDrainTimeout();
-  void onRequestTimeout();
   void startDrainSequence();
 
   bool isOldStyleWebSocketConnection() const { return ws_connection_ != nullptr; }

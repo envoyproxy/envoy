@@ -331,16 +331,6 @@ void ConnectionManagerImpl::onIdleTimeout() {
   }
 }
 
-void ConnectionManagerImpl::onRequestTimeout() {
-  ENVOY_CONN_LOG(debug, "request timeout", read_callbacks_->connection());
-  // TODO stats_.named_.downstream_cx_idle_timeout_.inc();
-  if (!codec_) {
-    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-  } else if (drain_state_ == DrainState::NotDraining) {
-    startDrainSequence();
-  }
-}
-
 void ConnectionManagerImpl::onDrainTimeout() {
   ASSERT(drain_state_ != DrainState::NotDraining);
   codec_->goAway();
