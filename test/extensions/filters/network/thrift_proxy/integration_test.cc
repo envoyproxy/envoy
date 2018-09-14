@@ -253,7 +253,8 @@ TEST_P(ThriftConnManagerIntegrationTest, Exception) {
 TEST_P(ThriftConnManagerIntegrationTest, EarlyClose) {
   initializeCall(DriverMode::Success);
 
-  std::string partial_request = request_bytes_.toString().substr(0, request_bytes_.length() - 5);
+  const std::string partial_request =
+      request_bytes_.toString().substr(0, request_bytes_.length() - 5);
 
   FakeUpstream* expected_upstream = getExpectedUpstream(false);
   expected_upstream->set_allow_unexpected_disconnects(true);
@@ -277,7 +278,8 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyClose) {
 TEST_P(ThriftConnManagerIntegrationTest, EarlyCloseWithUpstream) {
   initializeCall(DriverMode::Success);
 
-  std::string partial_request = request_bytes_.toString().substr(0, request_bytes_.length() - 5);
+  const std::string partial_request =
+      request_bytes_.toString().substr(0, request_bytes_.length() - 5);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(partial_request);
@@ -338,7 +340,8 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClose) {
 TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClosePartialRequest) {
   initializeOneway();
 
-  std::string partial_request = request_bytes_.toString().substr(0, request_bytes_.length() - 1);
+  const std::string partial_request =
+      request_bytes_.toString().substr(0, request_bytes_.length() - 1);
 
   FakeUpstream* expected_upstream = getExpectedUpstream(true);
   expected_upstream->set_allow_unexpected_disconnects(true);
