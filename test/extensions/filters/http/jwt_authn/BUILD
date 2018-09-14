@@ -51,10 +51,9 @@ envoy_extension_cc_test(
     srcs = ["filter_factory_test.cc"],
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
-        ":test_common_lib",
         "//source/extensions/filters/http/jwt_authn:config",
+        "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/mocks/server:server_mocks",
-        "//test/test_common:utility_lib",
     ],
 )
 
@@ -63,8 +62,9 @@ envoy_extension_cc_test(
     srcs = ["jwks_cache_test.cc"],
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
-        ":test_common_lib",
+        "//source/extensions/filters/http/common:jwks_fetcher_lib",
         "//source/extensions/filters/http/jwt_authn:jwks_cache_lib",
+        "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -75,10 +75,12 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         ":mock_lib",
-        ":test_common_lib",
+        "//source/extensions/filters/http/common:jwks_fetcher_lib",
         "//source/extensions/filters/http/jwt_authn:authenticator_lib",
         "//source/extensions/filters/http/jwt_authn:filter_config_interface",
         "//source/extensions/filters/http/jwt_authn:matchers_lib",
+        "//test/extensions/filters/http/common:mock_lib",
+        "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
     ],
@@ -89,9 +91,9 @@ envoy_extension_cc_test(
     srcs = ["filter_integration_test.cc"],
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
-        ":test_common_lib",
         "//source/extensions/filters/http/jwt_authn:config",
         "//test/config:utility_lib",
+        "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/integration:http_protocol_integration_lib",
     ],
 )

@@ -22,10 +22,12 @@ public:
   void SetUp() {
     MessageUtil::loadFromYaml(ExampleConfig, config_);
     cache_ = JwksCache::create(config_);
+    jwks_ = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
   }
 
   JwtAuthentication config_;
   JwksCachePtr cache_;
+  google::jwt_verify::JwksPtr jwks_;
 };
 
 // Test findByIssuer
@@ -44,7 +46,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwks) {
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
 
-  EXPECT_EQ(jwks->setRemoteJwks(PublicKey), Status::Ok);
+  EXPECT_EQ(jwks->setRemoteJwks(std::move(jwks_))->getStatus(), Status::Ok);
   EXPECT_FALSE(jwks->getJwksObj() == nullptr);
   EXPECT_FALSE(jwks->isExpired());
 
@@ -63,7 +65,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwksWithDefaultCacheDuration) {
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
 
-  EXPECT_EQ(jwks->setRemoteJwks(PublicKey), Status::Ok);
+  EXPECT_EQ(jwks->setRemoteJwks(std::move(jwks_))->getStatus(), Status::Ok);
   EXPECT_FALSE(jwks->getJwksObj() == nullptr);
   EXPECT_FALSE(jwks->isExpired());
 }

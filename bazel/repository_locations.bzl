@@ -63,19 +63,22 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/nanopb/nanopb/archive/f8ac463766281625ad710900479130c7fcb4d63b.tar.gz"],
     ),
     io_opentracing_cpp = dict(
-        commit = "3b36b084a4d7fffc196eac83203cf24dfb8696b3",  # v1.4.2
-        remote = "https://github.com/opentracing/opentracing-cpp",
+        sha256 = "4455ca507936bc4b658ded10a90d8ebbbd61c58f06207be565a4ffdc885687b5",
+        strip_prefix = "opentracing-cpp-1.5.0",
+        urls = ["https://github.com/opentracing/opentracing-cpp/archive/v1.5.0.tar.gz"],
     ),
     com_lightstep_tracer_cpp = dict(
-        commit = "ae6a6bba65f8c4d438a6a3ac855751ca8f52e1dc",
-        remote = "https://github.com/lightstep/lightstep-tracer-cpp",  # v0.7.1
+        sha256 = "defbf471facfebde6523ca1177529b63784893662d4ef2c60db074be8aef0634",
+        strip_prefix = "lightstep-tracer-cpp-0.8.0",
+        urls = ["https://github.com/lightstep/lightstep-tracer-cpp/archive/v0.8.0.tar.gz"],
     ),
     lightstep_vendored_googleapis = dict(
+        # From: https://github.com/lightstep/lightstep-tracer-cpp/blob/v0.8.0/lightstep-tracer-common/third_party/googleapis/README.lightstep-tracer-common#L6
         commit = "d6f78d948c53f3b400bb46996eb3084359914f9b",
         remote = "https://github.com/google/googleapis",
     ),
     com_github_google_jwt_verify = dict(
-        commit = "4eb9e96485b71e00d43acc7207501caafb085b4a",  # 2018-06-11
+        commit = "66792a057ec54e4b75c6a2eeda4e98220bd12a9a",  # 2018-08-17
         remote = "https://github.com/google/jwt_verify_lib",
     ),
     com_github_nodejs_http_parser = dict(

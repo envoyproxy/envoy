@@ -53,8 +53,9 @@ public:
     // Return true if jwks object is expired.
     virtual bool isExpired() const PURE;
 
-    // Set a remote Jwks string.
-    virtual ::google::jwt_verify::Status setRemoteJwks(const std::string& jwks_str) PURE;
+    // Set a remote Jwks.
+    virtual const ::google::jwt_verify::Jwks*
+    setRemoteJwks(::google::jwt_verify::JwksPtr&& jwks) PURE;
   };
 
   // Lookup issuer cache map. The cache only stores Jwks specified in the config.

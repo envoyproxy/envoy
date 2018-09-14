@@ -2,6 +2,7 @@
 
 #include "envoy/server/filter_config.h"
 
+#include "extensions/filters/http/common/jwks_fetcher.h"
 #include "extensions/filters/http/jwt_authn/extractor.h"
 #include "extensions/filters/http/jwt_authn/jwks_cache.h"
 
@@ -19,9 +20,13 @@ typedef std::unique_ptr<Authenticator> AuthenticatorPtr;
 typedef std::function<void(const ::google::jwt_verify::Status& status)> AuthenticatorCallback;
 
 /**
+ *  CreateJwksFetcherCb is a callback interface for creating a JwksFetcher instance.
+ */
+typedef std::function<Common::JwksFetcherPtr(Upstream::ClusterManager&)> CreateJwksFetcherCb;
+
+/**
  *  Authenticator object to handle all JWT authentication flow.
  */
-
 class Authenticator {
 public:
   virtual ~Authenticator() {}
@@ -37,7 +42,8 @@ public:
   // Authenticator factory function.
   static AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,
                                  const absl::optional<std::string>& provider, bool allow_failed,
-                                 JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager);
+                                 JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager,
+                                 CreateJwksFetcherCb createJwksFetcherCb);
 };
 
 /**

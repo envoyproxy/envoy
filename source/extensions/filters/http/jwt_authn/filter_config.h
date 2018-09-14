@@ -104,7 +104,7 @@ public:
   AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,
                           const absl::optional<std::string>& provider) const override {
     return Authenticator::create(check_audience, provider, !provider, getCache().getJwksCache(),
-                                 cm());
+                                 cm(), Common::JwksFetcher::create);
   }
 
 private:

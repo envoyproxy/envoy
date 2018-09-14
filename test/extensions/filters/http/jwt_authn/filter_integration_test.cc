@@ -59,9 +59,7 @@ TEST_P(LocalJwksIntegrationTest, WithGoodToken) {
   EXPECT_EQ(payload_entry->value().getStringView(), ExpectedPayloadValue);
   // Verify the token is removed.
   EXPECT_FALSE(upstream_request_->headers().Authorization());
-
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
-
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_STREQ("200", response->headers().Status()->value().c_str());

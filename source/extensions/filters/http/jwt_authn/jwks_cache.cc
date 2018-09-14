@@ -34,12 +34,13 @@ public:
 
     const auto inline_jwks = Config::DataSource::read(jwt_provider_.local_jwks(), true);
     if (!inline_jwks.empty()) {
-      const Status status = setKey(inline_jwks,
-                                   // inline jwks never expires.
-                                   std::chrono::steady_clock::time_point::max());
-      if (status != Status::Ok) {
+      auto ptr = setKey(
+          ::google::jwt_verify::Jwks::createFrom(inline_jwks, ::google::jwt_verify::Jwks::JWKS),
+          std::chrono::steady_clock::time_point::max());
+      if (ptr->getStatus() != Status::Ok) {
         ENVOY_LOG(warn, "Invalid inline jwks for issuer: {}, jwks: {}", jwt_provider_.issuer(),
                   inline_jwks);
+        jwks_obj_.reset(nullptr);
       }
     }
   }
@@ -54,8 +55,8 @@ public:
 
   bool isExpired() const override { return std::chrono::steady_clock::now() >= expiration_time_; }
 
-  Status setRemoteJwks(const std::string& jwks_str) override {
-    return setKey(jwks_str, getRemoteJwksExpirationTime());
+  const ::google::jwt_verify::Jwks* setRemoteJwks(::google::jwt_verify::JwksPtr&& jwks) override {
+    return setKey(std::move(jwks), getRemoteJwksExpirationTime());
   }
 
 private:
@@ -71,15 +72,11 @@ private:
     return expire;
   }
 
-  // Set a Jwks as string.
-  Status setKey(const std::string& jwks_str, std::chrono::steady_clock::time_point expire) {
-    auto jwks_obj = Jwks::createFrom(jwks_str, Jwks::JWKS);
-    if (jwks_obj->getStatus() != Status::Ok) {
-      return jwks_obj->getStatus();
-    }
-    jwks_obj_ = std::move(jwks_obj);
+  const ::google::jwt_verify::Jwks* setKey(::google::jwt_verify::JwksPtr&& jwks,
+                                           std::chrono::steady_clock::time_point expire) {
+    jwks_obj_ = std::move(jwks);
     expiration_time_ = expire;
-    return Status::Ok;
+    return jwks_obj_.get();
   }
 
   // The jwt provider config.
