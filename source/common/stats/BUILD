@@ -59,6 +59,15 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "null_stat_data_lib",
+    srcs = ["null_stat_data.cc"],
+    hdrs = ["null_stat_data.h"],
+    deps = [
+        ":stat_data_allocator_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "raw_stat_data_lib",
     srcs = ["raw_stat_data.cc"],
     hdrs = ["raw_stat_data.h"],
