@@ -203,6 +203,11 @@ MockListener::~MockListener() { onDestroy(); }
 MockConnectionHandler::MockConnectionHandler() {}
 MockConnectionHandler::~MockConnectionHandler() {}
 
+MockIp::MockIp() {}
+MockIp::~MockIp() {}
+
+MockResolvedAddress::~MockResolvedAddress() {}
+
 MockTransportSocket::MockTransportSocket() {
   ON_CALL(*this, setTransportSocketCallbacks(_))
       .WillByDefault(Invoke([&](TransportSocketCallbacks& callbacks) { callbacks_ = &callbacks; }));

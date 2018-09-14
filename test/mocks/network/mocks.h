@@ -390,6 +390,9 @@ public:
 
 class MockIp : public Address::Ip {
 public:
+  MockIp();
+  ~MockIp();
+
   MOCK_CONST_METHOD0(addressAsString, const std::string&());
   MOCK_CONST_METHOD0(isAnyAddress, bool());
   MOCK_CONST_METHOD0(isUnicastAddress, bool());
@@ -403,6 +406,7 @@ class MockResolvedAddress : public Address::Instance {
 public:
   MockResolvedAddress(const std::string& logical, const std::string& physical)
       : logical_(logical), physical_(physical) {}
+  ~MockResolvedAddress();
 
   bool operator==(const Address::Instance& other) const override {
     return asString() == other.asString();
