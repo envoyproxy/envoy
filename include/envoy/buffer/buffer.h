@@ -236,21 +236,21 @@ public:
     constexpr const auto displacement = Endianness == ByteOrder::BigEndian ? sizeof(T) - Size : 0;
 
     auto result = static_cast<T>(0);
-    auto bytes = reinterpret_cast<char*>(std::addressof(result));
+    constexpr const auto all_bits_enabled = static_cast<T>(~static_cast<T>(0));
+
+    char* bytes = reinterpret_cast<char*>(std::addressof(result));
     copyOut(start, Size, &bytes[displacement]);
 
     constexpr const auto most_significant_read_byte =
         Endianness == ByteOrder::BigEndian ? displacement : Size - 1;
 
-    constexpr const auto all_bits_enabled = static_cast<T>(~static_cast<T>(0));
-
-    const auto extension =
+    const auto sign_extension_bits =
         std::is_signed<T>::value && Size < sizeof(T) && bytes[most_significant_read_byte] < 0
             ? static_cast<T>(static_cast<typename std::make_unsigned<T>::type>(all_bits_enabled)
                              << (Size * CHAR_BIT))
             : static_cast<T>(0);
 
-    return fromEndianness<Endianness>(static_cast<T>(result)) | extension;
+    return fromEndianness<Endianness>(static_cast<T>(result)) | sign_extension_bits;
   }
 
   /**
@@ -278,7 +278,7 @@ public:
    */
   template <typename T, ByteOrder Endianness = ByteOrder::Host, size_t Size = sizeof(T)>
   T drainInt() {
-    auto const result = peekInt<T, Endianness, Size>();
+    const auto result = peekInt<T, Endianness, Size>();
     drain(Size);
     return result;
   }
@@ -319,9 +319,9 @@ public:
    */
   template <ByteOrder Endianness = ByteOrder::Host, typename T, size_t Size = sizeof(T)>
   void writeInt(T value) {
-    static_assert(Size <= sizeof(T), "requested size is bigger than integer being read");
+    static_assert(Size <= sizeof(T), "requested size is bigger than integer being written");
 
-    auto const data = toEndianness<Endianness>(value);
+    const auto data = toEndianness<Endianness>(value);
     constexpr const auto displacement = Endianness == ByteOrder::BigEndian ? sizeof(T) - Size : 0;
     add(reinterpret_cast<const char*>(std::addressof(data)) + displacement, Size);
   }
