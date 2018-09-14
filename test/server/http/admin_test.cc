@@ -1,4 +1,5 @@
 #include <fstream>
+#include <regex>
 #include <unordered_map>
 
 #include "envoy/admin/v2alpha/memory.pb.h"
@@ -53,8 +54,9 @@ public:
   static std::string
   statsAsJsonHandler(std::map<std::string, uint64_t>& all_stats,
                      const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                     const bool used_only) {
-    return AdminImpl::statsAsJson(all_stats, all_histograms, used_only, true);
+                     const bool used_only, const absl::optional<std::regex> regex = absl::nullopt) {
+    return AdminImpl::statsAsJson(all_stats, all_histograms, used_only, regex,
+                                  true /*pretty_print*/);
   }
 
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
@@ -260,7 +262,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
 
   std::map<std::string, uint64_t> all_stats;
 
-  std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), false);
+  std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), true);
 
   // Expected JSON should not have h2 values as it is not used.
   const std::string expected_json = R"EOF({
@@ -282,6 +284,218 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
                 "computed_quantiles": [
                     {
                         "name": "h1",
+                        "values": [
+                            {
+                                "interval": 100.0,
+                                "cumulative": 100.0
+                            },
+                            {
+                                "interval": 102.5,
+                                "cumulative": 105.0
+                            },
+                            {
+                                "interval": 105.0,
+                                "cumulative": 110.0
+                            },
+                            {
+                                "interval": 107.5,
+                                "cumulative": 205.0
+                            },
+                            {
+                                "interval": 109.0,
+                                "cumulative": 208.0
+                            },
+                            {
+                                "interval": 109.5,
+                                "cumulative": 209.0
+                            },
+                            {
+                                "interval": 109.9,
+                                "cumulative": 209.8
+                            },
+                            {
+                                "interval": 109.95,
+                                "cumulative": 209.9
+                            },
+                            {
+                                "interval": 109.99,
+                                "cumulative": 209.98
+                            },
+                            {
+                                "interval": 110.0,
+                                "cumulative": 210.0
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+})EOF";
+
+  EXPECT_EQ(expected_json, actual_json);
+  store_->shutdownThreading();
+}
+
+TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  Stats::Histogram& h1 = store_->histogram("h1");
+  Stats::Histogram& h2 = store_->histogram("h2");
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+  h1.recordValue(200);
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h2), 100));
+  h2.recordValue(100);
+
+  store_->mergeHistograms([]() -> void {});
+
+  // Again record a new value in h1 so that it has both interval and cumulative values.
+  // h2 should only have cumulative values.
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
+  h1.recordValue(100);
+
+  store_->mergeHistograms([]() -> void {});
+
+  EXPECT_CALL(alloc_, free(_));
+
+  std::map<std::string, uint64_t> all_stats;
+
+  std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), false,
+                                               absl::optional<std::regex>{std::regex("[a-z]1")});
+
+  // Because this is a filter case, we don't expect to see any stats except for those containing
+  // "h1" in their name.
+  const std::string expected_json = R"EOF({
+    "stats": [
+        {
+            "histograms": {
+                "supported_quantiles": [
+                    0.0,
+                    25.0,
+                    50.0,
+                    75.0,
+                    90.0,
+                    95.0,
+                    99.0,
+                    99.5,
+                    99.9,
+                    100.0
+                ],
+                "computed_quantiles": [
+                    {
+                        "name": "h1",
+                        "values": [
+                            {
+                                "interval": 100.0,
+                                "cumulative": 100.0
+                            },
+                            {
+                                "interval": 102.5,
+                                "cumulative": 105.0
+                            },
+                            {
+                                "interval": 105.0,
+                                "cumulative": 110.0
+                            },
+                            {
+                                "interval": 107.5,
+                                "cumulative": 205.0
+                            },
+                            {
+                                "interval": 109.0,
+                                "cumulative": 208.0
+                            },
+                            {
+                                "interval": 109.5,
+                                "cumulative": 209.0
+                            },
+                            {
+                                "interval": 109.9,
+                                "cumulative": 209.8
+                            },
+                            {
+                                "interval": 109.95,
+                                "cumulative": 209.9
+                            },
+                            {
+                                "interval": 109.99,
+                                "cumulative": 209.98
+                            },
+                            {
+                                "interval": 110.0,
+                                "cumulative": 210.0
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+})EOF";
+
+  EXPECT_EQ(expected_json, actual_json);
+  store_->shutdownThreading();
+}
+
+TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
+  InSequence s;
+  store_->initializeThreading(main_thread_dispatcher_, tls_);
+
+  Stats::Histogram& h1 = store_->histogram("h1_matches"); // Will match, be used, and print
+  Stats::Histogram& h2 = store_->histogram("h2_matches"); // Will match but not be used
+  Stats::Histogram& h3 = store_->histogram("h3_not");     // Will be used but not match
+
+  EXPECT_EQ("h1_matches", h1.name());
+  EXPECT_EQ("h2_matches", h2.name());
+  EXPECT_EQ("h3_not", h3.name());
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 200));
+  h1.recordValue(200);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h3), 200));
+  h3.recordValue(200);
+
+  store_->mergeHistograms([]() -> void {});
+
+  // Again record a new value in h1 and h3 so that they have both interval and cumulative values.
+  // h2 should only have cumulative values.
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h1), 100));
+  h1.recordValue(100);
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(h3), 100));
+  h3.recordValue(100);
+
+  store_->mergeHistograms([]() -> void {});
+
+  EXPECT_CALL(alloc_, free(_));
+
+  std::map<std::string, uint64_t> all_stats;
+
+  std::string actual_json = statsAsJsonHandler(all_stats, store_->histograms(), true,
+                                               absl::optional<std::regex>{std::regex("h[12]")});
+
+  // Expected JSON should not have h2 values as it is not used, and should not have h3 values as
+  // they are used but do not match.
+  const std::string expected_json = R"EOF({
+    "stats": [
+        {
+            "histograms": {
+                "supported_quantiles": [
+                    0.0,
+                    25.0,
+                    50.0,
+                    75.0,
+                    90.0,
+                    95.0,
+                    99.0,
+                    99.5,
+                    99.9,
+                    100.0
+                ],
+                "computed_quantiles": [
+                    {
+                        "name": "h1_matches",
                         "values": [
                             {
                                 "interval": 100.0,
