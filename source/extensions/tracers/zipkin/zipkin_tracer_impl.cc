@@ -75,8 +75,8 @@ Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_man
   const bool trace_id_128bit =
       config.getBoolean("trace_id_128bit", ZipkinCoreConstants::get().DEFAULT_TRACE_ID_128BIT);
 
-  const bool shared_span_context =
-      config.getBoolean("shared_span_context", ZipkinCoreConstants::get().DEFAULT_SHARED_SPAN_CONTEXT);
+  const bool shared_span_context = config.getBoolean(
+      "shared_span_context", ZipkinCoreConstants::get().DEFAULT_SHARED_SPAN_CONTEXT);
 
   tls_->set([this, collector_endpoint, &random_generator, trace_id_128bit, shared_span_context](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
