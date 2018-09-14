@@ -64,7 +64,9 @@ public:
     if (parent_ != nullptr) {
       return parent_->onComplete(status, context);
     }
-    return context.callback()->onComplete(status);
+
+    context.callback()->onComplete(status);
+    context.cancel();
   }
 
   // Check if next verifier should be notified of status, or if no next verifier exists signal
@@ -99,6 +101,8 @@ public:
         [=](const Status& status) { onComplete(status, static_cast<ContextImpl&>(*context)); });
     if (!ctximpl.getCompletionState(this).is_completed_) {
       ctximpl.storeAuth(std::move(auth));
+    } else {
+      auth->onDestroy();
     }
   }
 
@@ -142,6 +146,8 @@ public:
         [=](const Status& status) { onComplete(status, static_cast<ContextImpl&>(*context)); });
     if (!ctximpl.getCompletionState(this).is_completed_) {
       ctximpl.storeAuth(std::move(auth));
+    } else {
+      auth->onDestroy();
     }
   }
 

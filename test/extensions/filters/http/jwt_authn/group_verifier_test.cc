@@ -85,6 +85,7 @@ public:
           .WillOnce(
               Invoke([status = it.second](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*,
                                           AuthenticatorCallback callback) { callback(status); }));
+      EXPECT_CALL(*mock_auth.get(), onDestroy()).Times(1);
       mock_auths_[it.first] = std::move(mock_auth);
     }
     createVerifier();
@@ -101,6 +102,7 @@ public:
                                                             AuthenticatorCallback callback) {
             callbacks[iss] = std::move(callback);
           }));
+      EXPECT_CALL(*mock_auth.get(), onDestroy()).Times(1);
       mock_auths_[providers[i]] = std::move(mock_auth);
     }
     createVerifier();
@@ -496,6 +498,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyWithAllowAll) {
           [&](Http::HeaderMap&, std::vector<JwtLocationConstPtr>*, AuthenticatorCallback callback) {
             callbacks[allowfailed] = std::move(callback);
           }));
+  EXPECT_CALL(*mock_auth.get(), onDestroy()).Times(1);
   mock_auths_[allowfailed] = std::move(mock_auth);
   EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
     ASSERT_EQ(status, Status::Ok);

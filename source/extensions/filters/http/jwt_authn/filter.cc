@@ -46,9 +46,6 @@ void Filter::onComplete(const Status& status) {
   if (state_ == Responded) {
     return;
   }
-  if (context_) {
-    context_->cancel();
-  }
   if (Status::Ok != status) {
     stats_.denied_.inc();
     state_ = Responded;
