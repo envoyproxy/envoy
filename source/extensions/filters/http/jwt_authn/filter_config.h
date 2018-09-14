@@ -101,12 +101,9 @@ public:
   }
 
   // methods for AuthFactory interface. Factory method to help create authenticators.
-  AuthenticatorPtr create(const AudienceCheckerSupplier* supplier,
+  AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,
                           const absl::optional<std::string>& provider) const override {
-    if (supplier != nullptr) {
-      return Authenticator::create(*supplier, provider, getCache().getJwksCache(), cm());
-    }
-    return Authenticator::create(getCache().getJwksCache(), provider, getCache().getJwksCache(),
+    return Authenticator::create(check_audience, provider, !provider, getCache().getJwksCache(),
                                  cm());
   }
 

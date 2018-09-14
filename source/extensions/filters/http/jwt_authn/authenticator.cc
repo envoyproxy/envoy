@@ -12,6 +12,7 @@
 #include "jwt_verify_lib/verify.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
+using ::google::jwt_verify::CheckAudience;
 using ::google::jwt_verify::Status;
 
 namespace Envoy {
@@ -27,11 +28,11 @@ class AuthenticatorImpl : public Logger::Loggable<Logger::Id::filter>,
                           public Authenticator,
                           public Http::AsyncClient::Callbacks {
 public:
-  AuthenticatorImpl(const AudienceCheckerSupplier& audience_checker_suppiler,
-                    const absl::optional<std::string>& provider, JwksCache& jwks_cache,
-                    Upstream::ClusterManager& cluster_manager)
-      : jwks_cache_(jwks_cache), cm_(cluster_manager),
-        audience_checker_suppiler_(audience_checker_suppiler), provider_(provider) {}
+  AuthenticatorImpl(const CheckAudience* check_audience,
+                    const absl::optional<std::string>& provider, bool allow_failed,
+                    JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager)
+      : jwks_cache_(jwks_cache), cm_(cluster_manager), check_audience_(check_audience),
+        provider_(provider), is_allow_failed_(allow_failed) {}
 
   // Following functions are for Authenticator interface
   void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
@@ -81,10 +82,11 @@ private:
   std::string uri_;
   // The pending remote request so it can be canceled.
   Http::AsyncClient::Request* request_{};
-  // audience checker suppiler.
-  const AudienceCheckerSupplier& audience_checker_suppiler_;
+  // check audience object.
+  const CheckAudience* check_audience_;
   // specific provider or not when it is allow missing or failed.
   const absl::optional<std::string> provider_;
+  const bool is_allow_failed_;
 };
 
 void AuthenticatorImpl::verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
@@ -132,20 +134,16 @@ void AuthenticatorImpl::startVerify() {
     }
 
     // Check the issuer is configured or not.
-    if (provider_) {
-      jwks_data_ = jwks_cache_.findByProvider(provider_.value());
-    } else {
-      jwks_data_ = jwks_cache_.findByIssuer(jwt_.iss_);
-    }
+    jwks_data_ = provider_ ? jwks_cache_.findByProvider(provider_.value())
+                           : jwks_cache_.findByIssuer(jwt_.iss_);
     // isIssuerSpecified() check already make sure the issuer is in the cache.
     ASSERT(jwks_data_ != nullptr);
 
-    const AudienceChecker& audience_checker =
-        provider_ ? audience_checker_suppiler_.getAudienceCheckerByProvider(provider_.value())
-                  : audience_checker_suppiler_.getAudienceCheckerByIssuer(jwt_.iss_);
+    bool is_allowed = check_audience_ ? check_audience_->areAudiencesAllowed(jwt_.audiences_)
+                                      : jwks_data_->areAudiencesAllowed(jwt_.audiences_);
 
     // Check if audience is allowed
-    if (!audience_checker.areAudiencesAllowed(jwt_.audiences_)) {
+    if (!is_allowed) {
       status = Status::JwtAudienceNotAllowed;
       continue;
     }
@@ -254,11 +252,11 @@ void AuthenticatorImpl::verifyKey() {
 
 void AuthenticatorImpl::doneWithStatus(const Status& status) {
   // if on allow missing or failed this should verify all tokens, otherwise stop on ok.
-  if ((Status::Ok == status && provider_) || tokens_.empty()) {
+  if ((Status::Ok == status && !is_allow_failed_) || tokens_.empty()) {
     tokens_.clear();
     ENVOY_LOG(debug, "Jwt authentication completed with: {}",
               ::google::jwt_verify::getStatusString(status));
-    callback_(!provider_ ? Status::Ok : status);
+    callback_(is_allow_failed_ ? Status::Ok : status);
     return;
   }
   startVerify();
@@ -266,11 +264,11 @@ void AuthenticatorImpl::doneWithStatus(const Status& status) {
 
 } // namespace
 
-AuthenticatorPtr Authenticator::create(const AudienceCheckerSupplier& audience_checker_suppiler,
+AuthenticatorPtr Authenticator::create(const CheckAudience* check_audience,
                                        const absl::optional<std::string>& provider,
-                                       JwksCache& jwks_cache,
+                                       bool allow_failed, JwksCache& jwks_cache,
                                        Upstream::ClusterManager& cluster_manager) {
-  return std::make_unique<AuthenticatorImpl>(audience_checker_suppiler, provider, jwks_cache,
+  return std::make_unique<AuthenticatorImpl>(check_audience, provider, allow_failed, jwks_cache,
                                              cluster_manager);
 }
 

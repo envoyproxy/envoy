@@ -6,6 +6,7 @@ using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirement;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirementAndList;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirementOrList;
+using ::google::jwt_verify::CheckAudience;
 using ::google::jwt_verify::Status;
 
 namespace Envoy {
@@ -82,32 +83,17 @@ protected:
   const BaseVerifierImpl* const parent_;
 };
 
-class AudienceCheckerImpl : public AudienceChecker {
-public:
-  AudienceCheckerImpl(const std::vector<std::string>& config_aud) {
-    audiences_ = std::make_unique<::google::jwt_verify::CheckAudience>(config_aud);
-  }
-
-  bool areAudiencesAllowed(const std::vector<std::string>& jwt_audiences) const override {
-    return audiences_->areAudiencesAllowed(jwt_audiences);
-  }
-
-private:
-  // Check audience object
-  ::google::jwt_verify::CheckAudiencePtr audiences_;
-};
-
 // Provider specific verifier
 class ProviderVerifierImpl : public BaseVerifierImpl {
 public:
   ProviderVerifierImpl(const std::string& provider_name, const AuthFactory& factory,
                        const JwtProvider& provider, const BaseVerifierImpl* parent)
-      : BaseVerifierImpl(parent), provider_name_(provider_name), auth_factory_(factory),
-        extractor_(Extractor::create(provider)) {}
+      : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(Extractor::create(provider)),
+        provider_name_(absl::optional<std::string>{provider_name}) {}
 
   void verify(ContextSharedPtr context) const override {
     auto& ctximpl = static_cast<ContextImpl&>(*context);
-    auto auth = auth_factory_.create(getSuppiler(), absl::optional<std::string>{provider_name_});
+    auto auth = auth_factory_.create(getSuppiler(), provider_name_);
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), extractor_->extract(ctximpl.headers()),
@@ -118,40 +104,27 @@ public:
   }
 
 protected:
-  virtual const AudienceCheckerSupplier* getSuppiler() const { return nullptr; }
-
-  const std::string provider_name_;
+  virtual const CheckAudience* getSuppiler() const { return nullptr; }
 
 private:
   const AuthFactory& auth_factory_;
   const ExtractorConstPtr extractor_;
+  const absl::optional<std::string> provider_name_;
 };
 
-class ProviderAndAudienceVerifierImpl : public ProviderVerifierImpl,
-                                        public AudienceCheckerSupplier {
+class ProviderAndAudienceVerifierImpl : public ProviderVerifierImpl {
 public:
   ProviderAndAudienceVerifierImpl(const std::string& provider_name, const AuthFactory& factory,
                                   const JwtProvider& provider, const BaseVerifierImpl* parent,
                                   const std::vector<std::string>& config_audiences)
       : ProviderVerifierImpl(provider_name, factory, provider, parent),
-        audience_checker_(std::make_unique<AudienceCheckerImpl>(config_audiences)),
-        issuer_(provider.issuer()) {}
-
-  const AudienceChecker& getAudienceCheckerByProvider(const std::string& provider) const override {
-    ASSERT(provider_name_ == provider);
-    return *audience_checker_;
-  }
-
-  const AudienceChecker& getAudienceCheckerByIssuer(const std::string& issuer) const override {
-    ASSERT(issuer_ == issuer);
-    return *audience_checker_;
-  }
+        check_audience_(std::make_unique<CheckAudience>(config_audiences)) {}
 
 private:
-  const AudienceCheckerSupplier* getSuppiler() const override { return this; }
+  const CheckAudience* getSuppiler() const override { return check_audience_.get(); }
 
-  const std::unique_ptr<AudienceCheckerImpl> audience_checker_;
-  const std::string& issuer_;
+  // Check audience object
+  ::google::jwt_verify::CheckAudiencePtr check_audience_;
 };
 
 // Allow missing or failed verifier

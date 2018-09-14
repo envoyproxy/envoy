@@ -138,24 +138,6 @@ TEST_F(ProviderVerifierTest, TestRequiresNonexistentProvider) {
                EnvoyException);
 }
 
-// Test getAudienceChecker
-TEST_F(ProviderVerifierTest, TestGetAudienceChecker) {
-  MessageUtil::loadFromYaml(ExampleConfig, proto_config_);
-  auto* requires =
-      proto_config_.mutable_rules(0)->mutable_requires()->mutable_provider_and_audiences();
-  requires->set_provider_name("example_provider");
-  requires->add_audiences("invalid_service");
-  createVerifier();
-
-  const auto& supplier = dynamic_cast<AudienceCheckerSupplier&>(*verifier_);
-  const auto& ichecker = supplier.getAudienceCheckerByIssuer("https://example.com");
-  EXPECT_TRUE(ichecker.areAudiencesAllowed({"invalid_service"}));
-  EXPECT_FALSE(ichecker.areAudiencesAllowed({"example_service"}));
-  const auto& pchecker = supplier.getAudienceCheckerByProvider(ProviderName);
-  EXPECT_TRUE(pchecker.areAudiencesAllowed({"invalid_service"}));
-  EXPECT_FALSE(pchecker.areAudiencesAllowed({"example_service"}));
-}
-
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

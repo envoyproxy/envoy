@@ -13,28 +13,6 @@ namespace JwtAuthn {
 class JwksCache;
 typedef std::unique_ptr<JwksCache> JwksCachePtr;
 
-// JWT audience claim checker
-class AudienceChecker {
-public:
-  virtual ~AudienceChecker() {}
-
-  // Check if a list of audiences are allowed.
-  virtual bool areAudiencesAllowed(const std::vector<std::string>& audiences) const PURE;
-};
-
-// JWT audience claim checker suppiler
-class AudienceCheckerSupplier {
-public:
-  virtual ~AudienceCheckerSupplier() {}
-
-  // get audience checker by provider name. Bad things will happen provider is not configured.
-  virtual const AudienceChecker&
-  getAudienceCheckerByProvider(const std::string& provider) const PURE;
-
-  // get audience checker by issuer. Bad things will happen if issuer is not found.
-  virtual const AudienceChecker& getAudienceCheckerByIssuer(const std::string& issuer) const PURE;
-};
-
 /**
  * Interface to access all configured Jwt rules and their cached Jwks objects.
  * It only caches Jwks specified in the config.
@@ -43,9 +21,7 @@ public:
  *
  *     // for a given jwt
  *     auto jwks_data = jwks_cache->findByIssuer(jwt->getIssuer());
- *
- *     const auto& verifier = jwks_cache->getAudienceCheckerByIssuer(jwt->getIssuer());
- *     if (!verifier.areAudiencesAllowed(jwt->getAudiences())) reject;
+ *     if (!jwks_data->areAudiencesAllowed(jwt->getAudiences())) reject;
  *
  *     if (jwks_data->getJwksObj() == nullptr || jwks_data->isExpired()) {
  *        // Fetch remote Jwks.
@@ -55,14 +31,17 @@ public:
  *     verifyJwt(jwks_data->getJwksObj(), jwt);
  */
 
-class JwksCache : public AudienceCheckerSupplier {
+class JwksCache {
 public:
   virtual ~JwksCache() {}
 
   // Interface to access a Jwks config rule and its cached Jwks object.
-  class JwksData : public AudienceChecker {
+  class JwksData {
   public:
     virtual ~JwksData() {}
+
+    // Check if a list of audiences are allowed.
+    virtual bool areAudiencesAllowed(const std::vector<std::string>& audiences) const PURE;
 
     // Get the cached config: JWT rule.
     virtual const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider&

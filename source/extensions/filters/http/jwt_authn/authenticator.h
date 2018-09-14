@@ -5,6 +5,7 @@
 #include "extensions/filters/http/jwt_authn/extractor.h"
 #include "extensions/filters/http/jwt_authn/jwks_cache.h"
 
+#include "jwt_verify_lib/check_audience.h"
 #include "jwt_verify_lib/status.h"
 
 namespace Envoy {
@@ -34,9 +35,9 @@ public:
   virtual void onDestroy() PURE;
 
   // Authenticator factory function.
-  static AuthenticatorPtr create(const AudienceCheckerSupplier& audience_checker_suppiler,
-                                 const absl::optional<std::string>& provider, JwksCache& jwks_cache,
-                                 Upstream::ClusterManager& cluster_manager);
+  static AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,
+                                 const absl::optional<std::string>& provider, bool allow_failed,
+                                 JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager);
 };
 
 /**
@@ -47,7 +48,7 @@ public:
   virtual ~AuthFactory() {}
 
   // Factory method for creating authenticator, and populate it with provider config.
-  virtual AuthenticatorPtr create(const AudienceCheckerSupplier* audience_checker_suppiler,
+  virtual AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,
                                   const absl::optional<std::string>& provider) const PURE;
 };
 

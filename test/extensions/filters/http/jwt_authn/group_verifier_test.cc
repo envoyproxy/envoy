@@ -68,10 +68,10 @@ class GroupVerifierTest : public ::testing::Test {
 public:
   void createVerifier() {
     ON_CALL(mock_factory_, create(_, _))
-        .WillByDefault(Invoke(
-            [&](const AudienceCheckerSupplier*, const absl::optional<std::string>& provider) {
-              return std::move(mock_auths_[provider ? provider.value() : allowfailed]);
-            }));
+        .WillByDefault(Invoke([&](const ::google::jwt_verify::CheckAudience*,
+                                  const absl::optional<std::string>& provider) {
+          return std::move(mock_auths_[provider ? provider.value() : allowfailed]);
+        }));
     verifier_ = Verifier::create(proto_config_.rules()[0].requires(), proto_config_.providers(),
                                  mock_factory_, mock_extractor_);
     ON_CALL(mock_extractor_, extract(_)).WillByDefault(Invoke([](const Http::HeaderMap&) {

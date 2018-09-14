@@ -30,9 +30,10 @@ public:
   }
 
   void CreateAuthenticator(
+      ::google::jwt_verify::CheckAudience* check_audience = nullptr,
       const absl::optional<std::string>& provider = absl::optional<std::string>{ProviderName}) {
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
-    auth_ = Authenticator::create(filter_config_->getCache().getJwksCache(), provider,
+    auth_ = Authenticator::create(check_audience, provider, !provider,
                                   filter_config_->getCache().getJwksCache(), filter_config_->cm());
   }
 
@@ -412,7 +413,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleTokens) {
       {"c", "Bearer " + std::string(InvalidAudToken)},
       {":path", "/"},
   };
-  CreateAuthenticator(absl::nullopt);
+  CreateAuthenticator(nullptr, absl::nullopt);
   std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
   };
@@ -461,7 +462,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleIssuers) {
       {"other-auth", "Bearer " + std::string(OtherGoodToken)},
       {":path", "/"},
   };
-  CreateAuthenticator(absl::nullopt);
+  CreateAuthenticator(nullptr, absl::nullopt);
   std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
     ASSERT_EQ(status, Status::Ok);
   };
@@ -472,6 +473,26 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleIssuers) {
   EXPECT_TRUE(headers.has("expired-auth"));
   EXPECT_FALSE(headers.has("other-auth"));
   EXPECT_EQ(mock_pubkey.called_count(), 2);
+}
+
+// Test checks that supplying a CheckAudience to auth will override the one in JwksCache.
+TEST_F(AuthenticatorTest, TestCustomCheckAudience) {
+  auto check_audience = std::make_unique<::google::jwt_verify::CheckAudience>(
+      std::vector<std::string>{"invalid_service"});
+  CreateAuthenticator(check_audience.get());
+
+  auto headers =
+      Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(InvalidAudToken)}};
+  auto tokens = filter_config_->getExtractor().extract(headers);
+  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
+    ASSERT_EQ(status, Status::Ok);
+  };
+  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+
+  headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  tokens = filter_config_->getExtractor().extract(headers);
+  on_complete_cb = [](const Status& status) { ASSERT_EQ(status, Status::JwtAudienceNotAllowed); };
+  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
 }
 
 } // namespace JwtAuthn
