@@ -48,6 +48,12 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.retry_policy(), num_retries, 1);
   retry_on_ = RetryStateImpl::parseRetryOn(config.retry_policy().retry_on());
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(config.retry_policy().retry_on());
+
+  for (const auto& host_predicate : config.retry_policy().retry_host_predicate()) {
+    Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
+        host_predicate.name())
+        ->createHostPredicate(*this, host_predicate.config());
+  }
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) {
