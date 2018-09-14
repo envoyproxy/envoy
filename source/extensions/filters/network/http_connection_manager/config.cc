@@ -76,7 +76,8 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
           date_provider](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *filter_config, context.drainDecision(), context.random(), context.httpTracer(),
-        context.runtime(), context.localInfo(), context.clusterManager())});
+        context.runtime(), context.localInfo(), context.clusterManager(),
+        &context.overloadManager())});
   };
 }
 

@@ -419,6 +419,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "overload_integration_test",
+    srcs = ["overload_integration_test.cc"],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//source/extensions/resource_monitors/injected_resource:config",
+    ],
+)
+
+envoy_cc_test(
     name = "proxy_proto_integration_test",
     srcs = [
         "proxy_proto_integration_test.cc",
