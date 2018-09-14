@@ -3282,8 +3282,9 @@ TEST(HttpConnectionManagerTracingStatsTest, verifyTracingStats) {
 TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
   setup(false, "");
 
-  overload_manager_.overload_state_.setState("envoy.overload_actions.stop_accepting_requests",
-                                             Server::OverloadActionState::Active);
+  overload_manager_.overload_state_.setState(
+      Server::OverloadActionNames::get().StopAcceptingRequests,
+      Server::OverloadActionState::Active);
 
   EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);

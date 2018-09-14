@@ -458,7 +458,6 @@ private:
   WebSocketProxyPtr ws_connection_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
-  const Server::OverloadActionState overload_inactive_;
   const Server::OverloadActionState& overload_stop_accepting_requests_;
 };
 

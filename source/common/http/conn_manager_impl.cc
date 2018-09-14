@@ -65,11 +65,10 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
-      overload_inactive_(Server::OverloadActionState::Inactive),
       overload_stop_accepting_requests_(
           overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
-                                 "envoy.overload_actions.stop_accepting_requests")
-                           : overload_inactive_) {}
+                                 Server::OverloadActionNames::get().StopAcceptingRequests)
+                           : Server::OverloadManager::getInactiveState()) {}
 
 const HeaderMapImpl& ConnectionManagerImpl::continueHeader() {
   CONSTRUCT_ON_FIRST_USE(HeaderMapImpl,
