@@ -37,6 +37,12 @@ Config::Route::Route(
   }
 }
 
+Config::WeightedClusterEntry::WeightedClusterEntry(
+    const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight&
+        config)
+    : cluster_name_(config.name()), cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(config, weight)) {
+}
+
 Config::SharedConfig::SharedConfig(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
@@ -52,7 +58,8 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
                Server::Configuration::FactoryContext& context)
     : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
       upstream_drain_manager_slot_(context.threadLocal().allocateSlot()),
-      shared_config_(std::make_shared<SharedConfig>(config, context)) {
+      shared_config_(std::make_shared<SharedConfig>(config, context)),
+      random_generator_(context.random()) {
 
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     return ThreadLocal::ThreadLocalObjectSharedPtr(new UpstreamDrainManager());
@@ -71,6 +78,17 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
     routes_.emplace_back(default_route);
   }
 
+  // Weighted clusters will be enabled only if both the default cluster and
+  // deprecated v1 routes are absent.
+  if (routes_.empty() && config.has_weighted_clusters()) {
+    total_cluster_weight_ = 0UL;
+    for (const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::
+             ClusterWeight& cluster_desc : config.weighted_clusters().clusters()) {
+      weighted_clusters_.emplace_back(WeightedClusterEntry(cluster_desc));
+      total_cluster_weight_ += weighted_clusters_.back().cluster_weight_;
+    }
+  }
+
   if (config.has_metadata_match()) {
     const auto& filter_metadata = config.metadata_match().filter_metadata();
 
@@ -87,7 +105,7 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
   }
 }
 
-const std::string& Config::getRouteFromEntries(Network::Connection& connection) {
+const std::string& Config::getRegularRouteFromEntries(Network::Connection& connection) {
   for (const Config::Route& route : routes_) {
     if (!route.source_port_ranges_.empty() &&
         !Network::Utility::portInRangeList(*connection.remoteAddress(),
@@ -116,6 +134,35 @@ const std::string& Config::getRouteFromEntries(Network::Connection& connection) 
 
   // no match, no more routes to try
   return EMPTY_STRING;
+}
+
+const std::string& Config::getWeightedClusterRoute(const uint64_t random_value) {
+  uint64_t selected_value = random_value % total_cluster_weight_;
+  uint64_t begin = 0UL;
+  uint64_t end = 0UL;
+
+  // Find the right cluster to route to based on the interval in which
+  // the selected value falls. The intervals are determined as
+  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
+  for (const WeightedClusterEntry& cluster : weighted_clusters_) {
+    end = begin + cluster.cluster_weight_;
+    ASSERT(end <= total_cluster_weight_);
+
+    if (selected_value >= begin && selected_value < end) {
+      return cluster.cluster_name_;
+    }
+    begin = end;
+  }
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
+
+const std::string& Config::getRouteFromEntries(Network::Connection& connection) {
+  if (!weighted_clusters_.empty()) {
+    return getWeightedClusterRoute(random_generator_.random());
+  } else {
+    return getRegularRouteFromEntries(connection);
+  }
 }
 
 UpstreamDrainManager& Config::drainManager() {
