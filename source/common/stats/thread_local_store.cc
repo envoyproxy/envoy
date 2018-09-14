@@ -50,7 +50,9 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
 }
 
 ScopePtr ThreadLocalStoreImpl::createScope(const std::string& name) {
-  std::unique_ptr<ScopeImpl> new_scope(new ScopeImpl(*this, name));
+  std::unique_ptr<ScopeImpl> new_scope;
+  new_scope.reset(stats_options_.statsDisabled() ? new NullScopeImpl(*this, name)
+                                                 : new ScopeImpl(*this, name));
   Thread::LockGuard lock(lock_);
   scopes_.emplace(new_scope.get());
   return std::move(new_scope);

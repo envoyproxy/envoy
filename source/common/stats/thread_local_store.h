@@ -272,6 +272,24 @@ private:
     CentralCacheEntry central_cache_;
   };
 
+  struct NullScopeImpl : public ScopeImpl {
+    NullScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
+        : ScopeImpl(parent, prefix) {}
+    ~NullScopeImpl() {}
+
+    // Histograms don't get allocated with an allocator (not really), so in --disable-stats mode, we
+    // have to have a NullScope which just creates and returns references to one histogram all the
+    // time.
+    Histogram& histogram(const std::string& name) override {
+      UNREFERENCED_PARAMETER(name);
+      return ScopeImpl::histogram("null_histogram");
+    }
+    Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override {
+      UNREFERENCED_PARAMETER(name);
+      return ScopeImpl::tlsHistogram("null_histogram", parent);
+    }
+  };
+
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
     // The TLS scope cache is keyed by scope ID. This is used to avoid complex circular references
     // during scope destruction. An ID is required vs. using the address of the scope pointer
