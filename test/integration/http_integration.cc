@@ -247,8 +247,8 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   }
 }
 
-uint64_t HttpIntegrationTest::waitForNextUpstreamRequest(
-    const std::unordered_set<uint64_t>& upstream_indices) {
+uint64_t
+HttpIntegrationTest::waitForNextUpstreamRequest(const std::vector<uint64_t>& upstream_indices) {
   uint64_t upstream_with_request;
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
@@ -275,7 +275,7 @@ uint64_t HttpIntegrationTest::waitForNextUpstreamRequest(
 }
 
 void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
-  waitForNextUpstreamRequest(std::unordered_set<uint64_t>({upstream_index}));
+  waitForNextUpstreamRequest(std::vector<uint64_t>({upstream_index}));
 }
 
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(

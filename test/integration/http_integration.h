@@ -105,7 +105,7 @@ protected:
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
   // In cases where the upstream that will receive the request is not deterministic, a second
   // upstream index may be provided, in which case both upstreams will be checked for requests.
-  uint64_t waitForNextUpstreamRequest(const std::unordered_set<uint64_t>& upstream_indices);
+  uint64_t waitForNextUpstreamRequest(const std::vector<uint64_t>& upstream_indices);
   void waitForNextUpstreamRequest(uint64_t upstream_index = 0);
 
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
