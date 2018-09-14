@@ -115,7 +115,8 @@ class RetryHostPredicateFactory {
 public:
   virtual ~RetryHostPredicateFactory() {}
 
-  virtual void createHostPredicate(RetryHostPredicateFactoryCallbacks& callbacks) PURE;
+  virtual void createHostPredicate(RetryHostPredicateFactoryCallbacks& callbacks,
+                                   const ProtobufWkt::Struct& config) PURE;
 
   /**
    * @return name name of this factory.

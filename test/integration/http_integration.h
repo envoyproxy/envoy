@@ -101,12 +101,12 @@ protected:
       const Http::TestHeaderMapImpl& request_headers, uint32_t request_body_size,
       const Http::TestHeaderMapImpl& response_headers, uint32_t response_body_size);
 
-  // Wait for the end of stream on the next upstream stream on either of the two fake_upstreams_
+  // Wait for the end of stream on the next upstream stream on any of the provided fake upstreams.
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
   // In cases where the upstream that will receive the request is not deterministic, a second
   // upstream index may be provided, in which case both upstreams will be checked for requests.
-  uint64_t waitForNextUpstreamRequest(uint64_t upstream_index = 0,
-                                      absl::optional<uint64_t> second_upstream_index = {});
+  uint64_t waitForNextUpstreamRequest(const std::unordered_set<uint64_t>& upstream_indices);
+  void waitForNextUpstreamRequest(uint64_t upstream_index = 0);
 
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
   void cleanupUpstreamAndDownstream();

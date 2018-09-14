@@ -122,5 +122,7 @@ MockClusterUpdateCallbacks::MockClusterUpdateCallbacks() {}
 
 MockClusterUpdateCallbacks::~MockClusterUpdateCallbacks() {}
 
+MockRetryHostPredicate::MockRetryHostPredicate() {}
+MockRetryHostPredicate::~MockRetryHostPredicate() {}
 } // namespace Upstream
 } // namespace Envoy

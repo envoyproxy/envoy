@@ -50,12 +50,9 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(config.retry_policy().retry_on());
 
   for (const auto& host_predicate : config.retry_policy().retry_host_predicate()) {
-    // TODO(snowp): support passing the config Struct during initialization.
-    auto factory = Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
-        host_predicate.name());
-
-    ASSERT(factory);
-    factory->createHostPredicate(*this);
+    Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
+        host_predicate.name())
+        ->createHostPredicate(*this, host_predicate.config());
   }
 }
 

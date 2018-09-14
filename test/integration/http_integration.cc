@@ -247,20 +247,19 @@ void HttpIntegrationTest::cleanupUpstreamAndDownstream() {
   }
 }
 
-uint64_t
-HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index,
-                                                absl::optional<uint64_t> second_upstream_index) {
-  uint64_t upstream_with_request = upstream_index;
+uint64_t HttpIntegrationTest::waitForNextUpstreamRequest(
+    const std::unordered_set<uint64_t>& upstream_indices) {
+  uint64_t upstream_with_request;
   // If there is no upstream connection, wait for it to be established.
   if (!fake_upstream_connection_) {
-    AssertionResult result = fake_upstreams_[upstream_index]->waitForHttpConnection(
-        *dispatcher_, fake_upstream_connection_);
-
-    // If we didn't get a connection against the first upstream, try the next one.
-    if (!result && second_upstream_index) {
-      upstream_with_request = *second_upstream_index;
-      result = fake_upstreams_[*second_upstream_index]->waitForHttpConnection(
-          *dispatcher_, fake_upstream_connection_);
+    AssertionResult result = AssertionFailure();
+    for (auto upstream_index : upstream_indices) {
+      result = fake_upstreams_[upstream_index]->waitForHttpConnection(*dispatcher_,
+                                                                      fake_upstream_connection_);
+      if (result) {
+        upstream_with_request = upstream_index;
+        break;
+      }
     }
     RELEASE_ASSERT(result, result.message());
   }
@@ -273,6 +272,10 @@ HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index,
   RELEASE_ASSERT(result, result.message());
 
   return upstream_with_request;
+}
+
+void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
+  waitForNextUpstreamRequest(std::unordered_set<uint64_t>({upstream_index}));
 }
 
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
@@ -799,7 +802,7 @@ void HttpIntegrationTest::testRetryHostPredicateFilter() {
                                          1024);
 
   // Note how we're exepcting each upstream request to hit the same upstream.
-  auto upstream_idx = waitForNextUpstreamRequest(0, 1);
+  auto upstream_idx = waitForNextUpstreamRequest({0, 1});
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
 
   if (fake_upstreams_[upstream_idx]->httpType() == FakeHttpConnection::Type::HTTP1) {

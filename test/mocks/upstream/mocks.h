@@ -310,6 +310,9 @@ public:
 
 class MockRetryHostPredicate : public RetryHostPredicate {
 public:
+  MockRetryHostPredicate();
+  ~MockRetryHostPredicate();
+
   MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host& candidate_host));
   MOCK_METHOD1(onHostAttempted, void(HostDescriptionConstSharedPtr));
 };
