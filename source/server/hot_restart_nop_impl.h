@@ -15,7 +15,13 @@ namespace Server {
  */
 class HotRestartNopImpl : public Server::HotRestart {
 public:
-  HotRestartNopImpl() {}
+  HotRestartNopImpl(Options& options) : options_(options) {
+    if (options_.statsOptions().statsDisabled()) {
+      stats_allocator_.reset(new Stats::NullStatDataAllocator());
+    } else {
+      stats_allocator_.reset(new Stats::HeapStatDataAllocator());
+    }
+  }
 
   // Server::HotRestart
   void drainParentListeners() override {}
@@ -28,12 +34,13 @@ public:
   std::string version() override { return "disabled"; }
   Thread::BasicLockable& logLock() override { return log_lock_; }
   Thread::BasicLockable& accessLogLock() override { return access_log_lock_; }
-  Stats::StatDataAllocator& statsAllocator() override { return stats_allocator_; }
+  Stats::StatDataAllocator& statsAllocator() override { return *stats_allocator_; }
 
 private:
+  Options& options_;
   Thread::MutexBasicLockable log_lock_;
   Thread::MutexBasicLockable access_log_lock_;
-  Stats::HeapStatDataAllocator stats_allocator_;
+  std::unique_ptr<Stats::StatDataAllocator> stats_allocator_;
 };
 
 } // namespace Server
