@@ -177,7 +177,7 @@ private:
   void dispatch();
   void sendLocalReply(MessageMetadata& metadata, const DirectResponse& reponse);
   void doDeferredRpcDestroy(ActiveRpc& rpc);
-  void resetAllRpcs();
+  void resetAllRpcs(bool local_reset);
 
   Config& config_;
   ThriftFilterStats& stats_;

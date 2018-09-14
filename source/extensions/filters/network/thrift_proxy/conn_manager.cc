@@ -44,8 +44,7 @@ Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end
       }
     }
 
-    // Make sure a remote event is counted.
-    onEvent(Network::ConnectionEvent::RemoteClose);
+    resetAllRpcs(false);
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 
@@ -85,7 +84,7 @@ void ConnectionManager::dispatch() {
   }
 
   stats_.request_decoding_error_.inc();
-  resetAllRpcs();
+  resetAllRpcs(true);
   read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
 }
 
@@ -108,9 +107,9 @@ void ConnectionManager::continueDecoding() {
   dispatch();
 
   if (!stopped_ && half_closed_) {
-    // If we're half closed, but not stopped waiting for an upstream, close the connection, making
-    // sure a remote event is counted.
-    onEvent(Network::ConnectionEvent::RemoteClose);
+    // If we're half closed, but not stopped waiting for an upstream, reset any pending rpcs and
+    // close the connection.
+    resetAllRpcs(false);
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
@@ -119,8 +118,16 @@ void ConnectionManager::doDeferredRpcDestroy(ConnectionManager::ActiveRpc& rpc) 
   read_callbacks_->connection().dispatcher().deferredDelete(rpc.removeFromList(rpcs_));
 }
 
-void ConnectionManager::resetAllRpcs() {
+void ConnectionManager::resetAllRpcs(bool local_reset) {
   while (!rpcs_.empty()) {
+    if (local_reset) {
+      ENVOY_CONN_LOG(debug, "local close with active request", read_callbacks_->connection());
+      stats_.cx_destroy_local_with_active_rq_.inc();
+    } else {
+      ENVOY_CONN_LOG(debug, "remote close with active request", read_callbacks_->connection());
+      stats_.cx_destroy_remote_with_active_rq_.inc();
+    }
+
     rpcs_.front()->onReset();
   }
 }
@@ -133,17 +140,7 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
 }
 
 void ConnectionManager::onEvent(Network::ConnectionEvent event) {
-  if (!rpcs_.empty()) {
-    if (event == Network::ConnectionEvent::RemoteClose) {
-      ENVOY_CONN_LOG(debug, "remote close with active request", read_callbacks_->connection());
-      stats_.cx_destroy_remote_with_active_rq_.inc();
-    } else if (event == Network::ConnectionEvent::LocalClose) {
-      ENVOY_CONN_LOG(debug, "local close with active request", read_callbacks_->connection());
-      stats_.cx_destroy_local_with_active_rq_.inc();
-    }
-
-    resetAllRpcs();
-  }
+  resetAllRpcs(event == Network::ConnectionEvent::LocalClose);
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler() {
