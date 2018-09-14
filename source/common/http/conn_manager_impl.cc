@@ -754,6 +754,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,
                                                         HeaderMap& headers, bool end_stream) {
+  std::cout << "DECODING HEADERS\n";
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
   std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
   if (!filter) {
@@ -791,6 +792,17 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     ASSERT(buffered_request_data_);
     (*continue_data_entry)->stopped_ = true;
     (*continue_data_entry)->continueDecoding();
+  }
+  maybeDisarmRequestTimer();
+}
+
+void ConnectionManagerImpl::ActiveStream::maybeDisarmRequestTimer() {
+  std::cout << "MAYBEING AROUND" << "\n";
+  if (request_info_.lastUpstreamTxByteSent().has_value()) {
+    std::cout << "HAS VALUE" << "\n";
+    if (request_timer_) {
+      request_timer_->disableTimer();
+    }
   }
 }
 
@@ -1004,6 +1016,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     ActiveStreamEncoderFilter* filter, HeaderMap& headers) {
   resetIdleTimer();
+  std::cout << "ENCODING SOME 100 HEADERS" << "\n";
   if (request_timer_) request_timer_->disableTimer();
 
   ASSERT(connection_manager_.config_.proxy100Continue());
