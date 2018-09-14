@@ -1,7 +1,6 @@
 #include "test/integration/http_protocol_integration.h"
 
 #include "absl/strings/str_cat.h"
-#include "absl/strings/substitute.h"
 
 namespace Envoy {
 
@@ -13,35 +12,25 @@ protected:
 
   void initialize() override {
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      const std::string overload_config = absl::Substitute(R"EOF(
-        refresh_interval {
+      const std::string overload_config = fmt::format(R"EOF(
+        refresh_interval:
           seconds: 0
           nanos: 1000000
-        }
-        resource_monitors {
-          name: "envoy.resource_monitors.injected_resource"
-          config {
-            fields {
-              key: "filename"
-              value {
-                string_value: "$0"
-              }
-            }
-          }
-        }
-        actions {
-          name: "envoy.overload_actions.stop_accepting_requests"
-          triggers {
-            name: "envoy.resource_monitors.injected_resource"
-            threshold {
-              value: 0.9
-            }
-          }
-        }
+        resource_monitors:
+          - name: "envoy.resource_monitors.injected_resource"
+            config:
+              filename: "{}"
+        actions:
+          - name: "envoy.overload_actions.stop_accepting_requests"
+            triggers:
+              - name: "envoy.resource_monitors.injected_resource"
+                threshold:
+                  value: 0.9
       )EOF",
-                                                           injected_resource_filename_);
-      ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(overload_config,
-                                                        bootstrap.mutable_overload_manager()));
+                                                      injected_resource_filename_);
+      *bootstrap.mutable_overload_manager() =
+          TestUtility::parseYaml<envoy::config::overload::v2alpha::OverloadManager>(
+              overload_config);
     });
     updateResource(0);
     HttpIntegrationTest::initialize();

@@ -3286,7 +3286,7 @@ TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
       Server::OverloadActionNames::get().StopAcceptingRequests,
       Server::OverloadActionState::Active);
 
-  EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
+  EXPECT_CALL(*codec_, dispatch(_)).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
     HeaderMapPtr headers{
         new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
