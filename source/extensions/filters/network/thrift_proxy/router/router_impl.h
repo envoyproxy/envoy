@@ -174,6 +174,7 @@ private:
     Tcp::ConnectionPool::Cancellable* conn_pool_handle_{};
     Tcp::ConnectionPool::ConnectionDataPtr conn_data_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
+    ThriftConnectionState* conn_state_{};
     TransportPtr transport_;
     ProtocolPtr protocol_;
     ThriftObjectPtr upgrade_response_;

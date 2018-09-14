@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/event/timer.h"
+
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/fmt.h"
@@ -34,8 +36,9 @@ using testing::AssertionResult;
 using testing::AssertionSuccess;
 
 namespace Envoy {
-FakeStream::FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder)
-    : parent_(parent), encoder_(encoder) {
+FakeStream::FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
+                       Event::TimeSystem& time_system)
+    : parent_(parent), encoder_(encoder), time_system_(time_system) {
   encoder.getStream().addCallbacks(*this);
 }
 
@@ -119,9 +122,9 @@ void FakeStream::onResetStream(Http::StreamResetReason) {
 
 AssertionResult FakeStream::waitForHeadersComplete(milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  auto end_time = std::chrono::steady_clock::now() + timeout;
+  auto end_time = time_system_.monotonicTime() + timeout;
   while (!headers_) {
-    if (std::chrono::steady_clock::now() >= end_time) {
+    if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for headers.";
     }
     decoder_event_.waitFor(lock_, 5ms);
@@ -132,9 +135,9 @@ AssertionResult FakeStream::waitForHeadersComplete(milliseconds timeout) {
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length,
                                         milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  auto start_time = std::chrono::steady_clock::now();
+  auto start_time = time_system_.monotonicTime();
   while (bodyLength() < body_length) {
-    if (std::chrono::steady_clock::now() >= start_time + timeout) {
+    if (time_system_.monotonicTime() >= start_time + timeout) {
       return AssertionFailure() << "Timed out waiting for data.";
     }
     decoder_event_.waitFor(lock_, 5ms);
@@ -161,9 +164,9 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
 AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher,
                                              milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  auto start_time = std::chrono::steady_clock::now();
+  auto start_time = time_system_.monotonicTime();
   while (!end_stream_) {
-    if (std::chrono::steady_clock::now() >= start_time + timeout) {
+    if (time_system_.monotonicTime() >= start_time + timeout) {
       return AssertionFailure() << "Timed out waiting for end of stream.";
     }
     decoder_event_.waitFor(lock_, 5ms);
@@ -177,9 +180,9 @@ AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatche
 
 AssertionResult FakeStream::waitForReset(milliseconds timeout) {
   Thread::LockGuard lock(lock_);
-  auto start_time = std::chrono::steady_clock::now();
+  auto start_time = time_system_.monotonicTime();
   while (!saw_reset_) {
-    if (std::chrono::steady_clock::now() >= start_time + timeout) {
+    if (time_system_.monotonicTime() >= start_time + timeout) {
       return AssertionFailure() << "Timed out waiting for reset.";
     }
     // Safe since CondVar::waitFor won't throw.
@@ -198,8 +201,9 @@ void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
 }
 
 FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connection,
-                                       Stats::Store& store, Type type)
-    : FakeConnectionBase(shared_connection) {
+                                       Stats::Store& store, Type type,
+                                       Event::TimeSystem& time_system)
+    : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
     codec_.reset(new Http::Http1::ServerConnectionImpl(shared_connection_.connection(), *this,
                                                        Http::Http1Settings()));
@@ -236,7 +240,7 @@ AssertionResult FakeConnectionBase::enableHalfClose(bool enable,
 
 Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder) {
   Thread::LockGuard lock(lock_);
-  new_streams_.emplace_back(new FakeStream(*this, encoder));
+  new_streams_.emplace_back(new FakeStream(*this, encoder, time_system_));
   connection_event_.notifyOne();
   return *new_streams_.back();
 }
@@ -244,10 +248,10 @@ Http::StreamDecoder& FakeHttpConnection::newStream(Http::StreamEncoder& encoder)
 AssertionResult FakeConnectionBase::waitForDisconnect(bool ignore_spurious_events,
                                                       milliseconds timeout) {
   ENVOY_LOG(trace, "FakeConnectionBase waiting for disconnect");
-  auto end_time = std::chrono::steady_clock::now() + timeout;
+  auto end_time = time_system_.monotonicTime() + timeout;
   Thread::LockGuard lock(lock_);
   while (shared_connection_.connected()) {
-    if (std::chrono::steady_clock::now() >= end_time) {
+    if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for disconnect.";
     }
     Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
@@ -270,10 +274,10 @@ AssertionResult FakeConnectionBase::waitForDisconnect(bool ignore_spurious_event
 
 AssertionResult FakeConnectionBase::waitForHalfClose(bool ignore_spurious_events,
                                                      milliseconds timeout) {
-  auto end_time = std::chrono::steady_clock::now() + timeout;
+  auto end_time = time_system_.monotonicTime() + timeout;
   Thread::LockGuard lock(lock_);
   while (!half_closed_) {
-    if (std::chrono::steady_clock::now() >= end_time) {
+    if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for half close.";
     }
     Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
@@ -296,10 +300,10 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
                                                      FakeStreamPtr& stream,
                                                      bool ignore_spurious_events,
                                                      milliseconds timeout) {
-  auto end_time = std::chrono::steady_clock::now() + timeout;
+  auto end_time = time_system_.monotonicTime() + timeout;
   Thread::LockGuard lock(lock_);
   while (new_streams_.empty()) {
-    if (std::chrono::steady_clock::now() >= end_time) {
+    if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for new stream.";
     }
     Thread::CondVar::WaitStatus status = connection_event_.waitFor(lock_, 5ms);
@@ -406,11 +410,12 @@ void FakeUpstream::threadRoutine() {
 AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                                     FakeHttpConnectionPtr& connection,
                                                     milliseconds timeout) {
-  auto end_time = std::chrono::steady_clock::now() + timeout;
+  Event::TimeSystem& time_system = timeSystem();
+  auto end_time = time_system.monotonicTime() + timeout;
   {
     Thread::LockGuard lock(lock_);
     while (new_connections_.empty()) {
-      if (std::chrono::steady_clock::now() >= end_time) {
+      if (time_system.monotonicTime() >= end_time) {
         return AssertionFailure() << "Timed out waiting for new connection.";
       }
       new_connection_event_.waitFor(lock_, 5ms);
@@ -423,8 +428,8 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
     if (new_connections_.empty()) {
       return AssertionFailure() << "Got a new connection event, but didn't create a connection.";
     }
-    connection =
-        std::make_unique<FakeHttpConnection>(consumeConnection(), stats_store_, http_type_);
+    connection = std::make_unique<FakeHttpConnection>(consumeConnection(), stats_store_, http_type_,
+                                                      time_system);
   }
   VERIFY_ASSERTION(connection->initialize());
   VERIFY_ASSERTION(connection->readDisable(false));
@@ -435,8 +440,9 @@ AssertionResult
 FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                     std::vector<std::unique_ptr<FakeUpstream>>& upstreams,
                                     FakeHttpConnectionPtr& connection, milliseconds timeout) {
-  auto end_time = std::chrono::steady_clock::now() + timeout;
-  while (std::chrono::steady_clock::now() < end_time) {
+  Event::TimeSystem& time_system = client_dispatcher.timeSystem();
+  auto end_time = time_system.monotonicTime() + timeout;
+  while (time_system.monotonicTime() < end_time) {
     for (auto it = upstreams.begin(); it != upstreams.end(); ++it) {
       FakeUpstream& upstream = **it;
       Thread::ReleasableLockGuard lock(upstream.lock_);
@@ -449,7 +455,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
       } else {
         connection = std::make_unique<FakeHttpConnection>(
-            upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_);
+            upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_, time_system);
         lock.release();
         VERIFY_ASSERTION(connection->initialize());
         VERIFY_ASSERTION(connection->readDisable(false));
@@ -472,7 +478,7 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
     if (new_connections_.empty()) {
       return AssertionFailure() << "Timed out waiting for raw connection";
     }
-    connection = std::make_unique<FakeRawConnection>(consumeConnection());
+    connection = std::make_unique<FakeRawConnection>(consumeConnection(), timeSystem());
   }
   VERIFY_ASSERTION(connection->initialize());
   VERIFY_ASSERTION(connection->readDisable(false));
@@ -492,9 +498,9 @@ AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* 
                                                milliseconds timeout) {
   Thread::LockGuard lock(lock_);
   ENVOY_LOG(debug, "waiting for {} bytes of data", num_bytes);
-  auto end_time = std::chrono::steady_clock::now() + timeout;
+  auto end_time = time_system_.monotonicTime() + timeout;
   while (data_.size() != num_bytes) {
-    if (std::chrono::steady_clock::now() >= end_time) {
+    if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for data.";
     }
     connection_event_.waitFor(lock_, 5ms); // Safe since CondVar::waitFor won't throw.
@@ -510,9 +516,9 @@ FakeRawConnection::waitForData(const std::function<bool(const std::string&)>& da
                                std::string* data, milliseconds timeout) {
   Thread::LockGuard lock(lock_);
   ENVOY_LOG(debug, "waiting for data");
-  auto end_time = std::chrono::steady_clock::now() + timeout;
+  auto end_time = time_system_.monotonicTime() + timeout;
   while (!data_validator(data_)) {
-    if (std::chrono::steady_clock::now() >= end_time) {
+    if (time_system_.monotonicTime() >= end_time) {
       return AssertionFailure() << "Timed out waiting for data.";
     }
     connection_event_.waitFor(lock_, 5ms); // Safe since CondVar::waitFor won't throw.
