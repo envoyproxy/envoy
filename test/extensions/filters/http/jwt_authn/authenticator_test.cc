@@ -40,10 +40,11 @@ public:
       const absl::optional<std::string>& provider = absl::optional<std::string>{ProviderName}) {
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
     fetcher_ = new MockJwksFetcher;
-    fetcherPtr_.reset(fetcher_);
+    fetcher_ptr_.reset(fetcher_);
     auth_ = Authenticator::create(
         check_audience, provider, !provider, filter_config_->getCache().getJwksCache(),
-        filter_config_->cm(), [this](Upstream::ClusterManager&) { return std::move(fetcherPtr_); });
+        filter_config_->cm(),
+        [this](Upstream::ClusterManager&) { return std::move(fetcher_ptr_); });
     jwks_ = Jwks::createFrom(PublicKey, Jwks::JWKS);
     EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
   }
@@ -51,7 +52,7 @@ public:
   JwtAuthentication proto_config_;
   FilterConfigSharedPtr filter_config_;
   MockJwksFetcher* fetcher_;
-  JwksFetcherPtr fetcherPtr_;
+  JwksFetcherPtr fetcher_ptr_;
   AuthenticatorPtr auth_;
   ::google::jwt_verify::JwksPtr jwks_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
@@ -422,6 +423,23 @@ TEST_F(AuthenticatorTest, TestCustomCheckAudience) {
   headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   tokens = filter_config_->getExtractor().extract(headers);
   on_complete_cb = [](const Status& status) { ASSERT_EQ(Status::JwtAudienceNotAllowed, status); };
+  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+}
+
+// This test verifies that when invalid Jwks is fetched, JwksFetchFail status is returned.
+TEST_F(AuthenticatorTest, TestInvalidPubkeyKey) {
+  EXPECT_CALL(*fetcher_, fetch(_, _))
+      .WillOnce(
+          Invoke([](const ::envoy::api::v2::core::HttpUri&, JwksFetcher::JwksReceiver& receiver) {
+            auto jwks = Jwks::createFrom(PublicKey, Jwks::PEM);
+            receiver.onJwksSuccess(std::move(jwks));
+          }));
+
+  auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
+  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
+    ASSERT_EQ(status, Status::JwksPemBadBase64);
+  };
+  auto tokens = filter_config_->getExtractor().extract(headers);
   auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
 }
 

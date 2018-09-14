@@ -59,7 +59,7 @@ public:
   };
 
   // Lookup issuer cache map. The cache only stores Jwks specified in the config.
-  virtual JwksData* findByIssuer(const std::string& issuer) const PURE;
+  virtual JwksData* findByIssuer(const std::string& issuer) PURE;
 
   virtual JwksData* findByProvider(const std::string& provider) PURE;
 

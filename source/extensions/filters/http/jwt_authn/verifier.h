@@ -70,6 +70,7 @@ public:
              providers,
          const AuthFactory& factory, const Extractor& extractor_for_allow_fail);
 
+  // Factory method for creating verifier contexts.
   static ContextSharedPtr createContext(Http::HeaderMap& headers, Callbacks* callback);
 };
 

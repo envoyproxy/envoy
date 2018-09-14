@@ -102,7 +102,7 @@ public:
     }
   }
 
-  JwksData* findByIssuer(const std::string& issuer) const override {
+  JwksData* findByIssuer(const std::string& issuer) override {
     const auto it = issuer_ptr_map_.find(issuer);
     if (it == issuer_ptr_map_.end()) {
       return nullptr;

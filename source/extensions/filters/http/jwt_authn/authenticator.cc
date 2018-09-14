@@ -31,9 +31,10 @@ public:
   AuthenticatorImpl(const CheckAudience* check_audience,
                     const absl::optional<std::string>& provider, bool allow_failed,
                     JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager,
-                    CreateJwksFetcherCb createJwksFetcherCb)
-      : jwks_cache_(jwks_cache), cm_(cluster_manager), createJwksFetcherCb_(createJwksFetcherCb),
-        check_audience_(check_audience), provider_(provider), is_allow_failed_(allow_failed) {}
+                    CreateJwksFetcherCb create_jwks_fetcher_cb)
+      : jwks_cache_(jwks_cache), cm_(cluster_manager),
+        create_jwks_fetcher_cb_(create_jwks_fetcher_cb), check_audience_(check_audience),
+        provider_(provider), is_allow_failed_(allow_failed) {}
 
   // Following functions are for JwksFetcher::JwksReceiver interface
   void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
@@ -60,7 +61,7 @@ private:
   Upstream::ClusterManager& cm_;
 
   // The callback used to create a JwksFetcher instance.
-  CreateJwksFetcherCb createJwksFetcherCb_;
+  CreateJwksFetcherCb create_jwks_fetcher_cb_;
 
   // The Jwks fetcher object
   Common::JwksFetcherPtr fetcher_;
@@ -101,89 +102,86 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, std::vector<JwtLocation
 }
 
 void AuthenticatorImpl::startVerify() {
-  Status status = Status::JwtVerificationFail;
-  while (!tokens_.empty()) {
-    curr_token_ = std::move(tokens_.back());
-    tokens_.pop_back();
-    jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
-    status = jwt_->parseFromString(curr_token_->token());
-    if (status != Status::Ok) {
-      continue;
-    }
-
-    // Check if token extracted from the location contains the issuer specified by config.
-    if (!curr_token_->isIssuerSpecified(jwt_->iss_)) {
-      ENVOY_LOG(debug, "Jwt issuer {} does not match required", jwt_->iss_);
-      status = Status::JwtUnknownIssuer;
-      continue;
-    }
-
-    // TODO(qiwzhang): Cross-platform-wise the below unix_timestamp code is wrong as the
-    // epoch is not guaranteed to be defined as the unix epoch. We should use
-    // the abseil time functionality instead or use the jwt_verify_lib to check
-    // the validity of a JWT.
-    // Check "exp" claim.
-    const auto unix_timestamp = std::chrono::duration_cast<std::chrono::seconds>(
-                                    std::chrono::system_clock::now().time_since_epoch())
-                                    .count();
-    // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
-    // to 0.
-    if (jwt_->nbf_ > unix_timestamp) {
-      status = Status::JwtNotYetValid;
-      continue;
-    }
-    // If the exp claim does *not* appear in the JWT then the exp field is defaulted
-    // to 0.
-    if (jwt_->exp_ > 0 && jwt_->exp_ < unix_timestamp) {
-      status = Status::JwtExpired;
-      continue;
-    }
-
-    // Check the issuer is configured or not.
-    jwks_data_ = provider_ ? jwks_cache_.findByProvider(provider_.value())
-                           : jwks_cache_.findByIssuer(jwt_->iss_);
-    // isIssuerSpecified() check already make sure the issuer is in the cache.
-    ASSERT(jwks_data_ != nullptr);
-
-    // Check if audience is allowed
-    bool is_allowed = check_audience_ ? check_audience_->areAudiencesAllowed(jwt_->audiences_)
-                                      : jwks_data_->areAudiencesAllowed(jwt_->audiences_);
-    if (!is_allowed) {
-      status = Status::JwtAudienceNotAllowed;
-      continue;
-    }
-
-    auto jwks_obj = jwks_data_->getJwksObj();
-    if (jwks_obj != nullptr && !jwks_data_->isExpired()) {
-      // TODO(qiwzhang): It would seem there's a window of error whereby if the JWT issuer
-      // has started signing with a new key that's not in our cache, then the
-      // verification will fail even though the JWT is valid. A simple fix
-      // would be to check the JWS kid header field; if present check we have
-      // the key cached, if we do proceed to verify else try a new JWKS retrieval.
-      // JWTs without a kid header field in the JWS we might be best to get each
-      // time? This all only matters for remote JWKS.
-      verifyKey();
-      return;
-    }
-
-    // TODO(potatop): potential optimization.
-    // Only one remote jwks will be fetched, verify will not continue util it is completed. This is
-    // fine for provider name requirements, as each provider has only one issuer, but for allow
-    // missing or failed there can be more than one issuers. This can be optimized; the same remote
-    // jwks fetching can be shared by two requests.
-    if (jwks_data_->getJwtProvider().has_remote_jwks()) {
-      if (!fetcher_) {
-        fetcher_ = createJwksFetcherCb_(cm_);
-      }
-      fetcher_->fetch(jwks_data_->getJwtProvider().remote_jwks().http_uri(), *this);
-      return;
-    }
-    // No valid keys for this issuer. This may happen as a result of incorrect local
-    // JWKS configuration.
-    status = Status::JwksNoValidKeys;
+  ASSERT(!tokens_.empty());
+  curr_token_ = std::move(tokens_.back());
+  tokens_.pop_back();
+  jwt_ = std::make_unique<::google::jwt_verify::Jwt>();
+  const Status status = jwt_->parseFromString(curr_token_->token());
+  if (status != Status::Ok) {
+    doneWithStatus(status);
+    return;
   }
-  // send the last error status
-  doneWithStatus(status);
+
+  // Check if token extracted from the location contains the issuer specified by config.
+  if (!curr_token_->isIssuerSpecified(jwt_->iss_)) {
+    ENVOY_LOG(debug, "Jwt issuer {} does not match required", jwt_->iss_);
+    doneWithStatus(Status::JwtUnknownIssuer);
+    return;
+  }
+
+  // TODO(qiwzhang): Cross-platform-wise the below unix_timestamp code is wrong as the
+  // epoch is not guaranteed to be defined as the unix epoch. We should use
+  // the abseil time functionality instead or use the jwt_verify_lib to check
+  // the validity of a JWT.
+  // Check "exp" claim.
+  const auto unix_timestamp = std::chrono::duration_cast<std::chrono::seconds>(
+                                  std::chrono::system_clock::now().time_since_epoch())
+                                  .count();
+  // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
+  // to 0.
+  if (jwt_->nbf_ > unix_timestamp) {
+    doneWithStatus(Status::JwtNotYetValid);
+    return;
+  }
+  // If the exp claim does *not* appear in the JWT then the exp field is defaulted
+  // to 0.
+  if (jwt_->exp_ > 0 && jwt_->exp_ < unix_timestamp) {
+    doneWithStatus(Status::JwtExpired);
+    return;
+  }
+
+  // Check the issuer is configured or not.
+  jwks_data_ = provider_ ? jwks_cache_.findByProvider(provider_.value())
+                         : jwks_cache_.findByIssuer(jwt_->iss_);
+  // isIssuerSpecified() check already make sure the issuer is in the cache.
+  ASSERT(jwks_data_ != nullptr);
+
+  // Check if audience is allowed
+  bool is_allowed = check_audience_ ? check_audience_->areAudiencesAllowed(jwt_->audiences_)
+                                    : jwks_data_->areAudiencesAllowed(jwt_->audiences_);
+  if (!is_allowed) {
+    doneWithStatus(Status::JwtAudienceNotAllowed);
+    return;
+  }
+
+  auto jwks_obj = jwks_data_->getJwksObj();
+  if (jwks_obj != nullptr && !jwks_data_->isExpired()) {
+    // TODO(qiwzhang): It would seem there's a window of error whereby if the JWT issuer
+    // has started signing with a new key that's not in our cache, then the
+    // verification will fail even though the JWT is valid. A simple fix
+    // would be to check the JWS kid header field; if present check we have
+    // the key cached, if we do proceed to verify else try a new JWKS retrieval.
+    // JWTs without a kid header field in the JWS we might be best to get each
+    // time? This all only matters for remote JWKS.
+    verifyKey();
+    return;
+  }
+
+  // TODO(potatop): potential optimization.
+  // Only one remote jwks will be fetched, verify will not continue util it is completed. This is
+  // fine for provider name requirements, as each provider has only one issuer, but for allow
+  // missing or failed there can be more than one issuers. This can be optimized; the same remote
+  // jwks fetching can be shared by two requests.
+  if (jwks_data_->getJwtProvider().has_remote_jwks()) {
+    if (!fetcher_) {
+      fetcher_ = create_jwks_fetcher_cb_(cm_);
+    }
+    fetcher_->fetch(jwks_data_->getJwtProvider().remote_jwks().http_uri(), *this);
+    return;
+  }
+  // No valid keys for this issuer. This may happen as a result of incorrect local
+  // JWKS configuration.
+  doneWithStatus(Status::JwksNoValidKeys);
 }
 
 void AuthenticatorImpl::onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
@@ -246,9 +244,9 @@ AuthenticatorPtr Authenticator::create(const CheckAudience* check_audience,
                                        const absl::optional<std::string>& provider,
                                        bool allow_failed, JwksCache& jwks_cache,
                                        Upstream::ClusterManager& cluster_manager,
-                                       CreateJwksFetcherCb createJwksFetcherCb) {
+                                       CreateJwksFetcherCb create_jwks_fetcher_cb) {
   return std::make_unique<AuthenticatorImpl>(check_audience, provider, allow_failed, jwks_cache,
-                                             cluster_manager, createJwksFetcherCb);
+                                             cluster_manager, create_jwks_fetcher_cb);
 }
 
 } // namespace JwtAuthn

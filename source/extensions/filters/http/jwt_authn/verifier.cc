@@ -38,7 +38,6 @@ public:
     for (const auto& it : auths_) {
       it->onDestroy();
     }
-    auths_.clear();
   }
 
   // Get Response data which can be used to check if a verifier node has responded or not.
@@ -93,7 +92,7 @@ public:
 
   void verify(ContextSharedPtr context) const override {
     auto& ctximpl = static_cast<ContextImpl&>(*context);
-    auto auth = auth_factory_.create(getSuppiler(), provider_name_);
+    auto auth = auth_factory_.create(getAudienceChecker(), provider_name_, false);
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), extractor_->extract(ctximpl.headers()),
@@ -104,7 +103,7 @@ public:
   }
 
 protected:
-  virtual const CheckAudience* getSuppiler() const { return nullptr; }
+  virtual const CheckAudience* getAudienceChecker() const { return nullptr; }
 
 private:
   const AuthFactory& auth_factory_;
@@ -121,7 +120,7 @@ public:
         check_audience_(std::make_unique<CheckAudience>(config_audiences)) {}
 
 private:
-  const CheckAudience* getSuppiler() const override { return check_audience_.get(); }
+  const CheckAudience* getAudienceChecker() const override { return check_audience_.get(); }
 
   // Check audience object
   ::google::jwt_verify::CheckAudiencePtr check_audience_;
@@ -136,7 +135,7 @@ public:
 
   void verify(ContextSharedPtr context) const override {
     auto& ctximpl = static_cast<ContextImpl&>(*context);
-    auto auth = auth_factory_.create({}, absl::nullopt);
+    auto auth = auth_factory_.create(nullptr, absl::nullopt, true);
     extractor_.sanitizePayloadHeaders(ctximpl.headers());
     auth->verify(
         ctximpl.headers(), extractor_.extract(ctximpl.headers()),
@@ -232,11 +231,7 @@ public:
   AllowAllVerifierImpl(const BaseVerifierImpl* parent) : BaseVerifierImpl(parent) {}
 
   void verify(ContextSharedPtr context) const override {
-    onComplete(Status::Ok, static_cast<ContextImpl&>(*context));
-  }
-
-  void onComplete(const Status& status, ContextImpl& context) const override {
-    completeWithStatus(status, context);
+    completeWithStatus(Status::Ok, static_cast<ContextImpl&>(*context));
   }
 };
 
