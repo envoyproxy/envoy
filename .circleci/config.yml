@@ -10,7 +10,6 @@ jobs:
      resource_class: xlarge
      working_directory: /source
      environment:
-       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
