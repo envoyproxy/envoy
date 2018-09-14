@@ -472,6 +472,13 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/debugging:symbolize",
     )
 
+    # Require abseil_time as an indirect dependency as it is needed by the
+    # direct dependency jwt_verify_lib.
+    native.bind(
+        name = "abseil_time",
+        actual = "@com_google_absl//absl/time:time",
+    )
+
 def _com_google_protobuf():
     _repository_impl("com_google_protobuf")
 

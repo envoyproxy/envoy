@@ -155,6 +155,8 @@ bool ConnectionManager::ResponseDecoder::onData(Buffer::Instance& data) {
 
 FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
+  metadata_->setSequenceId(parent_.original_sequence_id_);
+
   first_reply_field_ =
       (metadata->hasMessageType() && metadata->messageType() == MessageType::Reply);
   return ProtocolConverter::messageBegin(metadata);
@@ -188,7 +190,6 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
           .createTransport();
 
   metadata_->setProtocol(parent_.parent_.decoder_->protocolType());
-  metadata_->setSequenceId(parent_.metadata_->sequenceId());
   transport->encodeFrame(buffer, *metadata_, parent_.response_buffer_);
   complete_ = true;
 
@@ -254,7 +255,10 @@ FilterStatus ConnectionManager::ActiveRpc::transportEnd() {
 }
 
 FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr metadata) {
+  ASSERT(metadata->hasSequenceId());
+
   metadata_ = metadata;
+  original_sequence_id_ = metadata_->sequenceId();
 
   if (metadata_->isProtocolUpgradeMessage()) {
     ASSERT(parent_.protocol_->supportsUpgrade());
@@ -309,6 +313,8 @@ Router::RouteConstSharedPtr ConnectionManager::ActiveRpc::route() {
 }
 
 void ConnectionManager::ActiveRpc::sendLocalReply(const DirectResponse& response) {
+  metadata_->setSequenceId(original_sequence_id_);
+
   parent_.sendLocalReply(*metadata_, response);
   parent_.doDeferredRpcDestroy(*this);
 }
