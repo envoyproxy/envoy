@@ -483,11 +483,23 @@ CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::str
 
 ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config)
     : ContextImpl(scope, config), server_name_indication_(config.serverNameIndication()),
-      allow_renegotiation_(config.allowRenegotiation()) {
+      allow_renegotiation_(config.allowRenegotiation()),
+      max_session_keys_(config.maxSessionKeys()) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
                                      parsed_alpn_protocols_.size());
     RELEASE_ASSERT(rc == 0, "");
+  }
+
+  if (max_session_keys_ > 0) {
+    SSL_CTX_set_session_cache_mode(ctx_.get(), SSL_SESS_CACHE_CLIENT);
+    SSL_CTX_sess_set_new_cb(ctx_.get(), [](SSL* ssl, SSL_SESSION* session) -> int {
+      ContextImpl* context_impl =
+          static_cast<ContextImpl*>(SSL_CTX_get_ex_data(SSL_get_SSL_CTX(ssl), sslContextIndex()));
+      ClientContextImpl* client_context_impl = dynamic_cast<ClientContextImpl*>(context_impl);
+      RELEASE_ASSERT(client_context_impl != nullptr, ""); // for Coverity
+      return client_context_impl->newSessionKey(session);
+    });
   }
 }
 
@@ -503,7 +515,29 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl() const {
     SSL_set_renegotiate_mode(ssl_con.get(), ssl_renegotiate_freely);
   }
 
+  if (max_session_keys_ > 0) {
+    absl::WriterMutexLock l(&session_keys_mu_);
+    if (!session_keys_.empty()) {
+      SSL_SESSION* session = session_keys_.front().get();
+      SSL_set_session(ssl_con.get(), session);
+      // Remove single-use (TLS v1.3) session key after first use.
+      if (SSL_SESSION_should_be_single_use(session)) {
+        session_keys_.pop_front();
+      }
+    }
+  }
+
   return ssl_con;
+}
+
+int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
+  absl::WriterMutexLock l(&session_keys_mu_);
+  // Evict oldest entries.
+  while (session_keys_.size() >= max_session_keys_) {
+    session_keys_.pop_back();
+  }
+  session_keys_.push_front(bssl::UniquePtr<SSL_SESSION>(session));
+  return 1; // Tell BoringSSL that we took ownership of the session.
 }
 
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope, const ServerContextConfig& config,

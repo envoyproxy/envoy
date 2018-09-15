@@ -1,5 +1,6 @@
 #pragma once
 
+#include <deque>
 #include <string>
 #include <vector>
 
@@ -12,6 +13,7 @@
 #include "common/ssl/context_impl.h"
 #include "common/ssl/context_manager_impl.h"
 
+#include "absl/synchronization/mutex.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -144,8 +146,13 @@ public:
   bssl::UniquePtr<SSL> newSsl() const override;
 
 private:
+  int newSessionKey(SSL_SESSION* session);
+
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
+  const size_t max_session_keys_;
+  mutable absl::Mutex session_keys_mu_;
+  mutable std::deque<bssl::UniquePtr<SSL_SESSION>> session_keys_ GUARDED_BY(session_keys_mu_);
 };
 
 class ServerContextImpl : public ContextImpl, public ServerContext {
