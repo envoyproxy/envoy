@@ -40,8 +40,7 @@ Config::Route::Route(
 Config::WeightedClusterEntry::WeightedClusterEntry(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight&
         config)
-    : cluster_name_(config.name()), cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(config, weight)) {
-}
+    : cluster_name_(config.name()), cluster_weight_(config.weight()) {}
 
 Config::SharedConfig::SharedConfig(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,

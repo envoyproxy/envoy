@@ -487,12 +487,12 @@ TEST_F(TcpProxyTest, WeightedClusters) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight*
       cluster1 = config.mutable_weighted_clusters()->mutable_clusters()->Add();
   cluster1->set_name("cluster1");
-  cluster1->mutable_weight()->set_value(10);
+  cluster1->set_weight(10);
 
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight*
       cluster2 = config.mutable_weighted_clusters()->mutable_clusters()->Add();
   cluster2->set_name("cluster2");
-  cluster2->mutable_weight()->set_value(90);
+  cluster2->set_weight(90);
 
   configure(config);
 
@@ -506,7 +506,7 @@ TEST_F(TcpProxyTest, DefaultRoutes) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight*
       ignored_cluster = config.mutable_weighted_clusters()->mutable_clusters()->Add();
   ignored_cluster->set_name("ignored_cluster");
-  ignored_cluster->mutable_weight()->set_value(10);
+  ignored_cluster->set_weight(10);
 
   configure(config);
 
