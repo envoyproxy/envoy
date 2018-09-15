@@ -177,7 +177,7 @@ private:
   void dispatch();
   void sendLocalReply(MessageMetadata& metadata, const DirectResponse& reponse);
   void doDeferredRpcDestroy(ActiveRpc& rpc);
-  void resetAllRpcs();
+  void resetAllRpcs(bool local_reset);
 
   Config& config_;
   ThriftFilterStats& stats_;
@@ -191,6 +191,7 @@ private:
   Buffer::OwnedImpl request_buffer_;
   Runtime::RandomGenerator& random_generator_;
   bool stopped_{false};
+  bool half_closed_{false};
 };
 
 } // namespace ThriftProxy

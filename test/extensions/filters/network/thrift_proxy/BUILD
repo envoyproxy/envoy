@@ -263,6 +263,7 @@ envoy_extension_cc_test(
     deps = [
         ":utility_lib",
         "//source/extensions/filters/network/thrift_proxy/router:config",
+        "//source/extensions/filters/network/thrift_proxy/router:router_interface",
         "//source/extensions/filters/network/thrift_proxy/router:router_lib",
         "//test/test_common:utility_lib",
     ],

@@ -130,9 +130,13 @@ MockClusterUpdateCallbacks::MockClusterUpdateCallbacks() {}
 
 MockClusterUpdateCallbacks::~MockClusterUpdateCallbacks() {}
 
+
 MockClusterInfoFactory::MockClusterInfoFactory() {}
 
 MockClusterInfoFactory::~MockClusterInfoFactory() {}
+
+MockRetryHostPredicate::MockRetryHostPredicate() {}
+MockRetryHostPredicate::~MockRetryHostPredicate() {}
 
 } // namespace Upstream
 } // namespace Envoy

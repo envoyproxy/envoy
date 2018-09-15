@@ -84,6 +84,14 @@ message RouteAction {
     // assigned to each cluster.
     WeightedCluster weighted_clusters = 2;
   }
+
+  // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
+  // the upstream cluster with metadata matching what is set in this field will be considered.
+  // Note that this will be merged with what's provided in :ref: `WeightedCluster.MetadataMatch
+  // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.WeightedCluster.ClusterWeight.metadata_match>`,
+  // with values there taking precedence. Keys and values should be provided under the "envoy.lb"
+  // metadata key.
+  envoy.api.v2.core.Metadata metadata_match = 3;
 }
 
 // Allows for specification of multiple upstream clusters along with weights that indicate the
@@ -98,6 +106,14 @@ message WeightedCluster {
     // weight. The sum of weights across all entries in the clusters array determines the total
     // weight.
     google.protobuf.UInt32Value weight = 2 [(validate.rules).uint32.gte = 1];
+
+    // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
+    // the upstream cluster with metadata matching what is set in this field, combined with what's
+    // provided in :ref: `RouteAction's metadata_match
+    // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.RouteAction.metadata_match>`,
+    // will be considered. Values here will take precedence. Keys and values should be provided
+    // under the "envoy.lb" metadata key.
+    envoy.api.v2.core.Metadata metadata_match = 3;
   }
 
   // Specifies one or more upstream clusters associated with the route.

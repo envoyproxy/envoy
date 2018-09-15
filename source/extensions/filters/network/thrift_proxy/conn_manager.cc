@@ -24,24 +24,28 @@ ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& r
 ConnectionManager::~ConnectionManager() {}
 
 Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end_stream) {
-  UNREFERENCED_PARAMETER(end_stream);
-
   request_buffer_.move(data);
   dispatch();
 
-  if (end_stream && stopped_) {
-    ASSERT(!rpcs_.empty());
-    MessageMetadata& metadata = *(*rpcs_.begin())->metadata_;
-    ASSERT(metadata.hasMessageType());
-    if (metadata.messageType() != MessageType::Oneway) {
-      // Downstream has closed, so unless we're still processing a oneway request, close. By
-      // writing an empty buffer with end_stream set, we allow a remote close event to be
-      // triggered, which maintains accurate bookkeeping of which end of the connection closed
-      // during an active request.
-      ENVOY_CONN_LOG(trace, "downstream half-closed", read_callbacks_->connection());
-      Buffer::OwnedImpl empty;
-      read_callbacks_->connection().write(empty, true);
+  if (end_stream) {
+    ENVOY_CONN_LOG(trace, "downstream half-closed", read_callbacks_->connection());
+
+    // Downstream has closed. Unless we're waiting for an upstream connection to complete a oneway
+    // request, close. The special case for oneway requests allows them to complete before the
+    // ConnectionManager is destroyed.
+    if (stopped_) {
+      ASSERT(!rpcs_.empty());
+      MessageMetadata& metadata = *(*rpcs_.begin())->metadata_;
+      ASSERT(metadata.hasMessageType());
+      if (metadata.messageType() == MessageType::Oneway) {
+        ENVOY_CONN_LOG(trace, "waiting for one-way completion", read_callbacks_->connection());
+        half_closed_ = true;
+        return Network::FilterStatus::StopIteration;
+      }
     }
+
+    resetAllRpcs(false);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 
   return Network::FilterStatus::StopIteration;
@@ -80,7 +84,7 @@ void ConnectionManager::dispatch() {
   }
 
   stats_.request_decoding_error_.inc();
-  resetAllRpcs();
+  resetAllRpcs(true);
   read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
 }
 
@@ -101,14 +105,29 @@ void ConnectionManager::continueDecoding() {
   ENVOY_CONN_LOG(debug, "thrift filter continued", read_callbacks_->connection());
   stopped_ = false;
   dispatch();
+
+  if (!stopped_ && half_closed_) {
+    // If we're half closed, but not stopped waiting for an upstream, reset any pending rpcs and
+    // close the connection.
+    resetAllRpcs(false);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  }
 }
 
 void ConnectionManager::doDeferredRpcDestroy(ConnectionManager::ActiveRpc& rpc) {
   read_callbacks_->connection().dispatcher().deferredDelete(rpc.removeFromList(rpcs_));
 }
 
-void ConnectionManager::resetAllRpcs() {
+void ConnectionManager::resetAllRpcs(bool local_reset) {
   while (!rpcs_.empty()) {
+    if (local_reset) {
+      ENVOY_CONN_LOG(debug, "local close with active request", read_callbacks_->connection());
+      stats_.cx_destroy_local_with_active_rq_.inc();
+    } else {
+      ENVOY_CONN_LOG(debug, "remote close with active request", read_callbacks_->connection());
+      stats_.cx_destroy_remote_with_active_rq_.inc();
+    }
+
     rpcs_.front()->onReset();
   }
 }
@@ -121,17 +140,7 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
 }
 
 void ConnectionManager::onEvent(Network::ConnectionEvent event) {
-  if (!rpcs_.empty()) {
-    if (event == Network::ConnectionEvent::RemoteClose) {
-      ENVOY_CONN_LOG(debug, "remote close with active request", read_callbacks_->connection());
-      stats_.cx_destroy_remote_with_active_rq_.inc();
-    } else if (event == Network::ConnectionEvent::LocalClose) {
-      ENVOY_CONN_LOG(debug, "local close with active request", read_callbacks_->connection());
-      stats_.cx_destroy_local_with_active_rq_.inc();
-    }
-
-    resetAllRpcs();
-  }
+  resetAllRpcs(event == Network::ConnectionEvent::LocalClose);
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler() {
