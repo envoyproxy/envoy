@@ -152,7 +152,7 @@ message TcpProxy {
       // When a request matches the route, the choice of an upstream cluster is
       // determined by its weight. The sum of weights across all entries in the
       // clusters array determines the total weight.
-      google.protobuf.UInt32Value weight = 2 [(validate.rules).uint32.gte = 1];
+      uint32 weight = 2 [(validate.rules).uint32.gte = 1];
     }
 
     // Specifies one or more upstream clusters associated with the route.
