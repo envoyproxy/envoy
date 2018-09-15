@@ -37,7 +37,8 @@ public:
    *        and new_total.
    */
   static void updateBufferStats(uint64_t delta, uint64_t new_total, uint64_t& previous_total,
-                                Stats::Counter& stat_total, Stats::Gauge& stat_current);
+                                Stats::Counter& stat_total, Stats::Gauge& stat_current,
+                                Stats::Histogram& stat_bytes);
 };
 
 /**

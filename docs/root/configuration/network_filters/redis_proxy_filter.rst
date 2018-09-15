@@ -23,9 +23,11 @@ following statistics:
   downstream_cx_protocol_error, Counter, Total protocol errors
   downstream_cx_rx_bytes_buffered, Gauge, Total received bytes currently buffered
   downstream_cx_rx_bytes_total, Counter, Total bytes received
+  downstream_cx_rx_bytes, Histogram, Size of bytes received
   downstream_cx_total, Counter, Total connections
   downstream_cx_tx_bytes_buffered, Gauge, Total sent bytes currently buffered
   downstream_cx_tx_bytes_total, Counter, Total bytes sent
+  downstream_cx_tx_bytes, Histogram, Size of bytes sent
   downstream_cx_drain_close, Counter, Number of connections closed due to draining
   downstream_rq_active, Gauge, Total active requests
   downstream_rq_total, Counter, Total requests

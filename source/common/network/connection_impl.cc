@@ -25,9 +25,11 @@ namespace Network {
 
 void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total,
                                               uint64_t& previous_total, Stats::Counter& stat_total,
-                                              Stats::Gauge& stat_current) {
+                                              Stats::Gauge& stat_current,
+                                              Stats::Histogram& stat_bytes) {
   if (delta) {
     stat_total.add(delta);
+    stat_bytes.recordValue(delta);
   }
 
   if (new_total != previous_total) {
@@ -515,9 +517,9 @@ void ConnectionImpl::updateReadBufferStats(uint64_t num_read, uint64_t new_size)
     return;
   }
 
-  ConnectionImplUtility::updateBufferStats(num_read, new_size, last_read_buffer_size_,
-                                           connection_stats_->read_total_,
-                                           connection_stats_->read_current_);
+  ConnectionImplUtility::updateBufferStats(
+      num_read, new_size, last_read_buffer_size_, connection_stats_->read_total_,
+      connection_stats_->read_current_, connection_stats_->read_bytes_);
 }
 
 void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_size) {
@@ -525,9 +527,9 @@ void ConnectionImpl::updateWriteBufferStats(uint64_t num_written, uint64_t new_s
     return;
   }
 
-  ConnectionImplUtility::updateBufferStats(num_written, new_size, last_write_buffer_size_,
-                                           connection_stats_->write_total_,
-                                           connection_stats_->write_current_);
+  ConnectionImplUtility::updateBufferStats(
+      num_written, new_size, last_write_buffer_size_, connection_stats_->write_total_,
+      connection_stats_->write_current_, connection_stats_->write_bytes_);
 }
 
 bool ConnectionImpl::bothSidesHalfClosed() {

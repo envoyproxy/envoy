@@ -82,8 +82,10 @@ public:
   struct ConnectionStats {
     Stats::Counter& read_total_;
     Stats::Gauge& read_current_;
+    Stats::Histogram& read_bytes_;
     Stats::Counter& write_total_;
     Stats::Gauge& write_current_;
+    Stats::Histogram& write_bytes_;
     // Counter* as this is an optional counter. Bind errors will not be tracked if this is nullptr.
     Stats::Counter* bind_errors_;
   };

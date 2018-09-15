@@ -28,8 +28,10 @@ statistics:
    downstream_cx_http2_active, Gauge, Total active HTTP/2 connections
    downstream_cx_protocol_error, Counter, Total protocol errors
    downstream_cx_length_ms, Histogram, Connection length milliseconds
+   downstream_cx_rx_bytes, Histogram, Size of bytes received
    downstream_cx_rx_bytes_total, Counter, Total bytes received
    downstream_cx_rx_bytes_buffered, Gauge, Total received bytes currently buffered
+   downstream_cx_tx_bytes, Histogram, Size of bytes sent
    downstream_cx_tx_bytes_total, Counter, Total bytes sent
    downstream_cx_tx_bytes_buffered, Gauge, Total sent bytes currently buffered
    downstream_cx_drain_close, Counter, Total connections closed due to draining
