@@ -36,7 +36,7 @@ public:
    *
    * @param attempted_host the host that was previously attempted.
    */
-  virtual void onHostAttempted(HostSharedPtr attempted_host) PURE;
+  virtual void onHostAttempted(HostDescriptionConstSharedPtr attempted_host) PURE;
 };
 
 typedef std::shared_ptr<RetryPriority> RetryPrioritySharedPtr;
@@ -67,7 +67,7 @@ public:
    *
    * @param attempted_host the host that was previously attempted.
    */
-  virtual void onHostAttempted(HostSharedPtr attempted_host) PURE;
+  virtual void onHostAttempted(HostDescriptionConstSharedPtr attempted_host) PURE;
 };
 
 typedef std::shared_ptr<RetryHostPredicate> RetryHostPredicateSharedPtr;
@@ -115,7 +115,13 @@ class RetryHostPredicateFactory {
 public:
   virtual ~RetryHostPredicateFactory() {}
 
-  virtual void createHostPredicate(RetryHostPredicateFactoryCallbacks& callbacks) PURE;
+  virtual void createHostPredicate(RetryHostPredicateFactoryCallbacks& callbacks,
+                                   const ProtobufWkt::Struct& config) PURE;
+
+  /**
+   * @return name name of this factory.
+   */
+  virtual std::string name() PURE;
 };
 
 } // namespace Upstream

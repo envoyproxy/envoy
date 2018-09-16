@@ -23,3 +23,17 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "jwks_fetcher_lib",
+    srcs = ["jwks_fetcher.cc"],
+    hdrs = ["jwks_fetcher.h"],
+    external_deps = [
+        "jwt_verify_lib",
+    ],
+    deps = [
+        "//include/envoy/upstream:cluster_manager_interface",
+        "//source/common/http:utility_lib",
+        "@envoy_api//envoy/api/v2/core:http_uri_cc",
+    ],
+)

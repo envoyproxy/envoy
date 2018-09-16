@@ -325,8 +325,11 @@ TEST_F(RdsImplTest, Failure) {
 
   EXPECT_EQ(2UL,
             factory_context_.scope_.counter("foo.rds.foo_route_config.update_attempt").value());
-  EXPECT_EQ(2UL,
+  EXPECT_EQ(1UL,
             factory_context_.scope_.counter("foo.rds.foo_route_config.update_failure").value());
+  // Validate that the schema error increments update_rejected stat.
+  EXPECT_EQ(1UL,
+            factory_context_.scope_.counter("foo.rds.foo_route_config.update_rejected").value());
 }
 
 TEST_F(RdsImplTest, FailureArray) {
@@ -349,7 +352,7 @@ TEST_F(RdsImplTest, FailureArray) {
   EXPECT_EQ(1UL,
             factory_context_.scope_.counter("foo.rds.foo_route_config.update_attempt").value());
   EXPECT_EQ(1UL,
-            factory_context_.scope_.counter("foo.rds.foo_route_config.update_failure").value());
+            factory_context_.scope_.counter("foo.rds.foo_route_config.update_rejected").value());
 }
 
 class RouteConfigProviderManagerImplTest : public RdsTestBase {

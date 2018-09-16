@@ -36,6 +36,15 @@ TEST(UnframedTransportTest, DecodeFrameStart) {
   EXPECT_EQ(buffer.length(), 4);
 }
 
+TEST(UnframedTransportTest, DecodeFrameStartWithNoData) {
+  UnframedTransportImpl transport;
+
+  Buffer::OwnedImpl buffer;
+  MessageMetadata metadata;
+  EXPECT_FALSE(transport.decodeFrameStart(buffer, metadata));
+  EXPECT_THAT(metadata, IsEmptyMetadata());
+}
+
 TEST(UnframedTransportTest, DecodeFrameEnd) {
   UnframedTransportImpl transport;
 

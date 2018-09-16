@@ -78,7 +78,8 @@ public:
                 bool validate_clusters,
                 envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode code,
                 envoy::api::v2::route::VirtualHost::TlsRequirementType type =
-                    envoy::api::v2::route::VirtualHost::NONE);
+                    envoy::api::v2::route::VirtualHost::NONE,
+                envoy::api::v2::route::RouteAction::RetryPolicy retry_policy = {});
 
   // Add an HTTP filter prior to existing filters.
   void addFilter(const std::string& filter_yaml);

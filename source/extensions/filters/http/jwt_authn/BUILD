@@ -46,6 +46,7 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/stats:stats_macros",
         "//source/common/http:message_lib",
+        "//source/extensions/filters/http/common:jwks_fetcher_lib",
     ],
 )
 
