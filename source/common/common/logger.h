@@ -127,6 +127,8 @@ public:
 
   bool hasLock() const { return lock_ != nullptr; }
   void setLock(Thread::BasicLockable& lock) { lock_ = &lock; }
+  void clearLock() { lock_ = nullptr; }
+  Thread::BasicLockable* lock() { return lock_; }
 
 private:
   Thread::BasicLockable* lock_{};
@@ -139,6 +141,7 @@ private:
 class DelegatingLogSink : public spdlog::sinks::sink {
 public:
   void setLock(Thread::BasicLockable& lock) { stderr_sink_->setLock(lock); }
+  void clearLock() { stderr_sink_->clearLock(); }
 
   // spdlog::sinks::sink
   void log(const spdlog::details::log_msg& msg) override;
@@ -169,6 +172,30 @@ private:
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
 };
 
+// Defines a scope in which logging can occur. This context should stay alive
+// whenever logging should be enabled. If a context is instantiated while
+// another is active, the old one will be restored on destruction.
+/**
+ * Initialize the logging system with the specified lock and log level.
+ * This is equivalalent to setLogLevel, setLogFormat, and setLock, which
+ * can be called individually as well, e.g. to set the log level without
+ * changing the lock or format.
+ */
+class Context {
+public:
+  Context(spdlog::level::level_enum log_level, const std::string& log_format,
+          Thread::BasicLockable& lock);
+  ~Context();
+
+private:
+  void restore();
+
+  spdlog::level::level_enum log_level_;
+  std::string log_format_;
+  Thread::BasicLockable& lock_;
+  Context* save_context_;
+};
+
 /**
  * A registry of all named loggers in envoy. Usable for adjusting levels of each logger
  * individually.
@@ -188,15 +215,6 @@ public:
     static DelegatingLogSinkPtr sink = DelegatingLogSink::init();
     return sink;
   }
-
-  /*
-   * Initialize the logging system with the specified lock and log level.
-   * This is equivalalent to setLogLevel, setLogFormat, and setLock, which
-   * can be called individually as well, e.g. to set the log level without
-   * changing the lock or format.
-   */
-  static void initialize(spdlog::level::level_enum log_level, const std::string& log_format,
-                         Thread::BasicLockable& lock);
 
   /**
    * Sets the minimum log severity required to print messages.
