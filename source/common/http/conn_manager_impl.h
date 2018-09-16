@@ -18,6 +18,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/overload_manager.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -49,7 +50,8 @@ public:
   ConnectionManagerImpl(ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
                         Runtime::RandomGenerator& random_generator, Tracing::HttpTracer& tracer,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
-                        Upstream::ClusterManager& cluster_manager);
+                        Upstream::ClusterManager& cluster_manager,
+                        Server::OverloadManager* overload_manager);
   ~ConnectionManagerImpl();
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -456,6 +458,7 @@ private:
   WebSocketProxyPtr ws_connection_;
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
+  const Server::OverloadActionState& overload_stop_accepting_requests_;
 };
 
 } // namespace Http

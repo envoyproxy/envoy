@@ -37,7 +37,7 @@ public:
     EXPECT_CALL(*retry_timer_, enableTimer(_));
   }
 
-  TestRetryPolicy policy_;
+  NiceMock<TestRetryPolicy> policy_;
   NiceMock<Upstream::MockClusterInfo> cluster_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;

@@ -39,6 +39,16 @@ public:
   RetryStatus shouldRetry(const Http::HeaderMap* response_headers,
                           const absl::optional<Http::StreamResetReason>& reset_reason,
                           DoRetryCallback callback) override;
+  bool shouldSelectAnotherHost(const Upstream::Host& host) override {
+    return std::any_of(
+        retry_host_predicates_.begin(), retry_host_predicates_.end(),
+        [&host](auto predicate) { return predicate->shouldSelectAnotherHost(host); });
+  }
+
+  void onHostAttempted(Upstream::HostDescriptionConstSharedPtr host) override {
+    std::for_each(retry_host_predicates_.begin(), retry_host_predicates_.end(),
+                  [&host](auto predicate) { predicate->onHostAttempted(host); });
+  }
 
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
@@ -61,6 +71,7 @@ private:
   Event::TimerPtr retry_timer_;
   Upstream::ResourcePriority priority_;
   BackOffStrategyPtr backoff_strategy_;
+  std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
 };
 
 } // namespace Router

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/router/router.h"
+
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
 #include "extensions/filters/network/thrift_proxy/conn_state.h"
 #include "extensions/filters/network/thrift_proxy/filters/filter.h"
@@ -239,6 +241,7 @@ public:
 
   // ThriftProxy::Router::RouteEntry
   MOCK_CONST_METHOD0(clusterName, const std::string&());
+  MOCK_CONST_METHOD0(metadataMatchCriteria, const Envoy::Router::MetadataMatchCriteria*());
 };
 
 class MockRoute : public Route {

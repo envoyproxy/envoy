@@ -58,12 +58,17 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              Runtime::RandomGenerator& random_generator,
                                              Tracing::HttpTracer& tracer, Runtime::Loader& runtime,
                                              const LocalInfo::LocalInfo& local_info,
-                                             Upstream::ClusterManager& cluster_manager)
+                                             Upstream::ClusterManager& cluster_manager,
+                                             Server::OverloadManager* overload_manager)
     : config_(config), stats_(config_.stats()),
       conn_length_(new Stats::Timespan(stats_.named_.downstream_cx_length_ms_)),
       drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
-      listener_stats_(config_.listenerStats()) {}
+      listener_stats_(config_.listenerStats()),
+      overload_stop_accepting_requests_(
+          overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
+                                 Server::OverloadActionNames::get().StopAcceptingRequests)
+                           : Server::OverloadManager::getInactiveState()) {}
 
 const HeaderMapImpl& ConnectionManagerImpl::continueHeader() {
   CONSTRUCT_ON_FIRST_USE(HeaderMapImpl,
@@ -486,6 +491,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   request_headers_ = std::move(headers);
   if (Http::Headers::get().MethodValues.Head == request_headers_->Method()->value().c_str()) {
     is_head_request_ = true;
+  }
+
+  // Drop new requests when overloaded as soon as we have decoded the headers.
+  if (connection_manager_.overload_stop_accepting_requests_ ==
+      Server::OverloadActionState::Active) {
+    connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
+                   Http::Code::ServiceUnavailable, "envoy overloaded", nullptr, is_head_request_);
+    return;
   }
 
   const bool upgrade_rejected = createFilterChain() == false;
