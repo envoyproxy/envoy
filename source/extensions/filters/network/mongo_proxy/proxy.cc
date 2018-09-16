@@ -21,8 +21,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace MongoProxy {
 
-AccessLog::AccessLog(const std::string& file_name,
-                     Envoy::AccessLog::AccessLogManager& log_manager) {
+AccessLog::AccessLog(const std::string& file_name, Envoy::AccessLog::AccessLogManager& log_manager,
+                     TimeSource& time_source)
+    : time_source_(time_source) {
   file_ = log_manager.createAccessLog(file_name);
 }
 
@@ -31,7 +32,7 @@ void AccessLog::logMessage(const Message& message, bool full,
   static const std::string log_format =
       "{{\"time\": \"{}\", \"message\": {}, \"upstream_host\": \"{}\"}}\n";
 
-  SystemTime now = std::chrono::system_clock::now();
+  SystemTime now = time_source_.systemTime();
   std::string log_line =
       fmt::format(log_format, AccessLogDateTimeFormatter::fromTime(now), message.toString(full),
                   upstream_host ? upstream_host->address()->asString() : "-");
@@ -43,10 +44,10 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
                          Runtime::Loader& runtime, AccessLogSharedPtr access_log,
                          const FaultConfigSharedPtr& fault_config,
                          const Network::DrainDecision& drain_decision,
-                         Runtime::RandomGenerator& generator)
+                         Runtime::RandomGenerator& generator, Event::TimeSystem& time_system)
     : stat_prefix_(stat_prefix), scope_(scope), stats_(generateStats(stat_prefix, scope)),
       runtime_(runtime), drain_decision_(drain_decision), generator_(generator),
-      access_log_(access_log), fault_config_(fault_config) {
+      access_log_(access_log), fault_config_(fault_config), time_system_(time_system) {
   if (!runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().ConnectionLoggingEnabled,
                                           100)) {
     // If we are not logging at the connection level, just release the shared pointer so that we
@@ -241,7 +242,7 @@ void ProxyFilter::chargeReplyStats(ActiveQuery& active_query, const std::string&
   scope_.histogram(fmt::format("{}.reply_size", prefix)).recordValue(reply_documents_byte_size);
   scope_.histogram(fmt::format("{}.reply_time_ms", prefix))
       .recordValue(std::chrono::duration_cast<std::chrono::milliseconds>(
-                       std::chrono::steady_clock::now() - active_query.start_time_)
+                       time_system_.monotonicTime() - active_query.start_time_)
                        .count());
 }
 

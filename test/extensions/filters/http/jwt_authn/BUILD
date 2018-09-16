@@ -71,6 +71,7 @@ envoy_extension_cc_test(
     deps = [
         ":test_common_lib",
         "//source/extensions/filters/http/jwt_authn:jwks_cache_lib",
+        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
     ],
 )

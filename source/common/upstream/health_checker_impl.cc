@@ -153,7 +153,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
   Router::FilterUtility::setUpstreamScheme(request_headers, *parent_.cluster_.info());
-  RequestInfo::RequestInfoImpl request_info(protocol_);
+  RequestInfo::RequestInfoImpl request_info(protocol_, parent_.dispatcher_.timeSystem());
   request_info.setDownstreamLocalAddress(local_address_);
   request_info.setDownstreamRemoteAddress(local_address_);
   request_info.onUpstreamHostSelected(host_);

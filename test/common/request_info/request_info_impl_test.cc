@@ -27,10 +27,15 @@ std::chrono::nanoseconds checkDuration(std::chrono::nanoseconds last,
   return timing.value();
 }
 
-TEST(RequestInfoImplTest, TimingTest) {
-  MonotonicTime pre_start = std::chrono::steady_clock::now();
-  RequestInfoImpl info(Http::Protocol::Http2);
-  MonotonicTime post_start = std::chrono::steady_clock::now();
+class RequestInfoImplTest : public testing::Test {
+protected:
+  DangerousDeprecatedTestTime test_time_;
+};
+
+TEST_F(RequestInfoImplTest, TimingTest) {
+  MonotonicTime pre_start = test_time_.timeSystem().monotonicTime();
+  RequestInfoImpl info(Http::Protocol::Http2, test_time_.timeSystem());
+  MonotonicTime post_start = test_time_.timeSystem().monotonicTime();
 
   const MonotonicTime& start = info.startTimeMonotonic();
 
@@ -71,8 +76,9 @@ TEST(RequestInfoImplTest, TimingTest) {
   dur = checkDuration(dur, info.requestComplete());
 }
 
-TEST(RequestInfoImplTest, BytesTest) {
-  RequestInfoImpl request_info(Http::Protocol::Http2);
+TEST_F(RequestInfoImplTest, BytesTest) {
+  RequestInfoImpl request_info(Http::Protocol::Http2, test_time_.timeSystem());
+
   const uint64_t bytes_sent = 7;
   const uint64_t bytes_received = 12;
 
@@ -83,7 +89,7 @@ TEST(RequestInfoImplTest, BytesTest) {
   EXPECT_EQ(bytes_received, request_info.bytesReceived());
 }
 
-TEST(RequestInfoImplTest, ResponseFlagTest) {
+TEST_F(RequestInfoImplTest, ResponseFlagTest) {
   const std::vector<ResponseFlag> responseFlags = {FailedLocalHealthCheck,
                                                    NoHealthyUpstream,
                                                    UpstreamRequestTimeout,
@@ -97,7 +103,8 @@ TEST(RequestInfoImplTest, ResponseFlagTest) {
                                                    FaultInjected,
                                                    RateLimited};
 
-  RequestInfoImpl request_info(Http::Protocol::Http2);
+  RequestInfoImpl request_info(Http::Protocol::Http2, test_time_.timeSystem());
+
   EXPECT_FALSE(request_info.hasAnyResponseFlag());
   EXPECT_FALSE(request_info.intersectResponseFlags(0));
   for (ResponseFlag flag : responseFlags) {
@@ -110,15 +117,16 @@ TEST(RequestInfoImplTest, ResponseFlagTest) {
   }
   EXPECT_TRUE(request_info.hasAnyResponseFlag());
 
-  RequestInfoImpl request_info2(Http::Protocol::Http2);
+  RequestInfoImpl request_info2(Http::Protocol::Http2, test_time_.timeSystem());
   request_info2.setResponseFlag(FailedLocalHealthCheck);
 
   EXPECT_TRUE(request_info2.intersectResponseFlags(FailedLocalHealthCheck));
 }
 
-TEST(RequestInfoImplTest, MiscSettersAndGetters) {
+TEST_F(RequestInfoImplTest, MiscSettersAndGetters) {
   {
-    RequestInfoImpl request_info(Http::Protocol::Http2);
+    RequestInfoImpl request_info(Http::Protocol::Http2, test_time_.timeSystem());
+
     EXPECT_EQ(Http::Protocol::Http2, request_info.protocol().value());
 
     request_info.protocol(Http::Protocol::Http10);
@@ -153,8 +161,9 @@ TEST(RequestInfoImplTest, MiscSettersAndGetters) {
   }
 }
 
-TEST(RequestInfoImplTest, DynamicMetadataTest) {
-  RequestInfoImpl request_info(Http::Protocol::Http2);
+TEST_F(RequestInfoImplTest, DynamicMetadataTest) {
+  RequestInfoImpl request_info(Http::Protocol::Http2, test_time_.timeSystem());
+
   EXPECT_EQ(0, request_info.dynamicMetadata().filter_metadata_size());
   request_info.setDynamicMetadata("com.test",
                                   MessageUtil::keyValueStruct("test_key", "test_value"));

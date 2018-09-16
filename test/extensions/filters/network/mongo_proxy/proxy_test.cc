@@ -70,12 +70,12 @@ public:
         .WillByDefault(Return(true));
 
     EXPECT_CALL(log_manager_, createAccessLog(_)).WillOnce(Return(file_));
-    access_log_.reset(new AccessLog("test", log_manager_));
+    access_log_.reset(new AccessLog("test", log_manager_, dispatcher_.timeSystem()));
   }
 
   void initializeFilter() {
     filter_.reset(new TestProxyFilter("test.", store_, runtime_, access_log_, fault_config_,
-                                      drain_decision_, generator_));
+                                      drain_decision_, generator_, dispatcher_.timeSystem()));
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
