@@ -130,7 +130,6 @@ MockClusterUpdateCallbacks::MockClusterUpdateCallbacks() {}
 
 MockClusterUpdateCallbacks::~MockClusterUpdateCallbacks() {}
 
-
 MockClusterInfoFactory::MockClusterInfoFactory() {}
 
 MockClusterInfoFactory::~MockClusterInfoFactory() {}
