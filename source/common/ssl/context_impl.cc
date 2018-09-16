@@ -478,7 +478,8 @@ std::string ContextImpl::getCertChainInformation() const {
 
 ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config)
     : ContextImpl(scope, config), server_name_indication_(config.serverNameIndication()),
-      allow_renegotiation_(config.allowRenegotiation()) {
+      allow_renegotiation_(config.allowRenegotiation()),
+      forward_original_sni_(config.forwardOriginalSni()) {
   if (!parsed_alpn_protocols_.empty()) {
     int rc = SSL_CTX_set_alpn_protos(ctx_.get(), &parsed_alpn_protocols_[0],
                                      parsed_alpn_protocols_.size());
