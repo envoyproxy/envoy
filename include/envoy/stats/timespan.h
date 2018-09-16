@@ -15,8 +15,8 @@ namespace Stats {
  */
 class Timespan {
 public:
-  Timespan(Histogram& histogram)
-      : histogram_(histogram), start_(std::chrono::steady_clock::now()) {}
+  Timespan(Histogram& histogram, TimeSource& time_source)
+      : time_source_(time_source), histogram_(histogram), start_(time_source.monotonicTime()) {}
 
   /**
    * Complete the timespan and send the time to the histogram.
@@ -27,11 +27,12 @@ public:
    * Get duration since the creation of the span.
    */
   std::chrono::milliseconds getRawDuration() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() -
+    return std::chrono::duration_cast<std::chrono::milliseconds>(time_source_.monotonicTime() -
                                                                  start_);
   }
 
 private:
+  TimeSource& time_source_;
   Histogram& histogram_;
   const MonotonicTime start_;
 };

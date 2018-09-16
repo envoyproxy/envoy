@@ -56,7 +56,8 @@ class ConnectionManager : public Network::ReadFilter,
                           public DecoderCallbacks,
                           Logger::Loggable<Logger::Id::thrift> {
 public:
-  ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator);
+  ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
+                    Event::TimeSystem& time_system);
   ~ConnectionManager();
 
   // Network::ReadFilter
@@ -114,7 +115,8 @@ private:
                      public ThriftFilters::DecoderFilterCallbacks,
                      public ThriftFilters::FilterChainFactoryCallbacks {
     ActiveRpc(ConnectionManager& parent)
-        : parent_(parent), request_timer_(new Stats::Timespan(parent_.stats_.request_time_ms_)),
+        : parent_(parent), request_timer_(new Stats::Timespan(parent_.stats_.request_time_ms_,
+                                                              parent_.time_system_)),
           stream_id_(parent_.random_generator_.random()) {
       parent_.stats_.request_active_.inc();
     }
@@ -191,6 +193,7 @@ private:
   Buffer::OwnedImpl request_buffer_;
   Runtime::RandomGenerator& random_generator_;
   bool stopped_{false};
+  Event::TimeSystem& time_system_;
 };
 
 } // namespace ThriftProxy

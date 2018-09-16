@@ -100,7 +100,8 @@ public:
     }
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
-    filter_.reset(new ConnectionManager(*config_, random_));
+    filter_.reset(new ConnectionManager(*config_, random_,
+                                        filter_callbacks_.connection_.dispatcher_.timeSystem()));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 

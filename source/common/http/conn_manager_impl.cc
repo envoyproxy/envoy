@@ -61,7 +61,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              Upstream::ClusterManager& cluster_manager,
                                              Event::TimeSystem& time_system)
     : config_(config), stats_(config_.stats()),
-      conn_length_(new Stats::Timespan(stats_.named_.downstream_cx_length_ms_)),
+      conn_length_(new Stats::Timespan(stats_.named_.downstream_cx_length_ms_, time_system)),
       drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()), time_system_(time_system) {}
@@ -356,7 +356,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     : connection_manager_(connection_manager),
       snapped_route_config_(connection_manager.config_.routeConfigProvider().config()),
       stream_id_(connection_manager.random_generator_.random()),
-      request_timer_(new Stats::Timespan(connection_manager_.stats_.named_.downstream_rq_time_)),
+      request_timer_(new Stats::Timespan(connection_manager_.stats_.named_.downstream_rq_time_,
+                                         connection_manager_.timeSystem())),
       request_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSystem()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
   connection_manager_.stats_.named_.downstream_rq_active_.inc();
