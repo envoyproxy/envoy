@@ -28,8 +28,7 @@ constexpr int PubkeyCacheExpirationSec = 600;
 class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::filter> {
 public:
   JwksDataImpl(const JwtProvider& jwt_provider, TimeSource& time_source)
-      : jwt_provider_(jwt_provider),
-        time_source_(time_source) {
+      : jwt_provider_(jwt_provider), time_source_(time_source) {
     std::vector<std::string> audiences;
     for (const auto& aud : jwt_provider_.audiences()) {
       audiences.push_back(aud);
@@ -56,9 +55,7 @@ public:
 
   const Jwks* getJwksObj() const override { return jwks_obj_.get(); }
 
-  bool isExpired() const override {
-    return time_source_.monotonicTime() >= expiration_time_;
-  }
+  bool isExpired() const override { return time_source_.monotonicTime() >= expiration_time_; }
 
   Status setRemoteJwks(const std::string& jwks_str) override {
     return setKey(jwks_str, getRemoteJwksExpirationTime());

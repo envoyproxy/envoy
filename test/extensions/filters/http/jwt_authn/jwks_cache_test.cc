@@ -25,7 +25,6 @@ public:
     cache_ = JwksCache::create(config_, test_time_.timeSystem());
   }
 
-
   DangerousDeprecatedTestTime test_time_;
   JwtAuthentication config_;
   JwksCachePtr cache_;

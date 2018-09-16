@@ -153,7 +153,7 @@ void HystrixSink::addHystrixCommand(ClusterStatsCache& cluster_stats_cache,
                                     std::chrono::milliseconds rolling_window_ms,
                                     const QuantileLatencyMap& histogram, std::stringstream& ss) {
 
-  std::time_t currentTime = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+  std::time_t currentTime = std::chrono::system_clock::to_time_t(server_.timeSystem().systemTime());
 
   ss << "data: {";
   addStringToStream("type", "HystrixCommand", ss, true);

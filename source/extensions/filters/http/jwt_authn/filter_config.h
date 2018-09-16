@@ -25,7 +25,7 @@ public:
   // Load the config from envoy config.
   ThreadLocalCache(
       const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config,
-                   TimeSource& time_source) {
+      TimeSource& time_source) {
     jwks_cache_ = JwksCache::create(config, time_source);
   }
 
@@ -67,8 +67,8 @@ public:
         time_source_(context.dispatcher().timeSystem()) {
     ENVOY_LOG(info, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
     tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-                return std::make_shared<ThreadLocalCache>(proto_config_, time_source_);
-              });
+      return std::make_shared<ThreadLocalCache>(proto_config_, time_source_);
+    });
     extractor_ = Extractor::create(proto_config_);
   }
 
@@ -84,6 +84,7 @@ public:
   ThreadLocalCache& getCache() { return tls_->getTyped<ThreadLocalCache>(); }
 
   Upstream::ClusterManager& cm() { return cm_; }
+  TimeSource& timeSource() { return time_source_; }
 
   // Get the token  extractor.
   const Extractor& getExtractor() const { return *extractor_; }
