@@ -69,7 +69,7 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       overload_stop_accepting_requests_(
           overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
                                  Server::OverloadActionNames::get().StopAcceptingRequests)
-          : Server::OverloadManager::getInactiveState()),
+                           : Server::OverloadManager::getInactiveState()),
       time_system_(time_system) {}
 
 const HeaderMapImpl& ConnectionManagerImpl::continueHeader() {

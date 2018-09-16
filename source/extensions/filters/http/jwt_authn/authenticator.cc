@@ -120,7 +120,7 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
   // Check "exp" claim.
   const auto unix_timestamp =
       std::chrono::duration_cast<std::chrono::seconds>(timeSource().systemTime().time_since_epoch())
-      .count();
+          .count();
   // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
   // to 0.
   if (jwt_.nbf_ > unix_timestamp) {
