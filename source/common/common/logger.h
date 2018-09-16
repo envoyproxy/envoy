@@ -172,14 +172,16 @@ private:
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
 };
 
-// Defines a scope in which logging can occur. This context should stay alive
-// whenever logging should be enabled. If a context is instantiated while
-// another is active, the old one will be restored on destruction.
 /**
- * Initialize the logging system with the specified lock and log level.
- * This is equivalalent to setLogLevel, setLogFormat, and setLock, which
- * can be called individually as well, e.g. to set the log level without
- * changing the lock or format.
+ * Defines a scope for the logging system with the specified lock and log level.
+ * This is equivalalent to setLogLevel, setLogFormat, and setLock, which can be
+ * called individually as well, e.g. to set the log level without changing the
+ * lock or format.
+ *
+ * Contexts can be nested. When a nested context is destroyed, the previous
+ * context is restored. When all contexts are destroyed, the lock is cleared,
+ * and logging will remain unlocked, the same state it is in prior to
+ * instantiating a Context.
  */
 class Context {
 public:
