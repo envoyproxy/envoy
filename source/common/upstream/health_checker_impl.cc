@@ -215,14 +215,14 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onResponseComplete() {
 }
 
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onTimeout() {
-  host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
-  ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
-                 HostUtility::healthFlagsToString(*host_));
-
-  // If there is an active request it will get reset, so make sure we ignore the reset.
-  expect_reset_ = true;
-
   if (client_) {
+    host_->setActiveHealthFailureType(Host::ActiveHealthFailureType::TIMEOUT);
+    ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
+                   HostUtility::healthFlagsToString(*host_));
+
+    // If there is an active request it will get reset, so make sure we ignore the reset.
+    expect_reset_ = true;
+
     client_->close();
   }
 }

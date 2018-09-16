@@ -1151,9 +1151,6 @@ TEST_F(HttpHealthCheckerImplTest, TimeoutAfterDisconnect) {
   EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthFlagGet(
       Host::HealthFlag::FAILED_ACTIVE_HC));
   EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
-
-  EXPECT_EQ(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->getActiveHealthFailureType(),
-            Host::ActiveHealthFailureType::TIMEOUT);
 }
 
 TEST_F(HttpHealthCheckerImplTest, DynamicAddAndRemove) {
