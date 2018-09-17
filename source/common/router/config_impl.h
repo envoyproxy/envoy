@@ -194,6 +194,7 @@ public:
   std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override {
     return retry_host_predicates_;
   }
+  uint32_t hostSelectionMaxAttempts() const override { return host_selection_attempts_; }
 
   // Upstream::RetryHostPredicateFactoryCallbacks
   void addHostPredicate(Upstream::RetryHostPredicateSharedPtr predicate) override {
@@ -205,6 +206,7 @@ private:
   uint32_t num_retries_{};
   uint32_t retry_on_{};
   std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
+  uint32_t host_selection_attempts_{1};
 };
 
 /**
