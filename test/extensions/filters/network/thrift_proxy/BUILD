@@ -51,7 +51,9 @@ envoy_extension_cc_test_library(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:byte_order_lib",
+        "//source/extensions/filters/network/thrift_proxy:protocol_lib",
         "//source/extensions/filters/network/thrift_proxy:thrift_lib",
+        "//test/common/buffer:utility_lib",
         "@envoy_api//envoy/config/filter/network/thrift_proxy/v2alpha1:thrift_proxy_cc",
     ],
 )

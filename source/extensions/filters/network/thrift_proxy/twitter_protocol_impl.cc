@@ -1076,12 +1076,12 @@ bool TwitterProtocolImpl::isUpgradePrefix(Buffer::Instance& buffer) {
   ASSERT(buffer.length() >= 12);
 
   // Must appear to be binary protocol.
-  if (!isMagic(BufferHelper::peekU16(buffer))) {
+  if (!isMagic(buffer.peekBEInt<uint16_t>())) {
     return false;
   }
 
   // Must have correct length message name length.
-  if (BufferHelper::peekU32(buffer, 4) != upgradeMethodName().length()) {
+  if (buffer.peekBEInt<uint32_t>(4) != upgradeMethodName().length()) {
     return false;
   }
 

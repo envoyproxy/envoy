@@ -374,11 +374,11 @@ INSTANTIATE_TEST_CASE_P(FramedTwitter, ThriftTwitterConnManagerIntegrationTest,
 TEST_P(ThriftTwitterConnManagerIntegrationTest, Success) {
   initializeCall(DriverMode::Success);
 
-  uint32_t upgrade_request_size = BufferHelper::peekU32(request_bytes_) + 4;
+  uint32_t upgrade_request_size = request_bytes_.peekBEInt<uint32_t>() + 4;
   Buffer::OwnedImpl upgrade_request_bytes;
   upgrade_request_bytes.move(request_bytes_, upgrade_request_size);
 
-  uint32_t upgrade_response_size = BufferHelper::peekU32(response_bytes_) + 4;
+  uint32_t upgrade_response_size = response_bytes_.peekBEInt<uint32_t>() + 4;
   Buffer::OwnedImpl upgrade_response_bytes;
   upgrade_response_bytes.move(response_bytes_, upgrade_response_size);
 

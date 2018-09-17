@@ -43,7 +43,7 @@ bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetadat
       return false;
     }
 
-    uint16_t version = BufferHelper::peekU16(buffer);
+    uint16_t version = buffer.peekBEInt<uint16_t>();
     if (BinaryProtocolImpl::isMagic(version)) {
       // 12 bytes is the minimum length for message-begin in the binary protocol.
       if (buffer.length() < 12) {

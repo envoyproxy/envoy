@@ -2,6 +2,7 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/http/async_client_impl.h"
+#include "common/http/codes.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -12,11 +13,29 @@ namespace Common {
 namespace ExtAuthz {
 
 namespace {
-
-const Http::HeaderMap* getZeroContentLengthHeader() {
+const Http::HeaderMap& getZeroContentLengthHeader() {
   static const Http::HeaderMap* header_map =
       new Http::HeaderMapImpl{{Http::Headers::get().ContentLength, std::to_string(0)}};
-  return header_map;
+  return *header_map;
+}
+
+const Response& getErrorResponse() {
+  static const Response* response =
+      new Response{CheckStatus::Error, Http::HeaderVector{}, Http::HeaderVector{}, std::string{},
+                   Http::Code::Forbidden};
+  return *response;
+}
+
+const Response& getDeniedResponse() {
+  static const Response* response =
+      new Response{CheckStatus::Denied, Http::HeaderVector{}, Http::HeaderVector{}, std::string{}};
+  return *response;
+}
+
+const Response& getOkResponse() {
+  static const Response* response = new Response{
+      CheckStatus::OK, Http::HeaderVector{}, Http::HeaderVector{}, std::string{}, Http::Code::OK};
+  return *response;
 }
 } // namespace
 
@@ -43,7 +62,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
-  Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>(*getZeroContentLengthHeader());
+  Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>(getZeroContentLengthHeader());
   for (const auto& allowed_header : allowed_request_headers_) {
     const auto& request_header =
         request.attributes().request().http().headers().find(allowed_header.get());
@@ -63,42 +82,52 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        timeout_);
 }
 
-void RawHttpClientImpl::onSuccess(Http::MessagePtr&& response) {
-  ResponsePtr authz_response = std::make_unique<Response>(Response{});
+ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
+  // Set an error status if parsing status code fails. A Forbidden response is sent to the client
+  // if the filter has not been configured with failure_mode_allow.
+  uint64_t status_code{};
+  if (!StringUtil::atoul(message->headers().Status()->value().c_str(), status_code)) {
+    ENVOY_LOG(warn, "ext_authz HTTP client failed to parse the HTTP status code.");
+    return std::make_unique<Response>(getErrorResponse());
+  }
 
-  uint64_t status_code;
-  if (StringUtil::atoul(response->headers().Status()->value().c_str(), status_code)) {
-    if (status_code == enumToInt(Http::Code::OK)) {
-      authz_response->status = CheckStatus::OK;
-      authz_response->status_code = Http::Code::OK;
-    } else {
-      authz_response->status = CheckStatus::Denied;
-      authz_response->body = response->bodyAsString();
-      authz_response->status_code = static_cast<Http::Code>(status_code);
-    }
+  // Set an error status if the call to the authorization server returns any of the 5xx HTTP error
+  // codes. A Forbidden response is sent to the client if the filter has not been configured with
+  // failure_mode_allow.
+  if (Http::CodeUtility::is5xx(status_code)) {
+    return std::make_unique<Response>(getErrorResponse());
+  }
+
+  ResponsePtr response;
+  // Set an accepted or a denied authorization response.
+  if (status_code == enumToInt(Http::Code::OK)) {
+    response = std::make_unique<Response>(getOkResponse());
   } else {
-    ENVOY_LOG(warn, "Authz_Ext failed to parse the HTTP response code.");
-    authz_response->status_code = Http::Code::Forbidden;
-    authz_response->status = CheckStatus::Denied;
+    response = std::make_unique<Response>(getDeniedResponse());
+    response->status_code = static_cast<Http::Code>(status_code);
+    response->body = message->bodyAsString();
   }
 
+  // Copy all headers from the message that should be in the response.
   for (const auto& allowed_header : allowed_authorization_headers_) {
-    const auto* entry = response->headers().get(allowed_header);
+    const auto* entry = message->headers().get(allowed_header);
     if (entry) {
-      authz_response->headers_to_add.emplace_back(Http::LowerCaseString{entry->key().c_str()},
-                                                  std::string{entry->value().c_str()});
+      response->headers_to_add.emplace_back(Http::LowerCaseString{entry->key().c_str()},
+                                            std::string{entry->value().c_str()});
     }
   }
 
-  callbacks_->onComplete(std::move(authz_response));
+  return response;
+}
+
+void RawHttpClientImpl::onSuccess(Http::MessagePtr&& message) {
+  callbacks_->onComplete(messageToResponse(std::move(message)));
   callbacks_ = nullptr;
 }
 
 void RawHttpClientImpl::onFailure(Http::AsyncClient::FailureReason reason) {
   ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
-  Response authz_response{};
-  authz_response.status = CheckStatus::Error;
-  callbacks_->onComplete(std::make_unique<Response>(authz_response));
+  callbacks_->onComplete(std::make_unique<Response>(getErrorResponse()));
   callbacks_ = nullptr;
 }
 

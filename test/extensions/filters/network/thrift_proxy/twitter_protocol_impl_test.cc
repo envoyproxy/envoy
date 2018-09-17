@@ -65,12 +65,12 @@ public:
 
   void addMessageStart(Buffer::Instance& buffer, const std::string& name = "the_name",
                        MessageType msg_type = MessageType::Call, int32_t seq_id = 101) {
-    addInt16(buffer, 0x8001);
-    addInt8(buffer, 0);
-    addInt8(buffer, msg_type);
-    addInt32(buffer, name.length());
-    addString(buffer, name);
-    addInt32(buffer, seq_id);
+    buffer.writeBEInt<int16_t>(0x8001);
+    buffer.writeByte(0);
+    buffer.writeByte(msg_type);
+    buffer.writeBEInt<int32_t>(name.length());
+    buffer.add(name);
+    buffer.writeBEInt<int32_t>(seq_id);
   }
 
   void addUpgradedMessageStart(Buffer::Instance& buffer, const std::string& name = "the_name",
@@ -118,7 +118,7 @@ public:
     clearMetadata();
 
     addUpgradeMessage(buffer);
-    addInt8(buffer, 0); // empty connection options
+    buffer.writeByte(0); // empty connection options
 
     EXPECT_TRUE(proto.readMessageBegin(buffer, *metadata_));
 
@@ -167,14 +167,14 @@ public:
 
     {
       Buffer::OwnedImpl buffer;
-      addInt32(buffer, TwitterProtocolImpl::upgradeMethodName().length() + 13);
+      buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length() + 13);
       addSeq(buffer, {
                          0x80, 0x01, 0x00, 0x02, // binary, reply
                      });
-      addInt32(buffer, TwitterProtocolImpl::upgradeMethodName().length());
-      addString(buffer, TwitterProtocolImpl::upgradeMethodName());
-      addInt32(buffer, 0);
-      addInt8(buffer, 0); // upgrade response stop field
+      buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length());
+      buffer.add(TwitterProtocolImpl::upgradeMethodName());
+      buffer.writeBEInt<int32_t>(0);
+      buffer.writeByte(0); // upgrade response stop field
 
       EXPECT_TRUE(response_decoder->onData(buffer));
     }
@@ -262,7 +262,7 @@ TEST_F(TwitterProtocolTest, RequestUpgradeSequence) {
   resetMetadata();
 
   addUpgradeMessage(buffer);
-  addInt8(buffer, 0); // empty connection options
+  buffer.writeByte(0); // empty connection options
 
   EXPECT_TRUE(proto.readMessageBegin(buffer, *metadata_));
   expectMetadata(TwitterProtocolImpl::upgradeMethodName(), MessageType::Call, 100);
@@ -311,12 +311,12 @@ TEST_F(TwitterProtocolTest, RequestUpgradeSequence) {
              0x00,
              static_cast<uint8_t>(TwitterProtocolImpl::upgradeMethodName().length()),
          });
-  addString(expected_buffer, TwitterProtocolImpl::upgradeMethodName());
+  expected_buffer.add(TwitterProtocolImpl::upgradeMethodName());
   addSeq(expected_buffer, {
                               0x00, 0x00, 0x00, 0x64, // sequence number
                               0x00,                   // upgrade response stop field
                           });
-  EXPECT_EQ(bufferToString(expected_buffer), bufferToString(response_buffer));
+  EXPECT_EQ(expected_buffer.toString(), response_buffer.toString());
 
   EXPECT_TRUE(proto.upgraded().has_value());
   EXPECT_TRUE(proto.upgraded().value());
@@ -338,25 +338,25 @@ TEST_F(TwitterProtocolTest, ResponseUpgradeSequence) {
   EXPECT_NE(nullptr, response_decoder);
 
   Buffer::OwnedImpl expected_buffer;
-  addInt32(expected_buffer, TwitterProtocolImpl::upgradeMethodName().length() + 13);
+  expected_buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length() + 13);
   addSeq(expected_buffer, {
                               0x80, 0x01, 0x00, 0x01, // binary, call
                           });
-  addInt32(expected_buffer, TwitterProtocolImpl::upgradeMethodName().length());
-  addString(expected_buffer, TwitterProtocolImpl::upgradeMethodName());
-  addInt32(expected_buffer, 0);
-  addInt8(expected_buffer, 0); // connection options stop field
-  EXPECT_EQ(bufferToString(expected_buffer), bufferToString(buffer));
+  expected_buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length());
+  expected_buffer.add(TwitterProtocolImpl::upgradeMethodName());
+  expected_buffer.writeBEInt<int32_t>(0);
+  expected_buffer.writeByte(0); // connection options stop field
+  EXPECT_EQ(expected_buffer.toString(), buffer.toString());
 
   Buffer::OwnedImpl response_buffer;
-  addInt32(response_buffer, TwitterProtocolImpl::upgradeMethodName().length() + 13);
+  response_buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length() + 13);
   addSeq(response_buffer, {
                               0x80, 0x01, 0x00, 0x02, // binary, reply
                           });
-  addInt32(response_buffer, TwitterProtocolImpl::upgradeMethodName().length());
-  addString(response_buffer, TwitterProtocolImpl::upgradeMethodName());
-  addInt32(response_buffer, 0);
-  addInt8(response_buffer, 0); // upgrade response stop field
+  response_buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length());
+  response_buffer.add(TwitterProtocolImpl::upgradeMethodName());
+  response_buffer.writeBEInt<int32_t>(0);
+  response_buffer.writeByte(0); // upgrade response stop field
 
   EXPECT_TRUE(response_decoder->onData(response_buffer));
 
@@ -401,19 +401,19 @@ TEST_F(TwitterProtocolTest, ResponseUpgradeRejectedSequence) {
   Buffer::OwnedImpl response_buffer;
   std::string response_err =
       fmt::format("Unknown function {}", TwitterProtocolImpl::upgradeMethodName());
-  addInt32(response_buffer,
-           TwitterProtocolImpl::upgradeMethodName().length() + response_err.length() + 27);
+  response_buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length() +
+                                      response_err.length() + 27);
   addSeq(response_buffer, {
                               0x80, 0x01, 0x00, 0x03, // binary, exception
                           });
-  addInt32(response_buffer, TwitterProtocolImpl::upgradeMethodName().length());
-  addString(response_buffer, TwitterProtocolImpl::upgradeMethodName());
-  addInt32(response_buffer, 0);
+  response_buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length());
+  response_buffer.add(TwitterProtocolImpl::upgradeMethodName());
+  response_buffer.writeBEInt<int32_t>(0);
   addSeq(response_buffer, {
                               0x0B, 0x00, 0x01, // string field 1
                           });
-  addInt32(response_buffer, response_err.length());
-  addString(response_buffer, response_err);
+  response_buffer.writeBEInt<int32_t>(response_err.length());
+  response_buffer.add(response_err);
   addSeq(response_buffer,
          {
              0x08, 0x00, 0x02, // int field 2
