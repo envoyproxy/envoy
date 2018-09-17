@@ -16,7 +16,7 @@ LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")),
-      time_source_(dispatcher.timeSource()) {
+      time_source_(dispatcher.timeSystem()) {
   request_.mutable_node()->MergeFrom(local_info.node());
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });

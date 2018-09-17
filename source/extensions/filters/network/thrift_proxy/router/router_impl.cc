@@ -21,17 +21,58 @@ RouteEntryImplBase::RouteEntryImplBase(
   for (const auto& header_map : route.match().headers()) {
     config_headers_.push_back(header_map);
   }
+
+  if (route.route().cluster_specifier_case() ==
+      envoy::config::filter::network::thrift_proxy::v2alpha1::RouteAction::kWeightedClusters) {
+
+    total_cluster_weight_ = 0UL;
+    for (const auto& cluster : route.route().weighted_clusters().clusters()) {
+      std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(cluster));
+      weighted_clusters_.emplace_back(std::move(cluster_entry));
+      total_cluster_weight_ += weighted_clusters_.back()->clusterWeight();
+    }
+  }
 }
 
 const std::string& RouteEntryImplBase::clusterName() const { return cluster_name_; }
 
 const RouteEntry* RouteEntryImplBase::routeEntry() const { return this; }
 
-RouteConstSharedPtr RouteEntryImplBase::clusterEntry() const { return shared_from_this(); }
+RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value) const {
+  if (weighted_clusters_.empty()) {
+    return shared_from_this();
+  }
+
+  uint64_t selected_value = random_value % total_cluster_weight_;
+  uint64_t begin = 0UL;
+  uint64_t end = 0UL;
+
+  // Find the right cluster to route to based on the interval in which
+  // the selected value falls. The intervals are determined as
+  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
+  for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
+    end = begin + cluster->clusterWeight();
+    ASSERT(end <= total_cluster_weight_);
+
+    if (selected_value >= begin && selected_value < end) {
+      return cluster;
+    }
+
+    begin = end;
+  }
+
+  NOT_REACHED_GCOVR_EXCL_LINE;
+}
 
 bool RouteEntryImplBase::headersMatch(const Http::HeaderMap& headers) const {
   return Http::HeaderUtility::matchHeaders(headers, config_headers_);
 }
+
+RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
+    const envoy::config::filter::network::thrift_proxy::v2alpha1::WeightedCluster_ClusterWeight&
+        cluster)
+    : cluster_name_(cluster.name()),
+      cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)) {}
 
 MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
@@ -42,13 +83,14 @@ MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
   }
 }
 
-RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
+RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& metadata,
+                                                      uint64_t random_value) const {
   if (RouteEntryImplBase::headersMatch(metadata.headers())) {
     bool matches =
         method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
 
     if (matches ^ invert_) {
-      return clusterEntry();
+      return clusterEntry(random_value);
     }
   }
 
@@ -70,14 +112,15 @@ ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
   }
 }
 
-RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata) const {
+RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& metadata,
+                                                       uint64_t random_value) const {
   if (RouteEntryImplBase::headersMatch(metadata.headers())) {
     bool matches = service_name_.empty() ||
                    (metadata.hasMethodName() &&
                     StringUtil::startsWith(metadata.methodName().c_str(), service_name_));
 
     if (matches ^ invert_) {
-      return clusterEntry();
+      return clusterEntry(random_value);
     }
   }
 
@@ -102,9 +145,10 @@ RouteMatcher::RouteMatcher(
   }
 }
 
-RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata) const {
+RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata,
+                                        uint64_t random_value) const {
   for (const auto& route : routes_) {
-    RouteConstSharedPtr route_entry = route->matches(metadata);
+    RouteConstSharedPtr route_entry = route->matches(metadata, random_value);
     if (nullptr != route_entry) {
       return route_entry;
     }
@@ -234,9 +278,8 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
       return;
     }
 
-    upstream_request_->protocol_->completeUpgrade(
-        *upstream_request_->conn_data_->connectionStateTyped<ThriftConnectionState>(),
-        *upstream_request_->upgrade_response_);
+    upstream_request_->protocol_->completeUpgrade(*upstream_request_->conn_state_,
+                                                  *upstream_request_->upgrade_response_);
 
     upstream_request_->upgrade_response_.reset();
     upstream_request_->onRequestStart(true);
@@ -328,6 +371,7 @@ void Router::UpstreamRequest::resetStream() {
   }
 
   if (conn_data_ != nullptr) {
+    conn_state_ = nullptr;
     conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
     conn_data_.reset();
   }
@@ -352,15 +396,15 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
   conn_data_->addUpstreamCallbacks(parent_);
   conn_pool_handle_ = nullptr;
 
-  ThriftConnectionState* state = conn_data_->connectionStateTyped<ThriftConnectionState>();
-  if (state == nullptr) {
+  conn_state_ = conn_data_->connectionStateTyped<ThriftConnectionState>();
+  if (conn_state_ == nullptr) {
     conn_data_->setConnectionState(std::make_unique<ThriftConnectionState>());
-    state = conn_data_->connectionStateTyped<ThriftConnectionState>();
+    conn_state_ = conn_data_->connectionStateTyped<ThriftConnectionState>();
   }
 
   if (protocol_->supportsUpgrade()) {
     upgrade_response_ =
-        protocol_->attemptUpgrade(*transport_, *state, parent_.upstream_request_buffer_);
+        protocol_->attemptUpgrade(*transport_, *conn_state_, parent_.upstream_request_buffer_);
     if (upgrade_response_ != nullptr) {
       conn_data_->connection().write(parent_.upstream_request_buffer_, false);
       return;
@@ -373,7 +417,7 @@ void Router::UpstreamRequest::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr
 void Router::UpstreamRequest::onRequestStart(bool continue_decoding) {
   parent_.initProtocolConverter(*protocol_, parent_.upstream_request_buffer_);
 
-  // TODO(zuercher): need to use an upstream-connection-specific sequence id
+  metadata_->setSequenceId(conn_state_->nextSequenceId());
   parent_.convertMessageBegin(metadata_);
 
   if (continue_decoding) {
@@ -385,6 +429,7 @@ void Router::UpstreamRequest::onRequestComplete() { request_complete_ = true; }
 
 void Router::UpstreamRequest::onResponseComplete() {
   response_complete_ = true;
+  conn_state_ = nullptr;
   conn_data_.reset();
 }
 
@@ -407,6 +452,10 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
         fmt::format("too many connections to '{}'", upstream_host_->address()->asString())));
     break;
   case Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure:
+    // Should only happen if we closed the connection, due to an error condition, in which case
+    // we've already handled any possible downstream response.
+    parent_.callbacks_->resetDownstreamConnection();
+    break;
   case Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
   case Tcp::ConnectionPool::PoolFailureReason::Timeout:
     // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)

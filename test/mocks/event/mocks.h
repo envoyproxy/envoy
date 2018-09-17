@@ -33,7 +33,7 @@ public:
   void setTimeSystem(TimeSystem& time_system) { time_system_ = &time_system; }
 
   // Dispatcher
-  TimeSystem& timeSource() override { return *time_system_; }
+  TimeSystem& timeSystem() override { return *time_system_; }
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket) override {

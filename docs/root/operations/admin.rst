@@ -158,6 +158,10 @@ modify different aspects of the server:
   Enable/disable different logging levels on different subcomponents. Generally only used during
   development.
 
+.. http:post:: /memory
+
+  Prints current memory allocation / heap usage, in bytes. Useful in lieu of printing all `/stats` and filtering to get the memory-related statistics.
+
 .. http:post:: /quitquitquit
 
   Cleanly exit the server.
@@ -201,6 +205,10 @@ The fields are:
 
   Outputs statistics that Envoy has updated (counters incremented at least once, gauges changed at
   least once, and histograms added to at least once).
+
+  .. http:get:: /stats?filter=regex
+
+  Filters the returned stats to those with names matching the regular expression `regex`. Compatible with `usedonly`. Performs partial matching by default, so `/stats?filter=server` will return all stats containing the word `server`. Full-string matching can be specified with begin- and end-line anchors. (i.e. `/stats?filter=^server.concurrency$`)
 
 .. http:get:: /stats?format=json
 

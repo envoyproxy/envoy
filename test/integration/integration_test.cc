@@ -6,15 +6,20 @@
 
 #include "common/filesystem/filesystem_impl.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/headers.h"
 #include "common/protobuf/utility.h"
 
 #include "test/integration/utility.h"
+#include "test/mocks/http/mocks.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
+using Envoy::Http::Headers;
+using Envoy::Http::HeaderValueOf;
+using Envoy::Http::HttpStatusIs;
 using testing::EndsWith;
 using testing::HasSubstr;
 using testing::MatchesRegex;
@@ -58,7 +63,7 @@ TEST_P(IntegrationTest, ConnectionClose) {
   codec_client_->waitForDisconnect();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
 }
 
 TEST_P(IntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
@@ -165,9 +170,9 @@ TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
 
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_NE(response->headers().GrpcStatus(), nullptr);
-  EXPECT_STREQ("2", response->headers().GrpcStatus()->value().c_str()); // Unknown gRPC error
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  EXPECT_THAT(response->headers(),
+              HeaderValueOf(Headers::get().GrpcStatus, "2")); // Unknown gRPC error
 }
 
 TEST_P(IntegrationTest, HittingEncoderFilterLimit) { testHittingEncoderFilterLimit(); }
@@ -225,21 +230,20 @@ TEST_P(IntegrationTest, TestHead) {
   // Without an explicit content length, assume we chunk for HTTP/1.1
   auto response = sendRequestAndWaitForResponse(head_request, 0, default_response_headers_, 0);
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_TRUE(response->headers().ContentLength() == nullptr);
-  ASSERT_TRUE(response->headers().TransferEncoding() != nullptr);
-  EXPECT_EQ(Http::Headers::get().TransferEncodingValues.Chunked,
-            response->headers().TransferEncoding()->value().c_str());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  EXPECT_EQ(response->headers().ContentLength(), nullptr);
+  EXPECT_THAT(response->headers(),
+              HeaderValueOf(Headers::get().TransferEncoding,
+                            Http::Headers::get().TransferEncodingValues.Chunked));
   EXPECT_EQ(0, response->body().size());
 
   // Preserve explicit content length.
   Http::TestHeaderMapImpl content_length_response{{":status", "200"}, {"content-length", "12"}};
   response = sendRequestAndWaitForResponse(head_request, 0, content_length_response, 0);
   ASSERT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  ASSERT_TRUE(response->headers().ContentLength() != nullptr);
-  EXPECT_STREQ(response->headers().ContentLength()->value().c_str(), "12");
-  EXPECT_TRUE(response->headers().TransferEncoding() == nullptr);
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().ContentLength, "12"));
+  EXPECT_EQ(response->headers().TransferEncoding(), nullptr);
   EXPECT_EQ(0, response->body().size());
 
   cleanupUpstreamAndDownstream();
@@ -323,7 +327,7 @@ TEST_P(IntegrationTest, TestFailedBind) {
                               {"x-envoy-upstream-rq-timeout-ms", "1000"}});
   response->waitForEndStream();
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_THAT(response->headers(), HttpStatusIs("503"));
   EXPECT_LT(0, test_server_->counter("cluster.cluster_0.bind_errors")->value());
 }
 
@@ -348,14 +352,13 @@ TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
                                                                    {"via", "foo"},
                                                                    {"connection", "close"}});
   waitForNextUpstreamRequest();
-  EXPECT_STREQ("foo, bar",
-               upstream_request_->headers().get(Http::Headers::get().Via)->value().c_str());
+  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().Via, "foo, bar"));
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
   codec_client_->waitForDisconnect();
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_STREQ("bar", response->headers().Via()->value().c_str());
+  EXPECT_THAT(response->headers(), HttpStatusIs("200"));
+  EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().Via, "bar"));
 }
 
 // Validate that 100-continue works as expected with via header addition on both request and

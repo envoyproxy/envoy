@@ -4,6 +4,7 @@
 #include "envoy/event/deferred_deletable.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/stats/timespan.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -55,7 +56,7 @@ class ConnectionManager : public Network::ReadFilter,
                           public DecoderCallbacks,
                           Logger::Loggable<Logger::Id::thrift> {
 public:
-  ConnectionManager(Config& config);
+  ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator);
   ~ConnectionManager();
 
   // Network::ReadFilter
@@ -114,7 +115,7 @@ private:
                      public ThriftFilters::FilterChainFactoryCallbacks {
     ActiveRpc(ConnectionManager& parent)
         : parent_(parent), request_timer_(new Stats::Timespan(parent_.stats_.request_time_ms_)),
-          stream_id_(parent_.stream_id_++) {
+          stream_id_(parent_.random_generator_.random()) {
       parent_.stats_.request_active_.inc();
     }
     ~ActiveRpc() {
@@ -167,6 +168,7 @@ private:
     ResponseDecoderPtr response_decoder_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     Buffer::OwnedImpl response_buffer_;
+    int32_t original_sequence_id_{0};
   };
 
   typedef std::unique_ptr<ActiveRpc> ActiveRpcPtr;
@@ -187,7 +189,7 @@ private:
   DecoderPtr decoder_;
   std::list<ActiveRpcPtr> rpcs_;
   Buffer::OwnedImpl request_buffer_;
-  uint64_t stream_id_{1};
+  Runtime::RandomGenerator& random_generator_;
   bool stopped_{false};
 };
 
