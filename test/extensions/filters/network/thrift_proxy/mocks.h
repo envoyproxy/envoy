@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/router/router.h"
 
 #include "extensions/filters/network/thrift_proxy/conn_manager.h"
@@ -226,9 +227,11 @@ public:
   MOCK_METHOD2(startUpstreamResponse, void(Transport&, Protocol&));
   MOCK_METHOD1(upstreamData, bool(Buffer::Instance&));
   MOCK_METHOD0(resetDownstreamConnection, void());
+  MOCK_CONST_METHOD0(dispatcher, Event::Dispatcher&());
 
   uint64_t stream_id_{1};
   NiceMock<Network::MockConnection> connection_;
+  NiceMock<Event::MockDispatcher> dispatcher_;
 };
 
 } // namespace ThriftFilters

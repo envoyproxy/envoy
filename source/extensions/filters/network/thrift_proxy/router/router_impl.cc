@@ -455,7 +455,6 @@ void Router::UpstreamRequest::onRequestStart(bool continue_decoding) {
     parent_.callbacks_->continueDecoding();
   }
 }
-
 void Router::UpstreamRequest::onRequestComplete() { request_complete_ = true; }
 
 void Router::UpstreamRequest::onResponseComplete() {

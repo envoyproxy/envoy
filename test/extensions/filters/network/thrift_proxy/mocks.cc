@@ -73,7 +73,9 @@ MockDecoderFilter::~MockDecoderFilter() {}
 MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
   ON_CALL(*this, streamId()).WillByDefault(Return(stream_id_));
   ON_CALL(*this, connection()).WillByDefault(Return(&connection_));
+  ON_CALL(*this, dispatcher()).WillByDefault(ReturnRef(dispatcher_));
 }
+
 MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() {}
 
 } // namespace ThriftFilters

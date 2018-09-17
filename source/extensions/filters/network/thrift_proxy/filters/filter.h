@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 
 #include "extensions/filters/network/thrift_proxy/decoder_events.h"
@@ -84,6 +85,11 @@ public:
    * Reset the downstream connection.
    */
   virtual void resetDownstreamConnection() PURE;
+
+  /**
+   * @return const Event::Dispatcher& the thread local dispatcher for allocating timers, etc.
+   */
+  virtual Event::Dispatcher& dispatcher() const PURE;
 };
 
 /**

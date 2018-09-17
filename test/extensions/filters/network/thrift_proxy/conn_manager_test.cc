@@ -11,6 +11,7 @@
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -100,8 +101,7 @@ public:
     }
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
-    filter_.reset(new ConnectionManager(*config_, random_,
-                                        filter_callbacks_.connection_.dispatcher_.timeSystem()));
+    filter_.reset(new ConnectionManager(*config_, random_, dispatcher_));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 
@@ -297,6 +297,7 @@ public:
   std::unique_ptr<ConnectionManager> filter_;
   MockTransport* custom_transport_{};
   MockProtocol* custom_protocol_{};
+  Event::MockDispatcher dispatcher_;
 };
 
 TEST_F(ThriftConnectionManagerTest, OnDataHandlesThriftCall) {
