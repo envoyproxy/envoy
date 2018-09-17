@@ -11,6 +11,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/resolver.h"
 #include "envoy/network/transport_socket.h"
+#include "envoy/request_info/filter_state.h"
 #include "envoy/stats/scope.h"
 
 #include "common/stats/isolated_store_impl.h"
@@ -86,6 +87,8 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
   MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
+  MOCK_METHOD0(perConnectionState, Envoy::RequestInfo::FilterState&());
+  MOCK_CONST_METHOD0(perConnectionState, const Envoy::RequestInfo::FilterState&());
 };
 
 /**
@@ -125,6 +128,7 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
   MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
+  MOCK_METHOD0(perConnectionState, Envoy::RequestInfo::FilterState&());
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());

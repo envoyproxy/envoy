@@ -19,6 +19,7 @@ envoy_cc_mock(
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:resolver_interface",
         "//include/envoy/network:transport_socket_interface",
+        "//include/envoy/request_info:filter_state_interface",
         "//include/envoy/server:listener_manager_interface",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",

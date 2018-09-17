@@ -221,9 +221,7 @@ protected:
   };
 
   // Callbacks for different error and success states during connection establishment
-  virtual const std::string& getUpstreamCluster() {
-    return config_->getRouteFromEntries(read_callbacks_->connection());
-  }
+  virtual const std::string& getUpstreamCluster();
 
   virtual void onInitFailure(UpstreamFailureReason) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
