@@ -71,30 +71,52 @@ void SecretManagerImpl::removeDynamicSecretProvider(const std::string& map_key) 
   ASSERT(num_deleted == 1, "");
 }
 
-TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(
+SdsApiSharedPtr SecretManagerImpl::findOrCreate(
     const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
-    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+    std::function<SdsApiSharedPtr(std::function<void()> unregister_secret_provider)> create_fn) {
   const std::string map_key = sds_config_source.SerializeAsString() + config_name;
 
-  TlsCertificateConfigProviderSharedPtr secret_provider = dynamic_secret_providers_[map_key].lock();
+  SdsApiSharedPtr secret_provider = dynamic_secret_providers_[map_key].lock();
   if (!secret_provider) {
-    ASSERT(secret_provider_context.initManager() != nullptr);
-
     // SdsApi is owned by ListenerImpl and ClusterInfo which are destroyed before
     // SecretManagerImpl. It is safe to invoke this callback at the destructor of SdsApi.
     std::function<void()> unregister_secret_provider = [map_key, this]() {
       removeDynamicSecretProvider(map_key);
     };
 
-    secret_provider = std::make_shared<SdsApi>(
-        secret_provider_context.localInfo(), secret_provider_context.dispatcher(),
-        secret_provider_context.random(), secret_provider_context.stats(),
-        secret_provider_context.clusterManager(), *secret_provider_context.initManager(),
-        sds_config_source, config_name, unregister_secret_provider);
+    secret_provider = create_fn(unregister_secret_provider);
     dynamic_secret_providers_[map_key] = secret_provider;
   }
-
   return secret_provider;
+}
+
+TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(
+    const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+  auto create_fn = [&secret_provider_context, &sds_config_source, &config_name](
+                       std::function<void()> unregister_secret_provider) -> SdsApiSharedPtr {
+    ASSERT(secret_provider_context.initManager() != nullptr);
+    return TlsCertificateSdsApi::create(secret_provider_context, sds_config_source, config_name,
+                                        unregister_secret_provider);
+  };
+  SdsApiSharedPtr secret_provider = findOrCreate(sds_config_source, config_name, create_fn);
+
+  return std::dynamic_pointer_cast<TlsCertificateConfigProvider>(secret_provider);
+}
+
+CertificateValidationContextConfigProviderSharedPtr
+SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
+    const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
+    Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+  auto create_fn = [&secret_provider_context, &sds_config_source, &config_name](
+                       std::function<void()> unregister_secret_provider) -> SdsApiSharedPtr {
+    ASSERT(secret_provider_context.initManager() != nullptr);
+    return CertificateValidationContextSdsApi::create(secret_provider_context, sds_config_source,
+                                                      config_name, unregister_secret_provider);
+  };
+  SdsApiSharedPtr secret_provider = findOrCreate(sds_config_source, config_name, create_fn);
+
+  return std::dynamic_pointer_cast<CertificateValidationContextConfigProvider>(secret_provider);
 }
 
 } // namespace Secret

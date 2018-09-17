@@ -232,14 +232,14 @@ message CommonTlsContext {
   //   relaxed in the future.
   repeated TlsCertificate tls_certificates = 2 [(validate.rules).repeated .max_items = 1];
 
-  // [#not-implemented-hide:]
+  // Configs for fetching TLS certificates via SDS API.
   repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6;
 
   oneof validation_context_type {
     // How to validate peer certificates.
     CertificateValidationContext validation_context = 3;
 
-    // [#not-implemented-hide:]
+    // Config for fetching validation context via SDS API.
     SdsSecretConfig validation_context_sds_secret_config = 7;
   }
 
@@ -302,7 +302,6 @@ message DownstreamTlsContext {
 }
 
 // [#proto-status: experimental]
-// [#not-implemented-hide:]
 message SdsSecretConfig {
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   // When both name and config are specified, then secret can be fetched and/or reloaded via SDS.
@@ -312,7 +311,6 @@ message SdsSecretConfig {
 }
 
 // [#proto-status: experimental]
-// [#not-implemented-hide:]
 message Secret {
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   string name = 1;

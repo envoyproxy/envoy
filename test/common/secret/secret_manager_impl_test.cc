@@ -171,7 +171,7 @@ tls_certificate:
   Protobuf::RepeatedPtrField<envoy::api::v2::auth::Secret> secret_resources;
   auto secret_config = secret_resources.Add();
   MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml), *secret_config);
-  dynamic_cast<SdsApi&>(*secret_provider).onConfigUpdate(secret_resources, "");
+  dynamic_cast<TlsCertificateSdsApi&>(*secret_provider).onConfigUpdate(secret_resources, "");
   const std::string cert_pem = "{{ test_rundir }}/test/common/ssl/test_data/selfsigned_cert.pem";
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(cert_pem)),
             secret_provider->secret()->certificateChain());
