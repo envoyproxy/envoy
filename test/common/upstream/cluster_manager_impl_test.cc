@@ -24,6 +24,7 @@
 #include "test/mocks/tcp/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -238,7 +239,7 @@ public:
   std::unique_ptr<ClusterManagerImpl> cluster_manager_;
   AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Server::MockAdmin> admin_;
-  NiceMock<MockTimeSystem> time_system_;
+  Event::SimulatedTimeSystem time_system_;
   MockLocalClusterUpdate local_cluster_update_;
 };
 
@@ -289,8 +290,7 @@ TEST_F(ClusterManagerImplTest, MultipleHealthCheckFail) {
 }
 
 TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
-  EXPECT_CALL(time_system_, systemTime())
-      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 
   const std::string yaml = R"EOF(
   static_resources:
@@ -766,8 +766,7 @@ TEST_F(ClusterManagerImplTest, ShutdownOrder) {
 }
 
 TEST_F(ClusterManagerImplTest, InitializeOrder) {
-  EXPECT_CALL(time_system_, systemTime())
-      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 
   const std::string json = fmt::sprintf(
       R"EOF(
@@ -985,8 +984,7 @@ TEST_F(ClusterManagerImplTest, DynamicRemoveWithLocalCluster) {
 }
 
 TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
-  EXPECT_CALL(time_system_, systemTime())
-      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
 
   const std::string json = R"EOF(
   {
@@ -1836,8 +1834,6 @@ TEST_F(ClusterManagerImplTest, MergedUpdates) {
 
 // Tests that mergeable updates outside of a window get applied immediately.
 TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
-  EXPECT_CALL(time_system_, monotonicTime())
-      .WillRepeatedly(Return(MonotonicTime(std::chrono::seconds(0))));
   createWithLocalClusterUpdate();
 
   // Ensure we see the right set of added/removed hosts on every call.
@@ -1860,8 +1856,7 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
   // The first update should be applied immediately, because even though it's mergeable
   // it's outside the default merge window of 3 seconds (found in debugger as value of
   // cluster.info()->lbConfig().update_merge_window() in ClusterManagerImpl::scheduleUpdate.
-  EXPECT_CALL(time_system_, monotonicTime())
-      .WillRepeatedly(Return(MonotonicTime(std::chrono::seconds(60))));
+  time_system_.sleep(std::chrono::seconds(60));
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
                                                               hosts_per_locality, {}, hosts_added,
                                                               hosts_removed, absl::nullopt);
@@ -1873,8 +1868,6 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
 
 // Tests that mergeable updates inside of a window are not applied immediately.
 TEST_F(ClusterManagerImplTest, MergedUpdatesInsideWindow) {
-  EXPECT_CALL(time_system_, monotonicTime())
-      .WillRepeatedly(Return(MonotonicTime(std::chrono::seconds(0))));
   createWithLocalClusterUpdate();
 
   const Cluster& cluster = cluster_manager_->clusters().begin()->second;
@@ -1886,9 +1879,9 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesInsideWindow) {
 
   // The first update will not be applied, as we make it inside the default mergeable window of
   // 3 seconds (found in debugger as value of cluster.info()->lbConfig().update_merge_window()
-  // in ClusterManagerImpl::scheduleUpdate.
-  EXPECT_CALL(time_system_, monotonicTime())
-      .WillRepeatedly(Return(MonotonicTime(std::chrono::seconds(2))));
+  // in ClusterManagerImpl::scheduleUpdate. Note that initially the update-time is
+  // default-initialized to a monotonic time of 0, as is SimulatedTimeSystem::monotonic_time_.
+  time_system_.sleep(std::chrono::seconds(2));
   cluster.prioritySet().hostSetsPerPriority()[0]->updateHosts(hosts, hosts, hosts_per_locality,
                                                               hosts_per_locality, {}, hosts_added,
                                                               hosts_removed, absl::nullopt);
