@@ -190,12 +190,12 @@ public:
   ~Context();
 
 private:
-  void restore();
+  void activate();
 
-  spdlog::level::level_enum log_level_;
-  std::string log_format_;
+  const spdlog::level::level_enum log_level_;
+  const std::string log_format_;
   Thread::BasicLockable& lock_;
-  Context* save_context_;
+  Context* const save_context_;
 };
 
 /**
