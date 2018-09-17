@@ -126,7 +126,11 @@ public:
   void flush() override;
 
   bool hasLock() const { return lock_ != nullptr; }
-  void setLock(Thread::BasicLockable& lock) { lock_ = &lock; }
+  void setLock(Thread::BasicLockable& lock) {
+    if (!lock_) {
+      lock_ = &lock;
+    }
+  }
 
 private:
   Thread::BasicLockable* lock_{};
