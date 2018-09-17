@@ -150,22 +150,6 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
   client_.onSuccess(std::move(message_response));
 }
 
-// Test the client when a denied response is received due to an unknown status code.
-TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithInvalidStatusCode) {
-  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "error", false}});
-  const auto authz_response = TestCommon::makeAuthzResponse(
-      CheckStatus::Denied, Http::Code::Forbidden, "", expected_headers);
-  Http::MessagePtr check_response(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "error"}}}));
-  envoy::service::auth::v2alpha::CheckRequest request;
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
-
-  EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
-
-  client_.onSuccess(std::move(check_response));
-}
-
 // Test the client when a denied response is received.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "403", false}});
@@ -207,6 +191,32 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   client_.onFailure(Http::AsyncClient::FailureReason::Reset);
+}
+
+// Test the client when a call to authorization server returns a 5xx error status.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
+  Http::MessagePtr check_response(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}}));
+  envoy::service::auth::v2alpha::CheckRequest request;
+  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+
+  client_.onSuccess(std::move(check_response));
+}
+
+// Test the client when a call to authorization server returns a status code that cannot be parsed.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestErrorParsingStatusCode) {
+  Http::MessagePtr check_response(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "foo"}}}));
+  envoy::service::auth::v2alpha::CheckRequest request;
+  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+
+  client_.onSuccess(std::move(check_response));
 }
 
 // Test the client when the request is canceled.
