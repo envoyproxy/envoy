@@ -91,17 +91,8 @@ public:
   Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
          Server::Configuration::FactoryContext& context);
 
-  /**
-   * Find out which cluster an upstream connection should be opened to based on the
-   * parameters of a downstream connection.
-   * @param connection supplies the parameters of the downstream connection for
-   * which the proxy needs to open the corresponding upstream.
-   * @return the cluster name to be used for the upstream connection.
-   * If no route applies, returns the empty string.
-   */
-  const std::string& getRouteFromEntries(Network::Connection& connection);
-
   const TcpProxyStats& stats() { return shared_config_->stats(); }
+  const std::string& cluster() { return cluster_; }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
   uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
   const absl::optional<std::chrono::milliseconds>& idleTimeout() {
@@ -114,22 +105,11 @@ public:
   }
 
 private:
-  struct Route {
-    Route(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
-              config);
-
-    Network::Address::IpList source_ips_;
-    Network::PortRangeList source_port_ranges_;
-    Network::Address::IpList destination_ips_;
-    Network::PortRangeList destination_port_ranges_;
-    std::string cluster_name_;
-  };
-
-  std::vector<Route> routes_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const uint32_t max_connect_attempts_;
   ThreadLocal::SlotPtr upstream_drain_manager_slot_;
   SharedConfigSharedPtr shared_config_;
+  std::string cluster_;
   std::unique_ptr<const Router::MetadataMatchCriteria> cluster_metadata_match_criteria_;
 };
 
@@ -221,9 +201,7 @@ protected:
   };
 
   // Callbacks for different error and success states during connection establishment
-  virtual const std::string& getUpstreamCluster() {
-    return config_->getRouteFromEntries(read_callbacks_->connection());
-  }
+  virtual const std::string& getUpstreamCluster() { return config_->cluster(); }
 
   virtual void onInitFailure(UpstreamFailureReason) {
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);

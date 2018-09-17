@@ -48,7 +48,7 @@ Config constructConfigFromJson(const Json::Object& json,
 }
 } // namespace
 
-TEST(ConfigTest, NoRouteConfig) {
+TEST(ConfigTest, NoClusterConfig) {
   std::string json = R"EOF(
     {
       "stat_prefix": "name"
@@ -60,81 +60,11 @@ TEST(ConfigTest, NoRouteConfig) {
   EXPECT_THROW(constructConfigFromJson(*config, factory_context), EnvoyException);
 }
 
-TEST(ConfigTest, BadConfig) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": 1,
-    "route_config": {
-      "routes": [
-        {
-          "cluster": "fake_cluster"
-        }
-      ]
-    }
-   }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(constructConfigFromJson(*json_config, factory_context), Json::Exception);
-}
-
-TEST(ConfigTest, Routes) {
+TEST(ConfigTest, ValidClusterConfig) {
   std::string json = R"EOF(
     {
       "stat_prefix": "name",
-      "route_config": {
-        "routes": [
-          {
-            "destination_ip_list": [
-              "10.10.10.10/32",
-              "10.10.11.0/24",
-              "10.11.0.0/16",
-              "11.0.0.0/8",
-              "128.0.0.0/1"
-            ],
-            "cluster": "with_destination_ip_list"
-          },
-          {
-            "destination_ip_list": [
-              "::1/128",
-              "2001:abcd::/64"
-            ],
-            "cluster": "with_v6_destination"
-          },
-          {
-            "destination_ports": "1-1024,2048-4096,12345",
-            "cluster": "with_destination_ports"
-          },
-          {
-            "source_ports": "23457,23459",
-            "cluster": "with_source_ports"
-          },
-          {
-            "destination_ip_list": [
-              "2002::/32"
-            ],
-            "source_ip_list": [
-              "2003::/64"
-            ],
-            "cluster": "with_v6_source_and_destination"
-          },
-          {
-            "destination_ip_list": [
-              "10.0.0.0/24"
-            ],
-            "source_ip_list": [
-              "20.0.0.0/24"
-            ],
-            "destination_ports" : "10000",
-            "source_ports": "20000",
-            "cluster": "with_everything"
-          },
-          {
-            "cluster": "catch_all"
-          }
-        ]
-      }
+      "cluster": "valid_cluster"
     }
     )EOF";
 
@@ -142,176 +72,7 @@ TEST(ConfigTest, Routes) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 
   Config config_obj(constructConfigFromJson(*json_config, factory_context_));
-
-  {
-    // hit route with destination_ip (10.10.10.10/32)
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.10.10");
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // fall-through
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.10.11");
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // hit route with destination_ip (10.10.11.0/24)
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11");
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // fall-through
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.12.12");
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // hit route with destination_ip (10.11.0.0/16)
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.11.11.11");
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // fall-through
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.12.12.12");
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // hit route with destination_ip (11.0.0.0/8)
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("11.11.11.11");
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // fall-through
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // hit route with destination_ip (128.0.0.0/8)
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("128.255.255.255");
-    EXPECT_EQ(std::string("with_destination_ip_list"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // hit route with destination port range
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 12345);
-    EXPECT_EQ(std::string("with_destination_ports"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // fall through
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456);
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // hit route with source port range
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456);
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 23459);
-    EXPECT_EQ(std::string("with_source_ports"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // fall through
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 23456);
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 23458);
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // hit the route with all criterias present
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.0", 10000);
-    connection.remote_address_ =
-        std::make_shared<Network::Address::Ipv4Instance>("20.0.0.0", 20000);
-    EXPECT_EQ(std::string("with_everything"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // fall through
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.0", 10000);
-    connection.remote_address_ =
-        std::make_shared<Network::Address::Ipv4Instance>("30.0.0.0", 20000);
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // hit route with destination_ip (::1/128)
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("::1");
-    EXPECT_EQ(std::string("with_v6_destination"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // hit route with destination_ip (2001:abcd/64")
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ =
-        std::make_shared<Network::Address::Ipv6Instance>("2001:abcd:0:0:1::");
-    EXPECT_EQ(std::string("with_v6_destination"), config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // hit route with destination_ip ("2002::/32") and source_ip ("2003::/64")
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ =
-        std::make_shared<Network::Address::Ipv6Instance>("2002:0:0:0:0:0::1");
-    connection.remote_address_ =
-        std::make_shared<Network::Address::Ipv6Instance>("2003:0:0:0:0::5");
-    EXPECT_EQ(std::string("with_v6_source_and_destination"),
-              config_obj.getRouteFromEntries(connection));
-  }
-
-  {
-    // fall through
-    NiceMock<Network::MockConnection> connection;
-    connection.local_address_ = std::make_shared<Network::Address::Ipv6Instance>("2004::");
-    connection.remote_address_ = std::make_shared<Network::Address::Ipv6Instance>("::");
-    EXPECT_EQ(std::string("catch_all"), config_obj.getRouteFromEntries(connection));
-  }
-}
-
-TEST(ConfigTest, EmptyRouteConfig) {
-  std::string json = R"EOF(
-    {
-      "stat_prefix": "name",
-      "route_config": {
-        "routes": [
-        ]
-      }
-    }
-    )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-
-  Config config_obj(constructConfigFromJson(*json_config, factory_context_));
-
-  NiceMock<Network::MockConnection> connection;
-  EXPECT_EQ(std::string(""), config_obj.getRouteFromEntries(connection));
+  EXPECT_EQ(std::string("valid_cluster"), config_obj.cluster());
 }
 
 TEST(ConfigTest, AccessLogConfig) {
@@ -361,9 +122,7 @@ public:
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy defaultConfig() {
     envoy::config::filter::network::tcp_proxy::v2::TcpProxy config;
     config.set_stat_prefix("name");
-    auto* route = config.mutable_deprecated_v1()->mutable_routes()->Add();
-    route->set_cluster("fake_cluster");
-
+    config.set_cluster("fake_cluster");
     return config;
   }
 
@@ -1058,14 +817,7 @@ public:
     std::string json = R"EOF(
     {
       "stat_prefix": "name",
-      "route_config": {
-        "routes": [
-          {
-            "destination_ports": "1-9999",
-            "cluster": "fake_cluster"
-          }
-        ]
-      }
+      "cluster": "fake_cluster"
     }
     )EOF";
 
@@ -1088,26 +840,6 @@ public:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   std::unique_ptr<Filter> filter_;
 };
-
-TEST_F(TcpProxyRoutingTest, NonRoutableConnection) {
-  uint32_t total_cx = config_->stats().downstream_cx_total_.value();
-  uint32_t non_routable_cx = config_->stats().downstream_cx_no_route_.value();
-
-  setup();
-
-  // Port 10000 is outside the specified destination port range.
-  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 10000);
-
-  // Expect filter to stop iteration and close connection.
-  EXPECT_CALL(connection_, close(Network::ConnectionCloseType::NoFlush));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
-
-  EXPECT_EQ(total_cx + 1, config_->stats().downstream_cx_total_.value());
-  EXPECT_EQ(non_routable_cx + 1, config_->stats().downstream_cx_no_route_.value());
-
-  // Cleanup
-  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-}
 
 TEST_F(TcpProxyRoutingTest, RoutableConnection) {
   uint32_t total_cx = config_->stats().downstream_cx_total_.value();

@@ -378,21 +378,9 @@ void FilterJson::translateTcpProxy(
   json_config.validateSchema(Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA);
 
   JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
+  JSON_UTIL_SET_STRING(json_config, proto_config, cluster);
   translateRepeatedAccessLog(json_config.getObjectArray("access_log", true),
                              *proto_config.mutable_access_log());
-
-  for (const Json::ObjectSharedPtr& route_desc :
-       json_config.getObject("route_config")->getObjectArray("routes")) {
-    envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute* route =
-        proto_config.mutable_deprecated_v1()->mutable_routes()->Add();
-    JSON_UTIL_SET_STRING(*route_desc, *route, cluster);
-    JSON_UTIL_SET_STRING(*route_desc, *route, destination_ports);
-    JSON_UTIL_SET_STRING(*route_desc, *route, source_ports);
-    AddressJson::translateCidrRangeList(route_desc->getStringArray("source_ip_list", true),
-                                        *route->mutable_source_ip_list());
-    AddressJson::translateCidrRangeList(route_desc->getStringArray("destination_ip_list", true),
-                                        *route->mutable_destination_ip_list());
-  }
 }
 
 void FilterJson::translateTcpRateLimitFilter(

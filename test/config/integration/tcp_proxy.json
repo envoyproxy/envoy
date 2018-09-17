@@ -6,13 +6,7 @@
       { "type": "read", "name": "tcp_proxy",
         "config": {
           "stat_prefix": "test_tcp",
-          "route_config": {
-            "routes": [
-              {
-                "cluster": "cluster_1"
-              }
-            ]
-          },
+          "cluster": "cluster_1",
           "access_log": [
             {
               "path": "{{ test_tmpdir }}/tcp_{{ ip_loopback_address }}.log",
@@ -30,13 +24,7 @@
       { "type": "read", "name": "tcp_proxy",
         "config": {
           "stat_prefix": "tcp_with_write_limits",
-          "route_config": {
-            "routes": [
-              {
-                "cluster": "cluster_with_buffer_limits"
-              }
-            ]
-          }
+          "cluster": "cluster_with_buffer_limits"
         }
       }
     ]
@@ -55,13 +43,7 @@
       { "type": "read", "name": "tcp_proxy",
         "config": {
           "stat_prefix": "test_tcp_sans_tls",
-          "route_config": {
-            "routes": [
-              {
-                "cluster": "cluster_with_buffer_limits"
-              }
-            ]
-          }
+          "cluster": "cluster_with_buffer_limits"
         }
       },
       { "type": "read", "name": "client_ssl_auth",
