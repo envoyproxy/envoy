@@ -5,6 +5,9 @@
 #include "envoy/common/pure.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "common/common/macros.h"
+#include "common/singleton/const_singleton.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -51,6 +54,17 @@ private:
 };
 
 /**
+ * Well-known overload action names.
+ */
+class OverloadActionNameValues {
+public:
+  // Overload action to stop accepting new requests.
+  const std::string StopAcceptingRequests = "envoy.overload_actions.stop_accepting_requests";
+};
+
+typedef ConstSingleton<OverloadActionNameValues> OverloadActionNames;
+
+/**
  * The OverloadManager protects the Envoy instance from being overwhelmed by client
  * requests. It monitors a set of resources and notifies registered listeners if
  * configured thresholds for those resources have been exceeded.
@@ -81,6 +95,17 @@ public:
    * an alternative to registering a callback for overload action state changes.
    */
   virtual ThreadLocalOverloadState& getThreadLocalOverloadState() PURE;
+
+  /**
+   * Convenience method to get a statically allocated reference to the inactive overload
+   * action state. Useful for code that needs to initialize a reference either to an
+   * entry in the ThreadLocalOverloadState map (if overload behavior is enabled) or to
+   * some other static memory location set to the inactive state (if overload behavior
+   * is disabled).
+   */
+  static const OverloadActionState& getInactiveState() {
+    CONSTRUCT_ON_FIRST_USE(OverloadActionState, OverloadActionState::Inactive);
+  }
 };
 
 } // namespace Server

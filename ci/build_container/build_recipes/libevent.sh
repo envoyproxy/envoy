@@ -3,8 +3,10 @@
 set -e
 
 VERSION=2.1.8-stable
+SHA256=316ddb401745ac5d222d7c529ef1eada12f58f6376a66c1118eee803cb70f83d
 
-curl https://github.com/libevent/libevent/archive/release-"$VERSION".tar.gz -sLo libevent-release-"$VERSION".tar.gz
+curl https://github.com/libevent/libevent/archive/release-"$VERSION".tar.gz -sLo libevent-release-"$VERSION".tar.gz \
+  && echo "$SHA256" libevent-release-"$VERSION".tar.gz | sha256sum --check
 tar xf libevent-release-"$VERSION".tar.gz
 cd libevent-release-"$VERSION"
 

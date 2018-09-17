@@ -62,7 +62,7 @@ void testUtil(const std::string& client_ctx_json, const std::string& server_ctx_
                                                         std::vector<std::string>{});
 
   DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl dispatcher(test_time.timeSource());
+  Event::DispatcherImpl dispatcher(test_time.timeSystem());
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
                                   true);
   Network::MockListenerCallbacks callbacks;
@@ -166,7 +166,7 @@ const std::string testUtilV2(const envoy::api::v2::Listener& server_proto,
                                                         server_names);
 
   DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl dispatcher(test_time.timeSource());
+  Event::DispatcherImpl dispatcher(test_time.timeSystem());
   Network::TcpListenSocket socket(Network::Test::getCanonicalLoopbackAddress(version), nullptr,
                                   true);
   NiceMock<Network::MockListenerCallbacks> callbacks;
@@ -302,7 +302,7 @@ void configureServerAndExpiredClientCertificate(envoy::api::v2::Listener& listen
 class SslSocketTest : public SslCertsTest,
                       public testing::WithParamInterface<Network::Address::IpVersion> {
 protected:
-  SslSocketTest() : dispatcher_(std::make_unique<Event::DispatcherImpl>(test_time_.timeSource())) {}
+  SslSocketTest() : dispatcher_(std::make_unique<Event::DispatcherImpl>(test_time_.timeSystem())) {}
 
   DangerousDeprecatedTestTime test_time_;
   std::unique_ptr<Event::DispatcherImpl> dispatcher_;
@@ -1785,7 +1785,7 @@ void testTicketSessionResumption(const std::string& server_ctx_json1,
   NiceMock<Network::MockListenerCallbacks> callbacks;
   Network::MockConnectionHandler connection_handler;
   DangerousDeprecatedTestTime test_time;
-  Event::DispatcherImpl dispatcher(test_time.timeSource());
+  Event::DispatcherImpl dispatcher(test_time.timeSystem());
   Network::ListenerPtr listener1 = dispatcher.createListener(socket1, callbacks, true, false);
   Network::ListenerPtr listener2 = dispatcher.createListener(socket2, callbacks, true, false);
 
@@ -2756,7 +2756,7 @@ public:
     MockWatermarkBuffer* client_write_buffer = nullptr;
     MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
     dispatcher_.reset(
-        new Event::DispatcherImpl(test_time_.timeSource(), Buffer::WatermarkFactoryPtr{factory}));
+        new Event::DispatcherImpl(test_time_.timeSystem(), Buffer::WatermarkFactoryPtr{factory}));
 
     // By default, expect 4 buffers to be created - the client and server read and write buffers.
     EXPECT_CALL(*factory, create_(_, _))

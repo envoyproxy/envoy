@@ -204,7 +204,7 @@ class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        dispatcher_(test_time_.timeSource()) {}
+        dispatcher_(test_time_.timeSystem()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
@@ -276,7 +276,7 @@ public:
     envoy::api::v2::core::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
     fillServiceWideInitialMetadata(config);
-    return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_.timeSource());
+    return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_.timeSystem());
   }
 
   virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() {

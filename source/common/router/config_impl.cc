@@ -48,6 +48,12 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.retry_policy(), num_retries, 1);
   retry_on_ = RetryStateImpl::parseRetryOn(config.retry_policy().retry_on());
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(config.retry_policy().retry_on());
+
+  for (const auto& host_predicate : config.retry_policy().retry_host_predicate()) {
+    Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
+        host_predicate.name())
+        ->createHostPredicate(*this, host_predicate.config());
+  }
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) {
@@ -210,43 +216,6 @@ HashPolicyImpl::generateHash(const Network::Address::Instance* downstream_addr,
     }
   }
   return hash;
-}
-
-std::vector<MetadataMatchCriterionConstSharedPtr>
-MetadataMatchCriteriaImpl::extractMetadataMatchCriteria(const MetadataMatchCriteriaImpl* parent,
-                                                        const ProtobufWkt::Struct& matches) {
-  std::vector<MetadataMatchCriterionConstSharedPtr> v;
-
-  // Track locations of each name (from the parent) in v to make it
-  // easier to replace them when the same name exists in matches.
-  std::unordered_map<std::string, std::size_t> existing;
-
-  if (parent) {
-    for (const auto& it : parent->metadata_match_criteria_) {
-      // v.size() is the index of the emplaced name.
-      existing.emplace(it->name(), v.size());
-      v.emplace_back(it);
-    }
-  }
-
-  // Add values from matches, replacing name/values copied from parent.
-  for (const auto it : matches.fields()) {
-    const auto index_it = existing.find(it.first);
-    if (index_it != existing.end()) {
-      v[index_it->second] = std::make_shared<MetadataMatchCriterionImpl>(it.first, it.second);
-    } else {
-      v.emplace_back(std::make_shared<MetadataMatchCriterionImpl>(it.first, it.second));
-    }
-  }
-
-  // Sort criteria by name to speed matching in the subset load balancer.
-  // See source/docs/subset_load_balancer.md.
-  std::sort(
-      v.begin(), v.end(),
-      [](const MetadataMatchCriterionConstSharedPtr& a,
-         const MetadataMatchCriterionConstSharedPtr& b) -> bool { return a->name() < b->name(); });
-
-  return v;
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::api::v2::route::Decorator& decorator)

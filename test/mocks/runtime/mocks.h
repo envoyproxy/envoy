@@ -50,6 +50,9 @@ public:
 
 class MockOverrideLayer : public Snapshot::OverrideLayer {
 public:
+  MockOverrideLayer();
+  ~MockOverrideLayer();
+
   MOCK_CONST_METHOD0(name, const std::string&());
   MOCK_CONST_METHOD0(values, const std::unordered_map<std::string, Snapshot::Entry>&());
 };

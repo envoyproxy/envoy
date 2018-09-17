@@ -9,24 +9,32 @@
 namespace Envoy {
 namespace Grpc {
 
-std::shared_ptr<grpc::ChannelCredentials> CredsUtility::sslChannelCredentials(
+std::shared_ptr<grpc::ChannelCredentials> CredsUtility::getChannelCredentials(
     const envoy::api::v2::core::GrpcService::GoogleGrpc& google_grpc) {
-  if (google_grpc.has_channel_credentials() &&
-      google_grpc.channel_credentials().has_ssl_credentials()) {
-    const auto& ssl_credentials = google_grpc.channel_credentials().ssl_credentials();
-    const grpc::SslCredentialsOptions ssl_credentials_options = {
-        .pem_root_certs = Config::DataSource::read(ssl_credentials.root_certs(), true),
-        .pem_private_key = Config::DataSource::read(ssl_credentials.private_key(), true),
-        .pem_cert_chain = Config::DataSource::read(ssl_credentials.cert_chain(), true),
-    };
-    return grpc::SslCredentials(ssl_credentials_options);
+  if (google_grpc.has_channel_credentials()) {
+    switch (google_grpc.channel_credentials().credential_specifier_case()) {
+    case envoy::api::v2::core::GrpcService::GoogleGrpc::ChannelCredentials::kSslCredentials: {
+      const auto& ssl_credentials = google_grpc.channel_credentials().ssl_credentials();
+      const grpc::SslCredentialsOptions ssl_credentials_options = {
+          .pem_root_certs = Config::DataSource::read(ssl_credentials.root_certs(), true),
+          .pem_private_key = Config::DataSource::read(ssl_credentials.private_key(), true),
+          .pem_cert_chain = Config::DataSource::read(ssl_credentials.cert_chain(), true),
+      };
+      return grpc::SslCredentials(ssl_credentials_options);
+    }
+    case envoy::api::v2::core::GrpcService::GoogleGrpc::ChannelCredentials::kLocalCredentials: {
+      return grpc::experimental::LocalCredentials(UDS);
+    }
+    default:
+      return nullptr;
+    }
   }
   return nullptr;
 }
 
 std::shared_ptr<grpc::ChannelCredentials> CredsUtility::defaultSslChannelCredentials(
     const envoy::api::v2::core::GrpcService& grpc_service_config) {
-  auto creds = sslChannelCredentials(grpc_service_config.google_grpc());
+  auto creds = getChannelCredentials(grpc_service_config.google_grpc());
   if (creds != nullptr) {
     return creds;
   }
@@ -78,7 +86,7 @@ CredsUtility::callCredentials(const envoy::api::v2::core::GrpcService::GoogleGrp
 std::shared_ptr<grpc::ChannelCredentials> CredsUtility::defaultChannelCredentials(
     const envoy::api::v2::core::GrpcService& grpc_service_config) {
   std::shared_ptr<grpc::ChannelCredentials> channel_creds =
-      sslChannelCredentials(grpc_service_config.google_grpc());
+      getChannelCredentials(grpc_service_config.google_grpc());
   if (channel_creds == nullptr) {
     channel_creds = grpc::InsecureChannelCredentials();
   }

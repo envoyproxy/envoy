@@ -183,7 +183,7 @@ typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
 /**
  * Implementation of RetryPolicy that reads from the proto route config.
  */
-class RetryPolicyImpl : public RetryPolicy {
+class RetryPolicyImpl : public RetryPolicy, Upstream::RetryHostPredicateFactoryCallbacks {
 public:
   RetryPolicyImpl(const envoy::api::v2::route::RouteAction& config);
 
@@ -191,11 +191,20 @@ public:
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }
   uint32_t retryOn() const override { return retry_on_; }
+  std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override {
+    return retry_host_predicates_;
+  }
+
+  // Upstream::RetryHostPredicateFactoryCallbacks
+  void addHostPredicate(Upstream::RetryHostPredicateSharedPtr predicate) override {
+    retry_host_predicates_.emplace_back(predicate);
+  }
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
+  std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
 };
 
 /**

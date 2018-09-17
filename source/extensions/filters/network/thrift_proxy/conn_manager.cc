@@ -15,18 +15,38 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-ConnectionManager::ConnectionManager(Config& config)
+ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator)
     : config_(config), stats_(config_.stats()), transport_(config.createTransport()),
       protocol_(config.createProtocol()),
-      decoder_(std::make_unique<Decoder>(*transport_, *protocol_, *this)) {}
+      decoder_(std::make_unique<Decoder>(*transport_, *protocol_, *this)),
+      random_generator_(random_generator) {}
 
 ConnectionManager::~ConnectionManager() {}
 
 Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end_stream) {
-  UNREFERENCED_PARAMETER(end_stream);
-
   request_buffer_.move(data);
   dispatch();
+
+  if (end_stream) {
+    ENVOY_CONN_LOG(trace, "downstream half-closed", read_callbacks_->connection());
+
+    // Downstream has closed. Unless we're waiting for an upstream connection to complete a oneway
+    // request, close. The special case for oneway requests allows them to complete before the
+    // ConnectionManager is destroyed.
+    if (stopped_) {
+      ASSERT(!rpcs_.empty());
+      MessageMetadata& metadata = *(*rpcs_.begin())->metadata_;
+      ASSERT(metadata.hasMessageType());
+      if (metadata.messageType() == MessageType::Oneway) {
+        ENVOY_CONN_LOG(trace, "waiting for one-way completion", read_callbacks_->connection());
+        half_closed_ = true;
+        return Network::FilterStatus::StopIteration;
+      }
+    }
+
+    resetAllRpcs(false);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  }
 
   return Network::FilterStatus::StopIteration;
 }
@@ -64,7 +84,7 @@ void ConnectionManager::dispatch() {
   }
 
   stats_.request_decoding_error_.inc();
-  resetAllRpcs();
+  resetAllRpcs(true);
   read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
 }
 
@@ -85,14 +105,29 @@ void ConnectionManager::continueDecoding() {
   ENVOY_CONN_LOG(debug, "thrift filter continued", read_callbacks_->connection());
   stopped_ = false;
   dispatch();
+
+  if (!stopped_ && half_closed_) {
+    // If we're half closed, but not stopped waiting for an upstream, reset any pending rpcs and
+    // close the connection.
+    resetAllRpcs(false);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  }
 }
 
 void ConnectionManager::doDeferredRpcDestroy(ConnectionManager::ActiveRpc& rpc) {
   read_callbacks_->connection().dispatcher().deferredDelete(rpc.removeFromList(rpcs_));
 }
 
-void ConnectionManager::resetAllRpcs() {
+void ConnectionManager::resetAllRpcs(bool local_reset) {
   while (!rpcs_.empty()) {
+    if (local_reset) {
+      ENVOY_CONN_LOG(debug, "local close with active request", read_callbacks_->connection());
+      stats_.cx_destroy_local_with_active_rq_.inc();
+    } else {
+      ENVOY_CONN_LOG(debug, "remote close with active request", read_callbacks_->connection());
+      stats_.cx_destroy_remote_with_active_rq_.inc();
+    }
+
     rpcs_.front()->onReset();
   }
 }
@@ -105,15 +140,7 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
 }
 
 void ConnectionManager::onEvent(Network::ConnectionEvent event) {
-  if (!rpcs_.empty()) {
-    if (event == Network::ConnectionEvent::RemoteClose) {
-      stats_.cx_destroy_remote_with_active_rq_.inc();
-    } else if (event == Network::ConnectionEvent::LocalClose) {
-      stats_.cx_destroy_local_with_active_rq_.inc();
-    }
-
-    resetAllRpcs();
-  }
+  resetAllRpcs(event == Network::ConnectionEvent::LocalClose);
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler() {
@@ -137,6 +164,8 @@ bool ConnectionManager::ResponseDecoder::onData(Buffer::Instance& data) {
 
 FilterStatus ConnectionManager::ResponseDecoder::messageBegin(MessageMetadataSharedPtr metadata) {
   metadata_ = metadata;
+  metadata_->setSequenceId(parent_.original_sequence_id_);
+
   first_reply_field_ =
       (metadata->hasMessageType() && metadata->messageType() == MessageType::Reply);
   return ProtocolConverter::messageBegin(metadata);
@@ -170,7 +199,6 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
           .createTransport();
 
   metadata_->setProtocol(parent_.parent_.decoder_->protocolType());
-  metadata_->setSequenceId(parent_.metadata_->sequenceId());
   transport->encodeFrame(buffer, *metadata_, parent_.response_buffer_);
   complete_ = true;
 
@@ -236,7 +264,10 @@ FilterStatus ConnectionManager::ActiveRpc::transportEnd() {
 }
 
 FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr metadata) {
+  ASSERT(metadata->hasSequenceId());
+
   metadata_ = metadata;
+  original_sequence_id_ = metadata_->sequenceId();
 
   if (metadata_->isProtocolUpgradeMessage()) {
     ASSERT(parent_.protocol_->supportsUpgrade());
@@ -279,7 +310,8 @@ void ConnectionManager::ActiveRpc::continueDecoding() { parent_.continueDecoding
 Router::RouteConstSharedPtr ConnectionManager::ActiveRpc::route() {
   if (!cached_route_) {
     if (metadata_ != nullptr) {
-      Router::RouteConstSharedPtr route = parent_.config_.routerConfig().route(*metadata_);
+      Router::RouteConstSharedPtr route =
+          parent_.config_.routerConfig().route(*metadata_, stream_id_);
       cached_route_ = std::move(route);
     } else {
       cached_route_ = nullptr;
@@ -290,6 +322,8 @@ Router::RouteConstSharedPtr ConnectionManager::ActiveRpc::route() {
 }
 
 void ConnectionManager::ActiveRpc::sendLocalReply(const DirectResponse& response) {
+  metadata_->setSequenceId(original_sequence_id_);
+
   parent_.sendLocalReply(*metadata_, response);
   parent_.doDeferredRpcDestroy(*this);
 }

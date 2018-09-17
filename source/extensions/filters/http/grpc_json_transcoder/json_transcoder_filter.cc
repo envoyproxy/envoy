@@ -398,6 +398,12 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
     response_headers_->insertGrpcMessage().value(*grpc_message_header);
   }
 
+  // remove Trailer headers if the client connection was http/1
+  if (encoder_callbacks_->requestInfo().protocol() != Http::Protocol::Http2) {
+    static const Http::LowerCaseString trailer_key = Http::LowerCaseString("trailer");
+    response_headers_->remove(trailer_key);
+  }
+
   response_headers_->insertContentLength().value(
       encoder_callbacks_->encodingBuffer() ? encoder_callbacks_->encodingBuffer()->length() : 0);
   return Http::FilterTrailersStatus::Continue;

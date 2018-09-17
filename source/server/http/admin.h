@@ -164,9 +164,16 @@ private:
   void writeClustersAsJson(Buffer::Instance& response);
   void writeClustersAsText(Buffer::Instance& response);
 
+  static bool shouldShowMetric(const std::shared_ptr<Stats::Metric>& metric, const bool used_only,
+                               const absl::optional<std::regex>& regex) {
+    return ((!used_only || metric->used()) &&
+            (!regex.has_value() || std::regex_search(metric->name(), regex.value())));
+  }
   static std::string statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                                  const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
-                                 bool show_all, bool pretty_print = false);
+                                 bool used_only,
+                                 const absl::optional<std::regex> regex = absl::nullopt,
+                                 bool pretty_print = false);
   static std::string
   runtimeAsJson(const std::vector<std::pair<std::string, Runtime::Snapshot::Entry>>& entries);
   std::vector<const UrlHandler*> sortedHandlers() const;
@@ -202,6 +209,8 @@ private:
                                  AdminStream&);
   Http::Code handlerLogging(absl::string_view path_and_query, Http::HeaderMap& response_headers,
                             Buffer::Instance& response, AdminStream&);
+  Http::Code handlerMemory(absl::string_view path_and_query, Http::HeaderMap& response_headers,
+                           Buffer::Instance& response, AdminStream&);
   Http::Code handlerMain(const std::string& path, Buffer::Instance& response, AdminStream&);
   Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
                                  Http::HeaderMap& response_headers, Buffer::Instance& response,

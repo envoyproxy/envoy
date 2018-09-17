@@ -7,7 +7,6 @@
 #include <functional>
 #include <list>
 #include <memory>
-#include <shared_mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -26,6 +25,7 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/health_checker.h"
 #include "envoy/upstream/load_balancer.h"
+#include "envoy/upstream/locality.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/callback_impl.h"
@@ -36,11 +36,12 @@
 #include "common/network/utility.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/upstream/load_balancer_impl.h"
-#include "common/upstream/locality.h"
 #include "common/upstream/outlier_detection_impl.h"
 #include "common/upstream/resource_manager_impl.h"
 
 #include "server/init_manager_impl.h"
+
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -91,11 +92,11 @@ public:
   // TODO(rgs1): we should move to absl locks, once there's support for R/W locks. We should
   // also add lock annotations, once they work correctly with R/W locks.
   const std::shared_ptr<envoy::api::v2::core::Metadata> metadata() const override {
-    std::shared_lock<std::shared_timed_mutex> lock(metadata_mutex_);
+    absl::ReaderMutexLock lock(&metadata_mutex_);
     return metadata_;
   }
   virtual void metadata(const envoy::api::v2::core::Metadata& new_metadata) override {
-    std::unique_lock<std::shared_timed_mutex> lock(metadata_mutex_);
+    absl::WriterMutexLock lock(&metadata_mutex_);
     metadata_ = std::make_shared<envoy::api::v2::core::Metadata>(new_metadata);
   }
 
@@ -134,8 +135,8 @@ protected:
   Network::Address::InstanceConstSharedPtr address_;
   Network::Address::InstanceConstSharedPtr health_check_address_;
   std::atomic<bool> canary_;
-  mutable std::shared_timed_mutex metadata_mutex_;
-  std::shared_ptr<envoy::api::v2::core::Metadata> metadata_;
+  mutable absl::Mutex metadata_mutex_;
+  std::shared_ptr<envoy::api::v2::core::Metadata> metadata_ GUARDED_BY(metadata_mutex_);
   const envoy::api::v2::core::Locality locality_;
   Stats::IsolatedStoreImpl stats_store_;
   HostStats stats_;
@@ -551,11 +552,6 @@ private:
   std::function<void()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
 };
-
-typedef std::unique_ptr<HostVector> HostListPtr;
-typedef std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>
-    LocalityWeightsMap;
-typedef std::vector<std::pair<HostListPtr, LocalityWeightsMap>> PriorityState;
 
 /**
  * Manages PriorityState of a cluster. PriorityState is a per-priority binding of a set of hosts
