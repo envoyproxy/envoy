@@ -1857,8 +1857,8 @@ TEST_F(ClusterManagerImplTest, MergedUpdatesOutOfWindow) {
   HostVector hosts_added;
   HostVector hosts_removed;
 
-  // The first update should be applied immediately, because even though it's
-  // inside the default merge window of 3 seconds (found in debugger as value of
+  // The first update should be applied immediately, because even though it's mergeable
+  // it's outside the default merge window of 3 seconds (found in debugger as value of
   // cluster.info()->lbConfig().update_merge_window() in ClusterManagerImpl::scheduleUpdate.
   EXPECT_CALL(time_system_, monotonicTime())
       .WillRepeatedly(Return(MonotonicTime(std::chrono::seconds(60))));
