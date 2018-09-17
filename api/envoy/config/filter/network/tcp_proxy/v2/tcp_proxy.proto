@@ -42,7 +42,7 @@ message TcpProxy {
       // criteria. Only endpoints in the upstream cluster with metadata
       // matching that set in metadata_match will be considered. The filter
       // name should be specified as *envoy.lb*.
-      core.Metadata metadata_match = 3;
+      envoy.api.v2.core.Metadata metadata_match = 3;
 
       // [#not-implemented-hide:] The per_filter_config field can be used
       // to provide weighted cluster-specific configurations for
