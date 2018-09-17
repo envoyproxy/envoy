@@ -37,10 +37,11 @@ public:
              const envoy::service::auth::v2alpha::CheckRequest& request, Tracing::Span&) override;
 
   // Http::AsyncClient::Callbacks
-  void onSuccess(Http::MessagePtr&& response) override;
+  void onSuccess(Http::MessagePtr&& message) override;
   void onFailure(Http::AsyncClient::FailureReason reason) override;
 
 private:
+  ResponsePtr messageToResponse(Http::MessagePtr message);
   const std::string cluster_name_;
   const std::string path_prefix_;
   const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers_;

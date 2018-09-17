@@ -69,11 +69,11 @@ TEST(HeaderTransportTest, NotEnoughData) {
   // Missing header data
   {
     Buffer::OwnedImpl buffer;
-    addInt32(buffer, 100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1); // sequence number
-    addInt16(buffer, 1); // header size / 4
+    buffer.writeBEInt<int32_t>(100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1); // sequence number
+    buffer.writeBEInt<int16_t>(1); // header size / 4
     addRepeated(buffer, 3, 0);
     EXPECT_FALSE(transport.decodeFrameStart(buffer, metadata));
     EXPECT_THAT(metadata, IsEmptyMetadata());
@@ -86,7 +86,7 @@ TEST(HeaderTransportTest, InvalidFrameSize) {
 
   {
     Buffer::OwnedImpl buffer;
-    addInt32(buffer, -1);
+    buffer.writeBEInt<int32_t>(-1);
     addRepeated(buffer, 10, 0);
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "invalid thrift header transport frame size -1");
@@ -95,7 +95,7 @@ TEST(HeaderTransportTest, InvalidFrameSize) {
 
   {
     Buffer::OwnedImpl buffer;
-    addInt32(buffer, 0x7fffffff);
+    buffer.writeBEInt<int32_t>(0x7fffffff);
     addRepeated(buffer, 10, 0);
 
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
@@ -109,8 +109,8 @@ TEST(HeaderTransportTest, InvalidMagic) {
   Buffer::OwnedImpl buffer;
   MessageMetadata metadata;
 
-  addInt32(buffer, 0x100);
-  addInt16(buffer, 0x0123);
+  buffer.writeBEInt<int32_t>(0x100);
+  buffer.writeBEInt<int16_t>(0x0123);
   addRepeated(buffer, 8, 0);
   EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                             "invalid thrift header transport magic 0123");
@@ -125,11 +125,11 @@ TEST(HeaderTransportTest, InvalidHeaderSize) {
   {
     Buffer::OwnedImpl buffer;
 
-    addInt32(buffer, 0x100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1); // sequence number
-    addInt16(buffer, 0);
+    buffer.writeBEInt<int32_t>(0x100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1); // sequence number
+    buffer.writeBEInt<int16_t>(0);
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "no header data");
     EXPECT_THAT(metadata, IsEmptyMetadata());
@@ -139,11 +139,11 @@ TEST(HeaderTransportTest, InvalidHeaderSize) {
   {
     Buffer::OwnedImpl buffer;
 
-    addInt32(buffer, 0x100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1); // sequence number
-    addInt16(buffer, -1);
+    buffer.writeBEInt<int32_t>(0x100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1); // sequence number
+    buffer.writeBEInt<int16_t>(-1);
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "invalid thrift header transport header size -4 (ffff)");
     EXPECT_THAT(metadata, IsEmptyMetadata());
@@ -153,11 +153,11 @@ TEST(HeaderTransportTest, InvalidHeaderSize) {
   {
     Buffer::OwnedImpl buffer;
 
-    addInt32(buffer, 0x100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1); // sequence number
-    addInt16(buffer, 0x4001);
+    buffer.writeBEInt<int32_t>(0x100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1); // sequence number
+    buffer.writeBEInt<int16_t>(0x4001);
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "invalid thrift header transport header size 65540 (4001)");
     EXPECT_THAT(metadata, IsEmptyMetadata());
@@ -167,11 +167,11 @@ TEST(HeaderTransportTest, InvalidHeaderSize) {
   {
     Buffer::OwnedImpl buffer;
 
-    addInt32(buffer, 0x100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1);                            // sequence number
-    addInt16(buffer, 1);                            // 4 bytes
+    buffer.writeBEInt<int32_t>(0x100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1);                  // sequence number
+    buffer.writeBEInt<int16_t>(1);                  // 4 bytes
     addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF, 0x1F}); // var int -1, exceeds header size
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "unable to read header transport protocol id: header too small");
@@ -181,11 +181,11 @@ TEST(HeaderTransportTest, InvalidHeaderSize) {
   {
     Buffer::OwnedImpl buffer;
 
-    addInt32(buffer, 0x100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1);                      // sequence number
-    addInt16(buffer, 1);                      // 4 bytes
+    buffer.writeBEInt<int32_t>(0x100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1);            // sequence number
+    buffer.writeBEInt<int16_t>(1);            // 4 bytes
     addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF}); // partial var int
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "unable to read header transport protocol id: header too small");
@@ -199,12 +199,12 @@ TEST(HeaderTransportTest, InvalidProto) {
   {
     Buffer::OwnedImpl buffer;
 
-    addInt32(buffer, 100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1);          // sequence number
-    addInt16(buffer, 1);          // size 4
-    addSeq(buffer, {1, 0, 0, 0}); // 1 = json, 0 = num transforms, pad, pad
+    buffer.writeBEInt<int32_t>(100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1); // sequence number
+    buffer.writeBEInt<int16_t>(1); // size 4
+    addSeq(buffer, {1, 0, 0, 0});  // 1 = json, 0 = num transforms, pad, pad
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "Unknown protocol 1");
   }
@@ -212,12 +212,12 @@ TEST(HeaderTransportTest, InvalidProto) {
   {
     Buffer::OwnedImpl buffer;
 
-    addInt32(buffer, 100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1);          // sequence number
-    addInt16(buffer, 1);          // size 4
-    addSeq(buffer, {3, 0, 0, 0}); // 3 = invalid proto, 0 = num transforms, pad, pad
+    buffer.writeBEInt<int32_t>(100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1); // sequence number
+    buffer.writeBEInt<int16_t>(1); // size 4
+    addSeq(buffer, {3, 0, 0, 0});  // 3 = invalid proto, 0 = num transforms, pad, pad
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "Unknown protocol 3");
   }
@@ -225,11 +225,11 @@ TEST(HeaderTransportTest, InvalidProto) {
   {
     Buffer::OwnedImpl buffer;
 
-    addInt32(buffer, 100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1);                            // sequence number
-    addInt16(buffer, 2);                            // size 8
+    buffer.writeBEInt<int32_t>(100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1);                  // sequence number
+    buffer.writeBEInt<int16_t>(2);                  // size 8
     addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF, 0x1F}); // -1 = invalid proto
     addSeq(buffer, {0, 0, 0});                      // 0 transforms and padding
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
@@ -244,12 +244,12 @@ TEST(HeaderTransportTest, NoTransformsOrInfo) {
     Buffer::OwnedImpl buffer;
     MessageMetadata metadata;
 
-    addInt32(buffer, 100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1);          // sequence number
-    addInt16(buffer, 1);          // size 4
-    addSeq(buffer, {0, 0, 0, 0}); // 0 = binary proto, 0 = num transforms, pad, pad
+    buffer.writeBEInt<int32_t>(100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1); // sequence number
+    buffer.writeBEInt<int16_t>(1); // size 4
+    addSeq(buffer, {0, 0, 0, 0});  // 0 = binary proto, 0 = num transforms, pad, pad
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
     EXPECT_THAT(metadata, HasFrameSize(86U));
     EXPECT_THAT(metadata, HasProtocol(ProtocolType::Binary));
@@ -262,12 +262,12 @@ TEST(HeaderTransportTest, NoTransformsOrInfo) {
     Buffer::OwnedImpl buffer;
     MessageMetadata metadata;
 
-    addInt32(buffer, 101);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 2);          // sequence number
-    addInt16(buffer, 1);          // size 4
-    addSeq(buffer, {2, 0, 0, 0}); // 2 = compact proto, 0 = num transforms, pad, pad
+    buffer.writeBEInt<int32_t>(101);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(2); // sequence number
+    buffer.writeBEInt<int16_t>(1); // size 4
+    addSeq(buffer, {2, 0, 0, 0});  // 2 = compact proto, 0 = num transforms, pad, pad
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
     EXPECT_THAT(metadata, HasFrameSize(87U));
     EXPECT_THAT(metadata, HasProtocol(ProtocolType::Compact));
@@ -284,12 +284,12 @@ TEST(HeaderTransportTest, TransformErrors) {
     HeaderTransportImpl transport;
     Buffer::OwnedImpl buffer;
 
-    addInt32(buffer, 100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1);                            // sequence number
-    addInt16(buffer, 2);                            // size 8
-    addInt8(buffer, 0);                             // binary proto
+    buffer.writeBEInt<int32_t>(100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1);                  // sequence number
+    buffer.writeBEInt<int16_t>(2);                  // size 8
+    buffer.writeByte(0);                            // binary proto
     addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF, 0x1F}); // -1 = invalid num transforms
     addSeq(buffer, {0, 0});                         // padding
 
@@ -302,11 +302,11 @@ TEST(HeaderTransportTest, TransformErrors) {
     HeaderTransportImpl transport;
     Buffer::OwnedImpl buffer;
 
-    addInt32(buffer, 100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1);                 // sequence number
-    addInt16(buffer, 1);                 // size 4
+    buffer.writeBEInt<int32_t>(100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1);       // sequence number
+    buffer.writeBEInt<int16_t>(1);       // size 4
     addSeq(buffer, {0, 1, xform_id, 0}); // 0 = binary proto, 1 = num transforms, xform id, pad
 
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
@@ -321,12 +321,12 @@ TEST(HeaderTransportTest, TransformErrors) {
     HeaderTransportImpl transport;
     Buffer::OwnedImpl buffer;
 
-    addInt32(buffer, 100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1);          // sequence number
-    addInt16(buffer, 1);          // size 4
-    addSeq(buffer, {0, 2, 1, 2}); // 0 = binary proto, 2 = num transforms, xform id 1, xform id 2
+    buffer.writeBEInt<int32_t>(100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1); // sequence number
+    buffer.writeBEInt<int16_t>(1); // size 4
+    addSeq(buffer, {0, 2, 1, 2});  // 0 = binary proto, 2 = num transforms, xform id 1, xform id 2
 
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
     EXPECT_THAT(metadata, HasFrameSize(86U));
@@ -342,12 +342,12 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
     Buffer::OwnedImpl buffer;
     MessageMetadata metadata;
 
-    addInt32(buffer, 100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1);          // sequence number
-    addInt16(buffer, 1);          // size 4
-    addSeq(buffer, {0, 0, 2, 0}); // 0 = binary proto, 0 = num transforms, 2 = unknown info id, pad
+    buffer.writeBEInt<int32_t>(100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1); // sequence number
+    buffer.writeBEInt<int16_t>(1); // size 4
+    addSeq(buffer, {0, 0, 2, 0});  // 0 = binary proto, 0 = num transforms, 2 = unknown info id, pad
 
     // Unknown info id is ignored.
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
@@ -364,12 +364,12 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
     Buffer::OwnedImpl buffer;
     MessageMetadata metadata;
 
-    addInt32(buffer, 100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1);       // sequence number
-    addInt16(buffer, 3);       // size 12
-    addSeq(buffer, {0, 0, 1}); // 0 = binary proto, 0 = num transforms, 1 key-value
+    buffer.writeBEInt<int32_t>(100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1); // sequence number
+    buffer.writeBEInt<int16_t>(3); // size 12
+    addSeq(buffer, {0, 0, 1});     // 0 = binary proto, 0 = num transforms, 1 key-value
     addSeq(buffer, {0xFF, 0xFF, 0xFF, 0xFF, 0x1F}); // -1 headers
     addSeq(buffer, {0, 0, 0, 0});
 
@@ -383,14 +383,14 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
     Buffer::OwnedImpl buffer;
     MessageMetadata metadata;
 
-    addInt32(buffer, 100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1);          // sequence number
-    addInt16(buffer, 2);          // size 8
-    addSeq(buffer, {0, 0, 1, 1}); // 0 = binary proto, 0 = num transforms, 1 key-value, 1 = num kvs
+    buffer.writeBEInt<int32_t>(100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1); // sequence number
+    buffer.writeBEInt<int16_t>(2); // size 8
+    addSeq(buffer, {0, 0, 1, 1});  // 0 = binary proto, 0 = num transforms, 1 key-value, 1 = num kvs
     addSeq(buffer, {0x80, 0x80, 0x40}); // var int 0x100000
-    addInt8(buffer, 0);
+    buffer.writeByte(0);
 
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "header transport header key: value 1048576 exceeds max i16 (32767)");
@@ -402,14 +402,14 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
     Buffer::OwnedImpl buffer;
     MessageMetadata metadata;
 
-    addInt32(buffer, 100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1);          // sequence number
-    addInt16(buffer, 2);          // size 8
-    addSeq(buffer, {0, 0, 1, 1}); // 0 = binary proto, 0 = num transforms, 1 key-value, 1 = num kvs
-    addInt8(buffer, 4);           // exceeds specified header size
-    addString(buffer, "key_");
+    buffer.writeBEInt<int32_t>(100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1); // sequence number
+    buffer.writeBEInt<int16_t>(2); // size 8
+    addSeq(buffer, {0, 0, 1, 1});  // 0 = binary proto, 0 = num transforms, 1 key-value, 1 = num kvs
+    buffer.writeByte(4);           // exceeds specified header size
+    buffer.add("key_");
 
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "unable to read header transport header key: header too small");
@@ -421,15 +421,15 @@ TEST(HeaderTransportTest, InvalidInfoBlock) {
     Buffer::OwnedImpl buffer;
     MessageMetadata metadata;
 
-    addInt32(buffer, 100);
-    addInt16(buffer, 0x0FFF);
-    addInt16(buffer, 0);
-    addInt32(buffer, 1);          // sequence number
-    addInt16(buffer, 2);          // size 8
-    addSeq(buffer, {0, 0, 1, 1}); // 0 = binary proto, 0 = num transforms, 1 key-value, 1 = num kvs
-    addInt8(buffer, 3);           // head ends with key, no room for value
-    addString(buffer, "abc");
-    addInt8(buffer, 0);
+    buffer.writeBEInt<int32_t>(100);
+    buffer.writeBEInt<int16_t>(0x0FFF);
+    buffer.writeBEInt<int16_t>(0);
+    buffer.writeBEInt<int32_t>(1); // sequence number
+    buffer.writeBEInt<int16_t>(2); // size 8
+    addSeq(buffer, {0, 0, 1, 1});  // 0 = binary proto, 0 = num transforms, 1 key-value, 1 = num kvs
+    buffer.writeByte(3);           // head ends with key, no room for value
+    buffer.add("abc");
+    buffer.writeByte(0);
 
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "unable to read header transport header value: header too small");
@@ -442,23 +442,23 @@ TEST(HeaderTransportTest, InfoBlock) {
   MessageMetadata metadata;
   metadata.headers().addCopy(Http::LowerCaseString("not"), "empty");
 
-  addInt32(buffer, 200);
-  addInt16(buffer, 0x0FFF);
-  addInt16(buffer, 0);
-  addInt32(buffer, 1);          // sequence number
-  addInt16(buffer, 38);         // size 152
+  buffer.writeBEInt<int32_t>(200);
+  buffer.writeBEInt<int16_t>(0x0FFF);
+  buffer.writeBEInt<int16_t>(0);
+  buffer.writeBEInt<int32_t>(1);  // sequence number
+  buffer.writeBEInt<int16_t>(38); // size 152
   addSeq(buffer, {0, 0, 1, 3}); // 0 = binary proto, 0 = num transforms, 1 = key value, 3 = num kvs
-  addInt8(buffer, 3);
-  addString(buffer, "key");
-  addInt8(buffer, 5);
-  addString(buffer, "value");
-  addInt8(buffer, 4);
-  addString(buffer, "key2");
+  buffer.writeByte(3);
+  buffer.add("key");
+  buffer.writeByte(5);
+  buffer.add("value");
+  buffer.writeByte(4);
+  buffer.add("key2");
   addSeq(buffer, {0x80, 0x01}); // var int 128
-  addString(buffer, std::string(128, 'x'));
-  addInt8(buffer, 0); // empty key
-  addInt8(buffer, 0); // empty value
-  addInt8(buffer, 0); // padding
+  buffer.add(std::string(128, 'x'));
+  buffer.writeByte(0); // empty key
+  buffer.writeByte(0); // empty value
+  buffer.writeByte(0); // padding
 
   Http::HeaderMapImpl expected_headers;
   expected_headers.addCopy(Http::LowerCaseString("not"), "empty");

@@ -98,7 +98,7 @@ public:
 
   bool shouldSelectAnotherHost(const Host&) override { return false; }
 
-  uint32_t hostSelectionRetryCount() const override { return 0; }
+  uint32_t hostSelectionRetryCount() const override { return 1; }
 };
 
 /**

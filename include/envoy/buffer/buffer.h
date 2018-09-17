@@ -6,7 +6,10 @@
 #include <string>
 
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
+
+#include "common/common/byte_order.h"
 
 #include "absl/strings/string_view.h"
 
@@ -194,6 +197,152 @@ public:
    * -1 for failure. If the call is successful, errno_ shouldn't be used.
    */
   virtual Api::SysCallIntResult write(int fd) PURE;
+
+  /**
+   * Copy an integer out of the buffer.
+   * @param start supplies the buffer index to start copying from.
+   * @param Size how many bytes to read out of the buffer.
+   * @param Endianness specifies the byte order to use when decoding the integer.
+   * @details Size parameter: Some protocols have integer fields whose size in bytes won't match the
+   * size in bytes of C++'s integer types. Take a 3-byte integer field for example, which we want to
+   * represent as a 32-bit (4 bytes) integer. One option to deal with that situation is to read 4
+   * bytes from the buffer and ignore 1. There are a few problems with that solution, though.
+   *   * The first problem is buffer underflow: there may not be more than Size bytes available
+   * (say, last field in the payload), so that's an edge case to take into consideration.
+   *   * The second problem is draining the buffer after reading. With the above solution we cannot
+   *     read and discard in one go. We'd need to peek 4 bytes, ignore 1 and then drain 3. That not
+   *     only looks hacky since the sizes don't match, but also produces less terse code and
+   * requires the caller to propagate that logic to all call sites. Things complicate even further
+   * when endianness is taken into consideration: should the most or least-significant bytes be
+   * padded? Dealing with this situation requires a high level of care and attention to detail.
+   * Properly calculating which bytes to discard and how to displace the data is not only error
+   * prone, but also shifts to the caller a burden that could be solved in a much more generic,
+   * transparent and well tested manner.
+   *   * The last problem in the list is sign extension, which should be properly handled when
+   * reading signed types with negative values. To make matters easier, the optional Size parameter
+   * can be specified in those situations where there's a need to read less bytes than a C++'s
+   * integer size in bytes. For the most common case when one needs to read exactly as many bytes as
+   * the size of C++'s integer, this parameter can simply be omitted and it will be automatically
+   * deduced from the size of the type T
+   */
+  template <typename T, ByteOrder Endianness = ByteOrder::Host, size_t Size = sizeof(T)>
+  T peekInt(uint64_t start = 0) {
+    static_assert(Size <= sizeof(T), "requested size is bigger than integer being read");
+
+    if (length() < start + Size) {
+      throw EnvoyException("buffer underflow");
+    }
+
+    constexpr const auto displacement = Endianness == ByteOrder::BigEndian ? sizeof(T) - Size : 0;
+
+    auto result = static_cast<T>(0);
+    constexpr const auto all_bits_enabled = static_cast<T>(~static_cast<T>(0));
+
+    char* bytes = reinterpret_cast<char*>(std::addressof(result));
+    copyOut(start, Size, &bytes[displacement]);
+
+    constexpr const auto most_significant_read_byte =
+        Endianness == ByteOrder::BigEndian ? displacement : Size - 1;
+
+    const auto sign_extension_bits =
+        std::is_signed<T>::value && Size < sizeof(T) && bytes[most_significant_read_byte] < 0
+            ? static_cast<T>(static_cast<typename std::make_unsigned<T>::type>(all_bits_enabled)
+                             << (Size * CHAR_BIT))
+            : static_cast<T>(0);
+
+    return fromEndianness<Endianness>(static_cast<T>(result)) | sign_extension_bits;
+  }
+
+  /**
+   * Copy a little endian integer out of the buffer.
+   * @param start supplies the buffer index to start copying from.
+   * @param Size how many bytes to read out of the buffer.
+   */
+  template <typename T, size_t Size = sizeof(T)> T peekLEInt(uint64_t start = 0) {
+    return peekInt<T, ByteOrder::LittleEndian, Size>(start);
+  }
+
+  /**
+   * Copy a big endian integer out of the buffer.
+   * @param start supplies the buffer index to start copying from.
+   * @param Size how many bytes to read out of the buffer.
+   */
+  template <typename T, size_t Size = sizeof(T)> T peekBEInt(uint64_t start = 0) {
+    return peekInt<T, ByteOrder::BigEndian, Size>(start);
+  }
+
+  /**
+   * Copy an integer out of the buffer and drain the read data.
+   * @param Size how many bytes to read out of the buffer.
+   * @param Endianness specifies the byte order to use when decoding the integer.
+   */
+  template <typename T, ByteOrder Endianness = ByteOrder::Host, size_t Size = sizeof(T)>
+  T drainInt() {
+    const auto result = peekInt<T, Endianness, Size>();
+    drain(Size);
+    return result;
+  }
+
+  /**
+   * Copy a little endian integer out of the buffer and drain the read data.
+   * @param Size how many bytes to read out of the buffer.
+   */
+  template <typename T, size_t Size = sizeof(T)> T drainLEInt() {
+    return drainInt<T, ByteOrder::LittleEndian, Size>();
+  }
+
+  /**
+   * Copy a big endian integer out of the buffer and drain the read data.
+   * @param Size how many bytes to read out of the buffer.
+   */
+  template <typename T, size_t Size = sizeof(T)> T drainBEInt() {
+    return drainInt<T, ByteOrder::BigEndian, Size>();
+  }
+
+  /**
+   * Copy a byte into the buffer.
+   * @param value supplies the byte to copy into the buffer.
+   */
+  void writeByte(uint8_t value) { add(std::addressof(value), 1); }
+
+  /**
+   * Copy value as a byte into the buffer.
+   * @param value supplies the byte to copy into the buffer.
+   */
+  template <typename T> void writeByte(T value) { writeByte(static_cast<uint8_t>(value)); }
+
+  /**
+   * Copy an integer into the buffer.
+   * @param value supplies the integer to copy into the buffer.
+   * @param Size how many bytes to write from the requested integer.
+   * @param Endianness specifies the byte order to use when encoding the integer.
+   */
+  template <ByteOrder Endianness = ByteOrder::Host, typename T, size_t Size = sizeof(T)>
+  void writeInt(T value) {
+    static_assert(Size <= sizeof(T), "requested size is bigger than integer being written");
+
+    const auto data = toEndianness<Endianness>(value);
+    constexpr const auto displacement = Endianness == ByteOrder::BigEndian ? sizeof(T) - Size : 0;
+    add(reinterpret_cast<const char*>(std::addressof(data)) + displacement, Size);
+  }
+
+  /**
+   * Copy an integer into the buffer in little endian byte order.
+   * @param value supplies the integer to copy into the buffer.
+   * @param Size how many bytes to write from the requested integer.
+   */
+  template <typename T, size_t Size = sizeof(T)> void writeLEInt(T value) {
+    writeInt<ByteOrder::LittleEndian, T, Size>(value);
+  }
+
+  /**
+   * Copy an integer into the buffer in big endian byte order.
+   * @param value supplies the integer to copy into the buffer.
+   * @param Size how many bytes to write from the requested integer.
+   */
+  template <typename T, size_t Size = sizeof(T)> void writeBEInt(T value) {
+    writeInt<ByteOrder::BigEndian, T, Size>(value);
+  }
 };
 
 typedef std::unique_ptr<Instance> InstancePtr;

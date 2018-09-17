@@ -16,7 +16,7 @@ bool FramedTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
     return false;
   }
 
-  int32_t thrift_size = BufferHelper::peekI32(buffer);
+  int32_t thrift_size = buffer.peekBEInt<int32_t>();
 
   if (thrift_size <= 0 || thrift_size > MaxFrameSize) {
     throw EnvoyException(fmt::format("invalid thrift framed transport frame size {}", thrift_size));
@@ -41,7 +41,7 @@ void FramedTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
 
   int32_t thrift_size = static_cast<int32_t>(size);
 
-  BufferHelper::writeI32(buffer, thrift_size);
+  buffer.writeBEInt<int32_t>(thrift_size);
   buffer.move(message);
 }
 

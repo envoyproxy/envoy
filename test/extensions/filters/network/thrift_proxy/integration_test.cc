@@ -253,16 +253,42 @@ TEST_P(ThriftConnManagerIntegrationTest, Exception) {
 TEST_P(ThriftConnManagerIntegrationTest, EarlyClose) {
   initializeCall(DriverMode::Success);
 
-  std::string partial_request = request_bytes_.toString().substr(0, request_bytes_.length() - 5);
+  const std::string partial_request =
+      request_bytes_.toString().substr(0, request_bytes_.length() - 5);
+
+  FakeUpstream* expected_upstream = getExpectedUpstream(false);
+  expected_upstream->set_allow_unexpected_disconnects(true);
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   tcp_client->write(partial_request);
   tcp_client->close();
 
-  FakeUpstream* expected_upstream = getExpectedUpstream(false);
-  expected_upstream->set_allow_unexpected_disconnects(true);
   FakeRawConnectionPtr fake_upstream_connection;
   ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
+
+  test_server_->waitForCounterGe("thrift.thrift_stats.cx_destroy_remote_with_active_rq", 1);
+
+  Stats::CounterSharedPtr counter =
+      test_server_->counter("thrift.thrift_stats.cx_destroy_remote_with_active_rq");
+  EXPECT_EQ(1U, counter->value());
+}
+
+// Tests when the downstream client closes before completing a request but an upstream has already
+// been connected/assigned.
+TEST_P(ThriftConnManagerIntegrationTest, EarlyCloseWithUpstream) {
+  initializeCall(DriverMode::Success);
+
+  const std::string partial_request =
+      request_bytes_.toString().substr(0, request_bytes_.length() - 5);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->write(partial_request);
+
+  FakeUpstream* expected_upstream = getExpectedUpstream(false);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
+
+  tcp_client->close();
 
   test_server_->waitForCounterGe("thrift.thrift_stats.cx_destroy_remote_with_active_rq", 1);
 
@@ -308,6 +334,29 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClose) {
   EXPECT_EQ(request_bytes_.toString(), upstream_request.toString());
 
   Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_oneway");
+  EXPECT_EQ(1U, counter->value());
+}
+
+TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClosePartialRequest) {
+  initializeOneway();
+
+  const std::string partial_request =
+      request_bytes_.toString().substr(0, request_bytes_.length() - 1);
+
+  FakeUpstream* expected_upstream = getExpectedUpstream(true);
+  expected_upstream->set_allow_unexpected_disconnects(true);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->write(partial_request);
+  tcp_client->close();
+
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
+
+  test_server_->waitForCounterGe("thrift.thrift_stats.cx_destroy_remote_with_active_rq", 1);
+
+  Stats::CounterSharedPtr counter =
+      test_server_->counter("thrift.thrift_stats.cx_destroy_remote_with_active_rq");
   EXPECT_EQ(1U, counter->value());
 }
 

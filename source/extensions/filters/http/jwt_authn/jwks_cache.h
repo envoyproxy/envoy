@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 #include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
 
 #include "jwt_verify_lib/jwks.h"
@@ -53,8 +54,9 @@ public:
     // Return true if jwks object is expired.
     virtual bool isExpired() const PURE;
 
-    // Set a remote Jwks string.
-    virtual ::google::jwt_verify::Status setRemoteJwks(const std::string& jwks_str) PURE;
+    // Set a remote Jwks.
+    virtual const ::google::jwt_verify::Jwks*
+    setRemoteJwks(::google::jwt_verify::JwksPtr&& jwks) PURE;
   };
 
   // Lookup issuer cache map. The cache only stores Jwks specified in the config.
@@ -62,7 +64,8 @@ public:
 
   // Factory function to create an instance.
   static JwksCachePtr
-  create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config);
+  create(const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config,
+         TimeSource& time_source);
 };
 
 } // namespace JwtAuthn

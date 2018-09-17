@@ -122,9 +122,10 @@ UpstreamDrainManager& Config::drainManager() {
   return upstream_drain_manager_slot_->getTyped<UpstreamDrainManager>();
 }
 
-Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager)
+Filter::Filter(ConfigSharedPtr config, Upstream::ClusterManager& cluster_manager,
+               TimeSource& time_source)
     : config_(config), cluster_manager_(cluster_manager), downstream_callbacks_(*this),
-      upstream_callbacks_(new UpstreamCallbacks(this)) {
+      upstream_callbacks_(new UpstreamCallbacks(this)), request_info_(time_source) {
   ASSERT(config != nullptr);
 }
 

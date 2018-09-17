@@ -82,6 +82,9 @@ Version history
 * ratelimit: added :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in 
   case of rate limit service error.
 * route checker: Added v2 config support and removed support for v1 configs.
+* config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`  
+  stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented 
+  in case of schema/validation error.
 
 1.7.0
 ===============
