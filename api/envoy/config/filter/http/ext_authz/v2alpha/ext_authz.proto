@@ -53,11 +53,11 @@ message ExtAuthz {
 // If an error happens during the checking process, two situations may occur depending on the
 // filter's configuration:
 //
-//  1. When *failure_mode_allow* is true, traffic will be allowed at the presence of an error. This
+//  1. When *failure_mode_allow* is true, traffic will be allowed in the presence of an error. This
 //     includes any of the HTTP 5xx errors, or a communication failure between the filter and the
 //     authorization server.
 //  2. When *failure_mode_allow* is false, the filter will *always* return a *Forbidden response* to
-//     the client. It will *not allow* traffic to the upstream at the presence of an error. This
+//     the client. It will *not allow* traffic to the upstream in the presence of an error. This
 //     includes any of the HTTP 5xx errors, or a communication failure between the filter and the
 //     authorization server.
 //

@@ -82,7 +82,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        timeout_);
 }
 
-ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr& message) {
+ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr message) {
   // Set an error status if parsing status code fails. A Forbidden response is sent to the client
   // if the filter has not been configured with failure_mode_allow.
   uint64_t status_code{};
@@ -120,8 +120,8 @@ ResponsePtr RawHttpClientImpl::messageToResponse(Http::MessagePtr& message) {
   return response;
 }
 
-void RawHttpClientImpl::onSuccess(Http::MessagePtr&& response) {
-  callbacks_->onComplete(messageToResponse(response));
+void RawHttpClientImpl::onSuccess(Http::MessagePtr&& message) {
+  callbacks_->onComplete(messageToResponse(std::move(message)));
   callbacks_ = nullptr;
 }
 
