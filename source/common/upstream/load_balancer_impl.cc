@@ -55,6 +55,7 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
 void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
   per_priority_load_.resize(priority_set_.hostSetsPerPriority().size());
   per_priority_health_.resize(priority_set_.hostSetsPerPriority().size());
+  per_priority_panic_.resize(priority_set_.hostSetsPerPriority().size());
 
   // Determine the health of the newly modified priority level.
   // Health ranges from 0-100, and is the ratio of healthy hosts to total hosts, modified by the
@@ -67,8 +68,17 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
                                  host_set.healthyHosts().size() / host_set.hosts().size()));
   }
 
-  // Now that we've updated health for the changed priority level, we need to caculate percentage
+  // Now that we've updated health for the changed priority level, we need to calculate percentage
   // load for all priority levels.
+
+  // The following cases are handled here;
+  // - Total health is >= 100. It means there are enough healthy hosts to handle the load.
+  //   Do not enter panic mode, even if a specific priority has low number of healthy hosts.
+  // - Total health is < 100. There is not enough healthy hosts to handle the load. Continue
+  //   distibuting the load among priority sets, but turn on Panic mode if # of healthy hosts is
+  //   low.
+  // - Total health is 0. All hosts are down. Redirect 100% of traffic to P=0 and enable PanicMode.
+
   //
   // First, determine if the load needs to be scaled relative to health. For example if there are
   // 3 host sets with 20% / 20% / 10% health they will get 40% / 40% / 20% load to ensure total load
@@ -79,6 +89,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
     // Everything is terrible. Send all load to P=0.
     // In this one case sumEntries(per_priority_load_) != 100 since we sinkhole all traffic in P=0.
     per_priority_load_[0] = 100;
+    per_priority_panic_[0] = true;
     return;
   }
   size_t total_load = 100;
@@ -88,6 +99,11 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
     per_priority_load_[i] =
         std::min<uint32_t>(total_load, per_priority_health_[i] * 100 / total_health);
     total_load -= per_priority_load_[i];
+
+    // For each level check if it should run in Panic mode. Never set Panic mode if the total health
+    // is 100%, even when individual priority level has very low # of healthy hosts.
+    HostSet& priority_host_set = *priority_set_.hostSetsPerPriority()[i];
+    per_priority_panic_[i] = (total_health == 100 ? false : isGlobalPanic(priority_host_set));
   }
   if (total_load != 0) {
     // Account for rounding errors.
@@ -378,7 +394,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
   hosts_source.priority_ = host_set.priority();
 
   // If the selected host set has insufficient healthy hosts, return all hosts.
-  if (isGlobalPanic(host_set)) {
+  if (per_priority_panic_[hosts_source.priority_]) {
     stats_.lb_healthy_panic_.inc();
     hosts_source.source_type_ = HostsSource::SourceType::AllHosts;
     return hosts_source;

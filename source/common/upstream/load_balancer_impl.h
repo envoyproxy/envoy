@@ -62,6 +62,7 @@ protected:
   HostSet& chooseHostSet(LoadBalancerContext* context);
 
   uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_[priority]; }
+  bool isInPanic(uint32_t priority) const { return per_priority_panic_[priority]; }
 
   ClusterStats& stats_;
   Runtime::Loader& runtime_;
@@ -79,6 +80,8 @@ protected:
   std::vector<uint32_t> per_priority_load_;
   // The health (0-100) for each priority level.
   std::vector<uint32_t> per_priority_health_;
+  // Levels which are in panic
+  std::vector<bool> per_priority_panic_;
 };
 
 class LoadBalancerContextBase : public LoadBalancerContext {
