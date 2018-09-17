@@ -577,6 +577,7 @@ void ClusterImplBase::onPreInitComplete() {
   }
   initialization_started_ = true;
 
+  ENVOY_LOG(debug, "initializing secondary cluster {} completed", info()->name());
   init_manager_.initialize([this]() { onInitDone(); });
 }
 
