@@ -101,8 +101,11 @@ protected:
       const Http::TestHeaderMapImpl& request_headers, uint32_t request_body_size,
       const Http::TestHeaderMapImpl& response_headers, uint32_t response_body_size);
 
-  // Wait for the end of stream on the next upstream stream on fake_upstreams_
+  // Wait for the end of stream on the next upstream stream on any of the provided fake upstreams.
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
+  // In cases where the upstream that will receive the request is not deterministic, a second
+  // upstream index may be provided, in which case both upstreams will be checked for requests.
+  uint64_t waitForNextUpstreamRequest(const std::vector<uint64_t>& upstream_indices);
   void waitForNextUpstreamRequest(uint64_t upstream_index = 0);
 
   // Close |codec_client_| and |fake_upstream_connection_| cleanly.
@@ -167,6 +170,7 @@ protected:
   void testRetryHittingBufferLimit();
   void testGrpcRouterNotFound();
   void testGrpcRetry();
+  void testRetryHostPredicateFilter();
   void testHittingDecoderFilterLimit();
   void testHittingEncoderFilterLimit();
   void testEnvoyHandling100Continue(bool additional_continue_from_upstream = false,

@@ -169,6 +169,12 @@ public:
    * @return uint32_t a local OR of RETRY_ON values above.
    */
   virtual uint32_t retryOn() const PURE;
+
+  /**
+   * Initializes the RetryHostPredicates to be used with this retry attempt.
+   * @return list of RetryHostPredicates to use
+   */
+  virtual std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const PURE;
 };
 
 /**
@@ -204,6 +210,21 @@ public:
   virtual RetryStatus shouldRetry(const Http::HeaderMap* response_headers,
                                   const absl::optional<Http::StreamResetReason>& reset_reason,
                                   DoRetryCallback callback) PURE;
+
+  /**
+   * Called when a host was attempted but the request failed and is eligible for another retry.
+   * Should be used to update whatever internal state depends on previously attempted hosts.
+   * @param host the previously attempted host.
+   */
+  virtual void onHostAttempted(Upstream::HostDescriptionConstSharedPtr host) PURE;
+
+  /**
+   * Determine whether host selection should be reattempted. Applies to host selection during
+   * retries, and is used to provide configurable host selection for retries.
+   * @param host the host under consideration
+   * @return whether host selection should be reattempted
+   */
+  virtual bool shouldSelectAnotherHost(const Upstream::Host& host) PURE;
 };
 
 typedef std::unique_ptr<RetryState> RetryStatePtr;

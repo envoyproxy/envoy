@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/router/router.h"
+
 #include "extensions/filters/network/thrift_proxy/metadata.h"
 
 namespace Envoy {
@@ -22,6 +24,12 @@ public:
    * @return const std::string& the upstream cluster that owns the route.
    */
   virtual const std::string& clusterName() const PURE;
+
+  /**
+   * @return MetadataMatchCriteria* the metadata that a subset load balancer should match when
+   * selecting an upstream host
+   */
+  virtual const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const PURE;
 };
 
 /**

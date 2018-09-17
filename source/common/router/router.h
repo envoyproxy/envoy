@@ -147,7 +147,7 @@ class Filter : Logger::Loggable<Logger::Id::router>,
 public:
   Filter(FilterConfig& config)
       : config_(config), downstream_response_started_(false), downstream_end_stream_(false),
-        do_shadowing_(false) {}
+        do_shadowing_(false), is_retry_(false) {}
 
   ~Filter();
 
@@ -203,6 +203,17 @@ public:
     return callbacks_->connection();
   }
   const Http::HeaderMap* downstreamHeaders() const override { return downstream_headers_; }
+
+  bool shouldSelectAnotherHost(const Upstream::Host& host) override {
+    // We only care about host selection when performing a retry, at which point we consult the
+    // RetryState to see if we're configured to avoid certain hosts during retries.
+    if (!is_retry_) {
+      return false;
+    }
+
+    ASSERT(retry_state_);
+    return retry_state_->shouldSelectAnotherHost(host);
+  }
 
   /**
    * Set a computed cookie to be sent with the downstream headers.
@@ -377,6 +388,7 @@ private:
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
   bool do_shadowing_ : 1;
+  bool is_retry_ : 1;
 };
 
 class ProdFilter : public Filter {

@@ -652,6 +652,48 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponse) {
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
 }
 
+// Tests that the downstream request's sequence number is used for the response.
+TEST_F(ThriftConnectionManagerTest, RequestAndResponseSequenceIdHandling) {
+  initializeFilter();
+  writeComplexFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+
+  writeComplexFramedBinaryMessage(write_buffer_, MessageType::Reply, 0xFF);
+
+  FramedTransportImpl transport;
+  BinaryProtocolImpl proto;
+  callbacks->startUpstreamResponse(transport, proto);
+
+  Buffer::OwnedImpl response_buffer;
+  writeComplexFramedBinaryMessage(response_buffer, MessageType::Reply, 0x0F);
+
+  EXPECT_CALL(filter_callbacks_.connection_, write(_, false))
+      .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
+        EXPECT_EQ(response_buffer.toString(), buffer.toString());
+      }));
+  EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
+  EXPECT_EQ(true, callbacks->upstreamData(write_buffer_));
+
+  filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(1U, store_.counter("test.request").value());
+  EXPECT_EQ(1U, store_.counter("test.request_call").value());
+  EXPECT_EQ(0U, store_.gauge("test.request_active").value());
+  EXPECT_EQ(1U, store_.counter("test.response").value());
+  EXPECT_EQ(1U, store_.counter("test.response_reply").value());
+  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
+  EXPECT_EQ(1U, store_.counter("test.response_success").value());
+  EXPECT_EQ(0U, store_.counter("test.response_error").value());
+}
+
 TEST_F(ThriftConnectionManagerTest, RequestAndExceptionResponse) {
   initializeFilter();
   writeFramedBinaryMessage(buffer_, MessageType::Call, 0x0F);
@@ -911,6 +953,7 @@ TEST_F(ThriftConnectionManagerTest, DownstreamProtocolUpgrade) {
   EXPECT_CALL(*custom_transport_, decodeFrameStart(_, _)).WillOnce(Return(true));
   EXPECT_CALL(*custom_protocol_, readMessageBegin(_, _))
       .WillOnce(Invoke([&](Buffer::Instance&, MessageMetadata& metadata) -> bool {
+        metadata.setSequenceId(0);
         metadata.setMessageType(MessageType::Call);
         metadata.setProtocolUpgradeMessage(true);
         return true;
