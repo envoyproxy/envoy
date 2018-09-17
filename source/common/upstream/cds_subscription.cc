@@ -55,10 +55,11 @@ void CdsSubscription::onFetchComplete() {}
 
 void CdsSubscription::onFetchFailure(const EnvoyException* e) {
   callbacks_->onConfigUpdateFailed(e);
-  stats_.update_failure_.inc();
   if (e) {
+    stats_.update_rejected_.inc();
     ENVOY_LOG(warn, "cds: fetch failure: {}", e->what());
   } else {
+    stats_.update_failure_.inc();
     ENVOY_LOG(debug, "cds: fetch failure: network error");
   }
 }

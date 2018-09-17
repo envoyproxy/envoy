@@ -21,8 +21,9 @@ class ThreadLocalCache : public ThreadLocal::ThreadLocalObject {
 public:
   // Load the config from envoy config.
   ThreadLocalCache(
-      const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config) {
-    jwks_cache_ = JwksCache::create(config);
+      const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config,
+      TimeSource& time_source) {
+    jwks_cache_ = JwksCache::create(config, time_source);
   }
 
   // Get the JwksCache object.
@@ -61,10 +62,11 @@ public:
       const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
       : proto_config_(proto_config), stats_(generateStats(stats_prefix, context.scope())),
-        tls_(context.threadLocal().allocateSlot()), cm_(context.clusterManager()) {
+        tls_(context.threadLocal().allocateSlot()), cm_(context.clusterManager()),
+        time_source_(context.dispatcher().timeSystem()) {
     ENVOY_LOG(info, "Loaded JwtAuthConfig: {}", proto_config_.DebugString());
     tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-      return std::make_shared<ThreadLocalCache>(proto_config_);
+      return std::make_shared<ThreadLocalCache>(proto_config_, time_source_);
     });
     extractor_ = Extractor::create(proto_config_);
 
@@ -86,6 +88,7 @@ public:
   ThreadLocalCache& getCache() const { return tls_->getTyped<ThreadLocalCache>(); }
 
   Upstream::ClusterManager& cm() const { return cm_; }
+  TimeSource& timeSource() const { return time_source_; }
 
   // Get the token  extractor.
   const Extractor& getExtractor() const { return *extractor_; }
@@ -105,7 +108,7 @@ public:
                           const absl::optional<std::string>& provider,
                           bool allow_failed) const override {
     return Authenticator::create(check_audience, provider, allow_failed, getCache().getJwksCache(),
-                                 cm(), Common::JwksFetcher::create);
+                                 cm(), Common::JwksFetcher::create, timeSource());
   }
 
 private:
@@ -126,6 +129,7 @@ private:
   ExtractorConstPtr extractor_;
   // The list of rule matchers.
   std::vector<MatcherConstSharedPtr> rule_matchers_;
+  TimeSource& time_source_;
 };
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
 

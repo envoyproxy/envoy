@@ -71,6 +71,11 @@ MockHotRestart::MockHotRestart() {
 }
 MockHotRestart::~MockHotRestart() {}
 
+MockOverloadManager::MockOverloadManager() {
+  ON_CALL(*this, getThreadLocalOverloadState()).WillByDefault(ReturnRef(overload_state_));
+}
+MockOverloadManager::~MockOverloadManager() {}
+
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
   ON_CALL(*this, createListenSocket(_, _, _))
@@ -90,7 +95,6 @@ MockListenerManager::MockListenerManager() {}
 MockListenerManager::~MockListenerManager() {}
 
 MockWorkerFactory::MockWorkerFactory() {}
-
 MockWorkerFactory::~MockWorkerFactory() {}
 
 MockWorker::MockWorker() {
@@ -148,6 +152,8 @@ MockMain::MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill)
   ON_CALL(*this, wdMultiKillTimeout()).WillByDefault(Return(wd_multikill_));
 }
 
+MockMain::~MockMain() {}
+
 MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::ManagerImpl()) {
   ON_CALL(*this, accessLogManager()).WillByDefault(ReturnRef(access_log_manager_));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
@@ -164,6 +170,7 @@ MockFactoryContext::MockFactoryContext() : singleton_manager_(new Singleton::Man
   ON_CALL(*this, admin()).WillByDefault(ReturnRef(admin_));
   ON_CALL(*this, listenerScope()).WillByDefault(ReturnRef(listener_scope_));
   ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_source_));
+  ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
 }
 
 MockFactoryContext::~MockFactoryContext() {}

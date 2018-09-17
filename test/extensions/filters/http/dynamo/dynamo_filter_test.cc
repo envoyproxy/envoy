@@ -33,7 +33,8 @@ public:
         .WillByDefault(Return(enabled));
     EXPECT_CALL(loader_.snapshot_, featureEnabled("dynamodb.filter_enabled", 100));
 
-    filter_.reset(new DynamoFilter(loader_, stat_prefix_, stats_));
+    filter_.reset(new DynamoFilter(loader_, stat_prefix_, stats_,
+                                   decoder_callbacks_.dispatcher().timeSystem()));
 
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);

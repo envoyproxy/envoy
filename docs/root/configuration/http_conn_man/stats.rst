@@ -54,6 +54,7 @@ statistics:
    downstream_rq_ws_on_non_ws_route, Counter, Total WebSocket upgrade requests rejected by non WebSocket routes
    downstream_rq_time, Histogram, Request time milliseconds
    downstream_rq_idle_timeout, Counter, Total requests closed due to idle timeout
+   downstream_rq_overload_close, Counter, Total requests closed due to envoy overload
    rs_too_large, Counter, Total response errors due to buffering an overly large body
 
 Per user agent statistics

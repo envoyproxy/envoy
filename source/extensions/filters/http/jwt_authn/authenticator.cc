@@ -31,10 +31,10 @@ public:
   AuthenticatorImpl(const CheckAudience* check_audience,
                     const absl::optional<std::string>& provider, bool allow_failed,
                     JwksCache& jwks_cache, Upstream::ClusterManager& cluster_manager,
-                    CreateJwksFetcherCb create_jwks_fetcher_cb)
+                    CreateJwksFetcherCb create_jwks_fetcher_cb, TimeSource& time_source)
       : jwks_cache_(jwks_cache), cm_(cluster_manager),
         create_jwks_fetcher_cb_(create_jwks_fetcher_cb), check_audience_(check_audience),
-        provider_(provider), is_allow_failed_(allow_failed) {}
+        provider_(provider), is_allow_failed_(allow_failed), time_source_(time_source) {}
 
   // Following functions are for JwksFetcher::JwksReceiver interface
   void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override;
@@ -43,6 +43,8 @@ public:
   void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
               AuthenticatorCallback callback) override;
   void onDestroy() override;
+
+  TimeSource& timeSource() { return time_source_; }
 
 private:
   // Verify with a specific public key.
@@ -83,6 +85,7 @@ private:
   // specific provider or not when it is allow missing or failed.
   const absl::optional<std::string> provider_;
   const bool is_allow_failed_;
+  TimeSource& time_source_;
 };
 
 void AuthenticatorImpl::verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
@@ -124,9 +127,9 @@ void AuthenticatorImpl::startVerify() {
   // the abseil time functionality instead or use the jwt_verify_lib to check
   // the validity of a JWT.
   // Check "exp" claim.
-  const auto unix_timestamp = std::chrono::duration_cast<std::chrono::seconds>(
-                                  std::chrono::system_clock::now().time_since_epoch())
-                                  .count();
+  const auto unix_timestamp =
+      std::chrono::duration_cast<std::chrono::seconds>(timeSource().systemTime().time_since_epoch())
+          .count();
   // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
   // to 0.
   if (jwt_->nbf_ > unix_timestamp) {
@@ -244,9 +247,10 @@ AuthenticatorPtr Authenticator::create(const CheckAudience* check_audience,
                                        const absl::optional<std::string>& provider,
                                        bool allow_failed, JwksCache& jwks_cache,
                                        Upstream::ClusterManager& cluster_manager,
-                                       CreateJwksFetcherCb create_jwks_fetcher_cb) {
+                                       CreateJwksFetcherCb create_jwks_fetcher_cb,
+                                       TimeSource& time_source) {
   return std::make_unique<AuthenticatorImpl>(check_audience, provider, allow_failed, jwks_cache,
-                                             cluster_manager, create_jwks_fetcher_cb);
+                                             cluster_manager, create_jwks_fetcher_cb, time_source);
 }
 
 } // namespace JwtAuthn
