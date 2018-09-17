@@ -116,6 +116,7 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       for (auto iter = secondary_init_clusters_.begin(); iter != secondary_init_clusters_.end();) {
         Cluster* cluster = *iter;
         ++iter;
+        ENVOY_LOG(debug, "initializing secondary cluster {}", cluster->info()->name());
         cluster->initialize([cluster, this] { onClusterInit(*cluster); });
       }
     }
