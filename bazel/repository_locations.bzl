@@ -52,9 +52,9 @@ REPOSITORY_LOCATIONS = dict(
         remote = "https://github.com/google/libprotobuf-mutator",
     ),
     com_github_grpc_grpc = dict(
-        sha256 = "c747e4d903f7dcf803be53abed4e4efc5d3e96f6c274ed1dfca7a03fa6f4e36b",
-        strip_prefix = "grpc-1.14.2",
-        urls = ["https://github.com/grpc/grpc/archive/v1.14.2.tar.gz"],
+        sha256 = "013cc34f3c51c0f87e059a12ea203087a7a15dca2e453295345e1d02e2b9634b",
+        strip_prefix = "grpc-1.15.0",
+        urls = ["https://github.com/grpc/grpc/archive/v1.15.0.tar.gz"],
     ),
     com_github_nanopb_nanopb = dict(
         # From: https://github.com/grpc/grpc/blob/v1.14.0/bazel/grpc_deps.bzl#L123

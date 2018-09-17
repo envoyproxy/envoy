@@ -44,6 +44,11 @@ message GrpcService {
       DataSource cert_chain = 3;
     }
 
+    // Local channel credentials. Only UDS is supported for now.
+    // See https://github.com/grpc/grpc/pull/15909.
+    message GoogleLocalCredentials {
+    }
+
     // See https://grpc.io/docs/guides/auth.html#credential-types to understand Channel and Call
     // credential types.
     message ChannelCredentials {
@@ -53,6 +58,8 @@ message GrpcService {
 
         // https://grpc.io/grpc/cpp/namespacegrpc.html#a6beb3ac70ff94bd2ebbd89b8f21d1f61
         google.protobuf.Empty google_default = 2;
+
+        GoogleLocalCredentials local_credentials = 3;
       }
     }
 

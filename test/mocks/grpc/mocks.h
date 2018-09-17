@@ -22,6 +22,9 @@ public:
 
 class MockAsyncStream : public AsyncStream {
 public:
+  MockAsyncStream();
+  ~MockAsyncStream();
+
   MOCK_METHOD2_T(sendMessage, void(const Protobuf::Message& request, bool end_stream));
   MOCK_METHOD0_T(closeStream, void());
   MOCK_METHOD0_T(resetStream, void());
