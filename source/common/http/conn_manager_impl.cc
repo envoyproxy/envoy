@@ -744,7 +744,6 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
 
 void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilter* filter,
                                                         HeaderMap& headers, bool end_stream) {
-  std::cout << "DECODING HEADERS\n";
   std::list<ActiveStreamDecoderFilterPtr>::iterator entry;
   std::list<ActiveStreamDecoderFilterPtr>::iterator continue_data_entry = decoder_filters_.end();
   if (!filter) {
@@ -784,16 +783,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     (*continue_data_entry)->continueDecoding();
   }
   maybeDisarmRequestTimer();
-}
-
-void ConnectionManagerImpl::ActiveStream::maybeDisarmRequestTimer() {
-  std::cout << "MAYBEING AROUND" << "\n";
-  if (request_info_.lastUpstreamTxByteSent().has_value()) {
-    std::cout << "HAS VALUE" << "\n";
-    if (request_timer_) {
-      request_timer_->disableTimer();
-    }
-  }
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -868,6 +857,7 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   if (trailers_added_entry != decoder_filters_.end()) {
     decodeTrailers(trailers_added_entry->get(), *request_trailers_);
   }
+  maybeDisarmRequestTimer();
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStream::addDecodedTrailers() {
@@ -939,6 +929,7 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
       return;
     }
   }
+  maybeDisarmRequestTimer();
 }
 
 void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
@@ -947,6 +938,18 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
   if (end_stream) {
     request_info_.onLastDownstreamRxByteReceived();
     ENVOY_STREAM_LOG(debug, "request end stream", *this);
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::disarmRequestTimer() {
+  if (request_timer_) {
+    request_timer_->disableTimer();
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::maybeDisarmRequestTimer() {
+  if (request_info_.lastUpstreamTxByteSent().has_value()) {
+    disarmRequestTimer();
   }
 }
 
@@ -1006,8 +1009,7 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
     ActiveStreamEncoderFilter* filter, HeaderMap& headers) {
   resetIdleTimer();
-  std::cout << "ENCODING SOME 100 HEADERS" << "\n";
-  if (request_timer_) request_timer_->disableTimer();
+  disarmRequestTimer();
 
   ASSERT(connection_manager_.config_.proxy100Continue());
   // Make sure commonContinue continues encode100ContinueHeaders.
@@ -1046,7 +1048,7 @@ void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
 void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilter* filter,
                                                         HeaderMap& headers, bool end_stream) {
   resetIdleTimer();
-  if (request_timer_) request_timer_->disableTimer();
+  disarmRequestTimer();
 
   std::list<ActiveStreamEncoderFilterPtr>::iterator entry = commonEncodePrefix(filter, end_stream);
   std::list<ActiveStreamEncoderFilterPtr>::iterator continue_data_entry = encoder_filters_.end();

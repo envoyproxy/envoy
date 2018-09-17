@@ -1377,7 +1377,6 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterUpstreamHeaders) 
 
   EXPECT_EQ(1U, stats_.named_.downstream_rq_idle_timeout_.value());
 }
-
 // Validate the per-stream idle timeout after a sequence of header/data events.
 TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
   setup(false, "");
@@ -1536,7 +1535,6 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnEncodeHeaders) {
     decoder->decodeHeaders(std::move(headers), false);
 
     EXPECT_CALL(*request_timer, disableTimer());
-
     EXPECT_CALL(response_encoder_, encodeHeaders(_, false));
     HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
     filter->callbacks_->encodeHeaders(std::move(response_headers), false);
@@ -1569,7 +1567,6 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnEncode100) {
     decoder->decodeHeaders(std::move(headers), false);
 
     EXPECT_CALL(*request_timer, disableTimer());
-
     EXPECT_CALL(response_encoder_, encode100ContinueHeaders(_));
     HeaderMapPtr continue_headers{new TestHeaderMapImpl{{":status", "100"}}};
     filter->callbacks_->encode100ContinueHeaders(std::move(continue_headers));
@@ -1580,13 +1577,6 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnEncode100) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
 }
-
-// TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteHeaders) { }
-// TEST_F(HttpConnectionManagerImplTest, StreamRequestTimeoutAfterTrailers) { }
-// TEST_F(HttpConnectionManagerImplTest, StreamRequestTimeoutWithEncode) { }
-// TEST_F(HttpConnectionManagerImplTest, StreamRequestTimeoutWithEncode100) { }
-// TEST_F(HttpConnectionManagerImplTest, StreamRequestTimeoutBodilessPost) { }
-// TEST_F(HttpConnectionManagerImplTest, StreamRequestTimeoutIncompleteHead) { }
 
 TEST_F(HttpConnectionManagerImplTest, RejectWebSocketOnNonWebSocketRoute) {
   setup(false, "");
