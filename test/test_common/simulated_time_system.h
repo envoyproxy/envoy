@@ -50,7 +50,7 @@ public:
     mutex_.lock();
     setMonotonicTimeAndUnlock(monotonic_time);
   }
-  template<class Duration> void setMonotonicTime(const Duration& duration) {
+  template <class Duration> void setMonotonicTime(const Duration& duration) {
     setMonotonicTime(MonotonicTime(duration));
   }
 
@@ -62,7 +62,7 @@ public:
    * @param system_time The desired new system time.
    */
   void setSystemTime(const SystemTime& system_time);
-  template<class Duration> void setSystemTime(const Duration& duration) {
+  template <class Duration> void setSystemTime(const Duration& duration) {
     setSystemTime(SystemTime(duration));
   }
 
