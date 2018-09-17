@@ -426,7 +426,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesProtocolError) {
 
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
-        EXPECT_EQ(bufferToString(write_buffer_), bufferToString(buffer));
+        EXPECT_EQ(write_buffer_.toString(), buffer.toString());
       }));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(filter_callbacks_.connection_.dispatcher_, deferredDelete_(_)).Times(1);
@@ -488,7 +488,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataHandlesTransportApplicationException) 
 
   EXPECT_CALL(filter_callbacks_.connection_, write(_, false))
       .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> void {
-        EXPECT_EQ(bufferToString(write_buffer_), bufferToString(buffer));
+        EXPECT_EQ(write_buffer_.toString(), buffer.toString());
       }));
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
 

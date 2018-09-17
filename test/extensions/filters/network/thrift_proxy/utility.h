@@ -51,15 +51,6 @@ inline void addSeq(Buffer::Instance& buffer, const std::initializer_list<uint8_t
 
 inline void addString(Buffer::Instance& buffer, const std::string& s) { buffer.add(s); }
 
-inline std::string bufferToString(Buffer::Instance& buffer) {
-  if (buffer.length() == 0) {
-    return "";
-  }
-
-  char* data = static_cast<char*>(buffer.linearize(buffer.length()));
-  return std::string(data, buffer.length());
-}
-
 inline std::string fieldTypeToString(const FieldType& field_type) {
   switch (field_type) {
   case FieldType::Stop:
