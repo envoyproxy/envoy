@@ -1530,7 +1530,8 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
   setup(SCRIPT);
 
   Http::TestHeaderMapImpl request_headers{{":path", "/"}};
-  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2);
+  DangerousDeprecatedTestTime test_time;
+  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2, test_time.timeSystem());
   EXPECT_EQ(0, request_info.dynamicMetadata().filter_metadata_size());
   EXPECT_CALL(decoder_callbacks_, requestInfo()).WillOnce(ReturnRef(request_info));
   EXPECT_CALL(*filter_, scriptLog(spdlog::level::trace, StrEq("bar")));

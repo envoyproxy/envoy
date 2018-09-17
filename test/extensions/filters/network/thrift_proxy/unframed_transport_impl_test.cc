@@ -27,7 +27,7 @@ TEST(UnframedTransportTest, DecodeFrameStart) {
   UnframedTransportImpl transport;
 
   Buffer::OwnedImpl buffer;
-  addInt32(buffer, 0xDEADBEEF);
+  buffer.writeBEInt<uint32_t>(0xDEADBEEF);
   EXPECT_EQ(buffer.length(), 4);
 
   MessageMetadata metadata;

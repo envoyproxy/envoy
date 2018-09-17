@@ -111,8 +111,8 @@ public:
     filter_callbacks_.connection_.remote_address_ =
         std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
     conn_manager_.reset(new ConnectionManagerImpl(*this, drain_close_, random_, tracer_, runtime_,
-                                                  local_info_, cluster_manager_,
-                                                  &overload_manager_));
+                                                  local_info_, cluster_manager_, &overload_manager_,
+                                                  test_time_.timeSystem()));
     conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 
     if (tracing) {
@@ -217,7 +217,7 @@ public:
               envoy::config::filter::network::tcp_proxy::v2::TcpProxy(), factory_context_));
           auto ret = std::make_unique<Http::WebSocket::WsHandlerImpl>(
               request_headers, request_info, route_entry, callbacks, cluster_manager,
-              read_callbacks, config);
+              read_callbacks, config, test_time_.timeSystem());
           return ret;
         }));
   }

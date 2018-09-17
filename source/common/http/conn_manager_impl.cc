@@ -59,16 +59,18 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
                                              Tracing::HttpTracer& tracer, Runtime::Loader& runtime,
                                              const LocalInfo::LocalInfo& local_info,
                                              Upstream::ClusterManager& cluster_manager,
-                                             Server::OverloadManager* overload_manager)
+                                             Server::OverloadManager* overload_manager,
+                                             Event::TimeSystem& time_system)
     : config_(config), stats_(config_.stats()),
-      conn_length_(new Stats::Timespan(stats_.named_.downstream_cx_length_ms_)),
+      conn_length_(new Stats::Timespan(stats_.named_.downstream_cx_length_ms_, time_system)),
       drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
       overload_stop_accepting_requests_(
           overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
                                  Server::OverloadActionNames::get().StopAcceptingRequests)
-                           : Server::OverloadManager::getInactiveState()) {}
+                           : Server::OverloadManager::getInactiveState()),
+      time_system_(time_system) {}
 
 const HeaderMapImpl& ConnectionManagerImpl::continueHeader() {
   CONSTRUCT_ON_FIRST_USE(HeaderMapImpl,
@@ -360,8 +362,9 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     : connection_manager_(connection_manager),
       snapped_route_config_(connection_manager.config_.routeConfigProvider().config()),
       stream_id_(connection_manager.random_generator_.random()),
-      request_timer_(new Stats::Timespan(connection_manager_.stats_.named_.downstream_rq_time_)),
-      request_info_(connection_manager_.codec_->protocol()) {
+      request_timer_(new Stats::Timespan(connection_manager_.stats_.named_.downstream_rq_time_,
+                                         connection_manager_.timeSystem())),
+      request_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSystem()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
   connection_manager_.stats_.named_.downstream_rq_active_.inc();
   if (connection_manager_.codec_->protocol() == Protocol::Http2) {

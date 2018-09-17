@@ -267,7 +267,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route)),
-      per_filter_configs_(route.per_filter_config(), factory_context) {
+      per_filter_configs_(route.per_filter_config(), factory_context),
+      time_system_(factory_context.dispatcher().timeSystem()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -352,9 +353,9 @@ Http::WebSocketProxyPtr RouteEntryImplBase::createWebSocketProxy(
     Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
     Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
     Network::ReadFilterCallbacks* read_callbacks) const {
-  return std::make_unique<Http::WebSocket::WsHandlerImpl>(request_headers, request_info, *this,
-                                                          callbacks, cluster_manager,
-                                                          read_callbacks, websocket_config_);
+  return std::make_unique<Http::WebSocket::WsHandlerImpl>(
+      request_headers, request_info, *this, callbacks, cluster_manager, read_callbacks,
+      websocket_config_, time_system_);
 }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,

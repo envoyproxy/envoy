@@ -24,8 +24,10 @@ namespace Dynamo {
  */
 class DynamoFilter : public Http::StreamFilter {
 public:
-  DynamoFilter(Runtime::Loader& runtime, const std::string& stat_prefix, Stats::Scope& scope)
-      : runtime_(runtime), stat_prefix_(stat_prefix + "dynamodb."), scope_(scope) {
+  DynamoFilter(Runtime::Loader& runtime, const std::string& stat_prefix, Stats::Scope& scope,
+               Event::TimeSystem& time_system)
+      : runtime_(runtime), stat_prefix_(stat_prefix + "dynamodb."), scope_(scope),
+        time_system_(time_system) {
     enabled_ = runtime_.snapshot().featureEnabled("dynamodb.filter_enabled", 100);
   }
 
@@ -74,6 +76,7 @@ private:
   Http::HeaderMap* response_headers_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
+  Event::TimeSystem& time_system_;
 };
 
 } // namespace Dynamo

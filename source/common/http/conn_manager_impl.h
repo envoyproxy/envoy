@@ -51,7 +51,7 @@ public:
                         Runtime::RandomGenerator& random_generator, Tracing::HttpTracer& tracer,
                         Runtime::Loader& runtime, const LocalInfo::LocalInfo& local_info,
                         Upstream::ClusterManager& cluster_manager,
-                        Server::OverloadManager* overload_manager);
+                        Server::OverloadManager* overload_manager, Event::TimeSystem& time_system);
   ~ConnectionManagerImpl();
 
   static ConnectionManagerStats generateStats(const std::string& prefix, Stats::Scope& scope);
@@ -83,6 +83,8 @@ public:
   void onBelowWriteBufferLowWatermark() override {
     codec_->onUnderlyingConnectionBelowWriteBufferLowWatermark();
   }
+
+  Event::TimeSystem& timeSystem() { return time_system_; }
 
 private:
   struct ActiveStream;
@@ -459,6 +461,7 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
   const Server::OverloadActionState& overload_stop_accepting_requests_;
+  Event::TimeSystem& time_system_;
 };
 
 } // namespace Http

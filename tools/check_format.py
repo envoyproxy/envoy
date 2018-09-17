@@ -167,7 +167,8 @@ def checkSourceLine(line, file_path, reportError):
     # legitimately show up in comments, for example this one.
     reportError("Don't use <shared_mutex>, use absl::Mutex for reader/writer locks.")
   if not whitelistedForRealTime(file_path):
-    if 'RealTimeSource' in line or 'RealTimeSystem' in line:
+    if 'RealTimeSource' in line or 'RealTimeSystem' in line or \
+       'std::chrono::system_clock::now' in line or 'std::chrono::steady_clock::now' in line:
       reportError("Don't reference real-world time sources from production code; use injection")
   if 'std::atomic_' in line:
     # The std::atomic_* free functions are functionally equivalent to calling

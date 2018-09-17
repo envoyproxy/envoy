@@ -30,7 +30,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
   // Don't let the filter chain continue as we are going to invoke check call.
   filter_return_ = FilterReturn::StopDecoding;
   initiating_call_ = true;
-  ENVOY_STREAM_LOG(trace, "Ext_authz filter calling authorization server", *callbacks_);
+  ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *callbacks_);
   client_->check(*this, check_request_, callbacks_->activeSpan());
   initiating_call_ = false;
 }
@@ -94,15 +94,15 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     break;
   }
 
-  ENVOY_STREAM_LOG(trace, "Ext_authz received status code {}", *callbacks_,
+  ENVOY_STREAM_LOG(trace, "ext_authz received status code {}", *callbacks_,
                    enumToInt(response->status_code));
 
   // We fail open/fail close based of filter config
   // if there is an error contacting the service.
   if (response->status == CheckStatus::Denied ||
       (response->status == CheckStatus::Error && !config_->failureModeAllow())) {
-    ENVOY_STREAM_LOG(debug, "Ext_authz rejected the request", *callbacks_);
-    ENVOY_STREAM_LOG(trace, "Ext_authz downstream header(s):", *callbacks_);
+    ENVOY_STREAM_LOG(debug, "ext_authz rejected the request", *callbacks_);
+    ENVOY_STREAM_LOG(trace, "ext_authz downstream header(s):", *callbacks_);
     callbacks_->sendLocalReply(response->status_code, response->body,
                                [& headers = response->headers_to_add, &callbacks = *callbacks_](
                                    Http::HeaderMap& response_headers) -> void {
@@ -116,7 +116,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     callbacks_->requestInfo().setResponseFlag(
         RequestInfo::ResponseFlag::UnauthorizedExternalService);
   } else {
-    ENVOY_STREAM_LOG(debug, "Ext_authz accepted the request", *callbacks_);
+    ENVOY_STREAM_LOG(debug, "ext_authz accepted the request", *callbacks_);
     // Let the filter chain continue.
     filter_return_ = FilterReturn::ContinueDecoding;
     if (config_->failureModeAllow() && response->status == CheckStatus::Error) {
@@ -125,7 +125,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     }
     // Only send headers if the response is ok.
     if (response->status == CheckStatus::OK) {
-      ENVOY_STREAM_LOG(trace, "Ext_authz upstream header(s):", *callbacks_);
+      ENVOY_STREAM_LOG(trace, "ext_authz upstream header(s):", *callbacks_);
       for (const auto& header : response->headers_to_add) {
         Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
         if (header_to_modify) {

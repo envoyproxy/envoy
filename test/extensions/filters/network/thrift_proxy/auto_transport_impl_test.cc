@@ -47,8 +47,8 @@ TEST(AutoTransportTest, UnknownTransport) {
   // Looks like unframed, but fails protocol check.
   {
     Buffer::OwnedImpl buffer;
-    addInt32(buffer, 0);
-    addInt32(buffer, 0);
+    buffer.writeBEInt<int32_t>(0);
+    buffer.writeBEInt<int32_t>(0);
 
     MessageMetadata metadata;
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
@@ -59,8 +59,8 @@ TEST(AutoTransportTest, UnknownTransport) {
   // Looks like framed, but fails protocol check.
   {
     Buffer::OwnedImpl buffer;
-    addInt32(buffer, 0xFF);
-    addInt32(buffer, 0);
+    buffer.writeBEInt<int32_t>(0xFF);
+    buffer.writeBEInt<int32_t>(0);
 
     MessageMetadata metadata;
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
@@ -74,9 +74,9 @@ TEST(AutoTransportTest, DecodeFrameStart) {
   {
     AutoTransportImpl transport;
     Buffer::OwnedImpl buffer;
-    addInt32(buffer, 0xFF);
-    addInt16(buffer, 0x8001);
-    addInt16(buffer, 0);
+    buffer.writeBEInt<int32_t>(0xFF);
+    buffer.writeBEInt<int16_t>(0x8001);
+    buffer.writeBEInt<int16_t>(0);
 
     MessageMetadata metadata;
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
@@ -90,9 +90,9 @@ TEST(AutoTransportTest, DecodeFrameStart) {
   {
     AutoTransportImpl transport;
     Buffer::OwnedImpl buffer;
-    addInt32(buffer, 0xFFF);
-    addInt16(buffer, 0x8201);
-    addInt16(buffer, 0);
+    buffer.writeBEInt<int32_t>(0xFFF);
+    buffer.writeBEInt<int16_t>(0x8201);
+    buffer.writeBEInt<int16_t>(0);
 
     MessageMetadata metadata;
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
@@ -106,7 +106,7 @@ TEST(AutoTransportTest, DecodeFrameStart) {
   {
     AutoTransportImpl transport;
     Buffer::OwnedImpl buffer;
-    addInt16(buffer, 0x8001);
+    buffer.writeBEInt<int16_t>(0x8001);
     addRepeated(buffer, 6, 0);
 
     MessageMetadata metadata;
@@ -121,7 +121,7 @@ TEST(AutoTransportTest, DecodeFrameStart) {
   {
     AutoTransportImpl transport;
     Buffer::OwnedImpl buffer;
-    addInt16(buffer, 0x8201);
+    buffer.writeBEInt<int16_t>(0x8201);
     addRepeated(buffer, 6, 0);
 
     MessageMetadata metadata;
@@ -136,13 +136,13 @@ TEST(AutoTransportTest, DecodeFrameStart) {
   {
     AutoTransportImpl transport;
     Buffer::OwnedImpl buffer;
-    addInt32(buffer, 0xFF);
-    addInt16(buffer, 0x0FFF); // header magic
-    addInt16(buffer, 0x0000);
-    addInt32(buffer, 0xEE); // sequence id
-    addInt16(buffer, 1);
-    addInt32(buffer, 0); // protocol (binary), 0 transforms + padding
-    addInt16(buffer, 0x8001);
+    buffer.writeBEInt<int32_t>(0xFF);
+    buffer.writeBEInt<int16_t>(0x0FFF); // header magic
+    buffer.writeBEInt<int16_t>(0x0000);
+    buffer.writeBEInt<int32_t>(0xEE); // sequence id
+    buffer.writeBEInt<int16_t>(1);
+    buffer.writeBEInt<int32_t>(0); // protocol (binary), 0 transforms + padding
+    buffer.writeBEInt<int16_t>(0x8001);
 
     MessageMetadata metadata;
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
@@ -158,13 +158,13 @@ TEST(AutoTransportTest, DecodeFrameStart) {
   {
     AutoTransportImpl transport;
     Buffer::OwnedImpl buffer;
-    addInt32(buffer, 0xFF);
-    addInt16(buffer, 0x0FFF); // header magic
-    addInt16(buffer, 0x0000);
-    addInt32(buffer, 0xEE); // sequence id
-    addInt16(buffer, 1);
-    addInt32(buffer, 0x02000000); // protocol (binary), 0 transforms + padding
-    addInt16(buffer, 0x8201);
+    buffer.writeBEInt<int32_t>(0xFF);
+    buffer.writeBEInt<int16_t>(0x0FFF); // header magic
+    buffer.writeBEInt<int16_t>(0x0000);
+    buffer.writeBEInt<int32_t>(0xEE); // sequence id
+    buffer.writeBEInt<int16_t>(1);
+    buffer.writeBEInt<int32_t>(0x02000000); // protocol (binary), 0 transforms + padding
+    buffer.writeBEInt<int16_t>(0x8201);
 
     MessageMetadata metadata;
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
@@ -180,9 +180,9 @@ TEST(AutoTransportTest, DecodeFrameStart) {
 TEST(AutoTransportTest, DecodeFrameEnd) {
   AutoTransportImpl transport;
   Buffer::OwnedImpl buffer;
-  addInt32(buffer, 0xFF);
-  addInt16(buffer, 0x8001);
-  addInt16(buffer, 0);
+  buffer.writeBEInt<int32_t>(0xFF);
+  buffer.writeBEInt<int16_t>(0x8001);
+  buffer.writeBEInt<int16_t>(0);
 
   MessageMetadata metadata;
   EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));

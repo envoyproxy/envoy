@@ -251,6 +251,8 @@ protected:
     MessageUtil::loadFromYaml(yaml_string, metadata);
     return metadata;
   }
+
+  DangerousDeprecatedTestTime test_time_;
 };
 
 // Return the current request protocol.
@@ -287,7 +289,7 @@ TEST_F(LuaRequestInfoWrapperTest, SetGetAndIterateDynamicMetadata) {
   InSequence s;
   setup(SCRIPT);
 
-  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2);
+  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2, test_time_.timeSystem());
   EXPECT_EQ(0, request_info.dynamicMetadata().filter_metadata_size());
   Filters::Common::Lua::LuaDeathRef<RequestInfoWrapper> wrapper(
       RequestInfoWrapper::create(coroutine_->luaState(), request_info), true);
@@ -323,7 +325,7 @@ TEST_F(LuaRequestInfoWrapperTest, ModifyDuringIterationForDynamicMetadata) {
   InSequence s;
   setup(SCRIPT);
 
-  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2);
+  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2, test_time_.timeSystem());
   Filters::Common::Lua::LuaDeathRef<RequestInfoWrapper> wrapper(
       RequestInfoWrapper::create(coroutine_->luaState(), request_info), true);
   EXPECT_THROW_WITH_MESSAGE(
@@ -357,7 +359,7 @@ TEST_F(LuaRequestInfoWrapperTest, ModifyAfterIterationForDynamicMetadata) {
   InSequence s;
   setup(SCRIPT);
 
-  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2);
+  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2, test_time_.timeSystem());
   EXPECT_EQ(0, request_info.dynamicMetadata().filter_metadata_size());
   Filters::Common::Lua::LuaDeathRef<RequestInfoWrapper> wrapper(
       RequestInfoWrapper::create(coroutine_->luaState(), request_info), true);
@@ -384,7 +386,7 @@ TEST_F(LuaRequestInfoWrapperTest, DontFinishIterationForDynamicMetadata) {
   InSequence s;
   setup(SCRIPT);
 
-  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2);
+  RequestInfo::RequestInfoImpl request_info(Http::Protocol::Http2, test_time_.timeSystem());
   Filters::Common::Lua::LuaDeathRef<RequestInfoWrapper> wrapper(
       RequestInfoWrapper::create(coroutine_->luaState(), request_info), true);
   EXPECT_THROW_WITH_MESSAGE(
