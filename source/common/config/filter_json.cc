@@ -378,7 +378,6 @@ void FilterJson::translateTcpProxy(
   json_config.validateSchema(Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA);
 
   JSON_UTIL_SET_STRING(json_config, proto_config, stat_prefix);
-  JSON_UTIL_SET_STRING(json_config, proto_config, cluster);
   translateRepeatedAccessLog(json_config.getObjectArray("access_log", true),
                              *proto_config.mutable_access_log());
 }

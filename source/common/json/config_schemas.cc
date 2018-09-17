@@ -473,10 +473,9 @@ const std::string Json::Schema::TCP_PROXY_NETWORK_FILTER_SCHEMA(R"EOF(
       "type" : "object",
       "properties": {
         "stat_prefix": {"type" : "string"},
-        "cluster": {"type" : "string"},
         "access_log" : { "type": "array" }
       },
-      "required": ["cluster", "stat_prefix"],
+      "required": ["stat_prefix"],
       "additionalProperties": false
   }
   )EOF");
