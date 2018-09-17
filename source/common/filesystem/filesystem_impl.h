@@ -120,7 +120,7 @@ private:
                                           // not get interleaved by multiple processes writing to
                                           // the same file during hot-restart.
   Thread::MutexBasicLockable flush_lock_; // This lock is used to prevent simulataneous flushes from
-                                          // the flush thread and a syncronous flush. This protects
+                                          // the flush thread and a synchronous flush. This protects
                                           // concurrent access to the about_to_write_buffer_, fd_,
                                           // and all other data used during flushing and file
                                           // re-opening.

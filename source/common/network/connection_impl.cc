@@ -280,7 +280,7 @@ void ConnectionImpl::readDisable(bool disable) {
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
   // back pressure at the kernel layer, but still get timely notification of a FIN. Note that
-  // we are not gaurenteed to get notified, so even if the remote has closed, we may not know
+  // we are not guaranteed to get notified, so even if the remote has closed, we may not know
   // until we try to write. Further note that currently we optionally don't correctly handle half
   // closed TCP connections in the sense that we assume that a remote FIN means the remote intends a
   // full close.
@@ -293,7 +293,7 @@ void ConnectionImpl::readDisable(bool disable) {
     read_enabled_ = false;
 
     // If half-close semantics are enabled, we never want early close notifications; we
-    // always want to read all avaiable data, even if the other side has closed.
+    // always want to read all available data, even if the other side has closed.
     if (detect_early_close_ && !enable_half_close_) {
       file_event_->setEnabled(Event::FileReadyType::Write | Event::FileReadyType::Closed);
     } else {

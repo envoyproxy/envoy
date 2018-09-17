@@ -36,7 +36,7 @@ private:
   /**
    * General parse command utility. Will parse token from start position. Token is expected to end
    * with ')'. An optional ":max_length" may be specified after the closing ')' char. Token may
-   * contain multiple values separated by "seperator" string. First value will be populated in
+   * contain multiple values separated by "separator" string. First value will be populated in
    * "main" and any additional sub values will be set in the vector "subitems". For example token
    * of: "com.test.my_filter:test_object:inner_key):100" with separator of ":" will set the
    * following:
@@ -46,7 +46,7 @@ private:
    *
    * @param token the token to parse
    * @param start the index to start parsing from
-   * @param seperator seperator between values
+   * @param separator separator between values
    * @param main the first value
    * @param sub_items any additional values
    * @param max_length optional max_length will be populated if specified

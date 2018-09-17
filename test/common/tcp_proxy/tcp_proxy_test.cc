@@ -242,7 +242,7 @@ TEST(ConfigTest, Routes) {
   }
 
   {
-    // hit the route with all criterias present
+    // hit the route with all criteria present
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.0", 10000);
     connection.remote_address_ =
