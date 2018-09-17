@@ -20,6 +20,11 @@ public:
             route->mutable_idle_timeout()->set_seconds(0);
             route->mutable_idle_timeout()->set_nanos(TimeoutMs * 1000 * 1000);
           }
+          if (enable_request_timeout_) {
+            hcm.mutable_stream_request_timeout()->set_seconds(0);
+            hcm.mutable_stream_request_timeout()->set_nanos(TimeoutMs * 1000 * 1000);
+          }
+
           // For validating encode100ContinueHeaders() timer kick.
           hcm.set_proxy_100_continue(true);
         });
@@ -49,14 +54,18 @@ public:
 
   void sleep() { std::this_thread::sleep_for(std::chrono::milliseconds(TimeoutMs / 2)); }
 
-  void waitForTimeout(IntegrationStreamDecoder& response) {
+  void waitForTimeout(IntegrationStreamDecoder& response,
+                      absl::string_view stat_name = "",
+                      absl::string_view stat_prefix = "http.config_test") {
     if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
       codec_client_->waitForDisconnect();
     } else {
       response.waitForReset();
       codec_client_->close();
     }
-    EXPECT_EQ(1, test_server_->counter("http.config_test.downstream_rq_idle_timeout")->value());
+    if (!stat_name.empty()) {
+      EXPECT_EQ(1, test_server_->counter(fmt::format("{}.{}", stat_prefix, stat_name))->value());
+    }
   }
 
   // TODO(htuch): This might require scaling for TSAN/ASAN/Valgrind/etc. Bump if
@@ -64,6 +73,7 @@ public:
   static constexpr uint64_t TimeoutMs = 200;
   bool enable_global_idle_timeout_{};
   bool enable_per_stream_idle_timeout_{true};
+  bool enable_request_timeout_{};
 };
 
 INSTANTIATE_TEST_CASE_P(Protocols, IdleTimeoutIntegrationTest,
@@ -74,7 +84,7 @@ INSTANTIATE_TEST_CASE_P(Protocols, IdleTimeoutIntegrationTest,
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
   auto response = setupPerStreamIdleTimeoutTest();
 
-  waitForTimeout(*response);
+  waitForTimeout(*response, "downstream_rq_idle_timeout");
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
@@ -86,7 +96,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutHeadRequestAfterDownstreamHeadRequest) {
   auto response = setupPerStreamIdleTimeoutTest("HEAD");
 
-  waitForTimeout(*response);
+  waitForTimeout(*response, "downstream_rq_idle_timeout");
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
@@ -102,7 +112,7 @@ TEST_P(IdleTimeoutIntegrationTest, GlobalPerStreamIdleTimeoutAfterDownstreamHead
   enable_per_stream_idle_timeout_ = false;
   auto response = setupPerStreamIdleTimeoutTest();
 
-  waitForTimeout(*response);
+  waitForTimeout(*response, "downstream_rq_idle_timeout");
 
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
@@ -118,7 +128,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeadersAnd
   sleep();
   codec_client_->sendData(*request_encoder_, 1, false);
 
-  waitForTimeout(*response);
+  waitForTimeout(*response, "downstream_rq_idle_timeout");
 
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(1U, upstream_request_->bodyLength());
@@ -133,7 +143,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterUpstreamHeaders) {
 
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
 
-  waitForTimeout(*response);
+  waitForTimeout(*response, "downstream_rq_idle_timeout");
 
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
@@ -165,7 +175,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterBidiData) {
   sleep();
   upstream_request_->encodeData(1, false);
 
-  waitForTimeout(*response);
+  waitForTimeout(*response, "downstream_rq_idle_timeout");
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(1U, upstream_request_->bodyLength());
@@ -178,6 +188,36 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterBidiData) {
 TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutRequestAndResponse) {
   testRouterRequestAndResponseWithBody(1024, 1024, false, nullptr);
 }
+
+TEST_P(IdleTimeoutIntegrationTest, RequestPathTimesOutOnBodilessPost) {
+  enable_request_timeout_ = true;
+
+  auto response = setupPerStreamIdleTimeoutTest("POST");
+
+  waitForTimeout(*response, "downstream_rq_path_timeout");
+
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("408", response->headers().Status()->value().c_str());
+  EXPECT_EQ("request timeout", response->body());
+}
+
+TEST_P(IdleTimeoutIntegrationTest, UnconfiguredRequestPathTimesntOutOnBodilessPost) {
+  enable_request_timeout_ = false;
+
+  auto response = setupPerStreamIdleTimeoutTest("POST");
+
+  waitForTimeout(*response);
+
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("408", response->headers().Status()->value().c_str());
+  EXPECT_NE("request timeout", response->body());
+}
+
+// TODO test that the request_timer triggers on a hung filter that does not send upstream
 
 } // namespace
 } // namespace Envoy
