@@ -6,6 +6,7 @@
 #include "extensions/filters/http/jwt_authn/jwks_cache.h"
 
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
@@ -21,10 +22,11 @@ class JwksCacheTest : public ::testing::Test {
 public:
   void SetUp() {
     MessageUtil::loadFromYaml(ExampleConfig, config_);
-    cache_ = JwksCache::create(config_);
+    cache_ = JwksCache::create(config_, test_time_.timeSystem());
     jwks_ = google::jwt_verify::Jwks::createFrom(PublicKey, google::jwt_verify::Jwks::JWKS);
   }
 
+  DangerousDeprecatedTestTime test_time_;
   JwtAuthentication config_;
   JwksCachePtr cache_;
   google::jwt_verify::JwksPtr jwks_;
@@ -41,7 +43,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwks) {
   auto& provider0 = (*config_.mutable_providers())[std::string(ProviderName)];
   // Set cache_duration to 1 second to test expiration
   provider0.mutable_remote_jwks()->mutable_cache_duration()->set_seconds(1);
-  cache_ = JwksCache::create(config_);
+  cache_ = JwksCache::create(config_, test_time_.timeSystem());
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
@@ -60,7 +62,7 @@ TEST_F(JwksCacheTest, TestSetRemoteJwksWithDefaultCacheDuration) {
   auto& provider0 = (*config_.mutable_providers())[std::string(ProviderName)];
   // Clear cache_duration to use default one.
   provider0.mutable_remote_jwks()->clear_cache_duration();
-  cache_ = JwksCache::create(config_);
+  cache_ = JwksCache::create(config_, test_time_.timeSystem());
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);
@@ -77,7 +79,7 @@ TEST_F(JwksCacheTest, TestGoodInlineJwks) {
   auto local_jwks = provider0.mutable_local_jwks();
   local_jwks->set_inline_string(PublicKey);
 
-  cache_ = JwksCache::create(config_);
+  cache_ = JwksCache::create(config_, test_time_.timeSystem());
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_FALSE(jwks->getJwksObj() == nullptr);
@@ -91,7 +93,7 @@ TEST_F(JwksCacheTest, TestBadInlineJwks) {
   auto local_jwks = provider0.mutable_local_jwks();
   local_jwks->set_inline_string("BAD-JWKS");
 
-  cache_ = JwksCache::create(config_);
+  cache_ = JwksCache::create(config_, test_time_.timeSystem());
 
   auto jwks = cache_->findByIssuer("https://example.com");
   EXPECT_TRUE(jwks->getJwksObj() == nullptr);

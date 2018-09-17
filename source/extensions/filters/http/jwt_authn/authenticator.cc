@@ -37,6 +37,8 @@ public:
   void onDestroy() override;
   void sanitizePayloadHeaders(Http::HeaderMap& headers) const override;
 
+  TimeSource& timeSource() { return config_->timeSource(); }
+
 private:
   // Verify with a specific public key.
   void verifyKey();
@@ -116,9 +118,9 @@ void AuthenticatorImpl::verify(Http::HeaderMap& headers, Authenticator::Callback
   // the abseil time functionality instead or use the jwt_verify_lib to check
   // the validity of a JWT.
   // Check "exp" claim.
-  const auto unix_timestamp = std::chrono::duration_cast<std::chrono::seconds>(
-                                  std::chrono::system_clock::now().time_since_epoch())
-                                  .count();
+  const auto unix_timestamp =
+      std::chrono::duration_cast<std::chrono::seconds>(timeSource().systemTime().time_since_epoch())
+          .count();
   // If the nbf claim does *not* appear in the JWT, then the nbf field is defaulted
   // to 0.
   if (jwt_.nbf_ > unix_timestamp) {

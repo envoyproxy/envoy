@@ -35,7 +35,8 @@ public:
   WsHandlerImpl(HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
                 const Router::RouteEntry& route_entry, WebSocketProxyCallbacks& callbacks,
                 Upstream::ClusterManager& cluster_manager,
-                Network::ReadFilterCallbacks* read_callbacks, TcpProxy::ConfigSharedPtr config);
+                Network::ReadFilterCallbacks* read_callbacks, TcpProxy::ConfigSharedPtr config,
+                Event::TimeSystem& time_system);
 
   // Upstream::LoadBalancerContext
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {

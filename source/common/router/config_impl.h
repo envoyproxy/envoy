@@ -558,6 +558,7 @@ private:
   const absl::optional<Http::Code> direct_response_code_;
   std::string direct_response_body_;
   PerFilterConfigs per_filter_configs_;
+  Event::TimeSystem& time_system_;
 };
 
 /**

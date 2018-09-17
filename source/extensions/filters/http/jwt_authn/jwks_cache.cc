@@ -3,6 +3,8 @@
 #include <chrono>
 #include <unordered_map>
 
+#include "envoy/common/time.h"
+
 #include "common/common/logger.h"
 #include "common/config/datasource.h"
 #include "common/protobuf/utility.h"
@@ -25,7 +27,8 @@ constexpr int PubkeyCacheExpirationSec = 600;
 
 class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::filter> {
 public:
-  JwksDataImpl(const JwtProvider& jwt_provider) : jwt_provider_(jwt_provider) {
+  JwksDataImpl(const JwtProvider& jwt_provider, TimeSource& time_source)
+      : jwt_provider_(jwt_provider), time_source_(time_source) {
     std::vector<std::string> audiences;
     for (const auto& aud : jwt_provider_.audiences()) {
       audiences.push_back(aud);
@@ -53,7 +56,7 @@ public:
 
   const Jwks* getJwksObj() const override { return jwks_obj_.get(); }
 
-  bool isExpired() const override { return std::chrono::steady_clock::now() >= expiration_time_; }
+  bool isExpired() const override { return time_source_.monotonicTime() >= expiration_time_; }
 
   const ::google::jwt_verify::Jwks* setRemoteJwks(::google::jwt_verify::JwksPtr&& jwks) override {
     return setKey(std::move(jwks), getRemoteJwksExpirationTime());
@@ -62,7 +65,7 @@ public:
 private:
   // Get the expiration time for a remote Jwks
   std::chrono::steady_clock::time_point getRemoteJwksExpirationTime() const {
-    auto expire = std::chrono::steady_clock::now();
+    auto expire = time_source_.monotonicTime();
     if (jwt_provider_.has_remote_jwks() && jwt_provider_.remote_jwks().has_cache_duration()) {
       expire += std::chrono::milliseconds(
           DurationUtil::durationToMilliseconds(jwt_provider_.remote_jwks().cache_duration()));
@@ -73,7 +76,7 @@ private:
   }
 
   const ::google::jwt_verify::Jwks* setKey(::google::jwt_verify::JwksPtr&& jwks,
-                                           std::chrono::steady_clock::time_point expire) {
+                                           MonotonicTime expire) {
     jwks_obj_ = std::move(jwks);
     expiration_time_ = expire;
     return jwks_obj_.get();
@@ -85,17 +88,18 @@ private:
   ::google::jwt_verify::CheckAudiencePtr audiences_;
   // The generated jwks object.
   ::google::jwt_verify::JwksPtr jwks_obj_;
+  TimeSource& time_source_;
   // The pubkey expiration time.
-  std::chrono::steady_clock::time_point expiration_time_;
+  MonotonicTime expiration_time_;
 };
 
 class JwksCacheImpl : public JwksCache {
 public:
   // Load the config from envoy config.
-  JwksCacheImpl(const JwtAuthentication& config) {
+  JwksCacheImpl(const JwtAuthentication& config, TimeSource& time_source) {
     for (const auto& it : config.providers()) {
       const auto& provider = it.second;
-      jwks_data_map_.emplace(provider.issuer(), provider);
+      jwks_data_map_.emplace(provider.issuer(), JwksDataImpl(provider, time_source));
     }
   }
 
@@ -115,8 +119,9 @@ private:
 } // namespace
 
 JwksCachePtr JwksCache::create(
-    const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config) {
-  return JwksCachePtr(new JwksCacheImpl(config));
+    const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config,
+    TimeSource& time_source) {
+  return JwksCachePtr(new JwksCacheImpl(config, time_source));
 }
 
 } // namespace JwtAuthn

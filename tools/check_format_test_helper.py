@@ -87,7 +87,7 @@ def emitStdoutAsError(stdout):
 
 def expectError(status, stdout, expected_substring):
   if status == 0:
-    logging.error("Expected failure, but succeeded")
+    logging.error("Expected failure `%s`, but succeeded" % expected_substring)
     return 1
   for line in stdout:
     if expected_substring in line:
@@ -152,6 +152,8 @@ if __name__ == "__main__":
       "Don't reference real-world time sources from production code; use injection")
   errors += fixFileExpectingFailure("real_time_source.cc", real_time_inject_error)
   errors += fixFileExpectingFailure("real_time_system.cc", real_time_inject_error)
+  errors += fixFileExpectingFailure("system_clock.cc", real_time_inject_error)
+  errors += fixFileExpectingFailure("steady_clock.cc", real_time_inject_error)
 
   errors += fixFileExpectingNoChange("ok_file.cc")
 
@@ -174,6 +176,8 @@ if __name__ == "__main__":
   errors += checkFileExpectingError("proto_format.proto", "clang-format check failed")
   errors += checkFileExpectingError("real_time_source.cc", real_time_inject_error)
   errors += checkFileExpectingError("real_time_system.cc", real_time_inject_error)
+  errors += checkFileExpectingError("system_clock.cc", real_time_inject_error)
+  errors += checkFileExpectingError("steady_clock.cc", real_time_inject_error)
   errors += checkFileExpectingError("std_atomic_free_functions.cc", "std::atomic_*")
   errors += fixFileExpectingFailure("std_atomic_free_functions.cc", "std::atomic_*")
 

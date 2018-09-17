@@ -389,7 +389,7 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
 
   // Has an update_merge_window gone by since the last update? If so, don't schedule
   // the update so it can be applied immediately. Ditto if this is not a mergeable update.
-  const auto delta = std::chrono::steady_clock::now() - updates->last_updated_;
+  const auto delta = time_source_.monotonicTime() - updates->last_updated_;
   const uint64_t delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
   const bool out_of_merge_window = delta_ms > timeout;
   if (out_of_merge_window || !mergeable) {
@@ -412,7 +412,7 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
       cm_stats_.update_merge_cancelled_.inc();
     }
 
-    updates->last_updated_ = std::chrono::steady_clock::now();
+    updates->last_updated_ = time_source_.monotonicTime();
     return false;
   }
 
@@ -445,7 +445,7 @@ void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
 
   cm_stats_.cluster_updated_via_merge_.inc();
   updates.timer_enabled_ = false;
-  updates.last_updated_ = std::chrono::steady_clock::now();
+  updates.last_updated_ = time_source_.monotonicTime();
 }
 
 bool ClusterManagerImpl::addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,

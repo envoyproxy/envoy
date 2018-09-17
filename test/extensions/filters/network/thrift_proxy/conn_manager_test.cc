@@ -100,7 +100,8 @@ public:
     }
 
     ON_CALL(random_, random()).WillByDefault(Return(42));
-    filter_.reset(new ConnectionManager(*config_, random_));
+    filter_.reset(new ConnectionManager(*config_, random_,
+                                        filter_callbacks_.connection_.dispatcher_.timeSystem()));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     filter_->onNewConnection();
 
@@ -291,9 +292,9 @@ public:
 
   Buffer::OwnedImpl buffer_;
   Buffer::OwnedImpl write_buffer_;
-  std::unique_ptr<ConnectionManager> filter_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  std::unique_ptr<ConnectionManager> filter_;
   MockTransport* custom_transport_{};
   MockProtocol* custom_protocol_{};
 };
