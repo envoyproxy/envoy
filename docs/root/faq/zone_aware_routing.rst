@@ -20,18 +20,23 @@ These are the requirements:
 .. code-block:: json
 
   {
-    "sds": "{...}",
-    "local_cluster_name": "cluster_a",
-    "clusters": [
-      {
-        "name": "cluster_a",
-        "type": "sds",
-      },
-      {
-        "name": "cluster_b",
-        "type": "sds"
-      }
-    ]
+    "cluster_manager": {
+      "local_cluster_name": "cluster_a"
+    },
+    "static_resources": {
+      "clusters": [
+        {
+          "name": "cluster_a",
+          "type": "EDS",
+          "eds_cluster_config": "{...}"
+        },
+        {
+          "name": "cluster_b",
+          "type": "EDS",
+          "eds_cluster_config": "{...}"
+        }
+      ]
+    }
   }
 
 Envoy configuration on the destination service
@@ -46,8 +51,8 @@ Only zone related data is listed in the response below.
 .. code-block:: json
 
    {
-      "tags": {
-          "az": "us-east-1d"
+      "locality": {
+          "zone": "us-east-1d"
       }
    }
 
