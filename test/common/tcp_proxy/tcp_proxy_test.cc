@@ -39,39 +39,13 @@ using testing::SaveArg;
 namespace Envoy {
 namespace TcpProxy {
 
-namespace {
-Config constructConfigFromJson(const Json::Object& json,
-                               Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy tcp_proxy;
-  Envoy::Config::FilterJson::translateTcpProxy(json, tcp_proxy);
-  return Config(tcp_proxy, context);
-}
-} // namespace
-
-TEST(ConfigTest, NoClusterConfig) {
-  std::string json = R"EOF(
-    {
-      "stat_prefix": "name"
-    }
-    )EOF";
-
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  EXPECT_THROW(constructConfigFromJson(*config, factory_context), EnvoyException);
-}
-
 TEST(ConfigTest, ValidClusterConfig) {
-  std::string json = R"EOF(
-    {
-      "stat_prefix": "name",
-      "cluster": "valid_cluster"
-    }
-    )EOF";
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config;
+  config.set_stat_prefix("name");
+  config.set_cluster("valid_cluster");
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json);
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-
-  Config config_obj(constructConfigFromJson(*json_config, factory_context_));
+  Config config_obj(Config(config, factory_context_));
   EXPECT_EQ(std::string("valid_cluster"), config_obj.cluster());
 }
 
@@ -814,15 +788,10 @@ TEST_F(TcpProxyTest, UpstreamFlushReceiveUpstreamData) {
 class TcpProxyRoutingTest : public testing::Test {
 public:
   TcpProxyRoutingTest() {
-    std::string json = R"EOF(
-    {
-      "stat_prefix": "name",
-      "cluster": "fake_cluster"
-    }
-    )EOF";
-
-    Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    config_.reset(new Config(constructConfigFromJson(*config, factory_context_)));
+    envoy::config::filter::network::tcp_proxy::v2::TcpProxy config;
+    config.set_stat_prefix("name");
+    config.set_cluster("fake_cluster");
+    config_.reset(new Config(config, factory_context_));
   }
 
   void setup() {
