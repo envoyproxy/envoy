@@ -67,21 +67,16 @@ SecretManagerImpl::createInlineCertificateValidationContextProvider(
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(
     const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
-  TlsCertificateSdsApiSharedPtr secret_provider =
-      certificate_providers_.findOrCreate(sds_config_source, config_name, secret_provider_context);
-
-  return secret_provider;
+  return certificate_providers_.findOrCreate(sds_config_source, config_name,
+                                             secret_provider_context);
 }
 
 CertificateValidationContextConfigProviderSharedPtr
 SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
     const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
-  CertificateValidationContextSdsApiSharedPtr secret_provider =
-      validation_context_providers_.findOrCreate(sds_config_source, config_name,
-                                                 secret_provider_context);
-
-  return secret_provider;
+  return validation_context_providers_.findOrCreate(sds_config_source, config_name,
+                                                    secret_provider_context);
 }
 
 } // namespace Secret

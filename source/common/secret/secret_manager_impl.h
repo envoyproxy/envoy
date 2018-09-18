@@ -14,7 +14,7 @@
 namespace Envoy {
 namespace Secret {
 
-class SecretManagerImpl : public SecretManager, Logger::Loggable<Logger::Id::secret> {
+class SecretManagerImpl : public SecretManager {
 public:
   void addStaticSecret(const envoy::api::v2::auth::Secret& secret) override;
 
@@ -42,7 +42,8 @@ public:
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
 private:
-  template <class SecretType> class DynamicSecretProviders {
+  template <class SecretType>
+  class DynamicSecretProviders : public Logger::Loggable<Logger::Id::secret> {
   public:
     // Finds or creates SdsApi object.
     std::shared_ptr<SecretType>
