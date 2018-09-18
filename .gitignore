@@ -17,3 +17,4 @@ SOURCE_VERSION
 .vscode
 .vs
 *.sw*
+tags
