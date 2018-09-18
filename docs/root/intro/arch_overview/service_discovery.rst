@@ -91,15 +91,6 @@ Generally active health checking is used in conjunction with the eventually cons
 discovery service data to making load balancing and routing decisions. This is discussed further in
 the following section.
 
-.. _arch_overview_service_discovery_types_eds:
-
-Endpoint discovery service (EDS)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The *endpoint discovery service* has the same role as SDS in the v1 API, the new name better describes what the API does
-in practice. Advanced global load balancing capable of utilizing N-dimensional upstream metrics is now supported. See
-detail in the :ref:`v2 API overview <config_overview_v2_management_server>`.
-
 .. _arch_overview_service_discovery_eventually_consistent:
 
 On eventually consistent service discovery
