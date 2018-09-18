@@ -259,7 +259,9 @@ public:
   bool generateRequestId() override { return true; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
-  std::chrono::milliseconds streamRequestTimeout() const override { return stream_request_timeout_; }
+  std::chrono::milliseconds streamRequestTimeout() const override {
+    return stream_request_timeout_;
+  }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return server_name_; }
   ConnectionManagerStats& stats() override { return stats_; }
@@ -1478,7 +1480,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutConfigured) {
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
-    Event::MockTimer* request_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+    Event::MockTimer* request_timer =
+        new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
     EXPECT_CALL(*request_timer, enableTimer(stream_request_timeout_));
 
     conn_manager_->newStream(response_encoder_);
@@ -1493,7 +1496,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutTriggers) {
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
-    Event::MockTimer* request_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+    Event::MockTimer* request_timer =
+        new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
     EXPECT_CALL(*request_timer, enableTimer(stream_request_timeout_));
     EXPECT_CALL(*request_timer, disableTimer());
     // 408 direct response after timeout.
@@ -1526,7 +1530,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnEncodeHeaders) {
       }));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
-    Event::MockTimer* request_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+    Event::MockTimer* request_timer =
+        new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
     EXPECT_CALL(*request_timer, enableTimer(_));
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
 
@@ -1558,7 +1563,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnEncode100) {
       }));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
-    Event::MockTimer* request_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+    Event::MockTimer* request_timer =
+        new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
     EXPECT_CALL(*request_timer, enableTimer(_));
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
 

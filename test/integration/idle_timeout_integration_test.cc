@@ -54,8 +54,7 @@ public:
 
   void sleep() { std::this_thread::sleep_for(std::chrono::milliseconds(TimeoutMs / 2)); }
 
-  void waitForTimeout(IntegrationStreamDecoder& response,
-                      absl::string_view stat_name = "",
+  void waitForTimeout(IntegrationStreamDecoder& response, absl::string_view stat_name = "",
                       absl::string_view stat_prefix = "http.config_test") {
     if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
       codec_client_->waitForDisconnect();
