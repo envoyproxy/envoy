@@ -12,25 +12,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace TcpProxy {
 
-TEST(ConfigTest, TcpProxy) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "cluster": "fake_cluster"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  ConfigFactory factory;
-  Network::FilterFactoryCb cb = factory.createFilterFactory(*json_config, context);
-  Network::MockConnection connection;
-  EXPECT_CALL(connection, addReadFilter(_));
-  cb(connection);
-
-  factory.createFilterFactory(*json_config, context);
-}
-
 TEST(ConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(ConfigFactory().createFilterFactoryFromProto(
