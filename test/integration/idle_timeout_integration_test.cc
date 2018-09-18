@@ -217,6 +217,21 @@ TEST_P(IdleTimeoutIntegrationTest, UnconfiguredRequestPathTimesntOutOnBodilessPo
   EXPECT_NE("request timeout", response->body());
 }
 
+TEST_P(IdleTimeoutIntegrationTest, RequestPathTimesOutOnIncompleteHeaders) {
+  if (downstreamProtocol() == Envoy::Http::CodecClient::Type::HTTP2) {
+    return;
+  }
+
+  enable_request_timeout_ = true;
+
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  std::string raw_response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1", &raw_response);
+  EXPECT_THAT(raw_response, testing::HasSubstr("request timeout"));
+}
+
 // TODO test that the request_timer triggers on a hung filter that does not send upstream
 
 } // namespace
