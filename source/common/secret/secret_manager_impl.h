@@ -45,10 +45,10 @@ private:
   template <class SecretType> class DynamicSecretProviders {
   public:
     // Finds or creates SdsApi object.
-    std::shared_ptr<SecretType> findOrCreate(
-        const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
-        std::function<std::shared_ptr<SecretType>(std::function<void()> unregister_secret_provider)>
-            create_fn) {
+    std::shared_ptr<SecretType>
+    findOrCreate(const envoy::api::v2::core::ConfigSource& sds_config_source,
+                 const std::string& config_name,
+                 Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
       const std::string map_key = sds_config_source.SerializeAsString() + config_name;
 
       std::shared_ptr<SecretType> secret_provider = dynamic_secret_providers_[map_key].lock();
@@ -58,8 +58,9 @@ private:
         std::function<void()> unregister_secret_provider = [map_key, this]() {
           removeDynamicSecretProvider(map_key);
         };
-
-        secret_provider = create_fn(unregister_secret_provider);
+        ASSERT(secret_provider_context.initManager() != nullptr);
+        secret_provider = SecretType::create(secret_provider_context, sds_config_source,
+                                             config_name, unregister_secret_provider);
         dynamic_secret_providers_[map_key] = secret_provider;
       }
       return secret_provider;

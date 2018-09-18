@@ -67,15 +67,8 @@ SecretManagerImpl::createInlineCertificateValidationContextProvider(
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(
     const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
-  auto create_fn =
-      [&secret_provider_context, &sds_config_source, &config_name](
-          std::function<void()> unregister_secret_provider) -> TlsCertificateSdsApiSharedPtr {
-    ASSERT(secret_provider_context.initManager() != nullptr);
-    return TlsCertificateSdsApi::create(secret_provider_context, sds_config_source, config_name,
-                                        unregister_secret_provider);
-  };
   TlsCertificateSdsApiSharedPtr secret_provider =
-      certificate_providers_.findOrCreate(sds_config_source, config_name, create_fn);
+      certificate_providers_.findOrCreate(sds_config_source, config_name, secret_provider_context);
 
   return secret_provider;
 }
@@ -84,15 +77,9 @@ CertificateValidationContextConfigProviderSharedPtr
 SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
     const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
-  auto create_fn = [&secret_provider_context, &sds_config_source,
-                    &config_name](std::function<void()> unregister_secret_provider)
-      -> CertificateValidationContextSdsApiSharedPtr {
-    ASSERT(secret_provider_context.initManager() != nullptr);
-    return CertificateValidationContextSdsApi::create(secret_provider_context, sds_config_source,
-                                                      config_name, unregister_secret_provider);
-  };
   CertificateValidationContextSdsApiSharedPtr secret_provider =
-      validation_context_providers_.findOrCreate(sds_config_source, config_name, create_fn);
+      validation_context_providers_.findOrCreate(sds_config_source, config_name,
+                                                 secret_provider_context);
 
   return secret_provider;
 }
