@@ -259,9 +259,7 @@ public:
   bool generateRequestId() override { return true; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
-  std::chrono::milliseconds streamRequestTimeout() const override {
-    return stream_request_timeout_;
-  }
+  std::chrono::milliseconds streamRequestTimeout() const override { return stream_request_timeout_; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return server_name_; }
   ConnectionManagerStats& stats() override { return stats_; }
@@ -1379,6 +1377,7 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterUpstreamHeaders) 
 
   EXPECT_EQ(1U, stats_.named_.downstream_rq_idle_timeout_.value());
 }
+
 // Validate the per-stream idle timeout after a sequence of header/data events.
 TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutAfterBidiData) {
   setup(false, "");

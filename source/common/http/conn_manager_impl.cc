@@ -263,7 +263,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       }
 
       if (!streams_.empty() && streams_.front()->state_.remote_complete_ &&
-
           !isOldStyleWebSocketConnection()) {
         read_callbacks_->connection().readDisable(true);
       }
@@ -901,11 +900,6 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(HeaderMapPtr&& trailers
 
 void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilter* filter,
                                                          HeaderMap& trailers) {
-
-  // TODO disarm request timer in three points, Maybe in
-  // decodeTrailers/decodeHeaders/decodeBody (dependent on
-  // request_info->complete). Def in encode and encode100.
-
   // See decodeData() above for why we check local_complete_ here.
   if (state_.local_complete_) {
     return;
