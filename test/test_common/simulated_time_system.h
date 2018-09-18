@@ -50,6 +50,9 @@ public:
     mutex_.lock();
     setMonotonicTimeAndUnlock(monotonic_time);
   }
+  template <class Duration> void setMonotonicTime(const Duration& duration) {
+    setMonotonicTime(MonotonicTime(duration));
+  }
 
   /**
    * Sets the system-time, whether forward or backward. If time moves forward,
@@ -59,6 +62,9 @@ public:
    * @param system_time The desired new system time.
    */
   void setSystemTime(const SystemTime& system_time);
+  template <class Duration> void setSystemTime(const Duration& duration) {
+    setSystemTime(SystemTime(duration));
+  }
 
 private:
   class SimulatedScheduler;
