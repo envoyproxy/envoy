@@ -1061,7 +1061,7 @@ void TwitterProtocolImpl::updateMetadataWithResponseHeader(const ThriftObject& h
   }
 
   SpanList& spans = resp_header.spans();
-  std::copy(spans.begin(), spans.end(), std::back_inserter(*metadata.mutable_spans()));
+  std::copy(spans.begin(), spans.end(), std::back_inserter(metadata.mutable_spans()));
 }
 
 void TwitterProtocolImpl::writeResponseHeader(Buffer::Instance& buffer,

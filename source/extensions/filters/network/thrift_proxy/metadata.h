@@ -64,9 +64,9 @@ public:
   const SpanList& spans() const { return spans_; }
 
   /**
-   * @return SpanList* a pointer to a mutable list of Spans
+   * @return SpanList& a reference to a mutable list of Spans
    */
-  SpanList* mutable_spans() { return &spans_; }
+  SpanList& mutable_spans() { return spans_; }
 
   bool hasAppException() const { return app_ex_type_.has_value(); }
   void setAppException(AppExceptionType app_ex_type, const std::string& message) {

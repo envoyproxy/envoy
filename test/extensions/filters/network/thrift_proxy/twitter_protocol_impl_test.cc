@@ -97,8 +97,8 @@ public:
 
     TestTwitterProtocolImpl proto;
 
-    metadata_->mutable_spans()->emplace_back(trace_id, "", span_id, absl::optional<int64_t>(),
-                                             AnnotationList(), BinaryAnnotationList(), false);
+    metadata_->mutable_spans().emplace_back(trace_id, "", span_id, absl::optional<int64_t>(),
+                                            AnnotationList(), BinaryAnnotationList(), false);
     metadata_->headers().addCopy(Http::LowerCaseString("test-header"), "test-header-value");
 
     proto.writeResponseHeaderForTest(buffer, *metadata_);
@@ -722,22 +722,22 @@ TEST_F(TwitterProtocolTest, WriteResponseHeader) {
   headers.addCopy(Http::LowerCaseString("key1"), "value1");
   headers.addCopy(Http::LowerCaseString("key2"), "value2");
 
-  SpanList* spans = metadata_->mutable_spans();
-  spans->emplace_back(1, "s1", 100, absl::optional<int64_t>(10),
-                      AnnotationList({
-                          Annotation(100000, "a1", {Endpoint(0xC0A80001, 0, "")}),
-                          Annotation(100001, "a2", {}),
-                      }),
-                      BinaryAnnotationList({
-                          BinaryAnnotation("bak1", "bav1", AnnotationType::I32,
-                                           {
-                                               Endpoint(0xC0A80002, 80, "service_name"),
-                                           }),
-                          BinaryAnnotation("bak2", "bav2", AnnotationType::String, {}),
-                      }),
-                      true);
-  spans->emplace_back(2, "s2", 200, absl::optional<int64_t>(), AnnotationList(),
-                      BinaryAnnotationList(), false);
+  SpanList& spans = metadata_->mutable_spans();
+  spans.emplace_back(1, "s1", 100, absl::optional<int64_t>(10),
+                     AnnotationList({
+                         Annotation(100000, "a1", {Endpoint(0xC0A80001, 0, "")}),
+                         Annotation(100001, "a2", {}),
+                     }),
+                     BinaryAnnotationList({
+                         BinaryAnnotation("bak1", "bav1", AnnotationType::I32,
+                                          {
+                                              Endpoint(0xC0A80002, 80, "service_name"),
+                                          }),
+                         BinaryAnnotation("bak2", "bav2", AnnotationType::String, {}),
+                     }),
+                     true);
+  spans.emplace_back(2, "s2", 200, absl::optional<int64_t>(), AnnotationList(),
+                     BinaryAnnotationList(), false);
   TestTwitterProtocolImpl proto;
   Buffer::OwnedImpl buffer;
   proto.writeResponseHeaderForTest(buffer, *metadata_);
@@ -922,8 +922,8 @@ TEST_F(TwitterProtocolTest, TestUpgradedWriteMessageBegin) {
   metadata_->setMethodName("message");
   metadata_->setSequenceId(1);
   metadata_->setTraceId(1);
-  metadata_->mutable_spans()->emplace_back(100, "", 100, absl::optional<int64_t>(),
-                                           AnnotationList(), BinaryAnnotationList(), false);
+  metadata_->mutable_spans().emplace_back(100, "", 100, absl::optional<int64_t>(), AnnotationList(),
+                                          BinaryAnnotationList(), false);
 
   {
     // Call
