@@ -91,7 +91,7 @@ void ConnectionManager::dispatch() {
 void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response) {
   Buffer::OwnedImpl buffer;
 
-  DirectResponse::ResponseType result = response.encode(metadata, *protocol_, buffer);
+  const DirectResponse::ResponseType result = response.encode(metadata, *protocol_, buffer);
 
   Buffer::OwnedImpl response_buffer;
   metadata.setProtocol(protocol_->type());

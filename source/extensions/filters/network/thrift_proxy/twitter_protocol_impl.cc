@@ -14,69 +14,90 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace {
 
-#define MAKE_STATIC_STRING(func, name)                                                             \
-  const std::string& func() { CONSTRUCT_ON_FIRST_USE(std::string, #name); }
+struct StructNameValues {
+  const std::string connectionOptionsStruct = "ConnectionOptions";
+  const std::string requestHeaderStruct = "RequestHeader";
+  const std::string clientIdStruct = "ClientId";
+  const std::string delegationStruct = "Delegation";
+  const std::string requestContextStruct = "RequestContext";
+  const std::string responseHeaderStruct = "ResponseHeader";
+  const std::string spanStruct = "Span";
+  const std::string annotationStruct = "Annotation";
+  const std::string binaryAnnotationStruct = "BinaryAnnotation";
+  const std::string endpointStruct = "Endpoint";
+  const std::string upgradeReplyStruct = "UpgradeReply";
+};
+typedef ConstSingleton<StructNameValues> StructNames;
 
-#define STRUCT_NAMES(F)                                                                            \
-  F(connectionOptionsStruct, ConnectionOptions)                                                    \
-  F(requestHeaderStruct, RequestHeader)                                                            \
-  F(clientIdStruct, ClientId)                                                                      \
-  F(delegationStruct, Delegation)                                                                  \
-  F(requestContextStruct, RequestContext)                                                          \
-  F(responseHeaderStruct, ResponseHeader)                                                          \
-  F(spanStruct, Span)                                                                              \
-  F(annotationStruct, Annotation)                                                                  \
-  F(binaryAnnotationStruct, BinaryAnnotation)                                                      \
-  F(endpointStruct, Endpoint)                                                                      \
-  F(upgradeReplyStruct, UpgradeReply)
+struct RequestHeaderFieldNameValues {
+  const std::string traceIdField = "trace_id";
+  const std::string spanIdField = "span_id";
+  const std::string parentSpanIdField = "parent_span_id";
+  const std::string sampledField = "sampled";
+  const std::string clientIdField = "client_id";
+  const std::string flagsField = "flags";
+  const std::string contextsField = "contexts";
+  const std::string destField = "dest";
+  const std::string delegationsField = "delegations";
+  const std::string traceIdHighField = "trace_id_high";
+};
+typedef ConstSingleton<RequestHeaderFieldNameValues> RequestHeaderFieldNames;
 
-#define REQUEST_HEADER_FIELD_NAMES(F)                                                              \
-  F(traceIdField, trace_id)                                                                        \
-  F(spanIdField, span_id)                                                                          \
-  F(parentSpanIdField, parent_span_id)                                                             \
-  F(sampledField, sampled)                                                                         \
-  F(clientIdField, client_id)                                                                      \
-  F(flagsField, flags)                                                                             \
-  F(contextsField, contexts)                                                                       \
-  F(destField, dest)                                                                               \
-  F(delegationsField, delegations)                                                                 \
-  F(traceIdHighField, trace_id_high)
+struct ClientIdFieldNameValues {
+  const std::string nameField = "name";
+};
+typedef ConstSingleton<ClientIdFieldNameValues> ClientIdFieldNames;
 
-#define CLIENT_ID_FIELD_NAMES(F) F(nameField, name)
+struct DelegationFieldNameValues {
+  const std::string srcField = "src";
+  const std::string dstField = "dst";
+};
+typedef ConstSingleton<DelegationFieldNameValues> DelegationFieldNames;
 
-#define DELEGATION_FIELD_NAMES(F)                                                                  \
-  F(srcField, src)                                                                                 \
-  F(dstField, dst)
+struct RequestContextFieldNameValues {
+  const std::string keyField = "key";
+  const std::string valueField = "value";
+};
+typedef ConstSingleton<RequestContextFieldNameValues> RequestContextFieldNames;
 
-#define RESPONSE_HEADER_FIELD_NAMES(F) F(spansField, spans)
+struct ResponseHeaderFieldNameValues {
+  const std::string spansField = "spans";
+  const std::string contextsField = "contexts";
+};
+typedef ConstSingleton<ResponseHeaderFieldNameValues> ResponseHeaderFieldNames;
 
-#define SPAN_FIELD_NAMES(F)                                                                        \
-  F(idField, id)                                                                                   \
-  F(parentIdField, parent_id)                                                                      \
-  F(annotationsField, annotations)                                                                 \
-  F(binaryAnnotationsField, binary_annotations)                                                    \
-  F(debugField, debug)
+struct SpanFieldNameValues {
+  const std::string traceIdField = "trace_id";
+  const std::string nameField = "name";
+  const std::string idField = "id";
+  const std::string parentIdField = "parent_id";
+  const std::string annotationsField = "annotations";
+  const std::string binaryAnnotationsField = "binary_annotations";
+  const std::string debugField = "debug";
+};
+typedef ConstSingleton<SpanFieldNameValues> SpanFieldNames;
 
-#define ANNOTATION_FIELD_NAMES(F)                                                                  \
-  F(timestampField, timestamp)                                                                     \
-  F(valueField, value)                                                                             \
-  F(hostField, host)                                                                               \
-  F(keyField, key)                                                                                 \
-  F(annotationTypeField, annotation_type)
+struct AnnotationFieldNameValues {
+  const std::string timestampField = "timestamp";
+  const std::string valueField = "value";
+  const std::string hostField = "host";
+};
+typedef ConstSingleton<AnnotationFieldNameValues> AnnotationFieldNames;
 
-#define ENDPOINT_FIELD_NAMES(F)                                                                    \
-  F(ipv4Field, ipv4)                                                                               \
-  F(portField, port)                                                                               \
-  F(serviceNameField, service_name)
+struct BinaryAnnotationFieldNameValues {
+  const std::string keyField = "key";
+  const std::string valueField = "value";
+  const std::string annotationTypeField = "annotation_type";
+  const std::string hostField = "host";
+};
+typedef ConstSingleton<BinaryAnnotationFieldNameValues> BinaryAnnotationFieldNames;
 
-STRUCT_NAMES(MAKE_STATIC_STRING)
-REQUEST_HEADER_FIELD_NAMES(MAKE_STATIC_STRING)
-CLIENT_ID_FIELD_NAMES(MAKE_STATIC_STRING)
-DELEGATION_FIELD_NAMES(MAKE_STATIC_STRING)
-RESPONSE_HEADER_FIELD_NAMES(MAKE_STATIC_STRING)
-SPAN_FIELD_NAMES(MAKE_STATIC_STRING)
-ANNOTATION_FIELD_NAMES(MAKE_STATIC_STRING)
-ENDPOINT_FIELD_NAMES(MAKE_STATIC_STRING)
+struct EndpointFieldNameValues {
+  const std::string ipv4Field = "ipv4";
+  const std::string portField = "port";
+  const std::string serviceNameField = "service_name";
+};
+typedef ConstSingleton<EndpointFieldNameValues> EndpointFieldNames;
 
 const std::string& emptyString() { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
 
@@ -123,10 +144,11 @@ public:
 
   void write(Buffer::Instance& buffer) {
     Protocol& protocol = headerObjectProtocol();
-    protocol.writeStructBegin(buffer, clientIdStruct());
+    protocol.writeStructBegin(buffer, StructNames::get().clientIdStruct);
 
     // name
-    protocol.writeFieldBegin(buffer, nameField(), FieldType::String, NameFieldId);
+    protocol.writeFieldBegin(buffer, ClientIdFieldNames::get().nameField, FieldType::String,
+                             NameFieldId);
     protocol.writeString(buffer, name_);
     protocol.writeFieldEnd(buffer);
 
@@ -166,7 +188,7 @@ public:
     // single field of id 0 (0x0B 0x00 0x00) to indicate success, followed by an empty UpgradeReply
     // struct (0x00), followed by a stop field for the reply struct (0x00). The finagle-twitter
     // implementation, however, just emits a single stop field.
-    protocol.writeStructBegin(buffer, upgradeReplyStruct());
+    protocol.writeStructBegin(buffer, StructNames::get().upgradeReplyStruct);
     protocol.writeFieldBegin(buffer, emptyString(), FieldType::Stop, 0);
     protocol.writeStructEnd(buffer);
 
@@ -216,15 +238,17 @@ public:
 
   void write(Buffer::Instance& buffer) const {
     Protocol& protocol = headerObjectProtocol();
-    protocol.writeStructBegin(buffer, requestContextStruct());
+    protocol.writeStructBegin(buffer, StructNames::get().requestContextStruct);
 
     // key
-    protocol.writeFieldBegin(buffer, keyField(), FieldType::String, KeyFieldId);
+    protocol.writeFieldBegin(buffer, RequestContextFieldNames::get().keyField, FieldType::String,
+                             KeyFieldId);
     protocol.writeString(buffer, key_);
     protocol.writeFieldEnd(buffer);
 
     // value
-    protocol.writeFieldBegin(buffer, valueField(), FieldType::String, ValueFieldId);
+    protocol.writeFieldBegin(buffer, RequestContextFieldNames::get().valueField, FieldType::String,
+                             ValueFieldId);
     protocol.writeString(buffer, value_);
     protocol.writeFieldEnd(buffer);
 
@@ -264,15 +288,17 @@ public:
 
   void write(Buffer::Instance& buffer) const {
     Protocol& protocol = headerObjectProtocol();
-    protocol.writeStructBegin(buffer, delegationStruct());
+    protocol.writeStructBegin(buffer, StructNames::get().delegationStruct);
 
     // src
-    protocol.writeFieldBegin(buffer, srcField(), FieldType::String, SrcFieldId);
+    protocol.writeFieldBegin(buffer, DelegationFieldNames::get().srcField, FieldType::String,
+                             SrcFieldId);
     protocol.writeString(buffer, src_);
     protocol.writeFieldEnd(buffer);
 
     // dst
-    protocol.writeFieldBegin(buffer, dstField(), FieldType::String, DstFieldId);
+    protocol.writeFieldBegin(buffer, DelegationFieldNames::get().dstField, FieldType::String,
+                             DstFieldId);
     protocol.writeString(buffer, dst_);
     protocol.writeFieldEnd(buffer);
 
@@ -382,49 +408,56 @@ public:
 
   void write(Buffer::Instance& buffer) {
     Protocol& protocol = headerObjectProtocol();
-    protocol.writeStructBegin(buffer, requestHeaderStruct());
+    protocol.writeStructBegin(buffer, StructNames::get().requestHeaderStruct);
 
     // trace_id
-    protocol.writeFieldBegin(buffer, traceIdField(), FieldType::I64, TraceIdFieldId);
+    protocol.writeFieldBegin(buffer, RequestHeaderFieldNames::get().traceIdField, FieldType::I64,
+                             TraceIdFieldId);
     protocol.writeInt64(buffer, trace_id_);
     protocol.writeFieldEnd(buffer);
 
     // span_id
-    protocol.writeFieldBegin(buffer, spanIdField(), FieldType::I64, SpanIdFieldId);
+    protocol.writeFieldBegin(buffer, RequestHeaderFieldNames::get().spanIdField, FieldType::I64,
+                             SpanIdFieldId);
     protocol.writeInt64(buffer, span_id_);
     protocol.writeFieldEnd(buffer);
 
     // parent_span_id
     if (parent_span_id_) {
-      protocol.writeFieldBegin(buffer, parentSpanIdField(), FieldType::I64, ParentSpanIdFieldId);
+      protocol.writeFieldBegin(buffer, RequestHeaderFieldNames::get().parentSpanIdField,
+                               FieldType::I64, ParentSpanIdFieldId);
       protocol.writeInt64(buffer, *parent_span_id_);
       protocol.writeFieldEnd(buffer);
     }
 
     // sampled
     if (sampled_) {
-      protocol.writeFieldBegin(buffer, sampledField(), FieldType::Bool, SampledFieldId);
+      protocol.writeFieldBegin(buffer, RequestHeaderFieldNames::get().sampledField, FieldType::Bool,
+                               SampledFieldId);
       protocol.writeBool(buffer, *sampled_);
       protocol.writeFieldEnd(buffer);
     }
 
     // client_id
     if (client_id_) {
-      protocol.writeFieldBegin(buffer, clientIdField(), FieldType::Struct, ClientIdFieldId);
+      protocol.writeFieldBegin(buffer, RequestHeaderFieldNames::get().clientIdField,
+                               FieldType::Struct, ClientIdFieldId);
       client_id_->write(buffer);
       protocol.writeFieldEnd(buffer);
     }
 
     // flags
     if (flags_) {
-      protocol.writeFieldBegin(buffer, flagsField(), FieldType::I64, FlagsFieldId);
+      protocol.writeFieldBegin(buffer, RequestHeaderFieldNames::get().flagsField, FieldType::I64,
+                               FlagsFieldId);
       protocol.writeInt64(buffer, *flags_);
       protocol.writeFieldEnd(buffer);
     }
 
     // contexts
     if (!contexts_.empty()) {
-      protocol.writeFieldBegin(buffer, contextsField(), FieldType::List, ContextsFieldId);
+      protocol.writeFieldBegin(buffer, RequestHeaderFieldNames::get().contextsField,
+                               FieldType::List, ContextsFieldId);
       protocol.writeListBegin(buffer, FieldType::Struct, contexts_.size());
       for (const auto& context : contexts_) {
         context.write(buffer);
@@ -435,14 +468,16 @@ public:
 
     // dest
     if (dest_) {
-      protocol.writeFieldBegin(buffer, destField(), FieldType::String, DestFieldId);
+      protocol.writeFieldBegin(buffer, RequestHeaderFieldNames::get().destField, FieldType::String,
+                               DestFieldId);
       protocol.writeString(buffer, *dest_);
       protocol.writeFieldEnd(buffer);
     }
 
     // delegations
     if (!delegations_.empty()) {
-      protocol.writeFieldBegin(buffer, delegationsField(), FieldType::List, DelegationsFieldId);
+      protocol.writeFieldBegin(buffer, RequestHeaderFieldNames::get().delegationsField,
+                               FieldType::List, DelegationsFieldId);
       protocol.writeListBegin(buffer, FieldType::Struct, delegations_.size());
       for (const auto& delegation : delegations_) {
         delegation.write(buffer);
@@ -453,7 +488,8 @@ public:
 
     // trace_id_high
     if (trace_id_high_) {
-      protocol.writeFieldBegin(buffer, traceIdHighField(), FieldType::I64, TraceIdHighFieldId);
+      protocol.writeFieldBegin(buffer, RequestHeaderFieldNames::get().traceIdHighField,
+                               FieldType::I64, TraceIdHighFieldId);
       protocol.writeInt64(buffer, *trace_id_high_);
       protocol.writeFieldEnd(buffer);
     }
@@ -553,11 +589,12 @@ public:
 
   void write(Buffer::Instance& buffer) {
     Protocol& protocol = headerObjectProtocol();
-    protocol.writeStructBegin(buffer, responseHeaderStruct());
+    protocol.writeStructBegin(buffer, StructNames::get().responseHeaderStruct);
 
     // spans
     if (!spans_.empty()) {
-      protocol.writeFieldBegin(buffer, spansField(), FieldType::List, SpansFieldId);
+      protocol.writeFieldBegin(buffer, ResponseHeaderFieldNames::get().spansField, FieldType::List,
+                               SpansFieldId);
       protocol.writeListBegin(buffer, FieldType::Struct, spans_.size());
       for (const auto& span : spans_) {
         writeSpan(buffer, span);
@@ -568,7 +605,8 @@ public:
 
     // contexts
     if (!contexts_.empty()) {
-      protocol.writeFieldBegin(buffer, contextsField(), FieldType::List, ContextsFieldId);
+      protocol.writeFieldBegin(buffer, ResponseHeaderFieldNames::get().contextsField,
+                               FieldType::List, ContextsFieldId);
       protocol.writeListBegin(buffer, FieldType::Struct, contexts_.size());
       for (const auto& context : contexts_) {
         context.write(buffer);
@@ -652,31 +690,35 @@ private:
   void writeSpan(Buffer::Instance& buffer, const Span& span) {
     Protocol& protocol = headerObjectProtocol();
 
-    protocol.writeStructBegin(buffer, spanStruct());
+    protocol.writeStructBegin(buffer, StructNames::get().spanStruct);
     // trace_id
-    protocol.writeFieldBegin(buffer, traceIdField(), FieldType::I64, SpanTraceIdFieldId);
+    protocol.writeFieldBegin(buffer, SpanFieldNames::get().traceIdField, FieldType::I64,
+                             SpanTraceIdFieldId);
     protocol.writeInt64(buffer, span.trace_id_);
     protocol.writeFieldEnd(buffer);
 
     // name
-    protocol.writeFieldBegin(buffer, nameField(), FieldType::String, SpanNameFieldId);
+    protocol.writeFieldBegin(buffer, SpanFieldNames::get().nameField, FieldType::String,
+                             SpanNameFieldId);
     protocol.writeString(buffer, span.name_);
     protocol.writeFieldEnd(buffer);
 
     // id
-    protocol.writeFieldBegin(buffer, idField(), FieldType::I64, SpanIdFieldId);
+    protocol.writeFieldBegin(buffer, SpanFieldNames::get().idField, FieldType::I64, SpanIdFieldId);
     protocol.writeInt64(buffer, span.span_id_);
     protocol.writeFieldEnd(buffer);
 
     // parent_id
     if (span.parent_span_id_) {
-      protocol.writeFieldBegin(buffer, parentIdField(), FieldType::I64, SpanParentIdFieldId);
+      protocol.writeFieldBegin(buffer, SpanFieldNames::get().parentIdField, FieldType::I64,
+                               SpanParentIdFieldId);
       protocol.writeInt64(buffer, *span.parent_span_id_);
       protocol.writeFieldEnd(buffer);
     }
 
     // annotations
-    protocol.writeFieldBegin(buffer, annotationsField(), FieldType::List, SpanAnnotationsFieldId);
+    protocol.writeFieldBegin(buffer, SpanFieldNames::get().annotationsField, FieldType::List,
+                             SpanAnnotationsFieldId);
     protocol.writeListBegin(buffer, FieldType::Struct, span.annotations_.size());
     for (const auto& annotation : span.annotations_) {
       writeAnnotation(buffer, annotation);
@@ -685,7 +727,7 @@ private:
     protocol.writeFieldEnd(buffer);
 
     // binary_annotations
-    protocol.writeFieldBegin(buffer, binaryAnnotationsField(), FieldType::List,
+    protocol.writeFieldBegin(buffer, SpanFieldNames::get().binaryAnnotationsField, FieldType::List,
                              SpanBinaryAnnotationsFieldId);
     protocol.writeListBegin(buffer, FieldType::Struct, span.binary_annotations_.size());
     for (const auto& annotation : span.binary_annotations_) {
@@ -695,7 +737,8 @@ private:
     protocol.writeFieldEnd(buffer);
 
     // debug
-    protocol.writeFieldBegin(buffer, debugField(), FieldType::Bool, SpanDebugFieldId);
+    protocol.writeFieldBegin(buffer, SpanFieldNames::get().debugField, FieldType::Bool,
+                             SpanDebugFieldId);
     protocol.writeBool(buffer, span.debug_);
     protocol.writeFieldEnd(buffer);
 
@@ -733,21 +776,24 @@ private:
   void writeAnnotation(Buffer::Instance& buffer, const Annotation& annotation) {
     Protocol& protocol = headerObjectProtocol();
 
-    protocol.writeStructBegin(buffer, annotationStruct());
+    protocol.writeStructBegin(buffer, StructNames::get().annotationStruct);
 
     // timestamp
-    protocol.writeFieldBegin(buffer, timestampField(), FieldType::I64, AnnotationTimestampFieldId);
+    protocol.writeFieldBegin(buffer, AnnotationFieldNames::get().timestampField, FieldType::I64,
+                             AnnotationTimestampFieldId);
     protocol.writeInt64(buffer, annotation.timestamp_);
     protocol.writeFieldEnd(buffer);
 
     // value
-    protocol.writeFieldBegin(buffer, valueField(), FieldType::String, AnnotationValueFieldId);
+    protocol.writeFieldBegin(buffer, AnnotationFieldNames::get().valueField, FieldType::String,
+                             AnnotationValueFieldId);
     protocol.writeString(buffer, annotation.value_);
     protocol.writeFieldEnd(buffer);
 
     // endpoint
     if (annotation.host_) {
-      protocol.writeFieldBegin(buffer, hostField(), FieldType::Struct, AnnotationHostFieldId);
+      protocol.writeFieldBegin(buffer, AnnotationFieldNames::get().hostField, FieldType::Struct,
+                               AnnotationHostFieldId);
       writeEndpoint(buffer, *annotation.host_);
       protocol.writeFieldEnd(buffer);
     }
@@ -791,27 +837,30 @@ private:
   void writeBinaryAnnotation(Buffer::Instance& buffer, const BinaryAnnotation& annotation) {
     Protocol& protocol = headerObjectProtocol();
 
-    protocol.writeStructBegin(buffer, binaryAnnotationStruct());
+    protocol.writeStructBegin(buffer, StructNames::get().binaryAnnotationStruct);
 
     // key
-    protocol.writeFieldBegin(buffer, keyField(), FieldType::String, BinaryAnnotationKeyFieldId);
+    protocol.writeFieldBegin(buffer, BinaryAnnotationFieldNames::get().keyField, FieldType::String,
+                             BinaryAnnotationKeyFieldId);
     protocol.writeString(buffer, annotation.key_);
     protocol.writeFieldEnd(buffer);
 
     // value
-    protocol.writeFieldBegin(buffer, valueField(), FieldType::String, BinaryAnnotationValueFieldId);
+    protocol.writeFieldBegin(buffer, BinaryAnnotationFieldNames::get().valueField,
+                             FieldType::String, BinaryAnnotationValueFieldId);
     protocol.writeString(buffer, annotation.value_);
     protocol.writeFieldEnd(buffer);
 
     // annotation_type
-    protocol.writeFieldBegin(buffer, annotationTypeField(), FieldType::I32,
-                             BinaryAnnotationAnnotationTypeFieldId);
+    protocol.writeFieldBegin(buffer, BinaryAnnotationFieldNames::get().annotationTypeField,
+                             FieldType::I32, BinaryAnnotationAnnotationTypeFieldId);
     protocol.writeInt32(buffer, static_cast<int32_t>(annotation.annotation_type_));
     protocol.writeFieldEnd(buffer);
 
     // endpoint
     if (annotation.host_) {
-      protocol.writeFieldBegin(buffer, hostField(), FieldType::Struct, BinaryAnnotationHostFieldId);
+      protocol.writeFieldBegin(buffer, BinaryAnnotationFieldNames::get().hostField,
+                               FieldType::Struct, BinaryAnnotationHostFieldId);
       writeEndpoint(buffer, *annotation.host_);
       protocol.writeFieldEnd(buffer);
     }
@@ -840,20 +889,22 @@ private:
   void writeEndpoint(Buffer::Instance& buffer, const Endpoint& endpoint) {
     Protocol& protocol = headerObjectProtocol();
 
-    protocol.writeStructBegin(buffer, endpointStruct());
+    protocol.writeStructBegin(buffer, StructNames::get().endpointStruct);
 
     // ipv4
-    protocol.writeFieldBegin(buffer, ipv4Field(), FieldType::I32, EndpointIpv4FieldId);
+    protocol.writeFieldBegin(buffer, EndpointFieldNames::get().ipv4Field, FieldType::I32,
+                             EndpointIpv4FieldId);
     protocol.writeInt32(buffer, endpoint.ipv4_);
     protocol.writeFieldEnd(buffer);
 
     // port
-    protocol.writeFieldBegin(buffer, portField(), FieldType::I16, EndpointPortFieldId);
+    protocol.writeFieldBegin(buffer, EndpointFieldNames::get().portField, FieldType::I16,
+                             EndpointPortFieldId);
     protocol.writeInt16(buffer, endpoint.port_);
     protocol.writeFieldEnd(buffer);
 
     // service_name
-    protocol.writeFieldBegin(buffer, serviceNameField(), FieldType::String,
+    protocol.writeFieldBegin(buffer, EndpointFieldNames::get().serviceNameField, FieldType::String,
                              EndpointServiceNameFieldId);
     protocol.writeString(buffer, endpoint.service_name_);
     protocol.writeFieldEnd(buffer);
@@ -1050,7 +1101,7 @@ ThriftObjectPtr TwitterProtocolImpl::attemptUpgrade(Transport& transport,
 
   Buffer::OwnedImpl message;
   BinaryProtocolImpl::writeMessageBegin(message, metadata);
-  writeStructBegin(message, connectionOptionsStruct());
+  writeStructBegin(message, StructNames::get().connectionOptionsStruct);
   writeFieldBegin(message, emptyString(), FieldType::Stop, 0);
   writeStructEnd(message);
   writeMessageEnd(message);
