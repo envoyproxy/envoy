@@ -5,7 +5,9 @@
 
 set -e
 
+# Used to filter a list of words that do not require spell checking
 IGNORE_STRING="Creater,creater,ect,overriden"
+
 MISSPELL_ARGS="-error -o stderr"
 
 if [[ $1 == "fix" ]];then
@@ -20,11 +22,11 @@ GOPATH=$(cd "/tmp/"; pwd)
 export GOPATH
 export PATH=$GOPATH/bin:$PATH
 
-# Install tools we need, but only from vendor/...
+# Install tools we need
 go get -u github.com/client9/misspell/cmd/misspell
 
 # Spell checking
-# All the skipping files are defined in bin/.spelling_failures
+# All the skipping files are defined in tools/.spelling_failures
 skipping_file="${ROOTDIR}/tools/.spelling_failures"
 failing_packages=$(echo `cat ${skipping_file}` | sed "s| | -e |g")
 git ls-files | grep -v -e ${failing_packages} | xargs misspell -i "${IGNORE_STRING}" ${MISSPELL_ARGS}
