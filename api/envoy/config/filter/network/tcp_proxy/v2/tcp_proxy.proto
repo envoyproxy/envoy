@@ -8,6 +8,7 @@ import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
@@ -21,19 +22,65 @@ message TcpProxy {
   // <config_network_filters_tcp_proxy_stats>`.
   string stat_prefix = 1 [(validate.rules).string.min_bytes = 1];
 
-  // The upstream cluster to connect to.
-  //
-  // .. note::
-  //
-  //  Once full filter chain matching is implemented in listeners, this field will become the only
-  //  way to configure the target cluster. All other matching will be done via :ref:`filter chain
-  //  matching rules <envoy_api_msg_listener.FilterChainMatch>`. For very simple configurations,
-  //  this field can still be used to select the cluster when no other matching rules are required.
-  //  Otherwise, a :ref:`deprecated_v1
-  //  <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.deprecated_v1>` configuration is
-  //  required to use more complex routing in the interim.
-  //
-  string cluster = 2;
+  // [#not-implemented-hide:] Weighted clusters allow for specification of
+  // multiple upstream clusters along with weights that indicate the
+  // percentage of traffic to be forwarded to each cluster. TCP Proxy
+  // selects an upstream cluster based on the weights.
+  message WeightedCluster {
+    message ClusterWeight {
+      // Name of the upstream cluster. The cluster must exist in the
+      // :ref:`cluster manager configuration <config_cluster_manager>`.
+      string name = 1 [(validate.rules).string.min_bytes = 1];
+      
+      // An integer between 0 and :ref:`total_weight
+      // <envoy_api_field_route.WeightedCluster.total_weight>`. The choice of an upstream
+      // cluster is determined by its weight. The sum of weights across all entries in the
+      // clusters array must add up to the total_weight, which defaults to 100.
+      google.protobuf.UInt32Value weight = 2;
+
+      // [#not-implemented-hide:] Optional endpoint metadata match
+      // criteria. Only endpoints in the upstream cluster with metadata
+      // matching that set in metadata_match will be considered. The filter
+      // name should be specified as *envoy.lb*.
+      envoy.api.v2.core.Metadata metadata_match = 3;
+
+      // [#not-implemented-hide:] The per_filter_config field can be used
+      // to provide weighted cluster-specific configurations for
+      // filters. The key should match the filter name, such as
+      // *envoy.buffer* for the HTTP buffer filter. Use of this field is
+      // filter specific; see the :ref:`HTTP filter documentation
+      // <config_http_filters>` for if and how it is utilized.
+      map<string, google.protobuf.Struct> per_filter_config = 4;
+    }
+
+    // Specifies one or more upstream clusters associated with the TCP proxy.
+    repeated ClusterWeight clusters = 1 [(validate.rules).repeated .min_items = 1];
+
+    // Specifies the total weight across all clusters. The sum of all cluster
+    // weights must equal this value, which must be greater than 0. Defaults
+    // to 100.
+    google.protobuf.UInt32Value total_weight = 3 [(validate.rules).uint32.gte = 1];
+  }
+  
+  oneof cluster_specifier {
+    option (validate.required) = true;
+
+    // The upstream cluster to connect to.
+    string cluster = 2 [(validate.rules).string.min_bytes = 1];
+
+    // [#not-implemented-hide:] Envoy will determine the cluster to route
+    // to based on the SNI presented by the client during the TLS
+    // handshake. If the SNI is empty (as is the case for plaintext TCP
+    // connections) or the referenced cluster does not exist, Envoy will
+    // terminate the connection.
+    google.protobuf.BoolValue use_sni_as_cluster = 10;
+
+    // [#not-implemented-hide:] Multiple upstream clusters can be specified for a
+    // given TCP proxy. The connection will be routed to one of the upstream clusters
+    // based on weights assigned to each cluster, similar to HTTP
+    // :ref:`traffic splitting <config_http_conn_man_route_table_traffic_splitting_split>`.
+    WeightedCluster weighted_clusters = 11;
+  }
 
   // Optional endpoint metadata match criteria. Only endpoints in the upstream
   // cluster with metadata matching that set in metadata_match will be
