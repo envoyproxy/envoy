@@ -16,3 +16,5 @@ SOURCE_VERSION
 .vimrc
 .vscode
 .vs
+*.sw*
+tags
