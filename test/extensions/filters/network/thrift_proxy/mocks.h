@@ -246,6 +246,7 @@ public:
   // ThriftProxy::Router::RouteEntry
   MOCK_CONST_METHOD0(clusterName, const std::string&());
   MOCK_CONST_METHOD0(metadataMatchCriteria, const Envoy::Router::MetadataMatchCriteria*());
+  MOCK_CONST_METHOD0(timeout, std::chrono::milliseconds());
 };
 
 class MockRoute : public Route {

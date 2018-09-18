@@ -45,7 +45,7 @@ public:
   virtual RouteConstSharedPtr matches(const MessageMetadata& metadata,
                                       uint64_t random_value) const PURE;
 
-  std::chrono::milliseconds timeout() const { return timeout_; }
+  std::chrono::milliseconds timeout() const override { return timeout_; }
 
 protected:
   RouteConstSharedPtr clusterEntry(uint64_t random_value) const;
@@ -70,6 +70,7 @@ private:
 
       return parent_.metadataMatchCriteria();
     }
+    std::chrono::milliseconds timeout() const override { return parent_.timeout(); }
 
     // Router::Route
     const RouteEntry* routeEntry() const override { return this; }
@@ -211,6 +212,7 @@ private:
 
   void convertMessageBegin(MessageMetadataSharedPtr metadata);
   void cleanup();
+  void onResponseTimeout();
 
   Upstream::ClusterManager& cluster_manager_;
 
@@ -221,6 +223,9 @@ private:
 
   std::unique_ptr<UpstreamRequest> upstream_request_;
   Buffer::OwnedImpl upstream_request_buffer_;
+
+  std::chrono::milliseconds timeout_;
+  Event::TimerPtr response_timer_;
 };
 
 } // namespace Router
