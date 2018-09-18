@@ -297,18 +297,22 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
   ASSERT(!upstream_request_->response_complete_);
 
   if (upstream_request_->upgrade_response_ != nullptr) {
+    ENVOY_STREAM_LOG(trace, "reading upgrade response: {} bytes", *callbacks_, data.length());
     // Handle upgrade response.
     if (!upstream_request_->upgrade_response_->onData(data)) {
       // Wait for more data.
       return;
     }
 
+    ENVOY_STREAM_LOG(debug, "upgrade response complete", *callbacks_);
     upstream_request_->protocol_->completeUpgrade(*upstream_request_->conn_state_,
                                                   *upstream_request_->upgrade_response_);
 
     upstream_request_->upgrade_response_.reset();
     upstream_request_->onRequestStart(true);
   } else {
+    ENVOY_STREAM_LOG(trace, "reading response: {} bytes", *callbacks_, data.length());
+
     // Handle normal response.
     if (!upstream_request_->response_started_) {
       callbacks_->startUpstreamResponse(*upstream_request_->transport_,
@@ -317,6 +321,7 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
     }
 
     if (callbacks_->upstreamData(data)) {
+      ENVOY_STREAM_LOG(debug, "response complete", *callbacks_);
       upstream_request_->onResponseComplete();
       cleanup();
       return;

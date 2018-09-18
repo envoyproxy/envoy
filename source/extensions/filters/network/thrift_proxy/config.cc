@@ -59,6 +59,8 @@ static const ProtocolTypeMap& protocolTypeMap() {
            ProtocolType::LaxBinary},
           {envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::COMPACT,
            ProtocolType::Compact},
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::TWITTER,
+           ProtocolType::Twitter},
       });
 }
 

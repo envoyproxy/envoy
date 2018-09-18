@@ -44,6 +44,8 @@ std::string PayloadOptions::protocolName() const {
     return "binary";
   case ProtocolType::Compact:
     return "compact";
+  case ProtocolType::Twitter:
+    return "finagle";
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

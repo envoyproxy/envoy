@@ -14,9 +14,9 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 /**
- * AutoProtocolImpl attempts to distinguish between the Thrift binary (strict mode only) and
- * compact protocols and then delegates subsequent decoding operations to the appropriate Protocol
- * implementation.
+ * AutoProtocolImpl attempts to distinguish between the Thrift binary (strict mode only), compact,
+ * and Twitter protocols and then delegates subsequent decoding operations to the appropriate
+ * Protocol implementation.
  */
 class AutoProtocolImpl : public Protocol {
 public:
@@ -129,6 +129,20 @@ public:
   }
   void writeBinary(Buffer::Instance& buffer, const std::string& value) override {
     protocol_->writeBinary(buffer, value);
+  }
+  bool supportsUpgrade() override { return protocol_->supportsUpgrade(); }
+  DecoderEventHandlerSharedPtr upgradeRequestDecoder() override {
+    return protocol_->upgradeRequestDecoder();
+  }
+  DirectResponsePtr upgradeResponse(const DecoderEventHandler& decoder) override {
+    return protocol_->upgradeResponse(decoder);
+  }
+  ThriftObjectPtr attemptUpgrade(Transport& transport, ThriftConnectionState& state,
+                                 Buffer::Instance& buffer) override {
+    return protocol_->attemptUpgrade(transport, state, buffer);
+  }
+  void completeUpgrade(ThriftConnectionState& state, ThriftObject& response) override {
+    return protocol_->completeUpgrade(state, response);
   }
 
   /*
