@@ -35,9 +35,9 @@ public:
     CreateAuthenticator();
   }
 
-  void CreateAuthenticator(
-      ::google::jwt_verify::CheckAudience* check_audience = nullptr,
-      const absl::optional<std::string>& provider = absl::optional<std::string>{ProviderName}) {
+  void CreateAuthenticator(::google::jwt_verify::CheckAudience* check_audience = nullptr,
+                           const absl::optional<std::string>& provider =
+                               absl::make_optional<std::string>(ProviderName)) {
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
     raw_fetcher_ = new MockJwksFetcher;
     fetcher_.reset(raw_fetcher_);
@@ -47,6 +47,14 @@ public:
                                   filter_config_->timeSource());
     jwks_ = Jwks::createFrom(PublicKey, Jwks::JWKS);
     EXPECT_TRUE(jwks_->getStatus() == Status::Ok);
+  }
+
+  void expectVerifyStatus(Status expected_status, Http::HeaderMap& headers) {
+    std::function<void(const Status&)> on_complete_cb = [&expected_status](const Status& status) {
+      ASSERT_EQ(status, expected_status);
+    };
+    auto tokens = filter_config_->getExtractor().extract(headers);
+    auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
   }
 
   JwtAuthentication proto_config_;
@@ -71,11 +79,7 @@ TEST_F(AuthenticatorTest, TestOkJWTandCache) {
   for (int i = 0; i < 10; i++) {
     auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
 
-    std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-      ASSERT_EQ(status, Status::Ok);
-    };
-    auto tokens = filter_config_->getExtractor().extract(headers);
-    auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+    expectVerifyStatus(Status::Ok, headers);
 
     EXPECT_EQ(headers.get_("sec-istio-auth-userinfo"), ExpectedPayloadValue);
     // Verify the token is removed.
@@ -97,11 +101,7 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
   // Test OK pubkey and its cache
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
 
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  };
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::Ok, headers);
 
   // Verify the token is NOT removed.
   EXPECT_TRUE(headers.Authorization());
@@ -119,11 +119,7 @@ TEST_F(AuthenticatorTest, TestJwtWithNonExistKid) {
   auto headers =
       Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(NonExistKidToken)}};
 
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::JwtVerificationFail);
-  };
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::JwtVerificationFail, headers);
 }
 
 // This test verifies if Jwt is missing, proper status is called.
@@ -132,11 +128,8 @@ TEST_F(AuthenticatorTest, TestMissedJWT) {
 
   // Empty headers.
   auto headers = Http::TestHeaderMapImpl{};
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::JwtMissed);
-  };
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+
+  expectVerifyStatus(Status::JwtMissed, headers);
 }
 
 // This test verifies if Jwt is invalid, JwtBadFormat status is returned.
@@ -145,11 +138,7 @@ TEST_F(AuthenticatorTest, TestInvalidJWT) {
 
   std::string token = "invalidToken";
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + token}};
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::JwtBadFormat);
-  };
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::JwtBadFormat, headers);
 }
 
 // This test verifies if Authorization header has invalid prefix, JwtMissed status is returned
@@ -157,11 +146,7 @@ TEST_F(AuthenticatorTest, TestInvalidPrefix) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer-invalid"}};
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::JwtMissed);
-  };
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::JwtMissed, headers);
 }
 
 // This test verifies when a JWT is non-expiring without audience specified, JwtAudienceNotAllowed
@@ -171,11 +156,7 @@ TEST_F(AuthenticatorTest, TestNonExpiringJWT) {
 
   auto headers =
       Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(NonExpiringToken)}};
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::JwtAudienceNotAllowed);
-  };
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::JwtAudienceNotAllowed, headers);
 }
 
 // This test verifies when a JWT is expired, JwtExpired status is returned.
@@ -183,24 +164,16 @@ TEST_F(AuthenticatorTest, TestExpiredJWT) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(ExpiredToken)}};
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::JwtExpired);
-  };
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::JwtExpired, headers);
 }
 
 // This test verifies when a JWT is not yet valid, JwtNotYetValid status is returned.
 TEST_F(AuthenticatorTest, TestNotYetValidJWT) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::JwtNotYetValid);
-  };
 
   auto headers =
       Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(NotYetValidToken)}};
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::JwtNotYetValid, headers);
 }
 
 // This test verifies when an inline JWKS is misconfigured, JwksNoValidKeys is returns
@@ -211,13 +184,9 @@ TEST_F(AuthenticatorTest, TestInvalidLocalJwks) {
   CreateAuthenticator();
 
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::JwksNoValidKeys);
-  };
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::JwksNoValidKeys, headers);
 }
 
 // This test verifies when a JWT is with invalid audience, JwtAudienceNotAllowed is returned.
@@ -226,11 +195,7 @@ TEST_F(AuthenticatorTest, TestNonMatchAudJWT) {
 
   auto headers =
       Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(InvalidAudToken)}};
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::JwtAudienceNotAllowed);
-  };
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::JwtAudienceNotAllowed, headers);
 }
 
 // This test verifies when Jwt issuer is not configured, JwtUnknownIssuer is returned.
@@ -242,11 +207,7 @@ TEST_F(AuthenticatorTest, TestIssuerNotFound) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _)).Times(0);
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::JwtUnknownIssuer);
-  };
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::JwtUnknownIssuer, headers);
 }
 
 // This test verifies that when Jwks fetching fails, JwksFetchFail status is returned.
@@ -258,11 +219,7 @@ TEST_F(AuthenticatorTest, TestPubkeyFetchFail) {
           }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::JwksFetchFail);
-  };
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::JwksFetchFail, headers);
 
   Http::MessagePtr response_message(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "401"}}}));
@@ -280,7 +237,7 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
   auto tokens = filter_config_->getExtractor().extract(headers);
   // callback should not be called.
-  std::function<void(const Status&)> on_complete_cb = [](const Status&) { ASSERT_TRUE(false); };
+  std::function<void(const Status&)> on_complete_cb = [](const Status&) { FAIL(); };
   auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
 
   // Destroy the authenticating process.
@@ -300,11 +257,7 @@ TEST_F(AuthenticatorTest, TestNoForwardPayloadHeader) {
           }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  };
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::Ok, headers);
 
   // Test when forward_payload_header is not set, the output should NOT
   // contain the sec-istio-auth-userinfo header.
@@ -334,11 +287,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleTokens) {
       {"c", "Bearer " + std::string(InvalidAudToken)},
       {":path", "/"},
   };
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  };
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::Ok, headers);
 
   EXPECT_TRUE(headers.has("a"));
   EXPECT_FALSE(headers.has("b"));
@@ -350,9 +299,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleTokens) {
       {"c", "Bearer " + std::string(GoodToken)},
       {":path", "/"},
   };
-  on_complete_cb = [](const Status& status) { ASSERT_EQ(status, Status::Ok); };
-  tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::Ok, headers);
 
   EXPECT_FALSE(headers.has("a"));
   EXPECT_FALSE(headers.has("b"));
@@ -390,11 +337,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleIssuers) {
       {"other-auth", "Bearer " + std::string(OtherGoodToken)},
       {":path", "/"},
   };
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  };
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::Ok, headers);
 
   EXPECT_FALSE(headers.has("Authorization"));
   EXPECT_TRUE(headers.has("expired-auth"));
@@ -414,16 +357,10 @@ TEST_F(AuthenticatorTest, TestCustomCheckAudience) {
 
   auto headers =
       Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(InvalidAudToken)}};
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(Status::Ok, status);
-  };
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::Ok, headers);
 
   headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  tokens = filter_config_->getExtractor().extract(headers);
-  on_complete_cb = [](const Status& status) { ASSERT_EQ(Status::JwtAudienceNotAllowed, status); };
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::JwtAudienceNotAllowed, headers);
 }
 
 // This test verifies that when invalid JWKS is fetched, an JWKS error status is returned.
@@ -436,11 +373,7 @@ TEST_F(AuthenticatorTest, TestInvalidPubkeyKey) {
           }));
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  std::function<void(const Status&)> on_complete_cb = [](const Status& status) {
-    ASSERT_EQ(status, Status::JwksPemBadBase64);
-  };
-  auto tokens = filter_config_->getExtractor().extract(headers);
-  auth_->verify(headers, std::move(tokens), std::move(on_complete_cb));
+  expectVerifyStatus(Status::JwksPemBadBase64, headers);
 }
 
 } // namespace JwtAuthn

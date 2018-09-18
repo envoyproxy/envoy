@@ -72,7 +72,7 @@ public:
                                   const absl::optional<std::string>& provider, bool) {
           return std::move(mock_auths_[provider ? provider.value() : allowfailed]);
         }));
-    verifier_ = Verifier::create(proto_config_.rules()[0].requires(), proto_config_.providers(),
+    verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),
                                  mock_factory_, mock_extractor_);
     ON_CALL(mock_extractor_, extract(_)).WillByDefault(Invoke([](const Http::HeaderMap&) {
       return std::vector<JwtLocationConstPtr>{};
@@ -151,9 +151,7 @@ rules:
   MessageUtil::loadFromYaml(config, proto_config_);
   createSyncMockAuthsAndVerifier(StatusMap{{"example_provider", Status::Ok}});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
   auto headers = Http::TestHeaderMapImpl{
       {"sec-istio-auth-userinfo", ""},
   };
@@ -190,9 +188,7 @@ rules:
   mock_auths_["example_provider"] = std::move(mock_auth);
   createVerifier();
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
@@ -204,9 +200,7 @@ TEST_F(GroupVerifierTest, TestRequiresAll) {
   createSyncMockAuthsAndVerifier(
       StatusMap{{"example_provider", Status::Ok}, {"other_provider", Status::Ok}});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
   auto headers = Http::TestHeaderMapImpl{
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
@@ -223,9 +217,7 @@ TEST_F(GroupVerifierTest, TestRequiresAllBadFormat) {
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"example_provider", "other_provider"});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::JwtBadFormat);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtBadFormat)).Times(1);
   auto headers = Http::TestHeaderMapImpl{
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
@@ -247,9 +239,7 @@ TEST_F(GroupVerifierTest, TestRequiresAllMissing) {
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"example_provider", "other_provider"});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::JwtMissed);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtMissed)).Times(1);
   auto headers = Http::TestHeaderMapImpl{
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
@@ -271,9 +261,7 @@ TEST_F(GroupVerifierTest, TestRequiresAllBothFailed) {
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"example_provider", "other_provider"});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::JwtUnknownIssuer);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer)).Times(1);
   auto headers = Http::TestHeaderMapImpl{
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
@@ -291,9 +279,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyFirstAuthOK) {
   MessageUtil::loadFromYaml(RequiresAnyConfig, proto_config_);
   createSyncMockAuthsAndVerifier(StatusMap{{"example_provider", Status::Ok}});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
   auto headers = Http::TestHeaderMapImpl{
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
@@ -310,9 +296,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyLastAuthOk) {
   createSyncMockAuthsAndVerifier(
       StatusMap{{"example_provider", Status::JwtUnknownIssuer}, {"other_provider", Status::Ok}});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
   auto headers = Http::TestHeaderMapImpl{
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
@@ -331,9 +315,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyAllAuthFailed) {
   createSyncMockAuthsAndVerifier(StatusMap{{"example_provider", Status::JwtHeaderBadKid},
                                            {"other_provider", Status::JwtUnknownIssuer}});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::JwtUnknownIssuer);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer)).Times(1);
   auto headers = Http::TestHeaderMapImpl{
       {"example-auth-userinfo", ""},
       {"other-auth-userinfo", ""},
@@ -350,9 +332,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllFirstAnyIsOk) {
   MessageUtil::loadFromYaml(AllWithAny, proto_config_);
   createSyncMockAuthsAndVerifier(StatusMap{{"provider_1", Status::Ok}, {"provider_3", Status::Ok}});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
@@ -366,9 +346,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllLastAnyIsOk) {
                                            {"provider_2", Status::Ok},
                                            {"provider_3", Status::Ok}});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
@@ -381,9 +359,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllBothInRequireAnyIsOk) {
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"provider_1", "provider_2", "provider_3"});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
@@ -399,9 +375,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllBothInRequireAnyFailed) {
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"provider_1", "provider_2", "provider_3"});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::JwksFetchFail);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwksFetchFail)).Times(1);
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
@@ -418,9 +392,7 @@ TEST_F(GroupVerifierTest, TestAllInAnyBothRequireAllFailed) {
   createSyncMockAuthsAndVerifier(
       StatusMap{{"provider_1", Status::JwksFetchFail}, {"provider_3", Status::JwtExpired}});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::JwtExpired);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtExpired)).Times(1);
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
@@ -433,9 +405,7 @@ TEST_F(GroupVerifierTest, TestAllInAnyFirstAllIsOk) {
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"provider_1", "provider_2", "provider_3", "provider_4"});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
@@ -451,9 +421,7 @@ TEST_F(GroupVerifierTest, TestAllInAnyLastAllIsOk) {
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"provider_1", "provider_2", "provider_3", "provider_4"});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
@@ -469,9 +437,7 @@ TEST_F(GroupVerifierTest, TestAllInAnyBothRequireAllAreOk) {
   auto callbacks = createAsyncMockAuthsAndVerifier(
       std::vector<std::string>{"provider_1", "provider_2", "provider_3", "provider_4"});
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
@@ -500,9 +466,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyWithAllowAll) {
           }));
   EXPECT_CALL(*mock_auth.get(), onDestroy()).Times(1);
   mock_auths_[allowfailed] = std::move(mock_auth);
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
 
   auto headers = Http::TestHeaderMapImpl{};
   context_ = Verifier::createContext(headers, &mock_cb_);

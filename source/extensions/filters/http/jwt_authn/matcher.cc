@@ -42,7 +42,7 @@ public:
     matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
     if (!config_query_parameters_.empty()) {
       Http::Utility::QueryParams query_parameters =
-          Http::Utility::parseQueryString(headers.Path()->value().c_str());
+          Http::Utility::parseQueryString(headers.Path()->value().getStringView());
       matches &= ConfigUtility::matchQueryParams(query_parameters, config_query_parameters_);
     }
     return matches;
@@ -96,17 +96,10 @@ public:
   bool matches(const Http::HeaderMap& headers) const override {
     if (BaseMatcherImpl::matchRoute(headers)) {
       const Http::HeaderString& path = headers.Path()->value();
-      const char* query_string_start = Http::Utility::findQueryStringStart(path);
-      size_t compare_length = path.size();
-      if (query_string_start != nullptr) {
-        compare_length = query_string_start - path.c_str();
-      }
+      size_t compare_length = Http::Utility::findQueryStringStart(path) - path.c_str();
 
-      if (compare_length != path_.size()) {
-        return false;
-      }
-      bool match = case_sensitive_ ? 0 == strncmp(path.c_str(), path_.c_str(), compare_length)
-                                   : 0 == strncasecmp(path.c_str(), path_.c_str(), compare_length);
+      auto real_path = path.getStringView().substr(0, compare_length);
+      bool match = case_sensitive_ ? real_path == path_ : StringUtil::caseCompare(real_path, path_);
       if (match) {
         ENVOY_LOG(debug, "Path requirement '{}' matched.", path_);
         return true;

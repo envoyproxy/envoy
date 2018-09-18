@@ -90,15 +90,16 @@ public:
   ProviderVerifierImpl(const std::string& provider_name, const AuthFactory& factory,
                        const JwtProvider& provider, const BaseVerifierImpl* parent)
       : BaseVerifierImpl(parent), auth_factory_(factory), extractor_(Extractor::create(provider)),
-        provider_name_(absl::optional<std::string>{provider_name}) {}
+        provider_name_(absl::make_optional<std::string>(provider_name)) {}
 
   void verify(ContextSharedPtr context) const override {
     auto& ctximpl = static_cast<ContextImpl&>(*context);
     auto auth = auth_factory_.create(getAudienceChecker(), provider_name_, false);
     extractor_->sanitizePayloadHeaders(ctximpl.headers());
-    auth->verify(
-        ctximpl.headers(), extractor_->extract(ctximpl.headers()),
-        [=](const Status& status) { onComplete(status, static_cast<ContextImpl&>(*context)); });
+    auth->verify(ctximpl.headers(), extractor_->extract(ctximpl.headers()),
+                 [this, context](const Status& status) {
+                   onComplete(status, static_cast<ContextImpl&>(*context));
+                 });
     if (!ctximpl.getCompletionState(this).is_completed_) {
       ctximpl.storeAuth(std::move(auth));
     } else {
@@ -141,9 +142,10 @@ public:
     auto& ctximpl = static_cast<ContextImpl&>(*context);
     auto auth = auth_factory_.create(nullptr, absl::nullopt, true);
     extractor_.sanitizePayloadHeaders(ctximpl.headers());
-    auth->verify(
-        ctximpl.headers(), extractor_.extract(ctximpl.headers()),
-        [=](const Status& status) { onComplete(status, static_cast<ContextImpl&>(*context)); });
+    auth->verify(ctximpl.headers(), extractor_.extract(ctximpl.headers()),
+                 [this, context](const Status& status) {
+                   onComplete(status, static_cast<ContextImpl&>(*context));
+                 });
     if (!ctximpl.getCompletionState(this).is_completed_) {
       ctximpl.storeAuth(std::move(auth));
     } else {

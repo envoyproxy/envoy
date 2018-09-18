@@ -23,7 +23,7 @@ public:
 
   void createVerifier() {
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
-    verifier_ = Verifier::create(proto_config_.rules()[0].requires(), proto_config_.providers(),
+    verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),
                                  *filter_config_, filter_config_->getExtractor());
   }
 
@@ -40,9 +40,7 @@ TEST_F(AllVerifierTest, TestAllAllow) {
   proto_config_.mutable_rules(0)->clear_requires();
   createVerifier();
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).Times(2).WillRepeatedly(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(2);
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer a"}};
   context_ = Verifier::createContext(headers, &mock_cb_);
   verifier_->verify(context_);
@@ -64,9 +62,7 @@ TEST_F(AllVerifierTest, TestAllowFailed) {
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.cluster_manager_, PublicKey);
 
-  EXPECT_CALL(mock_cb_, onComplete(_)).WillOnce(Invoke([](const Status& status) {
-    ASSERT_EQ(status, Status::Ok);
-  }));
+  EXPECT_CALL(mock_cb_, onComplete(Status::Ok)).Times(1);
   auto headers = Http::TestHeaderMapImpl{
       {"a", "Prefix " + std::string(GoodToken)},
       {"b", "Prefix " + std::string(NonExistKidToken)},
