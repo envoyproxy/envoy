@@ -54,7 +54,7 @@ Route table
 -----------
 
 The :ref:`configuration <config_http_conn_man>` for the HTTP connection manager owns the :ref:`route
-table <envoy_api_file_envoy/api/v2/rds.proto>` that is used by all configured HTTP filters. Although the
+table <envoy_api_msg_RouteConfiguration>` that is used by all configured HTTP filters. Although the
 router filter is the primary consumer of the route table, other filters also have access in case
 they want to make decisions based on the ultimate destination of the request. For example, the built
 in rate limit filter consults the route table to determine whether the global rate limit service

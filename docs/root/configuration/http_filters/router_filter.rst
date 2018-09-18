@@ -5,7 +5,7 @@ Router
 
 The router filter implements HTTP forwarding. It will be used in almost all HTTP proxy scenarios
 that Envoy is deployed for. The filter's main job is to follow the instructions specified in the
-configured :ref:`route table <envoy_api_file_envoy/api/v2/rds.proto>`. In addition to forwarding and
+configured :ref:`route table <envoy_api_msg_RouteConfiguration>`. In addition to forwarding and
 redirection, the filter also handles retry, statistics, etc.
 
 * :ref:`v1 API reference <config_http_filters_router_v1>`

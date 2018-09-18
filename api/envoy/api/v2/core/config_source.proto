@@ -58,7 +58,7 @@ message AggregatedConfigSource {
 
 // Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters
 // <config_cluster_manager>`, :ref:`routes
-// <envoy_api_file_envoy/api/v2/rds.proto>`, :ref:`endpoints
+// <envoy_api_msg_RouteConfiguration>`, :ref:`endpoints
 // <arch_overview_service_discovery>` etc. may either be sourced from the
 // filesystem or from an xDS API source. Filesystem configs are watched with
 // inotify for updates.

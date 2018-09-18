@@ -20,7 +20,7 @@ Fully static
 In a fully static configuration, the implementor provides a set of :ref:`listeners
 <config_listeners>` (and :ref:`filter chains <envoy_api_msg_listener.Filter>`), :ref:`clusters
 <config_cluster_manager>`, and optionally :ref:`HTTP route configurations
-<envoy_api_file_envoy/api/v2/rds.proto>`. Dynamic host discovery is only possible via DNS based
+<envoy_api_msg_RouteConfiguration>`. Dynamic host discovery is only possible via DNS based
 :ref:`service discovery <arch_overview_service_discovery>`. Configuration reloads must take place
 via the built in :ref:`hot restart <arch_overview_hot_restart>` mechanism.
 
