@@ -85,8 +85,7 @@ message ThriftFilter {
   // filter. The built-in filters are:
   //
   // [#comment:TODO(zuercher): Auto generate the following list]
-  // * :ref:`envoy.filters.thrift.router
-  //   <envoy_api_msg_config.filter.network.thrift_proxy.v2alpha1.router.Router>`
+  // * :ref:`envoy.filters.thrift.router <config_thrift_filters_router>`
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // Filter specific configuration which depends on the filter being
