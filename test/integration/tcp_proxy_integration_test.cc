@@ -392,8 +392,7 @@ void TcpProxySslIntegrationTest::setupConnections() {
       dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                           context_->createTransportSocket(), nullptr);
 
-  // Perform the SSL handshake. Loopback is whitelisted in tcp_proxy.json for the ssl_auth
-  // filter so there will be no pause waiting on auth data.
+  // Perform the SSL handshake.
   ssl_client_->addConnectionCallbacks(connect_callbacks_);
   ssl_client_->enableHalfClose(true);
   ssl_client_->addReadFilter(payload_reader_);

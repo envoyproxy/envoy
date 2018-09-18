@@ -45,10 +45,6 @@ TEST_P(LegacyJsonIntegrationTest, TestServerSsl) {
   createTestServer("test/config/integration/server_ssl.json", {"http"});
 }
 
-TEST_P(LegacyJsonIntegrationTest, TestTcpProxy) {
-  createTestServer("test/config/integration/tcp_proxy.json", {"tcp_proxy"});
-}
-
 TEST_P(LegacyJsonIntegrationTest, TestServerUds) {
   createTestServer("test/config/integration/server_uds.json", {"http"});
 }
