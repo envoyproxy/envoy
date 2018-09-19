@@ -43,13 +43,6 @@ void appendVia(HeaderMap& headers, const std::string& via);
 std::string createSslRedirectPath(const HeaderMap& headers);
 
 /**
- * Parse a URL into query parameters.
- * @param url supplies the url to parse.
- * @return QueryParams the parsed parameters, if any.
- */
-// QueryParams parseQueryString(absl::string_view url);
-
-/**
  * Finds the start of the query string in a path
  * @param path supplies a HeaderString& to search for the query string
  * @return const char* a pointer to the beginning of the query string, or the end of the
@@ -200,11 +193,6 @@ void extractHostPathFromUri(const absl::string_view& uri, absl::string_view& hos
  * Prepare headers for a HttpUri.
  */
 MessagePtr prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_uri);
-
-/**
- * Serialize query-params into a string.
- */
-// std::string queryParamsToString(const QueryParams& query_params);
 
 /**
  * Transforms the supplied headers from an HTTP/1 Upgrade request to an H2 style upgrade.
