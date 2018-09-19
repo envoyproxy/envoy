@@ -96,6 +96,9 @@ public:
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
+  const Http::InternalAddressConfig& internalAddressConfig() const override {
+    return internal_address_config_;
+  }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
   const std::string& via() const override { return EMPTY_STRING; }
@@ -134,6 +137,7 @@ public:
   TracingConnectionManagerConfigPtr tracing_config_;
   bool proxy_100_continue_ = true;
   Http::Http1Settings http1_settings_;
+  Http::DefaultInternalAddressConfig internal_address_config_;
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks
