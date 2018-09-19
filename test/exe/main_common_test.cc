@@ -110,6 +110,12 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   EXPECT_TRUE(main_common.run());
 }
 
+// Exercise the codepath to instantiate MainCommon and destruct it, without stats.
+TEST_P(MainCommonTest, ConstructDestructStatsDisabled) {
+  addArg("--disable-stats");
+  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
+}
+
 // Ensurees that existing users of main_common() can link.
 TEST_P(MainCommonTest, LegacyMain) {
 #ifdef ENVOY_HANDLE_SIGNALS
@@ -210,6 +216,16 @@ protected:
   bool pause_before_run_;
   bool pause_after_run_;
 };
+
+TEST_P(AdminRequestTest, AdminRequestDisableStats) {
+  addArg("--disable-stats");
+  startEnvoy();
+  started_.WaitForNotification();
+  // Under disable-stats mode, this should return nothing.
+  EXPECT_THAT(adminRequest("/stats", "GET"), HasSubstr("null:"));
+  adminRequest("/quitquitquit", "POST");
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
 
 TEST_P(AdminRequestTest, AdminRequestGetStatsAndQuit) {
   startEnvoy();

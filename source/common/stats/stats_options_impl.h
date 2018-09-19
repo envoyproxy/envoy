@@ -23,9 +23,11 @@ struct StatsOptionsImpl : public StatsOptions {
   size_t maxNameLength() const override { return max_obj_name_length_ + max_stat_suffix_length_; }
   size_t maxObjNameLength() const override { return max_obj_name_length_; }
   size_t maxStatSuffixLength() const override { return max_stat_suffix_length_; }
+  bool statsDisabled() const override { return stats_disabled_; }
 
   size_t max_obj_name_length_ = 60;
   size_t max_stat_suffix_length_ = 67;
+  bool stats_disabled_ = false;
 };
 
 } // namespace Stats

@@ -52,7 +52,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
     }
 #endif
     if (restarter_.get() == nullptr) {
-      restarter_.reset(new Server::HotRestartNopImpl());
+      restarter_.reset(new Server::HotRestartNopImpl(options_));
     }
 
     tls_.reset(new ThreadLocal::InstanceImpl);
@@ -71,7 +71,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
     break;
   }
   case Server::Mode::Validate:
-    restarter_.reset(new Server::HotRestartNopImpl());
+    restarter_.reset(new Server::HotRestartNopImpl(options_));
     Logger::Registry::initialize(options_.logLevel(), options_.logFormat(), restarter_->logLock());
     break;
   }

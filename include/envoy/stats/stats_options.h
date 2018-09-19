@@ -44,6 +44,11 @@ public:
    * The max allowed length of a stat suffix.
    */
   virtual size_t maxStatSuffixLength() const PURE;
+
+  /**
+   * Whether or not stats are disabled for Envoy.
+   */
+  virtual bool statsDisabled() const PURE;
 };
 
 } // namespace Stats
