@@ -68,17 +68,6 @@ Envoy can also pickup the original destination from a :ref:`HTTP header
 Original destination service discovery must be used with the original destination :ref:`load
 balancer <arch_overview_load_balancing_types_original_destination>`. 
 
-.. _arch_overview_service_discovery_types_sds:
-
-Service discovery service (SDS)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The *service discovery service* is a generic :ref:`REST based API <config_cluster_manager_sds_api>`
-used by Envoy to fetch cluster members. Lyft provides a reference implementation via the Python
-`discovery service <https://github.com/lyft/discovery>`_. That implementation uses AWS DynamoDB as
-the backing store, however the API is simple enough that it could easily be implemented on top of a
-variety of different backing stores.
-
 .. _arch_overview_service_discovery_types_eds:
 
 Endpoint discovery service (EDS)
@@ -98,6 +87,17 @@ preferred service discovery mechanism for a few reasons:
 Generally active health checking is used in conjunction with the eventually consistent service
 discovery service data to making load balancing and routing decisions. This is discussed further in
 the following section.
+
+.. _arch_overview_service_discovery_types_sds:
+
+Service discovery service (SDS)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The *service discovery service* is a generic :ref:`REST based API <config_cluster_manager_sds_api>`
+used by Envoy to fetch cluster members. Lyft provides a reference implementation via the Python
+`discovery service <https://github.com/lyft/discovery>`_. That implementation uses AWS DynamoDB as
+the backing store, however the API is simple enough that it could easily be implemented on top of a
+variety of different backing stores.
 
 .. _arch_overview_service_discovery_eventually_consistent:
 
