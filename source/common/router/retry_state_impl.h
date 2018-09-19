@@ -50,6 +50,8 @@ public:
                   [&host](auto predicate) { predicate->onHostAttempted(host); });
   }
 
+  uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
+
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
                  const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
@@ -72,6 +74,7 @@ private:
   Upstream::ResourcePriority priority_;
   BackOffStrategyPtr backoff_strategy_;
   std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
+  uint32_t host_selection_max_attempts_;
 };
 
 } // namespace Router

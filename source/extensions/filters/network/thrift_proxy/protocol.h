@@ -471,14 +471,27 @@ class DirectResponse {
 public:
   virtual ~DirectResponse() {}
 
+  enum class ResponseType {
+    // DirectResponse encodes MessageType::Reply with success payload
+    SuccessReply,
+
+    // DirectResponse encodes MessageType::Reply with an exception payload
+    ErrorReply,
+
+    // DirectResponse encodes MessageType::Exception
+    Exception,
+  };
+
   /**
    * Encodes the response via the given Protocol.
    * @param metadata the MessageMetadata for the request that generated this response
    * @param proto the Protocol to be used for message encoding
    * @param buffer the Buffer into which the message should be encoded
+   * @return ResponseType indicating whether the message is a successful or error reply or an
+   *         exception
    */
-  virtual void encode(MessageMetadata& metadata, Protocol& proto,
-                      Buffer::Instance& buffer) const PURE;
+  virtual ResponseType encode(MessageMetadata& metadata, Protocol& proto,
+                              Buffer::Instance& buffer) const PURE;
 };
 
 /**

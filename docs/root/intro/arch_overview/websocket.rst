@@ -50,7 +50,7 @@ Envoy supports upgrading a HTTP/1.1 connection to a WebSocket connection.
 Connection upgrade will be allowed only if the downstream client
 sends the correct upgrade headers and the matching HTTP route is explicitly
 configured to use WebSockets
-(:ref:`use_websocket <config_http_conn_man_route_table_route_use_websocket>`).
+(:ref:`use_websocket <envoy_api_field_route.RouteAction.use_websocket>`).
 If a request arrives at a WebSocket enabled route without the requisite
 upgrade headers, it will be treated as any regular HTTP/1.1 request.
 

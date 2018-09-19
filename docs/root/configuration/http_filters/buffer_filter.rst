@@ -20,8 +20,9 @@ the virtual host, route, or weighted cluster.
 Statistics
 ----------
 
-The buffer filter outputs statistics in the *http.<stat_prefix>.buffer.* namespace. The :ref:`stat
-prefix <config_http_conn_man_stat_prefix>` comes from the owning HTTP connection manager.
+The buffer filter outputs statistics in the *http.<stat_prefix>.buffer.* namespace. The :ref:`stat prefix
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stat_prefix>` comes from the
+owning HTTP connection manager.
 
 .. csv-table::
   :header: Name, Type, Description

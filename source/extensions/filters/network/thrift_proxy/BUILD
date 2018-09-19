@@ -105,9 +105,17 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":thrift_lib",
+        ":tracing_interface",
         "//include/envoy/buffer:buffer_interface",
         "//source/common/common:macros",
     ],
+)
+
+envoy_cc_library(
+    name = "tracing_interface",
+    hdrs = ["tracing.h"],
+    external_deps = ["abseil_optional"],
+    deps = [],
 )
 
 envoy_cc_library(
@@ -157,6 +165,7 @@ envoy_cc_library(
         ":buffer_helper_lib",
         ":compact_protocol_lib",
         ":protocol_interface",
+        ":twitter_protocol_lib",
         "//source/common/common:macros",
     ],
 )
@@ -193,11 +202,29 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "twitter_protocol_lib",
+    srcs = [
+        "twitter_protocol_impl.cc",
+    ],
+    hdrs = [
+        "twitter_protocol_impl.h",
+    ],
+    deps = [
+        ":binary_protocol_lib",
+        ":buffer_helper_lib",
+        ":protocol_interface",
+        ":thrift_object_lib",
+        "//source/common/common:macros",
+    ],
+)
+
+envoy_cc_library(
     name = "protocol_lib",
     deps = [
         ":auto_protocol_lib",
         ":binary_protocol_lib",
         ":compact_protocol_lib",
+        ":twitter_protocol_lib",
     ],
 )
 

@@ -4,7 +4,7 @@ Route discovery service (RDS)
 =============================
 
 The route discovery service (RDS) API is an optional API that Envoy will call to dynamically fetch
-:ref:`route configurations <config_http_conn_man_route_table>`. A route configuration includes both
+:ref:`route configurations <envoy_api_msg_RouteConfiguration>`. A route configuration includes both
 HTTP header modifications, virtual hosts, and the individual route entries contained within each
 virtual host. Each :ref:`HTTP connection manager filter <config_http_conn_man>` can independently
 fetch its own route configuration via the API.

@@ -11,6 +11,7 @@
 #include "extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
 #include "extensions/filters/network/thrift_proxy/buffer_helper.h"
 #include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
+#include "extensions/filters/network/thrift_proxy/twitter_protocol_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,6 +26,9 @@ void AutoProtocolImpl::setType(ProtocolType type) {
       break;
     case ProtocolType::Compact:
       setProtocol(std::make_unique<CompactProtocolImpl>());
+      break;
+    case ProtocolType::Twitter:
+      setProtocol(std::make_unique<TwitterProtocolImpl>());
       break;
     default:
       // Ignored: attempt protocol detection.
@@ -41,7 +45,19 @@ bool AutoProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetadat
 
     uint16_t version = buffer.peekBEInt<uint16_t>();
     if (BinaryProtocolImpl::isMagic(version)) {
-      setType(ProtocolType::Binary);
+      // 12 bytes is the minimum length for message-begin in the binary protocol.
+      if (buffer.length() < BinaryProtocolImpl::MinMessageBeginLength) {
+        return false;
+      }
+
+      // The first message in the twitter protocol is always an upgrade request, so we use as
+      // much of the buffer as possible to detect the upgrade message. If we guess wrong,
+      // TwitterProtocolImpl will still fall back to binary protocol.
+      if (TwitterProtocolImpl::isUpgradePrefix(buffer)) {
+        setType(ProtocolType::Twitter);
+      } else {
+        setType(ProtocolType::Binary);
+      }
     } else if (CompactProtocolImpl::isMagic(version)) {
       setType(ProtocolType::Compact);
     }

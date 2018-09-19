@@ -54,6 +54,11 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
         host_predicate.name())
         ->createHostPredicate(*this, host_predicate.config());
   }
+
+  auto host_selection_attempts = config.retry_policy().host_selection_retry_max_attempts();
+  if (host_selection_attempts) {
+    host_selection_attempts_ = host_selection_attempts;
+  }
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) {
@@ -261,7 +266,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           HeaderParser::configure(route.route().request_headers_to_add())),
       route_action_response_headers_parser_(HeaderParser::configure(
           route.route().response_headers_to_add(), route.route().response_headers_to_remove())),
-      request_headers_parser_(HeaderParser::configure(route.request_headers_to_add())),
+      request_headers_parser_(HeaderParser::configure(route.request_headers_to_add(),
+                                                      route.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
                                                        route.response_headers_to_remove())),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
@@ -579,7 +585,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     : DynamicRouteEntry(parent, cluster.name()), runtime_key_(runtime_key),
       loader_(factory_context.runtime()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
-      request_headers_parser_(HeaderParser::configure(cluster.request_headers_to_add())),
+      request_headers_parser_(HeaderParser::configure(cluster.request_headers_to_add(),
+                                                      cluster.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
                                                        cluster.response_headers_to_remove())),
       per_filter_configs_(cluster.per_filter_config(), factory_context) {
@@ -697,7 +704,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
                                  bool validate_clusters)
     : name_(virtual_host.name()), rate_limit_policy_(virtual_host.rate_limits()),
       global_route_config_(global_route_config),
-      request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add())),
+      request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add(),
+                                                      virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
       per_filter_configs_(virtual_host.per_filter_config(), factory_context) {
@@ -904,7 +912,8 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
     internal_only_headers_.push_back(Http::LowerCaseString(header));
   }
 
-  request_headers_parser_ = HeaderParser::configure(config.request_headers_to_add());
+  request_headers_parser_ =
+      HeaderParser::configure(config.request_headers_to_add(), config.request_headers_to_remove());
   response_headers_parser_ = HeaderParser::configure(config.response_headers_to_add(),
                                                      config.response_headers_to_remove());
 }

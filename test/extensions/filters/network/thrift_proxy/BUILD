@@ -186,6 +186,19 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "twitter_protocol_impl_test",
+    srcs = ["twitter_protocol_impl_test.cc"],
+    extension_name = "envoy.filters.network.thrift_proxy",
+    deps = [
+        ":mocks",
+        ":utility_lib",
+        "//source/extensions/filters/network/thrift_proxy:twitter_protocol_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_name = "envoy.filters.network.thrift_proxy",
