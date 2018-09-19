@@ -9,28 +9,31 @@
 namespace Envoy {
 namespace Stats {
 
-// TODO(ambuc): There is a possible performance optimization here for avoiding the encoding of IPs,
-// if they appear in stat names. We don't want to waste time symbolizing an integer as an integer,
-// if we can help it.
-StatNamePtr SymbolTableImpl::encode(const absl::string_view name) {
+// TODO(ambuc): There is a possible performance optimization here for avoiding the encoding of IPs /
+// numbers if they appear in stat names. We don't want to waste time symbolizing an integer as an
+// integer, if we can help it.
+StatNamePtr SymbolTable::encode(const absl::string_view name) {
   SymbolVec symbol_vec;
   std::vector<absl::string_view> name_vec = absl::StrSplit(name, '.');
   symbol_vec.reserve(name_vec.size());
+  Thread::LockGuard lock(lock_);
   std::transform(name_vec.begin(), name_vec.end(), std::back_inserter(symbol_vec),
                  [this](absl::string_view x) { return toSymbol(x); });
-
-  return std::make_unique<StatNameImpl>(symbol_vec, *this);
+  return std::make_unique<StatName>(symbol_vec, *this);
 }
 
-std::string SymbolTableImpl::decode(const SymbolVec& symbol_vec) const {
+std::string SymbolTable::decode(const SymbolVec& symbol_vec) const {
   std::vector<absl::string_view> name;
   name.reserve(symbol_vec.size());
+  Thread::ReleasableLockGuard lock(lock_);
   std::transform(symbol_vec.begin(), symbol_vec.end(), std::back_inserter(name),
                  [this](Symbol x) { return fromSymbol(x); });
+  lock.release();
   return absl::StrJoin(name, ".");
 }
 
-void SymbolTableImpl::free(const SymbolVec& symbol_vec) {
+void SymbolTable::free(const SymbolVec& symbol_vec) {
+  Thread::LockGuard lock(lock_);
   for (const Symbol symbol : symbol_vec) {
     auto decode_search = decode_map_.find(symbol);
     ASSERT(decode_search != decode_map_.end());
@@ -49,7 +52,7 @@ void SymbolTableImpl::free(const SymbolVec& symbol_vec) {
   }
 }
 
-Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
+Symbol SymbolTable::toSymbol(absl::string_view sv) EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   Symbol result;
   auto encode_find = encode_map_.find(sv);
   // If the string segment doesn't already exist,
@@ -76,10 +79,22 @@ Symbol SymbolTableImpl::toSymbol(absl::string_view sv) {
   return result;
 }
 
-absl::string_view SymbolTableImpl::fromSymbol(const Symbol symbol) const {
+absl::string_view SymbolTable::fromSymbol(const Symbol symbol) const
+    EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   auto search = decode_map_.find(symbol);
   ASSERT(search != decode_map_.end());
   return search->second;
+}
+
+void SymbolTable::newSymbol() EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+  if (pool_.empty()) {
+    next_symbol_ = ++monotonic_counter_;
+  } else {
+    next_symbol_ = pool_.top();
+    pool_.pop();
+  }
+  // This should catch integer overflow for the new symbol.
+  ASSERT(monotonic_counter_ != 0);
 }
 
 } // namespace Stats

@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Stats {
 
-HeapStatData::HeapStatData(absl::string_view key) : name_(key.data(), key.size()) {}
+HeapStatData::HeapStatData(StatNamePtr name_ptr) : name_ptr_(std::move(name_ptr)) {}
 
 HeapStatDataAllocator::HeapStatDataAllocator() {}
 
@@ -15,11 +15,11 @@ HeapStatDataAllocator::~HeapStatDataAllocator() { ASSERT(stats_.empty()); }
 HeapStatData* HeapStatDataAllocator::alloc(absl::string_view name) {
   // Any expected truncation of name is done at the callsite. No truncation is
   // required to use this allocator.
-  auto data = std::make_unique<HeapStatData>(name);
+  auto data = std::make_unique<HeapStatData>(table_.encode(name));
   Thread::ReleasableLockGuard lock(mutex_);
   auto ret = stats_.insert(data.get());
-  HeapStatData* existing_data = *ret.first;
   lock.release();
+  HeapStatData* existing_data = *ret.first;
 
   if (ret.second) {
     return data.release();

@@ -5,9 +5,11 @@
 #include <unordered_set>
 
 #include "common/common/hash.h"
+#include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
 #include "common/stats/stat_data_allocator_impl.h"
+#include "common/stats/symbol_table_impl.h"
 
 namespace Envoy {
 namespace Stats {
@@ -17,23 +19,20 @@ namespace Stats {
  * so that it can be allocated efficiently from the heap on demand.
  */
 struct HeapStatData {
-  explicit HeapStatData(absl::string_view key);
+  explicit HeapStatData(StatNamePtr name_ptr);
 
   /**
-   * @returns absl::string_view the name as a string_view.
+   * @returns std::string the name as a std::string with no truncation.
    */
-  absl::string_view key() const { return name_; }
+  std::string name() const { return name_ptr_->toString(); }
 
-  /**
-   * @returns std::string the name as a std::string.
-   */
-  std::string name() const { return name_; }
+  bool operator==(const HeapStatData& rhs) const { return *name_ptr_ == *rhs.name_ptr_; }
 
   std::atomic<uint64_t> value_{0};
   std::atomic<uint64_t> pending_increment_{0};
   std::atomic<uint16_t> flags_{0};
   std::atomic<uint16_t> ref_count_{1};
-  std::string name_;
+  StatNamePtr name_ptr_;
 };
 
 /**
@@ -52,27 +51,31 @@ public:
   // StatDataAllocator
   bool requiresBoundedStatNameSize() const override { return false; }
 
+  // SymbolTable
+  StatNamePtr encode(absl::string_view sv) { return table_.encode(sv); }
+
 private:
-  struct HeapStatHash_ {
-    size_t operator()(const HeapStatData* a) const { return HashUtil::xxHash64(a->key()); }
+  struct HeapStatHash {
+    size_t operator()(const HeapStatData* a) const { return a->name_ptr_->hash(); }
   };
-  struct HeapStatCompare_ {
-    bool operator()(const HeapStatData* a, const HeapStatData* b) const {
-      return (a->key() == b->key());
-    }
+  struct HeapStatCompare {
+    bool operator()(const HeapStatData* a, const HeapStatData* b) const { return *a == *b; }
   };
 
-  // TODO(jmarantz): See https://github.com/envoyproxy/envoy/pull/3927 and
-  //  https://github.com/envoyproxy/envoy/issues/3585, which can help reorganize
-  // the heap stats using a ref-counted symbol table to compress the stat strings.
-  typedef std::unordered_set<HeapStatData*, HeapStatHash_, HeapStatCompare_> StatSet;
+  typedef std::unordered_set<HeapStatData*, HeapStatHash, HeapStatCompare> StatSet;
 
   // An unordered set of HeapStatData pointers which keys off the key()
-  // field in each object. This necessitates a custom comparator and hasher.
+  // field in each object. This necessitates a custom comparator and hasher, which key off of the
+  // StatNamePtr's own StatNamePtrHash and StatNamePtrCompare operators.
   StatSet stats_ GUARDED_BY(mutex_);
-  // A mutex is needed here to protect the stats_ object from both alloc() and free() operations.
-  // Although alloc() operations are called under existing locking, free() operations are made from
-  // the destructors of the individual stat objects, which are not protected by locks.
+  // A locally held symbol table which encodes stat names as StatNamePtrs and decodes StatNamePtrs
+  // back into strings. This does not get guarded by mutex_, since it has its own internal mutex to
+  // guarantee thread safety.
+  SymbolTable table_;
+  // A mutex is needed here to protect both the stats_ object from both
+  // alloc() and free() operations. Although alloc() operations are called under existing locking,
+  // free() operations are made from the destructors of the individual stat objects, which are not
+  // protected by locks.
   Thread::MutexBasicLockable mutex_;
 };
 

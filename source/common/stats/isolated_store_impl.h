@@ -12,6 +12,7 @@
 #include "common/common/utility.h"
 #include "common/stats/heap_stat_data.h"
 #include "common/stats/stats_options_impl.h"
+#include "common/stats/symbol_table_impl.h"
 #include "common/stats/utility.h"
 
 namespace Envoy {
@@ -24,16 +25,18 @@ template <class Base> class IsolatedStatsCache {
 public:
   typedef std::function<std::shared_ptr<Base>(const std::string& name)> Allocator;
 
-  IsolatedStatsCache(Allocator alloc) : alloc_(alloc) {}
+  IsolatedStatsCache(Allocator alloc, HeapStatDataAllocator& heap_alloc)
+      : alloc_(alloc), heap_alloc_(heap_alloc) {}
 
   Base& get(const std::string& name) {
-    auto stat = stats_.find(name);
+    StatNamePtr ptr = heap_alloc_.encode(name);
+    auto stat = stats_.find(ptr);
     if (stat != stats_.end()) {
       return *stat->second;
     }
 
     std::shared_ptr<Base> new_stat = alloc_(name);
-    stats_.emplace(name, new_stat);
+    stats_.emplace(std::move(ptr), new_stat);
     return *new_stat;
   }
 
@@ -48,8 +51,11 @@ public:
   }
 
 private:
-  std::unordered_map<std::string, std::shared_ptr<Base>> stats_;
+  std::unordered_map<StatNamePtr, std::shared_ptr<Base>, StatNameUniquePtrHash,
+                     StatNameUniquePtrCompare>
+      stats_;
   Allocator alloc_;
+  HeapStatDataAllocator& heap_alloc_;
 };
 
 class IsolatedStoreImpl : public Store {

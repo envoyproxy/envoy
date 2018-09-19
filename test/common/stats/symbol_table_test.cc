@@ -12,14 +12,11 @@ namespace Stats {
 
 class StatNameTest : public testing::Test {
 protected:
-  SymbolVec getSymbols(StatName* stat_name_ptr) {
-    StatNameImpl& impl = dynamic_cast<StatNameImpl&>(*stat_name_ptr);
-    return impl.symbolVec();
-  }
+  SymbolVec getSymbols(StatName* stat_name_ptr) { return stat_name_ptr->symbolVec(); }
   std::string decodeSymbolVec(const SymbolVec& symbol_vec) { return table_.decode(symbol_vec); }
   Symbol monotonicCounter() { return table_.monotonicCounter(); }
 
-  SymbolTableImpl table_;
+  SymbolTable table_;
 };
 
 TEST_F(StatNameTest, TestArbitrarySymbolRoundtrip) {

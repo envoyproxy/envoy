@@ -14,6 +14,7 @@ envoy_cc_library(
     hdrs = ["heap_stat_data.h"],
     deps = [
         ":stat_data_allocator_lib",
+        ":symbol_table_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:thread_annotations",
@@ -64,6 +65,7 @@ envoy_cc_library(
     hdrs = ["raw_stat_data.h"],
     deps = [
         ":stat_data_allocator_lib",
+        ":symbol_table_lib",
         "//include/envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
@@ -124,8 +126,10 @@ envoy_cc_library(
     hdrs = ["symbol_table_impl.h"],
     external_deps = ["abseil_base"],
     deps = [
-        "//include/envoy/stats:symbol_table_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:hash_lib",
+        "//source/common/common:lock_guard_lib",
+        "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
     ],
 )
