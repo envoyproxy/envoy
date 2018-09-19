@@ -238,7 +238,6 @@ public:
   virtual bool shouldSelectAnotherHost(const Upstream::Host& host) PURE;
 
   /**
-<<<<<<< HEAD
    * Returns a reference to the PriorityLoad that should be used for the next retry.
    * @param priority_set current priority set.
    * @param priority_load original priority load.
@@ -247,11 +246,10 @@ public:
   virtual const Upstream::PriorityLoad&
   priorityLoadForRetry(const Upstream::PrioritySet& priority_set,
                        const Upstream::PriorityLoad& priority_load) PURE;
-=======
-   * @return how many times host selection should be reattempted during host selection.
+  /**
+   * return how many times host selection should be reattempted during host selection.
    */
   virtual uint32_t hostSelectionMaxAttempts() const PURE;
->>>>>>> origin/master
 };
 
 typedef std::unique_ptr<RetryState> RetryStatePtr;
