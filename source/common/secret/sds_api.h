@@ -68,14 +68,18 @@ private:
   Cleanup clean_up_;
 };
 
-typedef std::shared_ptr<SdsApi> SdsApiSharedPtr;
+class TlsCertificateSdsApi;
+class CertificateValidationContextSdsApi;
+typedef std::shared_ptr<TlsCertificateSdsApi> TlsCertificateSdsApiSharedPtr;
+typedef std::shared_ptr<CertificateValidationContextSdsApi>
+    CertificateValidationContextSdsApiSharedPtr;
 
 /**
  * TlsCertificateSdsApi implementation maintains and updates dynamic TLS certificate secrets.
  */
 class TlsCertificateSdsApi : public SdsApi, public TlsCertificateConfigProvider {
 public:
-  static SdsApiSharedPtr
+  static TlsCertificateSdsApiSharedPtr
   create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
          const envoy::api::v2::core::ConfigSource& sds_config, const std::string& sds_config_name,
          std::function<void()> destructor_cb) {
@@ -119,7 +123,7 @@ private:
 class CertificateValidationContextSdsApi : public SdsApi,
                                            public CertificateValidationContextConfigProvider {
 public:
-  static SdsApiSharedPtr
+  static CertificateValidationContextSdsApiSharedPtr
   create(Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
          const envoy::api::v2::core::ConfigSource& sds_config, const std::string& sds_config_name,
          std::function<void()> destructor_cb) {

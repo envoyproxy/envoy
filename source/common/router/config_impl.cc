@@ -54,6 +54,11 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
         host_predicate.name())
         ->createHostPredicate(*this, host_predicate.config());
   }
+
+  auto host_selection_attempts = config.retry_policy().host_selection_retry_max_attempts();
+  if (host_selection_attempts) {
+    host_selection_attempts_ = host_selection_attempts;
+  }
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) {

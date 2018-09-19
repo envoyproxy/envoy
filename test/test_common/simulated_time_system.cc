@@ -112,7 +112,7 @@ void SimulatedTimeSystem::Alarm::enableTimer(const std::chrono::milliseconds& du
 // the real current time. But thereafter, real-time will not be used, and time
 // will march forward only by calling sleep().
 SimulatedTimeSystem::SimulatedTimeSystem()
-    : monotonic_time_(real_time_source_.monotonicTime()),
+    : monotonic_time_(MonotonicTime(std::chrono::seconds(0))),
       system_time_(real_time_source_.systemTime()), index_(0) {}
 
 SystemTime SimulatedTimeSystem::systemTime() {

@@ -39,7 +39,7 @@ Output
     locations ats cluster_name
     Test_6
 
-  Testing with valid :ref:`runtime values <config_http_conn_man_route_table_route>` is not currently supported,
+  Testing with valid :ref:`runtime values <envoy_api_field_route.RouteMatch.runtime>` is not currently supported,
   this may be added in future work.
 
 Building

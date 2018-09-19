@@ -175,6 +175,12 @@ public:
    * @return list of RetryHostPredicates to use
    */
   virtual std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const PURE;
+
+  /**
+   * Number of times host selection should be reattempted when selecting a host
+   * for a retry attempt.
+   */
+  virtual uint32_t hostSelectionMaxAttempts() const PURE;
 };
 
 /**
@@ -225,6 +231,11 @@ public:
    * @return whether host selection should be reattempted
    */
   virtual bool shouldSelectAnotherHost(const Upstream::Host& host) PURE;
+
+  /**
+   * @return how many times host selection should be reattempted during host selection.
+   */
+  virtual uint32_t hostSelectionMaxAttempts() const PURE;
 };
 
 typedef std::unique_ptr<RetryState> RetryStatePtr;
