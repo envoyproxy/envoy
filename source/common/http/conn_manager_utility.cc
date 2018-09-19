@@ -104,8 +104,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   //               additional inference modes and make this mode legacy.
   const bool internal_request =
       (single_xff_address && final_remote_address != nullptr) &&
-      (Network::Utility::isInternalAddress(*final_remote_address) ||
-       config.internalAddressConfig().isInternalAddress(*final_remote_address));
+      config.internalAddressConfig().isInternalAddress(*final_remote_address);
 
   // After determining internal request status, if there is no final remote address, due to no XFF,
   // busted XFF, etc., use the direct connection remote address for logging.

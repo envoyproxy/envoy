@@ -4,6 +4,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/http/date_provider.h"
+#include "common/network/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -152,6 +153,16 @@ class InternalAddressConfig {
 public:
   virtual ~InternalAddressConfig() {}
   virtual bool isInternalAddress(const Network::Address::Instance& address) const PURE;
+};
+
+/**
+ * Determines if an address is internal based on whether it is an RFC1918 ip address.
+ */
+class DefaultInternalAddressConfig : public Http::InternalAddressConfig {
+public:
+  bool isInternalAddress(const Network::Address::Instance& address) const override {
+    return Network::Utility::isInternalAddress(address);
+  }
 };
 
 /**

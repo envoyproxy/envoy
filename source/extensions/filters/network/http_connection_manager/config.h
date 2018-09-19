@@ -60,6 +60,9 @@ public:
                                            const Buffer::Instance& data);
 };
 
+/**
+ * Determines if an address is internal based on user provided config.
+ */
 class InternalAddressConfig : public Http::InternalAddressConfig {
 public:
   InternalAddressConfig(const envoy::config::filter::network::http_connection_manager::v2::
@@ -108,7 +111,7 @@ public:
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
   const Http::InternalAddressConfig& internalAddressConfig() const override {
-    return internal_address_config_;
+    return *internal_address_config_;
   }
   uint32_t xffNumTrustedHops() const override { return xff_num_trusted_hops_; }
   bool skipXffAppend() const override { return skip_xff_append_; }
@@ -141,7 +144,7 @@ private:
   Http::ConnectionManagerStats stats_;
   Http::ConnectionManagerTracingStats tracing_stats_;
   const bool use_remote_address_{};
-  const InternalAddressConfig internal_address_config_;
+  const std::unique_ptr<Http::InternalAddressConfig> internal_address_config_;
   const uint32_t xff_num_trusted_hops_;
   const bool skip_xff_append_;
   const std::string via_;
