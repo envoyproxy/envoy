@@ -30,8 +30,8 @@ public:
 
     TestEnvironment::initializeOptions(argc, argv);
     Thread::MutexBasicLockable lock;
-    Logger::Registry::initialize(TestEnvironment::getOptions().logLevel(),
-                                 TestEnvironment::getOptions().logFormat(), lock);
+    Logger::Context logging_state(TestEnvironment::getOptions().logLevel(),
+                                  TestEnvironment::getOptions().logFormat(), lock);
 
     // Allocate fake log access manager.
     testing::NiceMock<AccessLog::MockAccessLogManager> access_log_manager;
