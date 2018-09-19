@@ -8,7 +8,6 @@ import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/duration.proto";
-import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
@@ -147,28 +146,13 @@ message TcpProxy {
   // The router selects an upstream cluster based on these weights.
   message WeightedCluster {
     message ClusterWeight {
-      // Name of the upstream cluster. The cluster must exist in the
-      // :ref:`cluster manager configuration <config_cluster_manager>`.
+      // Name of the upstream cluster.
       string name = 1 [(validate.rules).string.min_bytes = 1];
 
       // When a request matches the route, the choice of an upstream cluster is
       // determined by its weight. The sum of weights across all entries in the
       // clusters array determines the total weight.
       uint32 weight = 2 [(validate.rules).uint32.gte = 1];
-
-      // [#not-implemented-hide:] Optional endpoint metadata match
-      // criteria. Only endpoints in the upstream cluster with metadata
-      // matching that set in metadata_match will be considered. The filter
-      // name should be specified as *envoy.lb*.
-      envoy.api.v2.core.Metadata metadata_match = 3;
-
-      // [#not-implemented-hide:] The per_filter_config field can be used
-      // to provide weighted cluster-specific configurations for
-      // filters. The key should match the filter name, such as
-      // *envoy.buffer* for the HTTP buffer filter. Use of this field is
-      // filter specific; see the :ref:`HTTP filter documentation
-      // <config_http_filters>` for if and how it is utilized.
-      map<string, google.protobuf.Struct> per_filter_config = 4;
     }
 
     // Specifies one or more upstream clusters associated with the route.
