@@ -197,7 +197,7 @@ message HttpConnectionManager {
 
   message InternalAddressConfig {
     // Whether unix socket addresses should be considered internal.
-    google.protobuf.BoolValue unix_sockets = 1;
+    bool unix_sockets = 1;
   }
 
   // Configures what network addresses are considered internal for stats and header sanitazion

@@ -127,7 +127,7 @@ HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& c
 InternalAddressConfig::InternalAddressConfig(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
         InternalAddressConfig& config)
-    : unix_sockets_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, unix_sockets, false)) {}
+    : unix_sockets_(config.unix_sockets()) {}
 
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
