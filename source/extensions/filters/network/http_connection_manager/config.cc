@@ -49,7 +49,7 @@ std::unique_ptr<Http::InternalAddressConfig> createInternalAddressConfig(
     return std::make_unique<InternalAddressConfig>(config.internal_address_config());
   }
 
-  return std::make_unique<DefaultInternalAddressConfig>();
+  return std::make_unique<Http::DefaultInternalAddressConfig>();
 }
 
 } // namespace

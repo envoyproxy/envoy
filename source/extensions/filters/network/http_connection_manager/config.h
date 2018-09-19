@@ -69,7 +69,12 @@ public:
                             HttpConnectionManager::InternalAddressConfig& config);
 
   bool isInternalAddress(const Network::Address::Instance& address) const override {
-    return address.type() == Network::Address::Type::Pipe && unix_sockets_;
+    if (address.type() == Network::Address::Type::Pipe) {
+      return unix_sockets_;
+    }
+
+    // TODO(snowp): Make internal subnets configurable.
+    return Network::Utility::isInternalAddress(address);
   }
 
 private:

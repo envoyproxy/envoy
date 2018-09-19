@@ -145,9 +145,11 @@ TEST_F(HttpConnectionManagerConfigTest, UnixSocketInternalAddress) {
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_);
   Network::Address::PipeInstance unixAddress{"/foo"};
-  Network::Address::Ipv4Instance ipAddress{"127.0.0.1", 0};
+  Network::Address::Ipv4Instance internalIpAddress{"127.0.0.1", 0};
+  Network::Address::Ipv4Instance externalIpAddress{"12.0.0.1", 0};
   EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(unixAddress));
-  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(ipAddress));
+  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(internalIpAddress));
+  EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(externalIpAddress));
 }
 
 // Validated that an explicit zero stream idle timeout disables.

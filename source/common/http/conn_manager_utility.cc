@@ -103,7 +103,7 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   //               we can't change it at this point. In the future we will likely need to add
   //               additional inference modes and make this mode legacy.
   const bool internal_request =
-      (single_xff_address && final_remote_address != nullptr) &&
+      single_xff_address && final_remote_address != nullptr &&
       config.internalAddressConfig().isInternalAddress(*final_remote_address);
 
   // After determining internal request status, if there is no final remote address, due to no XFF,
