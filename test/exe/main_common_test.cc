@@ -27,6 +27,7 @@
 
 #include "absl/synchronization/notification.h"
 
+using testing::AllOf;
 using testing::HasSubstr;
 using testing::IsEmpty;
 
@@ -108,6 +109,20 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   initOnly();
   MainCommon main_common(argc(), argv());
   EXPECT_TRUE(main_common.run());
+}
+
+TEST_P(MainCommonTest, FilterStatsGoodRegex) {
+  addArg("--filter-stats");
+  addArg(".*foo.*");
+  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
+}
+
+// A bad regex passed in with --filter-stats should fail at startup.
+TEST_P(MainCommonTest, FilterStatsBadRegex) {
+  addArg("--filter-stats");
+  addArg(".*fo[o.*");
+  EXPECT_THROW_WITH_REGEX(MainCommon main_common(argc(), argv()), MalformedArgvException,
+                          ".*Unexpected character in bracket expression.*");
 }
 
 // Ensurees that existing users of main_common() can link.
@@ -310,6 +325,17 @@ TEST_P(AdminRequestTest, AdminRequestAfterRun) {
   EXPECT_TRUE(waitForEnvoyToExit());
   EXPECT_FALSE(admin_handler_was_called);
   EXPECT_EQ(1, lambda_destroy_count);
+}
+
+TEST_P(AdminRequestTest, AdminRequestGetStatsUnderFilter) {
+  addArg("--filter-stats");
+  addArg("^(cluster\\.|tcp\\.).*"); // ^(cluster\.|tcp\.).*
+  startEnvoy();
+  started_.WaitForNotification();
+  EXPECT_THAT(adminRequest("/stats", "GET"),
+              AllOf(HasSubstr("cluster"), Not(HasSubstr("cluster\\.")), Not(HasSubstr("tcp\\."))));
+  adminRequest("/quitquitquit", "POST");
+  EXPECT_TRUE(waitForEnvoyToExit());
 }
 
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminRequestTest,
