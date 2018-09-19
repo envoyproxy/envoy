@@ -235,3 +235,8 @@ following are the command line options that Envoy supports.
 
   *(optional)* This flag disables Envoy hot restart for builds that have it enabled. By default, hot
   restart is enabled.
+
+.. option:: --allow-unknown-fields
+
+  *(optional)* This flag disables validation of protobuf configurations for unknown fields. By default, the 
+  validation is enabled.
