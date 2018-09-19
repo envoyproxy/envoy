@@ -60,6 +60,11 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
     Registry::FactoryRegistry<Upstream::RetryPriorityFactory>::getFactory(retry_priority.name())
         ->createRetryPriority(*this, retry_priority.config());
   }
+
+  auto host_selection_attempts = config.retry_policy().host_selection_retry_max_attempts();
+  if (host_selection_attempts) {
+    host_selection_attempts_ = host_selection_attempts;
+  }
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) {
@@ -273,7 +278,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route)),
-      per_filter_configs_(route.per_filter_config(), factory_context) {
+      per_filter_configs_(route.per_filter_config(), factory_context),
+      time_system_(factory_context.dispatcher().timeSystem()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -358,9 +364,9 @@ Http::WebSocketProxyPtr RouteEntryImplBase::createWebSocketProxy(
     Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
     Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
     Network::ReadFilterCallbacks* read_callbacks) const {
-  return std::make_unique<Http::WebSocket::WsHandlerImpl>(request_headers, request_info, *this,
-                                                          callbacks, cluster_manager,
-                                                          read_callbacks, websocket_config_);
+  return std::make_unique<Http::WebSocket::WsHandlerImpl>(
+      request_headers, request_info, *this, callbacks, cluster_manager, read_callbacks,
+      websocket_config_, time_system_);
 }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,

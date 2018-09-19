@@ -59,6 +59,8 @@ static const ProtocolTypeMap& protocolTypeMap() {
            ProtocolType::LaxBinary},
           {envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::COMPACT,
            ProtocolType::Compact},
+          {envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::TWITTER,
+           ProtocolType::Twitter},
       });
 }
 
@@ -106,8 +108,8 @@ Network::FilterFactoryCb ThriftProxyFilterConfigFactory::createFilterFactoryFrom
   std::shared_ptr<Config> filter_config(new ConfigImpl(proto_config, context));
 
   return [filter_config, &context](Network::FilterManager& filter_manager) -> void {
-    filter_manager.addReadFilter(
-        std::make_shared<ConnectionManager>(*filter_config, context.random()));
+    filter_manager.addReadFilter(std::make_shared<ConnectionManager>(
+        *filter_config, context.random(), context.dispatcher().timeSystem()));
   };
 }
 

@@ -429,7 +429,7 @@ public:
 
     {
       testing::InSequence sequence;
-      filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
+      filter_.reset(new Filter(config_, factory_context_.cluster_manager_, timeSystem()));
       EXPECT_CALL(filter_callbacks_.connection_, enableHalfClose(true));
       EXPECT_CALL(filter_callbacks_.connection_, readDisable(true));
       filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -463,6 +463,8 @@ public:
                                        Tcp::ConnectionPool::PoolFailureReason reason) {
     conn_pool_callbacks_.at(conn_index)->onPoolFailure(reason, upstream_hosts_.at(conn_index));
   }
+
+  Event::TimeSystem& timeSystem() { return factory_context_.dispatcher().timeSystem(); }
 
   ConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
@@ -721,7 +723,7 @@ TEST_F(TcpProxyTest, WithMetadataMatch) {
       {Envoy::Config::MetadataFilters::get().ENVOY_LB, metadata_struct});
 
   configure(config);
-  filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
+  filter_.reset(new Filter(config_, factory_context_.cluster_manager_, timeSystem()));
 
   const auto& metadata_criteria = filter_->metadataMatchCriteria()->metadataMatchCriteria();
 
@@ -734,7 +736,7 @@ TEST_F(TcpProxyTest, WithMetadataMatch) {
 
 TEST_F(TcpProxyTest, DisconnectBeforeData) {
   configure(defaultConfig());
-  filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
+  filter_.reset(new Filter(config_, factory_context_.cluster_manager_, timeSystem()));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -773,7 +775,7 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
       new Upstream::ResourceManagerImpl(factory_context_.runtime_loader_, "fake_key", 0, 0, 0, 0));
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
-  filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
+  filter_.reset(new Filter(config_, factory_context_.cluster_manager_, timeSystem()));
   // The downstream connection closes if the proxy can't make an upstream connection.
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -1074,9 +1076,11 @@ public:
   void setup() {
     EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
 
-    filter_.reset(new Filter(config_, factory_context_.cluster_manager_));
+    filter_.reset(new Filter(config_, factory_context_.cluster_manager_, timeSystem()));
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
+
+  Event::TimeSystem& timeSystem() { return factory_context_.dispatcher().timeSystem(); }
 
   ConfigSharedPtr config_;
   NiceMock<Network::MockConnection> connection_;

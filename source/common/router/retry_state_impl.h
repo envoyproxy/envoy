@@ -63,6 +63,8 @@ public:
     return retry_priority_->determinePriorityLoad(priority_set, priority_load);
   }
 
+  uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
+
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
                  const Upstream::ClusterInfo& cluster, Runtime::Loader& runtime,
@@ -86,6 +88,7 @@ private:
   BackOffStrategyPtr backoff_strategy_;
   std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
+  uint32_t host_selection_max_attempts_;
 };
 
 } // namespace Router

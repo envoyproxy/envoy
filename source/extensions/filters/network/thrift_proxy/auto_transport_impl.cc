@@ -23,8 +23,8 @@ bool AutoTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMetada
       return false;
     }
 
-    int32_t size = BufferHelper::peekI32(buffer);
-    uint16_t proto_start = BufferHelper::peekU16(buffer, 4);
+    int32_t size = buffer.peekBEInt<int32_t>();
+    uint16_t proto_start = buffer.peekBEInt<uint16_t>(4);
 
     // Currently, transport detection depends on the following:
     // 1. Protocol may only be binary or compact, which start with 0x8001 or 0x8201.

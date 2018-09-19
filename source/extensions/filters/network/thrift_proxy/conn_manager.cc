@@ -15,11 +15,12 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator)
+ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
+                                     Event::TimeSystem& time_system)
     : config_(config), stats_(config_.stats()), transport_(config.createTransport()),
       protocol_(config.createProtocol()),
       decoder_(std::make_unique<Decoder>(*transport_, *protocol_, *this)),
-      random_generator_(random_generator) {}
+      random_generator_(random_generator), time_system_(time_system) {}
 
 ConnectionManager::~ConnectionManager() {}
 
@@ -91,14 +92,27 @@ void ConnectionManager::dispatch() {
 void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response) {
   Buffer::OwnedImpl buffer;
 
-  response.encode(metadata, *protocol_, buffer);
+  const DirectResponse::ResponseType result = response.encode(metadata, *protocol_, buffer);
 
   Buffer::OwnedImpl response_buffer;
-
   metadata.setProtocol(protocol_->type());
   transport_->encodeFrame(response_buffer, metadata, buffer);
 
   read_callbacks_->connection().write(response_buffer, false);
+
+  switch (result) {
+  case DirectResponse::ResponseType::SuccessReply:
+    stats_.response_success_.inc();
+    break;
+  case DirectResponse::ResponseType::ErrorReply:
+    stats_.response_error_.inc();
+    break;
+  case DirectResponse::ResponseType::Exception:
+    stats_.response_exception_.inc();
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 }
 
 void ConnectionManager::continueDecoding() {
@@ -255,7 +269,7 @@ FilterStatus ConnectionManager::ActiveRpc::transportEnd() {
   FilterStatus status = event_handler_->transportEnd();
 
   if (metadata_->isProtocolUpgradeMessage()) {
-    ENVOY_CONN_LOG(error, "thrift: sending protocol upgrade response",
+    ENVOY_CONN_LOG(debug, "thrift: sending protocol upgrade response",
                    parent_.read_callbacks_->connection());
     sendLocalReply(*parent_.protocol_->upgradeResponse(*upgrade_handler_));
   }
@@ -272,7 +286,7 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
   if (metadata_->isProtocolUpgradeMessage()) {
     ASSERT(parent_.protocol_->supportsUpgrade());
 
-    ENVOY_CONN_LOG(error, "thrift: decoding protocol upgrade request",
+    ENVOY_CONN_LOG(debug, "thrift: decoding protocol upgrade request",
                    parent_.read_callbacks_->connection());
     upgrade_handler_ = parent_.protocol_->upgradeRequestDecoder();
     ASSERT(upgrade_handler_ != nullptr);

@@ -27,6 +27,11 @@ public:
         .WillByDefault(Return(true));
   }
 
+  void setup() {
+    Http::TestHeaderMapImpl headers;
+    setup(headers);
+  }
+
   void setup(Http::HeaderMap& request_headers) {
     state_ = RetryStateImpl::create(policy_, request_headers, cluster_, runtime_, random_,
                                     dispatcher_, Upstream::ResourcePriority::Default);
@@ -391,6 +396,15 @@ TEST_F(RouterRetryStateImplTest, Backoff) {
 
   EXPECT_EQ(3UL, cluster_.stats().upstream_rq_retry_.value());
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_success_.value());
+}
+
+TEST_F(RouterRetryStateImplTest, HostSelectionAttempts) {
+  policy_.host_selection_max_attempts_ = 2;
+  policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+
+  setup();
+
+  EXPECT_EQ(2, state_->hostSelectionMaxAttempts());
 }
 
 TEST_F(RouterRetryStateImplTest, Cancel) {

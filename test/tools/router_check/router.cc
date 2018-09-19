@@ -154,7 +154,8 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
+  Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11,
+                                                   factory_context_->dispatcher().timeSystem());
   if (tool_config.route_->routeEntry() != nullptr) {
     tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,
                                                              true);
@@ -165,7 +166,8 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
 
 bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::string& expected) {
   std::string actual = "";
-  Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
+  Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11,
+                                                   factory_context_->dispatcher().timeSystem());
   if (tool_config.route_->routeEntry() != nullptr) {
     tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,
                                                              true);
@@ -192,7 +194,8 @@ bool RouterCheckTool::compareHeaderField(ToolConfig& tool_config, const std::str
 bool RouterCheckTool::compareCustomHeaderField(ToolConfig& tool_config, const std::string& field,
                                                const std::string& expected) {
   std::string actual = "";
-  Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11);
+  Envoy::RequestInfo::RequestInfoImpl request_info(Envoy::Http::Protocol::Http11,
+                                                   factory_context_->dispatcher().timeSystem());
   request_info.setDownstreamRemoteAddress(Network::Utility::getCanonicalIpv4LoopbackAddress());
   if (tool_config.route_->routeEntry() != nullptr) {
     tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.headers_, request_info,

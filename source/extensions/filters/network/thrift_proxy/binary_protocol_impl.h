@@ -70,6 +70,15 @@ public:
 
   static bool isMagic(uint16_t word) { return word == Magic; }
 
+  // Minimum message length:
+  //   version: 2 bytes +
+  //   unused: 1 byte +
+  //   msg type: 1 byte +
+  //   name len: 4 bytes +
+  //   name: 0 bytes +
+  //   seq id: 4 bytes
+  static constexpr uint64_t MinMessageBeginLength = 12;
+
 private:
   const static uint16_t Magic;
 };

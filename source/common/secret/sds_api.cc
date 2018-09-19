@@ -7,7 +7,6 @@
 #include "common/config/resources.h"
 #include "common/config/subscription_factory.h"
 #include "common/protobuf/utility.h"
-#include "common/ssl/tls_certificate_config_impl.h"
 
 namespace Envoy {
 namespace Secret {
@@ -15,8 +14,8 @@ namespace Secret {
 SdsApi::SdsApi(const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                Runtime::RandomGenerator& random, Stats::Store& stats,
                Upstream::ClusterManager& cluster_manager, Init::Manager& init_manager,
-               const envoy::api::v2::core::ConfigSource& sds_config, std::string sds_config_name,
-               std::function<void()> destructor_cb)
+               const envoy::api::v2::core::ConfigSource& sds_config,
+               const std::string& sds_config_name, std::function<void()> destructor_cb)
     : local_info_(local_info), dispatcher_(dispatcher), random_(random), stats_(stats),
       cluster_manager_(cluster_manager), sds_config_(sds_config), sds_config_name_(sds_config_name),
       secret_hash_(0), clean_up_(destructor_cb) {
@@ -60,12 +59,9 @@ void SdsApi::onConfigUpdate(const ResourceVector& resources, const std::string&)
   }
 
   const uint64_t new_hash = MessageUtil::hash(secret);
-  if (new_hash != secret_hash_ &&
-      secret.type_case() == envoy::api::v2::auth::Secret::TypeCase::kTlsCertificate) {
+  if (new_hash != secret_hash_) {
     secret_hash_ = new_hash;
-    tls_certificate_secrets_ =
-        std::make_unique<Ssl::TlsCertificateConfigImpl>(secret.tls_certificate());
-
+    setSecret(secret);
     update_callback_manager_.runCallbacks();
   }
 

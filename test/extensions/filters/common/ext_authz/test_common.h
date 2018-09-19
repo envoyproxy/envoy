@@ -14,7 +14,17 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-MATCHER_P(AuthzErrorResponse, status, "") { return arg->status == status; }
+MATCHER_P(AuthzErrorResponse, status, "") {
+  // These fields should be always empty when the status is an error.
+  if (!arg->headers_to_add.empty() || !arg->headers_to_append.empty() || !arg->body.empty()) {
+    return false;
+  }
+  // HTTP status code should be always set to Forbidden.
+  if (arg->status_code != Http::Code::Forbidden) {
+    return false;
+  }
+  return arg->status == status;
+}
 
 MATCHER_P(AuthzResponseNoAttributes, response, "") {
   if (arg->status != response.status) {

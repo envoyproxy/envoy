@@ -149,9 +149,10 @@ following are the command line options that Envoy supports.
   method for specifying this value and will override any value set in bootstrap
   configuration. It should be set if any of the following features are used:
   :ref:`statsd <arch_overview_statistics>`, :ref:`health check cluster
-  verification <config_cluster_manager_cluster_hc_service_name>`,
-  :ref:`runtime override directory <config_runtime_override_subdirectory>`,
-  :ref:`user agent addition <config_http_conn_man_add_user_agent>`,
+  verification <envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name>`,
+  :ref:`runtime override directory <envoy_api_msg_config.bootstrap.v2.Runtime>`,
+  :ref:`user agent addition
+  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.add_user_agent>`,
   :ref:`HTTP global rate limiting <config_http_filters_rate_limit>`,
   :ref:`CDS <config_cluster_manager_cds>`, and :ref:`HTTP tracing
   <arch_overview_tracing>`, either via this CLI option or in the bootstrap
@@ -179,7 +180,7 @@ following are the command line options that Envoy supports.
   alternative method for specifying this value and will override any value set
   in bootstrap configuration. It should be set if discovery service routing is
   used and the discovery service exposes :ref:`zone data
-  <config_cluster_manager_sds_api_host_az>`, either via this CLI option or in
+  <envoy_api_msg_endpoint.LocalityLbEndpoints>`, either via this CLI option or in
   the bootstrap configuration. The meaning of zone is context dependent, e.g.
   `Availability Zone (AZ)
   <https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html>`_

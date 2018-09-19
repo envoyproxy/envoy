@@ -197,6 +197,7 @@ public:
     return retry_host_predicates_;
   }
   Upstream::RetryPrioritySharedPtr retryPriority() const override { return retry_priority_; }
+  uint32_t hostSelectionMaxAttempts() const override { return host_selection_attempts_; }
 
   // Upstream::RetryHostPredicateFactoryCallbacks
   void addHostPredicate(Upstream::RetryHostPredicateSharedPtr predicate) override {
@@ -215,6 +216,7 @@ private:
   uint32_t retry_on_{};
   std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
+  uint32_t host_selection_attempts_{1};
 };
 
 /**
@@ -568,6 +570,7 @@ private:
   const absl::optional<Http::Code> direct_response_code_;
   std::string direct_response_body_;
   PerFilterConfigs per_filter_configs_;
+  Event::TimeSystem& time_system_;
 };
 
 /**

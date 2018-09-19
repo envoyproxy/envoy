@@ -18,9 +18,9 @@ Fully static
 ------------
 
 In a fully static configuration, the implementor provides a set of :ref:`listeners
-<config_listeners>` (and :ref:`filter chains <config_listener_network_filters>`), :ref:`clusters
+<config_listeners>` (and :ref:`filter chains <envoy_api_msg_listener.Filter>`), :ref:`clusters
 <config_cluster_manager>`, and optionally :ref:`HTTP route configurations
-<config_http_conn_man_route_table>`. Dynamic host discovery is only possible via DNS based
+<envoy_api_msg_RouteConfiguration>`. Dynamic host discovery is only possible via DNS based
 :ref:`service discovery <arch_overview_service_discovery>`. Configuration reloads must take place
 via the built in :ref:`hot restart <arch_overview_hot_restart>` mechanism.
 
@@ -35,7 +35,7 @@ SDS/EDS only
 The :ref:`service discovery service (SDS) API <config_cluster_manager_sds>` provides a more advanced
 mechanism by which Envoy can discover members of an upstream cluster. SDS has been renamed to :ref:`Endpoint
 Discovery Service (EDS)<envoy_api_file_envoy/api/v2/eds.proto>` in the
-:ref:`v2 API <config_overview_v2>`. Layered on top of a static
+:ref:`v2 API <config_overview_v2_management_server>`. Layered on top of a static
 configuration, SDS allows an Envoy deployment to circumvent the limitations of DNS (maximum records
 in a response, etc.) as well as consume more information used in load balancing and routing (e.g.,
 canary status, zone, etc.).
@@ -51,7 +51,7 @@ and remove clusters as specified by the API. This API allows implementors to bui
 which Envoy does not need to be aware of all upstream clusters at initial configuration time.
 Typically, when doing HTTP routing along with CDS (but without route discovery service),
 implementors will make use of the router's ability to forward requests to a cluster specified in an
-:ref:`HTTP request header <config_http_conn_man_route_table_route_cluster_header>`.
+:ref:`HTTP request header <envoy_api_field_route.RouteAction.cluster_header>`.
 
 Although it is possible to use CDS without SDS/EDS by specifying fully static clusters, we recommend
 still using the SDS/EDS API for clusters specified via CDS. Internally, when a cluster definition is

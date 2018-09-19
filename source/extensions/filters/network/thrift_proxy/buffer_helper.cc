@@ -7,113 +7,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-int8_t BufferHelper::peekI8(Buffer::Instance& buffer, uint64_t offset) {
-  if (buffer.length() < offset + 1) {
-    throw EnvoyException("buffer underflow");
-  }
-
-  int8_t i;
-  buffer.copyOut(offset, 1, &i);
-  return i;
-}
-
-int16_t BufferHelper::peekI16(Buffer::Instance& buffer, uint64_t offset) {
-  if (buffer.length() < offset + 2) {
-    throw EnvoyException("buffer underflow");
-  }
-
-  int16_t i;
-  buffer.copyOut(offset, 2, &i);
-  return be16toh(i);
-}
-
-int32_t BufferHelper::peekI32(Buffer::Instance& buffer, uint64_t offset) {
-  if (buffer.length() < offset + 4) {
-    throw EnvoyException("buffer underflow");
-  }
-
-  int32_t i;
-  buffer.copyOut(offset, 4, &i);
-  return be32toh(i);
-}
-
-int64_t BufferHelper::peekI64(Buffer::Instance& buffer, uint64_t offset) {
-  if (buffer.length() < offset + 8) {
-    throw EnvoyException("buffer underflow");
-  }
-
-  int64_t i;
-  buffer.copyOut(offset, 8, &i);
-  return be64toh(i);
-}
-
-uint16_t BufferHelper::peekU16(Buffer::Instance& buffer, uint64_t offset) {
-  if (buffer.length() < offset + 2) {
-    throw EnvoyException("buffer underflow");
-  }
-
-  uint16_t i;
-  buffer.copyOut(offset, 2, &i);
-  return be16toh(i);
-}
-
-uint32_t BufferHelper::peekU32(Buffer::Instance& buffer, uint64_t offset) {
-  if (buffer.length() < offset + 4) {
-    throw EnvoyException("buffer underflow");
-  }
-
-  uint32_t i;
-  buffer.copyOut(offset, 4, &i);
-  return be32toh(i);
-}
-
-uint64_t BufferHelper::peekU64(Buffer::Instance& buffer, uint64_t offset) {
-  if (buffer.length() < offset + 8) {
-    throw EnvoyException("buffer underflow");
-  }
-
-  uint64_t i;
-  buffer.copyOut(offset, 8, &i);
-  return be64toh(i);
-}
-
-int8_t BufferHelper::drainI8(Buffer::Instance& buffer) {
-  int8_t i = peekI8(buffer);
-  buffer.drain(1);
-  return i;
-}
-
-int16_t BufferHelper::drainI16(Buffer::Instance& buffer) {
-  int16_t i = peekI16(buffer);
-  buffer.drain(2);
-  return i;
-}
-
-int32_t BufferHelper::drainI32(Buffer::Instance& buffer) {
-  int32_t i = peekI32(buffer);
-  buffer.drain(4);
-  return i;
-}
-
-int64_t BufferHelper::drainI64(Buffer::Instance& buffer) {
-  int64_t i = peekI64(buffer);
-  buffer.drain(8);
-  return i;
-}
-
-uint32_t BufferHelper::drainU32(Buffer::Instance& buffer) {
-  uint32_t i = peekU32(buffer);
-  buffer.drain(4);
-  return i;
-}
-
-uint64_t BufferHelper::drainU64(Buffer::Instance& buffer) {
-  uint64_t i = peekU64(buffer);
-  buffer.drain(8);
-  return i;
-}
-
-double BufferHelper::drainDouble(Buffer::Instance& buffer) {
+double BufferHelper::drainBEDouble(Buffer::Instance& buffer) {
   static_assert(sizeof(double) == sizeof(uint64_t), "sizeof(double) != sizeof(uint64_t)");
   static_assert(std::numeric_limits<double>::is_iec559, "non-IEC559 (IEEE 754) double");
 
@@ -125,7 +19,7 @@ double BufferHelper::drainDouble(Buffer::Instance& buffer) {
   // 3. Using memcpy may be undefined, but probably reliable, and can be optimized to the
   //    same instructions as 1 and 2.
   // 4. Implementation of last resort is to manually copy from i to d via unsigned char*.
-  uint64_t i = drainU64(buffer);
+  uint64_t i = buffer.drainBEInt<uint64_t>();
   double d;
   std::memcpy(&d, &i, 8);
   return d;
@@ -145,7 +39,7 @@ uint64_t BufferHelper::peekVarInt(Buffer::Instance& buffer, uint64_t offset, int
   uint8_t shift = 0;
   uint64_t result = 0;
   for (uint64_t i = 0; i < last; i++) {
-    uint8_t b = peekI8(buffer, offset + i);
+    uint8_t b = buffer.peekInt<uint8_t>(offset + i);
 
     // Note: the compact protocol spec says these variable-length ints are encoded as big-endian,
     // but the Apache C++, Java, and Python implementations read and write them little-endian.
@@ -221,42 +115,14 @@ int32_t BufferHelper::peekZigZagI32(Buffer::Instance& buffer, uint64_t offset, i
   return (zz32 >> 1) ^ static_cast<uint32_t>(-static_cast<int32_t>(zz32 & 1));
 }
 
-void BufferHelper::writeI8(Buffer::Instance& buffer, int8_t value) { buffer.add(&value, 1); }
-
-void BufferHelper::writeI16(Buffer::Instance& buffer, int16_t value) {
-  value = htobe16(value);
-  buffer.add(&value, 2);
-}
-
-void BufferHelper::writeU16(Buffer::Instance& buffer, uint16_t value) {
-  value = htobe16(value);
-  buffer.add(&value, 2);
-}
-
-void BufferHelper::writeI32(Buffer::Instance& buffer, int32_t value) {
-  value = htobe32(value);
-  buffer.add(&value, 4);
-}
-
-void BufferHelper::writeU32(Buffer::Instance& buffer, uint32_t value) {
-  value = htobe32(value);
-  buffer.add(&value, 4);
-}
-
-void BufferHelper::writeI64(Buffer::Instance& buffer, int64_t value) {
-  value = htobe64(value);
-  buffer.add(&value, 8);
-}
-
-void BufferHelper::writeDouble(Buffer::Instance& buffer, double value) {
+void BufferHelper::writeBEDouble(Buffer::Instance& buffer, double value) {
   static_assert(sizeof(double) == sizeof(uint64_t), "sizeof(double) != sizeof(uint64_t)");
   static_assert(std::numeric_limits<double>::is_iec559, "non-IEC559 (IEEE 754) double");
 
   // See drainDouble for implementation details.
   uint64_t i;
   std::memcpy(&i, &value, 8);
-  i = htobe64(i);
-  buffer.add(&i, 8);
+  buffer.writeBEInt<uint64_t>(i);
 }
 
 // Thrift's var int encoding is described in
