@@ -195,6 +195,15 @@ message HttpConnectionManager {
   // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
   uint32 xff_num_trusted_hops = 19;
 
+  message InternalAddressConfig {
+    // Whether unix socket addresses should be considered internal.
+    google.protobuf.BoolValue unix_sockets = 1;
+  }
+
+  // Configures what network addresses are considered internal for stats and header sanitazion
+  // purposes.
+  InternalAddressConfig internal_address_config = 25;
+
   // If set, Envoy will not append the remote address to the
   // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header. This may be used in
   // conjunction with HTTP filters that explicitly manipulate XFF after the HTTP connection manager

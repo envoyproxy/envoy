@@ -114,6 +114,11 @@ HttpConnectionManagerConfigUtility::determineNextProtocol(Network::Connection& c
   return "";
 }
 
+InternalAddressConfig::InternalAddressConfig(
+    const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+        InternalAddressConfig& config)
+    : unix_sockets_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, unix_sockets, false)) {}
+
 HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
         config,
@@ -124,6 +129,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
       use_remote_address_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_remote_address, false)),
+      internal_address_config_(config.internal_address_config()),
       xff_num_trusted_hops_(config.xff_num_trusted_hops()),
       skip_xff_append_(config.skip_xff_append()), via_(config.via()),
       route_config_provider_manager_(route_config_provider_manager),

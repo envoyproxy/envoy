@@ -146,6 +146,15 @@ enum class ForwardClientCertType {
 enum class ClientCertDetailsType { Cert, Subject, URI, DNS };
 
 /**
+ * Configuration for what addresses should be considered internal beyond the defaults.
+ */
+class InternalAddressConfig {
+public:
+  virtual ~InternalAddressConfig() {}
+  virtual bool isInternalAddress(const Network::Address::Instance& address) const PURE;
+};
+
+/**
  * Abstract configuration for the connection manager.
  */
 class ConnectionManagerConfig {
@@ -230,6 +239,11 @@ public:
    *         status, etc. or to assume that XFF will already be populated with the remote address.
    */
   virtual bool useRemoteAddress() PURE;
+
+  /**
+   * @return InternalAddressConfig configuration for user defined internal addresses.
+   */
+  virtual const InternalAddressConfig& internalAddressConfig() const PURE;
 
   /**
    * @return uint32_t the number of trusted proxy hops in front of this Envoy instance, for
