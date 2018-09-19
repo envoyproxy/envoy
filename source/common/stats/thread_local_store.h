@@ -226,8 +226,9 @@ private:
 
   struct ScopeImpl : public TlsScope {
     ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
-        : scope_id_(next_scope_id_++), parent_(parent),
-          prefix_(Utility::sanitizeStatsName(prefix)) {}
+        : scope_id_(next_scope_id_++), parent_(parent), prefix_(Utility::sanitizeStatsName(prefix)),
+          has_filter_(statsOptions().statNameFilter().has_value()),
+          filter_(statsOptions().statNameFilter()) {}
     ~ScopeImpl();
 
     // Stats::Scope
@@ -240,6 +241,12 @@ private:
     Histogram& histogram(const std::string& name) override;
     Histogram& tlsHistogram(const std::string& name, ParentHistogramImpl& parent) override;
     const Stats::StatsOptions& statsOptions() const override { return parent_.statsOptions(); }
+
+    // Returns true when a stat should be initialized, i.e. when the filter doesn't exist or when
+    // the name doesn't match the filter.
+    bool passesFilter(const std::string& name) const {
+      return (!has_filter_ || !std::regex_match(name, filter_.value()));
+    }
 
     template <class StatType>
     using MakeStatFn =
@@ -270,6 +277,14 @@ private:
     ThreadLocalStoreImpl& parent_;
     const std::string prefix_;
     CentralCacheEntry central_cache_;
+
+    // It's ok to cache information relating to the top-level stat name filter regex, since it is
+    // set once at startup and never modified.
+    const bool has_filter_;
+    const absl::optional<std::regex> filter_;
+    NullCounterImpl null_counter_;
+    NullGaugeImpl null_gauge_;
+    NullHistogramImpl null_histogram_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {

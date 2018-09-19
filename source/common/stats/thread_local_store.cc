@@ -233,6 +233,10 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // Determine the final name based on the prefix and the passed name.
   std::string final_name = prefix_ + name;
 
+  if (!passesFilter(final_name)) {
+    return null_counter_;
+  }
+
   // We now try to acquire a *reference* to the TLS cache shared pointer. This might remain null
   // if we don't have TLS initialized currently. The de-referenced pointer might be null if there
   // is no cache entry.
@@ -271,6 +275,11 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
+
+  if (!passesFilter(final_name)) {
+    return null_gauge_;
+  }
+
   GaugeSharedPtr* tls_ref = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_ref = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].gauges_[final_name];
@@ -289,6 +298,11 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // See comments in counter(). There is no super clean way (via templates or otherwise) to
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
+
+  if (!passesFilter(final_name)) {
+    return null_histogram_;
+  }
+
   ParentHistogramSharedPtr* tls_ref = nullptr;
 
   if (!parent_.shutting_down_ && parent_.tls_) {
@@ -319,6 +333,10 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name,
                                                          ParentHistogramImpl& parent) {
   // See comments in counter() which explains the logic here.
+
+  if (!passesFilter(name)) {
+    return null_histogram_;
+  }
 
   // Here prefix will not be considered because, by the time ParentHistogram calls this method
   // during recordValue, the prefix is already attached to the name.
