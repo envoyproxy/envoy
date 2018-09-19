@@ -211,6 +211,13 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       destination_ips.push_back(cidr_range.asString());
     }
 
+    // Validate source IP addresses.
+    std::vector<std::string> source_ips;
+    for (const auto& source_ip : filter_chain_match.source_prefix_ranges()) {
+      const auto& cidr_range = Network::Address::CidrRange::create(source_ip);
+      source_ips.push_back(cidr_range.asString());
+    }
+
     std::vector<std::string> server_names(filter_chain_match.server_names().begin(),
                                           filter_chain_match.server_names().end());
 
