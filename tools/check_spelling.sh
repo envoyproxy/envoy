@@ -7,6 +7,9 @@ set -u
 set -e
 
 VERSION="0.3.4"
+linux_misspell_sha="34d489dbc5ddb4dfd6d3cfac9fde8660e6c37e6c"
+mac_misspell_sha="f2607e2297b9e8af562e384c38045033375c7433"
+
 OS=""
 
 MISSPELL_ARGS="-error -o stderr"
@@ -36,11 +39,27 @@ cd "$ROOTDIR"
 BIN_FILENAME="misspell_${VERSION}_${OS}_64bit.tar.gz"
 # Install tools we need
 if [[ ! -e "/tmp/misspell" ]]; then
-  if ! wget https://github.com/client9/misspell/releases/download/v${VERSION}/${BIN_FILENAME} -O /tmp/${BIN_FILENAME} --no-verbose -t 3  -o /tmp/wget.log; then
+  if ! wget https://github.com/client9/misspell/releases/download/v${VERSION}/${BIN_FILENAME} -O /tmp/${BIN_FILENAME} --no-verbose --tries=3 -o /tmp/wget.log; then
     cat /tmp/wget.log
     exit -1
   fi
   tar -xvf /tmp/${BIN_FILENAME} -C /tmp &> /dev/null
+fi
+
+actual_sha=""
+expect_sha=""
+
+if [[ $OS == "linux" ]]; then
+  actual_sha=$(sha1sum /tmp/misspell|cut -d' ' -f1)
+  expect_sha=${linux_misspell_sha}
+else
+  actual_sha=$(shasum -a 1 /tmp/misspell|cut -d' ' -f1)
+  expect_sha=${mac_misspell_sha}
+fi
+
+if [[ ! ${actual_sha} == ${expect_sha} ]]; then
+   echo "Expect shasum is ${expect_sha}, but actual is shasum ${actual_sha}"
+   exit -1
 fi
 
 chmod +x /tmp/misspell
