@@ -133,6 +133,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "stats_options_lib",
     hdrs = ["stats_options_impl.h"],
+    external_deps = ["abseil_optional"],
     deps = [
         "//include/envoy/stats:stats_interface",
     ],

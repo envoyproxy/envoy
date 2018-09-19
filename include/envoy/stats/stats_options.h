@@ -1,8 +1,11 @@
 #pragma once
 
 #include <memory>
+#include <regex>
 
 #include "envoy/common/pure.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
@@ -44,6 +47,11 @@ public:
    * The max allowed length of a stat suffix.
    */
   virtual size_t maxStatSuffixLength() const PURE;
+
+  /**
+   * The filter regex which limits stat creation.
+   */
+  virtual absl::optional<std::regex> statNameFilter() const PURE;
 };
 
 } // namespace Stats
