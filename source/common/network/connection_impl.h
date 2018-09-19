@@ -91,7 +91,9 @@ public:
   }
   absl::string_view requestedServerName() const override { return socket_->requestedServerName(); }
   Envoy::RequestInfo::FilterState& perConnectionState() override { return per_connection_state_; }
-  const Envoy::RequestInfo::FilterState& perConnectionState() const override { return per_connection_state_; }
+  const Envoy::RequestInfo::FilterState& perConnectionState() const override {
+    return per_connection_state_;
+  }
 
   // Network::BufferSource
   BufferSource::StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
