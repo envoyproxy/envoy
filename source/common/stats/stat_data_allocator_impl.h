@@ -88,6 +88,32 @@ private:
 };
 
 /**
+ * Null counter implementation.
+ * No-ops on all calls and requires no underlying metric or data.
+ */
+class NullCounterImpl : public Counter {
+public:
+  NullCounterImpl() {}
+  ~NullCounterImpl() {}
+  // Stats::Metric
+  const std::string name() const override { return ""; }
+  // Stats::MetricImpl
+  const std::string& tagExtractedName() const override { return tag_extracted_name_; }
+  const std::vector<Tag>& tags() const override { return tags_; }
+  // Stats::Counter
+  void add(uint64_t amount) override { UNREFERENCED_PARAMETER(amount); }
+  void inc() override {}
+  uint64_t latch() override { return 0; }
+  void reset() override {}
+  bool used() const override { return false; }
+  uint64_t value() const override { return 0; }
+
+private:
+  const std::string tag_extracted_name_ = "";
+  const std::vector<Tag> tags_;
+};
+
+/**
  * Gauge implementation that wraps a StatData.
  */
 template <class StatData> class GaugeImpl : public Gauge, public MetricImpl {
@@ -122,6 +148,33 @@ public:
 private:
   StatData& data_;
   StatDataAllocatorImpl<StatData>& alloc_;
+};
+
+/**
+ * Null gauge implementation.
+ * No-ops on all calls and requires no underlying metric or data.
+ */
+class NullGaugeImpl : public Gauge {
+public:
+  NullGaugeImpl() {}
+  ~NullGaugeImpl() {}
+  // Stats::Metric
+  const std::string name() const override { return ""; }
+  // Stats::MetricImpl
+  const std::string& tagExtractedName() const override { return tag_extracted_name_; }
+  const std::vector<Tag>& tags() const override { return tags_; }
+  // Stats::Gauge
+  void add(uint64_t amount) override { UNREFERENCED_PARAMETER(amount); }
+  void inc() override {}
+  void dec() override {}
+  void set(uint64_t amount) override { UNREFERENCED_PARAMETER(amount); }
+  void sub(uint64_t amount) override { UNREFERENCED_PARAMETER(amount); }
+  bool used() const override { return false; }
+  uint64_t value() const override { return 0; }
+
+private:
+  const std::string tag_extracted_name_ = "";
+  const std::vector<Tag> tags_;
 };
 
 template <class StatData>
