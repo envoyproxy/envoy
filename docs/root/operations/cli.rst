@@ -240,4 +240,4 @@ following are the command line options that Envoy supports.
 
   *(optional)* This flag prevents the creation of stats matching a regex. Since this flag is not set
   by default, all stats are enabled by default. To disable all stats within Envoy,
-  call `--filter-stats ".*".
+  call `--filter-stats ".*"`.
