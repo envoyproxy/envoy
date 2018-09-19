@@ -93,6 +93,9 @@ the following section.
 Service discovery service (SDS)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+*(deprecated)* This discovery service was replaced to endpoint discovery service in :ref:`v2 xDS
+API<config_overview_v2>`.
+
 The *service discovery service* is a generic :ref:`REST based API <config_cluster_manager_sds_api>`
 used by Envoy to fetch cluster members. Lyft provides a reference implementation via the Python
 `discovery service <https://github.com/lyft/discovery>`_. That implementation uses AWS DynamoDB as
