@@ -29,7 +29,6 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -261,7 +260,8 @@ public:
           }
           callback_ready_event.notifyOne();
         });
-    Thread::CondVar::WaitStatus status = callback_ready_event.waitFor(lock_, timeout);
+    Event::TimeSystem& time_system = connection_.dispatcher().timeSystem();
+    Thread::CondVar::WaitStatus status = time_system.waitFor(lock_, callback_ready_event, timeout);
     if (status == Thread::CondVar::WaitStatus::Timeout) {
       return testing::AssertionFailure() << "Timed out while executing on dispatcher.";
     }
@@ -504,11 +504,13 @@ class FakeUpstream : Logger::Loggable<Logger::Id::testing>,
                      public Network::FilterChainManager,
                      public Network::FilterChainFactory {
 public:
-  FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type);
+  FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type,
+               Event::TimeSystem& time_system);
   FakeUpstream(uint32_t port, FakeHttpConnection::Type type, Network::Address::IpVersion version,
-               bool enable_half_close = false);
+               Event::TimeSystem& time_system, bool enable_half_close = false);
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
-               FakeHttpConnection::Type type, Network::Address::IpVersion version);
+               FakeHttpConnection::Type type, Network::Address::IpVersion version,
+               Event::TimeSystem& time_system);
   ~FakeUpstream();
 
   FakeHttpConnection::Type httpType() { return http_type_; }
@@ -557,7 +559,7 @@ protected:
 private:
   FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                Network::SocketPtr&& connection, FakeHttpConnection::Type type,
-               bool enable_half_close);
+               Event::TimeSystem& time_system, bool enable_half_close);
 
   class FakeListener : public Network::ListenerConfig {
   public:
@@ -590,7 +592,7 @@ private:
   Thread::ThreadPtr thread_;
   Thread::CondVar new_connection_event_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
+  Event::TimeSystem& time_system_;
   Event::DispatcherPtr dispatcher_;
   Network::ConnectionHandlerPtr handler_;
   std::list<QueuedConnectionWrapperPtr> new_connections_ GUARDED_BY(lock_);

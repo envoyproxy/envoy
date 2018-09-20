@@ -16,6 +16,7 @@ namespace Event {
 class SimulatedTimeSystem : public TimeSystem {
 public:
   SimulatedTimeSystem();
+  ~SimulatedTimeSystem();
 
   // TimeSystem
   SchedulerPtr createScheduler(Libevent::BasePtr&) override;
@@ -23,20 +24,9 @@ public:
   // TimeSource
   SystemTime systemTime() override;
   MonotonicTime monotonicTime() override;
-
-  /**
-   * Advances time forward by the specified duration, running any timers
-   * along the way that have been scheduled to fire.
-   *
-   * @param duration The amount of time to sleep, expressed in any type that
-   * can be duration_casted to MonotonicTime::duration.
-   */
-  template <class Duration> void sleep(const Duration& duration) {
-    mutex_.lock();
-    MonotonicTime monotonic_time =
-        monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
-    setMonotonicTimeAndUnlock(monotonic_time);
-  }
+  void sleep(const Duration& duration) override;
+  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& lock, Thread::CondVar& condvar,
+                                      const Duration& duration) override;
 
   /**
    * Sets the time forward monotonically. If the supplied argument moves

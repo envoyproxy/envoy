@@ -24,8 +24,9 @@ namespace Envoy {
 
 IntegrationTestServerPtr IntegrationTestServer::create(
     const std::string& config_path, const Network::Address::IpVersion version,
-    std::function<void()> pre_worker_start_test_steps, bool deterministic) {
-  IntegrationTestServerPtr server{new IntegrationTestServer(config_path)};
+    std::function<void()> pre_worker_start_test_steps, bool deterministic,
+    Event::TimeSystem& time_system) {
+  IntegrationTestServerPtr server{new IntegrationTestServer(time_system, config_path)};
   server->start(version, pre_worker_start_test_steps, deterministic);
   return server;
 }
@@ -104,7 +105,7 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
     random_generator = std::make_unique<Runtime::RandomGeneratorImpl>();
   }
   server_.reset(new Server::InstanceImpl(
-      options, test_time_.timeSystem(), Network::Utility::getLocalAddress(version), *this,
+      options, time_system_, Network::Utility::getLocalAddress(version), *this,
       restarter, stats_store, lock, *this, std::move(random_generator), tls));
   pending_listeners_ = server_->listenerManager().listeners().size();
   ENVOY_LOG(info, "waiting for {} test server listeners", pending_listeners_);

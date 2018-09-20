@@ -14,6 +14,9 @@ class RealTimeSystem : public TimeSystem {
 public:
   // TimeSystem
   SchedulerPtr createScheduler(Libevent::BasePtr&) override;
+  void sleep(const Duration& duration) override;
+  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& lock, Thread::CondVar& condvar,
+                                      const Duration& duration) override;
 
   // TimeSource
   SystemTime systemTime() override { return time_source_.systemTime(); }

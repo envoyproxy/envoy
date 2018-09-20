@@ -7,6 +7,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 
+#include "common/common/thread.h"
 #include "common/event/libevent.h"
 
 namespace Envoy {
@@ -59,11 +60,38 @@ class TimeSystem : public TimeSource {
 public:
   virtual ~TimeSystem() {}
 
+  using Duration = MonotonicTime::duration;
+
   /**
    * Creates a timer factory. This indirection enables thread-local timer-queue management,
    * so servers can have a separate timer-factory in each thread.
    */
   virtual SchedulerPtr createScheduler(Libevent::BasePtr&) PURE;
+
+  /**
+   * Advances time forward by the specified duration, running any timers
+   * along the way that have been scheduled to fire.
+   *
+   * @param duration The amount of time to sleep.
+   */
+  virtual void sleep(const Duration& duration) PURE;
+  template<class D> void sleep(const D& duration) {
+    sleep(std::chrono::duration_cast<Duration>(duration));
+  }
+
+  /**
+   * Waits for the specified duration to expire, or for a condvar to
+   * be notified, whichever comes first.
+   *
+   * @param duration The amount of time to sleep.
+   */
+  virtual Thread::CondVar::WaitStatus waitFor(
+      Thread::MutexBasicLockable& lock, Thread::CondVar& condvar, const Duration& duration) PURE;
+
+  template<class D> Thread::CondVar::WaitStatus waitFor(
+      Thread::MutexBasicLockable& lock, Thread::CondVar& condvar, const D& duration) {
+    return waitFor(lock, condvar, std::chrono::duration_cast<Duration>(duration));
+  }
 };
 
 } // namespace Event
