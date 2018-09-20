@@ -164,7 +164,7 @@ TEST_F(SimulatedTimeSystemTest, OverrideEnable) {
   addTask(5, '5');
   timers_[0]->enableTimer(std::chrono::milliseconds(6));
   sleepMsAndLoop(5);
-  EXPECT_EQ("", output_);  // Timer didn't wake up because we overrode to 6ms.
+  EXPECT_EQ("", output_); // Timer didn't wake up because we overrode to 6ms.
   sleepMsAndLoop(1);
   EXPECT_EQ("5", output_);
 }
