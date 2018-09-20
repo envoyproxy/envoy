@@ -332,6 +332,14 @@ message RouteMatch {
   // query parameters is nonzero, they all must match the *path* header's
   // query string for a match to occur.
   repeated QueryParameterMatcher query_parameters = 7;
+
+  message GrpcRouteMatchOptions {
+  }
+
+  // If specified, only gRPC requests will be matched. The router will check
+  // that the content-type header has a application/grpc or one of the various
+  // application/grpc+ values.
+  GrpcRouteMatchOptions grpc = 8;
 }
 
 // [#comment:next free field: 9]
