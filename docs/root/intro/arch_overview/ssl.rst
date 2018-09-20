@@ -88,7 +88,7 @@ See the reference for :ref:`UpstreamTlsContexts <envoy_api_msg_auth.UpstreamTlsC
 .. _secret_discovery_service:
 
 Secret discovery service (SDS)
----------------------
+------------------------------
 
 TLS certificates can be specified in the bootstrap.static_resource
 :ref:`secrets <envoy_api_field_config.bootstrap.v2.Bootstrap.StaticResources.secrets>`.
@@ -98,7 +98,7 @@ The benefits of remote fetch are:
 * Easy to rotate expired certificates. SDS servers just push new certificates to Envoy.
 * Certificates are safe; they are not build into images, they can be fetched by secure channels such as Unix Domain Socket.
 
-A SDS server needs to implement service :ref:`SecretDiscoveryService <envoy.service.discovery.v2.SecretDiscoveryService>`.
+A SDS server needs to implement service `SecretDiscoveryService <https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/discovery/v2/sds.proto>`_.
 It follows the same protocol as other `xDS <https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md>`_
 
 :ref:`SdsSecretConfig <envoy_api_msg_auth.SdsSecretConfig>` is used to specify the secret. Its field "name" is a required field. If its "sds_config" field is empty, the "name" field specifies the secret in the bootstrap static_resource :ref:`secrets <envoy_api_field_config.bootstrap.v2.Bootstrap.StaticResources.secrets>`. Otherwise, it specifies the SDS server as :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>`. Only gRPC is supported for the SDS service so its "api_config_source" must specify a "grpc_service".
