@@ -13,7 +13,6 @@ namespace Common {
 namespace ExtAuthz {
 
 typedef std::vector<std::pair<const Http::LowerCaseString, const std::string>> HeaderKeyValueVector;
-typedef std::shared_ptr<const HeaderKeyValueVector> HeaderKeyValueVectorConstSharedPtr;
 
 /**
  * This client implementation is used when the Ext_Authz filter needs to communicate with an
@@ -32,7 +31,7 @@ public:
                              const std::string& path_prefix,
                              const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers,
                              const Http::LowerCaseStrUnorderedSet& allowed_request_headers,
-                             const HeaderKeyValueVectorConstSharedPtr authorization_headers_to_add);
+                             const HeaderKeyValueVector& authorization_headers_to_add);
   ~RawHttpClientImpl();
 
   // ExtAuthz::Client
@@ -49,7 +48,7 @@ private:
   const std::string path_prefix_;
   const Http::LowerCaseStrUnorderedSet& allowed_authorization_headers_;
   const Http::LowerCaseStrUnorderedSet& allowed_request_headers_;
-  const HeaderKeyValueVectorConstSharedPtr authorization_headers_to_add_;
+  const HeaderKeyValueVector& authorization_headers_to_add_;
   absl::optional<std::chrono::milliseconds> timeout_;
   Upstream::ClusterManager& cm_;
   Http::AsyncClient::Request* request_{};

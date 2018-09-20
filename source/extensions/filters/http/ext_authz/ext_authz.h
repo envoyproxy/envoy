@@ -59,8 +59,7 @@ public:
 
   bool failureModeAllow() const { return failure_mode_allow_; }
 
-  const Filters::Common::ExtAuthz::HeaderKeyValueVectorConstSharedPtr
-  authorizationHeadersToAdd() const {
+  const Filters::Common::ExtAuthz::HeaderKeyValueVector& authorizationHeadersToAdd() const {
     return authorization_headers_to_add_;
   }
 
@@ -88,16 +87,14 @@ private:
     return headers;
   }
 
-  static Filters::Common::ExtAuthz::HeaderKeyValueVectorConstSharedPtr toAuthorizationHeadersToAdd(
+  static Filters::Common::ExtAuthz::HeaderKeyValueVector toAuthorizationHeadersToAdd(
       const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& to_add_headers) {
-    std::shared_ptr<Filters::Common::ExtAuthz::HeaderKeyValueVector> headers =
-        std::make_shared<Filters::Common::ExtAuthz::HeaderKeyValueVector>();
-
+    Filters::Common::ExtAuthz::HeaderKeyValueVector headers;
+    headers.reserve(to_add_headers.size());
     for (const auto& header : to_add_headers) {
-      headers->push_back(
+      headers.emplace_back(
           std::make_pair(Http::LowerCaseString(header.key()), std::string(header.value())));
     }
-
     return headers;
   }
 
@@ -109,7 +106,7 @@ private:
   Http::LowerCaseStrUnorderedSet allowed_authorization_headers_;
   Http::LowerCaseStrUnorderedSet allowed_request_headers_;
   bool failure_mode_allow_;
-  const Filters::Common::ExtAuthz::HeaderKeyValueVectorConstSharedPtr authorization_headers_to_add_;
+  const Filters::Common::ExtAuthz::HeaderKeyValueVector authorization_headers_to_add_;
 };
 
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;

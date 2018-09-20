@@ -39,7 +39,6 @@ public:
         allowed_authorization_headers_{Http::LowerCaseString{"bar"}},
         allowed_request_headers_{Http::LowerCaseString{":method"}, Http::LowerCaseString{":path"}},
         async_client_{}, async_request_{&async_client_},
-        authorization_headers_to_add_{std::make_shared<const HeaderKeyValueVector>()},
         client_(cluster_name_, cluster_manager_, timeout_, path_prefix_,
                 allowed_authorization_headers_, allowed_request_headers_,
                 authorization_headers_to_add_) {
@@ -56,7 +55,7 @@ public:
   Http::LowerCaseStrUnorderedSet allowed_request_headers_;
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<Http::MockAsyncClientRequest> async_request_;
-  HeaderKeyValueVectorConstSharedPtr authorization_headers_to_add_;
+  HeaderKeyValueVector authorization_headers_to_add_;
   RawHttpClientImpl client_;
 };
 
@@ -76,13 +75,10 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
 
 // Test the client when authorization headers to add are specified.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
-  auto& authorization_headers_to_add =
-      const_cast<HeaderKeyValueVector&>(*authorization_headers_to_add_);
-
   auto header1 = std::make_pair(Http::LowerCaseString("x-authz-header1"), "value");
   auto header2 = std::make_pair(Http::LowerCaseString("x-authz-header2"), "value");
-  authorization_headers_to_add.push_back(header1);
-  authorization_headers_to_add.push_back(header2);
+  authorization_headers_to_add_.push_back(header1);
+  authorization_headers_to_add_.push_back(header2);
   allowed_request_headers_.insert(header2.first);
 
   const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
