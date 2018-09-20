@@ -152,7 +152,8 @@ private:
 
   // Default idle timeout is 5 minutes if nothing is specified in the HCM config.
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
-  static const uint64_t StreamRequestTimeoutMs = 5 * 60 * 1000;
+  // request timeout is disabled by default
+  static const uint64_t StreamRequestTimeoutMs = 0;
 };
 
 } // namespace HttpConnectionManager
