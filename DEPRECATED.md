@@ -29,9 +29,6 @@ A logged warning is expected for each deprecated item that is in deprecation win
 * Setting hosts via `hosts` field in `Cluster` is deprecated. Use `load_assignment` instead.
 * Use of `response_headers_to_*` and `request_headers_to_add` are deprecated at the `RouteAction`
   level. Please use the configuration options at the `Route` level.
-* Use of `runtime` in `RouteMatch`, found in
-  [route.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/api/v2/route/route.proto).
-  Set the `runtime_fraction` field instead.
 * Use of the string `user` field in `Authenticated` in [rbac.proto](https://github.com/envoyproxy/envoy/blob/master/api/envoy/config/rbac/v2alpha/rbac.proto)
   is deprecated in favor of the new `StringMatcher` based `principal_name` field.
 

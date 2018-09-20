@@ -134,14 +134,13 @@ bool FaultFilter::isDelayEnabled() {
   bool enabled = config_->runtime().snapshot().featureEnabled(
       DELAY_PERCENT_KEY, fault_settings_->delayPercentage().numerator(),
       config_->randomGenerator().random(),
-      ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-          fault_settings_->delayPercentage().denominator()));
+      ProtobufPercentHelper::fractionalPercentDenominatorToInt(fault_settings_->delayPercentage()));
   if (!downstream_cluster_delay_percent_key_.empty()) {
     enabled |= config_->runtime().snapshot().featureEnabled(
         downstream_cluster_delay_percent_key_, fault_settings_->delayPercentage().numerator(),
         config_->randomGenerator().random(),
         ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-            fault_settings_->delayPercentage().denominator()));
+            fault_settings_->delayPercentage()));
   }
   return enabled;
 }
@@ -150,14 +149,13 @@ bool FaultFilter::isAbortEnabled() {
   bool enabled = config_->runtime().snapshot().featureEnabled(
       ABORT_PERCENT_KEY, fault_settings_->abortPercentage().numerator(),
       config_->randomGenerator().random(),
-      ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-          fault_settings_->abortPercentage().denominator()));
+      ProtobufPercentHelper::fractionalPercentDenominatorToInt(fault_settings_->abortPercentage()));
   if (!downstream_cluster_abort_percent_key_.empty()) {
     enabled |= config_->runtime().snapshot().featureEnabled(
         downstream_cluster_abort_percent_key_, fault_settings_->abortPercentage().numerator(),
         config_->randomGenerator().random(),
         ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-            fault_settings_->abortPercentage().denominator()));
+            fault_settings_->abortPercentage()));
   }
   return enabled;
 }
