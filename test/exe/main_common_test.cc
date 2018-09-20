@@ -319,13 +319,26 @@ TEST_P(AdminRequestTest, AdminRequestAfterRun) {
   EXPECT_EQ(1, lambda_destroy_count);
 }
 
-TEST_P(AdminRequestTest, AdminRequestGetStatsUnderFilter) {
-  addArg("--filter-stats");
-  addArg("^(cluster\\.|tcp\\.).*"); // ^(cluster\.|tcp\.).*
+// Counterpoint to AdminRequestTest.AdminRequestGetStatsWithoutFilter.
+// We expect 'cluster.*' and 'server.*' to be common in the /stats endpoint, so we show that they
+// appear in an Envoy without `--filter-stats`, and then show that they don't appear in an Envoy
+// with `--filter-stats '^(cluster\.|server\.).*'`.
+TEST_P(AdminRequestTest, AdminRequestGetStatsWithoutFilter) {
   startEnvoy();
   started_.WaitForNotification();
   EXPECT_THAT(adminRequest("/stats", "GET"),
-              AllOf(HasSubstr("cluster"), Not(HasSubstr("cluster\\.")), Not(HasSubstr("tcp\\."))));
+              AllOf(HasSubstr("cluster"), HasSubstr("cluster."), HasSubstr("server.")));
+  adminRequest("/quitquitquit", "POST");
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_P(AdminRequestTest, AdminRequestGetStatsWithFilter) {
+  addArg("--filter-stats");
+  addArg("^(cluster\\.|server\\.).*"); // ^(cluster\.|server\.).*
+  startEnvoy();
+  started_.WaitForNotification();
+  EXPECT_THAT(adminRequest("/stats", "GET"),
+              AllOf(HasSubstr("cluster"), Not(HasSubstr("cluster.")), Not(HasSubstr("server."))));
   adminRequest("/quitquitquit", "POST");
   EXPECT_TRUE(waitForEnvoyToExit());
 }
