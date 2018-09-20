@@ -299,7 +299,8 @@ message RouteMatch {
   // query string for a match to occur.
   repeated QueryParameterMatcher query_parameters = 7;
 
-  message GrpcRouteMatchOptions {}
+  message GrpcRouteMatchOptions {
+  }
 
   // If specified, only gRPC requests will be matched. The router will check
   // that the content-type header has a application/grpc or one of the various
