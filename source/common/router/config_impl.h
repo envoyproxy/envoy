@@ -281,8 +281,7 @@ class RouteEntryImplBase : public RouteEntry,
                            public DirectResponseEntry,
                            public Route,
                            public PathMatchCriterion,
-                           public std::enable_shared_from_this<RouteEntryImplBase>,
-                           Logger::Loggable<Logger::Id::router> {
+                           public std::enable_shared_from_this<RouteEntryImplBase> {
 public:
   /**
    * @throw EnvoyException with reason if the route configuration contains any errors
@@ -377,8 +376,8 @@ protected:
 
 private:
   struct RuntimeData {
-    uint64_t numerator_val_{};
-    uint64_t denominator_val_{};
+    std::string key_{};
+    uint64_t default_{};
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {
@@ -509,7 +508,8 @@ private:
 
   typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
 
-  absl::optional<RuntimeData> loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
+  static absl::optional<RuntimeData>
+  loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
 
   static std::multimap<std::string, std::string>
   parseOpaqueConfig(const envoy::api::v2::route::Route& route);
@@ -530,8 +530,8 @@ private:
   const std::chrono::milliseconds timeout_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
-  Runtime::Loader& loader_;
   const absl::optional<RuntimeData> runtime_;
+  Runtime::Loader& loader_;
   const std::string host_redirect_;
   const std::string path_redirect_;
   const bool https_redirect_;
