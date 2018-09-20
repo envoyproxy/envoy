@@ -65,7 +65,7 @@ EOF
     local = True,
     defines = ["ENVOY_CONFIG_COVERAGE"],
     copts = [
-      "-DENVOY_CONFIG_COVERAGE=1"
+      "-DENVOY_CONFIG_COVERAGE=1",
       "--coverage",
     ],
     linkopts = ["--coverage"],
