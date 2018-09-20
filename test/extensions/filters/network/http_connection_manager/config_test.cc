@@ -162,6 +162,20 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamRequestTimeout) {
   EXPECT_EQ(0, config.streamRequestTimeout().count());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, UnconfiguredStreamRequestTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_);
+  EXPECT_EQ(0, config.streamRequestTimeout().count());
+}
+
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
   const std::string json_string = R"EOF(
   {
