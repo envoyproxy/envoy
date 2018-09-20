@@ -151,7 +151,7 @@ private:
    * @param params supplies the incoming endpoint query params.
    * @return TRUE if level change succeeded, FALSE otherwise.
    */
-  bool changeLogLevel(const Http::Utility::QueryParams& params);
+  bool changeLogLevel(const Http::Utility::QueryParamsMap& params);
 
   /**
    * Helper methods for the /clusters url handler.
@@ -291,6 +291,7 @@ private:
   Http::Http1Settings http1_settings_;
   ConfigTrackerImpl config_tracker_;
   const Network::FilterChainSharedPtr admin_filter_chain_;
+  Http::Utility::QueryParamsImpl query_params_;
 };
 
 /**

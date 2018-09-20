@@ -10,8 +10,8 @@
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/message.h"
-#include "envoy/http/query_params.h"
 
+#include "common/http/query_params_impl.h"
 #include "common/json/json_loader.h"
 
 #include "absl/strings/string_view.h"
@@ -40,13 +40,6 @@ void appendVia(HeaderMap& headers, const std::string& via);
  * @return std::string the redirect path.
  */
 std::string createSslRedirectPath(const HeaderMap& headers);
-
-/**
- * Parse a URL into query parameters.
- * @param url supplies the url to parse.
- * @return QueryParams the parsed parameters, if any.
- */
-QueryParams parseQueryString(absl::string_view url);
 
 /**
  * Finds the start of the query string in a path
@@ -136,7 +129,6 @@ Http1Settings parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOption
  * @param response_code supplies the HTTP response code.
  * @param body_text supplies the optional body text which is sent using the text/plain content
  *                  type.
- * @param is_head_request tells if this is a response to a HEAD request
  */
 void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const bool& is_reset,
                     Code response_code, const std::string& body_text, bool is_head_request);
@@ -152,6 +144,7 @@ void sendLocalReply(bool is_grpc, StreamDecoderFilterCallbacks& callbacks, const
  * @param response_code supplies the HTTP response code.
  * @param body_text supplies the optional body text which is sent using the text/plain content
  *                  type.
+ * @param is_head_request tells if this is a response to a HEAD request
  */
 void sendLocalReply(bool is_grpc,
                     std::function<void(HeaderMapPtr&& headers, bool end_stream)> encode_headers,
@@ -199,11 +192,6 @@ void extractHostPathFromUri(const absl::string_view& uri, absl::string_view& hos
  * Prepare headers for a HttpUri.
  */
 MessagePtr prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_uri);
-
-/**
- * Serialize query-params into a string.
- */
-std::string queryParamsToString(const QueryParams& query_params);
 
 /**
  * Transforms the supplied headers from an HTTP/1 Upgrade request to an H2 style upgrade.

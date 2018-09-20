@@ -44,7 +44,7 @@ public:
      * @param request_query_params supplies the parsed query parameters from a request.
      * @return bool true if a match for this QueryParameterMatcher exists in request_query_params.
      */
-    bool matches(const Http::Utility::QueryParams& request_query_params) const;
+    bool matches(const Http::Utility::QueryParamsMap& request_query_params) const;
 
   private:
     const std::string name_;
@@ -66,7 +66,7 @@ public:
    * @return bool true if all the query params (and values) in the config_params are found in the
    *         query_params
    */
-  static bool matchQueryParams(const Http::Utility::QueryParams& query_params,
+  static bool matchQueryParams(const Http::Utility::QueryParamsMap& query_params,
                                const std::vector<QueryParameterMatcher>& config_query_params);
 
   /**

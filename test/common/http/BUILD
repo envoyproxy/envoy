@@ -231,6 +231,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "query_params_test",
+    srcs = ["query_params_test.cc"],
+    deps = [
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "user_agent_test",
     srcs = ["user_agent_test.cc"],
     deps = [
