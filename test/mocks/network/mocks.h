@@ -11,9 +11,9 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/resolver.h"
 #include "envoy/network/transport_socket.h"
-#include "envoy/request_info/filter_state.h"
 #include "envoy/stats/scope.h"
 
+#include "common/request_info/filter_state_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -51,6 +51,7 @@ public:
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
   bool read_enabled_{true};
+  Envoy::RequestInfo::FilterStateImpl per_connection_state_;
   Connection::State state_{Connection::State::Open};
 };
 

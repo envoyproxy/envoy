@@ -1135,6 +1135,8 @@ TEST_F(TcpProxyTest, UseClusterFromPerConnectionState) {
   filter_callbacks_.connection_.per_connection_state_.setData("envoy.tcp_proxy.cluster",
                                                               "filter_state_cluster");
   connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
+  ON_CALL(filter_callbacks_.connection_, perConnectionState)
+      .WillByDefault(ReturnRef(filter_callbacks_.connection_.per_connection_state_));
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_,
