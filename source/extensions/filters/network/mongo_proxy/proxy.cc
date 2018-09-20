@@ -326,7 +326,7 @@ absl::optional<uint64_t> ProxyFilter::delayDuration() {
                                           fault_config_->delayPercentage().numerator(),
                                           generator_.random(),
                                           ProtobufPercentHelper::fractionalPercentDenominatorToInt(
-                                              fault_config_->delayPercentage().denominator()))) {
+                                              fault_config_->delayPercentage()))) {
     return result;
   }
 
