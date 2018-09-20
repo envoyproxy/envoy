@@ -128,7 +128,7 @@ protected:
   TransportSocketPtr transport_socket_;
   FilterManagerImpl filter_manager_;
   ConnectionSocketPtr socket_;
-  Envoy::RequestInfo::FilterStateImpl per_connection_state_{};
+  Envoy::RequestInfo::FilterStateImpl per_connection_state_;
 
   Buffer::OwnedImpl read_buffer_;
   // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
