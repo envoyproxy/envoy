@@ -836,7 +836,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndResponseProtocolError) {
   EXPECT_EQ(0U, store_.gauge("test.request_active").value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
   EXPECT_EQ(0U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(1U, store_.counter("test.response_exception").value());
   EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
@@ -878,7 +878,7 @@ TEST_F(ThriftConnectionManagerTest, RequestAndTransportApplicationException) {
   EXPECT_EQ(0U, store_.gauge("test.request_active").value());
   EXPECT_EQ(0U, store_.counter("test.response").value());
   EXPECT_EQ(0U, store_.counter("test.response_reply").value());
-  EXPECT_EQ(0U, store_.counter("test.response_exception").value());
+  EXPECT_EQ(1U, store_.counter("test.response_exception").value());
   EXPECT_EQ(0U, store_.counter("test.response_invalid_type").value());
   EXPECT_EQ(0U, store_.counter("test.response_success").value());
   EXPECT_EQ(0U, store_.counter("test.response_error").value());
@@ -991,8 +991,10 @@ TEST_F(ThriftConnectionManagerTest, DownstreamProtocolUpgrade) {
       }));
 
   EXPECT_CALL(*direct_response, encode(_, Ref(*custom_protocol_), _))
-      .WillOnce(Invoke([&](MessageMetadata&, Protocol&, Buffer::Instance& buffer) -> void {
+      .WillOnce(Invoke([&](MessageMetadata&, Protocol&,
+                           Buffer::Instance& buffer) -> DirectResponse::ResponseType {
         buffer.add("response");
+        return DirectResponse::ResponseType::SuccessReply;
       }));
   EXPECT_CALL(*custom_transport_, encodeFrame(_, _, _))
       .WillOnce(Invoke(

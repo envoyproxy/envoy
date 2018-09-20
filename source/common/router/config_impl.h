@@ -194,6 +194,7 @@ public:
   std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override {
     return retry_host_predicates_;
   }
+  uint32_t hostSelectionMaxAttempts() const override { return host_selection_attempts_; }
 
   // Upstream::RetryHostPredicateFactoryCallbacks
   void addHostPredicate(Upstream::RetryHostPredicateSharedPtr predicate) override {
@@ -205,6 +206,7 @@ private:
   uint32_t num_retries_{};
   uint32_t retry_on_{};
   std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
+  uint32_t host_selection_attempts_{1};
 };
 
 /**
@@ -279,7 +281,8 @@ class RouteEntryImplBase : public RouteEntry,
                            public DirectResponseEntry,
                            public Route,
                            public PathMatchCriterion,
-                           public std::enable_shared_from_this<RouteEntryImplBase> {
+                           public std::enable_shared_from_this<RouteEntryImplBase>,
+                           Logger::Loggable<Logger::Id::router> {
 public:
   /**
    * @throw EnvoyException with reason if the route configuration contains any errors
@@ -374,8 +377,8 @@ protected:
 
 private:
   struct RuntimeData {
-    std::string key_{};
-    uint64_t default_{};
+    uint64_t numerator_val_{};
+    uint64_t denominator_val_{};
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {
@@ -506,8 +509,7 @@ private:
 
   typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
 
-  static absl::optional<RuntimeData>
-  loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
+  absl::optional<RuntimeData> loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
 
   static std::multimap<std::string, std::string>
   parseOpaqueConfig(const envoy::api::v2::route::Route& route);
@@ -528,8 +530,8 @@ private:
   const std::chrono::milliseconds timeout_;
   const absl::optional<std::chrono::milliseconds> idle_timeout_;
   const absl::optional<std::chrono::milliseconds> max_grpc_timeout_;
-  const absl::optional<RuntimeData> runtime_;
   Runtime::Loader& loader_;
+  const absl::optional<RuntimeData> runtime_;
   const std::string host_redirect_;
   const std::string path_redirect_;
   const bool https_redirect_;

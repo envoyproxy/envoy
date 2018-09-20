@@ -36,7 +36,7 @@ message SocketAddress {
   // in :ref:`FilterChainMatch <envoy_api_msg_listener.FilterChainMatch>`.] When used
   // within an upstream :ref:`BindConfig <envoy_api_msg_core.BindConfig>`, the address
   // controls the source address of outbound connections. For :ref:`clusters
-  // <config_cluster_manager_cluster>`, the cluster type determines whether the
+  // <envoy_api_msg_Cluster>`, the cluster type determines whether the
   // address must be an IP (*STATIC* or *EDS* clusters) or a hostname resolved by DNS
   // (*STRICT_DNS* or *LOGICAL_DNS* clusters). Address resolution can be customized
   // via :ref:`resolver_name <envoy_api_field_core.SocketAddress.resolver_name>`.

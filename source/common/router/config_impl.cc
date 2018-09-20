@@ -11,6 +11,7 @@
 
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/type/percent.pb.validate.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -18,6 +19,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
+#include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/config/rds_json.h"
@@ -26,6 +28,7 @@
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/http/websocket/ws_handler_impl.h"
+#include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/retry_state_impl.h"
 
@@ -53,6 +56,11 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
     Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
         host_predicate.name())
         ->createHostPredicate(*this, host_predicate.config());
+  }
+
+  auto host_selection_attempts = config.retry_policy().host_selection_retry_max_attempts();
+  if (host_selection_attempts) {
+    host_selection_attempts_ = host_selection_attempts;
   }
 }
 
@@ -247,7 +255,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, DEFAULT_ROUTE_TIMEOUT_MS)),
       idle_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), idle_timeout)),
       max_grpc_timeout_(PROTOBUF_GET_OPTIONAL_MS(route.route(), max_grpc_timeout)),
-      runtime_(loadRuntimeData(route.match())), loader_(factory_context.runtime()),
+      loader_(factory_context.runtime()), runtime_(loadRuntimeData(route.match())),
       host_redirect_(route.redirect().host_redirect()),
       path_redirect_(route.redirect().path_redirect()),
       https_redirect_(route.redirect().https_redirect()),
@@ -261,7 +269,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           HeaderParser::configure(route.route().request_headers_to_add())),
       route_action_response_headers_parser_(HeaderParser::configure(
           route.route().response_headers_to_add(), route.route().response_headers_to_remove())),
-      request_headers_parser_(HeaderParser::configure(route.request_headers_to_add())),
+      request_headers_parser_(HeaderParser::configure(route.request_headers_to_add(),
+                                                      route.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
                                                        route.response_headers_to_remove())),
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
@@ -333,8 +342,11 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
   bool matches = true;
 
   if (runtime_) {
-    matches &= loader_.snapshot().featureEnabled(runtime_.value().key_, runtime_.value().default_,
-                                                 random_value);
+    matches &= random_value % runtime_->denominator_val_ < runtime_->numerator_val_;
+    if (!matches) {
+      // No need to waste further cycles calculating a route match.
+      return false;
+    }
   }
 
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
@@ -392,14 +404,36 @@ void RouteEntryImplBase::finalizeResponseHeaders(
 absl::optional<RouteEntryImplBase::RuntimeData>
 RouteEntryImplBase::loadRuntimeData(const envoy::api::v2::route::RouteMatch& route_match) {
   absl::optional<RuntimeData> runtime;
-  if (route_match.has_runtime()) {
-    RuntimeData data;
-    data.key_ = route_match.runtime().runtime_key();
-    data.default_ = route_match.runtime().default_value();
-    runtime = data;
+  RuntimeData runtime_data;
+
+  if (route_match.runtime_specifier_case() == envoy::api::v2::route::RouteMatch::kRuntimeFraction) {
+    envoy::type::FractionalPercent fractional_percent;
+    const std::string& fraction_yaml =
+        loader_.snapshot().get(route_match.runtime_fraction().runtime_key());
+
+    try {
+      MessageUtil::loadFromYamlAndValidate(fraction_yaml, fractional_percent);
+    } catch (const EnvoyException& ex) {
+      ENVOY_LOG(error, "failed to parse string value for runtime key {}: {}",
+                route_match.runtime_fraction().runtime_key(), ex.what());
+      fractional_percent = route_match.runtime_fraction().default_value();
+    }
+
+    runtime_data.numerator_val_ = fractional_percent.numerator();
+    runtime_data.denominator_val_ =
+        ProtobufPercentHelper::fractionalPercentDenominatorToInt(fractional_percent.denominator());
+  } else if (route_match.runtime_specifier_case() == envoy::api::v2::route::RouteMatch::kRuntime) {
+    // For backwards compatibility, the deprecated 'runtime' field must be converted to a
+    // RuntimeData format with a variable denominator type. The 'runtime' field assumes a percentage
+    // (0-100), so the hard-coded denominator value reflects this.
+    runtime_data.denominator_val_ = 100;
+    runtime_data.numerator_val_ = loader_.snapshot().getInteger(
+        route_match.runtime().runtime_key(), route_match.runtime().default_value());
+  } else {
+    return runtime;
   }
 
-  return runtime;
+  return runtime_data;
 }
 
 void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
@@ -579,7 +613,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     : DynamicRouteEntry(parent, cluster.name()), runtime_key_(runtime_key),
       loader_(factory_context.runtime()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
-      request_headers_parser_(HeaderParser::configure(cluster.request_headers_to_add())),
+      request_headers_parser_(HeaderParser::configure(cluster.request_headers_to_add(),
+                                                      cluster.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
                                                        cluster.response_headers_to_remove())),
       per_filter_configs_(cluster.per_filter_config(), factory_context) {
@@ -697,7 +732,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
                                  bool validate_clusters)
     : name_(virtual_host.name()), rate_limit_policy_(virtual_host.rate_limits()),
       global_route_config_(global_route_config),
-      request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add())),
+      request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add(),
+                                                      virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
       per_filter_configs_(virtual_host.per_filter_config(), factory_context) {
@@ -904,7 +940,8 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
     internal_only_headers_.push_back(Http::LowerCaseString(header));
   }
 
-  request_headers_parser_ = HeaderParser::configure(config.request_headers_to_add());
+  request_headers_parser_ =
+      HeaderParser::configure(config.request_headers_to_add(), config.request_headers_to_remove());
   response_headers_parser_ = HeaderParser::configure(config.response_headers_to_add(),
                                                      config.response_headers_to_remove());
 }

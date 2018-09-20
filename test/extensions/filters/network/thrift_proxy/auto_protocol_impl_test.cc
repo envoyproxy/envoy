@@ -5,6 +5,7 @@
 #include "extensions/filters/network/thrift_proxy/auto_protocol_impl.h"
 #include "extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
 #include "extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
+#include "extensions/filters/network/thrift_proxy/twitter_protocol_impl.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
@@ -61,13 +62,27 @@ TEST(ProtocolNames, FromType) {
 }
 
 TEST_F(AutoProtocolTest, NotEnoughData) {
-  Buffer::OwnedImpl buffer;
-  AutoProtocolImpl proto;
-  resetMetadata();
+  // Too short for any auto detection
+  {
+    Buffer::OwnedImpl buffer;
+    AutoProtocolImpl proto;
+    resetMetadata();
 
-  buffer.writeByte(0);
-  EXPECT_FALSE(proto.readMessageBegin(buffer, metadata_));
-  expectDefaultMetadata();
+    buffer.writeByte(0);
+    EXPECT_FALSE(proto.readMessageBegin(buffer, metadata_));
+    expectDefaultMetadata();
+  }
+
+  // Binary protocol, but too short to distinguish Twitter protocol
+  {
+    AutoProtocolImpl proto;
+    resetMetadata();
+
+    Buffer::OwnedImpl buffer;
+    buffer.writeBEInt<int16_t>(0x8001);
+
+    EXPECT_FALSE(proto.readMessageBegin(buffer, metadata_));
+  }
 }
 
 TEST_F(AutoProtocolTest, UnknownProtocol) {
@@ -119,6 +134,26 @@ TEST_F(AutoProtocolTest, ReadMessageBegin) {
     EXPECT_EQ(buffer.length(), 0);
     EXPECT_EQ(proto.name(), "compact(auto)");
     EXPECT_EQ(proto.type(), ProtocolType::Compact);
+  }
+
+  // Twitter protocol
+  {
+    AutoProtocolImpl proto;
+    resetMetadata();
+
+    Buffer::OwnedImpl buffer;
+    buffer.writeBEInt<int16_t>(0x8001);
+    buffer.writeByte(0);
+    buffer.writeByte(MessageType::Call);
+    buffer.writeBEInt<int32_t>(TwitterProtocolImpl::upgradeMethodName().length());
+    buffer.add(TwitterProtocolImpl::upgradeMethodName());
+    buffer.writeBEInt<int32_t>(1);
+
+    EXPECT_TRUE(proto.readMessageBegin(buffer, metadata_));
+    expectMetadata(TwitterProtocolImpl::upgradeMethodName(), MessageType::Call, 1);
+    EXPECT_EQ(buffer.length(), 0);
+    EXPECT_EQ(proto.name(), "twitter(auto)");
+    EXPECT_EQ(proto.type(), ProtocolType::Twitter);
   }
 }
 
@@ -330,6 +365,57 @@ TEST_F(AutoProtocolTest, WriteDelegation) {
   // writeBinary
   EXPECT_CALL(*proto, writeBinary(Ref(buffer), "binary"));
   auto_proto.writeBinary(buffer, "binary");
+}
+
+// Test that protocol-upgrade methods are delegated to the detected protocol.
+TEST_F(AutoProtocolTest, ProtocolUpgradeDelegation) {
+  NiceMock<MockProtocol>* proto = new NiceMock<MockProtocol>();
+  AutoProtocolImpl auto_proto;
+  auto_proto.setProtocol(ProtocolPtr{proto});
+
+  // supportsUpgrade
+  EXPECT_CALL(*proto, supportsUpgrade()).WillOnce(Return(true));
+  EXPECT_TRUE(auto_proto.supportsUpgrade());
+
+  // upgradeRequestDecoder
+  {
+    DecoderEventHandlerSharedPtr handler{new MockDecoderEventHandler()};
+    EXPECT_CALL(*proto, upgradeRequestDecoder()).WillOnce(Return(handler));
+    EXPECT_EQ(auto_proto.upgradeRequestDecoder().get(), handler.get());
+  }
+
+  // upgradeResponse
+  {
+    NiceMock<MockDecoderEventHandler> handler;
+    DirectResponse* response = new NiceMock<MockDirectResponse>();
+    EXPECT_CALL(*proto, upgradeResponse(Ref(handler)))
+        .WillOnce(Invoke([&](const DecoderEventHandler&) -> DirectResponsePtr {
+          return DirectResponsePtr{response};
+        }));
+    EXPECT_EQ(response, auto_proto.upgradeResponse(handler).get());
+  }
+
+  // attemptUpgrade
+  {
+    ThriftConnectionState state;
+    NiceMock<MockTransport> transport;
+    Buffer::OwnedImpl buffer;
+    ThriftObject* obj = new NiceMock<MockThriftObject>();
+    EXPECT_CALL(*proto, attemptUpgrade(Ref(transport), Ref(state), Ref(buffer)))
+        .WillOnce(
+            Invoke([&](Transport&, ThriftConnectionState&, Buffer::Instance&) -> ThriftObjectPtr {
+              return ThriftObjectPtr{obj};
+            }));
+    EXPECT_EQ(obj, auto_proto.attemptUpgrade(transport, state, buffer).get());
+  }
+
+  // completeUpgrade
+  {
+    ThriftConnectionState state;
+    NiceMock<MockThriftObject> obj;
+    EXPECT_CALL(*proto, completeUpgrade(Ref(state), Ref(obj)));
+    auto_proto.completeUpgrade(state, obj);
+  }
 }
 
 TEST_F(AutoProtocolTest, Name) {

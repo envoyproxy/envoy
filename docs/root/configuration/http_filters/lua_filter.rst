@@ -276,7 +276,7 @@ metadata()
 
 Returns the current route entry metadata. Note that the metadata should be specified
 under the filter name i.e. *envoy.lua*. Below is an example of a *metadata* in a
-:ref:`route entry <config_http_conn_man_route_table_route>`.
+:ref:`route entry <envoy_api_msg_route.Route>`.
 
 .. code-block:: yaml
 

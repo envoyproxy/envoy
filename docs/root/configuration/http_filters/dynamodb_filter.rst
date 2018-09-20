@@ -10,8 +10,9 @@ DynamoDB
 Statistics
 ----------
 
-The DynamoDB filter outputs statistics in the *http.<stat_prefix>.dynamodb.* namespace. The
-:ref:`stat prefix <config_http_conn_man_stat_prefix>` comes from the owning HTTP connection manager.
+The DynamoDB filter outputs statistics in the *http.<stat_prefix>.dynamodb.* namespace. The :ref:`stat prefix
+<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stat_prefix>` comes from the
+owning HTTP connection manager.
 
 Per operation stats can be found in the *http.<stat_prefix>.dynamodb.operation.<operation_name>.*
 namespace.
