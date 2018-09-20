@@ -78,7 +78,10 @@ public:
 
 Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
                                    const std::string& method) {
-  return Http::TestHeaderMapImpl{{":authority", host}, {":path", path}, {":method", method}};
+  return Http::TestHeaderMapImpl{{":authority", host},        {":path", path},
+                                 {":method", method},         {"x-safe", "safe"},
+                                 {"x-global-nope", "global"}, {"x-vhost-nope", "vhost"},
+                                 {"x-route-nope", "route"}};
 }
 
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromJson(const std::string& json_string) {
@@ -731,7 +734,7 @@ TEST(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalse) {
 name: foo
 virtual_hosts:
   - name: www2
-    domains: ["*"]
+    domains: ["www.lyft.com"]
     request_headers_to_add:
       - header:
           key: x-global-header
@@ -741,6 +744,7 @@ virtual_hosts:
           key: x-vhost-header
           value: vhost-www2
         append: false
+    request_headers_to_remove: ["x-vhost-nope"]
     routes:
       - match: { prefix: "/endpoint" }
         request_headers_to_add:
@@ -756,6 +760,7 @@ virtual_hosts:
               key: x-route-header
               value: route-endpoint
             append: false
+        request_headers_to_remove: ["x-route-nope"]
         route:
           cluster: www2
           request_headers_to_add:
@@ -776,11 +781,17 @@ virtual_hosts:
               append: false
       - match: { prefix: "/" }
         route: { cluster: www2 }
+  - name: default
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: default }
 request_headers_to_add:
   - header:
       key: x-global-header
       value: global
     append: false
+request_headers_to_remove: ["x-global-nope"]
 )EOF";
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
@@ -797,10 +808,15 @@ request_headers_to_add:
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/endpoint", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
       route->finalizeRequestHeaders(headers, request_info, true);
+      // Added headers.
       EXPECT_EQ("global", headers.get_("x-global-header"));
       EXPECT_EQ("vhost-www2", headers.get_("x-vhost-header"));
       EXPECT_EQ("route-endpoint", headers.get_("x-route-header"));
       EXPECT_EQ("route-action-endpoint", headers.get_("x-route-action-header"));
+      // Removed headers.
+      EXPECT_FALSE(headers.has("x-global-nope"));
+      EXPECT_FALSE(headers.has("x-vhost-nope"));
+      EXPECT_FALSE(headers.has("x-route-nope"));
     }
 
     // Global overrides virtual host.
@@ -808,8 +824,31 @@ request_headers_to_add:
       Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/", "GET");
       const RouteEntry* route = config.route(headers, 0)->routeEntry();
       route->finalizeRequestHeaders(headers, request_info, true);
+      // Added headers.
       EXPECT_EQ("global", headers.get_("x-global-header"));
       EXPECT_EQ("vhost-www2", headers.get_("x-vhost-header"));
+      EXPECT_FALSE(headers.has("x-route-header"));
+      EXPECT_FALSE(headers.has("x-route-action-header"));
+      // Removed headers.
+      EXPECT_FALSE(headers.has("x-global-nope"));
+      EXPECT_FALSE(headers.has("x-vhost-nope"));
+      EXPECT_TRUE(headers.has("x-route-nope"));
+    }
+
+    // Global only.
+    {
+      Http::TestHeaderMapImpl headers = genHeaders("www.example.com", "/", "GET");
+      const RouteEntry* route = config.route(headers, 0)->routeEntry();
+      route->finalizeRequestHeaders(headers, request_info, true);
+      // Added headers.
+      EXPECT_EQ("global", headers.get_("x-global-header"));
+      EXPECT_FALSE(headers.has("x-vhost-header"));
+      EXPECT_FALSE(headers.has("x-route-header"));
+      EXPECT_FALSE(headers.has("x-route-action-header"));
+      // Removed headers.
+      EXPECT_FALSE(headers.has("x-global-nope"));
+      EXPECT_TRUE(headers.has("x-vhost-nope"));
+      EXPECT_TRUE(headers.has("x-route-nope"));
     }
   }
 }

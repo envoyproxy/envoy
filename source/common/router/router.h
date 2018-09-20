@@ -215,6 +215,14 @@ public:
     return retry_state_->shouldSelectAnotherHost(host);
   }
 
+  uint32_t hostSelectionRetryCount() const override {
+    if (!is_retry_) {
+      return 1;
+    }
+
+    return retry_state_->hostSelectionMaxAttempts();
+  }
+
   /**
    * Set a computed cookie to be sent with the downstream headers.
    * @param key supplies the size of the cookie

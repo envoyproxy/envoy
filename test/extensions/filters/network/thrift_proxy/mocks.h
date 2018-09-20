@@ -160,7 +160,8 @@ public:
   ~MockDirectResponse();
 
   // ThriftProxy::DirectResponse
-  MOCK_CONST_METHOD3(encode, void(MessageMetadata&, Protocol&, Buffer::Instance&));
+  MOCK_CONST_METHOD3(encode,
+                     DirectResponse::ResponseType(MessageMetadata&, Protocol&, Buffer::Instance&));
 };
 
 class MockThriftObject : public ThriftObject {

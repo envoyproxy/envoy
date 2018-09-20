@@ -329,6 +329,8 @@ you can run:
 
   bazel run //tools:v1_to_bootstrap <path to v1 JSON/YAML configuration file>
 
+.. _config_overview_v2_management_server:
+
 Management server
 -----------------
 

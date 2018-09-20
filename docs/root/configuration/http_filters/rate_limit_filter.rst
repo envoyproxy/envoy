@@ -8,8 +8,8 @@ Rate limit
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>`
 
 The HTTP rate limit filter will call the rate limit service when the request's route or virtual host
-has one or more :ref:`rate limit configurations<config_http_conn_man_route_table_route_rate_limits>`
-that match the filter stage setting. The :ref:`route<config_http_conn_man_route_table_route_include_vh>`
+has one or more :ref:`rate limit configurations<envoy_api_field_route.VirtualHost.rate_limits>`
+that match the filter stage setting. The :ref:`route<envoy_api_field_route.RouteAction.include_vh_rate_limits>`
 can optionally include the virtual host rate limit configurations. More than one configuration can
 apply to a request. Each configuration results in a descriptor being sent to the rate limit service.
 
@@ -29,7 +29,7 @@ Composing Actions
   This section is written for the v1 API but the concepts also apply to the v2 API. It will be
   rewritten to target the v2 API in a future release.
 
-Each :ref:`rate limit action <config_http_conn_man_route_table_rate_limit_config>` on the route or
+Each :ref:`rate limit action <envoy_api_msg_route.RateLimit>` on the route or
 virtual host populates a descriptor entry. A vector of descriptor entries compose a descriptor. To
 create more complex rate limit descriptors, actions can be composed in any order. The descriptor
 will be populated in the order the actions are specified in the configuration.
@@ -128,4 +128,4 @@ ratelimit.http_filter_enforcing
 
 ratelimit.<route_key>.http_filter_enabled
   % of requests that will call the rate limit service for a given *route_key* specified in the
-  :ref:`rate limit configuration <config_http_conn_man_route_table_rate_limit_config>`. Defaults to 100.
+  :ref:`rate limit configuration <envoy_api_msg_route.RateLimit>`. Defaults to 100.

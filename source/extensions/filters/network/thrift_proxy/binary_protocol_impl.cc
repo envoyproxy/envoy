@@ -18,14 +18,7 @@ namespace ThriftProxy {
 const uint16_t BinaryProtocolImpl::Magic = 0x8001;
 
 bool BinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetadata& metadata) {
-  // Minimum message length:
-  //   version: 2 bytes +
-  //   unused: 1 byte +
-  //   msg type: 1 byte +
-  //   name len: 4 bytes +
-  //   name: 0 bytes +
-  //   seq id: 4 bytes
-  if (buffer.length() < 12) {
+  if (buffer.length() < MinMessageBeginLength) {
     return false;
   }
 
@@ -44,7 +37,7 @@ bool BinaryProtocolImpl::readMessageBegin(Buffer::Instance& buffer, MessageMetad
   }
 
   uint32_t name_len = buffer.peekBEInt<uint32_t>(4);
-  if (buffer.length() < name_len + 12) {
+  if (buffer.length() < name_len + MinMessageBeginLength) {
     return false;
   }
 

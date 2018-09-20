@@ -351,6 +351,30 @@ public:
         });
   }
 
+  void setupServiceValidationWithoutUserAgent() {
+    std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    interval_jitter: 1s
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name: locations
+      path: /healthcheck
+      host: "www.envoyproxy.io"
+      # The following entry removes the default "user-agent" header.
+      request_headers_to_remove: ["user-agent"]
+    )EOF";
+
+    health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
+                                                        dispatcher_, runtime_, random_,
+                                                        HealthCheckEventLoggerPtr(event_logger_)));
+    health_checker_->addHostCheckCompleteCb(
+        [this](HostSharedPtr host, HealthTransition changed_state) -> void {
+          onHostStatus(host, changed_state);
+        });
+  }
+
   void expectSessionCreate(const HostWithHealthCheckMap& health_check_map) {
     // Expectations are in LIFO order.
     TestSessionPtr new_test_session(new TestSession());
@@ -778,6 +802,46 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
         EXPECT_NE(headers.get(start_time)->value().c_str(), current_start_time);
         current_start_time = headers.get(start_time)->value().c_str();
       }));
+  health_checker_->start();
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
+      .WillOnce(Return(45000));
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(std::chrono::milliseconds(45000)));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  absl::optional<std::string> health_checked_cluster("locations-production-iad");
+  respond(0, "200", false, true, false, health_checked_cluster);
+  EXPECT_TRUE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  expectStreamCreate(0);
+  test_sessions_[0]->interval_timer_->callback_();
+}
+
+TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithoutUserAgent) {
+  setupServiceValidationWithoutUserAgent();
+  // requires non-empty `service_name` in config.
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
+      .WillOnce(Return(true));
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
+  auto metadata = TestUtility::parseYaml<envoy::api::v2::core::Metadata>(
+      R"EOF(
+        filter_metadata:
+          namespace:
+            key: value
+      )EOF");
+
+  std::string current_start_time;
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", metadata)};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeHeaders(_, true))
+      .WillRepeatedly(Invoke(
+          [&](const Http::HeaderMap& headers, bool) { EXPECT_EQ(headers.UserAgent(), nullptr); }));
   health_checker_->start();
 
   EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));

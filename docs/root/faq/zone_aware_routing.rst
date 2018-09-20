@@ -12,8 +12,9 @@ This section describes the specific configuration for the Envoy running side by 
 These are the requirements:
 
 * Envoy must be launched with :option:`--service-zone` option which defines the zone for the current host.
-* Both definitions of the source and the destination clusters must have :ref:`sds <config_cluster_manager_type>` type.
-* :ref:`local_cluster_name <config_cluster_manager_local_cluster_name>` must be set to the source cluster.
+* Both definitions of the source and the destination clusters must have :ref:`EDS <envoy_api_field_Cluster.type>` type.
+* :ref:`local_cluster_name <envoy_api_field_config.bootstrap.v2.ClusterManager.local_cluster_name>` must be set to the
+  source cluster.
 
   Only essential parts are listed in the configuration below for the cluster manager.
 
@@ -36,10 +37,10 @@ These are the requirements:
 
 Envoy configuration on the destination service
 ----------------------------------------------
-It's not necessary to run Envoy side by side with the destination service, but it's important that each host
-in the destination cluster registers with the discovery service
-:ref:`queried by the source service Envoy <config_cluster_manager_sds_api>`.
-:ref:`Zone <config_cluster_manager_sds_api_host>` information must be available as part of that response.
+It's not necessary to run Envoy side by side with the destination service, but it's important that each host in the
+destination cluster registers with the discovery service :ref:`queried by the source service Envoy
+<config_overview_v2_management_server>`. :ref:`Zone <envoy_api_msg_endpoint.LocalityLbEndpoints>`
+information must be available as part of that response.
 
 Only zone related data is listed in the response below.
 
