@@ -129,6 +129,7 @@ public:
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
   MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_METHOD0(perConnectionState, Envoy::RequestInfo::FilterState&());
+  MOCK_CONST_METHOD0(perConnectionState, const Envoy::RequestInfo::FilterState&());
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());
