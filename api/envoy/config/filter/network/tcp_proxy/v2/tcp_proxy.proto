@@ -41,6 +41,12 @@ message TcpProxy {
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
     // assigned to each cluster.
+    //
+    // .. note::
+    //
+    //  This field is ignored if the :ref:`deprecated_v1
+    //  <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.deprecated_v1>`
+    //  configuration is set.
     WeightedCluster weighted_clusters = 10;
   }
 

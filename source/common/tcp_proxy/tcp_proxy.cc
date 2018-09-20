@@ -80,7 +80,7 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
   // Weighted clusters will be enabled only if both the default cluster and
   // deprecated v1 routes are absent.
   if (routes_.empty() && config.has_weighted_clusters()) {
-    total_cluster_weight_ = 0UL;
+    total_cluster_weight_ = 0;
     for (const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::
              ClusterWeight& cluster_desc : config.weighted_clusters().clusters()) {
       weighted_clusters_.emplace_back(WeightedClusterEntry(cluster_desc));
