@@ -1128,54 +1128,21 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
   EXPECT_EQ(non_routable_cx, config_->stats().downstream_cx_no_route_.value());
 }
 
-class TcpProxyPerConnectionStateTest : public testing::Test {
-public:
-  TcpProxyPerConnectionStateTest() {
-    envoy::config::filter::network::tcp_proxy::v2::TcpProxy proto_config;
-    proto_config.set_stat_prefix("name");
-    auto* route = proto_config.mutable_deprecated_v1()->mutable_routes()->Add();
-    route->set_cluster("fake_cluster");
-
-    config_.reset(new Config(proto_config, factory_context_));
-  }
-
-  ~TcpProxyPerConnectionStateTest() {
-    if (filter_ != nullptr) {
-      filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
-    }
-  }
-
-  void setup() {
-    EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
-
-    filter_.reset(new Filter(config_, factory_context_.cluster_manager_, timeSystem()));
-    filter_->initializeReadFilterCallbacks(filter_callbacks_);
-  }
-
-  Event::TimeSystem& timeSystem() { return factory_context_.dispatcher().timeSystem(); }
-
-  ConfigSharedPtr config_;
-  NiceMock<Network::MockConnection> connection_;
-  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  std::unique_ptr<Filter> filter_;
-};
-
 // Test that the tcp proxy uses the cluster from FilterState if set
-TEST_F(TcpProxyPerConnectionStateTest, UseClusterFromPerConnectionState) {
+TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionState) {
   setup();
 
   Envoy::RequestInfo::FilterStateImpl per_connection_state;
   per_connection_state.setData(
       "envoy.tcp_proxy.cluster",
-      std::make_unique<PerConnectionTcpProxyConfig>("filter_state_cluster"));
+      std::make_unique<PerConnectionTcpProxyConfig>("fake_cluster"));
   ON_CALL(connection_, perConnectionState()).WillByDefault(ReturnRef(per_connection_state));
-  ON_CALL(Const(connection_), perConnectionState()).WillByDefault(ReturnRef(per_connection_state));
+  EXPECT_CALL(Const(connection_), perConnectionState()).WillRepeatedly(ReturnRef(per_connection_state));
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_,
-              tcpConnPoolForCluster("filter_state_cluster", _, _))
-      .WillOnce(Return(nullptr));
+              tcpConnPoolForCluster("fake_cluster", _, _))
+      .WillRepeatedly(Return(nullptr));
 
   filter_->onNewConnection();
 }
