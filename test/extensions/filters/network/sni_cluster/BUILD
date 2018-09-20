@@ -19,7 +19,7 @@ envoy_extension_cc_test(
     deps = [
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
-        "//extensions/filters/network/sni_cluster/config_lib",
-        "//extensions/filters/network/sni_cluster/sni_cluster_lib",        
+        "//extensions/filters/network/sni_cluster:config",
+        "//extensions/filters/network/sni_cluster:sni_cluster",
     ],
 )

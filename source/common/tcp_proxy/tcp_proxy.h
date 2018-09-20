@@ -139,11 +139,11 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
 /**
  * Per-connection TCP Proxy Filter configuration.
  */
-class PerConnectionTcpProxyConfig : public FilterState::Object {
+class PerConnectionTcpProxyConfig : public Envoy::RequestInfo::FilterState::Object {
 public:
-  PerConnectionTcpProxyConfig(std::string& cluster) : cluster_(cluster) {}
+  PerConnectionTcpProxyConfig(std::string cluster) : cluster_(cluster) {}
   const std::string& cluster() const { return cluster_; }
-  static const std::string CLUSTER_KEY = "envoy.tcp_proxy.cluster";
+  static const std::string CLUSTER_KEY;
 
 private:
   std::string cluster_;

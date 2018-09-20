@@ -11,16 +11,17 @@ namespace NetworkFilters {
 namespace SniCluster {
 
 Network::FilterStatus SniClusterFilter::onNewConnection() {
-  absl::string_view& sni = read_callbacks_->connection.requestedServerName();
+  absl::string_view sni = read_callbacks_->connection().requestedServerName();
   ENVOY_CONN_LOG(trace, "sni_cluster: new connection with server name {}",
                  read_callbacks_->connection(), sni);
-  if (!sni.empty()) {
 
+  if (!sni.empty()) {
     // Set the tcp_proxy cluster to the same value as SNI
     read_callbacks_->connection().perConnectionState().setData(
         Envoy::TcpProxy::PerConnectionTcpProxyConfig::CLUSTER_KEY,
         std::make_unique<Envoy::TcpProxy::PerConnectionTcpProxyConfig>(sni));
   }
+
   return Network::FilterStatus::Continue;
 }
 

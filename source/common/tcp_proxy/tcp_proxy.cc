@@ -21,6 +21,8 @@
 namespace Envoy {
 namespace TcpProxy {
 
+std::string PerConnectionTcpProxyConfig::CLUSTER_KEY = "envoy.tcp_proxy.cluster";
+
 Config::Route::Route(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute& config) {
   cluster_name_ = config.cluster();
