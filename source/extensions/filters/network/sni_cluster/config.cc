@@ -12,7 +12,8 @@ namespace SniCluster {
 /**
  * Config registration for the sni_cluster filter. @see NamedNetworkFilterConfigFactory.
  */
-class SniClusterNetworkFilterConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
+class SniClusterNetworkFilterConfigFactory
+    : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb createFilterFactory(const Json::Object&,
