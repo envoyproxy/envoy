@@ -71,7 +71,7 @@ This example show how to configurate secrets in the static_resource:
             tls_certificate_sds_secret_configs:
             - name: "server_cert"
             validation_context_sds_secret_config:
-            - name: "validation_context"
+              name: "validation_context"
 
 
 In this example, certificates are specified in the bootstrap static_resource, they are not fetched remotely. In the config, "secrets" static resource has 3 secrets: "client_cert", "server_cert" and "validation_context". In the cluster config, one of hosts uses "client_cert" in its tls_certificate_sds_secret_configs. In the listeners section, one of them uses "server_cert" in its tls_certificate_sds_secret_configs and "validation_context" for its validation_context_sds_secret_config.
@@ -97,8 +97,8 @@ This example shows how to configurate secrets fetched from remote SDS server:
                   api_config_source:
                     api_type: GRPC
                     grpc_services:
-                    - google_grpc:
-                      target_uri: unix:/tmp/uds_path
+                      google_grpc:
+                        target_uri: unix:/tmp/uds_path
       - name: sds_server
         http2_protocol_options: {}
         hosts:
@@ -115,16 +115,16 @@ This example shows how to configurate secrets fetched from remote SDS server:
                 api_config_source:
                   api_type: GRPC
                   grpc_services:
-                  - google_grpc:
-                    target_uri: unix:/tmp/uds_path
+                    google_grpc:
+                      target_uri: unix:/tmp/uds_path
             validation_context_sds_secret_config:
-            - name: "validation_context"
+              name: "validation_context"
               sds_config:
                 api_config_source:
                   api_type: GRPC
                   grpc_services:
-                  - envoy_grpc:
-                    cluster_name: sds_server
+                    envoy_grpc:
+                      cluster_name: sds_server
 
 
 In the above example, a gRPC SDS server can be reached by Unix Domain Socket path "/tmp/uds_path". It can provide three secrets, "client_cert", "server_cert" and "validation_context". In the config, "server_cert" and "validation_context" are used by one of listeners and "client_cert" is used by one of clusters.
