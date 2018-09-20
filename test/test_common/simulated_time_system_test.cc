@@ -53,6 +53,48 @@ TEST_F(SimulatedTimeSystemTest, Sleep) {
   EXPECT_EQ(start_system_time_ + std::chrono::milliseconds(5), sim_.systemTime());
 }
 
+TEST_F(SimulatedTimeSystemTest, WaitFor) {
+  EXPECT_EQ(start_monotonic_time_, sim_.monotonicTime());
+  EXPECT_EQ(start_system_time_, sim_.systemTime());
+
+  // Run an event loop in the background to activate timers.
+  std::atomic<bool> done(false);
+  auto thread = std::make_unique<Thread::Thread>([this, &done]() {
+    while (!done) {
+      event_base_loop(event_system_.get(), 0);
+    }
+  });
+  Thread::CondVar condvar;
+  Thread::MutexBasicLockable mutex;
+  TimerPtr timer = scheduler_->createTimer([&condvar, &mutex, &done]() {
+    Thread::LockGuard lock(mutex);
+    done = true;
+    condvar.notifyOne();
+  });
+  timer->enableTimer(std::chrono::seconds(60));
+
+  // Wait 50 simulated seconds of simulated time, which won't be enough to
+  // activate the alarm. We'll get a fast automatic timeout in waitFor because
+  // there are no pending timers.
+  {
+    Thread::LockGuard lock(mutex);
+    EXPECT_EQ(Thread::CondVar::WaitStatus::Timeout,
+              sim_.waitFor(mutex, condvar, std::chrono::seconds(50)));
+  }
+  EXPECT_FALSE(done);
+
+  // Waiting another 10 simulated seconds will activate the alarm, and the
+  // event-loop thread will call the corresponding callback quickly.
+  {
+    Thread::LockGuard lock(mutex);
+    EXPECT_EQ(Thread::CondVar::WaitStatus::NoTimeout,
+              sim_.waitFor(mutex, condvar, std::chrono::seconds(10)));
+  }
+  EXPECT_TRUE(done);
+
+  thread->join();
+}
+
 TEST_F(SimulatedTimeSystemTest, Monotonic) {
   // Setting time forward works.
   sim_.setMonotonicTime(start_monotonic_time_ + std::chrono::milliseconds(5));
