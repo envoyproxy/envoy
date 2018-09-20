@@ -167,9 +167,9 @@ TEST_P(BufferIntegrationTest, RequestPathTimesOutInBuffer) {
   EXPECT_EQ(getBufferTimeoutCount(), 1);
 }
 
-TEST_P(BufferIntegrationTest, RequestPathTimesntOutInBuffer) {
+TEST_P(BufferIntegrationTest, RequestPathDoesNotTimeoutInBuffer) {
   std::chrono::milliseconds test_connection_initiation_timeout(1250);
-  std::chrono::seconds buffer_timeout(5); // Greater than test timeout
+  std::chrono::seconds buffer_timeout(5); // Greater than test connection initiation of 1250 ms
 
   ConfigHelper::HttpModifierFunction mod = overrideConfigBufferTimeout(buffer_timeout);
   config_helper_.addConfigModifier(mod);

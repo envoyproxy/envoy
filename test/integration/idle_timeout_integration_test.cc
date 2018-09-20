@@ -209,6 +209,7 @@ TEST_P(IdleTimeoutIntegrationTest, UnconfiguredRequestPathTimesntOutOnBodilessPo
 
   waitForTimeout(*response);
 
+  // with no request timeout configured, the idle timeout triggers instead
   EXPECT_FALSE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
@@ -231,7 +232,8 @@ TEST_P(IdleTimeoutIntegrationTest, RequestPathTimesOutOnIncompleteHeaders) {
   EXPECT_THAT(raw_response, testing::HasSubstr("request timeout"));
 }
 
-// TODO test that the request_timer triggers on a hung filter that does not send upstream
+// TODO create a test filter that hangs and does not send data upstream, which would
+// trigger a configured request_timer
 
 } // namespace
 } // namespace Envoy
