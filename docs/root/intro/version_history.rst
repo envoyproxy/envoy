@@ -92,6 +92,7 @@ Version history
 * tls: implemented :ref:`Secret Discovery Service <config_secret_discovery_service>`.
 * tracing: added support for configuration of :ref:`tracing sampling
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
+* thrift_proxy: introduced thrift rate limiter filter
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
   selecting a host from a subset.
 * upstream: require opt-in to use the :ref:`x-envoy-orignal-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` header
