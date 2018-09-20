@@ -9,27 +9,29 @@ namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
 
-Filter::Filter(JwtAuthnFilterStats& stats, AuthenticatorPtr auth)
-    : stats_(stats), auth_(std::move(auth)) {}
+Filter::Filter(FilterConfigSharedPtr config) : stats_(config->stats()), config_(config) {}
 
 void Filter::onDestroy() {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
-  if (auth_) {
-    auth_->onDestroy();
+  if (context_) {
+    context_->cancel();
   }
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool) {
   ENVOY_LOG(debug, "Called Filter : {}", __func__);
-  // Remove headers configured to pass payload
-  auth_->sanitizePayloadHeaders(headers);
 
   state_ = Calling;
   stopped_ = false;
-
-  // TODO(qiwzhang): support per-route config.
   // Verify the JWT token, onComplete() will be called when completed.
-  auth_->verify(headers, this);
+  auto matcher = config_->findMatcher(headers);
+  if (!matcher) {
+    onComplete(Status::Ok);
+  } else {
+    context_ = Verifier::createContext(headers, this);
+    matcher->verifier()->verify(context_);
+  }
+
   if (state_ == Complete) {
     return Http::FilterHeadersStatus::Continue;
   }
@@ -44,7 +46,7 @@ void Filter::onComplete(const Status& status) {
   if (state_ == Responded) {
     return;
   }
-  if (status != Status::Ok) {
+  if (Status::Ok != status) {
     stats_.denied_.inc();
     state_ = Responded;
     // verification failed
@@ -54,7 +56,6 @@ void Filter::onComplete(const Status& status) {
                                        nullptr);
     return;
   }
-
   stats_.allowed_.inc();
   state_ = Complete;
   if (stopped_) {
