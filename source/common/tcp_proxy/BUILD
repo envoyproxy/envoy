@@ -19,7 +19,6 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
-        "//include/envoy/request_info:filter_state_interface",
         "//include/envoy/router:router_interface",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/stats:stats_interface",

@@ -1128,23 +1128,5 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
   EXPECT_EQ(non_routable_cx, config_->stats().downstream_cx_no_route_.value());
 }
 
-// Test that the tcp proxy uses the cluster from FilterState if set
-TEST_F(TcpProxyTest, UseClusterFromPerConnectionState) {
-  setup(1);
-
-  filter_callbacks_.connection_.per_connection_state_.setData("envoy.tcp_proxy.cluster",
-                                                              "filter_state_cluster");
-  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
-  ON_CALL(filter_callbacks_.connection_, perConnectionState)
-      .WillByDefault(ReturnRef(filter_callbacks_.connection_.per_connection_state_));
-
-  // Expect filter to try to open a connection to specified cluster.
-  EXPECT_CALL(factory_context_.cluster_manager_,
-              tcpConnPoolForCluster("filter_state_cluster", _, _))
-      .WillOnce(Return(nullptr));
-
-  filter_->onNewConnection();
-}
-
 } // namespace TcpProxy
 } // namespace Envoy
