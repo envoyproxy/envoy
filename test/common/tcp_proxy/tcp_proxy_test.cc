@@ -1128,16 +1128,49 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
   EXPECT_EQ(non_routable_cx, config_->stats().downstream_cx_no_route_.value());
 }
 
-// Test that the tcp proxy uses the cluster from FilterState if set
-TEST_F(TcpProxyTest, UseClusterFromPerConnectionState) {
-  setup(1);
+class TcpProxyPerConnectionStateTest : public testing::Test {
+public:
+  TcpProxyPerConnectionStateTest() {
+    envoy::config::filter::network::tcp_proxy::v2::TcpProxy proto_config;
+    proto_config.set_stat_prefix("name");
+    auto* route = proto_config.mutable_deprecated_v1()->mutable_routes()->Add();
+    route->set_cluster("fake_cluster");
 
-  auto per_connection_state = std::make_unique<PerConnectionTcpProxyConfig>("filter_state_cluster");
-  filter_callbacks_.connection_.per_connection_state_.setData("envoy.tcp_proxy.cluster",
-                                                              per_connection_state);
-  connection_.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 9999);
-  ON_CALL(filter_callbacks_.connection_, perConnectionState)
-      .WillByDefault(ReturnRef(filter_callbacks_.connection_.per_connection_state_));
+    config_.reset(new Config(proto_config, factory_context_));
+  }
+
+  ~TcpProxyPerConnectionStateTest() {
+    if (filter_ != nullptr) {
+      filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+    }
+  }
+
+  void setup() {
+    EXPECT_CALL(filter_callbacks_, connection()).WillRepeatedly(ReturnRef(connection_));
+
+    filter_.reset(new Filter(config_, factory_context_.cluster_manager_, timeSystem()));
+    filter_->initializeReadFilterCallbacks(filter_callbacks_);
+  }
+
+  Event::TimeSystem& timeSystem() { return factory_context_.dispatcher().timeSystem(); }
+
+  ConfigSharedPtr config_;
+  NiceMock<Network::MockConnection> connection_;
+  NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  std::unique_ptr<Filter> filter_;
+};
+
+// Test that the tcp proxy uses the cluster from FilterState if set
+TEST_F(TcpProxyPerConnectionStateTest, UseClusterFromPerConnectionState) {
+  setup();
+
+  Envoy::RequestInfo::FilterStateImpl per_connection_state;
+  per_connection_state.setData(
+      "envoy.tcp_proxy.cluster",
+      std::make_unique<PerConnectionTcpProxyConfig>("filter_state_cluster"));
+  ON_CALL(connection_, perConnectionState()).WillByDefault(ReturnRef(per_connection_state));
+  ON_CALL(Const(connection_), perConnectionState()).WillByDefault(ReturnRef(per_connection_state));
 
   // Expect filter to try to open a connection to specified cluster.
   EXPECT_CALL(factory_context_.cluster_manager_,
