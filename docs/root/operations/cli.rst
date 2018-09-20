@@ -239,4 +239,6 @@ following are the command line options that Envoy supports.
 .. option:: --allow-unknown-fields
 
   *(optional)* This flag disables validation of protobuf configurations for unknown fields. By default, the 
-  validation is enabled.
+  validation is enabled. For most deployments, the default should be used which ensures configuration errors
+  are caught upfront and Envoy is configured as intended. However in cases where Envoy needs to accept configuration 
+  produced by newer control planes, effectively ignoring new features it does not know about yet, this can be disabled.
