@@ -152,6 +152,21 @@ TEST_F(SimulatedTimeSystemTest, DisableTimer) {
   EXPECT_EQ("36", output_);
 }
 
+TEST_F(SimulatedTimeSystemTest, IgnoreRedundantDisable) {
+  addTask(5, '5');
+  timers_[0]->disableTimer();
+  timers_[0]->disableTimer();
+  sleepMsAndLoop(5);
+  EXPECT_EQ("", output_);
+}
+
+TEST_F(SimulatedTimeSystemTest, IgnoreRedundantEnable) {
+  addTask(5, '5');
+  timers_[0]->enableTimer(std::chrono::milliseconds(5));
+  sleepMsAndLoop(5);
+  EXPECT_EQ("5", output_);
+}
+
 TEST_F(SimulatedTimeSystemTest, DeleteTime) {
   addTask(5, '5');
   addTask(3, '3');
