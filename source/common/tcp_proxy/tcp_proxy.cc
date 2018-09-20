@@ -211,7 +211,7 @@ void Filter::readDisableDownstream(bool disable) {
   }
 }
 
-virtual const std::string& Filter::getUpstreamCluster() {
+const std::string& Filter::getUpstreamCluster() {
   // First check if the cluster has been set by any filter preceding TCP proxy.
   if (read_callbacks_->connection().perConnectionState().hasDataWithName(
           "envoy.tcp_proxy.cluster")) {
