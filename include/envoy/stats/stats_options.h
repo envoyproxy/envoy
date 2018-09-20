@@ -51,7 +51,7 @@ public:
   /**
    * The filter regex which limits stat creation.
    */
-  virtual absl::optional<std::regex> statNameFilter() const PURE;
+  virtual const absl::optional<std::regex>& statNameFilter() const PURE;
 };
 
 } // namespace Stats

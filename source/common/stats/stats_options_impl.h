@@ -26,7 +26,7 @@ struct StatsOptionsImpl : public StatsOptions {
   size_t maxNameLength() const override { return max_obj_name_length_ + max_stat_suffix_length_; }
   size_t maxObjNameLength() const override { return max_obj_name_length_; }
   size_t maxStatSuffixLength() const override { return max_stat_suffix_length_; }
-  absl::optional<std::regex> statNameFilter() const override { return stat_name_filter_; }
+  const absl::optional<std::regex>& statNameFilter() const override { return stat_name_filter_; }
 
   size_t max_obj_name_length_ = 60;
   size_t max_stat_suffix_length_ = 67;

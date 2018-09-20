@@ -101,7 +101,7 @@ public:
   const std::string& tagExtractedName() const override { return tag_extracted_name_; }
   const std::vector<Tag>& tags() const override { return tags_; }
   // Stats::Counter
-  void add(uint64_t amount) override { UNREFERENCED_PARAMETER(amount); }
+  void add(uint64_t) override {}
   void inc() override {}
   uint64_t latch() override { return 0; }
   void reset() override {}
@@ -164,11 +164,11 @@ public:
   const std::string& tagExtractedName() const override { return tag_extracted_name_; }
   const std::vector<Tag>& tags() const override { return tags_; }
   // Stats::Gauge
-  void add(uint64_t amount) override { UNREFERENCED_PARAMETER(amount); }
+  void add(uint64_t) override {}
   void inc() override {}
   void dec() override {}
-  void set(uint64_t amount) override { UNREFERENCED_PARAMETER(amount); }
-  void sub(uint64_t amount) override { UNREFERENCED_PARAMETER(amount); }
+  void set(uint64_t) override {}
+  void sub(uint64_t) override {}
   bool used() const override { return false; }
   uint64_t value() const override { return 0; }
 
