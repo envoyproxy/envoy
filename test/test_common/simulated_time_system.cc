@@ -21,8 +21,8 @@ namespace Event {
 class SimulatedTimeSystem::Alarm : public TimerImpl {
 public:
   Alarm(SimulatedTimeSystem& time_system, Libevent::BasePtr& libevent, TimerCb cb)
-      : TimerImpl(libevent, cb), time_system_(time_system), index_(time_system.nextIndex()),
-        armed_(false) {}
+      : TimerImpl(libevent, [this, cb] { runAlarm(cb); }), time_system_(time_system),
+        index_(time_system.nextIndex()), armed_(false) {}
 
   virtual ~Alarm();
 
@@ -39,6 +39,7 @@ public:
   void activate() {
     armed_ = false;
     std::chrono::milliseconds duration = std::chrono::milliseconds::zero();
+    time_system_.incPending();
     TimerImpl::enableTimer(duration);
   }
 
@@ -50,6 +51,11 @@ public:
   uint64_t index() const { return index_; }
 
 private:
+  void runAlarm(TimerCb cb) {
+    time_system_.decPending();
+    cb();
+  }
+
   SimulatedTimeSystem& time_system_;
   MonotonicTime time_;
   uint64_t index_;
@@ -93,13 +99,14 @@ SimulatedTimeSystem::Alarm::~Alarm() {
 }
 
 void SimulatedTimeSystem::Alarm::disableTimer() {
-  ASSERT(armed_);
-  time_system_.removeAlarm(this);
-  armed_ = false;
+  if (armed_) {
+    time_system_.removeAlarm(this);
+    armed_ = false;
+  }
 }
 
 void SimulatedTimeSystem::Alarm::enableTimer(const std::chrono::milliseconds& duration) {
-  ASSERT(!armed_);
+  disableTimer();
   armed_ = true;
   if (duration.count() == 0) {
     activate();
@@ -108,12 +115,18 @@ void SimulatedTimeSystem::Alarm::enableTimer(const std::chrono::milliseconds& du
   }
 }
 
+static int instance_count = 0;
+
 // When we initialize our simulated time, we'll start the current time based on
 // the real current time. But thereafter, real-time will not be used, and time
 // will march forward only by calling sleep().
 SimulatedTimeSystem::SimulatedTimeSystem()
     : monotonic_time_(MonotonicTime(std::chrono::seconds(0))),
-      system_time_(real_time_source_.systemTime()), index_(0) {}
+      system_time_(real_time_source_.systemTime()), index_(0), pending_alarms_(0) {
+  ASSERT(++instance_count <= 1);
+}
+
+SimulatedTimeSystem::~SimulatedTimeSystem() { --instance_count; }
 
 SystemTime SimulatedTimeSystem::systemTime() {
   Thread::LockGuard lock(mutex_);
@@ -123,6 +136,32 @@ SystemTime SimulatedTimeSystem::systemTime() {
 MonotonicTime SimulatedTimeSystem::monotonicTime() {
   Thread::LockGuard lock(mutex_);
   return monotonic_time_;
+}
+
+void SimulatedTimeSystem::sleep(const Duration& duration) {
+  mutex_.lock();
+  MonotonicTime monotonic_time =
+      monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
+  setMonotonicTimeAndUnlock(monotonic_time);
+}
+
+Thread::CondVar::WaitStatus SimulatedTimeSystem::waitFor(Thread::MutexBasicLockable& mutex,
+                                                         Thread::CondVar& condvar,
+                                                         const Duration& duration) noexcept {
+  // Advance time to activate any callbacks. Note that activating them does not
+  // call them immediately; the libtimer event loop must be called, typically by
+  // Dispatcher::run() in a separate thread.
+  sleep(duration);
+
+  // Now we must use a real-time condvar wait to allow the event-loop running in
+  // another thread to run the callbacks that we just activated. The real-time
+  // delay to allow the dispatcher thread to wake up is not related to the
+  // simulated duration passed into this function.
+  Thread::CondVar::WaitStatus status;
+  do {
+    status = condvar.waitFor(mutex, Duration(std::chrono::milliseconds(50)));
+  } while ((status == Thread::CondVar::WaitStatus::Timeout) && hasPending());
+  return status;
 }
 
 int64_t SimulatedTimeSystem::nextIndex() {
