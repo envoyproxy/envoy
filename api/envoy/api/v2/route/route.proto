@@ -8,7 +8,6 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/type/range.proto";
 
 import "google/protobuf/duration.proto";
-import "google/protobuf/empty.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -300,10 +299,12 @@ message RouteMatch {
   // query string for a match to occur.
   repeated QueryParameterMatcher query_parameters = 7;
 
-  // Specifies that gRPC requests should be matched. The router will check
+  message GrpcRouteMatchOptions {}
+
+  // If specified, only gRPC requests will be matched. The router will check
   // that the content-type header has a application/grpc or one of the various
   // application/grpc+ values.
-  google.protobuf.Empty grpc = 8;
+  GrpcRouteMatchOptions grpc = 8;
 }
 
 // [#comment:next free field: 9]
