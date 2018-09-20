@@ -106,7 +106,7 @@ It follows the same protocol as other `xDS <https://github.com/envoyproxy/data-p
 
 SdsSecretConfig is used in two fields in :ref:`CommonTlsContext <envoy_api_msg_auth.CommonTlsContext>`. The first field is "tls_certificate_sds_secret_configs" to use SDS to get :ref:`TlsCertificate <envoy_api_msg_auth.TlsCertificate>`. The second field is "validation_context_sds_secret_config" to use SDS to get :ref:`CertificateValidationContext <envoy_api_msg_auth.CertificateValidationContext>`.
 
-If a listener or a cluster requires TLS certificates that needed to be fetched by SDS, it will NOT be marked as active before they are fetched.  If Envoy fails to fetch the certificates due to connection failures, or bad response data, the listener will be marked as active, but the connection to the port will be reset. For the cluster, it will be marked as active too, but the requests routed to that cluster will be rejected.
+If a listener or a cluster requires TLS certificates that needed to be fetched by SDS, it will NOT be marked as active before they are fetched. If Envoy fails to fetch the certificates due to connection failures, or bad response data, the listener will be marked as active, but the connection to the port will be reset. For the cluster, it will be marked as active too, but the requests routed to that cluster will be rejected.
 
 Following examples show how to configurate SDS in the config:
 
@@ -201,7 +201,7 @@ In this example, certificates are specified in the bootstrap static_resource, th
                     cluster_name: sds_server
 
 
-In the above example, a gRPC SDS server can be reached by Unix Domain Socket path "/tmp/uds_path". It can provide three secrets, "client_cert", "server_cert" and "validation_context".  In the config, "server_cert" and "validation_context" are used by one of listeners and "client_cert" is used by one of clusters.
+In the above example, a gRPC SDS server can be reached by Unix Domain Socket path "/tmp/uds_path". It can provide three secrets, "client_cert", "server_cert" and "validation_context". In the config, "server_cert" and "validation_context" are used by one of listeners and "client_cert" is used by one of clusters.
 
 For illustration purpose, the config is using Google grpc to fetch "client_cert" and "server_cert" secrets from the SDS server. It uses Envoy grpc to fetch "validation_context" secret. In order to use Envoy gRPC, a static cluster is needed to specify the SDS gRPC server.
 
