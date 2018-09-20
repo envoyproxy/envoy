@@ -241,3 +241,10 @@ following are the command line options that Envoy supports.
   *(optional)* This flag prevents the creation of stats matching a regex. Since this flag is not set
   by default, all stats are enabled by default. To disable all stats within Envoy,
   call `--filter-stats ".*"`.
+
+.. option:: --allow-unknown-fields
+
+  *(optional)* This flag disables validation of protobuf configurations for unknown fields. By default, the 
+  validation is enabled. For most deployments, the default should be used which ensures configuration errors
+  are caught upfront and Envoy is configured as intended. However in cases where Envoy needs to accept configuration 
+  produced by newer control planes, effectively ignoring new features it does not know about yet, this can be disabled.

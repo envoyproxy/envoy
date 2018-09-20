@@ -73,6 +73,7 @@ message HealthCheck {
     }
   }
 
+  // [#comment:next free field: 9]
   message HttpHealthCheck {
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated
@@ -99,6 +100,10 @@ message HealthCheck {
     // the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
     repeated core.HeaderValueOption request_headers_to_add = 6;
+
+    // Specifies a list of HTTP headers that should be removed from each request that is sent to the
+    // health checked cluster.
+    repeated string request_headers_to_remove = 8;
 
     // If set, health checks will be made using http/2.
     bool use_http2 = 7;

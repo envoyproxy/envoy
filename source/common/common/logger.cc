@@ -58,14 +58,28 @@ DelegatingLogSinkPtr DelegatingLogSink::init() {
   return delegating_sink;
 }
 
-void Registry::initialize(spdlog::level::level_enum log_level, const std::string& log_format,
-                          Thread::BasicLockable& lock) {
-  // TODO(jmarantz): I think it would be more robust to push a separate lockable
-  // SinkDelegate onto the stack for the lifetime of the lock, so we don't crash
-  // if we try to log anything after the context owning the lock is destroyed.
-  getSink()->setLock(lock);
-  setLogLevel(log_level);
-  setLogFormat(log_format);
+static Context* current_context = nullptr;
+
+Context::Context(spdlog::level::level_enum log_level, const std::string& log_format,
+                 Thread::BasicLockable& lock)
+    : log_level_(log_level), log_format_(log_format), lock_(lock), save_context_(current_context) {
+  current_context = this;
+  activate();
+}
+
+Context::~Context() {
+  current_context = save_context_;
+  if (current_context != nullptr) {
+    current_context->activate();
+  } else {
+    Registry::getSink()->clearLock();
+  }
+}
+
+void Context::activate() {
+  Registry::getSink()->setLock(lock_);
+  Registry::setLogLevel(log_level_);
+  Registry::setLogFormat(log_format_);
 }
 
 std::vector<Logger>& Registry::allLoggers() {
