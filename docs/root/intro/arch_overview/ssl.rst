@@ -94,7 +94,8 @@ TLS certificates can be specified in the bootstrap.static_resource
 :ref:`secrets <envoy_api_field_config.bootstrap.v2.Bootstrap.StaticResources.secrets>`.
 But they can also be fetched remotely by Secret discovery service (SDS).
 
-The benefits of remote fetch are:
+The benefits of remote fetch are
+
 * Easy to rotate expired certificates. SDS servers just push new certificates to Envoy.
 * Certificates are safe; they are not build into images, they can be fetched by secure channels such as Unix Domain Socket.
 
@@ -200,7 +201,9 @@ In this example, certificates are specified in the bootstrap static_resource, th
                     cluster_name: sds_server
 
 
-In the above example, a gRPC SDS server can be reached by Unix Domain Socket path "/tmp/uds_path". It can provide three secrets, "client_cert", "server_cert" and "validation_context".  In the config, "server_cert" and "validation_context" are used by one of listeners and "client_cert" is used by one of clusters. For illustration purpose, the config is using Google grpc to fetch "client_cert" and "server_cert" secrets from the SDS server. It uses Envoy grpc to fetch "validation_context" secret. In order to use Envoy gRPC, a static cluster is needed to specify the SDS gRPC server.
+In the above example, a gRPC SDS server can be reached by Unix Domain Socket path "/tmp/uds_path". It can provide three secrets, "client_cert", "server_cert" and "validation_context".  In the config, "server_cert" and "validation_context" are used by one of listeners and "client_cert" is used by one of clusters.
+
+For illustration purpose, the config is using Google grpc to fetch "client_cert" and "server_cert" secrets from the SDS server. It uses Envoy grpc to fetch "validation_context" secret. In order to use Envoy gRPC, a static cluster is needed to specify the SDS gRPC server.
 
 .. _arch_overview_ssl_auth_filter:
 
