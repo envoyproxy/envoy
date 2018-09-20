@@ -68,11 +68,10 @@ uint64_t convertPercent(double percent, uint64_t max_value);
 
 /**
  * Convert a fractional percent denominator enum into an integer.
- * @param denominator supplies denominator to convert.
+ * @param percent supplies percent to convert.
  * @return the converted denominator.
  */
-uint64_t fractionalPercentDenominatorToInt(
-    const envoy::type::FractionalPercent::DenominatorType& denominator);
+uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent& percent);
 
 } // namespace ProtobufPercentHelper
 } // namespace Envoy

@@ -20,9 +20,8 @@ uint64_t convertPercent(double percent, uint64_t max_value) {
   return max_value * (percent / 100.0);
 }
 
-uint64_t fractionalPercentDenominatorToInt(
-    const envoy::type::FractionalPercent::DenominatorType& denominator) {
-  switch (denominator) {
+uint64_t fractionalPercentDenominatorToInt(const envoy::type::FractionalPercent& percent) {
+  switch (percent.denominator()) {
   case envoy::type::FractionalPercent::HUNDRED:
     return 100;
   case envoy::type::FractionalPercent::TEN_THOUSAND:
