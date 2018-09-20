@@ -32,6 +32,8 @@ public:
   const std::string ThriftProxy = "envoy.filters.network.thrift_proxy";
   // Role based access control filter
   const std::string Rbac = "envoy.filters.network.rbac";
+  // SNI Cluster filter
+  const std::string SniCluster = "envoy.filters.network.sni_cluster";
 
   // Converts names from v1 to v2
   const Config::V1Converter v1_converter_;
