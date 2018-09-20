@@ -328,7 +328,7 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
 }
 
 FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type,
-                       Event::TimeSystem& time_system)
+                           Event::TimeSystem& time_system)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
                    Network::SocketPtr{new Network::UdsListenSocket(
                        std::make_shared<Network::Address::PipeInstance>(uds_path))},
@@ -365,8 +365,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
                            Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type,
                            Event::TimeSystem& time_system, bool enable_half_close)
     : http_type_(type), socket_(std::move(listen_socket)), api_(new Api::Impl(milliseconds(10000))),
-      time_system_(time_system),
-      dispatcher_(api_->allocateDispatcher(time_system_)),
+      time_system_(time_system), dispatcher_(api_->allocateDispatcher(time_system_)),
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
       allow_unexpected_disconnects_(false), enable_half_close_(enable_half_close), listener_(*this),
       filter_chain_(Network::Test::createEmptyFilterChain(std::move(transport_socket_factory))) {

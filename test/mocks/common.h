@@ -59,8 +59,8 @@ public:
     return real_time_system_.createScheduler(base);
   }
   void sleep(const Duration& duration) override { real_time_system_.sleep(duration); }
-  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& lock,
-                                      Thread::CondVar& condvar, const Duration& duration) override {
+  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& lock, Thread::CondVar& condvar,
+                                      const Duration& duration) override {
     return real_time_system_.waitFor(lock, condvar, duration);
   }
   MOCK_METHOD0(systemTime, SystemTime());

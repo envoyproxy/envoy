@@ -15,11 +15,14 @@ public:
   LegacyJsonIntegrationTest() : BaseIntegrationTest(GetParam(), realTime()) {}
 
   void SetUp() override {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
     registerPort("upstream_0", fake_upstreams_.back()->localAddress()->ip()->port());
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
     registerPort("upstream_1", fake_upstreams_.back()->localAddress()->ip()->port());
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
     registerPort("cluster_with_buffer_limits",
                  fake_upstreams_.back()->localAddress()->ip()->port());
   }

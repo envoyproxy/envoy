@@ -104,8 +104,8 @@ public:
 
   void createUpstreams() override {
     AdsIntegrationBaseTest::createUpstreams();
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    fake_upstreams_.emplace_back(new FakeUpstream(
+        createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
   Network::TransportSocketFactoryPtr createUpstreamSslContext() {
@@ -651,7 +651,8 @@ public:
 
   void createUpstreams() override {
     AdsIntegrationBaseTest::createUpstreams();
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
   void initialize() override {
@@ -696,7 +697,8 @@ public:
 
   void createUpstreams() override {
     AdsIntegrationBaseTest::createUpstreams();
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
   void initialize() override {

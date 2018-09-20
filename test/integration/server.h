@@ -288,8 +288,7 @@ public:
 
 protected:
   IntegrationTestServer(Event::TimeSystem& time_system, const std::string& config_path)
-      : time_system_(time_system),
-        config_path_(config_path) {}
+      : time_system_(time_system), config_path_(config_path) {}
 
 private:
   /**

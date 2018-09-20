@@ -122,8 +122,7 @@ class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
   using TimeSystemPtr = std::unique_ptr<Event::TimeSystem>;
 
-  BaseIntegrationTest(Network::Address::IpVersion version,
-                      TimeSystemPtr time_system,
+  BaseIntegrationTest(Network::Address::IpVersion version, TimeSystemPtr time_system,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   virtual ~BaseIntegrationTest() {}
 
@@ -176,9 +175,10 @@ public:
 
   Api::ApiPtr api_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
- private:
+private:
   TimeSystemPtr time_system_;
- public:
+
+public:
   Event::DispatcherPtr dispatcher_;
 
   /**

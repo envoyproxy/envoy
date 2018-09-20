@@ -29,12 +29,11 @@ SchedulerPtr RealTimeSystem::createScheduler(Libevent::BasePtr& libevent) {
   return std::make_unique<RealScheduler>(libevent);
 }
 
-void RealTimeSystem::sleep(const Duration& duration) {
-  std::this_thread::sleep_for(duration);
-}
+void RealTimeSystem::sleep(const Duration& duration) { std::this_thread::sleep_for(duration); }
 
-Thread::CondVar::WaitStatus RealTimeSystem::waitFor(
-    Thread::MutexBasicLockable& lock, Thread::CondVar& condvar, const Duration& duration) {
+Thread::CondVar::WaitStatus RealTimeSystem::waitFor(Thread::MutexBasicLockable& lock,
+                                                    Thread::CondVar& condvar,
+                                                    const Duration& duration) {
   return condvar.waitFor(lock, duration);
 }
 

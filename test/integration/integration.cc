@@ -213,8 +213,7 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
                                          TimeSystemPtr time_system, const std::string& config)
     : api_(new Api::Impl(std::chrono::milliseconds(10000))),
-      mock_buffer_factory_(new NiceMock<MockBufferFactory>),
-      time_system_(std::move(time_system)),
+      mock_buffer_factory_(new NiceMock<MockBufferFactory>), time_system_(std::move(time_system)),
       dispatcher_(new Event::DispatcherImpl(*time_system_,
                                             Buffer::WatermarkFactoryPtr{mock_buffer_factory_})),
       version_(version), config_helper_(version, config),
@@ -255,12 +254,11 @@ void BaseIntegrationTest::initialize() {
 void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
     if (autonomous_upstream_) {
-      fake_upstreams_.emplace_back(new AutonomousUpstream(0, upstream_protocol_, version_,
-                                                          dispatcher_->timeSystem()));
-    } else {
       fake_upstreams_.emplace_back(
-          new FakeUpstream(0, upstream_protocol_, version_, dispatcher_->timeSystem(),
-                           enable_half_close_));
+          new AutonomousUpstream(0, upstream_protocol_, version_, dispatcher_->timeSystem()));
+    } else {
+      fake_upstreams_.emplace_back(new FakeUpstream(0, upstream_protocol_, version_,
+                                                    dispatcher_->timeSystem(), enable_half_close_));
     }
   }
 }
@@ -344,9 +342,8 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
 
 void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootstrap_path,
                                                        const std::vector<std::string>& port_names) {
-  test_server_ = IntegrationTestServer::create(bootstrap_path, version_,
-                                               pre_worker_start_test_steps_, deterministic_,
-                                               *time_system_);
+  test_server_ = IntegrationTestServer::create(
+      bootstrap_path, version_, pre_worker_start_test_steps_, deterministic_, *time_system_);
   if (config_helper_.bootstrap().static_resources().listeners_size() > 0) {
     // Wait for listeners to be created before invoking registerTestServerPorts() below, as that
     // needs to know about the bound listener ports.

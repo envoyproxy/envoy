@@ -75,7 +75,7 @@ public:
    * @param duration The amount of time to sleep.
    */
   virtual void sleep(const Duration& duration) PURE;
-  template<class D> void sleep(const D& duration) {
+  template <class D> void sleep(const D& duration) {
     sleep(std::chrono::duration_cast<Duration>(duration));
   }
 
@@ -85,11 +85,13 @@ public:
    *
    * @param duration The amount of time to sleep.
    */
-  virtual Thread::CondVar::WaitStatus waitFor(
-      Thread::MutexBasicLockable& lock, Thread::CondVar& condvar, const Duration& duration) PURE;
+  virtual Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& lock,
+                                              Thread::CondVar& condvar,
+                                              const Duration& duration) PURE;
 
-  template<class D> Thread::CondVar::WaitStatus waitFor(
-      Thread::MutexBasicLockable& lock, Thread::CondVar& condvar, const D& duration) {
+  template <class D>
+  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& lock, Thread::CondVar& condvar,
+                                      const D& duration) {
     return waitFor(lock, condvar, std::chrono::duration_cast<Duration>(duration));
   }
 };

@@ -148,7 +148,8 @@ public:
 
   void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(createUpstreamSslContext(context_manager_), 0,
-                                                  FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
+                                                  FakeHttpConnection::Type::HTTP1, version_,
+                                                  timeSystem()));
   }
 
 private:

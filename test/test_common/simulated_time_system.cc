@@ -93,7 +93,6 @@ SimulatedTimeSystem::Alarm::~Alarm() {
 }
 
 void SimulatedTimeSystem::Alarm::disableTimer() {
-  //ASSERT(armed_);
   if (armed_) {
     time_system_.removeAlarm(this);
     armed_ = false;
@@ -101,7 +100,6 @@ void SimulatedTimeSystem::Alarm::disableTimer() {
 }
 
 void SimulatedTimeSystem::Alarm::enableTimer(const std::chrono::milliseconds& duration) {
-  //ASSERT(!armed_);
   disableTimer();
   armed_ = true;
   if (duration.count() == 0) {
@@ -122,9 +120,7 @@ SimulatedTimeSystem::SimulatedTimeSystem()
   ASSERT(++instance_count <= 1);
 }
 
-SimulatedTimeSystem::~SimulatedTimeSystem() {
-  --instance_count;
-}
+SimulatedTimeSystem::~SimulatedTimeSystem() { --instance_count; }
 
 SystemTime SimulatedTimeSystem::systemTime() {
   Thread::LockGuard lock(mutex_);
@@ -143,15 +139,15 @@ void SimulatedTimeSystem::sleep(const Duration& duration) {
   setMonotonicTimeAndUnlock(monotonic_time);
 }
 
-Thread::CondVar::WaitStatus SimulatedTimeSystem::waitFor(
-    Thread::MutexBasicLockable& lock, Thread::CondVar& condvar, const Duration& duration) {
+Thread::CondVar::WaitStatus SimulatedTimeSystem::waitFor(Thread::MutexBasicLockable& lock,
+                                                         Thread::CondVar& condvar,
+                                                         const Duration& duration) {
   Thread::CondVar::WaitStatus status;
-  MonotonicTime end_time = monotonicTime() +
-                           std::chrono::duration_cast<MonotonicTime::duration>(duration);
+  MonotonicTime end_time =
+      monotonicTime() + std::chrono::duration_cast<MonotonicTime::duration>(duration);
   do {
     status = condvar.waitFor(lock, Duration(std::chrono::milliseconds(50)));
-  } while ((status == Thread::CondVar::WaitStatus::Timeout) &&
-           monotonicTime() < end_time);
+  } while ((status == Thread::CondVar::WaitStatus::Timeout) && monotonicTime() < end_time);
   return status;
 }
 
