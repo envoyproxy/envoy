@@ -11,10 +11,17 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 
-// This message specifies how a JSON Web Token (JWT) can be verified. JWT format is defined
-// `here <https://tools.ietf.org/html/rfc7519>`_. Please see `OAuth2.0
-//  <https://tools.ietf.org/html/rfc6749>`_ and `OIDC1.0  <http://openid.net/connect>`_ for
-// the authentication flow.
+// JWT format is defined `here <https://tools.ietf.org/html/rfc7519>`_. Please see `OAuth2.0
+// <https://tools.ietf.org/html/rfc6749>`_ and `OIDC1.0  <http://openid.net/connect>`_ for the
+// authentication flow.
+//
+// A JwtProvider message specifies how a JSON Web Token (JWT) can be verified. It specifies:
+//
+// * issuer: the principal that issues the JWT. It has to match the one from the token.
+// * allowed audiences: the ones in the token have to be listed here.
+// * how to fetch public key JWKS to verify the token signature.
+// * how to extract JWT token in the request.
+// * how to pass successfully verified token payload.
 //
 // Example:
 //
@@ -104,17 +111,17 @@ message JwtProvider {
   // If no explicit location is specified, the following default locations are tried in order:
   //
   // 1. The Authorization header using the Bearer schema. See `here
-  //     <https://tools.ietf.org/html/rfc6750#section-2.1>`_. Example:
+  //     <https://tools.ietf.org/html/rfc6750#section-2.1>`_. Example::
   //
   //       Authorization: Bearer <token>.
   //
   // 2. `access_token` query parameter. See `this
   // <https://tools.ietf.org/html/rfc6750#section-2.3>`_
   //
-
+  //
   // Multiple JWTs can be verified for a request. Each JWT has to be extracted from the locations
   // its issuer specified or from the default locations.
-
+  //
   // Specify the HTTP headers to extract JWT token. For examples, following config:
   //
   // .. code-block:: yaml
