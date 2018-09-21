@@ -162,6 +162,11 @@ Thread::CondVar::WaitStatus SimulatedTimeSystem::waitFor(Thread::MutexBasicLocka
       return Thread::CondVar::WaitStatus::NoTimeout;
     }
 
+    // Wait for the libevent poll in another thread to catch up prior to advancing time.
+    if (hasPending()) {
+      continue;
+    }
+
     mutex_.lock();
     if (monotonic_time_ < end_time) {
       if (alarms_.empty()) {
@@ -173,14 +178,9 @@ Thread::CondVar::WaitStatus SimulatedTimeSystem::waitFor(Thread::MutexBasicLocka
         setMonotonicTimeAndUnlock(std::min(next_wakeup, end_time));
       }
     } else {
-      // If there were no alarms, and we've already reached our end time, we may
-      // still need to call CondVar::waitFor one more time, if there are still
-      // pending callbacks that have been activated but not yet called by the
-      // event loop, running in another thread.
+      // If we reached our end_time, break the loop and return timeout.
       mutex_.unlock();
-      if (!hasPending()) {
-        break;
-      }
+      break;
     }
   }
   return Thread::CondVar::WaitStatus::Timeout;
