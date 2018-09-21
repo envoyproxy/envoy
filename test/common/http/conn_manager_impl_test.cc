@@ -264,6 +264,9 @@ public:
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
+  const Http::InternalAddressConfig& internalAddressConfig() const override {
+    return internal_address_config_;
+  }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
   const std::string& via() const override { return EMPTY_STRING; }
@@ -296,6 +299,7 @@ public:
   std::string server_name_;
   Network::Address::Ipv4Instance local_address_{"127.0.0.1"};
   bool use_remote_address_{true};
+  Http::DefaultInternalAddressConfig internal_address_config_;
   Http::ForwardClientCertType forward_client_cert_{Http::ForwardClientCertType::Sanitize};
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   absl::optional<std::string> user_agent_;
