@@ -14,6 +14,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::Const;
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnPointee;
@@ -92,6 +93,11 @@ template <class T> static void initializeMockConnection(T& connection) {
   ON_CALL(connection, write(_, _)).WillByDefault(Invoke([](Buffer::Instance& buffer, bool) -> void {
     buffer.drain(buffer.length());
   }));
+
+  ON_CALL(connection, perConnectionState())
+      .WillByDefault(ReturnRef(connection.per_connection_state_));
+  ON_CALL(Const(connection), perConnectionState())
+      .WillByDefault(ReturnRef(connection.per_connection_state_));
 }
 
 MockConnection::MockConnection() {
