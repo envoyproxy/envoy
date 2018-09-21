@@ -22,7 +22,6 @@ exports_files([
     "server_unix_listener.json",
     "server_unix_listener.yaml",
     "server_xfcc.json",
-    "tcp_proxy.json",
 ])
 
 filegroup(

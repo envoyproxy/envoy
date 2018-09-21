@@ -21,22 +21,6 @@
 namespace Envoy {
 namespace TcpProxy {
 
-Config::Route::Route(
-    const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute& config) {
-  cluster_name_ = config.cluster();
-
-  source_ips_ = Network::Address::IpList(config.source_ip_list());
-  destination_ips_ = Network::Address::IpList(config.destination_ip_list());
-
-  if (!config.source_ports().empty()) {
-    Network::Utility::parsePortRangeList(config.source_ports(), source_port_ranges_);
-  }
-
-  if (!config.destination_ports().empty()) {
-    Network::Utility::parsePortRangeList(config.destination_ports(), destination_port_ranges_);
-  }
-}
-
 Config::SharedConfig::SharedConfig(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
@@ -52,24 +36,11 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
                Server::Configuration::FactoryContext& context)
     : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
       upstream_drain_manager_slot_(context.threadLocal().allocateSlot()),
-      shared_config_(std::make_shared<SharedConfig>(config, context)) {
+      shared_config_(std::make_shared<SharedConfig>(config, context)), cluster_(config.cluster()) {
 
   upstream_drain_manager_slot_->set([](Event::Dispatcher&) {
     return ThreadLocal::ThreadLocalObjectSharedPtr(new UpstreamDrainManager());
   });
-
-  if (config.has_deprecated_v1()) {
-    for (const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
-             route_desc : config.deprecated_v1().routes()) {
-      routes_.emplace_back(Route(route_desc));
-    }
-  }
-
-  if (!config.cluster().empty()) {
-    envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute default_route;
-    default_route.set_cluster(config.cluster());
-    routes_.emplace_back(default_route);
-  }
 
   if (config.has_metadata_match()) {
     const auto& filter_metadata = config.metadata_match().filter_metadata();
@@ -85,37 +56,6 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
   for (const envoy::config::filter::accesslog::v2::AccessLog& log_config : config.access_log()) {
     access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
   }
-}
-
-const std::string& Config::getRouteFromEntries(Network::Connection& connection) {
-  for (const Config::Route& route : routes_) {
-    if (!route.source_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(*connection.remoteAddress(),
-                                           route.source_port_ranges_)) {
-      continue;
-    }
-
-    if (!route.source_ips_.empty() && !route.source_ips_.contains(*connection.remoteAddress())) {
-      continue;
-    }
-
-    if (!route.destination_port_ranges_.empty() &&
-        !Network::Utility::portInRangeList(*connection.localAddress(),
-                                           route.destination_port_ranges_)) {
-      continue;
-    }
-
-    if (!route.destination_ips_.empty() &&
-        !route.destination_ips_.contains(*connection.localAddress())) {
-      continue;
-    }
-
-    // if we made it past all checks, the route matches
-    return route.cluster_name_;
-  }
-
-  // no match, no more routes to try
-  return EMPTY_STRING;
 }
 
 UpstreamDrainManager& Config::drainManager() {
