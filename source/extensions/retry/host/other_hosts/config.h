@@ -13,7 +13,7 @@ namespace Host {
 class OtherHostsRetryPredicateFactory : public Upstream::RetryHostPredicateFactory {
 public:
   void createHostPredicate(Upstream::RetryHostPredicateFactoryCallbacks& callbacks,
-                           const ProtobufWkt::Struct&) override {
+                           const Protobuf::Message&) override {
     callbacks.addHostPredicate(std::make_shared<OtherHostsRetryPredicate>());
   }
 
