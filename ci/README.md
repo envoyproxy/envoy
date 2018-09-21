@@ -77,8 +77,8 @@ The build artifact can be found in `/tmp/envoy-docker-build/envoy/source/exe/env
 
 The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 
-* `bazel.api` &mdash; build and run API tests under `-c fastbuild` with clang-7.
-* `bazel.asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang-7.
+* `bazel.api` &mdash; build and run API tests under `-c fastbuild` with clang.
+* `bazel.asan` &mdash; build and run tests under `-c dbg --config=clang-asan` with clang.
 * `bazel.debug` &mdash; build Envoy static binary and run tests under `-c dbg`.
 * `bazel.debug.server_only` &mdash; build Envoy static binary under `-c dbg`.
 * `bazel.dev` &mdash; build Envoy static binary and run tests under `-c fastbuild` with gcc.
@@ -87,9 +87,9 @@ The `./ci/run_envoy_docker.sh './ci/do_ci.sh <TARGET>'` targets are:
 * `bazel.release.server_only` &mdash; build Envoy static binary under `-c opt` with gcc.
 * `bazel.coverage` &mdash; build and run tests under `-c dbg` with gcc, generating coverage information in `$ENVOY_DOCKER_BUILD_DIR/envoy/generated/coverage/coverage.html`.
 * `bazel.coverity` &mdash; build Envoy static binary and run Coverity Scan static analysis.
-* `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang-7.
-* `check_format`&mdash; run `clang-format-7` and `buildifier` on entire source tree.
-* `fix_format`&mdash; run and enforce `clang-format-7` and `buildifier` on entire source tree.
+* `bazel.tsan` &mdash; build and run tests under `-c dbg --config=clang-tsan` with clang.
+* `check_format`&mdash; run `clang-format` and `buildifier` on entire source tree.
+* `fix_format`&mdash; run and enforce `clang-format` and `buildifier` on entire source tree.
 * `docs`&mdash; build documentation tree in `generated/docs`.
 
 # Testing changes to the build image as a developer
