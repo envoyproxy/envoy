@@ -1009,7 +1009,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
     if (existing_itr != existing_hosts_for_current_priority.end()) {
       existing_hosts_for_current_priority.erase(existing_itr);
-      current_priority_hosts.erase(itr);
+      itr = current_priority_hosts.erase(itr);
     } else {
       itr++;
     }
