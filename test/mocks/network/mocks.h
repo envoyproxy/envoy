@@ -51,7 +51,7 @@ public:
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
   bool read_enabled_{true};
-  Envoy::RequestInfo::FilterStateImpl per_connection_state_;
+  RequestInfo::FilterStateImpl per_connection_state_;
   Connection::State state_{Connection::State::Open};
 };
 
@@ -88,8 +88,8 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
   MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
-  MOCK_METHOD0(perConnectionState, Envoy::RequestInfo::FilterState&());
-  MOCK_CONST_METHOD0(perConnectionState, const Envoy::RequestInfo::FilterState&());
+  MOCK_METHOD0(perConnectionState, RequestInfo::FilterState&());
+  MOCK_CONST_METHOD0(perConnectionState, const RequestInfo::FilterState&());
 };
 
 /**
@@ -129,8 +129,8 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
   MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
-  MOCK_METHOD0(perConnectionState, Envoy::RequestInfo::FilterState&());
-  MOCK_CONST_METHOD0(perConnectionState, const Envoy::RequestInfo::FilterState&());
+  MOCK_METHOD0(perConnectionState, RequestInfo::FilterState&());
+  MOCK_CONST_METHOD0(perConnectionState, const RequestInfo::FilterState&());
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());

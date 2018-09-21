@@ -241,8 +241,8 @@ public:
    * consumed by many other objects.
    * @return the per-connection state associated with this connection.
    */
-  virtual Envoy::RequestInfo::FilterState& perConnectionState() PURE;
-  virtual const Envoy::RequestInfo::FilterState& perConnectionState() const PURE;
+  virtual RequestInfo::FilterState& perConnectionState() PURE;
+  virtual const RequestInfo::FilterState& perConnectionState() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;
