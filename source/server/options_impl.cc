@@ -14,8 +14,6 @@
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 
-#include "absl/strings/str_split.h"
-
 // Can be overridden at compile time
 #ifndef ENVOY_DEFAULT_MAX_STATS
 #define ENVOY_DEFAULT_MAX_STATS 16384
@@ -159,43 +157,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
     }
   }
 
-  std::vector<std::string> log_level_vec = absl::StrSplit(log_level.getValue(), ',');
-  std::cout<<"log level vec size..."<<log_level_vec.size()<<"\n";
-  for (auto& level: log_level_vec) {
-    std::vector<std::string> log_level_vec_1 = absl::StrSplit(level, ':');
-    std::string log_name = log_level_vec_1[0];
-    std::string log_level = log_level_vec_1[1];
-    std::cout<<"log_name::"<<log_name<<"\n";
-    std::cout<<"log_level::"<<log_level<<"\n";
-
-  size_t level_to_use = std::numeric_limits<size_t>::max();
-  for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
-    std::cout<<"level is "<<spdlog::level::level_names[i]<<"\n";
-    if (log_level == spdlog::level::level_names[i]) {
-      level_to_use = i;
-      break;
-    }
-    
-  }
-  std::cout<<"level to use..."<<level_to_use<<"\n";
-  Logger::Logger* logger_to_change = nullptr;
-    for (Logger::Logger& logger : Logger::Registry::loggers()) {
-     logger.setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
-      std::cout<<"log name is "<<logger.name()<<"\n";
-      if (logger.name() == log_name) {
-        std::cout<<"setting tje level"<<"\n";
-        logger_to_change = &logger;
-        break;
-      }
-    }
-    if (logger_to_change) {
-      std::cout<<"setting the log level to pointer...."<<"\n";
-     logger_to_change->setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
-    }
-  }
-
   log_format_ = log_format.getValue();
-
+  sub_component_log_level_ = log_level.getValue();
   if (mode.getValue() == "serve") {
     mode_ = Server::Mode::Serve;
   } else if (mode.getValue() == "validate") {

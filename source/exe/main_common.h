@@ -56,6 +56,9 @@ protected:
   std::unique_ptr<Server::HotRestart> restarter_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> stats_store_;
   std::unique_ptr<Server::InstanceImpl> server_;
+
+private:
+  void configureLogging();
 };
 
 // TODO(jmarantz): consider removing this class; I think it'd be more useful to

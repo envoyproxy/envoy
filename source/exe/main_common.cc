@@ -17,6 +17,8 @@
 #include "server/server.h"
 #include "server/test_hooks.h"
 
+#include "absl/strings/str_split.h"
+
 #ifdef ENVOY_HOT_RESTART
 #include "server/hot_restart_impl.h"
 #endif
@@ -56,11 +58,10 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
     }
 
     tls_.reset(new ThreadLocal::InstanceImpl);
-    Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-    std::cout<<"initializing logger registry..."<<"\n";
-    Logger::Registry::initialize(options_.logLevel(), options_.logFormat(), log_lock);
+
+    configureLogging();
 
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
                                                                  restarter_->statsAllocator());
@@ -79,6 +80,30 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
 }
 
 MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
+
+void MainCommonBase::configureLogging() {
+  Thread::BasicLockable& log_lock = restarter_->logLock();
+  Logger::Registry::initialize(options_.logLevel(), options_.logFormat(), log_lock);
+  std::vector<std::string> log_levels = absl::StrSplit(options_.subComponentLogLevel(), ',');
+  for (auto& level : log_levels) {
+    std::vector<std::string> log_name_level = absl::StrSplit(level, ':');
+    std::string log_name = log_name_level[0];
+    std::string log_level = log_name_level[1];
+    size_t level_to_use = std::numeric_limits<size_t>::max();
+    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
+      if (log_level == spdlog::level::level_names[i]) {
+        level_to_use = i;
+        break;
+      }
+    }
+    for (Logger::Logger& logger : Logger::Registry::loggers()) {
+      if (logger.name() == log_name) {
+        logger.setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
+        break;
+      }
+    }
+  }
+}
 
 bool MainCommonBase::run() {
   switch (options_.mode()) {
