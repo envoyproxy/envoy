@@ -115,6 +115,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                                              cmd);
   TCLAP::SwitchArg disable_hot_restart("", "disable-hot-restart",
                                        "Disable hot restart functionality", cmd, false);
+  TCLAP::ValueArg<std::string> filter_stats(
+      "", "filter-stats", "A regex to disallow matching stat names", false, "", "regex", cmd);
 
   cmd.setExceptionHandling(false);
   try {
@@ -147,6 +149,23 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
                     "error: the 'max-stats' value specified ({}) is more than the maximum value "
                     "of 100M");
   // TODO(jmarantz): should we also multiply these to bound the total amount of memory?
+
+  if (filter_stats.getValue() == "") {
+    stats_options_.stat_name_filter_ = absl::nullopt;
+  } else {
+    // If the user-supplied regex is invalid, we'd rather throw at startup than throw at each usage
+    // of this regex.
+    try {
+      std::regex stat_name_filter_regex(filter_stats.getValue());
+    } catch (std::regex_error& e) {
+      const std::string message =
+          fmt::format("error: reading --filter-stats=<regex> failed: '{}'", e.what());
+      std::cerr << message << std::endl;
+      throw MalformedArgvException(message);
+    }
+    stats_options_.stat_name_filter_ =
+        absl::optional<std::regex>(std::regex(filter_stats.getValue()));
+  }
 
   hot_restart_disabled_ = disable_hot_restart.getValue();
 

@@ -24,6 +24,7 @@ envoy_cc_library(
         "tag_extractor.h",
         "tag_producer.h",
     ],
+    external_deps = ["abseil_optional"],
     deps = ["//include/envoy/common:interval_set_interface"],
 )
 

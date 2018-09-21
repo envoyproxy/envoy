@@ -19,6 +19,7 @@
 
 #include "absl/synchronization/notification.h"
 
+using testing::AllOf;
 using testing::HasSubstr;
 using testing::IsEmpty;
 
@@ -100,6 +101,20 @@ TEST_P(MainCommonTest, ConstructDestructHotRestartDisabledNoInit) {
   initOnly();
   MainCommon main_common(argc(), argv());
   EXPECT_TRUE(main_common.run());
+}
+
+TEST_P(MainCommonTest, FilterStatsGoodRegex) {
+  addArg("--filter-stats");
+  addArg(".*foo.*");
+  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
+}
+
+// A bad regex passed in with --filter-stats should fail at startup.
+TEST_P(MainCommonTest, FilterStatsBadRegex) {
+  addArg("--filter-stats");
+  addArg(".*fo[o.*");
+  EXPECT_THROW_WITH_REGEX(MainCommon main_common(argc(), argv()), MalformedArgvException,
+                          ".*Unexpected character in bracket expression.*");
 }
 
 // Ensurees that existing users of main_common() can link.
@@ -302,6 +317,30 @@ TEST_P(AdminRequestTest, AdminRequestAfterRun) {
   EXPECT_TRUE(waitForEnvoyToExit());
   EXPECT_FALSE(admin_handler_was_called);
   EXPECT_EQ(1, lambda_destroy_count);
+}
+
+// Counterpoint to AdminRequestTest.AdminRequestGetStatsWithoutFilter.
+// We expect 'cluster.*' and 'server.*' to be common in the /stats endpoint, so we show that they
+// appear in an Envoy without `--filter-stats`, and then show that they don't appear in an Envoy
+// with `--filter-stats '^(cluster\.|server\.).*'`.
+TEST_P(AdminRequestTest, AdminRequestGetStatsWithoutFilter) {
+  startEnvoy();
+  started_.WaitForNotification();
+  EXPECT_THAT(adminRequest("/stats", "GET"),
+              AllOf(HasSubstr("cluster"), HasSubstr("cluster."), HasSubstr("server.")));
+  adminRequest("/quitquitquit", "POST");
+  EXPECT_TRUE(waitForEnvoyToExit());
+}
+
+TEST_P(AdminRequestTest, AdminRequestGetStatsWithFilter) {
+  addArg("--filter-stats");
+  addArg("^(cluster\\.|server\\.).*"); // ^(cluster\.|server\.).*
+  startEnvoy();
+  started_.WaitForNotification();
+  EXPECT_THAT(adminRequest("/stats", "GET"),
+              AllOf(HasSubstr("cluster"), Not(HasSubstr("cluster.")), Not(HasSubstr("server."))));
+  adminRequest("/quitquitquit", "POST");
+  EXPECT_TRUE(waitForEnvoyToExit());
 }
 
 // Verifies that the Logger::Registry is usable after constructing and

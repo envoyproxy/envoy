@@ -1,8 +1,11 @@
 #pragma once
 
 #include <cstdint>
+#include <regex>
 
 #include "envoy/stats/stats_options.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Stats {
@@ -23,9 +26,11 @@ struct StatsOptionsImpl : public StatsOptions {
   size_t maxNameLength() const override { return max_obj_name_length_ + max_stat_suffix_length_; }
   size_t maxObjNameLength() const override { return max_obj_name_length_; }
   size_t maxStatSuffixLength() const override { return max_stat_suffix_length_; }
+  const absl::optional<std::regex>& statNameFilter() const override { return stat_name_filter_; }
 
   size_t max_obj_name_length_ = 60;
   size_t max_stat_suffix_length_ = 67;
+  absl::optional<std::regex> stat_name_filter_ = absl::nullopt; // No filter by default.
 };
 
 } // namespace Stats
