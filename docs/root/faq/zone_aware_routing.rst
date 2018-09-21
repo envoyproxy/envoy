@@ -26,10 +26,10 @@ These are the requirements:
     clusters:
     - name: cluster_a
       type: EDS
-      eds_cluster_config: "{...}"
+      eds_cluster_config: ...
     - name: cluster_b
       type: EDS
-      eds_cluster_config: "{...}"
+      eds_cluster_config: ...
 
 Envoy configuration on the destination service
 ----------------------------------------------
