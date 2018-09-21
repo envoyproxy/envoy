@@ -10,6 +10,7 @@
 #include "envoy/network/address.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/request_info/filter_state.h"
 #include "envoy/ssl/connection.h"
 
 namespace Envoy {
@@ -233,6 +234,15 @@ public:
    * Get the socket options set on this connection.
    */
   virtual const ConnectionSocket::OptionsSharedPtr& socketOptions() const PURE;
+
+  /**
+   * Object on which filters can share data on a per-connection basis.
+   * Only one filter can produce a named data object, but it may be
+   * consumed by many other objects.
+   * @return the per-connection state associated with this connection.
+   */
+  virtual RequestInfo::FilterState& perConnectionState() PURE;
+  virtual const RequestInfo::FilterState& perConnectionState() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;
