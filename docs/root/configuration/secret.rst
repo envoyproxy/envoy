@@ -7,10 +7,9 @@ TLS certificates, the secrets, can be specified in the bootstrap.static_resource
 :ref:`secrets <envoy_api_field_config.bootstrap.v2.Bootstrap.StaticResources.secrets>`.
 But they can also be fetched remotely by secret discovery service (SDS).
 
-The benefits of remote fetch are
+The most important benefit of SDS is to simplify the certificate management. Without this feature, in k8s deployment, certificates must be created as secrets and mounted into the proxy containers. If certificates are expired, the secrets need to be updated and the proxy containers need to be re-deployed. With SDS, a certral SDS server will push certificates to all proxy instances. If certificates are expired, the server just pushes new certificates to Envoy instances, Envoy will use the new ones right away without re-deployment.
 
-* Easy to rotate expired certificates. SDS servers just push new certificates to Envoy.
-* Certificates are safe; they are not build into images, they can be fetched by secure channels such as Unix Domain Socket.
+The connection bewteeen Envoy proxy and SDS server has to be secure. One option is to run the SDS server in the same VM (node) and use Unix Domain Socket for the connection. Otherwise it requires mTLS between the proxy and SDS server. In this case, the client certificates to the SDS server has to be mounted into Envoy container.
 
 SDS server
 ----------
