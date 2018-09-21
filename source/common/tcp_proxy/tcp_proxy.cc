@@ -84,7 +84,8 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
     total_cluster_weight_ = 0;
     for (const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::
              ClusterWeight& cluster_desc : config.weighted_clusters().clusters()) {
-      std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(cluster_desc));
+      std::unique_ptr<WeightedClusterEntry> cluster_entry(
+          std::make_unique<WeightedClusterEntry>(cluster_desc));
       weighted_clusters_.emplace_back(std::move(cluster_entry));
       total_cluster_weight_ += weighted_clusters_.back()->clusterWeight();
     }

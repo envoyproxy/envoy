@@ -139,7 +139,7 @@ private:
     const std::string cluster_name_;
     const uint64_t cluster_weight_;
   };
-  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
+  typedef std::unique_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
 
   std::vector<Route> routes_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
