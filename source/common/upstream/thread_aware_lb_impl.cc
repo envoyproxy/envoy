@@ -25,8 +25,11 @@ void ThreadAwareLoadBalancerBase::refresh() {
     const uint32_t priority = host_set->priority();
     (*per_priority_state_vector)[priority].reset(new PerPriorityState);
     const auto& per_priority_state = (*per_priority_state_vector)[priority];
-    per_priority_state->current_lb_ = createLoadBalancer(*host_set);
-    per_priority_state->global_panic_ = isGlobalPanic(*host_set);
+    // Copy panic flag from LoadBalancerBase. It is calculated when there is a change
+    // in hosts set or hosts' health.
+    per_priority_state->global_panic_ = per_priority_panic_[priority];
+    per_priority_state->current_lb_ =
+        createLoadBalancer(*host_set, per_priority_state->global_panic_);
   }
 
   {
@@ -42,6 +45,7 @@ ThreadAwareLoadBalancerBase::LoadBalancerImpl::chooseHost(LoadBalancerContext* c
   if (per_priority_state_ == nullptr) {
     return nullptr;
   }
+
   // If there is no hash in the context, just choose a random value (this effectively becomes
   // the random LB but it won't crash if someone configures it this way).
   // computeHashKey() may be computed on demand, so get it only once.
