@@ -386,13 +386,18 @@ TEST_F(ZipkinTracerTest, RootSpan128bitTraceId) {
   EXPECT_TRUE(root_span->isSetTraceIdHigh());
 }
 
+// This test checks that when configured to use shared span context, a child span
+// is created with the same id as the parent span.
 TEST_F(ZipkinTracerTest, SharedSpanContext) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator, false, true, time_source_);
+
+  const bool shared_span_context = true;
+  Tracer tracer("my_service_name", addr, random_generator, false, shared_span_context,
+                time_source_);
   NiceMock<MockTimeSource> mock_start_time;
-  SystemTime timestamp = mock_start_time.systemTime();
+  const SystemTime timestamp = mock_start_time.systemTime();
 
   NiceMock<Tracing::MockConfig> config;
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));
@@ -406,13 +411,18 @@ TEST_F(ZipkinTracerTest, SharedSpanContext) {
   EXPECT_EQ(parent_span->id(), child_span->id());
 }
 
+// This test checks that when configured to NOT use shared span context, a child span
+// is created with a different id to the parent span.
 TEST_F(ZipkinTracerTest, NotSharedSpanContext) {
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("127.0.0.1:9000");
   NiceMock<Runtime::MockRandomGenerator> random_generator;
-  Tracer tracer("my_service_name", addr, random_generator, false, false, time_source_);
+
+  const bool shared_span_context = false;
+  Tracer tracer("my_service_name", addr, random_generator, false, shared_span_context,
+                time_source_);
   NiceMock<MockTimeSource> mock_start_time;
-  SystemTime timestamp = mock_start_time.systemTime();
+  const SystemTime timestamp = mock_start_time.systemTime();
 
   NiceMock<Tracing::MockConfig> config;
   ON_CALL(config, operationName()).WillByDefault(Return(Tracing::OperationName::Ingress));

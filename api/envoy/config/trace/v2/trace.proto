@@ -10,6 +10,8 @@ import "envoy/api/v2/core/grpc_service.proto";
 
 import "google/protobuf/struct.proto";
 
+import "google/protobuf/wrappers.proto";
+
 import "validate/validate.proto";
 
 // The tracing configuration specifies global
@@ -62,7 +64,7 @@ message ZipkinConfig {
 
   // Determines whether client and server spans will shared the same span id.
   // The default value is true.
-  bool shared_span_context = 4;
+  google.protobuf.BoolValue shared_span_context = 4;
 }
 
 // DynamicOtConfig is used to dynamically load a tracer from a shared library
