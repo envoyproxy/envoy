@@ -119,7 +119,7 @@ public:
   MockRetryPriorityFactory(RetryPrioritySharedPtr retry_priority)
       : retry_priority_(retry_priority) {}
   void createRetryPriority(RetryPriorityFactoryCallbacks& callbacks,
-                           const ProtobufWkt::Struct&) override {
+                           const Protobuf::Message&) override {
     callbacks.addRetryPriority(retry_priority_);
   }
 
