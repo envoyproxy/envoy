@@ -59,6 +59,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
+    std::cout<<"initializing logger registry..."<<"\n";
     Logger::Registry::initialize(options_.logLevel(), options_.logFormat(), log_lock);
 
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
