@@ -5,10 +5,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/http/jwt_authn/extractor.h"
-#include "extensions/filters/http/jwt_authn/jwks_cache.h"
+#include "extensions/filters/http/jwt_authn/matcher.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -57,8 +54,10 @@ struct JwtAuthnFilterStats {
 /**
  * The filer config object to hold config and relavant objects.
  */
-class FilterConfig : public Logger::Loggable<Logger::Id::config> {
+class FilterConfig : public Logger::Loggable<Logger::Id::config>, public AuthFactory {
 public:
+  virtual ~FilterConfig() {}
+
   FilterConfig(
       const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
@@ -70,6 +69,11 @@ public:
       return std::make_shared<ThreadLocalCache>(proto_config_, time_source_);
     });
     extractor_ = Extractor::create(proto_config_);
+
+    for (const auto& rule : proto_config_.rules()) {
+      rule_matchers_.push_back(
+          Matcher::create(rule, proto_config_.providers(), *this, getExtractor()));
+    }
   }
 
   JwtAuthnFilterStats& stats() { return stats_; }
@@ -81,13 +85,31 @@ public:
   }
 
   // Get per-thread cache object.
-  ThreadLocalCache& getCache() { return tls_->getTyped<ThreadLocalCache>(); }
+  ThreadLocalCache& getCache() const { return tls_->getTyped<ThreadLocalCache>(); }
 
-  Upstream::ClusterManager& cm() { return cm_; }
-  TimeSource& timeSource() { return time_source_; }
+  Upstream::ClusterManager& cm() const { return cm_; }
+  TimeSource& timeSource() const { return time_source_; }
 
   // Get the token  extractor.
   const Extractor& getExtractor() const { return *extractor_; }
+
+  // Finds the matcher that matched the header
+  virtual const MatcherConstSharedPtr findMatcher(const Http::HeaderMap& headers) const {
+    for (const auto& matcher : rule_matchers_) {
+      if (matcher->matches(headers)) {
+        return matcher;
+      }
+    }
+    return nullptr;
+  }
+
+  // methods for AuthFactory interface. Factory method to help create authenticators.
+  AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,
+                          const absl::optional<std::string>& provider,
+                          bool allow_failed) const override {
+    return Authenticator::create(check_audience, provider, allow_failed, getCache().getJwksCache(),
+                                 cm(), Common::JwksFetcher::create, timeSource());
+  }
 
 private:
   JwtAuthnFilterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
@@ -105,6 +127,8 @@ private:
   Upstream::ClusterManager& cm_;
   // The object to extract tokens.
   ExtractorConstPtr extractor_;
+  // The list of rule matchers.
+  std::vector<MatcherConstSharedPtr> rule_matchers_;
   TimeSource& time_source_;
 };
 typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;

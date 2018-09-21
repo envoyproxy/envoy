@@ -99,12 +99,23 @@ public:
   JwksCacheImpl(const JwtAuthentication& config, TimeSource& time_source) {
     for (const auto& it : config.providers()) {
       const auto& provider = it.second;
-      jwks_data_map_.emplace(provider.issuer(), JwksDataImpl(provider, time_source));
+      jwks_data_map_.emplace(it.first, JwksDataImpl(provider, time_source));
+      if (issuer_ptr_map_.find(provider.issuer()) == issuer_ptr_map_.end()) {
+        issuer_ptr_map_.emplace(provider.issuer(), findByProvider(it.first));
+      }
     }
   }
 
-  JwksData* findByIssuer(const std::string& name) override {
-    auto it = jwks_data_map_.find(name);
+  JwksData* findByIssuer(const std::string& issuer) override {
+    const auto it = issuer_ptr_map_.find(issuer);
+    if (it == issuer_ptr_map_.end()) {
+      return nullptr;
+    }
+    return it->second;
+  }
+
+  JwksData* findByProvider(const std::string& provider) override {
+    const auto it = jwks_data_map_.find(provider);
     if (it == jwks_data_map_.end()) {
       return nullptr;
     }
@@ -112,8 +123,10 @@ public:
   }
 
 private:
-  // The Jwks data map indexed by issuer.
+  // The Jwks data map indexed by provider.
   std::unordered_map<std::string, JwksDataImpl> jwks_data_map_;
+  // The Jwks data pointer map indexed by issuer.
+  std::unordered_map<std::string, JwksData*> issuer_ptr_map_;
 };
 
 } // namespace
