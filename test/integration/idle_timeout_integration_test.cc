@@ -188,7 +188,7 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutRequestAndResponse) {
   testRouterRequestAndResponseWithBody(1024, 1024, false, nullptr);
 }
 
-TEST_P(IdleTimeoutIntegrationTest, RequestPathTimesOutOnBodilessPost) {
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnBodilessPost) {
   enable_request_timeout_ = true;
 
   auto response = setupPerStreamIdleTimeoutTest("POST");
@@ -202,7 +202,8 @@ TEST_P(IdleTimeoutIntegrationTest, RequestPathTimesOutOnBodilessPost) {
   EXPECT_EQ("request timeout", response->body());
 }
 
-TEST_P(IdleTimeoutIntegrationTest, UnconfiguredRequestPathTimesntOutOnBodilessPost) {
+TEST_P(IdleTimeoutIntegrationTest, UnconfiguredRequestTimeoutHangsOutOnBodilessPost) {
+  enable_per_stream_idle_timeout_ = true;
   enable_request_timeout_ = false;
 
   auto response = setupPerStreamIdleTimeoutTest("POST");
@@ -217,7 +218,7 @@ TEST_P(IdleTimeoutIntegrationTest, UnconfiguredRequestPathTimesntOutOnBodilessPo
   EXPECT_NE("request timeout", response->body());
 }
 
-TEST_P(IdleTimeoutIntegrationTest, RequestPathTimesOutOnIncompleteHeaders) {
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOutOnIncompleteHeaders) {
   if (downstreamProtocol() == Envoy::Http::CodecClient::Type::HTTP2) {
     return;
   }

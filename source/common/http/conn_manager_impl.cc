@@ -449,13 +449,9 @@ void ConnectionManagerImpl::ActiveStream::onIdleTimeout() {
 
 void ConnectionManagerImpl::ActiveStream::onRequestTimeout() {
   connection_manager_.stats_.named_.downstream_rq_path_timeout_.inc();
-  if (response_headers_ != nullptr) {
-    connection_manager_.doEndStream(*this);
-  } else {
-    sendLocalReply(request_headers_ != nullptr &&
-                       Grpc::Common::hasGrpcContentType(*request_headers_),
-                   Http::Code::RequestTimeout, "request timeout", nullptr, is_head_request_);
-  }
+  sendLocalReply(request_headers_ != nullptr &&
+                     Grpc::Common::hasGrpcContentType(*request_headers_),
+                 Http::Code::RequestTimeout, "request timeout", nullptr, is_head_request_);
 }
 
 void ConnectionManagerImpl::ActiveStream::addStreamDecoderFilterWorker(

@@ -459,7 +459,6 @@ private:
   UserAgent user_agent_;
   Event::TimerPtr idle_timer_;
   Event::TimerPtr drain_timer_;
-  Event::TimerPtr request_timer_;
   Runtime::RandomGenerator& random_generator_;
   Tracing::HttpTracer& tracer_;
   Runtime::Loader& runtime_;
