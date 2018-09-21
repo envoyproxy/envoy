@@ -900,9 +900,8 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
                      Network::Address::InstanceConstSharedPtr address, Server::Instance& server,
                      Stats::ScopePtr&& listener_scope)
     : AdminImpl(access_log_path, profile_path, server) {
-  socket_ = absl::make_unique<Network::TcpListenSocket>(address, nullptr, true);
-  // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
-  listener_ = absl::make_unique<AdminListener>(*this, std::move(listener_scope));
+  socket_ = std::make_unique<Network::TcpListenSocket>(address, nullptr, true);
+  listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
     if (!address_out_file) {
@@ -921,6 +920,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSystem()),
+      // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
           {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false, false},
