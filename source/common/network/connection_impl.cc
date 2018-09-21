@@ -116,12 +116,21 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 
     // No need to continue if a FlushWrite/FlushWriteAndDelay has already been issued and there is a
     // pending delayed close.
+    //
+    // An example of this condition manifests when a downstream connection is closed early by Envoy,
+    // such as when a route can't be matched:
+    //   In ConnectionManagerImpl::onData()
+    //     1) Via codec_->dispatch(), a local reply with a 404 is sent to the client
+    //       a) ConnectionManagerImpl::doEndStream() issues the first connection close() via
+    //          ConnectionManagerImpl::checkForDeferredClose()
+    //     2) A second close is issued by a subsequent call to
+    //        ConnectionManagerImpl::checkForDeferredClose() prior to returning from onData()
     if (delayed_close_) {
       return;
     }
 
     delayed_close_ = true;
-    bool delayed_close_timeout_set = delayedCloseTimeout().count() > 0;
+    const bool delayed_close_timeout_set = delayedCloseTimeout().count() > 0;
 
     // NOTE: the delayed close timeout (if set) affects both FlushWrite and FlushWriteAndDelay
     // closes:
