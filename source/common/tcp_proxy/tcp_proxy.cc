@@ -93,7 +93,7 @@ const std::string& Config::getRouteFromEntries(Network::Connection& connection) 
   // First check if the per-connection state to see if we need to route to a pre-selected cluster
   if (connection.perConnectionState().hasData<PerConnectionTcpProxyConfig>(
           PerConnectionTcpProxyConfig::CLUSTER_KEY)) {
-    const auto per_connection_config =
+    const PerConnectionTcpProxyConfig& per_connection_config =
         connection.perConnectionState().getData<PerConnectionTcpProxyConfig>(
             PerConnectionTcpProxyConfig::CLUSTER_KEY);
     return per_connection_config.cluster();
