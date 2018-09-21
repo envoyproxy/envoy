@@ -200,6 +200,9 @@ public:
   void setTagProducer(TagProducerPtr&& tag_producer) override {
     tag_producer_ = std::move(tag_producer);
   }
+  void setStatsFilter(StatsFilterPtr&& stats_filter) override {
+    stats_filter_ = std::move(stats_filter);
+  }
   void initializeThreading(Event::Dispatcher& main_thread_dispatcher,
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
@@ -302,6 +305,7 @@ private:
   ScopePtr default_scope_;
   std::list<std::reference_wrapper<Sink>> timer_sinks_;
   TagProducerPtr tag_producer_;
+  StatsFilterPtr stats_filter_;
   std::atomic<bool> shutting_down_{};
   std::atomic<bool> merge_in_progress_{};
   Counter& num_last_resort_stats_;
