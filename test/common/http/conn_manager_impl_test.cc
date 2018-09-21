@@ -1558,10 +1558,10 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteHeaders) {
         callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
       }));
   EXPECT_CALL(*filter, decodeHeaders(_, true))
-    .WillRepeatedly(Invoke([&](HeaderMap&, bool) -> FilterHeadersStatus {
-      filter->callbacks_->requestInfo().onLastUpstreamTxByteSent();
-      return FilterHeadersStatus::StopIteration;
-    }));
+      .WillRepeatedly(Invoke([&](HeaderMap&, bool) -> FilterHeadersStatus {
+        filter->callbacks_->requestInfo().onLastUpstreamTxByteSent();
+        return FilterHeadersStatus::StopIteration;
+      }));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     Event::MockTimer* request_timer =
@@ -1570,7 +1570,8 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteHeaders) {
     StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
 
     EXPECT_CALL(*request_timer, disableTimer());
-    HeaderMapPtr headers{ new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
 
     decoder->decodeHeaders(std::move(headers), true);
 
@@ -1591,10 +1592,10 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteData) {
         callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
       }));
   EXPECT_CALL(*filter, decodeData(_, true))
-    .WillRepeatedly(Invoke([&](Buffer::Instance&, bool) -> FilterDataStatus {
-      filter->callbacks_->requestInfo().onLastUpstreamTxByteSent();
-      return FilterDataStatus::StopIterationNoBuffer;
-    }));
+      .WillRepeatedly(Invoke([&](Buffer::Instance&, bool) -> FilterDataStatus {
+        filter->callbacks_->requestInfo().onLastUpstreamTxByteSent();
+        return FilterDataStatus::StopIterationNoBuffer;
+      }));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     Event::MockTimer* request_timer =
@@ -1626,10 +1627,10 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteTrailersWit
         callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
       }));
   EXPECT_CALL(*filter, decodeTrailers(_))
-    .WillRepeatedly(Invoke([&](HeaderMap&) -> FilterTrailersStatus {
-      filter->callbacks_->requestInfo().onLastUpstreamTxByteSent();
-      return FilterTrailersStatus::StopIteration;
-    }));
+      .WillRepeatedly(Invoke([&](HeaderMap&) -> FilterTrailersStatus {
+        filter->callbacks_->requestInfo().onLastUpstreamTxByteSent();
+        return FilterTrailersStatus::StopIteration;
+      }));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     Event::MockTimer* request_timer =
@@ -1663,10 +1664,10 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteTrailers) {
         callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{filter});
       }));
   EXPECT_CALL(*filter, decodeTrailers(_))
-    .WillRepeatedly(Invoke([&](HeaderMap&) -> FilterTrailersStatus {
-      filter->callbacks_->requestInfo().onLastUpstreamTxByteSent();
-      return FilterTrailersStatus::Continue;
-    }));
+      .WillRepeatedly(Invoke([&](HeaderMap&) -> FilterTrailersStatus {
+        filter->callbacks_->requestInfo().onLastUpstreamTxByteSent();
+        return FilterTrailersStatus::Continue;
+      }));
 
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance& data) -> void {
     Event::MockTimer* request_timer =
