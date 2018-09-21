@@ -100,6 +100,9 @@ message Bootstrap {
   // Configuration for internal processing of stats.
   envoy.config.metrics.v2.StatsConfig stats_config = 13;
 
+  // Optional string matcher for allowing/disallowing the instantiation of stats by name.
+  envoy.config.metrics.v2.StatsFilter stats_filter = 16;
+
   // Optional duration between flushes to configured stats sinks. For
   // performance reasons Envoy latches counters and only flushes counters and
   // gauges at a periodic interval. If not specified the default is 5000ms (5

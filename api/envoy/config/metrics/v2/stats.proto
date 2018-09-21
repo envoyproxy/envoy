@@ -7,6 +7,7 @@ package envoy.config.metrics.v2;
 option go_package = "v2";
 
 import "envoy/api/v2/core/address.proto";
+import "envoy/type/matcher/string.proto";
 
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
@@ -56,6 +57,30 @@ message StatsConfig {
   //
   // If not provided, the value is assumed to be true.
   google.protobuf.BoolValue use_all_default_tags = 2;
+}
+
+// Inclusion/exclusion filter for stat name creation. If not provided, all stats are instantiated as
+// normal.
+message StatsFilter {
+  // Stat creation is unrestricted by default. StatsFilter can accept either an exclusion list or an
+  // inclusion list. If an inclusion list is supplied, all stats are disabled by default except for
+  // those matching.
+  //
+  // .. note::
+  //
+  //   If possible, it is recommended to supply a StringMatcher prefix or suffix instead of a regex
+  //   for performance reasons.
+  oneof stats_filter {
+    option (validate.required) = true;
+
+    // Exclusive match. All stats are enabled except for those matching one of the supplied
+    // StringMatcher protos.
+    envoy.type.matcher.ListStringMatcher exclusion_list = 1;
+
+    // Inclusive match. No stats are enabled except for those matching one of the supplied
+    // StringMatcher protos.
+    envoy.type.matcher.ListStringMatcher inclusion_list = 2;
+  };
 }
 
 // Designates a tag name and value pair. The value may be either a fixed value
