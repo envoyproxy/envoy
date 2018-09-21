@@ -55,6 +55,7 @@ Version history
   dynamic table size of both: encoder and decoder.
 * http: added support for removing request headers using :ref:`request_headers_to_remove
   <envoy_api_field_route.Route.request_headers_to_remove>`.
+* jwt-authn filter: add support for per route JWT requirements.
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
   :ref:`destination_port <envoy_api_field_listener.FilterChainMatch.destination_port>` and
   :ref:`prefix_ranges <envoy_api_field_listener.FilterChainMatch.prefix_ranges>`.

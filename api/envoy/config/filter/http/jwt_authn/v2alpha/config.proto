@@ -7,6 +7,7 @@ import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/http_uri.proto";
 import "envoy/api/v2/route/route.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 
@@ -30,7 +31,6 @@ import "validate/validate.proto";
 //       cache_duration:
 //         seconds: 300
 //
-// [#not-implemented-hide:]
 message JwtProvider {
   // Identifies the principal that issued the JWT. See `here
   //  <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_. Usually a URL or an email address.
@@ -253,7 +253,7 @@ message JwtRequirement {
     // verification fails. A typical usage is: this filter is used to only verify
     // JWTs and pass the verified JWT payloads to another filter, the other filter
     // will make decision. In this mode, all JWT tokens will be verified.
-    google.protobuf.BoolValue allow_missing_or_failed = 5;
+    google.protobuf.Empty allow_missing_or_failed = 5;
   }
 }
 
@@ -350,7 +350,6 @@ message RequirementRule {
 //              - provider_name: "provider1"
 //              - provider_name: "provider2"
 //
-//// [#not-implemented-hide:]
 message JwtAuthentication {
   // Map of provider names to JwtProviders.
   //
