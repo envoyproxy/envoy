@@ -15,6 +15,7 @@
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
+#include "common/common/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/router/metadatamatchcriteria_impl.h"
 
@@ -83,8 +84,9 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
     total_cluster_weight_ = 0;
     for (const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::
              ClusterWeight& cluster_desc : config.weighted_clusters().clusters()) {
-      weighted_clusters_.emplace_back(WeightedClusterEntry(cluster_desc));
-      total_cluster_weight_ += weighted_clusters_.back().cluster_weight_;
+      std::unique_ptr<WeightedClusterEntry> cluster_entry(new WeightedClusterEntry(cluster_desc));
+      weighted_clusters_.emplace_back(std::move(cluster_entry));
+      total_cluster_weight_ += weighted_clusters_.back()->clusterWeight();
     }
   }
 
@@ -135,33 +137,13 @@ const std::string& Config::getRegularRouteFromEntries(Network::Connection& conne
   return EMPTY_STRING;
 }
 
-const std::string& Config::getWeightedClusterRoute(const uint64_t random_value) {
-  uint64_t selected_value = random_value % total_cluster_weight_;
-  uint64_t begin = 0UL;
-  uint64_t end = 0UL;
-
-  // Find the right cluster to route to based on the interval in which
-  // the selected value falls. The intervals are determined as
-  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
-  for (const WeightedClusterEntry& cluster : weighted_clusters_) {
-    end = begin + cluster.cluster_weight_;
-    ASSERT(end <= total_cluster_weight_);
-
-    if (selected_value >= begin && selected_value < end) {
-      return cluster.cluster_name_;
-    }
-    begin = end;
-  }
-
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
 const std::string& Config::getRouteFromEntries(Network::Connection& connection) {
-  if (!weighted_clusters_.empty()) {
-    return getWeightedClusterRoute(random_generator_.random());
-  } else {
+  if (weighted_clusters_.empty()) {
     return getRegularRouteFromEntries(connection);
   }
+  return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_,
+                                          random_generator_.random(), false)
+      ->clusterName();
 }
 
 UpstreamDrainManager& Config::drainManager() {

@@ -102,7 +102,6 @@ public:
    */
   const std::string& getRouteFromEntries(Network::Connection& connection);
   const std::string& getRegularRouteFromEntries(Network::Connection& connection);
-  const std::string& getWeightedClusterRoute(const uint64_t random_value);
 
   const TcpProxyStats& stats() { return shared_config_->stats(); }
   const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
@@ -128,16 +127,22 @@ private:
     std::string cluster_name_;
   };
 
-  struct WeightedClusterEntry {
+  class WeightedClusterEntry {
+  public:
     WeightedClusterEntry(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::
                              WeightedCluster::ClusterWeight& config);
 
+    const std::string& clusterName() const { return cluster_name_; }
+    uint64_t clusterWeight() const { return cluster_weight_; }
+
+  private:
     const std::string cluster_name_;
     const uint64_t cluster_weight_;
   };
+  typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
 
   std::vector<Route> routes_;
-  std::vector<WeightedClusterEntry> weighted_clusters_;
+  std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_;
   std::vector<AccessLog::InstanceSharedPtr> access_logs_;
   const uint32_t max_connect_attempts_;

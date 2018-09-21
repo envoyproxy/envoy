@@ -481,25 +481,6 @@ public:
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
 };
 
-TEST_F(TcpProxyTest, WeightedClusters) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config;
-
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight*
-      cluster1 = config.mutable_weighted_clusters()->mutable_clusters()->Add();
-  cluster1->set_name("cluster1");
-  cluster1->set_weight(10);
-
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight*
-      cluster2 = config.mutable_weighted_clusters()->mutable_clusters()->Add();
-  cluster2->set_name("cluster2");
-  cluster2->set_weight(90);
-
-  configure(config);
-
-  EXPECT_EQ(std::string("cluster1"), config_->getWeightedClusterRoute(5));
-  EXPECT_EQ(std::string("cluster2"), config_->getWeightedClusterRoute(25));
-}
-
 TEST_F(TcpProxyTest, DefaultRoutes) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
 
