@@ -90,8 +90,8 @@ the following section.
 
 .. _arch_overview_service_discovery_types_sds:
 
-Service discovery service (SDS)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Service discovery service (v1 SDS)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 *(deprecated)* This discovery service was replaced to endpoint discovery service in :ref:`v2 xDS
 API<config_overview_v2>`.
@@ -101,6 +101,13 @@ used by Envoy to fetch cluster members. Lyft provides a reference implementation
 `discovery service <https://github.com/lyft/discovery>`_. That implementation uses AWS DynamoDB as
 the backing store, however the API is simple enough that it could easily be implemented on top of a
 variety of different backing stores.
+
+.. attention::
+
+  In the current xDS API, the word "SDS" is used as an acronym for `Secret Discovery Service
+  <https://github.com/envoyproxy/data-plane-api/blob/master/API_OVERVIEW.md#apis>`_.
+
+.. TODO(taiki45): Link to secret discovery service arch overview page when https://github.com/envoyproxy/envoy/pull/4484 gets merged.
 
 .. _arch_overview_service_discovery_eventually_consistent:
 
