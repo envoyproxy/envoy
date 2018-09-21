@@ -70,6 +70,10 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
           overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
                                  Server::OverloadActionNames::get().StopAcceptingRequests)
                            : Server::OverloadManager::getInactiveState()),
+      overload_disable_keepalive_(overload_manager
+                                      ? overload_manager->getThreadLocalOverloadState().getState(
+                                            Server::OverloadActionNames::get().DisableHttpKeepAlive)
+                                      : Server::OverloadManager::getInactiveState()),
       time_system_(time_system) {}
 
 const HeaderMapImpl& ConnectionManagerImpl::continueHeader() {
@@ -1054,6 +1058,11 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     connection_manager_.drain_state_ = DrainState::Closing;
   }
 
+  if (connection_manager_.overload_disable_keepalive_ == Server::OverloadActionState::Active) {
+    ENVOY_STREAM_LOG(debug, "closing connection due to envoy overload", *this);
+    connection_manager_.drain_state_ = DrainState::Closing;
+  }
+
   // If we are destroying a stream before remote is complete and the connection does not support
   // multiplexing, we should disconnect since we don't want to wait around for the request to
   // finish.
@@ -1068,7 +1077,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   if (connection_manager_.drain_state_ == DrainState::Closing &&
       connection_manager_.codec_->protocol() != Protocol::Http2) {
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
-    // Do not do this for H2 (which drains via GOAWA) or Upgrade (as the upgrade
+    // Do not do this for H2 (which drains via GOAWAY) or Upgrade (as the upgrade
     // payload is no longer HTTP/1.1)
     if (!Utility::isUpgrade(headers)) {
       headers.insertConnection().value().setReference(Headers::get().ConnectionValues.Close);

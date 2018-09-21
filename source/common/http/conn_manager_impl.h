@@ -461,6 +461,7 @@ private:
   Network::ReadFilterCallbacks* read_callbacks_{};
   ConnectionManagerListenerStats& listener_stats_;
   const Server::OverloadActionState& overload_stop_accepting_requests_;
+  const Server::OverloadActionState& overload_disable_keepalive_;
   Event::TimeSystem& time_system_;
 };
 

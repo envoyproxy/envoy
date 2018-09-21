@@ -24,6 +24,7 @@ The following overload actions are supported:
   :widths: 1, 2
 
   envoy.overload_actions.stop_accepting_requests, Envoy will immediately respond with a 503 response code to new requests
+  envoy.overload_actions.disable_http_keepalive, Envoy will disable http keepalive
 
 Statistics
 ----------
