@@ -63,5 +63,27 @@ private:
   const std::string name_;
 };
 
+/**
+ * Null histogram implementation.
+ * No-ops on all calls and requires no underlying metric or data.
+ */
+class NullHistogramImpl : public Histogram {
+public:
+  NullHistogramImpl() {}
+  ~NullHistogramImpl() {}
+  // Stats::Metric
+  const std::string name() const override { return ""; }
+  // Stats::MetricImpl
+  const std::string& tagExtractedName() const override { return tag_extracted_name_; }
+  const std::vector<Tag>& tags() const override { return tags_; }
+  // Stats::Histogram
+  void recordValue(uint64_t value) override { UNREFERENCED_PARAMETER(value); }
+  bool used() const override { return false; }
+
+private:
+  const std::string tag_extracted_name_ = "";
+  const std::vector<Tag> tags_;
+};
+
 } // namespace Stats
 } // namespace Envoy

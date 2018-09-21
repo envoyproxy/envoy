@@ -270,6 +270,10 @@ private:
     ThreadLocalStoreImpl& parent_;
     const std::string prefix_;
     CentralCacheEntry central_cache_;
+
+    NullCounterImpl null_counter_;
+    NullGaugeImpl null_gauge_;
+    NullHistogramImpl null_histogram_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
