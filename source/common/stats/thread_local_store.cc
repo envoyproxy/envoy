@@ -14,6 +14,7 @@
 #include "envoy/stats/stats_options.h"
 
 #include "common/common/lock_guard.h"
+#include "common/stats/stats_filter_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
 #include "absl/strings/str_join.h"
@@ -25,6 +26,7 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(const StatsOptions& stats_options,
                                            StatDataAllocator& alloc)
     : stats_options_(stats_options), alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
+      stats_filter_(std::make_unique<StatsFilterImpl>()),
       num_last_resort_stats_(default_scope_->counter("stats.overflow")), source_(*this) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
