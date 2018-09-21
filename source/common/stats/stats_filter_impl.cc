@@ -23,6 +23,7 @@ StatsFilterImpl::StatsFilterImpl(const envoy::config::metrics::v2::StatsFilter& 
     break;
   default:
     // No filter was supplied, so we default to allow all stat names.
+    break;
   }
 }
 
