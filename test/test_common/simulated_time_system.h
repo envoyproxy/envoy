@@ -87,7 +87,7 @@ private:
   // which helps waitFor() determine when to give up and declare a timeout.
   void incPending() { ++pending_alarms_; }
   void decPending() { --pending_alarms_; }
-  bool hasPending() { return pending_alarms_ > 0; }
+  bool hasPending() const { return pending_alarms_ > 0; }
 
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ GUARDED_BY(mutex_);

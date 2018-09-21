@@ -82,15 +82,26 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
               sim_.waitFor(mutex, condvar, std::chrono::seconds(50)));
   }
   EXPECT_FALSE(done);
+  EXPECT_EQ(MonotonicTime(std::chrono::seconds(50)), sim_.monotonicTime());
 
-  // Waiting another 10 simulated seconds will activate the alarm, and the
-  // event-loop thread will call the corresponding callback quickly.
+  // Waiting another 20 simulated seconds will activate the alarm after 10,
+  // and the event-loop thread will call the corresponding callback quickly.
   {
     Thread::LockGuard lock(mutex);
     EXPECT_EQ(Thread::CondVar::WaitStatus::NoTimeout,
               sim_.waitFor(mutex, condvar, std::chrono::seconds(10)));
   }
   EXPECT_TRUE(done);
+  EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), sim_.monotonicTime());
+
+  // Waiting a third time, with no pending timeouts, will just sleep out for
+  // the max duration and return a timeout.
+  {
+    Thread::LockGuard lock(mutex);
+    EXPECT_EQ(Thread::CondVar::WaitStatus::Timeout,
+              sim_.waitFor(mutex, condvar, std::chrono::seconds(20)));
+  }
+  EXPECT_EQ(MonotonicTime(std::chrono::seconds(80)), sim_.monotonicTime());
 
   thread->join();
 }

@@ -153,20 +153,37 @@ void SimulatedTimeSystem::sleep(const Duration& duration) {
 Thread::CondVar::WaitStatus SimulatedTimeSystem::waitFor(Thread::MutexBasicLockable& mutex,
                                                          Thread::CondVar& condvar,
                                                          const Duration& duration) noexcept {
-  // Advance time to activate any callbacks. Note that activating them does not
-  // call them immediately; the libtimer event loop must be called, typically by
-  // Dispatcher::run() in a separate thread.
-  sleep(duration);
+  const Duration real_time_poll_delay(std::chrono::milliseconds(50));
+  const MonotonicTime end_time = monotonicTime() + duration;
 
-  // Now we must use a real-time condvar wait to allow the event-loop running in
-  // another thread to run the callbacks that we just activated. The real-time
-  // delay to allow the dispatcher thread to wake up is not related to the
-  // simulated duration passed into this function.
-  Thread::CondVar::WaitStatus status;
-  do {
-    status = condvar.waitFor(mutex, Duration(std::chrono::milliseconds(50)));
-  } while ((status == Thread::CondVar::WaitStatus::Timeout) && hasPending());
-  return status;
+  while (true) {
+    // First check to see if the condition is already satisfied without advancing sim time.
+    if (condvar.waitFor(mutex, real_time_poll_delay) == Thread::CondVar::WaitStatus::NoTimeout) {
+      return Thread::CondVar::WaitStatus::NoTimeout;
+    }
+
+    mutex_.lock();
+    if (monotonic_time_ < end_time) {
+      if (alarms_.empty()) {
+        // If no alarms are pending, sleep till the end time.
+        setMonotonicTimeAndUnlock(end_time);
+      } else {
+        // If there's another alarm pending, sleep forward to it.
+        MonotonicTime next_wakeup = (*alarms_.begin())->time();
+        setMonotonicTimeAndUnlock(std::min(next_wakeup, end_time));
+      }
+    } else {
+      // If there were no alarms, and we've already reached our end time, we may
+      // still need to call CondVar::waitFor one more time, if there are still
+      // pending callbacks that have been activated but not yet called by the
+      // event loop, running in another thread.
+      mutex_.unlock();
+      if (!hasPending()) {
+        break;
+      }
+    }
+  }
+  return Thread::CondVar::WaitStatus::Timeout;
 }
 
 int64_t SimulatedTimeSystem::nextIndex() {
