@@ -36,6 +36,10 @@
 namespace Envoy {
 namespace Server {
 
+class AdminInternalAddressConfig : public Http::InternalAddressConfig {
+  bool isInternalAddress(const Network::Address::Instance&) const override { return false; }
+};
+
 /**
  * Implementation of Server::Admin.
  */
@@ -100,6 +104,9 @@ public:
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return true; }
+  const Http::InternalAddressConfig& internalAddressConfig() const override {
+    return internal_address_config_;
+  }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
   const std::string& via() const override { return EMPTY_STRING; }
@@ -295,6 +302,7 @@ private:
   const Network::FilterChainSharedPtr admin_filter_chain_;
   Network::SocketPtr socket_;
   AdminListenerPtr listener_;
+  const AdminInternalAddressConfig internal_address_config_;
 };
 
 /**
