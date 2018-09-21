@@ -1,7 +1,7 @@
-#include "envoy/registry/registry.h"
+#pragma once
+
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/network/sni_cluster/sni_cluster.h"
 #include "extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
@@ -17,32 +17,13 @@ class SniClusterNetworkFilterConfigFactory
 public:
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb createFilterFactory(const Json::Object&,
-                                               Server::Configuration::FactoryContext&) override {
-    // Only used in v1 filters.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-
+                                               Server::Configuration::FactoryContext&) override;
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::FactoryContext&) override {
-    return [](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<SniClusterFilter>());
-    };
-  }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
-  }
-
+                               Server::Configuration::FactoryContext&) override;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() override { return NetworkFilterNames::get().SniCluster; }
 };
-
-/**
- * Static registration for the sni_cluster filter. @see RegisterFactory.
- */
-static Registry::RegisterFactory<SniClusterNetworkFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
 
 } // namespace SniCluster
 } // namespace NetworkFilters

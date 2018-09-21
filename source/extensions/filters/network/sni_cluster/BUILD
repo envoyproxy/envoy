@@ -23,6 +23,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "config",
+    srcs = ["config.cc"],
     hdrs = ["config.h"],
     deps = [
         ":sni_cluster",

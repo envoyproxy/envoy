@@ -17,7 +17,7 @@ envoy_extension_cc_test(
     srcs = ["sni_cluster_test.cc"],
     extension_name = "envoy.filters.network.sni_cluster",
     deps = [
-        "//source/extensions/filters/network/sni_cluster",
+        "//source/extensions/filters/network/sni_cluster:sni_cluster",
         "//source/extensions/filters/network/sni_cluster:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
