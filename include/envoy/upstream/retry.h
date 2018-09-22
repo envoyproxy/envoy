@@ -106,7 +106,7 @@ public:
   virtual ~RetryPriorityFactory() {}
 
   virtual void createRetryPriority(RetryPriorityFactoryCallbacks& callbacks,
-                                   const ProtobufWkt::Message& config) PURE;
+                                   const Protobuf::Message& config) PURE;
 
   virtual std::string name() const PURE;
 };
