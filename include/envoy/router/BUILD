@@ -72,6 +72,6 @@ envoy_cc_library(
     hdrs = ["string_accessor.h"],
     external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/request_info:filter_state_interface",
+        "//include/envoy/stream_info:filter_state_interface",
     ],
 )

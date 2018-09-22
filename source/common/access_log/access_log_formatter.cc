@@ -9,7 +9,7 @@
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/http/utility.h"
-#include "common/request_info/utility.h"
+#include "common/stream_info/utility.h"
 
 #include "absl/strings/str_split.h"
 #include "fmt/format.h"
@@ -60,13 +60,13 @@ FormatterImpl::FormatterImpl(const std::string& format) {
 std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
                                   const Http::HeaderMap& response_headers,
                                   const Http::HeaderMap& response_trailers,
-                                  const RequestInfo::RequestInfo& request_info) const {
+                                  const StreamInfo::StreamInfo& stream_info) const {
   std::string log_line;
   log_line.reserve(256);
 
   for (const FormatterPtr& formatter : formatters_) {
     log_line +=
-        formatter->format(request_headers, response_headers, response_trailers, request_info);
+        formatter->format(request_headers, response_headers, response_trailers, stream_info);
   }
 
   return log_line;
@@ -198,7 +198,7 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
                                      : "";
         formatters.emplace_back(new StartTimeFormatter(args));
       } else {
-        formatters.emplace_back(new RequestInfoFormatter(token));
+        formatters.emplace_back(new StreamInfoFormatter(token));
       }
       pos = command_end_position;
     } else {
@@ -213,20 +213,20 @@ std::vector<FormatterPtr> AccessLogFormatParser::parse(const std::string& format
   return formatters;
 }
 
-RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
+StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
 
   if (field_name == "REQUEST_DURATION") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return AccessLogFormatUtils::durationToString(request_info.lastDownstreamRxByteReceived());
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return AccessLogFormatUtils::durationToString(stream_info.lastDownstreamRxByteReceived());
     };
   } else if (field_name == "RESPONSE_DURATION") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return AccessLogFormatUtils::durationToString(request_info.firstUpstreamRxByteReceived());
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return AccessLogFormatUtils::durationToString(stream_info.firstUpstreamRxByteReceived());
     };
   } else if (field_name == "RESPONSE_TX_DURATION") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      auto downstream = request_info.lastDownstreamTxByteSent();
-      auto upstream = request_info.firstUpstreamRxByteReceived();
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      auto downstream = stream_info.lastDownstreamTxByteSent();
+      auto upstream = stream_info.firstUpstreamRxByteReceived();
 
       if (downstream && upstream) {
         auto val = downstream.value() - upstream.value();
@@ -236,95 +236,95 @@ RequestInfoFormatter::RequestInfoFormatter(const std::string& field_name) {
       return UnspecifiedValueString;
     };
   } else if (field_name == "BYTES_RECEIVED") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return fmt::FormatInt(request_info.bytesReceived()).str();
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return fmt::FormatInt(stream_info.bytesReceived()).str();
     };
   } else if (field_name == "PROTOCOL") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return AccessLogFormatUtils::protocolToString(request_info.protocol());
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return AccessLogFormatUtils::protocolToString(stream_info.protocol());
     };
   } else if (field_name == "RESPONSE_CODE") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return request_info.responseCode() ? fmt::FormatInt(request_info.responseCode().value()).str()
-                                         : "0";
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return stream_info.responseCode() ? fmt::FormatInt(stream_info.responseCode().value()).str()
+                                        : "0";
     };
   } else if (field_name == "BYTES_SENT") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return fmt::FormatInt(request_info.bytesSent()).str();
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return fmt::FormatInt(stream_info.bytesSent()).str();
     };
   } else if (field_name == "DURATION") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return AccessLogFormatUtils::durationToString(request_info.requestComplete());
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return AccessLogFormatUtils::durationToString(stream_info.requestComplete());
     };
   } else if (field_name == "RESPONSE_FLAGS") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return RequestInfo::ResponseFlagUtils::toShortString(request_info);
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return StreamInfo::ResponseFlagUtils::toShortString(stream_info);
     };
   } else if (field_name == "UPSTREAM_HOST") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      if (request_info.upstreamHost()) {
-        return request_info.upstreamHost()->address()->asString();
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      if (stream_info.upstreamHost()) {
+        return stream_info.upstreamHost()->address()->asString();
       } else {
         return UnspecifiedValueString;
       }
     };
   } else if (field_name == "UPSTREAM_CLUSTER") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
       std::string upstream_cluster_name;
-      if (nullptr != request_info.upstreamHost()) {
-        upstream_cluster_name = request_info.upstreamHost()->cluster().name();
+      if (nullptr != stream_info.upstreamHost()) {
+        upstream_cluster_name = stream_info.upstreamHost()->cluster().name();
       }
 
       return upstream_cluster_name.empty() ? UnspecifiedValueString : upstream_cluster_name;
     };
   } else if (field_name == "UPSTREAM_LOCAL_ADDRESS") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return request_info.upstreamLocalAddress() != nullptr
-                 ? request_info.upstreamLocalAddress()->asString()
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return stream_info.upstreamLocalAddress() != nullptr
+                 ? stream_info.upstreamLocalAddress()->asString()
                  : UnspecifiedValueString;
     };
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return request_info.downstreamLocalAddress()->asString();
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return stream_info.downstreamLocalAddress()->asString();
     };
   } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT") {
-    field_extractor_ = [](const Envoy::RequestInfo::RequestInfo& request_info) {
-      return RequestInfo::Utility::formatDownstreamAddressNoPort(
-          *request_info.downstreamLocalAddress());
+    field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+      return StreamInfo::Utility::formatDownstreamAddressNoPort(
+          *stream_info.downstreamLocalAddress());
     };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return request_info.downstreamRemoteAddress()->asString();
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return stream_info.downstreamRemoteAddress()->asString();
     };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      return RequestInfo::Utility::formatDownstreamAddressNoPort(
-          *request_info.downstreamRemoteAddress());
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return StreamInfo::Utility::formatDownstreamAddressNoPort(
+          *stream_info.downstreamRemoteAddress());
     };
   } else if (field_name == "REQUESTED_SERVER_NAME") {
-    field_extractor_ = [](const RequestInfo::RequestInfo& request_info) {
-      if (!request_info.requestedServerName().empty()) {
-        return request_info.requestedServerName();
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      if (!stream_info.requestedServerName().empty()) {
+        return stream_info.requestedServerName();
       } else {
         return UnspecifiedValueString;
       }
     };
   } else {
-    throw EnvoyException(fmt::format("Not supported field in RequestInfo: {}", field_name));
+    throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }
 }
 
-std::string RequestInfoFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
-                                         const Http::HeaderMap&,
-                                         const RequestInfo::RequestInfo& request_info) const {
-  return field_extractor_(request_info);
+std::string StreamInfoFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
+                                        const Http::HeaderMap&,
+                                        const StreamInfo::StreamInfo& stream_info) const {
+  return field_extractor_(stream_info);
 }
 
 PlainStringFormatter::PlainStringFormatter(const std::string& str) : str_(str) {}
 
 std::string PlainStringFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                          const Http::HeaderMap&,
-                                         const RequestInfo::RequestInfo&) const {
+                                         const StreamInfo::StreamInfo&) const {
   return str_;
 }
 
@@ -362,7 +362,7 @@ ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
 std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,
                                             const Http::HeaderMap& response_headers,
                                             const Http::HeaderMap&,
-                                            const RequestInfo::RequestInfo&) const {
+                                            const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::format(response_headers);
 }
 
@@ -373,7 +373,7 @@ RequestHeaderFormatter::RequestHeaderFormatter(const std::string& main_header,
 
 std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_headers,
                                            const Http::HeaderMap&, const Http::HeaderMap&,
-                                           const RequestInfo::RequestInfo&) const {
+                                           const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::format(request_headers);
 }
 
@@ -384,7 +384,7 @@ ResponseTrailerFormatter::ResponseTrailerFormatter(const std::string& main_heade
 
 std::string ResponseTrailerFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                              const Http::HeaderMap& response_trailers,
-                                             const RequestInfo::RequestInfo&) const {
+                                             const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::format(response_trailers);
 }
 
@@ -426,19 +426,19 @@ DynamicMetadataFormatter::DynamicMetadataFormatter(const std::string& filter_nam
 
 std::string DynamicMetadataFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                              const Http::HeaderMap&,
-                                             const RequestInfo::RequestInfo& request_info) const {
-  return MetadataFormatter::format(request_info.dynamicMetadata());
+                                             const StreamInfo::StreamInfo& stream_info) const {
+  return MetadataFormatter::format(stream_info.dynamicMetadata());
 }
 
 StartTimeFormatter::StartTimeFormatter(const std::string& format) : date_formatter_(format) {}
 
 std::string StartTimeFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                        const Http::HeaderMap&,
-                                       const RequestInfo::RequestInfo& request_info) const {
+                                       const StreamInfo::StreamInfo& stream_info) const {
   if (date_formatter_.formatString().empty()) {
-    return AccessLogDateTimeFormatter::fromTime(request_info.startTime());
+    return AccessLogDateTimeFormatter::fromTime(stream_info.startTime());
   } else {
-    return date_formatter_.fromTime(request_info.startTime());
+    return date_formatter_.fromTime(stream_info.startTime());
   }
 }
 

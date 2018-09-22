@@ -1,9 +1,9 @@
 #pragma once
 
-#include "envoy/request_info/filter_state.h"
+#include "envoy/stream_info/filter_state.h"
 
 namespace Envoy {
-namespace RequestInfo {
+namespace StreamInfo {
 
 class TestIntAccessor : public FilterState::Object {
 public:
@@ -15,5 +15,5 @@ private:
   int value_;
 };
 
-} // namespace RequestInfo
+} // namespace StreamInfo
 } // namespace Envoy

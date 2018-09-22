@@ -25,7 +25,7 @@
 #include "common/network/cidr_range.h"
 #include "common/network/filter_impl.h"
 #include "common/network/utility.h"
-#include "common/request_info/request_info_impl.h"
+#include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 
 namespace Envoy {
@@ -264,7 +264,7 @@ protected:
 
   virtual void onConnectionSuccess() {}
 
-  virtual RequestInfo::RequestInfo& getRequestInfo() { return request_info_; }
+  virtual StreamInfo::StreamInfo& getStreamInfo() { return stream_info_; }
 
   void initialize(Network::ReadFilterCallbacks& callbacks, bool set_connection_stats);
   Network::FilterStatus initializeUpstreamConnection();
@@ -285,7 +285,7 @@ protected:
   Event::TimerPtr idle_timer_;
   std::shared_ptr<UpstreamCallbacks> upstream_callbacks_; // shared_ptr required for passing as a
                                                           // read filter.
-  RequestInfo::RequestInfoImpl request_info_;
+  StreamInfo::StreamInfoImpl stream_info_;
   uint32_t connect_attempts_{};
   bool connecting_{};
 };

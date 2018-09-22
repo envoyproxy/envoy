@@ -18,7 +18,7 @@ public:
   // AccessLog::Instance
   void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
            const Http::HeaderMap* response_trailers,
-           const RequestInfo::RequestInfo& request_info) override;
+           const StreamInfo::StreamInfo& stream_info) override;
 
 private:
   Filesystem::FileSharedPtr log_file_;

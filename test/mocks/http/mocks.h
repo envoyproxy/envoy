@@ -19,8 +19,8 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/request_info/mocks.h"
 #include "test/mocks/router/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
@@ -175,7 +175,7 @@ public:
 class MockStreamFilterCallbacksBase {
 public:
   Event::MockDispatcher dispatcher_;
-  testing::NiceMock<RequestInfo::MockRequestInfo> request_info_;
+  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   std::shared_ptr<Router::MockRoute> route_;
 };
 
@@ -192,7 +192,7 @@ public:
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
   MOCK_METHOD0(clearRouteCache, void());
   MOCK_METHOD0(streamId, uint64_t());
-  MOCK_METHOD0(requestInfo, RequestInfo::RequestInfo&());
+  MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(tracingConfig, Tracing::Config&());
   MOCK_METHOD0(onDecoderFilterAboveWriteBufferHighWatermark, void());
@@ -255,7 +255,7 @@ public:
   MOCK_METHOD0(route, Router::RouteConstSharedPtr());
   MOCK_METHOD0(clearRouteCache, void());
   MOCK_METHOD0(streamId, uint64_t());
-  MOCK_METHOD0(requestInfo, RequestInfo::RequestInfo&());
+  MOCK_METHOD0(streamInfo, StreamInfo::StreamInfo&());
   MOCK_METHOD0(activeSpan, Tracing::Span&());
   MOCK_METHOD0(tracingConfig, Tracing::Config&());
   MOCK_METHOD0(onEncoderFilterAboveWriteBufferHighWatermark, void());
