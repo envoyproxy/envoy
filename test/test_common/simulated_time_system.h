@@ -25,14 +25,9 @@ public:
   SystemTime systemTime() override;
   MonotonicTime monotonicTime() override;
   void sleep(const Duration& duration) override;
-<<<<<<< HEAD
-  Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& lock, Thread::CondVar& condvar,
-                                      const Duration& duration) override;
-=======
   Thread::CondVar::WaitStatus
   waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
           const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
->>>>>>> master
 
   /**
    * Sets the time forward monotonically. If the supplied argument moves

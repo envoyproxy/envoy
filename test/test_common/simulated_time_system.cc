@@ -115,14 +115,11 @@ void SimulatedTimeSystem::Alarm::enableTimer(const std::chrono::milliseconds& du
   }
 }
 
-<<<<<<< HEAD
-=======
 // It would be very confusing if there were more than one simulated time system
 // extant at once. Technically this might be something we want, but more likely
 // it indicates some kind of plumbing error in test infrastructure. So track
 // the instance count with a simple int. In the future if there's a good reason
 // to have more than one around at a time, this variable can be deleted.
->>>>>>> master
 static int instance_count = 0;
 
 // When we initialize our simulated time, we'll start the current time based on
