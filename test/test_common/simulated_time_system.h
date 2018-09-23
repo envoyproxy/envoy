@@ -16,6 +16,7 @@ namespace Event {
 class SimulatedTimeSystem : public TimeSystem {
 public:
   SimulatedTimeSystem();
+  ~SimulatedTimeSystem();
 
   // TimeSystem
   SchedulerPtr createScheduler(Libevent::BasePtr&) override;
@@ -23,20 +24,10 @@ public:
   // TimeSource
   SystemTime systemTime() override;
   MonotonicTime monotonicTime() override;
-
-  /**
-   * Advances time forward by the specified duration, running any timers
-   * along the way that have been scheduled to fire.
-   *
-   * @param duration The amount of time to sleep, expressed in any type that
-   * can be duration_casted to MonotonicTime::duration.
-   */
-  template <class Duration> void sleep(const Duration& duration) {
-    mutex_.lock();
-    MonotonicTime monotonic_time =
-        monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
-    setMonotonicTimeAndUnlock(monotonic_time);
-  }
+  void sleep(const Duration& duration) override;
+  Thread::CondVar::WaitStatus
+  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 
   /**
    * Sets the time forward monotonically. If the supplied argument moves
@@ -92,12 +83,19 @@ private:
   void addAlarm(Alarm*, const std::chrono::milliseconds& duration);
   void removeAlarm(Alarm*);
 
+  // Keeps track of how many alarms have been activated but not yet called,
+  // which helps waitFor() determine when to give up and declare a timeout.
+  void incPending() { ++pending_alarms_; }
+  void decPending() { --pending_alarms_; }
+  bool hasPending() const { return pending_alarms_ > 0; }
+
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ GUARDED_BY(mutex_);
   SystemTime system_time_ GUARDED_BY(mutex_);
   AlarmSet alarms_ GUARDED_BY(mutex_);
   uint64_t index_ GUARDED_BY(mutex_);
   mutable Thread::MutexBasicLockable mutex_;
+  std::atomic<uint32_t> pending_alarms_;
 };
 
 } // namespace Event
