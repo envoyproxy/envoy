@@ -3,6 +3,7 @@
 #include "envoy/event/timer.h"
 
 namespace Envoy {
+namespace Event {
 
 // Adds sleep() and waitFor() interfaces to Event::TimeSystem.
 class TestTimeSystem : public Event::TimeSystem {
@@ -38,4 +39,5 @@ public:
   }
 };
 
+} // namespace Event
 } // namespace Envoy

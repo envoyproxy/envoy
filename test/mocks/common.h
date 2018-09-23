@@ -47,7 +47,7 @@ public:
   MOCK_METHOD0(monotonicTime, MonotonicTime());
 };
 
-class MockTimeSystem : public TestTimeSystem {
+class MockTimeSystem : public Event::TestTimeSystem {
 public:
   MockTimeSystem();
   ~MockTimeSystem();
@@ -68,7 +68,7 @@ public:
   MOCK_METHOD0(systemTime, SystemTime());
   MOCK_METHOD0(monotonicTime, MonotonicTime());
 
-  TestRealTimeSystem real_time_system_;
+  Event::TestRealTimeSystem real_time_system_;
 };
 
 class MockTokenBucket : public TokenBucket {

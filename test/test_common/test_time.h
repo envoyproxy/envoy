@@ -5,6 +5,7 @@
 #include "test/test_common/test_time_system.h"
 
 namespace Envoy {
+namespace Event {
 
 class TestRealTimeSystem : public TestTimeSystem {
 public:
@@ -27,6 +28,8 @@ private:
   Event::RealTimeSystem real_time_system_;
 };
 
+} // namespace Event
+
 // Instantiates real-time sources for testing purposes. In general, this is a
 // bad idea, and tests should use simulated or mock time.
 //
@@ -39,7 +42,7 @@ public:
   Event::TimeSystem& timeSystem() { return time_system_; }
 
 private:
-  TestRealTimeSystem time_system_;
+  Event::TestRealTimeSystem time_system_;
 };
 
 } // namespace Envoy
