@@ -19,7 +19,7 @@ namespace TlsInspector {
 /**
  * All stats for the TLS inspector. @see stats_macros.h
  */
-#define ALL_TLS_INSPECTOR_STATS(COUNTER)                                                           \
+#define TLS_STATS(COUNTER)                                                                         \
   COUNTER(connection_closed)                                                                       \
   COUNTER(client_hello_too_large)                                                                  \
   COUNTER(read_error)                                                                              \
@@ -32,10 +32,10 @@ namespace TlsInspector {
   COUNTER(sni_not_found)
 
 /**
- * Definition of all stats for the TLS inspector. @see stats_macros.h
+ * Definition of stats for the TLS. @see stats_macros.h
  */
-struct TlsInspectorStats {
-  ALL_TLS_INSPECTOR_STATS(GENERATE_COUNTER_STRUCT)
+struct TlsStats {
+  TLS_STATS(GENERATE_COUNTER_STRUCT)
 };
 
 /**
@@ -43,39 +43,66 @@ struct TlsInspectorStats {
  */
 class Config {
 public:
-  Config(Stats::Scope& scope, uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO);
+  Config(Stats::Scope& scope, uint32_t max_client_hello_size = TLS_MAX_CLIENT_HELLO,
+         const std::string& stat_prefix = "tls_inspector.");
 
-  const TlsInspectorStats& stats() const { return stats_; }
+  const TlsStats& stats() const { return stats_; }
   bssl::UniquePtr<SSL> newSsl();
   uint32_t maxClientHelloSize() const { return max_client_hello_size_; }
 
   static constexpr size_t TLS_MAX_CLIENT_HELLO = 64 * 1024;
 
 private:
-  TlsInspectorStats stats_;
+  TlsStats stats_;
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   const uint32_t max_client_hello_size_;
 };
 
 typedef std::shared_ptr<Config> ConfigSharedPtr;
 
+class TlsFilterBase {
+public:
+  virtual ~TlsFilterBase() {}
+
+private:
+  virtual void onALPN(const unsigned char* data, unsigned int len) PURE;
+  virtual void onServername(absl::string_view name) PURE;
+
+  // Allows callbacks on the SSL_CTX to set fields in this class.
+  friend class Config;
+};
+
 /**
  * TLS inspector listener filter.
  */
-class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
+class Filter : public Network::ListenerFilter,
+               public TlsFilterBase,
+               Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const ConfigSharedPtr config);
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
+  static void initializeSsl(uint32_t maxClientHelloSize, size_t bufSize,
+                            const bssl::UniquePtr<SSL>& ssl, void* appData);
+  static void parseClientHello(const void* data, size_t len, bssl::UniquePtr<SSL>& ssl,
+                               uint64_t read, uint32_t maxClientHelloSize, const TlsStats& stats,
+                               std::function<void(bool)> done, bool& alpn_found,
+                               bool& clienthello_success, std::function<void()> onSuccess);
+  static void doOnServername(absl::string_view name, const TlsStats& stats,
+                             std::function<void(absl::string_view name)> onServernameCb,
+                             bool& clienthello_success_);
+  static void doOnALPN(const unsigned char* data, unsigned int len,
+                       std::function<void(std::vector<absl::string_view> protocols)> onAlpnCb,
+                       bool& alpn_found);
 
 private:
-  void parseClientHello(const void* data, size_t len);
   void onRead();
   void onTimeout();
   void done(bool success);
-  void onALPN(const unsigned char* data, unsigned int len);
-  void onServername(absl::string_view name);
+  // Extensions::ListenerFilters::TlsInspector::TlsFilterBase
+  void onALPN(const unsigned char* data, unsigned int len) override;
+  void onServername(absl::string_view name) override;
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_;
@@ -88,9 +115,6 @@ private:
   bool clienthello_success_{false};
 
   static thread_local uint8_t buf_[Config::TLS_MAX_CLIENT_HELLO];
-
-  // Allows callbacks on the SSL_CTX to set fields in this class.
-  friend class Config;
 };
 
 } // namespace TlsInspector
