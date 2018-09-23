@@ -133,6 +133,12 @@ TEST_F(JwksCacheTest, TestAudiences) {
   EXPECT_FALSE(jwks->areAudiencesAllowed({"wrong-audience1", "wrong-audience2"}));
 }
 
+// Test findByProvider
+TEST_F(JwksCacheTest, TestFindByProvider) {
+  EXPECT_TRUE(cache_->findByProvider(ProviderName) != nullptr);
+  EXPECT_TRUE(cache_->findByProvider("other-provider") == nullptr);
+}
+
 } // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters

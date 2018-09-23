@@ -25,8 +25,14 @@ public:
   SystemTime systemTime() override;
   MonotonicTime monotonicTime() override;
   void sleep(const Duration& duration) override;
+<<<<<<< HEAD
   Thread::CondVar::WaitStatus waitFor(Thread::MutexBasicLockable& lock, Thread::CondVar& condvar,
                                       const Duration& duration) override;
+=======
+  Thread::CondVar::WaitStatus
+  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
+>>>>>>> master
 
   /**
    * Sets the time forward monotonically. If the supplied argument moves
@@ -86,7 +92,7 @@ private:
   // which helps waitFor() determine when to give up and declare a timeout.
   void incPending() { ++pending_alarms_; }
   void decPending() { --pending_alarms_; }
-  bool hasPending() { return pending_alarms_ > 0; }
+  bool hasPending() const { return pending_alarms_ > 0; }
 
   RealTimeSource real_time_source_; // Used to initialize monotonic_time_ and system_time_;
   MonotonicTime monotonic_time_ GUARDED_BY(mutex_);

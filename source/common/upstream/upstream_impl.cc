@@ -1004,13 +1004,22 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
   // Remove hosts from current_priority_hosts that were matched to an existing host in the previous
   // loop.
-  current_priority_hosts.erase(std::remove_if(current_priority_hosts.begin(),
-                                              current_priority_hosts.end(),
-                                              [&existing_hosts_for_current_priority](auto host) {
-                                                return existing_hosts_for_current_priority.count(
-                                                    host->address()->asString());
-                                              }),
-                               current_priority_hosts.end());
+  for (auto itr = current_priority_hosts.begin(); itr != current_priority_hosts.end();) {
+    auto existing_itr = existing_hosts_for_current_priority.find((*itr)->address()->asString());
+
+    if (existing_itr != existing_hosts_for_current_priority.end()) {
+      existing_hosts_for_current_priority.erase(existing_itr);
+      itr = current_priority_hosts.erase(itr);
+    } else {
+      itr++;
+    }
+  }
+
+  // If we saw existing hosts during this iteration from a different priority, then we've moved
+  // a host from another priority into this one, so we should mark the priority as having changed.
+  if (!existing_hosts_for_current_priority.empty()) {
+    hosts_changed = true;
+  }
 
   // The remaining hosts are hosts that are not referenced in the config update. We remove them from
   // the priority if any of the following is true:

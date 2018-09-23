@@ -4,6 +4,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/http/date_provider.h"
+#include "common/network/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -146,6 +147,25 @@ enum class ForwardClientCertType {
 enum class ClientCertDetailsType { Cert, Subject, URI, DNS };
 
 /**
+ * Configuration for what addresses should be considered internal beyond the defaults.
+ */
+class InternalAddressConfig {
+public:
+  virtual ~InternalAddressConfig() {}
+  virtual bool isInternalAddress(const Network::Address::Instance& address) const PURE;
+};
+
+/**
+ * Determines if an address is internal based on whether it is an RFC1918 ip address.
+ */
+class DefaultInternalAddressConfig : public Http::InternalAddressConfig {
+public:
+  bool isInternalAddress(const Network::Address::Instance& address) const override {
+    return Network::Utility::isInternalAddress(address);
+  }
+};
+
+/**
  * Abstract configuration for the connection manager.
  */
 class ConnectionManagerConfig {
@@ -230,6 +250,11 @@ public:
    *         status, etc. or to assume that XFF will already be populated with the remote address.
    */
   virtual bool useRemoteAddress() PURE;
+
+  /**
+   * @return InternalAddressConfig configuration for user defined internal addresses.
+   */
+  virtual const InternalAddressConfig& internalAddressConfig() const PURE;
 
   /**
    * @return uint32_t the number of trusted proxy hops in front of this Envoy instance, for

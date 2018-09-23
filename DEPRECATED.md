@@ -8,8 +8,8 @@ A logged warning is expected for each deprecated item that is in deprecation win
 
 ## Version 1.8.0 (pending)
 
-* Use of the v1 API is deprecated. See envoy-announce
-  [email](https://groups.google.com/forum/#!topic/envoy-announce/oPnYMZw8H4U).
+* Use of the v1 API (including `*.deprecated_v1` fields in the v2 API) is deprecated.
+  See envoy-announce [email](https://groups.google.com/forum/#!topic/envoy-announce/oPnYMZw8H4U).
 * Use of the legacy
   [ratelimit.proto](https://github.com/envoyproxy/envoy/blob/b0a518d064c8255e0e20557a8f909b6ff457558f/source/common/ratelimit/ratelimit.proto)
   is deprecated, in favor of the proto defined in

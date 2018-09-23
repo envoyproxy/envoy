@@ -106,6 +106,28 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenHeadReply) {
   EXPECT_STREQ("", response->body().c_str());
 }
 
+// This test verifies a request is passed with a path that don't match any requirements.
+TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
+  config_helper_.addFilter(getFilterConfig(true));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/foo"},
+      {":scheme", "http"},
+      {":authority", "host"},
+  });
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+}
+
 // The test case with a fake upstream for remote Jwks server.
 class RemoteJwksIntegrationTest : public HttpProtocolIntegrationTest {
 public:

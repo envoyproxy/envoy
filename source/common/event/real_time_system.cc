@@ -33,7 +33,7 @@ void RealTimeSystem::sleep(const Duration& duration) { std::this_thread::sleep_f
 
 Thread::CondVar::WaitStatus RealTimeSystem::waitFor(Thread::MutexBasicLockable& lock,
                                                     Thread::CondVar& condvar,
-                                                    const Duration& duration) {
+                                                    const Duration& duration) noexcept {
   return condvar.waitFor(lock, duration);
 }
 

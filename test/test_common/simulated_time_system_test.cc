@@ -82,15 +82,26 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
               sim_.waitFor(mutex, condvar, std::chrono::seconds(50)));
   }
   EXPECT_FALSE(done);
+  EXPECT_EQ(MonotonicTime(std::chrono::seconds(50)), sim_.monotonicTime());
 
-  // Waiting another 10 simulated seconds will activate the alarm, and the
-  // event-loop thread will call the corresponding callback quickly.
+  // Waiting another 20 simulated seconds will activate the alarm after 10,
+  // and the event-loop thread will call the corresponding callback quickly.
   {
     Thread::LockGuard lock(mutex);
     EXPECT_EQ(Thread::CondVar::WaitStatus::NoTimeout,
               sim_.waitFor(mutex, condvar, std::chrono::seconds(10)));
   }
   EXPECT_TRUE(done);
+  EXPECT_EQ(MonotonicTime(std::chrono::seconds(60)), sim_.monotonicTime());
+
+  // Waiting a third time, with no pending timeouts, will just sleep out for
+  // the max duration and return a timeout.
+  {
+    Thread::LockGuard lock(mutex);
+    EXPECT_EQ(Thread::CondVar::WaitStatus::Timeout,
+              sim_.waitFor(mutex, condvar, std::chrono::seconds(20)));
+  }
+  EXPECT_EQ(MonotonicTime(std::chrono::seconds(80)), sim_.monotonicTime());
 
   thread->join();
 }
@@ -150,6 +161,23 @@ TEST_F(SimulatedTimeSystemTest, DisableTimer) {
   EXPECT_EQ("3", output_);
   sleepMsAndLoop(1);
   EXPECT_EQ("36", output_);
+}
+
+TEST_F(SimulatedTimeSystemTest, IgnoreRedundantDisable) {
+  addTask(5, '5');
+  timers_[0]->disableTimer();
+  timers_[0]->disableTimer();
+  sleepMsAndLoop(5);
+  EXPECT_EQ("", output_);
+}
+
+TEST_F(SimulatedTimeSystemTest, OverrideEnable) {
+  addTask(5, '5');
+  timers_[0]->enableTimer(std::chrono::milliseconds(6));
+  sleepMsAndLoop(5);
+  EXPECT_EQ("", output_); // Timer didn't wake up because we overrode to 6ms.
+  sleepMsAndLoop(1);
+  EXPECT_EQ("5", output_);
 }
 
 TEST_F(SimulatedTimeSystemTest, DeleteTime) {
