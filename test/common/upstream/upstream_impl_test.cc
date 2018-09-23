@@ -751,13 +751,14 @@ TEST(HostImplTest, HostnameCanaryAndLocality) {
   locality.set_sub_zone("world");
   HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
                 metadata, 1, locality,
-                envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance());
+                envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 1);
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_EQ("lyft.com", host.hostname());
   EXPECT_TRUE(host.canary());
   EXPECT_EQ("oceania", host.locality().region());
   EXPECT_EQ("hello", host.locality().zone());
   EXPECT_EQ("world", host.locality().sub_zone());
+  EXPECT_EQ(1, host.priority());
 }
 
 TEST(StaticClusterImplTest, InitialHosts) {
