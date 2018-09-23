@@ -52,8 +52,6 @@ int main(int argc, char** argv) {
   Envoy::test_corpus_ = Envoy::TestUtility::listFiles(corpus_path, true);
   testing::InitGoogleTest(&argc, argv);
   Envoy::Fuzz::Runner::setupEnvironment(argc, argv, spdlog::level::info);
-  Envoy::Logger::Context logging_context(Envoy::Fuzz::Runner::logLevel(),
-                                         Envoy::TestEnvironment::getOptions().logFormat(), lock);
 
   return RUN_ALL_TESTS();
 }
