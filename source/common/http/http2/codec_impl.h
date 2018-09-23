@@ -323,10 +323,8 @@ private:
  */
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
-  ServerConnectionImpl(
-      Network::Connection& connection, ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
-      const Http2Settings& http2_settings,
-      std::chrono::milliseconds delayed_close_timeout = std::chrono::milliseconds(0));
+  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
+                       Stats::Scope& scope, const Http2Settings& http2_settings);
 
 private:
   // ConnectionImpl

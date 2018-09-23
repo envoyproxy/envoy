@@ -302,21 +302,22 @@ Http::ServerConnectionPtr
 HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          const Buffer::Instance& data,
                                          Http::ServerConnectionCallbacks& callbacks) {
+  connection.setDelayedCloseTimeout(delayed_close_timeout_);
   switch (codec_type_) {
   case CodecType::HTTP1:
-    return Http::ServerConnectionPtr{new Http::Http1::ServerConnectionImpl(
-        connection, callbacks, http1_settings_, delayed_close_timeout_)};
+    return Http::ServerConnectionPtr{
+        new Http::Http1::ServerConnectionImpl(connection, callbacks, http1_settings_)};
   case CodecType::HTTP2:
     return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-        connection, callbacks, context_.scope(), http2_settings_, delayed_close_timeout_)};
+        connection, callbacks, context_.scope(), http2_settings_)};
   case CodecType::AUTO:
     if (HttpConnectionManagerConfigUtility::determineNextProtocol(connection, data) ==
         Http::Http2::ALPN_STRING) {
       return Http::ServerConnectionPtr{new Http::Http2::ServerConnectionImpl(
-          connection, callbacks, context_.scope(), http2_settings_, delayed_close_timeout_)};
+          connection, callbacks, context_.scope(), http2_settings_)};
     } else {
-      return Http::ServerConnectionPtr{new Http::Http1::ServerConnectionImpl(
-          connection, callbacks, http1_settings_, delayed_close_timeout_)};
+      return Http::ServerConnectionPtr{
+          new Http::Http1::ServerConnectionImpl(connection, callbacks, http1_settings_)};
     }
   }
 

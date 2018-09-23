@@ -450,11 +450,8 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
 
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            ServerConnectionCallbacks& callbacks,
-                                           Http1Settings settings,
-                                           std::chrono::milliseconds delayed_close_timeout)
-    : ConnectionImpl(connection, HTTP_REQUEST), callbacks_(callbacks), codec_settings_(settings) {
-  connection_.setDelayedCloseTimeout(delayed_close_timeout);
-}
+                                           Http1Settings settings)
+    : ConnectionImpl(connection, HTTP_REQUEST), callbacks_(callbacks), codec_settings_(settings) {}
 
 void ServerConnectionImpl::onEncodeComplete() {
   ASSERT(active_request_);

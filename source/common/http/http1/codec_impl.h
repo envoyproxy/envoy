@@ -277,9 +277,8 @@ private:
  */
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
-  ServerConnectionImpl(
-      Network::Connection& connection, ServerConnectionCallbacks& callbacks, Http1Settings settings,
-      std::chrono::milliseconds delayed_close_timeout = std::chrono::milliseconds(0));
+  ServerConnectionImpl(Network::Connection& connection, ServerConnectionCallbacks& callbacks,
+                       Http1Settings settings);
 
   virtual bool supports_http_10() override { return codec_settings_.accept_http_10_; }
 

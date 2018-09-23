@@ -811,10 +811,8 @@ int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& na
 
 ServerConnectionImpl::ServerConnectionImpl(Network::Connection& connection,
                                            Http::ServerConnectionCallbacks& callbacks,
-                                           Stats::Scope& scope, const Http2Settings& http2_settings,
-                                           std::chrono::milliseconds delayed_close_timeout)
+                                           Stats::Scope& scope, const Http2Settings& http2_settings)
     : ConnectionImpl(connection, scope, http2_settings), callbacks_(callbacks) {
-  connection_.setDelayedCloseTimeout(delayed_close_timeout);
   Http2Options http2_options(http2_settings);
   nghttp2_session_server_new2(&session_, http2_callbacks_.callbacks(), base(),
                               http2_options.options());
