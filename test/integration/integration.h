@@ -120,21 +120,21 @@ struct ApiFilesystemConfig {
  */
 class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
-  using TimeSystemPtr = std::unique_ptr<Event::TimeSystem>;
+  using TestTimeSystemPtr = std::unique_ptr<Event::TestTimeSystem>;
 
-  BaseIntegrationTest(Network::Address::IpVersion version, TimeSystemPtr time_system,
+  BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr time_system,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
   virtual ~BaseIntegrationTest() {}
 
   /**
    * Helper function to create a simulated time integration test during construction.
    */
-  static TimeSystemPtr simTime() { return std::make_unique<Event::SimulatedTimeSystem>(); }
+  static TestTimeSystemPtr simTime() { return std::make_unique<Event::SimulatedTimeSystem>(); }
 
   /**
    * Helper function to create a wall-clock time integration test during construction.
    */
-  static TimeSystemPtr realTime() { return std::make_unique<Event::RealTimeSystem>(); }
+  static TestTimeSystemPtr realTime() { return std::make_unique<Event::TestRealTimeSystem>(); }
 
   // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
   virtual void initialize();
@@ -171,12 +171,12 @@ public:
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                            const std::vector<std::string>& port_names);
 
-  Event::TimeSystem& timeSystem() { return *time_system_; }
+  Event::TestTimeSystem& timeSystem() { return *time_system_; }
 
   Api::ApiPtr api_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
 private:
-  TimeSystemPtr time_system_;
+  TestTimeSystemPtr time_system_;
 
 public:
   Event::DispatcherPtr dispatcher_;

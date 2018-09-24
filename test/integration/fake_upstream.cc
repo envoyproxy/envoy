@@ -37,7 +37,7 @@ using testing::AssertionSuccess;
 
 namespace Envoy {
 FakeStream::FakeStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
-                       Event::TimeSystem& time_system)
+                       Event::TestTimeSystem& time_system)
     : parent_(parent), encoder_(encoder), time_system_(time_system) {
   encoder.getStream().addCallbacks(*this);
 }
@@ -202,7 +202,7 @@ void FakeStream::finishGrpcStream(Grpc::Status::GrpcStatus status) {
 
 FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connection,
                                        Stats::Store& store, Type type,
-                                       Event::TimeSystem& time_system)
+                                       Event::TestTimeSystem& time_system)
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
     codec_.reset(new Http::Http1::ServerConnectionImpl(shared_connection_.connection(), *this,
@@ -328,7 +328,7 @@ AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_d
 }
 
 FakeUpstream::FakeUpstream(const std::string& uds_path, FakeHttpConnection::Type type,
-                           Event::TimeSystem& time_system)
+                           Event::TestTimeSystem& time_system)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
                    Network::SocketPtr{new Network::UdsListenSocket(
                        std::make_shared<Network::Address::PipeInstance>(uds_path))},
@@ -344,7 +344,7 @@ static Network::SocketPtr makeTcpListenSocket(uint32_t port, Network::Address::I
 }
 
 FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
-                           Network::Address::IpVersion version, Event::TimeSystem& time_system,
+                           Network::Address::IpVersion version, Event::TestTimeSystem& time_system,
                            bool enable_half_close)
     : FakeUpstream(Network::Test::createRawBufferSocketFactory(),
                    makeTcpListenSocket(port, version), type, time_system, enable_half_close) {
@@ -354,7 +354,7 @@ FakeUpstream::FakeUpstream(uint32_t port, FakeHttpConnection::Type type,
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            uint32_t port, FakeHttpConnection::Type type,
-                           Network::Address::IpVersion version, Event::TimeSystem& time_system)
+                           Network::Address::IpVersion version, Event::TestTimeSystem& time_system)
     : FakeUpstream(std::move(transport_socket_factory), makeTcpListenSocket(port, version), type,
                    time_system, false) {
   ENVOY_LOG(info, "starting fake SSL server on port {}. Address version is {}",
@@ -363,7 +363,7 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
 
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type,
-                           Event::TimeSystem& time_system, bool enable_half_close)
+                           Event::TestTimeSystem& time_system, bool enable_half_close)
     : http_type_(type), socket_(std::move(listen_socket)), api_(new Api::Impl(milliseconds(10000))),
       time_system_(time_system), dispatcher_(api_->allocateDispatcher(time_system_)),
       handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), *dispatcher_)),
@@ -412,7 +412,7 @@ void FakeUpstream::threadRoutine() {
 AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                                     FakeHttpConnectionPtr& connection,
                                                     milliseconds timeout) {
-  Event::TimeSystem& time_system = timeSystem();
+  Event::TestTimeSystem& time_system = timeSystem();
   auto end_time = time_system.monotonicTime() + timeout;
   {
     Thread::LockGuard lock(lock_);
@@ -457,7 +457,8 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
         client_dispatcher.run(Event::Dispatcher::RunType::NonBlock);
       } else {
         connection = std::make_unique<FakeHttpConnection>(
-            upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_, time_system);
+            upstream.consumeConnection(), upstream.stats_store_, upstream.http_type_,
+            upstream.timeSystem());
         lock.release();
         VERIFY_ASSERTION(connection->initialize());
         VERIFY_ASSERTION(connection->readDisable(false));

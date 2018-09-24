@@ -48,7 +48,7 @@ typedef std::unique_ptr<AutonomousHttpConnection> AutonomousHttpConnectionPtr;
 class AutonomousUpstream : public FakeUpstream {
 public:
   AutonomousUpstream(uint32_t port, FakeHttpConnection::Type type,
-                     Network::Address::IpVersion version, Event::TimeSystem& time_system)
+                     Network::Address::IpVersion version, Event::TestTimeSystem& time_system)
       : FakeUpstream(port, type, version, time_system) {}
   ~AutonomousUpstream();
   bool

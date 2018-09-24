@@ -317,6 +317,7 @@ envoy_cc_test_library(
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:test_time_system_interface",
         "//test/test_common:utility_lib",
     ],
 )

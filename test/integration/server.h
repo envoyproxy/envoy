@@ -19,6 +19,7 @@
 #include "server/test_hooks.h"
 
 #include "test/integration/server_stats.h"
+#include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -221,7 +222,7 @@ public:
   static IntegrationTestServerPtr create(const std::string& config_path,
                                          const Network::Address::IpVersion version,
                                          std::function<void()> pre_worker_start_test_steps,
-                                         bool deterministic, Event::TimeSystem& time_system);
+                                         bool deterministic, Event::TestTimeSystem& time_system);
   ~IntegrationTestServer();
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
@@ -287,7 +288,7 @@ public:
   }
 
 protected:
-  IntegrationTestServer(Event::TimeSystem& time_system, const std::string& config_path)
+  IntegrationTestServer(Event::TestTimeSystem& time_system, const std::string& config_path)
       : time_system_(time_system), config_path_(config_path) {}
 
 private:
@@ -296,7 +297,7 @@ private:
    */
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic);
 
-  Event::TimeSystem& time_system_;
+  Event::TestTimeSystem& time_system_;
   const std::string config_path_;
   Thread::ThreadPtr thread_;
   Thread::CondVar listeners_cv_;

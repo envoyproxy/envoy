@@ -211,7 +211,7 @@ void IntegrationTcpClient::ConnectionCallbacks::onEvent(Network::ConnectionEvent
 }
 
 BaseIntegrationTest::BaseIntegrationTest(Network::Address::IpVersion version,
-                                         TimeSystemPtr time_system, const std::string& config)
+                                         TestTimeSystemPtr time_system, const std::string& config)
     : api_(new Api::Impl(std::chrono::milliseconds(10000))),
       mock_buffer_factory_(new NiceMock<MockBufferFactory>), time_system_(std::move(time_system)),
       dispatcher_(new Event::DispatcherImpl(*time_system_,
@@ -255,10 +255,10 @@ void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
     if (autonomous_upstream_) {
       fake_upstreams_.emplace_back(
-          new AutonomousUpstream(0, upstream_protocol_, version_, dispatcher_->timeSystem()));
+          new AutonomousUpstream(0, upstream_protocol_, version_, *time_system_));
     } else {
-      fake_upstreams_.emplace_back(new FakeUpstream(0, upstream_protocol_, version_,
-                                                    dispatcher_->timeSystem(), enable_half_close_));
+      fake_upstreams_.emplace_back(
+          new FakeUpstream(0, upstream_protocol_, version_, *time_system_, enable_half_close_));
     }
   }
 }
