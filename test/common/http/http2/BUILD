@@ -66,3 +66,16 @@ envoy_cc_test(
         "//test/test_common:test_time_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "metadata_encoder_test",
+    srcs = ["metadata_encoder_test.cc"],
+    external_deps = [
+        "nghttp2",
+    ],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http/http2:metadata_encoder_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
