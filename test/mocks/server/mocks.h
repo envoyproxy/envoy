@@ -119,6 +119,7 @@ public:
   MOCK_METHOD0(getConfigTracker, ConfigTracker&());
   MOCK_METHOD4(request, Http::Code(absl::string_view path_and_query, absl::string_view method,
                                    Http::HeaderMap& response_headers, std::string& body));
+  MOCK_METHOD1(addListenerToHandler, void(Network::ConnectionHandler* handler));
 
   NiceMock<MockConfigTracker> config_tracker_;
 };

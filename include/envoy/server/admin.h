@@ -124,6 +124,12 @@ public:
    */
   virtual Http::Code request(absl::string_view path_and_query, absl::string_view method,
                              Http::HeaderMap& response_headers, std::string& body) PURE;
+
+  /**
+   * Add this Admin's listener to the provided handler, if the listener exists.
+   * @param handler the handler that will receive this Admin's listener.
+   */
+  virtual void addListenerToHandler(Network::ConnectionHandler* handler) PURE;
 };
 
 } // namespace Server

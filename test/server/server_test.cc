@@ -248,6 +248,14 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckValidTimeoutAndInterva
                                                   0.25, 0.5));
 }
 
+// Test that a Bootstrap proto with no address specified in its Admin field can go through
+// initialization properly, but without starting an admin listener.
+TEST_P(ServerInstanceImplTest, BootstrapNodeNoAdmin) {
+  EXPECT_NO_THROW(initialize("test/server/node_bootstrap_no_admin_port.yaml"));
+  EXPECT_THROW_WITH_MESSAGE(server_->admin().addListenerToHandler(nullptr), EnvoyException,
+                            "asked to add a non-existent listener");
+}
+
 // Negative test for protoc-gen-validate constraints.
 TEST_P(ServerInstanceImplTest, ValidateFail) {
   options_.service_cluster_name_ = "some_cluster_name";

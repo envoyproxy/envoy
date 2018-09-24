@@ -125,7 +125,7 @@ public:
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::HeaderMap& response_headers, std::string& body) override;
   void closeSocket();
-  void addListenerToHandler(Network::ConnectionHandler* handler);
+  void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
 private:
   /**
