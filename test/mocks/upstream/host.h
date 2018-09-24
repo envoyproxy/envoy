@@ -86,6 +86,8 @@ public:
   MOCK_CONST_METHOD0(hostname, const std::string&());
   MOCK_CONST_METHOD0(stats, HostStats&());
   MOCK_CONST_METHOD0(locality, const envoy::api::v2::core::Locality&());
+  MOCK_CONST_METHOD0(priority, uint32_t());
+  MOCK_METHOD1(priority, void(uint32_t));
 
   std::string hostname_;
   Network::Address::InstanceConstSharedPtr address_;
@@ -157,6 +159,8 @@ public:
   MOCK_CONST_METHOD0(used, bool());
   MOCK_METHOD1(used, void(bool new_used));
   MOCK_CONST_METHOD0(locality, const envoy::api::v2::core::Locality&());
+  MOCK_CONST_METHOD0(priority, uint32_t());
+  MOCK_METHOD1(priority, void(uint32_t));
 
   testing::NiceMock<MockClusterInfo> cluster_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
