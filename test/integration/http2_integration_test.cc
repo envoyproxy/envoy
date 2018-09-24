@@ -107,6 +107,8 @@ TEST_P(Http2IntegrationTest, GrpcRouterNotFound) { testGrpcRouterNotFound(); }
 
 TEST_P(Http2IntegrationTest, RetryHostPredicateFilter) { testRetryHostPredicateFilter(); }
 
+TEST_P(Http2IntegrationTest, RetryPriority) { testRetryPriority(); }
+
 TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
 // Send a request with overly large headers, and ensure it results in stream reset.

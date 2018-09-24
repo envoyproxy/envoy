@@ -99,6 +99,36 @@ public:
   Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
 };
 
+class MockRetryPriority : public RetryPriority {
+public:
+  MockRetryPriority(const PriorityLoad& priority_load) : priority_load_(priority_load) {}
+  ~MockRetryPriority();
+
+  const PriorityLoad& determinePriorityLoad(const PrioritySet&, const PriorityLoad&) {
+    return priority_load_;
+  }
+
+  MOCK_METHOD1(onHostAttempted, void(HostDescriptionConstSharedPtr));
+
+private:
+  const PriorityLoad& priority_load_;
+};
+
+class MockRetryPriorityFactory : public RetryPriorityFactory {
+public:
+  MockRetryPriorityFactory(RetryPrioritySharedPtr retry_priority)
+      : retry_priority_(retry_priority) {}
+  void createRetryPriority(RetryPriorityFactoryCallbacks& callbacks,
+                           const Protobuf::Message&) override {
+    callbacks.addRetryPriority(retry_priority_);
+  }
+
+  std::string name() const override { return "envoy.mock_retry_priority"; }
+
+private:
+  RetryPrioritySharedPtr retry_priority_;
+};
+
 class MockCluster : public Cluster {
 public:
   MockCluster();

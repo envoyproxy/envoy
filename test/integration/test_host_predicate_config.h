@@ -10,7 +10,7 @@ public:
   std::string name() override { return "envoy.test_host_predicate"; }
 
   void createHostPredicate(Upstream::RetryHostPredicateFactoryCallbacks& callbacks,
-                           const ProtobufWkt::Struct&) override {
+                           const Protobuf::Message&) override {
     callbacks.addHostPredicate(std::make_shared<TestHostPredicate>());
   }
 };

@@ -55,6 +55,12 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
         ->createHostPredicate(*this, host_predicate.config());
   }
 
+  const auto retry_priority = config.retry_policy().retry_priority();
+  if (!retry_priority.name().empty()) {
+    Registry::FactoryRegistry<Upstream::RetryPriorityFactory>::getFactory(retry_priority.name())
+        ->createRetryPriority(*this, retry_priority.config());
+  }
+
   auto host_selection_attempts = config.retry_policy().host_selection_retry_max_attempts();
   if (host_selection_attempts) {
     host_selection_attempts_ = host_selection_attempts;
