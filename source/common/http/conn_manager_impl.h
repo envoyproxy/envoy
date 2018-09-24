@@ -400,7 +400,7 @@ private:
     std::list<ActiveStreamDecoderFilterPtr> decoder_filters_;
     std::list<ActiveStreamEncoderFilterPtr> encoder_filters_;
     std::list<AccessLog::InstanceSharedPtr> access_log_handlers_;
-    Stats::TimespanPtr request_timespan_;
+    Stats::TimespanPtr request_response_timespan_;
     // Per-stream idle timeout.
     Event::TimerPtr idle_timer_;
     // Per-stream request timeout.

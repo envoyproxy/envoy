@@ -19,7 +19,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 26]
+// [#comment:next free field: 27]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -168,7 +168,7 @@ message HttpConnectionManager {
   // request initiates, and is disarmed when the last byte of the request is sent upstream, OR when
   // the response is encoded. If not specified or set to 0, this timeout is disabled. Retries
   // are not currently supported.
-  google.protobuf.Duration stream_request_timeout = 25 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration request_timeout = 26 [(gogoproto.stdduration) = true];
 
   // The time that Envoy will wait between sending an HTTP/2 “shutdown
   // notification” (GOAWAY frame with max stream ID) and a final GOAWAY frame.

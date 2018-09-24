@@ -362,7 +362,7 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     : connection_manager_(connection_manager),
       snapped_route_config_(connection_manager.config_.routeConfigProvider().config()),
       stream_id_(connection_manager.random_generator_.random()),
-      request_timespan_(new Stats::Timespan(connection_manager_.stats_.named_.downstream_rq_time_,
+      request_response_timespan_(new Stats::Timespan(connection_manager_.stats_.named_.downstream_rq_time_,
                                             connection_manager_.timeSystem())),
       request_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSystem()) {
   connection_manager_.stats_.named_.downstream_rq_total_.inc();
@@ -388,8 +388,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
     resetIdleTimer();
   }
 
-  if (connection_manager_.config_.streamRequestTimeout().count()) {
-    request_timeout_ms_ = connection_manager_.config_.streamRequestTimeout();
+  if (connection_manager_.config_.requestTimeout().count()) {
+    request_timeout_ms_ = connection_manager_.config_.requestTimeout();
     request_timer_ = connection_manager.read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onRequestTimeout(); });
     request_timer_->enableTimer(request_timeout_ms_);
@@ -937,6 +937,7 @@ void ConnectionManagerImpl::ActiveStream::disarmRequestTimer() {
   }
 }
 
+// Call disarmRequestTimer() iff the last byte of the request was sent upstream
 void ConnectionManagerImpl::ActiveStream::maybeDisarmRequestTimer() {
   if (request_info_.lastUpstreamTxByteSent().has_value()) {
     disarmRequestTimer();
@@ -1263,7 +1264,7 @@ void ConnectionManagerImpl::ActiveStream::encodeTrailers(ActiveStreamEncoderFilt
 void ConnectionManagerImpl::ActiveStream::maybeEndEncode(bool end_stream) {
   if (end_stream) {
     request_info_.onLastDownstreamTxByteSent();
-    request_timespan_->complete();
+    request_response_timespan_->complete();
     connection_manager_.doEndStream(*this);
   }
 }

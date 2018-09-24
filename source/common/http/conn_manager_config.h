@@ -229,7 +229,7 @@ public:
    * @return per-stream request timeout for incoming connection manager connections. Zero indicates
    * a disabled request timeout.
    */
-  virtual std::chrono::milliseconds streamRequestTimeout() const PURE;
+  virtual std::chrono::milliseconds requestTimeout() const PURE;
 
   /**
    * @return Router::RouteConfigProvider& the configuration provider used to acquire a route

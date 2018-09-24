@@ -259,8 +259,7 @@ public:
   bool generateRequestId() override { return true; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
-  std::chrono::milliseconds streamRequestTimeout() const override {
-    return stream_request_timeout_;
+  std::chrono::milliseconds requestTimeout() const override { return request_timeout_;
   }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return server_name_; }
@@ -308,7 +307,7 @@ public:
   absl::optional<std::string> user_agent_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   std::chrono::milliseconds stream_idle_timeout_{};
-  std::chrono::milliseconds stream_request_timeout_{};
+  std::chrono::milliseconds request_timeout_{};
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -1468,7 +1467,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisabledByDefault) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisabledWithZero) {
-  stream_request_timeout_ = std::chrono::milliseconds(0);
+  request_timeout_ = std::chrono::milliseconds(0);
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
@@ -1481,13 +1480,13 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisabledWithZero) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutConfigured) {
-  stream_request_timeout_ = std::chrono::milliseconds(10);
+  request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
     Event::MockTimer* request_timer =
         new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-    EXPECT_CALL(*request_timer, enableTimer(stream_request_timeout_));
+    EXPECT_CALL(*request_timer, enableTimer(request_timeout_));
 
     conn_manager_->newStream(response_encoder_);
   }));
@@ -1497,13 +1496,13 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutConfigured) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutTriggers) {
-  stream_request_timeout_ = std::chrono::milliseconds(10);
+  request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
   EXPECT_CALL(*codec_, dispatch(_)).Times(1).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
     Event::MockTimer* request_timer =
         new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
-    EXPECT_CALL(*request_timer, enableTimer(stream_request_timeout_));
+    EXPECT_CALL(*request_timer, enableTimer(request_timeout_));
     EXPECT_CALL(*request_timer, disableTimer());
     // 408 direct response after timeout.
     EXPECT_CALL(response_encoder_, encodeHeaders(_, false))
@@ -1525,7 +1524,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutTriggers) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutStaysArmedOnIncompleteRequest) {
-  stream_request_timeout_ = std::chrono::milliseconds(10);
+  request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -1553,7 +1552,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutStaysArmedOnIncompleteReques
 }
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteHeaders) {
-  stream_request_timeout_ = std::chrono::milliseconds(10);
+  request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -1587,7 +1586,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteHeaders) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteData) {
-  stream_request_timeout_ = std::chrono::milliseconds(10);
+  request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -1622,7 +1621,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteData) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteTrailersWithStop) {
-  stream_request_timeout_ = std::chrono::milliseconds(10);
+  request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -1659,7 +1658,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteTrailersWit
 }
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteTrailers) {
-  stream_request_timeout_ = std::chrono::milliseconds(10);
+  request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -1696,7 +1695,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteTrailers) {
 }
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnEncodeHeaders) {
-  stream_request_timeout_ = std::chrono::milliseconds(10);
+  request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
@@ -1729,7 +1728,7 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnEncodeHeaders) {
 
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnEncode100) {
   proxy_100_continue_ = true;
-  stream_request_timeout_ = std::chrono::milliseconds(10);
+  request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");
 
   std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());

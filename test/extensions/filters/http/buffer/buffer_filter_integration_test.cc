@@ -149,6 +149,8 @@ TEST_P(BufferIntegrationTest, RouteOverride) {
 }
 
 TEST_P(BufferIntegrationTest, RequestPathTimesOutInBuffer) {
+  // Stall connection initiation, and allow enough connection initiation time for
+  // the buffer timeout to trigger.
   std::chrono::milliseconds test_connection_initiation_timeout(1250);
   std::chrono::seconds buffer_timeout(1);
 

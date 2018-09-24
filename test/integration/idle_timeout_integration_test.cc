@@ -21,8 +21,8 @@ public:
             route->mutable_idle_timeout()->set_nanos(TimeoutMs * 1000 * 1000);
           }
           if (enable_request_timeout_) {
-            hcm.mutable_stream_request_timeout()->set_seconds(0);
-            hcm.mutable_stream_request_timeout()->set_nanos(TimeoutMs * 1000 * 1000);
+            hcm.mutable_request_timeout()->set_seconds(0);
+            hcm.mutable_request_timeout()->set_nanos(TimeoutMs * 1000 * 1000);
           }
 
           // For validating encode100ContinueHeaders() timer kick.
@@ -202,7 +202,7 @@ TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnBodilessPost) {
   EXPECT_EQ("request timeout", response->body());
 }
 
-TEST_P(IdleTimeoutIntegrationTest, UnconfiguredRequestTimeoutHangsOutOnBodilessPost) {
+TEST_P(IdleTimeoutIntegrationTest, UnconfiguredRequestTimeoutDoesNotTrigger) {
   enable_per_stream_idle_timeout_ = true;
   enable_request_timeout_ = false;
 
@@ -218,7 +218,7 @@ TEST_P(IdleTimeoutIntegrationTest, UnconfiguredRequestTimeoutHangsOutOnBodilessP
   EXPECT_NE("request timeout", response->body());
 }
 
-TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOutOnIncompleteHeaders) {
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnIncompleteHeaders) {
   if (downstreamProtocol() == Envoy::Http::CodecClient::Type::HTTP2) {
     return;
   }

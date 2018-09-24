@@ -168,10 +168,10 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   EXPECT_EQ(0, config.streamIdleTimeout().count());
 }
 
-TEST_F(HttpConnectionManagerConfigTest, DisabledStreamRequestTimeout) {
+TEST_F(HttpConnectionManagerConfigTest, DisabledRequestTimeout) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
-  stream_request_timeout: 0s
+  request_timeout: 0s
   route_config:
     name: local_route
   http_filters:
@@ -180,10 +180,10 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamRequestTimeout) {
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_);
-  EXPECT_EQ(0, config.streamRequestTimeout().count());
+  EXPECT_EQ(0, config.requestTimeout().count());
 }
 
-TEST_F(HttpConnectionManagerConfigTest, UnconfiguredStreamRequestTimeout) {
+TEST_F(HttpConnectionManagerConfigTest, UnconfiguredRequestTimeout) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
   route_config:
@@ -194,7 +194,7 @@ TEST_F(HttpConnectionManagerConfigTest, UnconfiguredStreamRequestTimeout) {
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_);
-  EXPECT_EQ(0, config.streamRequestTimeout().count());
+  EXPECT_EQ(0, config.requestTimeout().count());
 }
 
 TEST_F(HttpConnectionManagerConfigTest, SingleDateProvider) {
