@@ -15,6 +15,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AllOf;
 using testing::Invoke;
 using testing::Ref;
 using testing::Return;
@@ -39,7 +40,8 @@ public:
         allowed_request_headers_{Http::LowerCaseString{":method"}, Http::LowerCaseString{":path"}},
         async_client_{}, async_request_{&async_client_},
         client_(cluster_name_, cluster_manager_, timeout_, path_prefix_,
-                allowed_authorization_headers_, allowed_request_headers_) {
+                allowed_authorization_headers_, allowed_request_headers_,
+                authorization_headers_to_add_) {
     ON_CALL(cluster_manager_, httpAsyncClientForCluster(cluster_name_))
         .WillByDefault(ReturnRef(async_client_));
   }
@@ -53,6 +55,7 @@ public:
   Http::LowerCaseStrUnorderedSet allowed_request_headers_;
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<Http::MockAsyncClientRequest> async_request_;
+  HeaderKeyValueVector authorization_headers_to_add_;
   RawHttpClientImpl client_;
 };
 
@@ -67,6 +70,32 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
 
+  client_.onSuccess(std::move(check_response));
+}
+
+// Test the client when authorization headers to add are specified.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
+  auto header1 = std::make_pair(Http::LowerCaseString("x-authz-header1"), "value");
+  auto header2 = std::make_pair(Http::LowerCaseString("x-authz-header2"), "value");
+  authorization_headers_to_add_.push_back(header1);
+  authorization_headers_to_add_.push_back(header2);
+  allowed_request_headers_.insert(header2.first);
+
+  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
+  const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
+  auto check_response = TestCommon::makeMessageResponse(expected_headers);
+  envoy::service::auth::v2alpha::CheckRequest request;
+  auto mutable_headers =
+      request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
+  (*mutable_headers)[std::string{":x-authz-header2"}] = std::string{"forged-value"};
+
+  // Expect that header1 will be added and header2 correctly overwritten.
+  EXPECT_CALL(async_client_,
+              send_(AllOf(ContainsPairAsHeader(header1), ContainsPairAsHeader(header2)), _, _));
+  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
   client_.onSuccess(std::move(check_response));
 }
 
@@ -150,22 +179,6 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
   client_.onSuccess(std::move(message_response));
 }
 
-// Test the client when a denied response is received due to an unknown status code.
-TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithInvalidStatusCode) {
-  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "error", false}});
-  const auto authz_response = TestCommon::makeAuthzResponse(
-      CheckStatus::Denied, Http::Code::Forbidden, "", expected_headers);
-  Http::MessagePtr check_response(new Http::ResponseMessageImpl(
-      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "error"}}}));
-  envoy::service::auth::v2alpha::CheckRequest request;
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
-
-  EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
-
-  client_.onSuccess(std::move(check_response));
-}
-
 // Test the client when a denied response is received.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "403", false}});
@@ -207,6 +220,32 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
   client_.onFailure(Http::AsyncClient::FailureReason::Reset);
+}
+
+// Test the client when a call to authorization server returns a 5xx error status.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
+  Http::MessagePtr check_response(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}}));
+  envoy::service::auth::v2alpha::CheckRequest request;
+  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+
+  client_.onSuccess(std::move(check_response));
+}
+
+// Test the client when a call to authorization server returns a status code that cannot be parsed.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestErrorParsingStatusCode) {
+  Http::MessagePtr check_response(new Http::ResponseMessageImpl(
+      Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "foo"}}}));
+  envoy::service::auth::v2alpha::CheckRequest request;
+  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+
+  client_.onSuccess(std::move(check_response));
 }
 
 // Test the client when the request is canceled.

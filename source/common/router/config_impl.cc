@@ -48,6 +48,23 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
   num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.retry_policy(), num_retries, 1);
   retry_on_ = RetryStateImpl::parseRetryOn(config.retry_policy().retry_on());
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(config.retry_policy().retry_on());
+
+  for (const auto& host_predicate : config.retry_policy().retry_host_predicate()) {
+    Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
+        host_predicate.name())
+        ->createHostPredicate(*this, host_predicate.config());
+  }
+
+  const auto retry_priority = config.retry_policy().retry_priority();
+  if (!retry_priority.name().empty()) {
+    Registry::FactoryRegistry<Upstream::RetryPriorityFactory>::getFactory(retry_priority.name())
+        ->createRetryPriority(*this, retry_priority.config());
+  }
+
+  auto host_selection_attempts = config.retry_policy().host_selection_retry_max_attempts();
+  if (host_selection_attempts) {
+    host_selection_attempts_ = host_selection_attempts;
+  }
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config) {
@@ -255,13 +272,16 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
           HeaderParser::configure(route.route().request_headers_to_add())),
       route_action_response_headers_parser_(HeaderParser::configure(
           route.route().response_headers_to_add(), route.route().response_headers_to_remove())),
-      request_headers_parser_(HeaderParser::configure(route.request_headers_to_add())),
+      request_headers_parser_(HeaderParser::configure(route.request_headers_to_add(),
+                                                      route.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
                                                        route.response_headers_to_remove())),
-      opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
+      match_grpc_(route.match().has_grpc()), opaque_config_(parseOpaqueConfig(route)),
+      decorator_(parseDecorator(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route)),
-      per_filter_configs_(route.per_filter_config(), factory_context) {
+      per_filter_configs_(route.per_filter_config(), factory_context),
+      time_system_(factory_context.dispatcher().timeSystem()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -330,6 +350,10 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
                                                  random_value);
   }
 
+  if (match_grpc_) {
+    matches &= Grpc::Common::hasGrpcContentType(headers);
+  }
+
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
   if (!config_query_parameters_.empty()) {
     Http::Utility::QueryParams query_parameters =
@@ -346,9 +370,9 @@ Http::WebSocketProxyPtr RouteEntryImplBase::createWebSocketProxy(
     Http::HeaderMap& request_headers, RequestInfo::RequestInfo& request_info,
     Http::WebSocketProxyCallbacks& callbacks, Upstream::ClusterManager& cluster_manager,
     Network::ReadFilterCallbacks* read_callbacks) const {
-  return std::make_unique<Http::WebSocket::WsHandlerImpl>(request_headers, request_info, *this,
-                                                          callbacks, cluster_manager,
-                                                          read_callbacks, websocket_config_);
+  return std::make_unique<Http::WebSocket::WsHandlerImpl>(
+      request_headers, request_info, *this, callbacks, cluster_manager, read_callbacks,
+      websocket_config_, time_system_);
 }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
@@ -572,7 +596,8 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     : DynamicRouteEntry(parent, cluster.name()), runtime_key_(runtime_key),
       loader_(factory_context.runtime()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)),
-      request_headers_parser_(HeaderParser::configure(cluster.request_headers_to_add())),
+      request_headers_parser_(HeaderParser::configure(cluster.request_headers_to_add(),
+                                                      cluster.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(cluster.response_headers_to_add(),
                                                        cluster.response_headers_to_remove())),
       per_filter_configs_(cluster.per_filter_config(), factory_context) {
@@ -690,7 +715,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
                                  bool validate_clusters)
     : name_(virtual_host.name()), rate_limit_policy_(virtual_host.rate_limits()),
       global_route_config_(global_route_config),
-      request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add())),
+      request_headers_parser_(HeaderParser::configure(virtual_host.request_headers_to_add(),
+                                                      virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
       per_filter_configs_(virtual_host.per_filter_config(), factory_context) {
@@ -897,7 +923,8 @@ ConfigImpl::ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
     internal_only_headers_.push_back(Http::LowerCaseString(header));
   }
 
-  request_headers_parser_ = HeaderParser::configure(config.request_headers_to_add());
+  request_headers_parser_ =
+      HeaderParser::configure(config.request_headers_to_add(), config.request_headers_to_remove());
   response_headers_parser_ = HeaderParser::configure(config.response_headers_to_add(),
                                                      config.response_headers_to_remove());
 }

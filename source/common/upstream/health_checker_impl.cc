@@ -90,7 +90,8 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
       request_headers_parser_(
-          Router::HeaderParser::configure(config.http_health_check().request_headers_to_add())),
+          Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
+                                          config.http_health_check().request_headers_to_remove())),
       codec_client_type_(codecClientType(config.http_health_check().use_http2())) {
   if (!config.http_health_check().service_name().empty()) {
     service_name_ = config.http_health_check().service_name();
@@ -153,7 +154,7 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
       {Http::Headers::get().Path, parent_.path_},
       {Http::Headers::get().UserAgent, Http::Headers::get().UserAgentValues.EnvoyHealthChecker}};
   Router::FilterUtility::setUpstreamScheme(request_headers, *parent_.cluster_.info());
-  RequestInfo::RequestInfoImpl request_info(protocol_);
+  RequestInfo::RequestInfoImpl request_info(protocol_, parent_.dispatcher_.timeSystem());
   request_info.setDownstreamLocalAddress(local_address_);
   request_info.setDownstreamRemoteAddress(local_address_);
   request_info.onUpstreamHostSelected(host_);

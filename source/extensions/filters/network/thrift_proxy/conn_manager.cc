@@ -15,33 +15,38 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
 
-ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator)
+ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
+                                     Event::TimeSystem& time_system)
     : config_(config), stats_(config_.stats()), transport_(config.createTransport()),
       protocol_(config.createProtocol()),
       decoder_(std::make_unique<Decoder>(*transport_, *protocol_, *this)),
-      random_generator_(random_generator) {}
+      random_generator_(random_generator), time_system_(time_system) {}
 
 ConnectionManager::~ConnectionManager() {}
 
 Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end_stream) {
-  UNREFERENCED_PARAMETER(end_stream);
-
   request_buffer_.move(data);
   dispatch();
 
-  if (end_stream && stopped_) {
-    ASSERT(!rpcs_.empty());
-    MessageMetadata& metadata = *(*rpcs_.begin())->metadata_;
-    ASSERT(metadata.hasMessageType());
-    if (metadata.messageType() != MessageType::Oneway) {
-      // Downstream has closed, so unless we're still processing a oneway request, close. By
-      // writing an empty buffer with end_stream set, we allow a remote close event to be
-      // triggered, which maintains accurate bookkeeping of which end of the connection closed
-      // during an active request.
-      ENVOY_CONN_LOG(trace, "downstream half-closed", read_callbacks_->connection());
-      Buffer::OwnedImpl empty;
-      read_callbacks_->connection().write(empty, true);
+  if (end_stream) {
+    ENVOY_CONN_LOG(trace, "downstream half-closed", read_callbacks_->connection());
+
+    // Downstream has closed. Unless we're waiting for an upstream connection to complete a oneway
+    // request, close. The special case for oneway requests allows them to complete before the
+    // ConnectionManager is destroyed.
+    if (stopped_) {
+      ASSERT(!rpcs_.empty());
+      MessageMetadata& metadata = *(*rpcs_.begin())->metadata_;
+      ASSERT(metadata.hasMessageType());
+      if (metadata.messageType() == MessageType::Oneway) {
+        ENVOY_CONN_LOG(trace, "waiting for one-way completion", read_callbacks_->connection());
+        half_closed_ = true;
+        return Network::FilterStatus::StopIteration;
+      }
     }
+
+    resetAllRpcs(false);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 
   return Network::FilterStatus::StopIteration;
@@ -80,35 +85,63 @@ void ConnectionManager::dispatch() {
   }
 
   stats_.request_decoding_error_.inc();
-  resetAllRpcs();
+  resetAllRpcs(true);
   read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
 }
 
 void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response) {
   Buffer::OwnedImpl buffer;
 
-  response.encode(metadata, *protocol_, buffer);
+  const DirectResponse::ResponseType result = response.encode(metadata, *protocol_, buffer);
 
   Buffer::OwnedImpl response_buffer;
-
   metadata.setProtocol(protocol_->type());
   transport_->encodeFrame(response_buffer, metadata, buffer);
 
   read_callbacks_->connection().write(response_buffer, false);
+
+  switch (result) {
+  case DirectResponse::ResponseType::SuccessReply:
+    stats_.response_success_.inc();
+    break;
+  case DirectResponse::ResponseType::ErrorReply:
+    stats_.response_error_.inc();
+    break;
+  case DirectResponse::ResponseType::Exception:
+    stats_.response_exception_.inc();
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 }
 
 void ConnectionManager::continueDecoding() {
   ENVOY_CONN_LOG(debug, "thrift filter continued", read_callbacks_->connection());
   stopped_ = false;
   dispatch();
+
+  if (!stopped_ && half_closed_) {
+    // If we're half closed, but not stopped waiting for an upstream, reset any pending rpcs and
+    // close the connection.
+    resetAllRpcs(false);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+  }
 }
 
 void ConnectionManager::doDeferredRpcDestroy(ConnectionManager::ActiveRpc& rpc) {
   read_callbacks_->connection().dispatcher().deferredDelete(rpc.removeFromList(rpcs_));
 }
 
-void ConnectionManager::resetAllRpcs() {
+void ConnectionManager::resetAllRpcs(bool local_reset) {
   while (!rpcs_.empty()) {
+    if (local_reset) {
+      ENVOY_CONN_LOG(debug, "local close with active request", read_callbacks_->connection());
+      stats_.cx_destroy_local_with_active_rq_.inc();
+    } else {
+      ENVOY_CONN_LOG(debug, "remote close with active request", read_callbacks_->connection());
+      stats_.cx_destroy_remote_with_active_rq_.inc();
+    }
+
     rpcs_.front()->onReset();
   }
 }
@@ -121,17 +154,7 @@ void ConnectionManager::initializeReadFilterCallbacks(Network::ReadFilterCallbac
 }
 
 void ConnectionManager::onEvent(Network::ConnectionEvent event) {
-  if (!rpcs_.empty()) {
-    if (event == Network::ConnectionEvent::RemoteClose) {
-      ENVOY_CONN_LOG(debug, "remote close with active request", read_callbacks_->connection());
-      stats_.cx_destroy_remote_with_active_rq_.inc();
-    } else if (event == Network::ConnectionEvent::LocalClose) {
-      ENVOY_CONN_LOG(debug, "local close with active request", read_callbacks_->connection());
-      stats_.cx_destroy_local_with_active_rq_.inc();
-    }
-
-    resetAllRpcs();
-  }
+  resetAllRpcs(event == Network::ConnectionEvent::LocalClose);
 }
 
 DecoderEventHandler& ConnectionManager::newDecoderEventHandler() {
@@ -246,7 +269,7 @@ FilterStatus ConnectionManager::ActiveRpc::transportEnd() {
   FilterStatus status = event_handler_->transportEnd();
 
   if (metadata_->isProtocolUpgradeMessage()) {
-    ENVOY_CONN_LOG(error, "thrift: sending protocol upgrade response",
+    ENVOY_CONN_LOG(debug, "thrift: sending protocol upgrade response",
                    parent_.read_callbacks_->connection());
     sendLocalReply(*parent_.protocol_->upgradeResponse(*upgrade_handler_));
   }
@@ -263,7 +286,7 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
   if (metadata_->isProtocolUpgradeMessage()) {
     ASSERT(parent_.protocol_->supportsUpgrade());
 
-    ENVOY_CONN_LOG(error, "thrift: decoding protocol upgrade request",
+    ENVOY_CONN_LOG(debug, "thrift: decoding protocol upgrade request",
                    parent_.read_callbacks_->connection());
     upgrade_handler_ = parent_.protocol_->upgradeRequestDecoder();
     ASSERT(upgrade_handler_ != nullptr);

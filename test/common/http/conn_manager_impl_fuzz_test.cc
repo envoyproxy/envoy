@@ -23,6 +23,7 @@
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/access_log/mocks.h"
+#include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
@@ -96,6 +97,9 @@ public:
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
+  const Http::InternalAddressConfig& internalAddressConfig() const override {
+    return internal_address_config_;
+  }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
   const std::string& via() const override { return EMPTY_STRING; }
@@ -135,6 +139,7 @@ public:
   TracingConnectionManagerConfigPtr tracing_config_;
   bool proxy_100_continue_ = true;
   Http::Http1Settings http1_settings_;
+  Http::DefaultInternalAddressConfig internal_address_config_;
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks
@@ -379,6 +384,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
+  NiceMock<MockTimeSystem> time_system;
   std::unique_ptr<Ssl::MockConnection> ssl_connection;
   bool connection_alive = true;
 
@@ -392,7 +398,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::ConnManagerImplTestCase& input) {
       std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0");
 
   ConnectionManagerImpl conn_manager(config, drain_close, random, tracer, runtime, local_info,
-                                     cluster_manager);
+                                     cluster_manager, nullptr, time_system);
   conn_manager.initializeReadFilterCallbacks(filter_callbacks);
 
   std::vector<FuzzStreamPtr> streams;

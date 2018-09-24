@@ -51,7 +51,9 @@ envoy_extension_cc_test_library(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/common:byte_order_lib",
+        "//source/extensions/filters/network/thrift_proxy:protocol_lib",
         "//source/extensions/filters/network/thrift_proxy:thrift_lib",
+        "//test/common/buffer:utility_lib",
         "@envoy_api//envoy/config/filter/network/thrift_proxy/v2alpha1:thrift_proxy_cc",
     ],
 )
@@ -184,6 +186,19 @@ envoy_extension_cc_test(
 )
 
 envoy_extension_cc_test(
+    name = "twitter_protocol_impl_test",
+    srcs = ["twitter_protocol_impl_test.cc"],
+    extension_name = "envoy.filters.network.thrift_proxy",
+    deps = [
+        ":mocks",
+        ":utility_lib",
+        "//source/extensions/filters/network/thrift_proxy:twitter_protocol_lib",
+        "//test/test_common:printers_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_name = "envoy.filters.network.thrift_proxy",
@@ -263,6 +278,7 @@ envoy_extension_cc_test(
     deps = [
         ":utility_lib",
         "//source/extensions/filters/network/thrift_proxy/router:config",
+        "//source/extensions/filters/network/thrift_proxy/router:router_interface",
         "//source/extensions/filters/network/thrift_proxy/router:router_lib",
         "//test/test_common:utility_lib",
     ],

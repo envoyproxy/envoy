@@ -4,6 +4,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/http/date_provider.h"
+#include "common/network/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -58,6 +59,7 @@ namespace Http {
   COUNTER  (downstream_rq_5xx)                                                                     \
   HISTOGRAM(downstream_rq_time)                                                                    \
   COUNTER  (downstream_rq_idle_timeout)                                                            \
+  COUNTER  (downstream_rq_overload_close)                                                          \
   COUNTER  (rs_too_large)
 // clang-format on
 
@@ -144,6 +146,25 @@ enum class ForwardClientCertType {
  * information to the next hop.
  */
 enum class ClientCertDetailsType { Cert, Subject, URI, DNS };
+
+/**
+ * Configuration for what addresses should be considered internal beyond the defaults.
+ */
+class InternalAddressConfig {
+public:
+  virtual ~InternalAddressConfig() {}
+  virtual bool isInternalAddress(const Network::Address::Instance& address) const PURE;
+};
+
+/**
+ * Determines if an address is internal based on whether it is an RFC1918 ip address.
+ */
+class DefaultInternalAddressConfig : public Http::InternalAddressConfig {
+public:
+  bool isInternalAddress(const Network::Address::Instance& address) const override {
+    return Network::Utility::isInternalAddress(address);
+  }
+};
 
 /**
  * Abstract configuration for the connection manager.
@@ -236,6 +257,11 @@ public:
    *         status, etc. or to assume that XFF will already be populated with the remote address.
    */
   virtual bool useRemoteAddress() PURE;
+
+  /**
+   * @return InternalAddressConfig configuration for user defined internal addresses.
+   */
+  virtual const InternalAddressConfig& internalAddressConfig() const PURE;
 
   /**
    * @return uint32_t the number of trusted proxy hops in front of this Envoy instance, for

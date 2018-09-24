@@ -276,14 +276,16 @@ public:
 
 class MockOverloadManager : public OverloadManager {
 public:
-  MockOverloadManager() {}
-  ~MockOverloadManager() {}
+  MockOverloadManager();
+  ~MockOverloadManager();
 
   // OverloadManager
   MOCK_METHOD0(start, void());
   MOCK_METHOD3(registerForAction, void(const std::string& action, Event::Dispatcher& dispatcher,
                                        OverloadActionCb callback));
   MOCK_METHOD0(getThreadLocalOverloadState, ThreadLocalOverloadState&());
+
+  ThreadLocalOverloadState overload_state_;
 };
 
 class MockInstance : public Instance {
@@ -362,6 +364,7 @@ class MockMain : public Main {
 public:
   MockMain() : MockMain(0, 0, 0, 0) {}
   MockMain(int wd_miss, int wd_megamiss, int wd_kill, int wd_multikill);
+  ~MockMain();
 
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager*());
   MOCK_METHOD0(httpTracer, Tracing::HttpTracer&());
@@ -400,6 +403,7 @@ public:
   MOCK_METHOD0(runtime, Envoy::Runtime::Loader&());
   MOCK_METHOD0(scope, Stats::Scope&());
   MOCK_METHOD0(singletonManager, Singleton::Manager&());
+  MOCK_METHOD0(overloadManager, OverloadManager&());
   MOCK_METHOD0(threadLocal, ThreadLocal::Instance&());
   MOCK_METHOD0(admin, Server::Admin&());
   MOCK_METHOD0(listenerScope, Stats::Scope&());
@@ -422,6 +426,7 @@ public:
   testing::NiceMock<MockAdmin> admin_;
   Stats::IsolatedStoreImpl listener_scope_;
   testing::NiceMock<MockTimeSource> time_source_;
+  testing::NiceMock<MockOverloadManager> overload_manager_;
 };
 
 class MockTransportSocketFactoryContext : public TransportSocketFactoryContext {

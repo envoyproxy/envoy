@@ -183,7 +183,9 @@ typedef std::shared_ptr<VirtualHostImpl> VirtualHostSharedPtr;
 /**
  * Implementation of RetryPolicy that reads from the proto route config.
  */
-class RetryPolicyImpl : public RetryPolicy {
+class RetryPolicyImpl : public RetryPolicy,
+                        Upstream::RetryHostPredicateFactoryCallbacks,
+                        Upstream::RetryPriorityFactoryCallbacks {
 public:
   RetryPolicyImpl(const envoy::api::v2::route::RouteAction& config);
 
@@ -191,11 +193,30 @@ public:
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }
   uint32_t retryOn() const override { return retry_on_; }
+  std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override {
+    return retry_host_predicates_;
+  }
+  Upstream::RetryPrioritySharedPtr retryPriority() const override { return retry_priority_; }
+  uint32_t hostSelectionMaxAttempts() const override { return host_selection_attempts_; }
+
+  // Upstream::RetryHostPredicateFactoryCallbacks
+  void addHostPredicate(Upstream::RetryHostPredicateSharedPtr predicate) override {
+    retry_host_predicates_.emplace_back(predicate);
+  }
+
+  // Upstream::RetryHostPredicateFactoryCallbacks
+  void addRetryPriority(Upstream::RetryPrioritySharedPtr retry_priority) override {
+    ASSERT(!retry_priority_);
+    retry_priority_ = retry_priority;
+  }
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
+  std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
+  Upstream::RetryPrioritySharedPtr retry_priority_;
+  uint32_t host_selection_attempts_{1};
 };
 
 /**
@@ -541,6 +562,7 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   envoy::api::v2::core::Metadata metadata_;
+  const bool match_grpc_;
 
   // TODO(danielhochman): refactor multimap into unordered_map since JSON is unordered map.
   const std::multimap<std::string, std::string> opaque_config_;
@@ -549,6 +571,7 @@ private:
   const absl::optional<Http::Code> direct_response_code_;
   std::string direct_response_body_;
   PerFilterConfigs per_filter_configs_;
+  Event::TimeSystem& time_system_;
 };
 
 /**

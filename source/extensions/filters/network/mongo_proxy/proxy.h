@@ -85,12 +85,14 @@ struct MongoProxyStats {
  */
 class AccessLog {
 public:
-  AccessLog(const std::string& file_name, Envoy::AccessLog::AccessLogManager& log_manager);
+  AccessLog(const std::string& file_name, Envoy::AccessLog::AccessLogManager& log_manager,
+            TimeSource& time_source);
 
   void logMessage(const Message& message, bool full,
                   const Upstream::HostDescription* upstream_host);
 
 private:
+  TimeSource& time_source_;
   Filesystem::FileSharedPtr file_;
 };
 
@@ -127,7 +129,8 @@ class ProxyFilter : public Network::Filter,
 public:
   ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
               AccessLogSharedPtr access_log, const FaultConfigSharedPtr& fault_config,
-              const Network::DrainDecision& drain_decision, Runtime::RandomGenerator& generator);
+              const Network::DrainDecision& drain_decision, Runtime::RandomGenerator& generator,
+              Event::TimeSystem& time_system);
   ~ProxyFilter();
 
   virtual DecoderPtr createDecoder(DecoderCallbacks& callbacks) PURE;
@@ -160,7 +163,7 @@ public:
 private:
   struct ActiveQuery {
     ActiveQuery(ProxyFilter& parent, const QueryMessage& query)
-        : parent_(parent), query_info_(query), start_time_(std::chrono::steady_clock::now()) {
+        : parent_(parent), query_info_(query), start_time_(parent_.time_system_.monotonicTime()) {
       parent_.stats_.op_query_active_.inc();
     }
 
@@ -205,6 +208,7 @@ private:
   const FaultConfigSharedPtr fault_config_;
   Event::TimerPtr delay_timer_;
   Event::TimerPtr drain_close_timer_;
+  Event::TimeSystem& time_system_;
 };
 
 class ProdProxyFilter : public ProxyFilter {

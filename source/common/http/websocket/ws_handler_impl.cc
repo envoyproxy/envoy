@@ -47,8 +47,8 @@ WsHandlerImpl::WsHandlerImpl(HeaderMap& request_headers, RequestInfo::RequestInf
                              WebSocketProxyCallbacks& callbacks,
                              Upstream::ClusterManager& cluster_manager,
                              Network::ReadFilterCallbacks* read_callbacks,
-                             TcpProxy::ConfigSharedPtr config)
-    : TcpProxy::Filter(config, cluster_manager), request_headers_(request_headers),
+                             TcpProxy::ConfigSharedPtr config, Event::TimeSystem& time_system)
+    : TcpProxy::Filter(config, cluster_manager, time_system), request_headers_(request_headers),
       request_info_(request_info), route_entry_(route_entry), ws_callbacks_(callbacks) {
 
   // set_connection_stats == false because the http connection manager has already set them

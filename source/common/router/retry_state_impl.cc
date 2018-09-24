@@ -52,7 +52,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
                                Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                Upstream::ResourcePriority priority)
     : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
-      priority_(priority) {
+      priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
+      retry_priority_(route_policy.retryPriority()) {
 
   if (request_headers.EnvoyRetryOn()) {
     retry_on_ = parseRetryOn(request_headers.EnvoyRetryOn()->value().c_str());
@@ -74,6 +75,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
   const uint32_t base = runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25);
   // Cap the max interval to 10 times the base interval to ensure reasonable backoff intervals.
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(base, base * 10, random_);
+  host_selection_max_attempts_ = route_policy.hostSelectionMaxAttempts();
 }
 
 RetryStateImpl::~RetryStateImpl() { resetRetry(); }

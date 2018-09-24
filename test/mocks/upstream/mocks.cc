@@ -34,6 +34,8 @@ MockHostSet::MockHostSet(uint32_t priority, uint32_t overprovisioning_factor)
   }));
 }
 
+MockHostSet::~MockHostSet() {}
+
 MockPrioritySet::MockPrioritySet() {
   getHostSet(0);
   ON_CALL(*this, hostSetsPerPriority()).WillByDefault(ReturnRef(host_sets_));
@@ -43,6 +45,8 @@ MockPrioritySet::MockPrioritySet() {
         return member_update_cb_helper_.add(cb);
       }));
 }
+
+MockPrioritySet::~MockPrioritySet() {}
 
 HostSet& MockPrioritySet::getHostSet(uint32_t priority) {
   if (host_sets_.size() < priority + 1) {
@@ -62,6 +66,8 @@ void MockPrioritySet::runUpdateCallbacks(uint32_t priority, const HostVector& ho
   member_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
 }
 
+MockRetryPriority::~MockRetryPriority() {}
+
 MockCluster::MockCluster() {
   ON_CALL(*this, prioritySet()).WillByDefault(ReturnRef(priority_set_));
   ON_CALL(testing::Const(*this), prioritySet()).WillByDefault(ReturnRef(priority_set_));
@@ -74,6 +80,10 @@ MockCluster::MockCluster() {
 }
 
 MockCluster::~MockCluster() {}
+
+MockLoadBalancerContext::MockLoadBalancerContext() {}
+
+MockLoadBalancerContext::~MockLoadBalancerContext() {}
 
 MockLoadBalancer::MockLoadBalancer() { ON_CALL(*this, chooseHost(_)).WillByDefault(Return(host_)); }
 
@@ -121,6 +131,13 @@ MockCdsApi::~MockCdsApi() {}
 MockClusterUpdateCallbacks::MockClusterUpdateCallbacks() {}
 
 MockClusterUpdateCallbacks::~MockClusterUpdateCallbacks() {}
+
+MockClusterInfoFactory::MockClusterInfoFactory() {}
+
+MockClusterInfoFactory::~MockClusterInfoFactory() {}
+
+MockRetryHostPredicate::MockRetryHostPredicate() {}
+MockRetryHostPredicate::~MockRetryHostPredicate() {}
 
 } // namespace Upstream
 } // namespace Envoy

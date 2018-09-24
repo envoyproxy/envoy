@@ -231,6 +231,7 @@ below:
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {}
       load_assignment:
+        cluster_name: xds_cluster
         endpoints:
         - lb_endpoints:
           - endpoint:
@@ -328,6 +329,8 @@ you can run:
 .. code-block:: console
 
   bazel run //tools:v1_to_bootstrap <path to v1 JSON/YAML configuration file>
+
+.. _config_overview_v2_management_server:
 
 Management server
 -----------------

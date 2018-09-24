@@ -268,6 +268,7 @@ public:
   Envoy::Runtime::Loader& runtime() override { return parent_.server_.runtime(); }
   Stats::Scope& scope() override { return *global_scope_; }
   Singleton::Manager& singletonManager() override { return parent_.server_.singletonManager(); }
+  OverloadManager& overloadManager() override { return parent_.server_.overloadManager(); }
   ThreadLocal::Instance& threadLocal() override { return parent_.server_.threadLocal(); }
   Admin& admin() override { return parent_.server_.admin(); }
   const envoy::api::v2::core::Metadata& listenerMetadata() const override {

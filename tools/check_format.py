@@ -34,7 +34,7 @@ REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
                        './source/server/config_validation/server.cc',
                        './source/common/common/perf_annotation.h')
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-6.0")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-7")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")
@@ -167,7 +167,8 @@ def checkSourceLine(line, file_path, reportError):
     # legitimately show up in comments, for example this one.
     reportError("Don't use <shared_mutex>, use absl::Mutex for reader/writer locks.")
   if not whitelistedForRealTime(file_path):
-    if 'RealTimeSource' in line or 'RealTimeSystem' in line:
+    if 'RealTimeSource' in line or 'RealTimeSystem' in line or \
+       'std::chrono::system_clock::now' in line or 'std::chrono::steady_clock::now' in line:
       reportError("Don't reference real-world time sources from production code; use injection")
   if 'std::atomic_' in line:
     # The std::atomic_* free functions are functionally equivalent to calling

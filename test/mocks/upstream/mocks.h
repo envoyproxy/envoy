@@ -37,6 +37,7 @@ class MockHostSet : public HostSet {
 public:
   MockHostSet(uint32_t priority = 0,
               uint32_t overprovisioning_factor = kDefaultOverProvisioningFactor);
+  ~MockHostSet();
 
   void runCallbacks(const HostVector added, const HostVector removed) {
     member_update_cb_helper_.runCallbacks(priority(), added, removed);
@@ -79,7 +80,7 @@ public:
 class MockPrioritySet : public PrioritySet {
 public:
   MockPrioritySet();
-  ~MockPrioritySet() {}
+  ~MockPrioritySet();
 
   HostSet& getHostSet(uint32_t priority);
   void runUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
@@ -96,6 +97,36 @@ public:
 
   std::vector<HostSetPtr> host_sets_;
   Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
+};
+
+class MockRetryPriority : public RetryPriority {
+public:
+  MockRetryPriority(const PriorityLoad& priority_load) : priority_load_(priority_load) {}
+  ~MockRetryPriority();
+
+  const PriorityLoad& determinePriorityLoad(const PrioritySet&, const PriorityLoad&) {
+    return priority_load_;
+  }
+
+  MOCK_METHOD1(onHostAttempted, void(HostDescriptionConstSharedPtr));
+
+private:
+  const PriorityLoad& priority_load_;
+};
+
+class MockRetryPriorityFactory : public RetryPriorityFactory {
+public:
+  MockRetryPriorityFactory(RetryPrioritySharedPtr retry_priority)
+      : retry_priority_(retry_priority) {}
+  void createRetryPriority(RetryPriorityFactoryCallbacks& callbacks,
+                           const Protobuf::Message&) override {
+    callbacks.addRetryPriority(retry_priority_);
+  }
+
+  std::string name() const override { return "envoy.mock_retry_priority"; }
+
+private:
+  RetryPrioritySharedPtr retry_priority_;
 };
 
 class MockCluster : public Cluster {
@@ -122,6 +153,9 @@ public:
 
 class MockLoadBalancerContext : public LoadBalancerContext {
 public:
+  MockLoadBalancerContext();
+  ~MockLoadBalancerContext();
+
   MOCK_METHOD0(computeHashKey, absl::optional<uint64_t>());
   MOCK_METHOD0(metadataMatchCriteria, Router::MetadataMatchCriteria*());
   MOCK_CONST_METHOD0(downstreamConnection, const Network::Connection*());
@@ -299,6 +333,9 @@ public:
 
 class MockClusterInfoFactory : public ClusterInfoFactory, Logger::Loggable<Logger::Id::upstream> {
 public:
+  MockClusterInfoFactory();
+  ~MockClusterInfoFactory();
+
   MOCK_METHOD10(createClusterInfo,
                 ClusterInfoConstSharedPtr(
                     Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
@@ -306,6 +343,15 @@ public:
                     Ssl::ContextManager& ssl_context_manager, bool added_via_api,
                     ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
                     Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random));
+};
+
+class MockRetryHostPredicate : public RetryHostPredicate {
+public:
+  MockRetryHostPredicate();
+  ~MockRetryHostPredicate();
+
+  MOCK_METHOD1(shouldSelectAnotherHost, bool(const Host& candidate_host));
+  MOCK_METHOD1(onHostAttempted, void(HostDescriptionConstSharedPtr));
 };
 
 } // namespace Upstream

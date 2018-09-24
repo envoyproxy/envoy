@@ -47,16 +47,20 @@ public:
                                      ->mutable_common_tls_context();
       common_tls_context->add_alpn_protocols("http/1.1");
 
-      auto* validation_context = common_tls_context->mutable_validation_context();
+      common_tls_context->mutable_validation_context_sds_secret_config()->set_name(
+          "validation_context");
+      common_tls_context->add_tls_certificate_sds_secret_configs()->set_name("server_cert");
+
+      auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+      secret->set_name("validation_context");
+      auto* validation_context = secret->mutable_validation_context();
       validation_context->mutable_trusted_ca()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
       validation_context->add_verify_certificate_hash(
           "E0:F3:C8:CE:5E:2E:A3:05:F0:70:1F:F5:12:E3:6E:2E:"
           "97:92:82:84:A2:28:BC:F7:73:32:D3:39:30:A1:B6:FD");
 
-      common_tls_context->add_tls_certificate_sds_secret_configs()->set_name("server_cert");
-
-      auto* secret = bootstrap.mutable_static_resources()->add_secrets();
+      secret = bootstrap.mutable_static_resources()->add_secrets();
       secret->set_name("server_cert");
       auto* tls_certificate = secret->mutable_tls_certificate();
       tls_certificate->mutable_certificate_chain()->set_filename(
