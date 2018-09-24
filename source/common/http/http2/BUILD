@@ -57,3 +57,16 @@ envoy_cc_library(
         "//source/common/upstream:upstream_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "metadata_encoder_lib",
+    srcs = ["metadata_encoder.cc"],
+    hdrs = ["metadata_encoder.h"],
+    external_deps = [
+        "nghttp2",
+    ],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)

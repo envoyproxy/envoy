@@ -36,6 +36,7 @@ namespace Logger {
   FUNCTION(hystrix)              \
   FUNCTION(lua)                  \
   FUNCTION(main)                 \
+  FUNCTION(metadata)             \
   FUNCTION(misc)                 \
   FUNCTION(mongo)                \
   FUNCTION(pool)                 \
