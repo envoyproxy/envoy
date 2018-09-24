@@ -19,16 +19,20 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
 
+// smart pointer for grpc_alts_credentials_options that will be automatically freed.
 typedef CSmartPtr<grpc_alts_credentials_options, grpc_alts_credentials_options_destroy>
     GrpcAltsCredentialsOptionsPtr;
 
+namespace {
+
 // Returns true if the peer's service account is found in peers, otherwise
 // returns false and fills out err with an error message.
-static bool doValidate(const tsi_peer& peer, const std::unordered_set<std::string>& peers,
-                       std::string& err) {
+bool doValidate(const tsi_peer& peer, const std::unordered_set<std::string>& peers,
+                std::string& err) {
   for (size_t i = 0; i < peer.property_count; ++i) {
-    std::string name = std::string(peer.properties[i].name);
-    std::string value = std::string(peer.properties[i].value.data, peer.properties[i].value.length);
+    const std::string name = std::string(peer.properties[i].name);
+    const std::string value =
+        std::string(peer.properties[i].value.data, peer.properties[i].value.length);
     if (name.compare(TSI_ALTS_SERVICE_ACCOUNT_PEER_PROPERTY) == 0 &&
         peers.find(value) != peers.end()) {
       return true;
@@ -40,8 +44,9 @@ static bool doValidate(const tsi_peer& peer, const std::unordered_set<std::strin
   return false;
 }
 
-ProtobufTypes::MessagePtr AltsTransportSocketConfigFactory::createEmptyConfigProto() {
+} // namespace
 
+ProtobufTypes::MessagePtr AltsTransportSocketConfigFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::config::transport_socket::alts::v2alpha::Alts>();
 }
 
@@ -65,7 +70,7 @@ UpstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
     };
   }
 
-  return std::make_unique<TsiSocketFactory>(
+  HandshakerFactory factory =
       [handshaker_service](Event::Dispatcher& dispatcher,
                            const Network::Address::InstanceConstSharedPtr&,
                            const Network::Address::InstanceConstSharedPtr&) -> TsiHandshakerPtr {
@@ -84,8 +89,10 @@ UpstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
         }
 
         return std::make_unique<TsiHandshaker>(std::move(handshaker_ptr), dispatcher);
-      },
-      validator);
+      };
+
+
+  return std::make_unique<TsiSocketFactory>(factory, validator);
 }
 
 Network::TransportSocketFactoryPtr
@@ -109,7 +116,7 @@ DownstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
     };
   }
 
-  return std::make_unique<TsiSocketFactory>(
+  HandshakerFactory factory =
       [handshaker_service](Event::Dispatcher& dispatcher,
                            const Network::Address::InstanceConstSharedPtr&,
                            const Network::Address::InstanceConstSharedPtr&) -> TsiHandshakerPtr {
@@ -126,8 +133,9 @@ DownstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
         }
 
         return std::make_unique<TsiHandshaker>(std::move(handshaker_ptr), dispatcher);
-      },
-      validator);
+      };
+
+  return std::make_unique<TsiSocketFactory>(factory, validator);
 }
 
 static Registry::RegisterFactory<UpstreamAltsTransportSocketConfigFactory,
