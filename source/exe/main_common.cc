@@ -60,7 +60,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
     tls_.reset(new ThreadLocal::InstanceImpl);
     Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
-    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());   
+    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     logging_context_ =
         std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(), log_lock);
     configureComponentLogLevels();
@@ -85,7 +85,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
 MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
 
 void MainCommonBase::configureComponentLogLevels() {
-  std::vector<std::string> log_levels = absl::StrSplit(options_.subComponentLogLevel(), ',');
+  std::vector<std::string> log_levels = absl::StrSplit(options_.componentLogLevel(), ',');
   for (auto& level : log_levels) {
     std::vector<std::string> log_name_level = absl::StrSplit(level, ':');
     std::string log_name = log_name_level[0];

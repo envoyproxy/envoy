@@ -41,7 +41,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   log_levels_string +=
       fmt::format("\nDefault is [{}]", spdlog::level::level_names[default_log_level]);
 
-  const std::string component_log_level_string = "Comma separated list of component log levels. For example upstream:debug,config:trace";
+  const std::string component_log_level_string =
+      "Comma separated list of component log levels. For example upstream:debug,config:trace";
   const std::string log_format_string =
       fmt::format("Log message format in spdlog syntax "
                   "(see https://github.com/gabime/spdlog/wiki/3.-Custom-formatting)"
@@ -78,9 +79,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::ValueArg<std::string> log_level("l", "log-level", log_levels_string, false,
                                          spdlog::level::level_names[default_log_level], "string",
                                          cmd);
-  TCLAP::ValueArg<std::string> component_log_level("", "component-log-level", component_log_level_string, false,
-                                          "", "string",
-                                          cmd);
+  TCLAP::ValueArg<std::string> component_log_level(
+      "", "component-log-level", component_log_level_string, false, "", "string", cmd);
   TCLAP::ValueArg<std::string> log_format("", "log-format", log_format_string, false,
                                           Logger::Logger::DEFAULT_LOG_FORMAT, "string", cmd);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",

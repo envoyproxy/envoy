@@ -90,6 +90,7 @@ Version history
 * config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`  
   stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented 
   in case of schema/validation error.
+* cli: Added support for :ref:`component log level <operations_cli>` command line option for configuring log levels of individual components.
 
 1.7.0
 ===============

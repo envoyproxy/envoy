@@ -80,7 +80,7 @@ public:
   }
   std::chrono::seconds drainTime() const override { return drain_time_; }
   spdlog::level::level_enum logLevel() const override { return log_level_; }
-  const std::string& subComponentLogLevel() const override { return component_log_level_; }
+  const std::string& componentLogLevel() const override { return component_log_level_; }
   const std::string& logFormat() const override { return log_format_; }
   const std::string& logPath() const override { return log_path_; }
   std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }

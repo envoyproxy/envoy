@@ -97,7 +97,10 @@ public:
    */
   virtual spdlog::level::level_enum logLevel() const PURE;
 
-  virtual const std::string& subComponentLogLevel() const PURE;
+  /**
+   * @return const std::string& the comma separated list of component log levels.
+   */
+  virtual const std::string& componentLogLevel() const PURE;
 
   /**
    * @return const std::string& the log format string.
