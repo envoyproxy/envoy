@@ -141,7 +141,6 @@ public:
   std::string last_response_nonce_;
   std::vector<std::string> last_cluster_names_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  Stats::MockIsolatedStatsStore stats_store_;
 };
 
 // TODO(danielhochman): test with RDS and ensure version_info is same as what API returned
