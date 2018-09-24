@@ -59,7 +59,8 @@ message StatsConfig {
   google.protobuf.BoolValue use_all_default_tags = 2;
 
   // Inclusion/exclusion filter for stat name creation. If not provided, all stats are instantiated
-  // as normal.
+  // as normal. Preventing the instantiation of certain families of stats can improve memory
+  // performance for Envoys running especially large configs.
   StatsFilter stats_filter = 3;
 }
 
