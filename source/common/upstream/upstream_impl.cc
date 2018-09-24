@@ -986,7 +986,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
       // Did the priority change?
       if (host->priority() != existing_host->second->priority()) {
         existing_host->second->priority(host->priority());
-        hosts_changed = true;
       }
 
       existing_host->second->weight(host->weight());
