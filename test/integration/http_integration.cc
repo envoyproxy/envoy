@@ -768,6 +768,84 @@ void HttpIntegrationTest::testGrpcRetry() {
   }
 }
 
+// Verifies that a retry priority can be configured and affect the host selected during retries.
+// The retry priority will always target P1, which would otherwise never be hit due to P0 being
+// healthy.
+void HttpIntegrationTest::testRetryPriority() {
+  const Upstream::PriorityLoad priority_load{0, 100};
+  Upstream::MockRetryPriorityFactory factory(
+      std::make_shared<NiceMock<Upstream::MockRetryPriority>>(priority_load));
+
+  Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_factory(factory);
+
+  envoy::api::v2::route::RouteAction::RetryPolicy retry_policy;
+  retry_policy.mutable_retry_priority()->set_name(factory.name());
+
+  // Add route with custom retry policy
+  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
+                          envoy::api::v2::route::RouteAction::NOT_FOUND,
+                          envoy::api::v2::route::VirtualHost::NONE, retry_policy);
+
+  // Use load assignments instead of static hosts. Necessary in order to use priorities.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto load_assignment = cluster->mutable_load_assignment();
+    load_assignment->set_cluster_name(cluster->name());
+    const auto& host_address = cluster->hosts(0).socket_address().address();
+
+    for (int i = 0; i < 2; ++i) {
+      auto locality = load_assignment->add_endpoints();
+      locality->set_priority(i);
+      locality->mutable_locality()->set_region("region");
+      locality->mutable_locality()->set_zone("zone");
+      locality->mutable_locality()->set_sub_zone("sub_zone" + std::to_string(i));
+      auto lb_endpoint = locality->add_lb_endpoints();
+      lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
+          host_address);
+      lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
+          0);
+    }
+
+    cluster->clear_hosts();
+  });
+
+  fake_upstreams_count_ = 2;
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test_retry"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                                 {"x-envoy-retry-on", "5xx"}},
+                                         1024);
+
+  // Note how we're exepcting each upstream request to hit the same upstream.
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
+
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(512, true);
+
+  response->waitForEndStream();
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ(512U, response->body().size());
+}
+
+//
 // Verifies that a retry host filter can be configured and affect the host selected during retries.
 // The predicate will keep track of the first host attempted, and attempt to route all requests to
 // the same host. With a total of two upstream hosts, this should result in us continuously sending

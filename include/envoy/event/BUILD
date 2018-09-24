@@ -46,6 +46,7 @@ envoy_cc_library(
     name = "timer_interface",
     hdrs = ["timer.h"],
     deps = [
+        "//source/common/common:thread_lib",
         "//source/common/event:libevent_lib",
     ],
 )

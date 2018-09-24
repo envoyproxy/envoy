@@ -106,8 +106,8 @@ BENCHMARK(BM_TlsInspector)->Unit(benchmark::kMicrosecond);
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
 int main(int argc, char** argv) {
   Envoy::Thread::MutexBasicLockable lock;
-  Envoy::Logger::Registry::initialize(spdlog::level::warn,
-                                      Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock);
+  Envoy::Logger::Context logging_context(spdlog::level::warn,
+                                         Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock);
 
   benchmark::Initialize(&argc, argv);
   if (benchmark::ReportUnrecognizedArguments(argc, argv)) {

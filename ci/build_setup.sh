@@ -17,9 +17,10 @@ function setup_gcc_toolchain() {
 }
 
 function setup_clang_toolchain() {
-  export CC=clang-6.0
-  export CXX=clang++-6.0
-  export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-6.0/bin/llvm-symbolizer
+  export PATH=/usr/lib/llvm-7/bin:$PATH
+  export CC=clang
+  export CXX=clang++
+  export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-7/bin/llvm-symbolizer
   echo "$CC/$CXX toolchain configured"
 }
 

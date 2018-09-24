@@ -55,6 +55,12 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
         ->createHostPredicate(*this, host_predicate.config());
   }
 
+  const auto retry_priority = config.retry_policy().retry_priority();
+  if (!retry_priority.name().empty()) {
+    Registry::FactoryRegistry<Upstream::RetryPriorityFactory>::getFactory(retry_priority.name())
+        ->createRetryPriority(*this, retry_priority.config());
+  }
+
   auto host_selection_attempts = config.retry_policy().host_selection_retry_max_attempts();
   if (host_selection_attempts) {
     host_selection_attempts_ = host_selection_attempts;
@@ -270,7 +276,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                                       route.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
                                                        route.response_headers_to_remove())),
-      opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
+      match_grpc_(route.match().has_grpc()), opaque_config_(parseOpaqueConfig(route)),
+      decorator_(parseDecorator(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route)),
       per_filter_configs_(route.per_filter_config(), factory_context),
@@ -341,6 +348,10 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers, uint64_t ran
   if (runtime_) {
     matches &= loader_.snapshot().featureEnabled(runtime_.value().key_, runtime_.value().default_,
                                                  random_value);
+  }
+
+  if (match_grpc_) {
+    matches &= Grpc::Common::hasGrpcContentType(headers);
   }
 
   matches &= Http::HeaderUtility::matchHeaders(headers, config_headers_);
@@ -528,24 +539,8 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
     }
   }
 
-  uint64_t selected_value = random_value % total_cluster_weight_;
-  uint64_t begin = 0UL;
-  uint64_t end = 0UL;
-
-  // Find the right cluster to route to based on the interval in which
-  // the selected value falls. The intervals are determined as
-  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
-  for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
-    end = begin + cluster->clusterWeight();
-    if (((selected_value >= begin) && (selected_value < end)) || (end >= total_cluster_weight_)) {
-      // end > total_cluster_weight_: This case can only occur with Runtimes, when the user
-      // specifies invalid weights such that sum(weights) > total_cluster_weight_. In this case,
-      // terminate the search and just return the cluster whose weight caused the overflow.
-      return cluster;
-    }
-    begin = end;
-  }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_, random_value,
+                                          true);
 }
 
 void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {

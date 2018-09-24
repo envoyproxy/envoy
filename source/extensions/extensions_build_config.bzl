@@ -107,6 +107,9 @@ EXTENSIONS = {
 
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
     "envoy.transport_sockets.capture":                  "//source/extensions/transport_sockets/capture:config",
+
+    # Retry host predicates
+    "envoy.retry_host_predicates.other_hosts":          "//source/extensions/retry/host/other_hosts:config",
 }
 
 WINDOWS_EXTENSIONS = {

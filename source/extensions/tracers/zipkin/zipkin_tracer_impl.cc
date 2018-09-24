@@ -75,10 +75,13 @@ Driver::Driver(const Json::Object& config, Upstream::ClusterManager& cluster_man
   const bool trace_id_128bit =
       config.getBoolean("trace_id_128bit", ZipkinCoreConstants::get().DEFAULT_TRACE_ID_128BIT);
 
-  tls_->set([this, collector_endpoint, &random_generator, trace_id_128bit](
+  const bool shared_span_context = config.getBoolean(
+      "shared_span_context", ZipkinCoreConstants::get().DEFAULT_SHARED_SPAN_CONTEXT);
+
+  tls_->set([this, collector_endpoint, &random_generator, trace_id_128bit, shared_span_context](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     TracerPtr tracer(new Tracer(local_info_.clusterName(), local_info_.address(), random_generator,
-                                trace_id_128bit, time_source_));
+                                trace_id_128bit, shared_span_context, time_source_));
     tracer->setReporter(
         ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector_endpoint));
     return ThreadLocal::ThreadLocalObjectSharedPtr{new TlsTracer(std::move(tracer), *this)};
