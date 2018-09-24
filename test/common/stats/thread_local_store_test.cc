@@ -702,8 +702,8 @@ TEST_F(HistogramTest, MultiHistogramMultipleMerges) {
   expectCallAndAccumulate(h2, 2);
   EXPECT_EQ(2, validateMerge());
 
-  // Do not insert any value and validate that intervalSummary is empty for both the histograms
-  // and cumulativeSummary has right values.
+  // Do not insert any value and validate that intervalSummary is empty for both the histograms and
+  // cumulativeSummary has right values.
   EXPECT_EQ(2, validateMerge());
 }
 
