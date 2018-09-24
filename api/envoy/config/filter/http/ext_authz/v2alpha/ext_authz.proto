@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.filter.http.ext_authz.v2alpha;
 option go_package = "v2alpha";
 
+import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/grpc_service.proto";
 import "envoy/api/v2/core/http_uri.proto";
 
@@ -82,4 +83,8 @@ message HttpService {
   // *Method* and *Path* are always dispatched to the authorization server by default. The message
   // will not contain body data and the *Content-Length* will be set to zero.
   repeated string allowed_request_headers = 5;
+
+  // Sets a list of headers and their values that will be added to the request to external
+  // authorization server. Note that these will override the headers coming from the downstream.
+  repeated envoy.api.v2.core.HeaderValue authorization_headers_to_add = 6;
 }

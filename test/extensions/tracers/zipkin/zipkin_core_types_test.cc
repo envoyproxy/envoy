@@ -33,9 +33,8 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   ep.setServiceName("my_service");
   EXPECT_EQ("my_service", ep.serviceName());
 
-  EXPECT_EQ(
-      R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
-      ep.toJson());
+  EXPECT_EQ(R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
+            ep.toJson());
 }
 
 TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
@@ -50,9 +49,8 @@ TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
       "[2001:0db8:85a3:0000:0000:8a2e:0370:4444]:7334");
   ep.setAddress(addr);
 
-  EXPECT_EQ(
-      R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
-      ep.toJson());
+  EXPECT_EQ(R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
+            ep.toJson());
 }
 
 TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
@@ -385,19 +383,18 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   span.setBinaryAnnotations(binary_annotations);
   EXPECT_EQ(1ULL, span.binaryAnnotations().size());
 
-  EXPECT_EQ(
-      R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
-          span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
-          R"(","timestamp":)" + std::to_string(span.timestamp()) +
-          R"(,"duration":3000,)"
-          R"("annotations":[)"
-          R"({"timestamp":)" +
-          std::to_string(span.timestamp()) +
-          R"(,"value":"cs","endpoint":)"
-          R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}],)"
-          R"("binaryAnnotations":[{"key":"lc","value":"my_component_name","endpoint":)"
-          R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}]})",
-      span.toJson());
+  EXPECT_EQ(R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
+                span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
+                R"(","timestamp":)" + std::to_string(span.timestamp()) +
+                R"(,"duration":3000,)"
+                R"("annotations":[)"
+                R"({"timestamp":)" +
+                std::to_string(span.timestamp()) +
+                R"(,"value":"cs","endpoint":)"
+                R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}],)"
+                R"("binaryAnnotations":[{"key":"lc","value":"my_component_name","endpoint":)"
+                R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}]})",
+            span.toJson());
 
   // Test the copy-semantics flavor of addAnnotation and addBinaryAnnotation
 

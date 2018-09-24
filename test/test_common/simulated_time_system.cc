@@ -21,8 +21,8 @@ namespace Event {
 class SimulatedTimeSystem::Alarm : public TimerImpl {
 public:
   Alarm(SimulatedTimeSystem& time_system, Libevent::BasePtr& libevent, TimerCb cb)
-      : TimerImpl(libevent, cb), time_system_(time_system), index_(time_system.nextIndex()),
-        armed_(false) {}
+      : TimerImpl(libevent, [this, cb] { runAlarm(cb); }), time_system_(time_system),
+        index_(time_system.nextIndex()), armed_(false) {}
 
   virtual ~Alarm();
 
@@ -39,6 +39,7 @@ public:
   void activate() {
     armed_ = false;
     std::chrono::milliseconds duration = std::chrono::milliseconds::zero();
+    time_system_.incPending();
     TimerImpl::enableTimer(duration);
   }
 
@@ -50,6 +51,11 @@ public:
   uint64_t index() const { return index_; }
 
 private:
+  void runAlarm(TimerCb cb) {
+    time_system_.decPending();
+    cb();
+  }
+
   SimulatedTimeSystem& time_system_;
   MonotonicTime time_;
   uint64_t index_;
@@ -93,13 +99,14 @@ SimulatedTimeSystem::Alarm::~Alarm() {
 }
 
 void SimulatedTimeSystem::Alarm::disableTimer() {
-  ASSERT(armed_);
-  time_system_.removeAlarm(this);
-  armed_ = false;
+  if (armed_) {
+    time_system_.removeAlarm(this);
+    armed_ = false;
+  }
 }
 
 void SimulatedTimeSystem::Alarm::enableTimer(const std::chrono::milliseconds& duration) {
-  ASSERT(!armed_);
+  disableTimer();
   armed_ = true;
   if (duration.count() == 0) {
     activate();
@@ -108,12 +115,23 @@ void SimulatedTimeSystem::Alarm::enableTimer(const std::chrono::milliseconds& du
   }
 }
 
+// It would be very confusing if there were more than one simulated time system
+// extant at once. Technically this might be something we want, but more likely
+// it indicates some kind of plumbing error in test infrastructure. So track
+// the instance count with a simple int. In the future if there's a good reason
+// to have more than one around at a time, this variable can be deleted.
+static int instance_count = 0;
+
 // When we initialize our simulated time, we'll start the current time based on
 // the real current time. But thereafter, real-time will not be used, and time
 // will march forward only by calling sleep().
 SimulatedTimeSystem::SimulatedTimeSystem()
     : monotonic_time_(MonotonicTime(std::chrono::seconds(0))),
-      system_time_(real_time_source_.systemTime()), index_(0) {}
+      system_time_(real_time_source_.systemTime()), index_(0), pending_alarms_(0) {
+  ASSERT(++instance_count <= 1);
+}
+
+SimulatedTimeSystem::~SimulatedTimeSystem() { --instance_count; }
 
 SystemTime SimulatedTimeSystem::systemTime() {
   Thread::LockGuard lock(mutex_);
@@ -123,6 +141,49 @@ SystemTime SimulatedTimeSystem::systemTime() {
 MonotonicTime SimulatedTimeSystem::monotonicTime() {
   Thread::LockGuard lock(mutex_);
   return monotonic_time_;
+}
+
+void SimulatedTimeSystem::sleep(const Duration& duration) {
+  mutex_.lock();
+  MonotonicTime monotonic_time =
+      monotonic_time_ + std::chrono::duration_cast<MonotonicTime::duration>(duration);
+  setMonotonicTimeAndUnlock(monotonic_time);
+}
+
+Thread::CondVar::WaitStatus SimulatedTimeSystem::waitFor(Thread::MutexBasicLockable& mutex,
+                                                         Thread::CondVar& condvar,
+                                                         const Duration& duration) noexcept {
+  const Duration real_time_poll_delay(std::chrono::milliseconds(50));
+  const MonotonicTime end_time = monotonicTime() + duration;
+
+  while (true) {
+    // First check to see if the condition is already satisfied without advancing sim time.
+    if (condvar.waitFor(mutex, real_time_poll_delay) == Thread::CondVar::WaitStatus::NoTimeout) {
+      return Thread::CondVar::WaitStatus::NoTimeout;
+    }
+
+    // Wait for the libevent poll in another thread to catch up prior to advancing time.
+    if (hasPending()) {
+      continue;
+    }
+
+    mutex_.lock();
+    if (monotonic_time_ < end_time) {
+      if (alarms_.empty()) {
+        // If no alarms are pending, sleep till the end time.
+        setMonotonicTimeAndUnlock(end_time);
+      } else {
+        // If there's another alarm pending, sleep forward to it.
+        MonotonicTime next_wakeup = (*alarms_.begin())->time();
+        setMonotonicTimeAndUnlock(std::min(next_wakeup, end_time));
+      }
+    } else {
+      // If we reached our end_time, break the loop and return timeout.
+      mutex_.unlock();
+      break;
+    }
+  }
+  return Thread::CondVar::WaitStatus::Timeout;
 }
 
 int64_t SimulatedTimeSystem::nextIndex() {
