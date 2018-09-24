@@ -3,17 +3,96 @@
 JWT Authentication
 ==================
 
-JSON Web Token (JWT) usually is used to carry end user identity. This build-in HTTP filter can be used to authenticate JWT.
+This HTTP filter can be used to authenticate JSON Web Token (JWT). If JWT verification fails, the request will be rejected. If JWT verification success, its payload can be forwarded to the upstream for further authorization.
 
 A public key (JWKS) is needed to verify a JWT signature. It can be specified in the filter config, or can be fetched remotely from a JWKS server. If it is fetched remotely, Envoy will cache it.
-
-If JWT verification fails, the request will be rejected. If JWT verification success, its payload can be forwarded to the upstream if desired.
 
 Configuration
 -------------
 
-Filter config uses "rules" to specify matching rules and their authentication requirements. It uses "providers" map to specify how a JWT should be verified, such as where to extract the token, where to fetch the public key (JWKS) and how to output its payload.
+Filer config has two fields, "providers" and "rules". It uses "providers" to specify how JWT should be verified, such as where to extract the token, where to fetch the public key (JWKS) and how to output its payload. It uses "rules" to specify request matching rules and their requirements. It a request matches a rule, its requirement applies. The requirement specifies which JWT providers should be verified. They will be described in details in the following sections.
 
+JwtProvider
+~~~~~~~~~~~
+
+It specifies how JWT should be verified. It has following fields:
+
+* issuer: the principal that issued the JWT, usually a URL or an email address
+* audiences: a list of JWT audiences allowed to access. A JWT containing any of these audiences will be accepted.
+  If not specified, will not check audiences in the JWT
+* local_jwks: fetch JWKS in local data source, either in a local file or embedded in the inline string.
+* remote_jwks: fetch JWKS from a remote HTTP server, also specify cache duration.
+* forward: if true, JWT will be forwarded to the upstream.
+* from_headers: extract JWT from custom HTTP header.
+* from_params: extract JWT from custom query parameter keys.
+* forward_payload_header: forward the JWT payload in the specified HTTP header.
+
+Default token extract location: if "from_headers" and "from_params" is empty,  the default location is from HTTP header::
+
+  Authorization: Bearer <token>
+
+If not there, then check query parameter key "access_token" as this example::
+  
+  /path?access_token=<JWT>
+
+In the filer config, "providers" a map, to map provider_name to a JwtProvider message. The "provider_name" has to be unique, usually it is the same as "issuer".  Multiple JwtProviders with the same issuer could be used to specify different audiences or different token extract locations.
+
+
+Config examples:
+
+.. code-block:: yaml
+
+  providers:
+    provider_name1:
+      issuer: https://example.com
+      audiences:
+      - bookstore_android.apps.googleusercontent.com
+      - bookstore_web.apps.googleusercontent.com
+      remote_jwks:
+        http_uri:
+          uri: https://example.com/.well-known/jwks.json
+          cluster: example_jwks_cluster
+        cache_duration:
+          seconds: 300
+
+Above example specifies:
+
+* provider_name is "provider_name1"
+* issuer is https://example.com
+* audiences: bookstore_android.apps.googleusercontent.com and bookstore_web.apps.googleusercontent.com
+* remote_jwks: use URL "https://example.com/.well-known/jwks.json" from cluster "example_jwks_cluster", its cache duration is 300 seconds.
+* token will be extracted from default locations since from_headers and from_params are empty.
+* token will not be forwarded to upstream
+* JWT payload will not be added to the request header.
+
+.. code-block:: yaml
+
+  providers:
+    provider_name2:
+      issuer: https://example2.com
+      local_jwks:
+        inline_string: "PUBLIC-KEY"
+      from_headers:
+      - name: x-goog-iap-jwt-assertion
+      forward: true
+      forward_payload_header: x-jwt-payload
+
+Above example specifies:
+
+* provider_name is "provider_name2"
+* issuer is https://example2.com
+* audiences: not specified, not JWT token will not be checked.
+* local_jwks: JWKS is embeded in the inline string.
+* from_headers: token will be extracted from HTTP headers as::
+
+     x-goog-iap-jwt-assertion: <JWT>.
+  
+* forward: token will forwarded to upstream
+* JWT payload will be added to the request header as::
+
+    x-jwt-payload: base64_encoded(jwt_payload_in_JSON)
+  
+	  
 The external authorization HTTP filter calls an external gRPC or HTTP service to check if the incoming
 HTTP request is authorized or not.
 If the request is deemed unauthorized then the request will be denied normally with 403 (Forbidden) response.
