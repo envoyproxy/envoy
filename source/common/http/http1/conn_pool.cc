@@ -91,9 +91,9 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
     return nullptr;
   }
 
-  if (host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
+  if (host_->cluster().resourceManager(priority_).pendingRequests()->canCreate()) {
     bool can_create_connection =
-        host_->cluster().resourceManager(priority_).connections().canCreate();
+        host_->cluster().resourceManager(priority_).connections()->canCreate();
     if (!can_create_connection) {
       host_->cluster().stats().upstream_cx_overflow_.inc();
     }
@@ -299,12 +299,12 @@ ConnPoolImpl::PendingRequest::PendingRequest(ConnPoolImpl& parent, StreamDecoder
     : parent_(parent), decoder_(decoder), callbacks_(callbacks) {
   parent_.host_->cluster().stats().upstream_rq_pending_total_.inc();
   parent_.host_->cluster().stats().upstream_rq_pending_active_.inc();
-  parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().inc();
+  parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests()->inc();
 }
 
 ConnPoolImpl::PendingRequest::~PendingRequest() {
   parent_.host_->cluster().stats().upstream_rq_pending_active_.dec();
-  parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests().dec();
+  parent_.host_->cluster().resourceManager(parent_.priority_).pendingRequests()->dec();
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
@@ -328,7 +328,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   conn_length_.reset(new Stats::Timespan(parent_.host_->cluster().stats().upstream_cx_length_ms_,
                                          parent_.dispatcher_.timeSystem()));
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
-  parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
+  parent_.host_->cluster().resourceManager(parent_.priority_).connections()->inc();
 
   codec_client_->setConnectionStats(
       {parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
@@ -342,7 +342,7 @@ ConnPoolImpl::ActiveClient::~ActiveClient() {
   parent_.host_->cluster().stats().upstream_cx_active_.dec();
   parent_.host_->stats().cx_active_.dec();
   conn_length_->complete();
-  parent_.host_->cluster().resourceManager(parent_.priority_).connections().dec();
+  parent_.host_->cluster().resourceManager(parent_.priority_).connections()->dec();
 }
 
 void ConnPoolImpl::ActiveClient::onConnectTimeout() {

@@ -127,7 +127,7 @@ uint32_t RetryStateImpl::parseRetryGrpcOn(absl::string_view retry_grpc_on_header
 
 void RetryStateImpl::resetRetry() {
   if (callback_) {
-    cluster_.resourceManager(priority_).retries().dec();
+    cluster_.resourceManager(priority_).retries()->dec();
     callback_ = nullptr;
   }
 }
@@ -153,7 +153,7 @@ RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
     return RetryStatus::No;
   }
 
-  if (!cluster_.resourceManager(priority_).retries().canCreate()) {
+  if (!cluster_.resourceManager(priority_).retries()->canCreate()) {
     cluster_.stats().upstream_rq_retry_overflow_.inc();
     return RetryStatus::NoOverflow;
   }
@@ -164,7 +164,7 @@ RetryStatus RetryStateImpl::shouldRetry(const Http::HeaderMap* response_headers,
 
   ASSERT(!callback_);
   callback_ = callback;
-  cluster_.resourceManager(priority_).retries().inc();
+  cluster_.resourceManager(priority_).retries()->inc();
   cluster_.stats().upstream_rq_retry_.inc();
   enableBackoffTimer();
   return RetryStatus::Yes;

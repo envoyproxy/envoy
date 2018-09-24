@@ -342,7 +342,7 @@ Network::FilterStatus Filter::initializeUpstreamConnection() {
 
   // Check this here because the TCP conn pool will queue our request waiting for a connection that
   // will never be released.
-  if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections().canCreate()) {
+  if (!cluster->resourceManager(Upstream::ResourcePriority::Default).connections()->canCreate()) {
     getRequestInfo().setResponseFlag(RequestInfo::ResponseFlag::UpstreamOverflow);
     cluster->stats().upstream_cx_overflow_.inc();
     onInitFailure(UpstreamFailureReason::RESOURCE_LIMIT_EXCEEDED);
