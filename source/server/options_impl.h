@@ -80,7 +80,7 @@ public:
   }
   std::chrono::seconds drainTime() const override { return drain_time_; }
   spdlog::level::level_enum logLevel() const override { return log_level_; }
-  const std::string& subComponentLogLevel() const override { return sub_component_log_level_; }
+  const std::string& subComponentLogLevel() const override { return component_log_level_; }
   const std::string& logFormat() const override { return log_format_; }
   const std::string& logPath() const override { return log_path_; }
   std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }
@@ -105,13 +105,13 @@ private:
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;
+  std::string component_log_level_;
   std::string log_format_;
   std::string log_path_;
   uint64_t restart_epoch_;
   std::string service_cluster_;
   std::string service_node_;
   std::string service_zone_;
-  std::string sub_component_log_level_;
   std::chrono::milliseconds file_flush_interval_msec_;
   std::chrono::seconds drain_time_;
   std::chrono::seconds parent_shutdown_time_;
