@@ -40,7 +40,7 @@ class ZipkinDriverTest : public Test {
 public:
   ZipkinDriverTest() : time_source_(test_time_.timeSystem()) {}
 
-  void setup(Json::Object& config, bool init_timer) {
+  void setup(envoy::config::trace::v2::ZipkinConfig& zipkin_config, bool init_timer) {
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
         .WillByDefault(ReturnRef(cm_.async_client_));
 
@@ -50,21 +50,20 @@ public:
     }
 
     driver_.reset(
-        new Driver(config, cm_, stats_, tls_, runtime_, local_info_, random_, time_source_));
+        new Driver(zipkin_config, cm_, stats_, tls_, runtime_, local_info_, random_, time_source_));
   }
 
   void setupValidDriver() {
     EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
 
-    std::string valid_config = R"EOF(
-      {
-       "collector_cluster": "fake_cluster",
-       "collector_endpoint": "/api/v1/spans"
-       }
+    const std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    collector_endpoint: /api/v1/spans
     )EOF";
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(valid_config);
+    envoy::config::trace::v2::ZipkinConfig zipkin_config;
+    MessageUtil::loadFromYaml(yaml_string, zipkin_config);
 
-    setup(*loader, true);
+    setup(zipkin_config, true);
   }
 
   // TODO(#4160): Currently time_system_ is initialized from DangerousDeprecatedTestTime, which uses
@@ -95,34 +94,23 @@ public:
 
 TEST_F(ZipkinDriverTest, InitializeDriver) {
   {
-    std::string invalid_config = R"EOF(
-      {"fake" : "fake"}
-    )EOF";
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(invalid_config);
+    // Empty config
+    envoy::config::trace::v2::ZipkinConfig zipkin_config;
 
-    EXPECT_THROW(setup(*loader, false), EnvoyException);
-  }
-
-  {
-    std::string empty_config = "{}";
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(empty_config);
-
-    EXPECT_THROW(setup(*loader, false), EnvoyException);
+    EXPECT_THROW(setup(zipkin_config, false), EnvoyException);
   }
 
   {
     // Valid config but not valid cluster.
     EXPECT_CALL(cm_, get("fake_cluster")).WillOnce(Return(nullptr));
-
-    std::string valid_config = R"EOF(
-      {
-       "collector_cluster": "fake_cluster",
-       "collector_endpoint": "/api/v1/spans"
-       }
+    const std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    collector_endpoint: /api/v1/spans
     )EOF";
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(valid_config);
+    envoy::config::trace::v2::ZipkinConfig zipkin_config;
+    MessageUtil::loadFromYaml(yaml_string, zipkin_config);
 
-    EXPECT_THROW(setup(*loader, false), EnvoyException);
+    EXPECT_THROW(setup(zipkin_config, false), EnvoyException);
   }
 
   {
@@ -130,15 +118,14 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
     EXPECT_CALL(cm_, get("fake_cluster")).WillRepeatedly(Return(&cm_.thread_local_cluster_));
     ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, features()).WillByDefault(Return(0));
 
-    std::string valid_config = R"EOF(
-      {
-       "collector_cluster": "fake_cluster",
-       "collector_endpoint": "/api/v1/spans"
-       }
+    const std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    collector_endpoint: /api/v1/spans
     )EOF";
-    Json::ObjectSharedPtr loader = Json::Factory::loadFromString(valid_config);
+    envoy::config::trace::v2::ZipkinConfig zipkin_config;
+    MessageUtil::loadFromYaml(yaml_string, zipkin_config);
 
-    setup(*loader, true);
+    setup(zipkin_config, true);
   }
 }
 

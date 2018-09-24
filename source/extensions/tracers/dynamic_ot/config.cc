@@ -13,11 +13,21 @@ namespace Extensions {
 namespace Tracers {
 namespace DynamicOt {
 
-Tracing::HttpTracerPtr
-DynamicOpenTracingTracerFactory::createHttpTracer(const Json::Object& json_config,
-                                                  Server::Instance& server) {
-  const std::string library = json_config.getString("library");
-  const std::string config = json_config.getObject("config")->asJsonString();
+Tracing::HttpTracerPtr DynamicOpenTracingTracerFactory::createHttpTracer(
+    const envoy::config::trace::v2::Tracing& configuration, Server::Instance& server) {
+  ProtobufTypes::MessagePtr config_ptr =
+      ProtobufTypes::MessagePtr{new envoy::config::trace::v2::DynamicOtConfig()};
+
+  if (configuration.http().has_config()) {
+    MessageUtil::jsonConvert(configuration.http().config(), *config_ptr);
+  }
+
+  const auto& dynaot_config =
+      dynamic_cast<const envoy::config::trace::v2::DynamicOtConfig&>(*config_ptr);
+
+  const std::string library = dynaot_config.library();
+  Json::ObjectSharedPtr json_config = MessageUtil::getJsonObjectFromMessage(dynaot_config.config());
+  const std::string config = json_config->asJsonString();
   Tracing::DriverPtr dynamic_driver{
       std::make_unique<DynamicOpenTracingDriver>(server.stats(), library, config)};
   return std::make_unique<Tracing::HttpTracerImpl>(std::move(dynamic_driver), server.localInfo());

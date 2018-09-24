@@ -43,8 +43,8 @@ public:
    * @param json_config supplies the general json configuration for the HttpTracer
    * @param server supplies the server instance
    */
-  virtual Tracing::HttpTracerPtr createHttpTracer(const Json::Object& json_config,
-                                                  Instance& server) PURE;
+  virtual Tracing::HttpTracerPtr
+  createHttpTracer(const envoy::config::trace::v2::Tracing& configuration, Instance& server) PURE;
 
   /**
    * Returns the identifying name for a particular implementation of tracer produced by the
