@@ -6,6 +6,12 @@ Version history
 
 1.8.0 (Oct 4, 2018)
 ===================
+1.9.0 (Pending)
+===============
+* Renamed the `RequestInfo` namespace to `StreamInfo` to better match its behaviour within TCP and HTTP implementations.
+
+1.8.0 (Pending)
+===============
 * access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>`
   to filter based on the presence of Envoy response flags.
 * access log: added RESPONSE_DURATION and RESPONSE_TX_DURATION.
@@ -106,7 +112,6 @@ Version history
 * config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`  
   stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented 
   in case of schema/validation error.
-* Renamed the `RequestInfo` namespace to `StreamInfo` to better match its behaviour within TCP and HTTP implementations.
 
 1.7.0 (Jun 21, 2018)
 ====================
