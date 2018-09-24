@@ -146,7 +146,7 @@ protected:
   HostStats stats_;
   Outlier::DetectorHostMonitorPtr outlier_detector_;
   HealthCheckHostMonitorPtr health_checker_;
-  uint32_t priority_;
+  std::atomic<uint32_t> priority_;
 };
 
 /**
