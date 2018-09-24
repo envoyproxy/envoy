@@ -46,6 +46,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "stats_filter_test",
+    srcs = ["stats_filter_test.cc"],
+    deps = [
+        "//source/common/stats:stats_filter_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "tag_producer_test",
     srcs = ["tag_producer_test.cc"],
     deps = [
