@@ -124,6 +124,9 @@ public:
   }
 
   std::string name() const override { return "envoy.mock_retry_priority"; }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+  }
 
 private:
   RetryPrioritySharedPtr retry_priority_;

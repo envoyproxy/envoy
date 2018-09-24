@@ -109,6 +109,8 @@ public:
                                    const Protobuf::Message& config) PURE;
 
   virtual std::string name() const PURE;
+
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 };
 
 /**
@@ -125,6 +127,8 @@ public:
    * @return name name of this factory.
    */
   virtual std::string name() PURE;
+
+  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 };
 
 } // namespace Upstream

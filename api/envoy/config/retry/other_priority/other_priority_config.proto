@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package envoy.config.retry.other_priority;
+
+// A retry host selector that attempts to spread retries between priorities, even if certain
+// priorities would not normally be attempted due to higher priorities being available.
+message OtherPriorityConfig {
+  // How often the priority load should be updated based on previously attempted priorities. Useful
+  // to allow each priorities to receive more than one request before being excluded.
+  int32 update_frequency = 1;
+}
