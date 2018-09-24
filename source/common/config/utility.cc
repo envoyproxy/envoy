@@ -224,7 +224,7 @@ Utility::createTagProducer(const envoy::config::bootstrap::v2::Bootstrap& bootst
 
 Stats::StatsFilterPtr
 Utility::createStatsFilter(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-  return std::make_unique<Stats::StatsFilterImpl>(bootstrap.stats_filter());
+  return std::make_unique<Stats::StatsFilterImpl>(bootstrap.stats_config());
 }
 
 void Utility::checkObjNameLength(const std::string& error_prefix, const std::string& name,

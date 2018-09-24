@@ -8,16 +8,16 @@
 namespace Envoy {
 namespace Stats {
 
-StatsFilterImpl::StatsFilterImpl(const envoy::config::metrics::v2::StatsFilter& filter) {
-  switch (filter.stats_filter_case()) {
+StatsFilterImpl::StatsFilterImpl(const envoy::config::metrics::v2::StatsConfig& config) {
+  switch (config.stats_filter().stats_filter_case()) {
   case envoy::config::metrics::v2::StatsFilter::kExclusionList:
-    for (const auto& stats_filter : filter.exclusion_list().patterns()) {
+    for (const auto& stats_filter : config.stats_filter().exclusion_list().patterns()) {
       matchers_.push_back(Matchers::StringMatcher(stats_filter));
     }
     break;
   case envoy::config::metrics::v2::StatsFilter::kInclusionList:
     default_inclusive_ = false;
-    for (const auto& stats_filter : filter.inclusion_list().patterns()) {
+    for (const auto& stats_filter : config.stats_filter().inclusion_list().patterns()) {
       matchers_.push_back(Matchers::StringMatcher(stats_filter));
     }
     break;

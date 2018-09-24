@@ -57,10 +57,12 @@ message StatsConfig {
   //
   // If not provided, the value is assumed to be true.
   google.protobuf.BoolValue use_all_default_tags = 2;
+
+  // Inclusion/exclusion filter for stat name creation. If not provided, all stats are instantiated
+  // as normal.
+  StatsFilter stats_filter = 3;
 }
 
-// Inclusion/exclusion filter for stat name creation. If not provided, all stats are instantiated as
-// normal.
 message StatsFilter {
   // Stat creation is unrestricted by default. StatsFilter can accept either an exclusion list or an
   // inclusion list. If an inclusion list is supplied, all stats are disabled by default except for

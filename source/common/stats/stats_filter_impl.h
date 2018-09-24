@@ -18,7 +18,7 @@ namespace Stats {
  */
 class StatsFilterImpl : public StatsFilter {
 public:
-  StatsFilterImpl(const envoy::config::metrics::v2::StatsFilter& filter);
+  StatsFilterImpl(const envoy::config::metrics::v2::StatsConfig& config);
 
   // Default constructor simply allows everything.
   StatsFilterImpl() {}
