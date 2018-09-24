@@ -3,7 +3,10 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/config/metrics/v2/stats.pb.h"
+
 #include "common/common/c_smart_ptr.h"
+#include "common/stats/stats_matcher_impl.h"
 #include "common/stats/thread_local_store.h"
 
 #include "test/mocks/event/mocks.h"
@@ -460,6 +463,113 @@ TEST_F(StatsThreadLocalStoreTest, HotRestartTruncation) {
   EXPECT_CALL(*alloc_, free(_)).Times(2);
 }
 
+class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
+public:
+  StatsMatcherTLSTest() : StatsThreadLocalStoreTest() {}
+  envoy::config::metrics::v2::StatsConfig stats_config_;
+};
+
+TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
+  InSequence s;
+
+  EXPECT_CALL(*alloc_, alloc(_)).Times(0);
+
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "noop");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+
+  // Testing No-op counters, gauges, histograms which match the prefix "noop".
+
+  // Counter
+  Counter& noop_counter = store_->counter("noop_counter");
+  EXPECT_EQ(noop_counter.name(), "");
+  EXPECT_EQ(noop_counter.value(), 0);
+  noop_counter.add(1);
+  EXPECT_EQ(noop_counter.value(), 0);
+  noop_counter.inc();
+  EXPECT_EQ(noop_counter.value(), 0);
+  noop_counter.reset();
+  EXPECT_EQ(noop_counter.value(), 0);
+  Counter& noop_counter_2 = store_->counter("noop_counter_2");
+  EXPECT_EQ(&noop_counter, &noop_counter_2);
+
+  // Gauge
+  Gauge& noop_gauge = store_->gauge("noop_gauge");
+  EXPECT_EQ(noop_gauge.name(), "");
+  EXPECT_EQ(noop_gauge.value(), 0);
+  noop_gauge.add(1);
+  EXPECT_EQ(noop_gauge.value(), 0);
+  noop_gauge.inc();
+  EXPECT_EQ(noop_gauge.value(), 0);
+  noop_gauge.dec();
+  EXPECT_EQ(noop_gauge.value(), 0);
+  noop_gauge.set(2);
+  EXPECT_EQ(noop_gauge.value(), 0);
+  noop_gauge.sub(2);
+  EXPECT_EQ(noop_gauge.value(), 0);
+  Gauge& noop_gauge_2 = store_->gauge("noop_gauge_2");
+  EXPECT_EQ(&noop_gauge, &noop_gauge_2);
+
+  // Histogram
+  Histogram& noop_histogram = store_->histogram("noop_histogram");
+  EXPECT_EQ(noop_histogram.name(), "");
+  Histogram& noop_histogram_2 = store_->histogram("noop_histogram_2");
+  EXPECT_EQ(&noop_histogram, &noop_histogram_2);
+
+  // Includes overflow stat.
+  EXPECT_CALL(*alloc_, free(_)).Times(1);
+
+  store_->shutdownThreading();
+}
+
+// We only test the exclusion list -- the inclusion list is the inverse, and both are tested in
+// test/common/stats:stats_matcher_test.
+TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
+  InSequence s;
+
+  EXPECT_CALL(*alloc_, alloc(_)).Times(2);
+
+  // Will block all stats containing any capital alphanumeric letter.
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_regex(
+      ".*[A-Z].*");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+
+  // Testing No-op counters, gauges, histograms which match the prefix "noop".
+  Counter& lowercase_counter = store_->counter("lowercase_counter");
+  EXPECT_EQ(lowercase_counter.name(), "lowercase_counter");
+
+  Counter& uppercase_counter = store_->counter("UPPERCASE_counter");
+  EXPECT_EQ(uppercase_counter.name(), "");
+  uppercase_counter.inc();
+  EXPECT_EQ(uppercase_counter.value(), 0);
+  uppercase_counter.inc();
+  EXPECT_EQ(uppercase_counter.value(), 0);
+
+  // Adding another exclusion rule -- now we reject not just uppercase stats but those starting with
+  // the string "invalid".
+  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+      "invalid");
+  store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
+
+  Gauge& valid_gauge = store_->gauge("valid_gauge");
+  valid_gauge.set(2);
+  EXPECT_EQ(valid_gauge.value(), 2);
+
+  Gauge& invalid_gauge_1 = store_->gauge("invalid_gauge");
+  invalid_gauge_1.inc();
+  EXPECT_EQ(invalid_gauge_1.value(), 0);
+
+  // But the old exclusion rule still holds.
+  Gauge& invalid_gauge_2 = store_->gauge("also_INVALID_gauge");
+  invalid_gauge_2.inc();
+  EXPECT_EQ(invalid_gauge_2.value(), 0);
+
+  // Includes overflow stat.
+  EXPECT_CALL(*alloc_, free(_)).Times(3);
+
+  store_->shutdownThreading();
+}
+
 class HeapStatsThreadLocalStoreTest : public StatsThreadLocalStoreTest {
 public:
   void SetUp() override {
@@ -592,8 +702,8 @@ TEST_F(HistogramTest, MultiHistogramMultipleMerges) {
   expectCallAndAccumulate(h2, 2);
   EXPECT_EQ(2, validateMerge());
 
-  // Do not insert any value and validate that intervalSummary is empty for both the histograms and
-  // cumulativeSummary has right values.
+  // Do not insert any value and validate that intervalSummary is empty for both the histograms
+  // and cumulativeSummary has right values.
   EXPECT_EQ(2, validateMerge());
 }
 
