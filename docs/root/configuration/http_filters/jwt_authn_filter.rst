@@ -10,7 +10,7 @@ A public key (JWKS) is needed to verify a JWT signature. It can be specified in 
 Configuration
 -------------
 
-Filer config has two fields, "providers" and "rules". It uses "providers" to specify how JWT should be verified, such as where to extract the token, where to fetch the public key (JWKS) and how to output its payload. It uses "rules" to specify request matching rules and their requirements. It a request matches a rule, its requirement applies. The requirement specifies which JWT providers should be verified. They will be described in details in the following sections.
+This HTTP filer config has two fields, "providers" and "rules". Field "providers" specifies how JWT should be verified, such as where to extract the token, where to fetch the public key (JWKS) and how to output its payload. Field "rules" specifies matching rules and their requirements. It a request matches a rule, its requirement applies. The requirement specifies which JWT providers should be verified.
 
 JwtProvider
 ~~~~~~~~~~~
@@ -23,19 +23,19 @@ It specifies how JWT should be verified. It has following fields:
 * local_jwks: fetch JWKS in local data source, either in a local file or embedded in the inline string.
 * remote_jwks: fetch JWKS from a remote HTTP server, also specify cache duration.
 * forward: if true, JWT will be forwarded to the upstream.
-* from_headers: extract JWT from custom HTTP header.
-* from_params: extract JWT from custom query parameter keys.
+* from_headers: extract JWT from custom HTTP header other than the default location.
+* from_params: extract JWT from custom query parameter keys other than the default location.
 * forward_payload_header: forward the JWT payload in the specified HTTP header.
 
-Default token extract location: if "from_headers" and "from_params" is empty,  the default location is from HTTP header::
+The default token extract location: if "from_headers" and "from_params" is empty,  the default location is from HTTP header::
 
   Authorization: Bearer <token>
 
-If not there, then check query parameter key "access_token" as this example::
+If fails to extract a token from there, then check query parameter key "access_token" as this example::
   
   /path?access_token=<JWT>
 
-In the filer config, "providers" a map, to map provider_name to a JwtProvider message. The "provider_name" has to be unique, usually it is the same as "issuer".  Multiple JwtProviders with the same issuer could be used to specify different audiences or different token extract locations.
+In the filter config, "providers" a map, to map provider_name to a JwtProvider message. The "provider_name" has to be unique, usually it is the same as "issuer".  Multiple JwtProviders with the same issuer are allowed to specify different audiences or different token extract locations for the same issuer.
 
 
 Config examples:
@@ -43,7 +43,7 @@ Config examples:
 .. code-block:: yaml
 
   providers:
-    provider_name1:
+    https://example.com:
       issuer: https://example.com
       audiences:
       - bookstore_android.apps.googleusercontent.com
@@ -57,18 +57,18 @@ Config examples:
 
 Above example specifies:
 
-* provider_name is "provider_name1"
-* issuer is https://example.com
+* provider_name is "https://example.com"
+* issuer is https://example.com also.
 * audiences: bookstore_android.apps.googleusercontent.com and bookstore_web.apps.googleusercontent.com
 * remote_jwks: use URL "https://example.com/.well-known/jwks.json" from cluster "example_jwks_cluster", its cache duration is 300 seconds.
-* token will be extracted from default locations since from_headers and from_params are empty.
+* token will be extracted from the default extract locations since from_headers and from_params are empty.
 * token will not be forwarded to upstream
 * JWT payload will not be added to the request header.
 
 .. code-block:: yaml
 
   providers:
-    provider_name2:
+    https://example2.com:
       issuer: https://example2.com
       local_jwks:
         inline_string: "PUBLIC-KEY"
@@ -79,22 +79,41 @@ Above example specifies:
 
 Above example specifies:
 
-* provider_name is "provider_name2"
-* issuer is https://example2.com
-* audiences: not specified, not JWT token will not be checked.
+* provider_name is "https://example2.com"
+* issuer is https://example2.com too.
+* audiences: not specified, JWT "aud" field will not be checked.
 * local_jwks: JWKS is embeded in the inline string.
 * from_headers: token will be extracted from HTTP headers as::
 
      x-goog-iap-jwt-assertion: <JWT>.
   
 * forward: token will forwarded to upstream
-* JWT payload will be added to the request header as::
+* JWT payload will be added to the request header as following format::
 
     x-jwt-payload: base64_encoded(jwt_payload_in_JSON)
   
-	  
-The external authorization HTTP filter calls an external gRPC or HTTP service to check if the incoming
-HTTP request is authorized or not.
+
+RequirementRule
+~~~~~~~~~~~~~~~
+
+It has two fields: "match" and "requires".  The field "match" to specify how a request can be matched; e.g. by HTTP headers, or by query parameters, or by path prefixes.  The field "requires" specifies the JWT requirement, e.g. which provider is required. Multiple providers may be required in such forms, such as "require_all" or "require_any". 
+
+The field "match" uses following fields to define a match:
+* one of following path_specifier: prefix, path, and regex.
+* headers: specify how to match HTTP headers.
+* query_parameters: specify how to match query parameters.
+
+The field "requires" can be specified as any one of followings:
+* provider_name: specifies the provider name of required JwtProvider
+* provider_and_audiences: specifies the provider with audiences. The audiences will override the one in the JwtProvider.
+* requires_any: a list of requirements that if any of them success, it will be success.
+* requires_all: a list of requirements that only if all of them success, it will be success.
+* allow_missing_or_failed: If true, all JWT token will be verified, successfully verified JWTs will output its payload results. The request will proceeded regardless JWT is missing or any of verification failures. The typical use case is: there is another HTTP filter after this JWT filter. The JWT filter is used to do JWT verification, that filter will make decision based on the results.
+
+
+
+
+    HTTP request is authorized or not.
 If the request is deemed unauthorized then the request will be denied normally with 403 (Forbidden) response.
 Note that sending additional custom metadata from the authorization service to the upstream, or to the downstream is 
 also possible. This is explained in more details at :ref:`HTTP filter <envoy_api_msg_config.filter.http.ext_authz.v2alpha.ExtAuthz>`.
