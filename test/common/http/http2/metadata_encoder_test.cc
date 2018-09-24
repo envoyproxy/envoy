@@ -43,7 +43,7 @@ static ssize_t pack_extension_callback(nghttp2_session* session, uint8_t* buf, s
   const uint64_t size_from_encoder =
       std::min(encoder->getMaxMetadataSize(), encoder->payload()->length());
   const uint64_t size_to_copy = std::min(static_cast<uint64_t>(len), size_from_encoder);
-  Buffer::OwnedImpl* p = reinterpret_cast<Buffer::OwnedImpl*>(frame->ext.payload);
+  Buffer::OwnedImpl* p = reinterpret_cast<Buffer::OwnedImpl*>(encoder->payload());
   p->copyOut(0, size_to_copy, buf);
 
   // Releases the payload that has been copied to nghttp2.
@@ -65,6 +65,8 @@ static ssize_t pack_extension_callback(nghttp2_session* session, uint8_t* buf, s
 static int on_extension_chunk_recv_callback(nghttp2_session* session, const nghttp2_frame_hd* hd,
                                             const uint8_t* data, size_t len, void* user_data) {
   EXPECT_NE(nullptr, session);
+  // Sanity check header length.
+  EXPECT_EQ(hd->length, len);
   // All the flag should be 0 except the last frame.
   EXPECT_EQ(0, reinterpret_cast<UserData*>(user_data)->flag);
   reinterpret_cast<UserData*>(user_data)->flag = hd->flags;
@@ -217,8 +219,6 @@ TEST_F(MetadataEncoderTest, EncodeSmallHeaderBlock) {
 TEST_F(MetadataEncoderTest, EncodeLargeHeaderBlock) {
   initialize();
 
-  const std::string large_value1 = std::string(90000, 'a');
-  const std::string large_value2 = std::string(90000, 'b');
   MetadataMap metadata_map = {
       {"header_key1", std::string(20000, 'a')},
       {"header_key2", std::string(20000, 'b')},
@@ -230,8 +230,10 @@ TEST_F(MetadataEncoderTest, EncodeLargeHeaderBlock) {
   // Submits METADATA to nghttp2.
   const uint8_t flag =
       (encoder_.payload()->length() > encoder_.getMaxMetadataSize()) ? 0 : END_METADATA_FLAG;
+  // The payload can't be submitted within one frame. Callback function will
+  // keep submitting until all the payload has been submitted.
   int result =
-      nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, flag, STREAM_ID, encoder_.payload());
+      nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, flag, STREAM_ID, nullptr);
   EXPECT_EQ(0, result);
 
   // Sends METADATA to nghttp2.
