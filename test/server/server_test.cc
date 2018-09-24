@@ -252,8 +252,8 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckValidTimeoutAndInterva
 // initialization properly, but without starting an admin listener.
 TEST_P(ServerInstanceImplTest, BootstrapNodeNoAdmin) {
   EXPECT_NO_THROW(initialize("test/server/node_bootstrap_no_admin_port.yaml"));
-  EXPECT_THROW_WITH_MESSAGE(server_->admin().addListenerToHandler(nullptr), EnvoyException,
-                            "asked to add a non-existent listener");
+  EXPECT_THROW_WITH_MESSAGE(server_->admin().addListenerToHandler(/*handler=*/nullptr),
+                            EnvoyException, "asked to add a non-existent listener");
 }
 
 // Negative test for protoc-gen-validate constraints.
