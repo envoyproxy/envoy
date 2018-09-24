@@ -27,6 +27,11 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Http {
 
+class MockInternalAddressConfig : public Http::InternalAddressConfig {
+public:
+  MOCK_CONST_METHOD1(isInternalAddress, bool(const Network::Address::Instance&));
+};
+
 class MockConnectionManagerConfig : public ConnectionManagerConfig {
 public:
   MockConnectionManagerConfig() { ON_CALL(*this, generateRequestId()).WillByDefault(Return(true)); }
@@ -51,6 +56,10 @@ public:
   MOCK_METHOD0(stats, ConnectionManagerStats&());
   MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
   MOCK_METHOD0(useRemoteAddress, bool());
+  const Http::InternalAddressConfig& internalAddressConfig() const override {
+    return *internal_address_config_;
+  }
+  MOCK_METHOD0(unixSocketInternal, bool());
   MOCK_CONST_METHOD0(xffNumTrustedHops, uint32_t());
   MOCK_CONST_METHOD0(skipXffAppend, bool());
   MOCK_CONST_METHOD0(via, const std::string&());
@@ -63,6 +72,9 @@ public:
   MOCK_METHOD0(listenerStats, ConnectionManagerListenerStats&());
   MOCK_CONST_METHOD0(proxy100Continue, bool());
   MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
+
+  std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
+      std::make_unique<DefaultInternalAddressConfig>();
 };
 
 class ConnectionManagerUtilityTest : public testing::Test {
@@ -148,6 +160,25 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
   EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", false}),
             callMutateRequestHeaders(headers, Protocol::Http2));
   EXPECT_STREQ("198.51.100.1", headers.ForwardedFor()->value().c_str());
+}
+
+// Verify internal request and XFF is set when we are using remote address and the address is
+// internal according to user configuration.
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWhenUserConfiguredRemoteAddress) {
+  auto config = std::make_unique<NiceMock<MockInternalAddressConfig>>();
+  ON_CALL(*config, isInternalAddress).WillByDefault(Return(true));
+  config_.internal_address_config_ = std::move(config);
+
+  Network::Address::Ipv4Instance local_address("10.3.2.1");
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, localAddress()).WillByDefault(ReturnRef(local_address));
+
+  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
+
+  TestHeaderMapImpl headers;
+  EXPECT_EQ((MutateRequestRet{"12.12.12.12:0", true}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ("12.12.12.12", headers.get_(Headers::get().ForwardedFor));
 }
 
 // Verify internal request and XFF is set when we are using remote address the address is internal.

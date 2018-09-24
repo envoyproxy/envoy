@@ -58,10 +58,12 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
     }
 
     tls_.reset(new ThreadLocal::InstanceImpl);
+    Thread::BasicLockable& log_lock = restarter_->logLock();
     Thread::BasicLockable& access_log_lock = restarter_->accessLogLock();
-    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
-
-    configureLogging();
+    auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());   
+    logging_context_ =
+        std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(), log_lock);
+    configureComponentLogLevels();
 
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
                                                                  restarter_->statsAllocator());
@@ -74,16 +76,15 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
   }
   case Server::Mode::Validate:
     restarter_.reset(new Server::HotRestartNopImpl());
-    Logger::Registry::initialize(options_.logLevel(), options_.logFormat(), restarter_->logLock());
+    logging_context_ = std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(),
+                                                         restarter_->logLock());
     break;
   }
 }
 
 MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
 
-void MainCommonBase::configureLogging() {
-  Thread::BasicLockable& log_lock = restarter_->logLock();
-  Logger::Registry::initialize(options_.logLevel(), options_.logFormat(), log_lock);
+void MainCommonBase::configureComponentLogLevels() {
   std::vector<std::string> log_levels = absl::StrSplit(options_.subComponentLogLevel(), ',');
   for (auto& level : log_levels) {
     std::vector<std::string> log_name_level = absl::StrSplit(level, ':');

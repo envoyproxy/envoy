@@ -42,5 +42,18 @@ virtual_hosts:
       cluster: local_service_with_header_pattern_unset_regex
   - match:
       prefix: /
+      grpc: {}
+      headers:
+      - name: test_header
+        exact_match: some_value
+    route:
+      cluster: local_service_with_grpc_and_other_header
+  - match:
+      prefix: /
+      grpc: {}
+    route:
+      cluster: local_service_with_grpc
+  - match:
+      prefix: /
     route:
       cluster: local_service_without_headers

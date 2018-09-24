@@ -534,39 +534,41 @@ TEST(HeaderParserTest, EvaluateCompoundHeaders) {
 match: { prefix: "/new_endpoint" }
 route:
   cluster: www2
-  request_headers_to_add:
-    - header:
-        key: "x-prefix"
-        value: "prefix-%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-    - header:
-        key: "x-suffix"
-        value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%-suffix"
-    - header:
-        key: "x-both"
-        value: "prefix-%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%-suffix"
-    - header:
-        key: "x-escaping-1"
-        value: "%%%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%%%"
-    - header:
-        key: "x-escaping-2"
-        value: "%%%%%%"
-    - header:
-        key: "x-multi"
-        value: "%PROTOCOL% from %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-    - header:
-        key: "x-multi-back-to-back"
-        value: "%PROTOCOL%%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-    - header:
-        key: "x-metadata"
-        value: "%UPSTREAM_METADATA([\"namespace\", \"%key%\"])%"
-    - header:
-        key: "x-per-request"
-        value: "%PER_REQUEST_STATE(testing)%"
+request_headers_to_add:
+  - header:
+      key: "x-prefix"
+      value: "prefix-%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+  - header:
+      key: "x-suffix"
+      value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%-suffix"
+  - header:
+      key: "x-both"
+      value: "prefix-%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%-suffix"
+  - header:
+      key: "x-escaping-1"
+      value: "%%%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%%%"
+  - header:
+      key: "x-escaping-2"
+      value: "%%%%%%"
+  - header:
+      key: "x-multi"
+      value: "%PROTOCOL% from %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+  - header:
+      key: "x-multi-back-to-back"
+      value: "%PROTOCOL%%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+  - header:
+      key: "x-metadata"
+      value: "%UPSTREAM_METADATA([\"namespace\", \"%key%\"])%"
+  - header:
+      key: "x-per-request"
+      value: "%PER_REQUEST_STATE(testing)%"
+request_headers_to_remove: ["x-nope"]
   )EOF";
 
+  const auto route = parseRouteFromV2Yaml(yaml);
   HeaderParserPtr req_header_parser =
-      HeaderParser::configure(parseRouteFromV2Yaml(yaml).route().request_headers_to_add());
-  Http::TestHeaderMapImpl header_map{{":method", "POST"}};
+      HeaderParser::configure(route.request_headers_to_add(), route.request_headers_to_remove());
+  Http::TestHeaderMapImpl header_map{{":method", "POST"}, {"x-safe", "safe"}, {"x-nope", "nope"}};
   NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
   absl::optional<Envoy::Http::Protocol> protocol = Envoy::Http::Protocol::Http11;
   ON_CALL(request_info, protocol()).WillByDefault(ReturnPointee(&protocol));
@@ -618,6 +620,9 @@ route:
 
   EXPECT_TRUE(header_map.has("x-per-request"));
   EXPECT_EQ("test_value", header_map.get_("x-per-request"));
+
+  EXPECT_TRUE(header_map.has("x-safe"));
+  EXPECT_FALSE(header_map.has("x-nope"));
 }
 
 TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
