@@ -64,15 +64,58 @@ message StatsConfig {
   StatsFilter stats_filter = 3;
 }
 
+// Configuration for disabling stat instantiation.
 message StatsFilter {
-  // Stat creation is unrestricted by default. StatsFilter can accept either an exclusion list or an
-  // inclusion list. If an inclusion list is supplied, all stats are disabled by default except for
-  // those matching.
+  // The instantiation of stats is unrestricted by default. However, StatsFilter can be used to
+  // limit the creation of families of stats in order to conserve memory. Stats can be limited by
+  // either an exclusion or an inclusion list of
+  // :ref:`StringMatcher <envoy_api_msg_type.matcher.StringMatcher>` protos:
   //
-  // .. note::
+  // * If an exclusion list is supplied, any stat name matching *any* of the StringMatchers in the
+  //   list will not instantiate.
   //
-  //   If possible, it is recommended to supply a StringMatcher prefix or suffix instead of a regex
-  //   for performance reasons.
+  // * If an inclusion list is supplied, no stats will instantiate, except those matching *any* of
+  //   the StringMatchers in the list.
+  //
+  //
+  // A StringMatcher can match by an exact string, a suffix / prefix, or a regex. For performance
+  // reasons, it is recommended to use a prefix or suffix rather than a regex.
+  //
+  // Example 1. Excluding all cluster-specific stats, but not cluster-manager stats:
+  //
+  // .. code-block:: json
+  //
+  //   {
+  //     "statsFilter": {
+  //       "exclusionList": {
+  //         "patterns": [
+  //           {
+  //             "prefix": "cluster."
+  //           }
+  //         ]
+  //       }
+  //     }
+  //   }
+  //
+  // Example 2. Including only manager-related stats:
+  //
+  // .. code-block:: json
+  //
+  //   {
+  //     "statsFilter": {
+  //       "inclusionList": {
+  //         "patterns": [
+  //           {
+  //             "prefix": "cluster_manager."
+  //           },
+  //           {
+  //             "prefix": "listener_manager."
+  //           }
+  //         ]
+  //       }
+  //     }
+  //   }
+  //
   oneof stats_filter {
     option (validate.required) = true;
 
