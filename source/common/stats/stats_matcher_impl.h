@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/config/metrics/v2/stats.pb.h"
-#include "envoy/stats/stats_filter.h"
+#include "envoy/stats/stats_matcher.h"
 
 #include "common/common/matchers.h"
 #include "common/protobuf/protobuf.h"
@@ -14,14 +14,14 @@ namespace Envoy {
 namespace Stats {
 
 /**
- * Supplies a stats filter.
+ * Supplies a stats matcher.
  */
-class StatsFilterImpl : public StatsFilter {
+class StatsMatcherImpl : public StatsMatcher {
 public:
-  StatsFilterImpl(const envoy::config::metrics::v2::StatsConfig& config);
+  StatsMatcherImpl(const envoy::config::metrics::v2::StatsConfig& config);
 
   // Default constructor simply allows everything.
-  StatsFilterImpl() {}
+  StatsMatcherImpl() {}
 
   /**
    * Take a metric name and report whether or not it should be disallowed.

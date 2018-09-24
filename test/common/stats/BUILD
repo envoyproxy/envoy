@@ -46,10 +46,10 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "stats_filter_test",
-    srcs = ["stats_filter_test.cc"],
+    name = "stats_matcher_test",
+    srcs = ["stats_matcher_test.cc"],
     deps = [
-        "//source/common/stats:stats_filter_lib",
+        "//source/common/stats:stats_matcher_lib",
         "//test/test_common:utility_lib",
     ],
 )

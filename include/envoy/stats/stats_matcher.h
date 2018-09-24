@@ -8,9 +8,9 @@
 namespace Envoy {
 namespace Stats {
 
-class StatsFilter {
+class StatsMatcher {
 public:
-  virtual ~StatsFilter() {}
+  virtual ~StatsMatcher() {}
 
   /**
    * Take a metric name and report whether or not it should be instantiated.
@@ -20,7 +20,7 @@ public:
   virtual bool rejects(const std::string& name) const PURE;
 };
 
-typedef std::unique_ptr<const StatsFilter> StatsFilterPtr;
+typedef std::unique_ptr<const StatsMatcher> StatsMatcherPtr;
 
 } // namespace Stats
 } // namespace Envoy

@@ -16,7 +16,7 @@
 #include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
-#include "common/stats/stats_filter_impl.h"
+#include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
 namespace Envoy {
@@ -222,9 +222,9 @@ Utility::createTagProducer(const envoy::config::bootstrap::v2::Bootstrap& bootst
   return std::make_unique<Stats::TagProducerImpl>(bootstrap.stats_config());
 }
 
-Stats::StatsFilterPtr
-Utility::createStatsFilter(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-  return std::make_unique<Stats::StatsFilterImpl>(bootstrap.stats_config());
+Stats::StatsMatcherPtr
+Utility::createStatsMatcher(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  return std::make_unique<Stats::StatsMatcherImpl>(bootstrap.stats_config());
 }
 
 void Utility::checkObjNameLength(const std::string& error_prefix, const std::string& name,

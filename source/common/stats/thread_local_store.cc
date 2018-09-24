@@ -14,7 +14,7 @@
 #include "envoy/stats/stats_options.h"
 
 #include "common/common/lock_guard.h"
-#include "common/stats/stats_filter_impl.h"
+#include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
 #include "absl/strings/str_join.h"
@@ -26,7 +26,7 @@ ThreadLocalStoreImpl::ThreadLocalStoreImpl(const StatsOptions& stats_options,
                                            StatDataAllocator& alloc)
     : stats_options_(stats_options), alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
-      stats_filter_(std::make_unique<StatsFilterImpl>()),
+      stats_matcher_(std::make_unique<StatsMatcherImpl>()),
       num_last_resort_stats_(default_scope_->counter("stats.overflow")), source_(*this) {}
 
 ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
@@ -235,7 +235,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counter(const std::string& name) {
   // Determine the final name based on the prefix and the passed name.
   std::string final_name = prefix_ + name;
 
-  if (parent_.stats_filter_->rejects(final_name)) {
+  if (parent_.stats_matcher_->rejects(final_name)) {
     return null_counter_;
   }
 
@@ -278,7 +278,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gauge(const std::string& name) {
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
 
-  if (parent_.stats_filter_->rejects(final_name)) {
+  if (parent_.stats_matcher_->rejects(final_name)) {
     return null_gauge_;
   }
 
@@ -301,7 +301,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
   // share this code so I'm leaving it largely duplicated for now.
   std::string final_name = prefix_ + name;
 
-  if (parent_.stats_filter_->rejects(final_name)) {
+  if (parent_.stats_matcher_->rejects(final_name)) {
     return null_histogram_;
   }
 
@@ -334,7 +334,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogram(const std::string& name) {
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(const std::string& name,
                                                          ParentHistogramImpl& parent) {
-  if (parent_.stats_filter_->rejects(name)) {
+  if (parent_.stats_matcher_->rejects(name)) {
     return null_histogram_;
   }
 

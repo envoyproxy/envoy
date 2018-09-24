@@ -6,7 +6,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats_filter.h"
+#include "envoy/stats/stats_matcher.h"
 #include "envoy/stats/tag_producer.h"
 
 namespace Envoy {
@@ -68,10 +68,10 @@ public:
   virtual void setTagProducer(TagProducerPtr&& tag_producer) PURE;
 
   /**
-   * Set the given stats filter to prevent the initialization of stats matching a specific stat
+   * Set the given stats matcher to prevent the initialization of stats matching a specific stat
    * name.
    */
-  virtual void setStatsFilter(StatsFilterPtr&& stats_filter) PURE;
+  virtual void setStatsMatcher(StatsMatcherPtr&& stats_matcher) PURE;
 
   /**
    * Initialize the store for threading. This will be called once after all worker threads have

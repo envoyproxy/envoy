@@ -1,4 +1,4 @@
-#include "common/stats/stats_filter_impl.h"
+#include "common/stats/stats_matcher_impl.h"
 
 #include <regex>
 #include <string>
@@ -8,26 +8,26 @@
 namespace Envoy {
 namespace Stats {
 
-StatsFilterImpl::StatsFilterImpl(const envoy::config::metrics::v2::StatsConfig& config) {
-  switch (config.stats_filter().stats_filter_case()) {
-  case envoy::config::metrics::v2::StatsFilter::kExclusionList:
-    for (const auto& stats_filter : config.stats_filter().exclusion_list().patterns()) {
-      matchers_.push_back(Matchers::StringMatcher(stats_filter));
+StatsMatcherImpl::StatsMatcherImpl(const envoy::config::metrics::v2::StatsConfig& config) {
+  switch (config.stats_matcher().stats_matcher_case()) {
+  case envoy::config::metrics::v2::StatsMatcher::kExclusionList:
+    for (const auto& stats_matcher : config.stats_matcher().exclusion_list().patterns()) {
+      matchers_.push_back(Matchers::StringMatcher(stats_matcher));
     }
     break;
-  case envoy::config::metrics::v2::StatsFilter::kInclusionList:
+  case envoy::config::metrics::v2::StatsMatcher::kInclusionList:
     default_inclusive_ = false;
-    for (const auto& stats_filter : config.stats_filter().inclusion_list().patterns()) {
-      matchers_.push_back(Matchers::StringMatcher(stats_filter));
+    for (const auto& stats_matcher : config.stats_matcher().inclusion_list().patterns()) {
+      matchers_.push_back(Matchers::StringMatcher(stats_matcher));
     }
     break;
   default:
-    // No filter was supplied, so we default to allow all stat names.
+    // No matcher was supplied, so we default to allow all stat names.
     break;
   }
 }
 
-bool StatsFilterImpl::rejects(const std::string& name) const {
+bool StatsMatcherImpl::rejects(const std::string& name) const {
   if (default_inclusive_) {
     // If we are in default-allow mode, matching any of the matchers is grounds for denial.
     return std::any_of(matchers_.begin(), matchers_.end(),

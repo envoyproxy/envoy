@@ -163,9 +163,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "stats_filter_lib",
-    srcs = ["stats_filter_impl.cc"],
-    hdrs = ["stats_filter_impl.h"],
+    name = "stats_matcher_lib",
+    srcs = ["stats_matcher_impl.cc"],
+    hdrs = ["stats_matcher_impl.h"],
     deps = [
         "//include/envoy/stats:stats_interface",
         "//source/common/common:matchers_lib",
@@ -180,8 +180,8 @@ envoy_cc_library(
     hdrs = ["thread_local_store.h"],
     deps = [
         ":heap_stat_data_lib",
-        ":stats_filter_lib",
         ":stats_lib",
+        ":stats_matcher_lib",
         ":tag_producer_lib",
         "//include/envoy/thread_local:thread_local_interface",
     ],
