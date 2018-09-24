@@ -302,7 +302,6 @@ Http::ServerConnectionPtr
 HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
                                          const Buffer::Instance& data,
                                          Http::ServerConnectionCallbacks& callbacks) {
-  connection.setDelayedCloseTimeout(delayed_close_timeout_);
   switch (codec_type_) {
   case CodecType::HTTP1:
     return Http::ServerConnectionPtr{

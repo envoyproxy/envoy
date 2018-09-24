@@ -205,6 +205,12 @@ public:
   virtual std::chrono::milliseconds streamIdleTimeout() const PURE;
 
   /**
+   * @return delayed close timeout for downstream HTTP connections. Zero indicates a disabled
+   *         timeout. See http_connection_manager.proto for a detailed description of this timeout.
+   */
+  virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
+
+  /**
    * @return Router::RouteConfigProvider& the configuration provider used to acquire a route
    *         config for each request flow.
    */
