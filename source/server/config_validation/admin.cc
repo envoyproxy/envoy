@@ -18,5 +18,9 @@ Http::Code ValidationAdmin::request(absl::string_view, absl::string_view, Http::
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 
+void ValidationAdmin::addListenerToHandler(Network::ConnectionHandler*) {
+  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+}
+
 } // namespace Server
 } // namespace Envoy

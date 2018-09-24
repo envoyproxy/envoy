@@ -127,6 +127,7 @@ public:
 
   /**
    * Add this Admin's listener to the provided handler, if the listener exists.
+   * Throws an exception if the listener does not exist.
    * @param handler the handler that will receive this Admin's listener.
    */
   virtual void addListenerToHandler(Network::ConnectionHandler* handler) PURE;
