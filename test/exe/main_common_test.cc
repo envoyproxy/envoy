@@ -1,11 +1,3 @@
-// MainCommonTest works fine in coverage tests, but it appears to break SignalsTest when
-// run in the same process. It appears that MainCommon doesn't completely clean up after
-// itself, possibly due to a bug in SignalAction. So for now, we can test MainCommon
-// but can't measure its test coverage.
-//
-// TODO(issues/2580): Fix coverage tests when MainCommonTest is enabled.
-#ifndef ENVOY_CONFIG_COVERAGE
-
 #include <unistd.h>
 
 #include "common/common/lock_guard.h"
@@ -312,10 +304,15 @@ TEST_P(AdminRequestTest, AdminRequestAfterRun) {
   EXPECT_EQ(1, lambda_destroy_count);
 }
 
+// Verifies that the Logger::Registry is usable after constructing and
+// destructing MainCommon.
+TEST_P(MainCommonTest, ConstructDestructLogger) {
+  VERBOSE_EXPECT_NO_THROW(MainCommon main_common(argc(), argv()));
+  Logger::Registry::getSink()->log({});
+}
+
 INSTANTIATE_TEST_CASE_P(IpVersions, AdminRequestTest,
                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                         TestUtility::ipTestParamsToString);
 
 } // namespace Envoy
-
-#endif // ENVOY_CONFIG_COVERAGE

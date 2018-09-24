@@ -13,6 +13,7 @@
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
+#include "common/request_info/filter_state_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/mocks/event/mocks.h"
@@ -50,6 +51,7 @@ public:
   Address::InstanceConstSharedPtr remote_address_;
   Address::InstanceConstSharedPtr local_address_;
   bool read_enabled_{true};
+  RequestInfo::FilterStateImpl per_connection_state_;
   Connection::State state_{Connection::State::Open};
 };
 
@@ -86,6 +88,8 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
   MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
+  MOCK_METHOD0(perConnectionState, RequestInfo::FilterState&());
+  MOCK_CONST_METHOD0(perConnectionState, const RequestInfo::FilterState&());
 };
 
 /**
@@ -125,6 +129,8 @@ public:
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
   MOCK_CONST_METHOD0(socketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
+  MOCK_METHOD0(perConnectionState, RequestInfo::FilterState&());
+  MOCK_CONST_METHOD0(perConnectionState, const RequestInfo::FilterState&());
 
   // Network::ClientConnection
   MOCK_METHOD0(connect, void());

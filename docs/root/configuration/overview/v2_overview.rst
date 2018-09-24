@@ -231,6 +231,7 @@ below:
       lb_policy: ROUND_ROBIN
       http2_protocol_options: {}
       load_assignment:
+        cluster_name: xds_cluster
         endpoints:
         - lb_endpoints:
           - endpoint:

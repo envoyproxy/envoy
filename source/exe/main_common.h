@@ -55,6 +55,7 @@ protected:
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> stats_store_;
+  std::unique_ptr<Logger::Context> logging_context_;
   std::unique_ptr<Server::InstanceImpl> server_;
 };
 
