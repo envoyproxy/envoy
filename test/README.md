@@ -15,7 +15,7 @@ downstream-Envoy-upstream communication.
 ## Custom matchers
 
 Envoy includes some custom Google Mock matchers to make test expectation
-statements simpler to write.
+statements simpler to write and easier to understand.
 
 ### HeaderValueOf
 
