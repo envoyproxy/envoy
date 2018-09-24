@@ -18,6 +18,11 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "backward-cpp-1.4",
         urls = ["https://github.com/bombela/backward-cpp/archive/v1.4.tar.gz"],
     ),
+    com_github_c_ares_c_ares = dict(
+        sha256 = "62dd12f0557918f89ad6f5b759f0bf4727174ae9979499f5452c02be38d9d3e8",
+        strip_prefix = "c-ares-cares-1_14_0",
+        urls = ["https://github.com/c-ares/c-ares/archive/cares-1_14_0.tar.gz"],
+    ),
     com_github_circonus_labs_libcircllhist = dict(
         commit = "050da53a44dede7bda136b93a9aeef47bd91fa12",  # 2018-07-02
         remote = "https://github.com/circonus-labs/libcircllhist",
@@ -61,6 +66,11 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = "8bbbb1e78d4ddb0a1919276924ab10d11b631df48b657d960e0c795a25515735",
         strip_prefix = "nanopb-f8ac463766281625ad710900479130c7fcb4d63b",
         urls = ["https://github.com/nanopb/nanopb/archive/f8ac463766281625ad710900479130c7fcb4d63b.tar.gz"],
+    ),
+    com_github_nghttp2_nghttp2 = dict(
+        sha256 = "42fff7f290100c02234ac3b0095852e4392e6bfd95ebed900ca8bd630850d88c",
+        strip_prefix = "nghttp2-1.33.0",
+        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.33.0/nghttp2-1.33.0.tar.gz"],
     ),
     io_opentracing_cpp = dict(
         sha256 = "4455ca507936bc4b658ded10a90d8ebbbd61c58f06207be565a4ffdc885687b5",
