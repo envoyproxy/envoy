@@ -19,7 +19,7 @@ import "gogoproto/gogo.proto";
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 
-// [#comment:next free field: 25]
+// [#comment:next free field: 27]
 message HttpConnectionManager {
   enum CodecType {
     option (gogoproto.goproto_enum_prefix) = false;
@@ -174,6 +174,25 @@ message HttpConnectionManager {
   // draining. The default grace period is 5000 milliseconds (5 seconds) if this
   // option is not specified.
   google.protobuf.Duration drain_timeout = 12 [(gogoproto.stdduration) = true];
+
+  // The delayed close timeout is for downstream connections managed by the HTTP connection manager.
+  // It is defined as a grace period after connection close processing has been locally initiated
+  // during which Envoy will flush the write buffers for the connection and await the peer to close
+  // (i.e., a TCP FIN/RST is received by Envoy from the downstream connection).
+  //
+  // Delaying Envoy's connection close and giving the peer the opportunity to initate the close
+  // sequence mitigates a race condition that exists when downstream clients do not drain/process
+  // data in a connection's receive buffer after a remote close has been detected via a socket
+  // write(). This race leads to such clients failing to process the response code sent by Envoy,
+  // which could result in erroneous downstream processing.
+  //
+  // If the timeout triggers, Envoy will close the connection's socket.
+  //
+  // The default timeout is 1000 ms if this option is not specified.
+  //
+  // A value of 0 will completely disable delayed close processing, and the downstream connection's
+  // socket will be closed immediately after the write flush is completed.
+  google.protobuf.Duration delayed_close_timeout = 26 [(gogoproto.stdduration) = true];
 
   // Configuration for :ref:`HTTP access logs <arch_overview_access_logs>`
   // emitted by the connection manager.
