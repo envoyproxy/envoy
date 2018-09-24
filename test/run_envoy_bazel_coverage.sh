@@ -35,6 +35,7 @@ BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} -c dbg --copt=-DNDEBUG"
 # a single coverage test binary and do not require the "bazel coverage" support
 # for collecting multiple traces and glueing them together.
 "${BAZEL_COVERAGE}" --batch test "${COVERAGE_TARGET}" ${BAZEL_TEST_OPTIONS} \
+  --experimental_cc_skylark_api_enabled_packages=@rules_foreign_cc//tools/build_defs,tools/build_defs \
   --cache_test_results=no --cxxopt="--coverage" --cxxopt="-DENVOY_CONFIG_COVERAGE=1" \
   --linkopt="--coverage" --define ENVOY_CONFIG_COVERAGE=1 --test_output=streamed \
   --strategy=Genrule=standalone --spawn_strategy=standalone --test_timeout=1000 \
