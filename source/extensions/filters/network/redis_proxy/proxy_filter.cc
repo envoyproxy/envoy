@@ -25,8 +25,9 @@ ProxyFilterConfig::ProxyFilterConfig(
 }
 
 ProxyStats ProxyFilterConfig::generateStats(const std::string& prefix, Stats::Scope& scope) {
-  return {
-      ALL_REDIS_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix), POOL_GAUGE_PREFIX(scope, prefix))};
+  return {ALL_REDIS_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix),
+                                POOL_GAUGE_PREFIX(scope, prefix),
+                                POOL_HISTOGRAM_PREFIX(scope, prefix))};
 }
 
 ProxyFilter::ProxyFilter(DecoderFactory& factory, EncoderPtr&& encoder,
@@ -47,9 +48,10 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
   callbacks_->connection().addConnectionCallbacks(*this);
   callbacks_->connection().setConnectionStats({config_->stats_.downstream_cx_rx_bytes_total_,
                                                config_->stats_.downstream_cx_rx_bytes_buffered_,
+                                               config_->stats_.downstream_cx_rx_bytes_,
                                                config_->stats_.downstream_cx_tx_bytes_total_,
                                                config_->stats_.downstream_cx_tx_bytes_buffered_,
-                                               nullptr});
+                                               config_->stats_.downstream_cx_tx_bytes_, nullptr});
 }
 
 void ProxyFilter::onRespValue(RespValuePtr&& value) {

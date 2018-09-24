@@ -141,7 +141,7 @@ Filter::~Filter() {
 }
 
 TcpProxyStats Config::SharedConfig::generateStats(Stats::Scope& scope) {
-  return {ALL_TCP_PROXY_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
+  return {ALL_TCP_PROXY_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope), POOL_HISTOGRAM(scope))};
 }
 
 void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
@@ -167,8 +167,9 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
     read_callbacks_->connection().setConnectionStats(
         {config_->stats().downstream_cx_rx_bytes_total_,
          config_->stats().downstream_cx_rx_bytes_buffered_,
-         config_->stats().downstream_cx_tx_bytes_total_,
-         config_->stats().downstream_cx_tx_bytes_buffered_, nullptr});
+         config_->stats().downstream_cx_rx_bytes_, config_->stats().downstream_cx_tx_bytes_total_,
+         config_->stats().downstream_cx_tx_bytes_buffered_,
+         config_->stats().downstream_cx_tx_bytes_, nullptr});
   }
 }
 

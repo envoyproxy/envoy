@@ -333,8 +333,10 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   codec_client_->setConnectionStats(
       {parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
        parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
+       parent_.host_->cluster().stats().upstream_cx_rx_bytes_,
        parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
        parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_,
+       parent_.host_->cluster().stats().upstream_cx_tx_bytes_,
        &parent_.host_->cluster().stats().bind_errors_});
 }
 

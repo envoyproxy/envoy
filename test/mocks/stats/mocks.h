@@ -88,7 +88,7 @@ public:
 
   std::string name_;
   std::vector<Tag> tags_;
-  Store* store_;
+  Store* store_{nullptr};
 };
 
 class MockParentHistogram : public ParentHistogram {
@@ -112,7 +112,7 @@ public:
   std::string name_;
   std::vector<Tag> tags_;
   bool used_;
-  Store* store_;
+  Store* store_{nullptr};
   std::shared_ptr<HistogramStatistics> histogram_stats_ =
       std::make_shared<HistogramStatisticsImpl>();
 };

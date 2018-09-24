@@ -25,24 +25,26 @@ namespace RedisProxy {
  * All redis proxy stats. @see stats_macros.h
  */
 // clang-format off
-#define ALL_REDIS_PROXY_STATS(COUNTER, GAUGE)                                                      \
-  COUNTER(downstream_cx_rx_bytes_total)                                                            \
-  GAUGE  (downstream_cx_rx_bytes_buffered)                                                         \
-  COUNTER(downstream_cx_tx_bytes_total)                                                            \
-  GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \
-  COUNTER(downstream_cx_protocol_error)                                                            \
-  COUNTER(downstream_cx_total)                                                                     \
-  GAUGE  (downstream_cx_active)                                                                    \
-  COUNTER(downstream_cx_drain_close)                                                               \
-  COUNTER(downstream_rq_total)                                                                     \
-  GAUGE  (downstream_rq_active)
+#define ALL_REDIS_PROXY_STATS(COUNTER, GAUGE, HISTOGRAM)                                           \
+  HISTOGRAM(downstream_cx_rx_bytes)                                                                \
+  COUNTER  (downstream_cx_rx_bytes_total)                                                          \
+  GAUGE    (downstream_cx_rx_bytes_buffered)                                                       \
+  HISTOGRAM(downstream_cx_tx_bytes)                                                                \
+  COUNTER  (downstream_cx_tx_bytes_total)                                                          \
+  GAUGE    (downstream_cx_tx_bytes_buffered)                                                       \
+  COUNTER  (downstream_cx_protocol_error)                                                          \
+  COUNTER  (downstream_cx_total)                                                                   \
+  GAUGE    (downstream_cx_active)                                                                  \
+  COUNTER  (downstream_cx_drain_close)                                                             \
+  COUNTER  (downstream_rq_total)                                                                   \
+  GAUGE    (downstream_rq_active)
 // clang-format on
 
 /**
  * Struct definition for all redis proxy stats. @see stats_macros.h
  */
 struct ProxyStats {
-  ALL_REDIS_PROXY_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+  ALL_REDIS_PROXY_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**

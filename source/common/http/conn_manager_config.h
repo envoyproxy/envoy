@@ -32,10 +32,12 @@ namespace Http {
   GAUGE    (downstream_cx_http2_active)                                                            \
   COUNTER  (downstream_cx_protocol_error)                                                          \
   HISTOGRAM(downstream_cx_length_ms)                                                               \
+  HISTOGRAM(downstream_cx_rx_bytes)                                                                \
   COUNTER  (downstream_cx_rx_bytes_total)                                                          \
   GAUGE    (downstream_cx_rx_bytes_buffered)                                                       \
   COUNTER  (downstream_cx_tx_bytes_total)                                                          \
   GAUGE    (downstream_cx_tx_bytes_buffered)                                                       \
+  HISTOGRAM(downstream_cx_tx_bytes)                                                                \
   COUNTER  (downstream_cx_drain_close)                                                             \
   COUNTER  (downstream_cx_idle_timeout)                                                            \
   COUNTER  (downstream_flow_control_paused_reading_total)                                          \

@@ -358,8 +358,10 @@ public:
   COUNTER  (upstream_cx_destroy_local_with_active_rq)                                              \
   COUNTER  (upstream_cx_destroy_remote_with_active_rq)                                             \
   COUNTER  (upstream_cx_close_notify)                                                              \
+  HISTOGRAM(upstream_cx_rx_bytes)                                                                  \
   COUNTER  (upstream_cx_rx_bytes_total)                                                            \
   GAUGE    (upstream_cx_rx_bytes_buffered)                                                         \
+  HISTOGRAM(upstream_cx_tx_bytes)                                                                  \
   COUNTER  (upstream_cx_tx_bytes_total)                                                            \
   GAUGE    (upstream_cx_tx_bytes_buffered)                                                         \
   COUNTER  (upstream_cx_protocol_error)                                                            \

@@ -51,24 +51,28 @@ TEST(RawBufferSocket, TestBasics) {
 TEST(ConnectionImplUtility, updateBufferStats) {
   StrictMock<Stats::MockCounter> counter;
   StrictMock<Stats::MockGauge> gauge;
+  StrictMock<Stats::MockHistogram> histogram;
   uint64_t previous_total = 0;
 
   InSequence s;
   EXPECT_CALL(counter, add(5));
+  EXPECT_CALL(histogram, recordValue(5));
   EXPECT_CALL(gauge, add(5));
-  ConnectionImplUtility::updateBufferStats(5, 5, previous_total, counter, gauge);
+  ConnectionImplUtility::updateBufferStats(5, 5, previous_total, counter, gauge, histogram);
   EXPECT_EQ(5UL, previous_total);
 
   EXPECT_CALL(counter, add(1));
+  EXPECT_CALL(histogram, recordValue(1));
   EXPECT_CALL(gauge, sub(1));
-  ConnectionImplUtility::updateBufferStats(1, 4, previous_total, counter, gauge);
+  ConnectionImplUtility::updateBufferStats(1, 4, previous_total, counter, gauge, histogram);
 
   EXPECT_CALL(gauge, sub(4));
-  ConnectionImplUtility::updateBufferStats(0, 0, previous_total, counter, gauge);
+  ConnectionImplUtility::updateBufferStats(0, 0, previous_total, counter, gauge, histogram);
 
   EXPECT_CALL(counter, add(3));
+  EXPECT_CALL(histogram, recordValue(3));
   EXPECT_CALL(gauge, add(3));
-  ConnectionImplUtility::updateBufferStats(3, 3, previous_total, counter, gauge);
+  ConnectionImplUtility::updateBufferStats(3, 3, previous_total, counter, gauge, histogram);
 }
 
 class ConnectionImplDeathTest : public testing::TestWithParam<Address::IpVersion> {};
@@ -358,13 +362,18 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
 
 struct MockConnectionStats {
   Connection::ConnectionStats toBufferStats() {
-    return {rx_total_, rx_current_, tx_total_, tx_current_, &bind_errors_};
+    rx_bytes_.store_ = &stats_store_;
+    tx_bytes_.store_ = &stats_store_;
+    return {rx_total_, rx_current_, rx_bytes_, tx_total_, tx_current_, tx_bytes_, &bind_errors_};
   }
 
+  Stats::MockStore stats_store_;
   StrictMock<Stats::MockCounter> rx_total_;
   StrictMock<Stats::MockGauge> rx_current_;
+  StrictMock<Stats::MockHistogram> rx_bytes_;
   StrictMock<Stats::MockCounter> tx_total_;
   StrictMock<Stats::MockGauge> tx_current_;
+  StrictMock<Stats::MockHistogram> tx_bytes_;
   StrictMock<Stats::MockCounter> bind_errors_;
 };
 
@@ -388,6 +397,8 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
   EXPECT_CALL(*filter, onWrite(_, _)).InSequence(s1).WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::Connected)).InSequence(s1);
   EXPECT_CALL(client_connection_stats.tx_total_, add(4)).InSequence(s1);
+  EXPECT_CALL(client_connection_stats.tx_bytes_, recordValue(4)).InSequence(s1);
+  EXPECT_CALL(client_connection_stats.stats_store_, deliverHistogramToSinks(_, 4)).InSequence(s1);
 
   read_filter_.reset(new NiceMock<MockReadFilter>());
   MockConnectionStats server_connection_stats;
@@ -408,6 +419,8 @@ TEST_P(ConnectionImplTest, ConnectionStats) {
 
   Sequence s2;
   EXPECT_CALL(server_connection_stats.rx_total_, add(4)).InSequence(s2);
+  EXPECT_CALL(server_connection_stats.rx_bytes_, recordValue(4)).InSequence(s2);
+  EXPECT_CALL(server_connection_stats.stats_store_, deliverHistogramToSinks(_, 4)).InSequence(s2);
   EXPECT_CALL(server_connection_stats.rx_current_, add(4)).InSequence(s2);
   EXPECT_CALL(server_connection_stats.rx_current_, sub(4)).InSequence(s2);
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose)).InSequence(s2);

@@ -33,25 +33,27 @@ namespace TcpProxy {
  * All tcp proxy stats. @see stats_macros.h
  */
 // clang-format off
-#define ALL_TCP_PROXY_STATS(COUNTER, GAUGE)                                                        \
-  COUNTER(downstream_cx_rx_bytes_total)                                                            \
-  GAUGE  (downstream_cx_rx_bytes_buffered)                                                         \
-  COUNTER(downstream_cx_tx_bytes_total)                                                            \
-  GAUGE  (downstream_cx_tx_bytes_buffered)                                                         \
-  COUNTER(downstream_cx_total)                                                                     \
-  COUNTER(downstream_cx_no_route)                                                                  \
-  COUNTER(downstream_flow_control_paused_reading_total)                                            \
-  COUNTER(downstream_flow_control_resumed_reading_total)                                           \
-  COUNTER(idle_timeout)                                                                            \
-  COUNTER(upstream_flush_total)                                                                    \
-  GAUGE  (upstream_flush_active)
+#define ALL_TCP_PROXY_STATS(COUNTER, GAUGE, HISTOGRAM)                                             \
+  HISTOGRAM(downstream_cx_rx_bytes)                                                                \
+  COUNTER  (downstream_cx_rx_bytes_total)                                                          \
+  GAUGE    (downstream_cx_rx_bytes_buffered)                                                       \
+  HISTOGRAM(downstream_cx_tx_bytes)                                                                \
+  COUNTER  (downstream_cx_tx_bytes_total)                                                          \
+  GAUGE    (downstream_cx_tx_bytes_buffered)                                                       \
+  COUNTER  (downstream_cx_total)                                                                   \
+  COUNTER  (downstream_cx_no_route)                                                                \
+  COUNTER  (downstream_flow_control_paused_reading_total)                                          \
+  COUNTER  (downstream_flow_control_resumed_reading_total)                                         \
+  COUNTER  (idle_timeout)                                                                          \
+  COUNTER  (upstream_flush_total)                                                                  \
+  GAUGE    (upstream_flush_active)
 // clang-format on
 
 /**
  * Struct definition for all tcp proxy stats. @see stats_macros.h
  */
 struct TcpProxyStats {
-  ALL_TCP_PROXY_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
+  ALL_TCP_PROXY_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
 };
 
 class Drainer;

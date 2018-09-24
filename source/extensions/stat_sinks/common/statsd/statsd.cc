@@ -242,8 +242,10 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
     connection_->addConnectionCallbacks(*this);
     connection_->setConnectionStats({parent_.cluster_info_->stats().upstream_cx_rx_bytes_total_,
                                      parent_.cluster_info_->stats().upstream_cx_rx_bytes_buffered_,
+                                     parent_.cluster_info_->stats().upstream_cx_rx_bytes_,
                                      parent_.cluster_info_->stats().upstream_cx_tx_bytes_total_,
                                      parent_.cluster_info_->stats().upstream_cx_tx_bytes_buffered_,
+                                     parent_.cluster_info_->stats().upstream_cx_tx_bytes_,
                                      &parent_.cluster_info_->stats().bind_errors_});
     connection_->connect();
   }

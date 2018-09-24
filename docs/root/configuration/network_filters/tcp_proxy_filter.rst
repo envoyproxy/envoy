@@ -22,8 +22,10 @@ statistics are rooted at *tcp.<stat_prefix>.* with the following statistics:
 
   downstream_cx_total, Counter, Total number of connections handled by the filter
   downstream_cx_no_route, Counter, Number of connections for which no matching route was found or the cluster for the route was not found
+  downstream_cx_tx_bytes, Histogram, Bytes written to the downstream connection
   downstream_cx_tx_bytes_total, Counter, Total bytes written to the downstream connection
   downstream_cx_tx_bytes_buffered, Gauge, Total bytes currently buffered to the downstream connection
+  downstream_cx_rx_bytes, Histogram, Bytes read from the downstream connection
   downstream_cx_rx_bytes_total, Counter, Total bytes read from the downstream connection
   downstream_cx_rx_bytes_buffered, Gauge, Total bytes currently buffered from the downstream connection
   downstream_flow_control_paused_reading_total, Counter, Total number of times flow control paused reading from downstream
