@@ -7,7 +7,8 @@
 #include "envoy/event/timer.h"
 
 #include "common/common/logger.h"
-#include "common/event/real_time_system.h"
+
+#include "test/test_common/test_time.h"
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
@@ -46,7 +47,7 @@ public:
   MOCK_METHOD0(monotonicTime, MonotonicTime());
 };
 
-class MockTimeSystem : public Event::TimeSystem {
+class MockTimeSystem : public Event::TestTimeSystem {
 public:
   MockTimeSystem();
   ~MockTimeSystem();
@@ -67,7 +68,7 @@ public:
   MOCK_METHOD0(systemTime, SystemTime());
   MOCK_METHOD0(monotonicTime, MonotonicTime());
 
-  Event::RealTimeSystem real_time_system_;
+  Event::TestRealTimeSystem real_time_system_;
 };
 
 class MockTokenBucket : public TokenBucket {
