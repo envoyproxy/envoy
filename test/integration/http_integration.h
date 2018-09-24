@@ -170,6 +170,7 @@ protected:
   void testRetryHittingBufferLimit();
   void testGrpcRouterNotFound();
   void testGrpcRetry();
+  void testRetryPriority();
   void testRetryHostPredicateFilter();
   void testHittingDecoderFilterLimit();
   void testHittingEncoderFilterLimit();

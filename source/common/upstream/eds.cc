@@ -90,8 +90,7 @@ void EdsClusterImpl::onConfigUpdate(const ResourceVector& resources, const std::
   const uint32_t overprovisioning_factor = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 
-  // Loop over existing priorities not present in the config. This will empty out any priorities
-  // the config update did not refer to
+  // Loop over all priorities that exist in the new configuration.
   auto& priority_state = priority_state_manager.priorityState();
   for (size_t i = 0; i < priority_state.size(); ++i) {
     if (priority_state[i].first != nullptr) {
