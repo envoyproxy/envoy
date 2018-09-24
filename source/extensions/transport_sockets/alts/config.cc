@@ -103,7 +103,7 @@ DownstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
       MessageUtil::downcastAndValidate<const envoy::config::transport_socket::alts::v2alpha::Alts&>(
           message);
 
-  std::string handshaker_service = config.handshaker_service();
+  const std::string handshaker_service = config.handshaker_service();
   const auto& peer_service_accounts = config.peer_service_accounts();
   std::unordered_set<std::string> peers(peer_service_accounts.cbegin(),
                                         peer_service_accounts.cend());
