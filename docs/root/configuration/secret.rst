@@ -9,7 +9,11 @@ But they can also be fetched remotely by secret discovery service (SDS).
 
 The most important benefit of SDS is to simplify the certificate management. Without this feature, in k8s deployment, certificates must be created as secrets and mounted into the proxy containers. If certificates are expired, the secrets need to be updated and the proxy containers need to be re-deployed. With SDS, a certral SDS server will push certificates to all proxy instances. If certificates are expired, the server just pushes new certificates to Envoy instances, Envoy will use the new ones right away without re-deployment.
 
-The connection bewteeen Envoy proxy and SDS server has to be secure. One option is to run the SDS server in the same VM (node) and use Unix Domain Socket for the connection. Otherwise it requires mTLS between the proxy and SDS server. In this case, the client certificates to the SDS server has to be mounted into Envoy container.
+If a listener server certificates needed to be fetched by SDS remotely, it will NOT be marked as active, its port will not be opened before the certificates are fetched. If Envoy fails to fetch the certificates due to connection failures, or bad response data, the listener will be marked as active, and the port will be open, but the connection to the port will be reset.
+
+Upstream cluster is handled in the similar way, if a cluster client certificates needed to be fetched by SDS remotely, it will NOT be marked as active and it will not be used before the certificates are fetched. If Envoy fails to fetch the certificates due to connection failures, or bad response data, the cluster will be marked as active, it can be used to handle the requests, but the requests routed to that cluster will be rejected.
+
+The connection bewteeen Envoy proxy and SDS server has to be secure. One option is to run the SDS server in the same host and use Unix Domain Socket for the connection. Otherwise it requires mTLS between the proxy and SDS server. In this case, the client certificates for the SDS connection must be statically configured.
 
 SDS server
 ----------
@@ -23,8 +27,6 @@ SDS Configuration
 :ref:`SdsSecretConfig <envoy_api_msg_auth.SdsSecretConfig>` is used to specify the secret. Its field "name" is a required field. If its "sds_config" field is empty, the "name" field specifies the secret in the bootstrap static_resource :ref:`secrets <envoy_api_field_config.bootstrap.v2.Bootstrap.StaticResources.secrets>`. Otherwise, it specifies the SDS server as :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>`. Only gRPC is supported for the SDS service so its "api_config_source" must specify a "grpc_service".
 
 SdsSecretConfig is used in two fields in :ref:`CommonTlsContext <envoy_api_msg_auth.CommonTlsContext>`. The first field is "tls_certificate_sds_secret_configs" to use SDS to get :ref:`TlsCertificate <envoy_api_msg_auth.TlsCertificate>`. The second field is "validation_context_sds_secret_config" to use SDS to get :ref:`CertificateValidationContext <envoy_api_msg_auth.CertificateValidationContext>`.
-
-If a listener or a cluster requires TLS certificates that needed to be fetched by SDS, it will NOT be marked as active before they are fetched. If Envoy fails to fetch the certificates due to connection failures, or bad response data, the listener will be marked as active, but the connection to the port will be reset. For the cluster, it will be marked as active too, but the requests routed to that cluster will be rejected.
 
 Examples one: static_resource
 -----------------------------
@@ -83,6 +85,24 @@ This example shows how to configurate secrets fetched from remote SDS server:
 .. code-block:: yaml
 
     clusters:
+      - name: sds_server_mtls
+        http2_protocol_options: {}
+        hosts:
+          socket_address:
+            address: 127.0.0.1
+            port_value: 8234
+        tls_context:
+          common_tls_context:
+          - tls_certificate:
+            certificate_chain:
+              filename: certs/sds_cert.pem
+            private_key:
+              filename: certs/sds_key.pem
+      - name: sds_server_uds
+        http2_protocol_options: {}
+        hosts:
+          - pipe:
+              path: /tmp/uds_path
       - name: example_cluster
         connect_timeout: 0.25s
         hosts:
@@ -98,11 +118,6 @@ This example shows how to configurate secrets fetched from remote SDS server:
                     grpc_services:
                       google_grpc:
                         target_uri: unix:/tmp/uds_path
-      - name: sds_server
-        http2_protocol_options: {}
-        hosts:
-          - pipe:
-              path: /tmp/uds_path
     listeners:
       ....
       filter_chains:
@@ -114,8 +129,8 @@ This example shows how to configurate secrets fetched from remote SDS server:
                 api_config_source:
                   api_type: GRPC
                   grpc_services:
-                    google_grpc:
-                      target_uri: unix:/tmp/uds_path
+                    envoy_grpc:
+                      cluster_name: sds_server_mtls
             validation_context_sds_secret_config:
               name: "validation_context"
               sds_config:
@@ -123,9 +138,7 @@ This example shows how to configurate secrets fetched from remote SDS server:
                   api_type: GRPC
                   grpc_services:
                     envoy_grpc:
-                      cluster_name: sds_server
+                      cluster_name: sds_server_uds
 
 
-In the above example, a gRPC SDS server can be reached by Unix Domain Socket path "/tmp/uds_path". It can provide three secrets, "client_cert", "server_cert" and "validation_context". In the config, "server_cert" and "validation_context" are used by one of listeners and "client_cert" is used by one of clusters.
-
-For illustration purpose, the config is using Google grpc to fetch "client_cert" and "server_cert" secrets from the SDS server. It uses Envoy grpc to fetch "validation_context" secret. In order to use Envoy gRPC, a static cluster is needed to specify the SDS gRPC server.
+For illustration, above example uses 3 ways to access the SDS server. A gRPC SDS server can be reached by Unix Domain Socket path "/tmp/uds_path" and "127.0.0.1:8234" by mTLS. It can provide three secrets, "client_cert", "server_cert" and "validation_context". In the config, cluster "example_cluster" certificates "client_cert" is configured to use google_grpc by using UDS to talk to SDS server. The Listener needs to fetch "server_cert" and "validation_context" from the SDS server. The "server_cert" is using envoy_grpc with cluster "sds_server_mtls" configured with client certificates to use mTLS to talk to SDS server. The "validate_context" is using envoy_grpc with cluster "sds_server_uds" configured with UDS path to talk to the SDS server.
