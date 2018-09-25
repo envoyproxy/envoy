@@ -40,10 +40,10 @@ If fails to extract a JWT from above header, then check query parameter key *acc
 
 In the :ref:`filter config <envoy_api_msg_config.filter.http.jwt_authn.v2alpha.JwtAuthentication>`, *providers* is a map, to map *provider_name* to a :ref:`JwtProvider <envoy_api_msg_config.filter.http.jwt_authn.v2alpha.JwtProvider>`. The *provider_name* has to be unique, it is referred in the `JwtRequirement <envoy_api_msg_config.filter.http.jwt_authn.v2alpha.JwtRequirement>` in its *provider_name* field.
 
-Important note for *remote_jwks*, a **jwks_cluster** cluster is required for Envoy to talk to a JWKS server. Due to this, `OpenID connection discovery <https://openid.net/specs/openid-connect-discovery-1_0.html>`_ is not supported since the URL to fetch JWKS is in the response of the discovery. It is not easy to setup an Envoy cluster for such URL.
+**Important note** for *remote_jwks*, a **jwks_cluster** cluster is required for Envoy to talk to a JWKS server. Due to this, `OpenID connection discovery <https://openid.net/specs/openid-connect-discovery-1_0.html>`_ is not supported since the URL to fetch JWKS is in the response of the discovery. It is not easy to setup a cluster config for a dynamic URL.
 
-Config Examples
-~~~~~~~~~~~~~~~
+JwtProvider config example one
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: yaml
 
@@ -83,7 +83,10 @@ Following cluster **example_jwks_cluster** is needed to fetch JWKS.
         portValue: 80
 
 
-Here is another config example using inline JWKS:
+JwtProvider config example two
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Another config example using inline JWKS:
 
 .. code-block:: yaml
 
@@ -112,7 +115,6 @@ Above example specifies:
 
     x-jwt-payload: base64_encoded(jwt_payload_in_JSON)
 
-
 RequirementRule
 ~~~~~~~~~~~~~~~
 
@@ -132,11 +134,17 @@ The field *requires* can be specified as any one of followings:
 * *requires_all*: a list of requirements that only if all of them success, it will be success.
 * *allow_missing_or_failed*: If true, all JWTs will be verified, successfully verified JWTs will output its payload results. The request will proceeded even with any verification failures. The designed use case: another HTTP filter is inserted after this JWT filter. This JWT filter is used to do JWT verification, that filter will make decision based on the payload results outputed from this filter.
 
-If a request matches multiple rules, the first matched rule will apply. The order of rules is important. The suggestion is to put the more specific matching rule first, more boarder matching rule later, and a capture all matching rule at the last.
+Important Match Rules
+~~~~~~~~~~~~~~~~~~~~~
 
-If a request doesn't match any rules, or the matched rule has empty *requires* field, JWT verification is not required.
+**If a request matches multiple rules, the first matched rule will apply**. The order of rules is important. The suggestion is to put the more specific matching rule first, more boarder matching rule later, and a capture all matching rule at the last.
 
-Config samples:
+If the matched rule has empty *requires* field, **JWT verification is not required**.
+
+If a request doesn't match any rules, **JWT verification is not required**.
+
+Config example one
+~~~~~~~~~~~~~~~~~~
 
 .. code-block:: yaml
 
@@ -170,6 +178,8 @@ The config has three rules:
 * The second rule has path prefix **/api**, its *requires" is to use **jwt_provider1** with *audiences* override of **api_audience**. If a request has **/api** path prefix, it will use **jwt_provider1** with overrided **api_audience** to verify the JWT.
 * The third rule has a capture all prefix of **/**, it will match all requests. Its *requires" is to use **jwt_provider1** to verify JWT.
 
+Config example two
+~~~~~~~~~~~~~~~~~~
 
 .. code-block:: yaml
 
