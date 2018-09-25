@@ -1143,12 +1143,12 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
 }
 
 // Test that the tcp proxy uses the cluster from FilterState if set
-TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionState) {
+TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
   setup();
 
-  Envoy::RequestInfo::FilterStateImpl per_connection_state;
+  RequestInfo::FilterStateImpl per_connection_state;
   per_connection_state.setData("envoy.tcp_proxy.cluster",
-                               std::make_unique<PerConnectionState>("filter_state_cluster"));
+                               std::make_unique<PerConnectionCluster>("filter_state_cluster"));
   ON_CALL(connection_, perConnectionState()).WillByDefault(ReturnRef(per_connection_state));
   EXPECT_CALL(Const(connection_), perConnectionState())
       .WillRepeatedly(ReturnRef(per_connection_state));

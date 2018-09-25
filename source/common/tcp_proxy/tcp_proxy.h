@@ -156,16 +156,16 @@ private:
 typedef std::shared_ptr<Config> ConfigSharedPtr;
 
 /**
- * Per-connection TCP Proxy Filter configuration.
+ * Per-connection TCP Proxy Cluster configuration.
  */
-class PerConnectionState : public RequestInfo::FilterState::Object {
+class PerConnectionCluster : public RequestInfo::FilterState::Object {
 public:
-  PerConnectionTcpProxyConfig(absl::string_view cluster) : cluster_(cluster) {}
-  const std::string& cluster() const { return cluster_; }
-  static const std::string CLUSTER_KEY;
+  PerConnectionCluster(absl::string_view cluster) : cluster_(cluster) {}
+  const std::string& value() const { return cluster_; }
+  static const std::string KEY;
 
 private:
-  std::string cluster_;
+  const std::string cluster_;
 };
 
 /**

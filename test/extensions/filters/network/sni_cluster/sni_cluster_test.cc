@@ -36,7 +36,7 @@ TEST(SniCluster, ConfigTest) {
 TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
 
-  Envoy::RequestInfo::FilterStateImpl per_connection_state;
+  RequestInfo::FilterStateImpl per_connection_state;
   ON_CALL(filter_callbacks.connection_, perConnectionState())
       .WillByDefault(ReturnRef(per_connection_state));
   ON_CALL(Const(filter_callbacks.connection_), perConnectionState())
@@ -51,8 +51,8 @@ TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
         .WillByDefault(Return(EMPTY_STRING));
     filter.onNewConnection();
 
-    EXPECT_FALSE(per_connection_state.hasData<Envoy::TcpProxy::PerConnectionState>(
-        Envoy::TcpProxy::PerConnectionState::CLUSTER_KEY));
+    EXPECT_FALSE(per_connection_state.hasData<TcpProxy::PerConnectionCluster>(
+        TcpProxy::PerConnectionCluster::KEY));
   }
 
   // with sni
@@ -61,12 +61,12 @@ TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
         .WillByDefault(Return("filter_state_cluster"));
     filter.onNewConnection();
 
-    EXPECT_TRUE(per_connection_state.hasData<Envoy::TcpProxy::PerConnectionState>(
-        Envoy::TcpProxy::PerConnectionState::CLUSTER_KEY));
+    EXPECT_TRUE(per_connection_state.hasData<TcpProxy::PerConnectionCluster>(
+        TcpProxy::PerConnectionCluster::KEY));
 
-    auto per_connection_config = per_connection_state.getData<Envoy::TcpProxy::PerConnectionState>(
-        Envoy::TcpProxy::PerConnectionState::CLUSTER_KEY);
-    EXPECT_EQ(per_connection_config.cluster(), "filter_state_cluster");
+    auto per_connection_cluster = per_connection_state.getData<TcpProxy::PerConnectionCluster>(
+        TcpProxy::PerConnectionCluster::KEY);
+    EXPECT_EQ(per_connection_cluster.value(), "filter_state_cluster");
   }
 }
 
