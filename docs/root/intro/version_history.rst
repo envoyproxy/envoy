@@ -78,6 +78,8 @@ Version history
 * rest-api: added ability to set the :ref:`request timeout <envoy_api_field_core.ApiConfigSource.request_timeout>` for REST API requests.
 * router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
 * tcp_proxy: added support for :ref:`weighted clusters <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.weighted_clusters>`.
+* tls: implemented `SecretDiscoveryService <https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/\
+  discovery/v2/sds.proto>`_.
 * tracing: added support for configuration of :ref:`tracing sampling
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
 * thrift_proxy: introduced thrift routing, moved configuration to correct location
