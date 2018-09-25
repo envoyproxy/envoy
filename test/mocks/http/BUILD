@@ -4,6 +4,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_mock",
     "envoy_package",
+    "envoy_cc_test",
 )
 
 envoy_package()
@@ -30,5 +31,15 @@ envoy_cc_mock(
         "//test/mocks/router:router_mocks",
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:host_mocks",
+    ],
+)
+
+envoy_cc_test(
+    name = "http_mocks_test",
+    srcs = ["mocks_test.cc"],
+    deps = [
+        ":http_mocks",
+        "//include/envoy/http:header_map_interface",
+        "//test/test_common:utility_lib",
     ],
 )
