@@ -144,3 +144,26 @@ This example shows how to configurate secrets fetched from remote SDS servers:
 
 
 For illustration, above example uses three methods to access the SDS server. A gRPC SDS server can be reached by Unix Domain Socket path **/tmp/uds_path** and **127.0.0.1:8234** by mTLS. It provides three secrets, **client_cert**, **server_cert** and **validation_context**. In the config, cluster **example_cluster** certificate **client_cert** is configured to use Google gRPC with UDS to talk to the SDS server. The Listener needs to fetch **server_cert** and **validation_context** from the SDS server. The **server_cert** is using Envoy gRPC with cluster **sds_server_mtls** configured with client certificate to use mTLS to talk to SDS server. The **validate_context** is using Envoy gRPC with cluster **sds_server_uds** configured with UDS path to talk to the SDS server.
+
+Statistics
+----------
+SSL socket factory outputs following SDS related statistics. They are all counter type.
+
+For downstream listeners, they are in the *listener.<LISTENER_IP>.server_ssl_socket_factory.* namespace.
+
+.. csv-table::
+     :header: Name, Description
+     :widths: 1, 2
+
+     ssl_context_update_by_sds, Total number of ssl context has been updated.
+     downstream_context_secrets_not_ready, Total number of downstream connections reset due to empty ssl certificate.
+
+For upstream clusters, they are in the *cluster.<CLUSTER_NAME>.client_ssl_socket_factory.* namespace.
+
+.. csv-table::
+     :header: Name, Description
+     :widths: 1, 2
+
+     ssl_context_update_by_sds, Total number of ssl context has been updated.
+     upstream_context_secrets_not_ready, Total number of upstream connections reset due to empty ssl certificate.
+
