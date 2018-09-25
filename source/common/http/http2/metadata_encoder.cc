@@ -16,7 +16,7 @@ bool MetadataEncoder::createPayload(MetadataMap& metadata_map) {
 
   bool success = createHeaderBlockUsingNghttp2(metadata_map);
   if (!success || !hasNextFrame()) {
-    ENVOY_LOG(error, "Fails to create payload.");
+    ENVOY_LOG(error, "Failed to create payload.");
     return false;
   }
   return true;
@@ -46,10 +46,14 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(MetadataMap& metadata_map) {
 
   // Estimates the upper bound of output payload.
   size_t buflen = nghttp2_hd_deflate_bound(deflater, nva, nvlen);
+  if (buflen > max_payload_size_bound_) {
+    ENVOY_LOG(error, "Payload size {} exceeds the max bound.", buflen);
+    return false;
+  }
   Buffer::RawSlice iovec;
   payload_.reserve(buflen, &iovec, 1);
   if (iovec.len_ < buflen) {
-    ENVOY_LOG(error, "Fails to reserve memory in |payload_|.");
+    ENVOY_LOG(error, "Failed to reserve memory in |payload_|.");
     nghttp2_hd_deflate_del(deflater);
     return false;
   }
@@ -59,7 +63,7 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(MetadataMap& metadata_map) {
   uint8_t* buf = reinterpret_cast<uint8_t*>(iovec.mem_);
   ssize_t result = nghttp2_hd_deflate_hd(deflater, buf, buflen, nva, nvlen);
   if (result < 0) {
-    ENVOY_LOG(error, "Fails deflating.");
+    ENVOY_LOG(error, "Failed deflating.");
     nghttp2_hd_deflate_del(deflater);
     return false;
   }

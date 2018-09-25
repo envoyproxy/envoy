@@ -41,10 +41,10 @@ static ssize_t pack_extension_callback(nghttp2_session* session, uint8_t* buf, s
 
   MetadataEncoder* encoder = reinterpret_cast<UserData*>(user_data)->encoder;
   const uint64_t size_from_encoder =
-      std::min(encoder->getMaxMetadataSize(), encoder->payload()->length());
+      std::min(encoder->getMaxMetadataSize(), encoder->payload().length());
   const uint64_t size_to_copy = std::min(static_cast<uint64_t>(len), size_from_encoder);
-  Buffer::OwnedImpl* p = reinterpret_cast<Buffer::OwnedImpl*>(encoder->payload());
-  p->copyOut(0, size_to_copy, buf);
+  Buffer::OwnedImpl& p = reinterpret_cast<Buffer::OwnedImpl&>(encoder->payload());
+  p.copyOut(0, size_to_copy, buf);
 
   // Releases the payload that has been copied to nghttp2.
   encoder->releasePayload(size_to_copy);
@@ -52,9 +52,9 @@ static ssize_t pack_extension_callback(nghttp2_session* session, uint8_t* buf, s
   // Keep submitting extension frames if there is payload left in the encoder.
   if (encoder->hasNextFrame()) {
     const uint8_t flag =
-        (encoder->payload()->length() > encoder->getMaxMetadataSize()) ? 0 : END_METADATA_FLAG;
+        (encoder->payload().length() > encoder->getMaxMetadataSize()) ? 0 : END_METADATA_FLAG;
     int result = nghttp2_submit_extension(session, METADATA_FRAME_TYPE, flag, frame->hd.stream_id,
-                                          encoder->payload());
+                                          &encoder->payload());
     EXPECT_EQ(0, result);
   }
 
@@ -200,7 +200,7 @@ TEST_F(MetadataEncoderTest, EncodeSmallHeaderBlock) {
   encoder_.createPayload(metadata_map);
   // Submits METADATA to nghttp2.
   int result = nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID,
-                                        encoder_.payload());
+                                        &encoder_.payload());
   EXPECT_EQ(0, result);
   // Sends METADATA to nghttp2.
   result = nghttp2_session_send(session_);
@@ -229,11 +229,10 @@ TEST_F(MetadataEncoderTest, EncodeLargeHeaderBlock) {
 
   // Submits METADATA to nghttp2.
   const uint8_t flag =
-      (encoder_.payload()->length() > encoder_.getMaxMetadataSize()) ? 0 : END_METADATA_FLAG;
+      (encoder_.payload().length() > encoder_.getMaxMetadataSize()) ? 0 : END_METADATA_FLAG;
   // The payload can't be submitted within one frame. Callback function will
   // keep submitting until all the payload has been submitted.
-  int result =
-      nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, flag, STREAM_ID, nullptr);
+  int result = nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, flag, STREAM_ID, nullptr);
   EXPECT_EQ(0, result);
 
   // Sends METADATA to nghttp2.
