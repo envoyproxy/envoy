@@ -164,7 +164,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
   log_format_ = log_format.getValue();
 
-  component_log_levels_ = parseComponentLogLevels(component_log_level.getValue());
+  parseComponentLogLevels(component_log_level.getValue());
 
   if (mode.getValue() == "serve") {
     mode_ = Server::Mode::Serve;
@@ -217,8 +217,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   }
 }
 
-const std::vector<std::pair<std::string, std::string>>
-OptionsImpl::parseComponentLogLevels(const std::string& component_log_levels) const {
+void OptionsImpl::parseComponentLogLevels(const std::string& component_log_levels) {
   std::vector<std::pair<std::string, std::string>> parsed_log_levels;
   if (!component_log_levels.empty()) {
     std::vector<std::string> log_levels = absl::StrSplit(component_log_levels, ',');
@@ -253,7 +252,10 @@ OptionsImpl::parseComponentLogLevels(const std::string& component_log_levels) co
       parsed_log_levels.push_back(std::make_pair(log_name, log_level));
     }
   }
-  return parsed_log_levels;
+  for (auto& parsed_log_level : parsed_log_levels) {
+    component_log_levels_.push_back(
+        std::make_pair(parsed_log_level.first, parsed_log_level.second));
+  }
 }
 
 void OptionsImpl::logError(const std::string& error) const {

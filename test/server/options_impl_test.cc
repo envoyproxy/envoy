@@ -38,7 +38,8 @@ public:
   std::vector<std::pair<std::string, std::string>>
   parseComponentLogLevels(const std::unique_ptr<OptionsImpl>& options,
                           const std::string& component_log_levels) {
-    return options->parseComponentLogLevels(component_log_levels);
+    options->parseComponentLogLevels(component_log_levels);
+    return options->componentLogLevels();
   }
 };
 
@@ -204,8 +205,9 @@ TEST_F(OptionsImplTest, InvalidComponentLogLevel) {
 
 TEST_F(OptionsImplTest, ParseComponentLogLevels) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  parseComponentLogLevels(options, "upstream:debug,connection:trace");
   const std::vector<std::pair<std::string, std::string>> component_log_levels =
-      parseComponentLogLevels(options, "upstream:debug,connection:trace");
+      options->componentLogLevels();
   EXPECT_EQ(2, component_log_levels.size());
   EXPECT_EQ("upstream", component_log_levels[0].first);
   EXPECT_EQ("debug", component_log_levels[0].second);

@@ -99,8 +99,7 @@ public:
   bool hotRestartDisabled() const override { return hot_restart_disabled_; }
 
 private:
-  const std::vector<std::pair<std::string, std::string>>
-  parseComponentLogLevels(const std::string& component_log_levels) const;
+  void parseComponentLogLevels(const std::string& component_log_levels);
   void logError(const std::string& error) const;
 
   uint64_t base_id_;
