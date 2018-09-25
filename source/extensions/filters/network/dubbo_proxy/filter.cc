@@ -14,9 +14,10 @@ namespace NetworkFilters {
 namespace DubboProxy {
 
 Filter::Filter(const std::string& stat_prefix, ConfigProtocolType protocol_type,
-               ConfigSerializationType serialization_type, Stats::Scope& scope)
+               ConfigSerializationType serialization_type, Stats::Scope& scope,
+               Event::TimeSystem& time_system)
     : stats_(generateStats(stat_prefix, scope)), protocol_type_(protocol_type),
-      serialization_type_(serialization_type) {}
+      serialization_type_(serialization_type), time_system_(time_system) {}
 
 Filter::~Filter() {}
 

@@ -2,6 +2,7 @@
 
 #include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.h"
 #include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.validate.h"
+#include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
@@ -59,7 +60,7 @@ public:
   using ConfigSerializationType = envoy::extensions::filters::network::dubbo_proxy::v2alpha1::DubboProxy_SerializationType;
 
   Filter(const std::string& stat_prefix, ConfigProtocolType protocol_type,
-         ConfigSerializationType serialization_type, Stats::Scope& scope);
+         ConfigSerializationType serialization_type, Stats::Scope& scope, Event::TimeSystem& time_system);
   virtual ~Filter();
 
   // Network::ReadFilter
@@ -93,7 +94,7 @@ private:
   struct ActiveMessage {
     ActiveMessage(Filter& parent, int32_t request_id)
         : parent_(parent),
-          request_timer_(new Stats::Timespan(parent_.stats_.request_time_ms_)),
+          request_timer_(new Stats::Timespan(parent_.stats_.request_time_ms_, parent_.time_system_)),
           request_id_(request_id) {
       parent_.stats_.request_active_.inc();
     }
@@ -128,6 +129,8 @@ private:
 
   ConfigProtocolType protocol_type_;
   ConfigSerializationType serialization_type_;
+
+  Event::TimeSystem& time_system_;
 };
 
 } // namespace DubboProxy

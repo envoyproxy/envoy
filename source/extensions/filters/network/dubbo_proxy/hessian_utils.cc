@@ -34,7 +34,7 @@ char* WriteIntoString(std::string* str, size_t length) {
 
 std::string HessianUtils::peekString(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
-  uint8_t code = BufferHelper::peekU8(buffer, offset);
+  uint8_t code = buffer.peekInt<uint8_t>(offset);
   size_t delta_length = 0;
   std::string result;
   switch (code) {
@@ -86,7 +86,7 @@ std::string HessianUtils::peekString(Buffer::Instance& buffer, size_t* size, uin
       throw EnvoyException("buffer underflow");
     }
 
-    delta_length = (code - 0x30) * 256 + BufferHelper::peekU8(buffer, offset + 1);
+    delta_length = (code - 0x30) * 256 + buffer.peekInt<int8_t>(offset + 1);
     if (delta_length + 2 + offset > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
@@ -100,7 +100,7 @@ std::string HessianUtils::peekString(Buffer::Instance& buffer, size_t* size, uin
       throw EnvoyException("buffer underflow");
     }
 
-    delta_length = BufferHelper::peekU16(buffer, offset + 1);
+    delta_length = buffer.peekBEInt<uint16_t>(offset + 1);
 
     if (delta_length + 3 + offset > buffer.length()) {
       throw EnvoyException("buffer underflow");
@@ -115,7 +115,7 @@ std::string HessianUtils::peekString(Buffer::Instance& buffer, size_t* size, uin
       throw EnvoyException("buffer underflow");
     }
 
-    delta_length = BufferHelper::peekU16(buffer, offset + 1);
+    delta_length = buffer.peekBEInt<uint16_t>(offset + 1);
     buffer.copyOut(offset + 3, delta_length, WriteIntoString(&result, delta_length));
     size_t next_size = 0;
     result.append(peekString(buffer, &next_size, delta_length + 3 + offset));
@@ -135,7 +135,7 @@ std::string HessianUtils::readString(Buffer::Instance& buffer) {
 long HessianUtils::peekLong(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
   long result;
-  uint8_t code = BufferHelper::peekU8(buffer, offset);
+  uint8_t code = buffer.peekInt<uint8_t>(offset);
   switch (code) {
   case 0xd8:
   case 0xd9:
@@ -182,7 +182,7 @@ long HessianUtils::peekLong(Buffer::Instance& buffer, size_t* size, uint64_t off
       throw EnvoyException("buffer underflow");
     }
 
-    result = leftShift<int16_t>(code - 0xf8, 8) + BufferHelper::peekU8(buffer, offset + 1);
+    result = leftShift<int16_t>(code - 0xf8, 8) + buffer.peekInt<int8_t>(offset + 1);
     *size = 2;
     return result;
 
@@ -199,8 +199,8 @@ long HessianUtils::peekLong(Buffer::Instance& buffer, size_t* size, uint64_t off
       throw EnvoyException("buffer underflow");
     }
 
-    result = leftShift<int32_t>(code - 0x3c, 16) + (BufferHelper::peekU8(buffer, offset + 1) << 8) +
-             BufferHelper::peekU8(buffer, offset + 2);
+    result = leftShift<int32_t>(code - 0x3c, 16) + (buffer.peekInt<uint8_t>(offset + 1) << 8) +
+             buffer.peekInt<uint8_t>(offset + 2);
     *size = 3;
     return result;
 
@@ -210,7 +210,7 @@ long HessianUtils::peekLong(Buffer::Instance& buffer, size_t* size, uint64_t off
       throw EnvoyException("buffer underflow");
     }
 
-    result = BufferHelper::peekU32(buffer, offset + 1);
+    result = buffer.peekBEInt<uint32_t>(offset + 1);
     *size = 5;
     return result;
 
@@ -220,7 +220,7 @@ long HessianUtils::peekLong(Buffer::Instance& buffer, size_t* size, uint64_t off
       throw EnvoyException("buffer underflow");
     }
 
-    result = BufferHelper::peekI64(buffer, offset + 1);
+    result = buffer.peekBEInt<int64_t>(offset + 1);
     *size = 9;
     return result;
   }
@@ -238,7 +238,7 @@ long HessianUtils::readLong(Buffer::Instance& buffer) {
 bool HessianUtils::peekBool(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
   bool result;
-  uint8_t code = BufferHelper::peekU8(buffer, offset);
+  uint8_t code = buffer.peekInt<uint8_t>(offset);
   if (code == 0x46) {
     result = false;
     *size = 1;
@@ -263,7 +263,7 @@ bool HessianUtils::readBool(Buffer::Instance& buffer) {
 
 int HessianUtils::peekInt(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
-  uint8_t code = BufferHelper::peekU8(buffer, offset);
+  uint8_t code = buffer.peekInt<uint8_t>(offset);
   int result;
 
   // Compact int
@@ -293,7 +293,7 @@ int HessianUtils::peekInt(Buffer::Instance& buffer, size_t* size, uint64_t offse
       throw EnvoyException("buffer underflow");
     }
 
-    result = leftShift<int16_t>(code - 0xc8, 8) + BufferHelper::peekU8(buffer, offset + 1);
+    result = leftShift<int16_t>(code - 0xc8, 8) + buffer.peekInt<uint8_t>(offset + 1);
     *size = 2;
     return result;
 
@@ -308,8 +308,8 @@ int HessianUtils::peekInt(Buffer::Instance& buffer, size_t* size, uint64_t offse
     if (offset + 3 > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
-    result = leftShift<int32_t>(code - 0xd4, 16) + (BufferHelper::peekU8(buffer, offset + 1) << 8) +
-             BufferHelper::peekU8(buffer, offset + 2);
+    result = leftShift<int32_t>(code - 0xd4, 16) + (buffer.peekInt<uint8_t>(offset + 1) << 8) +
+             buffer.peekInt<uint8_t>(offset + 2);
     *size = 3;
     return result;
 
@@ -317,7 +317,7 @@ int HessianUtils::peekInt(Buffer::Instance& buffer, size_t* size, uint64_t offse
     if (offset + 5 > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
-    result = BufferHelper::peekI32(buffer, offset + 1);
+    result = buffer.peekBEInt<int32_t>(offset + 1);
     *size = 5;
     return result;
   }
@@ -335,7 +335,7 @@ int HessianUtils::readInt(Buffer::Instance& buffer) {
 double HessianUtils::peekDouble(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
   double result;
-  uint8_t code = BufferHelper::peekU8(buffer, offset);
+  uint8_t code = buffer.peekInt<uint8_t>(offset);
   switch (code) {
   case 0x5b:
     result = 0.0;
@@ -351,7 +351,7 @@ double HessianUtils::peekDouble(Buffer::Instance& buffer, size_t* size, uint64_t
     if (offset + 2 > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
-    result = static_cast<double>(BufferHelper::peekI8(buffer, offset + 1));
+    result = static_cast<double>(buffer.peekInt<int8_t>(offset + 1));
     *size = 2;
     return result;
 
@@ -359,8 +359,8 @@ double HessianUtils::peekDouble(Buffer::Instance& buffer, size_t* size, uint64_t
     if (offset + 3 > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
-    result = static_cast<double>(256 * BufferHelper::peekI8(buffer, offset + 1) +
-                                 BufferHelper::peekU8(buffer, offset + 2));
+    result = static_cast<double>(256 * buffer.peekInt<int8_t>(offset + 1) +
+                                 buffer.peekInt<uint8_t>(offset + 2));
     *size = 3;
     return result;
 
@@ -393,7 +393,7 @@ double HessianUtils::readDouble(Buffer::Instance& buffer) {
 
 void HessianUtils::peekNull(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
-  uint8_t code = BufferHelper::peekU8(buffer, offset);
+  uint8_t code = buffer.peekInt<uint8_t>(offset);
   if (code == 0x4e) {
     *size = 1;
     return;
@@ -413,14 +413,14 @@ std::chrono::milliseconds HessianUtils::peekDate(Buffer::Instance& buffer, size_
                                                  uint64_t offset) {
   ASSERT(buffer.length() > offset);
   std::chrono::milliseconds result;
-  uint8_t code = BufferHelper::peekU8(buffer, offset);
+  uint8_t code = buffer.peekInt<uint8_t>(offset);
   switch (code) {
   case 0x4b:
     if (offset + 5 > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
 
-    result = std::chrono::minutes(BufferHelper::peekU32(buffer, offset + 1));
+    result = std::chrono::minutes(buffer.peekBEInt<uint32_t>(offset + 1));
     *size = 5;
     return result;
 
@@ -428,7 +428,7 @@ std::chrono::milliseconds HessianUtils::peekDate(Buffer::Instance& buffer, size_
     if (offset + 9 > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
-    result = std::chrono::milliseconds(BufferHelper::peekU64(buffer, offset + 1));
+    result = std::chrono::milliseconds(buffer.peekBEInt<uint64_t>(offset + 1));
     *size = 9;
     return result;
   }
@@ -447,7 +447,7 @@ std::chrono::milliseconds HessianUtils::readDate(Buffer::Instance& buffer) {
 std::string HessianUtils::peekByte(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
   std::string result;
-  uint8_t code = BufferHelper::peekU8(buffer, offset);
+  uint8_t code = buffer.peekInt<uint8_t>(offset);
   size_t delta_length = 0;
   switch (code) {
   case 0x20:
@@ -479,7 +479,7 @@ std::string HessianUtils::peekByte(Buffer::Instance& buffer, size_t* size, uint6
   case 0x35:
   case 0x36:
   case 0x37:
-    delta_length = (code - 0x34) * 256 + BufferHelper::peekU8(buffer, offset + 1);
+    delta_length = (code - 0x34) * 256 + buffer.peekInt<uint8_t>(offset + 1);
     if (delta_length + 2 + offset > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
@@ -492,7 +492,7 @@ std::string HessianUtils::peekByte(Buffer::Instance& buffer, size_t* size, uint6
       throw EnvoyException("buffer underflow");
     }
 
-    delta_length = BufferHelper::peekU16(buffer, offset + 1);
+    delta_length = buffer.peekBEInt<uint16_t>(offset + 1);
     if (delta_length + 3 + offset > buffer.length()) {
       throw EnvoyException("buffer underflow");
     }
@@ -506,7 +506,7 @@ std::string HessianUtils::peekByte(Buffer::Instance& buffer, size_t* size, uint6
       throw EnvoyException("buffer underflow");
     }
 
-    delta_length = BufferHelper::peekU16(buffer, offset + 1);
+    delta_length = buffer.peekBEInt<uint16_t>(offset + 1);
     buffer.copyOut(offset + 3, delta_length, WriteIntoString(&result, delta_length));
     size_t next_size;
     result.append(peekByte(buffer, &next_size, delta_length + 3 + offset));
