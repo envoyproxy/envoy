@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
