@@ -263,7 +263,7 @@ private:
     Stats::ScopePtr scope_;
     Http::ConnectionManagerListenerStats stats_;
   };
-  typedef std::unique_ptr<AdminListener> AdminListenerPtr;
+  using AdminListenerPtr = std::unique_ptr<AdminListener>;
 
   class AdminFilterChain : public Network::FilterChain {
   public:
