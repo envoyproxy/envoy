@@ -158,7 +158,7 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
 /**
  * Per-connection TCP Proxy Filter configuration.
  */
-class PerConnectionTcpProxyConfig : public Envoy::RequestInfo::FilterState::Object {
+class PerConnectionState : public RequestInfo::FilterState::Object {
 public:
   PerConnectionTcpProxyConfig(absl::string_view cluster) : cluster_(cluster) {}
   const std::string& cluster() const { return cluster_; }

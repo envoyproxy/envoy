@@ -22,7 +22,7 @@
 namespace Envoy {
 namespace TcpProxy {
 
-const std::string PerConnectionTcpProxyConfig::CLUSTER_KEY = "envoy.tcp_proxy.cluster";
+const std::string PerConnectionState::CLUSTER_KEY = "envoy.tcp_proxy.cluster";
 
 Config::Route::Route(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute& config) {
@@ -111,11 +111,11 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
 
 const std::string& Config::getRegularRouteFromEntries(Network::Connection& connection) {
   // First check if the per-connection state to see if we need to route to a pre-selected cluster
-  if (connection.perConnectionState().hasData<PerConnectionTcpProxyConfig>(
-          PerConnectionTcpProxyConfig::CLUSTER_KEY)) {
-    const PerConnectionTcpProxyConfig& per_connection_config =
-        connection.perConnectionState().getData<PerConnectionTcpProxyConfig>(
-            PerConnectionTcpProxyConfig::CLUSTER_KEY);
+  if (connection.perConnectionState().hasData<PerConnectionState>(
+          PerConnectionState::CLUSTER_KEY)) {
+    const PerConnectionState& per_connection_config =
+        connection.perConnectionState().getData<PerConnectionState>(
+            PerConnectionState::CLUSTER_KEY);
     return per_connection_config.cluster();
   }
 

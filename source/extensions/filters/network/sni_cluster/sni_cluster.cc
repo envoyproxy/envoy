@@ -18,8 +18,8 @@ Network::FilterStatus SniClusterFilter::onNewConnection() {
   if (!sni.empty()) {
     // Set the tcp_proxy cluster to the same value as SNI
     read_callbacks_->connection().perConnectionState().setData(
-        Envoy::TcpProxy::PerConnectionTcpProxyConfig::CLUSTER_KEY,
-        std::make_unique<Envoy::TcpProxy::PerConnectionTcpProxyConfig>(sni));
+        TcpProxy::PerConnectionState::CLUSTER_KEY,
+        std::make_unique<TcpProxy::PerConnectionState>(sni));
   }
 
   return Network::FilterStatus::Continue;

@@ -25,7 +25,7 @@ Network::FilterFactoryCb SniClusterNetworkFilterConfigFactory::createFilterFacto
 }
 
 ProtobufTypes::MessagePtr SniClusterNetworkFilterConfigFactory::createEmptyConfigProto() {
-  return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+  return ProtobufTypes::MessagePtr{new ProtobufWkt::Empty()};
 }
 
 /**

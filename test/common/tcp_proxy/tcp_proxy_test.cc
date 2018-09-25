@@ -1147,9 +1147,8 @@ TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionState) {
   setup();
 
   Envoy::RequestInfo::FilterStateImpl per_connection_state;
-  per_connection_state.setData(
-      "envoy.tcp_proxy.cluster",
-      std::make_unique<PerConnectionTcpProxyConfig>("filter_state_cluster"));
+  per_connection_state.setData("envoy.tcp_proxy.cluster",
+                               std::make_unique<PerConnectionState>("filter_state_cluster"));
   ON_CALL(connection_, perConnectionState()).WillByDefault(ReturnRef(per_connection_state));
   EXPECT_CALL(Const(connection_), perConnectionState())
       .WillRepeatedly(ReturnRef(per_connection_state));

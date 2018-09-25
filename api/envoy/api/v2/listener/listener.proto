@@ -31,7 +31,6 @@ message Filter {
   // * :ref:`envoy.ratelimit <config_network_filters_rate_limit>`
   // * :ref:`envoy.redis_proxy <config_network_filters_redis_proxy>`
   // * :ref:`envoy.tcp_proxy <config_network_filters_tcp_proxy>`
-  // * :ref:`envoy.sni_cluster <config_network_filters_sni_cluster>`
   string name = 1 [(validate.rules).string.min_bytes = 1];
 
   // Filter specific configuration which depends on the filter being

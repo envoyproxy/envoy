@@ -51,8 +51,8 @@ TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
         .WillByDefault(Return(EMPTY_STRING));
     filter.onNewConnection();
 
-    EXPECT_FALSE(per_connection_state.hasData<Envoy::TcpProxy::PerConnectionTcpProxyConfig>(
-        Envoy::TcpProxy::PerConnectionTcpProxyConfig::CLUSTER_KEY));
+    EXPECT_FALSE(per_connection_state.hasData<Envoy::TcpProxy::PerConnectionState>(
+        Envoy::TcpProxy::PerConnectionState::CLUSTER_KEY));
   }
 
   // with sni
@@ -61,12 +61,11 @@ TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
         .WillByDefault(Return("filter_state_cluster"));
     filter.onNewConnection();
 
-    EXPECT_TRUE(per_connection_state.hasData<Envoy::TcpProxy::PerConnectionTcpProxyConfig>(
-        Envoy::TcpProxy::PerConnectionTcpProxyConfig::CLUSTER_KEY));
+    EXPECT_TRUE(per_connection_state.hasData<Envoy::TcpProxy::PerConnectionState>(
+        Envoy::TcpProxy::PerConnectionState::CLUSTER_KEY));
 
-    auto per_connection_config =
-        per_connection_state.getData<Envoy::TcpProxy::PerConnectionTcpProxyConfig>(
-            Envoy::TcpProxy::PerConnectionTcpProxyConfig::CLUSTER_KEY);
+    auto per_connection_config = per_connection_state.getData<Envoy::TcpProxy::PerConnectionState>(
+        Envoy::TcpProxy::PerConnectionState::CLUSTER_KEY);
     EXPECT_EQ(per_connection_config.cluster(), "filter_state_cluster");
   }
 }
