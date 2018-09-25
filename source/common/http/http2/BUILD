@@ -66,7 +66,13 @@ envoy_cc_library(
         "nghttp2",
     ],
     deps = [
+        ":metadata_interface_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:minimal_logger_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "metadata_interface_lib",
+    hdrs = ["metadata_interface.h"],
 )
