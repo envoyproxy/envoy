@@ -539,24 +539,8 @@ RouteConstSharedPtr RouteEntryImplBase::clusterEntry(const Http::HeaderMap& head
     }
   }
 
-  uint64_t selected_value = random_value % total_cluster_weight_;
-  uint64_t begin = 0UL;
-  uint64_t end = 0UL;
-
-  // Find the right cluster to route to based on the interval in which
-  // the selected value falls. The intervals are determined as
-  // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
-  for (const WeightedClusterEntrySharedPtr& cluster : weighted_clusters_) {
-    end = begin + cluster->clusterWeight();
-    if (((selected_value >= begin) && (selected_value < end)) || (end >= total_cluster_weight_)) {
-      // end > total_cluster_weight_: This case can only occur with Runtimes, when the user
-      // specifies invalid weights such that sum(weights) > total_cluster_weight_. In this case,
-      // terminate the search and just return the cluster whose weight caused the overflow.
-      return cluster;
-    }
-    begin = end;
-  }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_, random_value,
+                                          true);
 }
 
 void RouteEntryImplBase::validateClusters(Upstream::ClusterManager& cm) const {

@@ -616,6 +616,7 @@ TEST_F(EdsTest, EndpointMoved) {
     EXPECT_EQ(hosts.size(), 1);
 
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_EQ(0, hosts[0]->priority());
     // Mark the host as healthy
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   }
@@ -625,6 +626,7 @@ TEST_F(EdsTest, EndpointMoved) {
     EXPECT_EQ(hosts.size(), 1);
 
     EXPECT_TRUE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_EQ(1, hosts[0]->priority());
     // Mark the host as healthy
     hosts[0]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
   }
@@ -639,9 +641,10 @@ TEST_F(EdsTest, EndpointMoved) {
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 1);
-    //
+
     // assert that it moved
     EXPECT_EQ(hosts[0]->address()->asString(), "1.2.3.4:81");
+    EXPECT_EQ(0, hosts[0]->priority());
 
     // The endpoint was healthy in the original priority, so moving it
     // around should preserve that.
@@ -654,6 +657,7 @@ TEST_F(EdsTest, EndpointMoved) {
 
     // assert that it moved
     EXPECT_EQ(hosts[0]->address()->asString(), "1.2.3.4:80");
+    EXPECT_EQ(1, hosts[0]->priority());
 
     // The endpoint was healthy in the original priority, so moving it
     // around should preserve that.
@@ -697,6 +701,7 @@ TEST_F(EdsTest, EndpointLocality) {
   auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
   EXPECT_EQ(hosts.size(), 2);
   for (int i = 0; i < 2; ++i) {
+    EXPECT_EQ(0, hosts[i]->priority());
     const auto& locality = hosts[i]->locality();
     EXPECT_EQ("oceania", locality.region());
     EXPECT_EQ("hello", locality.zone());
