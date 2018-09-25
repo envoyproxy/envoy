@@ -65,6 +65,21 @@ Above example specifies:
 * token will not be forwarded to upstream
 * JWT payload will not be added to the request header.
 
+Important note for remote_jwks, a cluster must be created for Envoy to talk to a JWKS server. In above example, following cluster *example_jwks_cluster* is needed.
+
+.. code-block:: yaml
+
+  cluster:
+    name: example_jwks_cluster
+    type: STRICT_DNS
+    hosts:
+      socket_address: 
+        address: example.com
+        portValue: 80
+
+
+Here is another config example using inline JWKS:
+
 .. code-block:: yaml
 
   providers:
@@ -110,6 +125,31 @@ The field "requires" can be specified as any one of followings:
 * requires_all: a list of requirements that only if all of them success, it will be success.
 * allow_missing_or_failed: If true, all JWT token will be verified, successfully verified JWTs will output its payload results. The request will proceeded regardless JWT is missing or any of verification failures. The typical use case is: there is another HTTP filter after this JWT filter. The JWT filter is used to do JWT verification, that filter will make decision based on the results.
 
+If a request matches multiple rules, the first matched rule will apply.  The order of rules is important.
+
+If a request doesn't match any rules, or the matched rule has empty "requires" field, JWT verification is not required. 
+
+Config samples:
+
+.. code-block:: yaml
+
+  providers:
+    jwt_provider1:
+      issuer: https://example.com
+      remote_jwks:
+        http_uri:
+          uri: https://example.com/.well-known/jwks.json
+          cluster: example_jwks_cluster
+        cache_duration:
+          seconds: 300
+    jwt_provider2:
+      issuer: https://example2.com
+      local_jwks:
+        inline_string: "PUBLIC-KEY"
+      from_headers:
+      - name: x-goog-iap-jwt-assertion
+  rules:
+  - match
 
 
 
