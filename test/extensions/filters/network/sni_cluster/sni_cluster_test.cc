@@ -52,7 +52,7 @@ TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
     filter.onNewConnection();
 
     EXPECT_FALSE(per_connection_state.hasData<TcpProxy::PerConnectionCluster>(
-        TcpProxy::PerConnectionCluster::KEY));
+        TcpProxy::PerConnectionCluster::Key));
   }
 
   // with sni
@@ -62,10 +62,10 @@ TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
     filter.onNewConnection();
 
     EXPECT_TRUE(per_connection_state.hasData<TcpProxy::PerConnectionCluster>(
-        TcpProxy::PerConnectionCluster::KEY));
+        TcpProxy::PerConnectionCluster::Key));
 
     auto per_connection_cluster = per_connection_state.getData<TcpProxy::PerConnectionCluster>(
-        TcpProxy::PerConnectionCluster::KEY);
+        TcpProxy::PerConnectionCluster::Key);
     EXPECT_EQ(per_connection_cluster.value(), "filter_state_cluster");
   }
 }
