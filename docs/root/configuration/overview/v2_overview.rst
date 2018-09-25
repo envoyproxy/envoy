@@ -589,7 +589,7 @@ Management Server has a statistics tree rooted at *control_plane.* with the foll
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   connected_state, Gauge, Indicates the current connection state with management server
+   connected_state, Gauge, A boolan (1 for connected and 0 for disconnected) that indicates the current connection state with management server
 
 .. _config_overview_v2_status:
 
