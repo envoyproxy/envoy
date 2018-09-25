@@ -1156,8 +1156,6 @@ void AdminImpl::closeSocket() {
 void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   if (listener_) {
     handler->addListener(*listener_);
-  } else {
-    throw EnvoyException("asked to add a non-existent listener");
   }
 }
 
