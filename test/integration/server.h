@@ -52,7 +52,9 @@ public:
   }
   std::chrono::seconds drainTime() const override { return std::chrono::seconds(1); }
   spdlog::level::level_enum logLevel() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  const std::string& componentLogLevel() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  const std::vector<std::pair<std::string, std::string>> componentLogLevels() const override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   const std::string& logFormat() const override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   std::chrono::seconds parentShutdownTime() const override { return std::chrono::seconds(2); }
   const std::string& logPath() const override { return log_path_; }

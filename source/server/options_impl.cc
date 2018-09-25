@@ -11,6 +11,7 @@
 #include "common/common/version.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/str_split.h"
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 
@@ -162,7 +163,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   }
 
   log_format_ = log_format.getValue();
-  component_log_level_ = component_log_level.getValue();
+
+  component_log_levels_ = parseComponentLogLevels(component_log_level.getValue());
 
   if (mode.getValue() == "serve") {
     mode_ = Server::Mode::Serve;
@@ -214,4 +216,49 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
     throw NoServingException();
   }
 }
+
+const std::vector<std::pair<std::string, std::string>>
+OptionsImpl::parseComponentLogLevels(const std::string& component_log_levels) const {
+  std::vector<std::pair<std::string, std::string>> parsed_log_levels;
+  if (!component_log_levels.empty()) {
+    std::vector<std::string> log_levels = absl::StrSplit(component_log_levels, ',');
+    for (auto& level : log_levels) {
+      std::vector<std::string> log_name_level = absl::StrSplit(level, ':');
+      std::string log_name = log_name_level[0];
+      std::string log_level = log_name_level[1];
+      if (log_name_level.size() != 2) {
+        logError(fmt::format("error: component log level not correctly specified '{}'", level));
+      }
+      size_t level_to_use = std::numeric_limits<size_t>::max();
+      for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
+        if (log_level == spdlog::level::level_names[i]) {
+          level_to_use = i;
+          break;
+        }
+      }
+      if (level_to_use == std::numeric_limits<size_t>::max()) {
+        logError(fmt::format("error: invalid log level specified '{}'", log_level));
+      }
+      bool component_found = false;
+      for (Logger::Logger& logger : Logger::Registry::loggers()) {
+        if (logger.name() == log_name) {
+          component_found = true;
+          break;
+        }
+      }
+
+      if (!component_found) {
+        logError(fmt::format("error: invalid component specified '{}'", log_name));
+      }
+      parsed_log_levels.push_back(std::make_pair(log_name, log_level));
+    }
+  }
+  return parsed_log_levels;
+}
+
+void OptionsImpl::logError(const std::string& error) const {
+  std::cerr << error << std::endl;
+  throw MalformedArgvException(error);
+}
+
 } // namespace Envoy

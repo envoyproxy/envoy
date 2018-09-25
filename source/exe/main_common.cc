@@ -85,24 +85,22 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
 MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
 
 void MainCommonBase::configureComponentLogLevels() {
-  if (!options_.componentLogLevel().empty()) {
-    std::vector<std::string> log_levels = absl::StrSplit(options_.componentLogLevel(), ',');
-    for (auto& level : log_levels) {
-      std::vector<std::string> log_name_level = absl::StrSplit(level, ':');
-      std::string log_name = log_name_level[0];
-      std::string log_level = log_name_level[1];
-      size_t level_to_use = std::numeric_limits<size_t>::max();
-      for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
-        if (log_level == spdlog::level::level_names[i]) {
-          level_to_use = i;
-          break;
-        }
+  const std::vector<std::pair<std::string, std::string>>& component_log_levels =
+      options_.componentLogLevels();
+  for (auto& component_log_level : component_log_levels) {
+    const std::string& component = component_log_level.first;
+    const std::string& log_level = component_log_level.second;
+    size_t level_to_use = std::numeric_limits<size_t>::max();
+    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
+      if (log_level == spdlog::level::level_names[i]) {
+        level_to_use = i;
+        break;
       }
-      for (Logger::Logger& logger : Logger::Registry::loggers()) {
-        if (logger.name() == log_name) {
-          logger.setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
-          break;
-        }
+    }
+    for (Logger::Logger& logger : Logger::Registry::loggers()) {
+      if (logger.name() == component) {
+        logger.setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
+        break;
       }
     }
   }

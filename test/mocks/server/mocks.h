@@ -60,7 +60,7 @@ public:
   MOCK_CONST_METHOD0(localAddressIpVersion, Network::Address::IpVersion());
   MOCK_CONST_METHOD0(drainTime, std::chrono::seconds());
   MOCK_CONST_METHOD0(logLevel, spdlog::level::level_enum());
-  MOCK_CONST_METHOD0(componentLogLevel, const std::string&());
+  MOCK_CONST_METHOD0(componentLogLevels, const std::vector<std::pair<std::string, std::string>>());
   MOCK_CONST_METHOD0(logFormat, const std::string&());
   MOCK_CONST_METHOD0(logPath, const std::string&());
   MOCK_CONST_METHOD0(parentShutdownTime, std::chrono::seconds());
