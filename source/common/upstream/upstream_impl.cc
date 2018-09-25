@@ -751,10 +751,10 @@ void PriorityStateManager::registerHostForPriority(
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
     const absl::optional<Upstream::Host::HealthFlag> health_checker_flag) {
-  const HostSharedPtr host(new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
-                                        lb_endpoint.load_balancing_weight().value(),
-                                        locality_lb_endpoint.locality(),
-                                        lb_endpoint.endpoint().health_check_config()));
+  const HostSharedPtr host(
+      new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
+                   lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
+                   lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority()));
   registerHostForPriority(host, locality_lb_endpoint, lb_endpoint, health_checker_flag);
 }
 
@@ -983,6 +983,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
         hosts_changed = true;
       }
 
+      // Did the priority change?
+      if (host->priority() != existing_host->second->priority()) {
+        existing_host->second->priority(host->priority());
+      }
+
       existing_host->second->weight(host->weight());
       final_hosts.push_back(existing_host->second);
       updated_hosts[existing_host->second->address()->asString()] = existing_host->second;
@@ -1173,7 +1178,8 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           new_hosts.emplace_back(new HostImpl(
               parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
               lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
-              locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config()));
+              locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config(),
+              locality_lb_endpoint_.priority()));
         }
 
         HostVector hosts_added;
@@ -1181,6 +1187,9 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
                                           updated_hosts)) {
           ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
+          ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
+            return host->priority() == locality_lb_endpoint_.priority();
+          }));
           parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
         }
 

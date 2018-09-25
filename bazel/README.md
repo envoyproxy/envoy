@@ -33,7 +33,7 @@ On Ubuntu, run the following commands:
  apt-get install libtool
  apt-get install cmake
  apt-get install realpath
- apt-get install clang-format-6.0
+ apt-get install clang-format-7
  apt-get install automake
  apt-get install ninja-build
  apt-get install curl

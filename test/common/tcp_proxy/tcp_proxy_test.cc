@@ -483,6 +483,20 @@ public:
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
 };
 
+TEST_F(TcpProxyTest, DefaultRoutes) {
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight*
+      ignored_cluster = config.mutable_weighted_clusters()->mutable_clusters()->Add();
+  ignored_cluster->set_name("ignored_cluster");
+  ignored_cluster->set_weight(10);
+
+  configure(config);
+
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_EQ(std::string("fake_cluster"), config_->getRouteFromEntries(connection));
+}
+
 // Tests that half-closes are proxied and don't themselves cause any connection to be closed.
 TEST_F(TcpProxyTest, HalfCloseProxy) {
   setup(1);

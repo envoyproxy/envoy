@@ -67,7 +67,7 @@ public:
 
   NiceMock<Network::MockConnection> downstream_connection_;
   MockRetryState* retry_state_{};
-  bool reject_all_hosts_;
+  bool reject_all_hosts_ = false;
 };
 
 class RouterTestBase : public testing::Test {
