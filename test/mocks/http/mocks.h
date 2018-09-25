@@ -14,8 +14,8 @@
 #include "envoy/http/filter.h"
 #include "envoy/ssl/connection.h"
 
-#include "common/http/utility.h"
 #include "common/http/header_map_impl.h"
+#include "common/http/utility.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
