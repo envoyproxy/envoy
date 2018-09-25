@@ -218,7 +218,6 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 }
 
 void OptionsImpl::parseComponentLogLevels(const std::string& component_log_levels) {
-  std::vector<std::pair<std::string, std::string>> parsed_log_levels;
   if (!component_log_levels.empty()) {
     std::vector<std::string> log_levels = absl::StrSplit(component_log_levels, ',');
     for (auto& level : log_levels) {
@@ -245,16 +244,11 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
           break;
         }
       }
-
       if (!component_found) {
         logError(fmt::format("error: invalid component specified '{}'", log_name));
       }
-      parsed_log_levels.push_back(std::make_pair(log_name, log_level));
+      component_log_levels_.push_back(std::make_pair(log_name, log_level));
     }
-  }
-  for (auto& parsed_log_level : parsed_log_levels) {
-    component_log_levels_.push_back(
-        std::make_pair(parsed_log_level.first, parsed_log_level.second));
   }
 }
 
