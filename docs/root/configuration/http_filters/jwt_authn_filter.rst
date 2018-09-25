@@ -30,7 +30,7 @@ The **default extract location**. If *from_headers* and *from_params* is empty, 
   Authorization: Bearer <token>
 
 If fails to extract a JWT from there, then check query parameter key *access_token* as this example::
-  
+
   /path?access_token=<JWT>
 
 In the filter config, *providers* a map, to map *provider_name* to a *JwtProvider* message. The *provider_name* has to be unique, it is referred in the *JwtRequirement* message *provider_name* field.
@@ -72,7 +72,7 @@ In above example, following cluster **example_jwks_cluster** is needed.
     name: example_jwks_cluster
     type: STRICT_DNS
     hosts:
-      socket_address: 
+      socket_address:
         address: example.com
         portValue: 80
 
@@ -100,17 +100,17 @@ Above example specifies:
 * *from_headers*: token will be extracted from HTTP headers as::
 
      jwt-assertion: <JWT>.
-  
+
 * *forward*: token will forwarded to upstream
 * JWT payload will be added to the request header as following format::
 
     x-jwt-payload: base64_encoded(jwt_payload_in_JSON)
-  
+
 
 RequirementRule
 ~~~~~~~~~~~~~~~
 
-It has two fields: *match* and *requires*. The field *match* specifies how a request can be matched; e.g. by HTTP headers, or by query parameters, or by path prefixes. The field *requires* specifies the JWT requirement, e.g. which provider is required. Multiple providers may be required in such forms, such as "require_all" or "require_any". 
+It has two fields: *match* and *requires*. The field *match* specifies how a request can be matched; e.g. by HTTP headers, or by query parameters, or by path prefixes. The field *requires* specifies the JWT requirement, e.g. which provider is required. Multiple providers may be required in such forms, such as "require_all" or "require_any".
 
 The field *match* uses following fields to define a match:
 * one of following path_specifier: *prefix*, *path*, and *regex*.
@@ -153,7 +153,6 @@ Config samples:
       prefix: /
     requires:
       provider_name: jwt_provider1
-        
 
 Above config specifies one *JwtProvider* with *provider_name* as **jwt_provider1** with an **audience1** *audience* and inline_string *local_jwks*. The config has three rules. The first rule with prefix **/health** has empty *requires* field, if a request has **/health** path prefix, it doesn't need to do any JWT verification. The second rule has path prefix **/api**, its *requires" is to use **jwt_provider1** with *audiences* override of **api_audience**. If a request has **/api** path prefix, it will use **jwt_provider1** with overrided **api_audience** to verify the JWT. The third rule has capture all prefix of **/**, it will match all requests. Its *requires" is to use **jwt_provider1** to verify JWT. The *rules* are checked on the specified order, the first matched *rule* will be used. In this config, the requests not matched with the first and the second rules will match the last one, most requests will use **jwt_provider1** to verify JWT.
 
@@ -184,8 +183,5 @@ Above config specifies one *JwtProvider* with *provider_name* as **jwt_provider1
         requirements:
         - provider_name: provider1
         - provider_name: provider2
-        
 
 Above config uses *group* requirements. The first *rule* specifies *requires_any*; if any of **provider1** or **provider2** requirement is satisfied, the request is OK to proceed. The second *rule* specifies *requires_all*; only if both **provider1** and **provider2** requirements are satisfied, the request is OK to proceed.
-
-
