@@ -258,16 +258,14 @@ void InstanceImpl::initialize(Options& options,
   info.original_start_time_ = original_start_time_;
   restarter_.shutdownParentAdmin(info);
   original_start_time_ = info.original_start_time_;
+  admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
+                             initial_config.admin().profilePath(), *this));
   if (initial_config.admin().address()) {
     ENVOY_LOG(info, "admin address: {}", initial_config.admin().address()->asString());
-    admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
-                               initial_config.admin().profilePath(), options.adminAddressPath(),
-                               initial_config.admin().address(), *this,
-                               stats_store_.createScope("listener.admin.")));
+    admin_->startHttpListener(options.adminAddressPath(), initial_config.admin().address(),
+                              stats_store_.createScope("listener.admin."));
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
-    admin_.reset(new AdminImpl(initial_config.admin().accessLogPath(),
-                               initial_config.admin().profilePath(), *this));
   }
   config_tracker_entry_ =
       admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });

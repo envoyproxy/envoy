@@ -895,11 +895,9 @@ void AdminFilter::onComplete() {
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
-AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& profile_path,
-                     const std::string& address_out_path,
-                     Network::Address::InstanceConstSharedPtr address, Server::Instance& server,
-                     Stats::ScopePtr&& listener_scope)
-    : AdminImpl(access_log_path, profile_path, server) {
+void AdminImpl::startHttpListener(const std::string& address_out_path,
+                                  Network::Address::InstanceConstSharedPtr address,
+                                  Stats::ScopePtr&& listener_scope) {
   socket_ = std::make_unique<Network::TcpListenSocket>(address, nullptr, true);
   listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
   if (!address_out_path.empty()) {

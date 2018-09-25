@@ -69,12 +69,8 @@ public:
 
 class AdminFilterTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  // TODO(mattklein123): Switch to mocks and do not bind to a real port.
   AdminFilterTest()
-      : admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"),
-               TestEnvironment::temporaryPath("admin.address"),
-               Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
-               listener_scope_.createScope("listener.admin.")),
+      : admin_("/dev/null", TestEnvironment::temporaryPath("envoy.prof"), server_),
         filter_(admin_), request_headers_{{":path", "/"}} {
     filter_.setDecoderFilterCallbacks(callbacks_);
   }
@@ -578,11 +574,11 @@ public:
   AdminInstanceTest()
       : address_out_path_(TestEnvironment::temporaryPath("admin.address")),
         cpu_profile_path_(TestEnvironment::temporaryPath("envoy.prof")),
-        admin_("/dev/null", cpu_profile_path_, address_out_path_,
-               Network::Test::getCanonicalLoopbackAddress(GetParam()), server_,
-               listener_scope_.createScope("listener.admin.")),
-        request_headers_{{":path", "/"}}, admin_filter_(admin_) {
-
+        admin_("/dev/null", cpu_profile_path_, server_), request_headers_{{":path", "/"}},
+        admin_filter_(admin_) {
+    admin_.startHttpListener(address_out_path_,
+                             Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                             listener_scope_.createScope("listener.admin."));
     EXPECT_EQ(std::chrono::milliseconds(100), admin_.drainTimeout());
     admin_.tracingStats().random_sampling_.inc();
     EXPECT_TRUE(admin_.setCurrentClientCertDetails().empty());
@@ -648,10 +644,8 @@ TEST_P(AdminInstanceTest, MutatesErrorWithGet) {
 
 TEST_P(AdminInstanceTest, AdminBadProfiler) {
   Buffer::OwnedImpl data;
-  AdminImpl admin_bad_profile_path("/dev/null",
-                                   TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"),
-                                   "", Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                                   server_, listener_scope_.createScope("listener.admin."));
+  AdminImpl admin_bad_profile_path(
+      "/dev/null", TestEnvironment::temporaryPath("some/unlikely/bad/path.prof"), server_);
   Http::HeaderMapImpl header_map;
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
   request_headers_.insertMethod().value(post.data(), post.size());
@@ -671,13 +665,12 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 
 TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   std::string bad_path = TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
-  std::unique_ptr<AdminImpl> admin_bad_address_out_path;
-  EXPECT_LOG_CONTAINS(
-      "critical", "cannot open admin address output file " + bad_path + " for writing.",
-      admin_bad_address_out_path =
-          std::make_unique<AdminImpl>("/dev/null", cpu_profile_path_, bad_path,
-                                      Network::Test::getCanonicalLoopbackAddress(GetParam()),
-                                      server_, listener_scope_.createScope("listener.admin.")));
+  AdminImpl admin_bad_address_out_path("/dev/null", cpu_profile_path_, server_);
+  EXPECT_LOG_CONTAINS("critical",
+                      "cannot open admin address output file " + bad_path + " for writing.",
+                      admin_bad_address_out_path.startHttpListener(
+                          bad_path, Network::Test::getCanonicalLoopbackAddress(GetParam()),
+                          listener_scope_.createScope("listener.admin.")));
   EXPECT_FALSE(std::ifstream(bad_path));
 }
 

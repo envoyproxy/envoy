@@ -50,9 +50,6 @@ class AdminImpl : public Admin,
                   public Http::ConnectionManagerConfig,
                   Logger::Loggable<Logger::Id::admin> {
 public:
-  AdminImpl(const std::string& access_log_path, const std::string& profiler_path,
-            const std::string& address_out_path, Network::Address::InstanceConstSharedPtr address,
-            Server::Instance& server, Stats::ScopePtr&& listener_scope);
   AdminImpl(const std::string& access_log_path, const std::string& profile_path,
             Server::Instance& server);
 
@@ -70,6 +67,10 @@ public:
                   bool removable, bool mutates_server_state) override;
   bool removeHandler(const std::string& prefix) override;
   ConfigTracker& getConfigTracker() override;
+
+  void startHttpListener(const std::string& address_out_path,
+                         Network::Address::InstanceConstSharedPtr address,
+                         Stats::ScopePtr&& listener_scope) override;
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {

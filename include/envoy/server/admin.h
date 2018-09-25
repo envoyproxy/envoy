@@ -112,6 +112,16 @@ public:
   virtual ConfigTracker& getConfigTracker() PURE;
 
   /**
+   * Expose this Admin console as an HTTP server.
+   * @param address_out_path file path to write the listening socket's address to.
+   * @param address network address to bind and listen on.
+   * @param listener_scope stats scope for the listener being started,
+   */
+  virtual void startHttpListener(const std::string& address_out_path,
+                                 Network::Address::InstanceConstSharedPtr address,
+                                 Stats::ScopePtr&& listener_scope) PURE;
+
+  /**
    * Executes an admin request with the specified query params. Note: this must
    * be called from Envoy's main thread.
    *
