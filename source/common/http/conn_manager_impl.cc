@@ -94,10 +94,12 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     idle_timer_->enableTimer(config_.idleTimeout().value());
   }
 
+  read_callbacks_->connection().setDelayedCloseTimeout(config_.delayedCloseTimeout());
+
   read_callbacks_->connection().setConnectionStats(
       {stats_.named_.downstream_cx_rx_bytes_total_, stats_.named_.downstream_cx_rx_bytes_buffered_,
        stats_.named_.downstream_cx_tx_bytes_total_, stats_.named_.downstream_cx_tx_bytes_buffered_,
-       nullptr});
+       nullptr, &stats_.named_.downstream_cx_delayed_close_timeout_});
 }
 
 ConnectionManagerImpl::~ConnectionManagerImpl() {
@@ -125,7 +127,7 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
 
 void ConnectionManagerImpl::checkForDeferredClose() {
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
-    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
   }
 }
 
@@ -240,12 +242,12 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), e.what());
       stats_.named_.downstream_cx_protocol_error_.inc();
 
-      // In the protocol error case, we need to reset all streams now. Since we do a flush write,
-      // the connection might stick around long enough for a pending stream to come back and try
-      // to encode.
+      // In the protocol error case, we need to reset all streams now. Since we do a flush write and
+      // delayed close, the connection might stick around long enough for a pending stream to come
+      // back and try to encode.
       resetAllStreams();
 
-      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
       return Network::FilterStatus::StopIteration;
     }
 
@@ -324,6 +326,8 @@ void ConnectionManagerImpl::onIdleTimeout() {
   ENVOY_CONN_LOG(debug, "idle timeout", read_callbacks_->connection());
   stats_.named_.downstream_cx_idle_timeout_.inc();
   if (!codec_) {
+    // No need to delay close after flushing since an idle timeout has already fired. Attempt to
+    // write out buffered data one last time and issue a local close if successful.
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
