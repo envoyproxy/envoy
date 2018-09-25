@@ -92,6 +92,8 @@ Version history
 * config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`  
   stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented 
   in case of schema/validation error.
+* config: Added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with 
+  management server. 
 
 1.7.0
 ===============
