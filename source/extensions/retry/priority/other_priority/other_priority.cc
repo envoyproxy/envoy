@@ -16,7 +16,7 @@ const Upstream::PriorityLoad& OtherPriorityRetryPriority::determinePriorityLoad(
     for (auto& host_set : priority_set_->hostSetsPerPriority()) {
       recalculatePerPriorityState(host_set->priority());
     }
-    callback_ = priority_set.addMemberUpdateCb([&,this](int priority, auto, auto) {
+    callback_ = priority_set.addMemberUpdateCb([&, this](int priority, auto, auto) {
       recalculatePerPriorityState(priority);
       adjustForAttemptedPriorities();
     });
