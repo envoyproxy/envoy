@@ -28,6 +28,8 @@ public:
   const std::string TcpProxy = "envoy.tcp_proxy";
   // Authorization filter
   const std::string ExtAuthorization = "envoy.ext_authz";
+  // Kafka filter
+  const std::string Kafka = "envoy.filters.network.kafka";
   // Thrift proxy filter
   const std::string ThriftProxy = "envoy.filters.network.thrift_proxy";
   // Role based access control filter

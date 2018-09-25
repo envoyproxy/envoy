@@ -1,0 +1,114 @@
+licenses(["notice"])  # Apache 2
+
+# Kafka network filter.
+# Public docs: docs/root/configuration/network_filters/kafka_filter.rst
+
+load(
+    "//bazel:envoy_build_system.bzl",
+    "envoy_cc_library",
+    "envoy_package",
+)
+
+envoy_package()
+
+envoy_cc_library(
+    name = "config",
+    srcs = ["config.cc"],
+    hdrs = ["metrics_holder.h"],
+    deps = [
+        ":kafka_filter_lib",
+        ":metrics_holder_lib",
+        "//include/envoy/registry",
+        "//include/envoy/server:filter_config_interface",
+        "//source/extensions/filters/network:well_known_names",
+    ],
+)
+
+envoy_cc_library(
+    name = "kafka_filter_lib",
+    srcs = ["kafka_filter.cc"],
+    hdrs = ["kafka_filter.h"],
+    deps = [
+        ":kafka_codec_lib",
+        ":kafka_request_lib",
+        ":kafka_response_lib",
+        ":metrics_holder_lib",
+        "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/network:filter_interface",
+        "//source/common/common:assert_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "kafka_codec_lib",
+    srcs = ["codec.cc"],
+    hdrs = ["codec.h"],
+    deps = [
+        ":kafka_request_lib",
+        ":kafka_response_lib",
+        "//include/envoy/buffer:buffer_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "kafka_request_lib",
+    srcs = ["kafka_request.cc"],
+    hdrs = ["kafka_request.h"],
+    deps = [
+        ":parser_lib",
+        ":serialization_lib",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/common:assert_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "kafka_response_lib",
+    srcs = ["kafka_response.cc"],
+    hdrs = ["kafka_response.h"],
+    deps = [
+        ":parser_lib",
+        ":serialization_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "metrics_holder_lib",
+    srcs = ["metrics_holder.cc"],
+    hdrs = ["metrics_holder.h"],
+    deps = [
+        ":kafka_protocol_lib",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/common:macros",
+        "//source/common/common:to_lower_table_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "parser_lib",
+    hdrs = ["parser.h"],
+    deps = [
+        ":kafka_protocol_lib",
+        "//source/common/common:minimal_logger_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "serialization_lib",
+    hdrs = ["serialization.h"],
+    deps = [
+        ":kafka_protocol_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "kafka_protocol_lib",
+    hdrs = ["kafka_types.h", "kafka_protocol.h"],
+    external_deps = ["abseil_optional"],
+    deps = [
+        "//source/common/common:macros",
+    ],
+)
