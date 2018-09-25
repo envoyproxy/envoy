@@ -35,6 +35,7 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(MetadataMap& metadata_map) {
   }
 
   // Create deflater (encoder).
+  // TODO(soya3129): share deflater among all encoders in the same connection.
   int rv;
   nghttp2_hd_deflater* deflater;
   rv = nghttp2_hd_deflate_new(&deflater, header_table_size_);
