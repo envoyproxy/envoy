@@ -1,5 +1,6 @@
 #include "test/fuzz/fuzz_runner.h"
 
+#include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/event/libevent.h"
 
@@ -30,6 +31,14 @@ void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum d
   // spew too much when running under a fuzz engine.
   log_level_ =
       environment_log_level <= spdlog::level::debug ? environment_log_level : default_log_level;
+  // This needs to work in both the Envoy test shim and oss-fuzz build environments, so we can't
+  // allocate in main.cc. Instead, just create these non-PODs to live forever, since we don't get a
+  // shutdown hook (see
+  // https://github.com/llvm-mirror/compiler-rt/blob/master/lib/fuzzer/FuzzerInterface.h).
+  static auto* lock = new Thread::MutexBasicLockable();
+  static auto* logging_context =
+      new Logger::Context(log_level_, TestEnvironment::getOptions().logFormat(), *lock);
+  UNREFERENCED_PARAMETER(logging_context);
 }
 
 } // namespace Fuzz

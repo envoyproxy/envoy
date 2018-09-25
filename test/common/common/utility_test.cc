@@ -470,6 +470,33 @@ TEST(RegexUtil, parseRegex) {
   }
 }
 
+class WeightedClusterEntry {
+public:
+  WeightedClusterEntry(const std::string name, const uint64_t weight)
+      : name_(name), weight_(weight) {}
+
+  const std::string& clusterName() const { return name_; }
+  uint64_t clusterWeight() const { return weight_; }
+
+private:
+  const std::string name_;
+  const uint64_t weight_;
+};
+typedef std::shared_ptr<WeightedClusterEntry> WeightedClusterEntrySharedPtr;
+
+TEST(WeightedClusterUtil, pickCluster) {
+  std::vector<WeightedClusterEntrySharedPtr> clusters;
+
+  std::unique_ptr<WeightedClusterEntry> cluster1(new WeightedClusterEntry("cluster1", 10));
+  clusters.emplace_back(std::move(cluster1));
+
+  std::unique_ptr<WeightedClusterEntry> cluster2(new WeightedClusterEntry("cluster2", 90));
+  clusters.emplace_back(std::move(cluster2));
+
+  EXPECT_EQ("cluster1", WeightedClusterUtil::pickCluster(clusters, 100, 5, false)->clusterName());
+  EXPECT_EQ("cluster2", WeightedClusterUtil::pickCluster(clusters, 80, 79, true)->clusterName());
+}
+
 static std::string intervalSetIntToString(const IntervalSetImpl<int>& interval_set) {
   std::string out;
   const char* prefix = "";
