@@ -4,6 +4,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/http/date_provider.h"
+#include "common/network/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -37,6 +38,7 @@ namespace Http {
   GAUGE    (downstream_cx_tx_bytes_buffered)                                                       \
   COUNTER  (downstream_cx_drain_close)                                                             \
   COUNTER  (downstream_cx_idle_timeout)                                                            \
+  COUNTER  (downstream_cx_delayed_close_timeout)                                                   \
   COUNTER  (downstream_flow_control_paused_reading_total)                                          \
   COUNTER  (downstream_flow_control_resumed_reading_total)                                         \
   COUNTER  (downstream_rq_total)                                                                   \
@@ -146,6 +148,25 @@ enum class ForwardClientCertType {
 enum class ClientCertDetailsType { Cert, Subject, URI, DNS };
 
 /**
+ * Configuration for what addresses should be considered internal beyond the defaults.
+ */
+class InternalAddressConfig {
+public:
+  virtual ~InternalAddressConfig() {}
+  virtual bool isInternalAddress(const Network::Address::Instance& address) const PURE;
+};
+
+/**
+ * Determines if an address is internal based on whether it is an RFC1918 ip address.
+ */
+class DefaultInternalAddressConfig : public Http::InternalAddressConfig {
+public:
+  bool isInternalAddress(const Network::Address::Instance& address) const override {
+    return Network::Utility::isInternalAddress(address);
+  }
+};
+
+/**
  * Abstract configuration for the connection manager.
  */
 class ConnectionManagerConfig {
@@ -205,6 +226,12 @@ public:
   virtual std::chrono::milliseconds streamIdleTimeout() const PURE;
 
   /**
+   * @return delayed close timeout for downstream HTTP connections. Zero indicates a disabled
+   *         timeout. See http_connection_manager.proto for a detailed description of this timeout.
+   */
+  virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
+
+  /**
    * @return Router::RouteConfigProvider& the configuration provider used to acquire a route
    *         config for each request flow.
    */
@@ -230,6 +257,11 @@ public:
    *         status, etc. or to assume that XFF will already be populated with the remote address.
    */
   virtual bool useRemoteAddress() PURE;
+
+  /**
+   * @return InternalAddressConfig configuration for user defined internal addresses.
+   */
+  virtual const InternalAddressConfig& internalAddressConfig() const PURE;
 
   /**
    * @return uint32_t the number of trusted proxy hops in front of this Envoy instance, for

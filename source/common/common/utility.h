@@ -387,7 +387,7 @@ public:
 };
 
 /**
- * Utilities for finding primes
+ * Utilities for finding primes.
  */
 class Primes {
 public:
@@ -411,11 +411,56 @@ public:
    * Constructs a std::regex, converting any std::regex_error exception into an EnvoyException.
    * @param regex std::string containing the regular expression to parse.
    * @param flags std::regex::flag_type containing parser flags. Defaults to std::regex::optimize.
-   * @return std::regex constructed from regex and flags
+   * @return std::regex constructed from regex and flags.
    * @throw EnvoyException if the regex string is invalid.
    */
   static std::regex parseRegex(const std::string& regex,
                                std::regex::flag_type flags = std::regex::optimize);
+};
+
+/**
+ * Utilities for working with weighted clusters.
+ */
+class WeightedClusterUtil {
+public:
+  /*
+   * Returns a WeightedClusterEntry from the given weighted clusters based on
+   * the total cluster weight and a random value.
+   * @param weighted_clusters a vector of WeightedClusterEntry instances.
+   * @param total_cluster_weight the total weight of all clusters.
+   * @param random_value the random value.
+   * @param ignore_overflow whether to ignore cluster weight overflows.
+   * @return a WeightedClusterEntry.
+   */
+  template <typename WeightedClusterEntry>
+  static const WeightedClusterEntry&
+  pickCluster(const std::vector<WeightedClusterEntry>& weighted_clusters,
+              const uint64_t total_cluster_weight, const uint64_t random_value,
+              const bool ignore_overflow) {
+    uint64_t selected_value = random_value % total_cluster_weight;
+    uint64_t begin = 0;
+    uint64_t end = 0;
+
+    // Find the right cluster to route to based on the interval in which
+    // the selected value falls. The intervals are determined as
+    // [0, cluster1_weight), [cluster1_weight, cluster1_weight+cluster2_weight),..
+    for (const WeightedClusterEntry& cluster : weighted_clusters) {
+      end = begin + cluster->clusterWeight();
+      if (!ignore_overflow) {
+        // end > total_cluster_weight: This case can only occur with Runtimes,
+        // when the user specifies invalid weights such that
+        // sum(weights) > total_cluster_weight.
+        ASSERT(end <= total_cluster_weight);
+      }
+
+      if (selected_value >= begin && selected_value < end) {
+        return cluster;
+      }
+      begin = end;
+    }
+
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 };
 
 /**
