@@ -65,7 +65,7 @@ public:
   AdsIntegrationBaseTest(Http::CodecClient::Type downstream_protocol,
                          Network::Address::IpVersion version,
                          const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG)
-      : HttpIntegrationTest(downstream_protocol, version, config) {}
+      : HttpIntegrationTest(downstream_protocol, version, realTime(), config) {}
 
   void createAdsConnection(FakeUpstream& upstream) {
     ads_upstream_ = &upstream;
@@ -104,8 +104,8 @@ public:
 
   void createUpstreams() override {
     AdsIntegrationBaseTest::createUpstreams();
-    fake_upstreams_.emplace_back(
-        new FakeUpstream(createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP2, version_));
+    fake_upstreams_.emplace_back(new FakeUpstream(
+        createUpstreamSslContext(), 0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
   Network::TransportSocketFactoryPtr createUpstreamSslContext() {
@@ -651,7 +651,8 @@ public:
 
   void createUpstreams() override {
     AdsIntegrationBaseTest::createUpstreams();
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
   void initialize() override {
@@ -696,7 +697,8 @@ public:
 
   void createUpstreams() override {
     AdsIntegrationBaseTest::createUpstreams();
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP2, version_, timeSystem()));
   }
 
   void initialize() override {

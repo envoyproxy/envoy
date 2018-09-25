@@ -43,7 +43,8 @@ message Bootstrap {
     // IP or DNS-based).
     repeated envoy.api.v2.Cluster clusters = 2 [(gogoproto.nullable) = false];
 
-    // [#not-implemented-hide:]
+    // These static secrets can be used by :ref:`SdsSecretConfig
+    // <envoy_api_msg_auth.SdsSecretConfig>`
     repeated envoy.api.v2.auth.Secret secrets = 3 [(gogoproto.nullable) = false];
   }
   // Statically specified resources.
