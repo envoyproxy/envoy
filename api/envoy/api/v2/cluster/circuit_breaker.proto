@@ -50,7 +50,4 @@ message CircuitBreakers {
   // :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`, the default values
   // are used.
   repeated Thresholds thresholds = 1;
-
-  // Whether circuit breaking should be enabled. Defaults to true.
-  google.protobuf.BoolValue enabled = 2;
 }
