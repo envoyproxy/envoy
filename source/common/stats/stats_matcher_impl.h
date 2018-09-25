@@ -21,7 +21,7 @@ public:
   StatsMatcherImpl(const envoy::config::metrics::v2::StatsConfig& config);
 
   // Default constructor simply allows everything.
-  StatsMatcherImpl() {}
+  StatsMatcherImpl() : is_inclusive_(true) {}
 
   /**
    * Take a metric name and report whether or not it should be disallowed.
@@ -32,7 +32,7 @@ public:
 
 private:
   // We want to allow stats through by default.
-  bool default_inclusive_ = true;
+  bool is_inclusive_;
 
   std::vector<Matchers::StringMatcher> matchers_;
 };

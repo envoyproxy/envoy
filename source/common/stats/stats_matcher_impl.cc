@@ -10,34 +10,39 @@ namespace Stats {
 
 StatsMatcherImpl::StatsMatcherImpl(const envoy::config::metrics::v2::StatsConfig& config) {
   switch (config.stats_matcher().stats_matcher_case()) {
-  case envoy::config::metrics::v2::StatsMatcher::kExclusionList:
-    for (const auto& stats_matcher : config.stats_matcher().exclusion_list().patterns()) {
-      matchers_.push_back(Matchers::StringMatcher(stats_matcher));
-    }
-    break;
   case envoy::config::metrics::v2::StatsMatcher::kInclusionList:
-    default_inclusive_ = false;
+    // If we have an inclusion list, we are being default-exclusive.
     for (const auto& stats_matcher : config.stats_matcher().inclusion_list().patterns()) {
       matchers_.push_back(Matchers::StringMatcher(stats_matcher));
     }
+    is_inclusive_ = false;
     break;
+  case envoy::config::metrics::v2::StatsMatcher::kExclusionList:
+    // If we have an exclusion list, we are being default-inclusive.
+    for (const auto& stats_matcher : config.stats_matcher().exclusion_list().patterns()) {
+      matchers_.push_back(Matchers::StringMatcher(stats_matcher));
+    }
+    FALLTHRU;
   default:
-    // No matcher was supplied, so we default to allow all stat names.
+    // No matcher was supplied, so we default to inclusion.
+    is_inclusive_ = true;
     break;
   }
 }
 
 bool StatsMatcherImpl::rejects(const std::string& name) const {
-  if (default_inclusive_) {
-    // If we are in default-allow mode, matching any of the matchers is grounds for denial.
-    return std::any_of(matchers_.begin(), matchers_.end(),
-                       [&name](auto matcher) { return matcher.match(name); });
-  } else {
-    // On the other hand, if we are in default-deny mode, matching any of the matchers is
-    // grounds for admission.
-    return !std::any_of(matchers_.begin(), matchers_.end(),
-                        [&name](auto matcher) { return matcher.match(name); });
-  }
+  //
+  //  is_inclusive_ | match | return
+  // ---------------+-------+--------
+  //        T       |   T   |   T     Default-inclusive and matching an (exclusion) matcher, deny.
+  //        T       |   F   |   F     Otherwise, allow.
+  //        F       |   T   |   F     Default-exclusive and matching an (inclusion) matcher, allow.
+  //        F       |   F   |   T     Otherwise, deny.
+  //
+  // This is an XNOR, which can be evaluated by checking for equality.
+
+  return (is_inclusive_ == std::any_of(matchers_.begin(), matchers_.end(),
+                                       [&name](auto matcher) { return matcher.match(name); }));
 }
 
 } // namespace Stats
