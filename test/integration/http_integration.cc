@@ -213,8 +213,9 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                                          Network::Address::IpVersion version,
-                                         const std::string& config)
-    : BaseIntegrationTest(version, config), downstream_protocol_(downstream_protocol) {
+                                         TestTimeSystemPtr time_system, const std::string& config)
+    : BaseIntegrationTest(version, std::move(time_system), config),
+      downstream_protocol_(downstream_protocol) {
   // Legacy integration tests expect the default listener to be named "http" for lookupPort calls.
   config_helper_.renameListener("http");
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
