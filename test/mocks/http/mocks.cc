@@ -8,7 +8,6 @@
 
 using testing::_;
 using testing::Invoke;
-using testing::IsSubsetOf;
 using testing::MakeMatcher;
 using testing::Matcher;
 using testing::MatcherInterface;
@@ -166,39 +165,8 @@ MockInstance::~MockInstance() {}
 
 } // namespace ConnectionPool
 
-namespace {
-
-class IsSubsetOfHeadersMatcher : public MatcherInterface<const HeaderMap&> {
-public:
-  explicit IsSubsetOfHeadersMatcher(const HeaderMap& expected_headers)
-      : expected_headers_(expected_headers) {}
-
-  bool MatchAndExplain(const HeaderMap& headers, MatchResultListener* listener) const override {
-    // Collect header maps into vectors, to use for IsSubsetOf.
-    auto get_headers_cb = [](const HeaderEntry& header, void* headers) {
-      static_cast<std::vector<std::pair<absl::string_view, absl::string_view>>*>(headers)
-          ->push_back(std::make_pair(header.key().getStringView(), header.value().getStringView()));
-      return HeaderMap::Iterate::Continue;
-    };
-    std::vector<std::pair<absl::string_view, absl::string_view>> arg_headers_vec;
-    headers.iterate(get_headers_cb, &arg_headers_vec);
-    std::vector<std::pair<absl::string_view, absl::string_view>> expected_headers_vec;
-    expected_headers_.iterate(get_headers_cb, &expected_headers_vec);
-
-    return ExplainMatchResult(IsSubsetOf(expected_headers_vec), arg_headers_vec, listener);
-  }
-
-  void DescribeTo(std::ostream* os) const override {
-    *os << "is a subset of headers:\n" << expected_headers_;
-  }
-
-  const HeaderMap& expected_headers_;
-};
-
-} // namespace
-
-Matcher<const HeaderMap&> IsSubsetOfHeaders(const HeaderMap& expected_headers) {
-  return MakeMatcher(new IsSubsetOfHeadersMatcher(expected_headers));
+IsSubsetOfHeadersMatcher IsSubsetOfHeaders(const HeaderMap& expected_headers) {
+  return IsSubsetOfHeadersMatcher(expected_headers);
 }
 
 } // namespace Http

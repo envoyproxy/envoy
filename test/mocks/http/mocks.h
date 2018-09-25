@@ -15,6 +15,7 @@
 #include "envoy/ssl/connection.h"
 
 #include "common/http/utility.h"
+#include "common/http/header_map_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -547,7 +548,60 @@ MATCHER_P(HttpStatusIs, expected_code, "") {
   return true;
 }
 
-testing::Matcher<const HeaderMap&> IsSubsetOfHeaders(const HeaderMap& expected_headers);
+template <typename HeaderMapT>
+class IsSubsetOfHeadersMatcherImpl : public testing::MatcherInterface<HeaderMapT> {
+public:
+  explicit IsSubsetOfHeadersMatcherImpl(const HeaderMap& expected_headers)
+      : expected_headers_(expected_headers) {}
+
+  IsSubsetOfHeadersMatcherImpl(IsSubsetOfHeadersMatcherImpl&& other)
+      : expected_headers_(other.expected_headers_) {}
+
+  IsSubsetOfHeadersMatcherImpl(const IsSubsetOfHeadersMatcherImpl& other)
+      : expected_headers_(other.expected_headers_) {}
+
+  bool MatchAndExplain(HeaderMapT headers, testing::MatchResultListener* listener) const override {
+    // Collect header maps into vectors, to use for IsSubsetOf.
+    auto get_headers_cb = [](const HeaderEntry& header, void* headers) {
+      static_cast<std::vector<std::pair<absl::string_view, absl::string_view>>*>(headers)
+          ->push_back(std::make_pair(header.key().getStringView(), header.value().getStringView()));
+      return HeaderMap::Iterate::Continue;
+    };
+    std::vector<std::pair<absl::string_view, absl::string_view>> arg_headers_vec;
+    headers.iterate(get_headers_cb, &arg_headers_vec);
+    std::vector<std::pair<absl::string_view, absl::string_view>> expected_headers_vec;
+    expected_headers_.iterate(get_headers_cb, &expected_headers_vec);
+
+    return ExplainMatchResult(testing::IsSubsetOf(expected_headers_vec), arg_headers_vec, listener);
+  }
+
+  void DescribeTo(std::ostream* os) const override {
+    *os << "is a subset of headers:\n" << expected_headers_;
+  }
+
+  const HeaderMapImpl expected_headers_;
+};
+
+class IsSubsetOfHeadersMatcher {
+public:
+  IsSubsetOfHeadersMatcher(const HeaderMap& expected_headers)
+      : expected_headers_(expected_headers) {}
+
+  IsSubsetOfHeadersMatcher(IsSubsetOfHeadersMatcher&& other)
+      : expected_headers_(static_cast<const HeaderMap&>(other.expected_headers_)) {}
+
+  IsSubsetOfHeadersMatcher(const IsSubsetOfHeadersMatcher& other)
+      : expected_headers_(static_cast<const HeaderMap&>(other.expected_headers_)) {}
+
+  template <typename HeaderMapT> operator testing::Matcher<HeaderMapT>() const {
+    return testing::MakeMatcher(new IsSubsetOfHeadersMatcherImpl<HeaderMapT>(expected_headers_));
+  }
+
+private:
+  HeaderMapImpl expected_headers_;
+};
+
+IsSubsetOfHeadersMatcher IsSubsetOfHeaders(const HeaderMap& expected_headers);
 
 } // namespace Http
 
