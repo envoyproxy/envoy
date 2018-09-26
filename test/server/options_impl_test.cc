@@ -188,30 +188,6 @@ TEST_F(OptionsImplTest, BadMaxStatsOption) {
                           "'max-stats' value specified");
 }
 
-TEST_F(OptionsImplTest, InvalidComponentLogLevelArgument) {
-  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --component-log-level upstream"),
-                          MalformedArgvException,
-                          "component log level not correctly specified 'upstream'");
-}
-
-TEST_F(OptionsImplTest, InvalidLogLevel) {
-  EXPECT_THROW_WITH_REGEX(
-      createOptionsImpl("envoy --component-log-level upstream:blah,connection:trace"),
-      MalformedArgvException, "error: invalid log level specified 'blah'");
-}
-
-TEST_F(OptionsImplTest, InvalidComponent) {
-  EXPECT_THROW_WITH_REGEX(
-      createOptionsImpl("envoy --component-log-level upstream:debug,blah:trace"),
-      MalformedArgvException, "error: invalid component specified 'blah'");
-}
-
-TEST_F(OptionsImplTest, InvalidComponentLogLevel) {
-  EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --component-log-level upstream:foo:bar"),
-                          MalformedArgvException,
-                          "error: component log level not correctly specified 'upstream:foo:bar'");
-}
-
 TEST_F(OptionsImplTest, ParseComponentLogLevels) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
   parseComponentLogLevels(options, "upstream:debug,connection:trace");

@@ -11,6 +11,7 @@ Version history
   through `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
 * grpc-json: added support for building HTTP response from
   `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
+* cli: Added support for :ref:`component log level <operations_cli>` command line option for configuring log levels of individual components.
 * cluster: added :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>` to merge
   health check/weight/metadata updates within the given duration.
 * config: regex validation added to limit to a maximum of 1024 characters.
@@ -94,7 +95,6 @@ Version history
 * config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`  
   stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented 
   in case of schema/validation error.
-* cli: Added support for :ref:`component log level <operations_cli>` command line option for configuring log levels of individual components.
 * :ref:`sni_cluster <config_network_filters_sni_cluster>`: introduced a new network filter that forwards connections to the
   upstream cluster specified by the SNI value presented by the client during a TLS handshake.
 * config: Added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with 
