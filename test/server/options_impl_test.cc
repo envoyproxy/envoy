@@ -195,9 +195,9 @@ TEST_F(OptionsImplTest, ParseComponentLogLevels) {
       options->componentLogLevels();
   EXPECT_EQ(2, component_log_levels.size());
   EXPECT_EQ("upstream", component_log_levels[0].first);
-  EXPECT_EQ("debug", spdlog::level::to_str(component_log_levels[0].second));
+  EXPECT_EQ(spdlog::level::level_enum::debug, component_log_levels[0].second);
   EXPECT_EQ("connection", component_log_levels[1].first);
-  EXPECT_EQ("trace", spdlog::level::to_str(component_log_levels[1].second));
+  EXPECT_EQ(spdlog::level::level_enum::trace, component_log_levels[1].second);
 }
 
 TEST_F(OptionsImplTest, ParseComponentLogLevelsWithBlank) {
