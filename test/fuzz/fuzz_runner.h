@@ -20,10 +20,13 @@ public:
   ~PerTestEnvironment();
 
   std::string temporaryPath(const std::string& path) const { return test_tmpdir_ + "/" + path; }
+  const std::string& testId() const { return test_id_; }
 
 private:
   static uint32_t test_num_;
+  const uint32_t per_test_num_;
   const std::string test_tmpdir_;
+  const std::string test_id_;
 };
 
 class Runner {
