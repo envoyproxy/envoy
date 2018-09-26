@@ -243,7 +243,8 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
     if (!logger_to_change) {
       logError(fmt::format("error: invalid component specified '{}'", log_name));
     }
-    component_log_levels_.push_back(std::make_pair(log_name, level_to_use));
+    component_log_levels_.push_back(
+        std::make_pair(log_name, static_cast<spdlog::level::level_enum>(level_to_use)));
   }
 }
 

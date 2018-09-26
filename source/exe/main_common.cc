@@ -87,11 +87,9 @@ MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
 
 void MainCommonBase::configureComponentLogLevels() {
   for (auto& component_log_level : options_.componentLogLevels()) {
-    const std::string& component = component_log_level.first;
-    const size_t level_to_use = component_log_level.second;
-    Logger::Logger* logger_to_change = Logger::Registry::logger(component);
+    Logger::Logger* logger_to_change = Logger::Registry::logger(component_log_level.first);
     ASSERT(logger_to_change);
-    logger_to_change->setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
+    logger_to_change->setLevel(component_log_level.second);
   }
 }
 
