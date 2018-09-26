@@ -242,7 +242,10 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "idle_timeout_integration_test",
     srcs = ["idle_timeout_integration_test.cc"],
-    deps = [":http_protocol_integration_lib"],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//test/test_common:test_time_lib",
+    ],
 )
 
 envoy_cc_test_library(

@@ -4,6 +4,7 @@
 #include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -18,8 +19,8 @@ namespace Http {
 TEST(UserAgentTest, All) {
   Stats::MockStore stat_store;
   NiceMock<Stats::MockHistogram> original_histogram;
-  NiceMock<MockTimeSource> time_source;
-  Stats::Timespan span(original_histogram, time_source);
+  Event::SimulatedTimeSystem time_system;
+  Stats::Timespan span(original_histogram, time_system);
 
   EXPECT_CALL(stat_store.counter_, inc()).Times(5);
   EXPECT_CALL(stat_store, counter("test.user_agent.ios.downstream_cx_total"));
