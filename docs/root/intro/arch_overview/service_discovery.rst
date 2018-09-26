@@ -104,10 +104,8 @@ variety of different backing stores.
 
 .. attention::
 
-  In the current xDS API, the word "SDS" is used as an acronym for `Secret Discovery Service
-  <https://github.com/envoyproxy/data-plane-api/blob/master/API_OVERVIEW.md#apis>`_.
-
-.. TODO(taiki45): Link to secret discovery service arch overview page when https://github.com/envoyproxy/envoy/pull/4484 gets merged.
+  In the current xDS API, the word "SDS" is used as an acronym for :ref:`Secret Discovery Service
+  <config_secret_discovery_service>`.
 
 .. _arch_overview_service_discovery_eventually_consistent:
 
