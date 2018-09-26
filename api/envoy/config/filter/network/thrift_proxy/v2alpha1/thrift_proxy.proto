@@ -5,13 +5,15 @@ option go_package = "v2";
 
 import "envoy/config/filter/network/thrift_proxy/v2alpha1/route.proto";
 
+import "google/protobuf/struct.proto";
+
 import "validate/validate.proto";
 import "gogoproto/gogo.proto";
 
 // [#protodoc-title: Thrift Proxy]
 // Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
 
-// [#comment:next free field: 5]
+// [#comment:next free field: 6]
 message ThriftProxy {
   // Supplies the type of transport that the Thrift proxy should use. Defaults to
   // :ref:`AUTO_TRANSPORT<envoy_api_enum_value_config.filter.network.thrift_proxy.v2alpha1.TransportType.AUTO_TRANSPORT>`.
@@ -26,6 +28,12 @@ message ThriftProxy {
 
   // The route table for the connection manager is static and is specified in this property.
   RouteConfiguration route_config = 4;
+
+  // A list of individual Thrift filters that make up the filter chain for requests made to the
+  // Thrift proxy. Order matters as the filters are processed sequentially. For backwards
+  // compatibility, if no thrift_filters are specified, a default Thrift router filter
+  // (`envoy.filters.thrift.router`) is used.
+  repeated ThriftFilter thrift_filters = 5;
 }
 
 // Thrift transport types supported by Envoy.
@@ -68,6 +76,21 @@ enum ProtocolType {
 
   // The Thrift proxy will use the Thrift "Twitter" protocol implemented by the finagle library.
   TWITTER = 4;
+}
+
+// ThriftFilter configures a Thrift filter.
+// [#comment:next free field: 3]
+message ThriftFilter {
+  // The name of the filter to instantiate. The name must match a supported
+  // filter. The built-in filters are:
+  //
+  // [#comment:TODO(zuercher): Auto generate the following list]
+  // * :ref:`envoy.filters.thrift.router <config_thrift_filters_router>`
+  string name = 1 [(validate.rules).string.min_bytes = 1];
+
+  // Filter specific configuration which depends on the filter being
+  // instantiated. See the supported filters for further documentation.
+  google.protobuf.Struct config = 2;
 }
 
 // ThriftProtocolOptions specifies Thrift upstream protocol options. This object is used in

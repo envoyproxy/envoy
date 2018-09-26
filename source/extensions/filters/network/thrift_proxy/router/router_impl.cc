@@ -177,12 +177,6 @@ void Router::setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& ca
   // TODO(zuercher): handle buffer limits
 }
 
-void Router::resetUpstreamConnection() {
-  if (upstream_request_ != nullptr) {
-    upstream_request_->resetStream();
-  }
-}
-
 FilterStatus Router::transportBegin(MessageMetadataSharedPtr metadata) {
   UNREFERENCED_PARAMETER(metadata);
   return FilterStatus::Continue;
@@ -207,7 +201,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                      metadata->methodName());
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::UnknownMethod,
-                     fmt::format("no route for method '{}'", metadata->methodName())));
+                     fmt::format("no route for method '{}'", metadata->methodName())),
+        true);
     return FilterStatus::StopIteration;
   }
 
@@ -218,7 +213,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
-                     fmt::format("unknown cluster '{}'", route_entry_->clusterName())));
+                     fmt::format("unknown cluster '{}'", route_entry_->clusterName())),
+        true);
     return FilterStatus::StopIteration;
   }
 
@@ -227,9 +223,10 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                    route_entry_->clusterName(), metadata->methodName());
 
   if (cluster_->maintenanceMode()) {
-    callbacks_->sendLocalReply(AppException(
-        AppExceptionType::InternalError,
-        fmt::format("maintenance mode for cluster '{}'", route_entry_->clusterName())));
+    callbacks_->sendLocalReply(
+        AppException(AppExceptionType::InternalError,
+                     fmt::format("maintenance mode for cluster '{}'", route_entry_->clusterName())),
+        true);
     return FilterStatus::StopIteration;
   }
 
@@ -251,7 +248,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   if (!conn_pool) {
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
-                     fmt::format("no healthy upstream for '{}'", route_entry_->clusterName())));
+                     fmt::format("no healthy upstream for '{}'", route_entry_->clusterName())),
+        true);
     return FilterStatus::StopIteration;
   }
 
@@ -302,16 +300,22 @@ void Router::onUpstreamData(Buffer::Instance& data, bool end_stream) {
       upstream_request_->response_started_ = true;
     }
 
-    if (callbacks_->upstreamData(data)) {
+    ThriftFilters::ResponseStatus status = callbacks_->upstreamData(data);
+    if (status == ThriftFilters::ResponseStatus::Complete) {
       ENVOY_STREAM_LOG(debug, "response complete", *callbacks_);
       upstream_request_->onResponseComplete();
       cleanup();
+      return;
+    } else if (status == ThriftFilters::ResponseStatus::Reset) {
+      ENVOY_STREAM_LOG(debug, "upstream reset", *callbacks_);
+      upstream_request_->resetStream();
       return;
     }
   }
 
   if (end_stream) {
     // Response is incomplete, but no more data is coming.
+    ENVOY_STREAM_LOG(debug, "response underflow", *callbacks_);
     upstream_request_->onResponseComplete();
     upstream_request_->onResetStream(
         Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
@@ -459,9 +463,11 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
 
   switch (reason) {
   case Tcp::ConnectionPool::PoolFailureReason::Overflow:
-    parent_.callbacks_->sendLocalReply(AppException(
-        AppExceptionType::InternalError,
-        fmt::format("too many connections to '{}'", upstream_host_->address()->asString())));
+    parent_.callbacks_->sendLocalReply(
+        AppException(
+            AppExceptionType::InternalError,
+            fmt::format("too many connections to '{}'", upstream_host_->address()->asString())),
+        true);
     break;
   case Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure:
     // Should only happen if we closed the connection, due to an error condition, in which case
@@ -472,9 +478,11 @@ void Router::UpstreamRequest::onResetStream(Tcp::ConnectionPool::PoolFailureReas
   case Tcp::ConnectionPool::PoolFailureReason::Timeout:
     // TODO(zuercher): distinguish between these cases where appropriate (particularly timeout)
     if (!response_started_) {
-      parent_.callbacks_->sendLocalReply(AppException(
-          AppExceptionType::InternalError,
-          fmt::format("connection failure '{}'", upstream_host_->address()->asString())));
+      parent_.callbacks_->sendLocalReply(
+          AppException(
+              AppExceptionType::InternalError,
+              fmt::format("connection failure '{}'", upstream_host_->address()->asString())),
+          true);
       return;
     }
 

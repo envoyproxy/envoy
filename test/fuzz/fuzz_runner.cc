@@ -14,7 +14,9 @@ spdlog::level::level_enum Runner::log_level_;
 uint32_t PerTestEnvironment::test_num_;
 
 PerTestEnvironment::PerTestEnvironment()
-    : test_tmpdir_(TestEnvironment::temporaryPath(fmt::format("fuzz_{}", test_num_++))) {
+    : per_test_num_(test_num_++),
+      test_tmpdir_(TestEnvironment::temporaryPath(fmt::format("fuzz_{}", per_test_num_))),
+      test_id_(std::to_string(HashUtil::xxHash64(test_tmpdir_))) {
   TestEnvironment::createPath(test_tmpdir_);
 }
 

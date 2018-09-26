@@ -18,6 +18,8 @@
 #include "extensions/filters/network/thrift_proxy/stats.h"
 #include "extensions/filters/network/thrift_proxy/transport.h"
 
+#include "absl/types/any.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -87,8 +89,8 @@ private:
 
     // ProtocolConverter
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
-    FilterStatus fieldBegin(absl::string_view name, FieldType field_type,
-                            int16_t field_id) override;
+    FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
+                            int16_t& field_id) override;
     FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
       UNREFERENCED_PARAMETER(metadata);
       return FilterStatus::Continue;
@@ -108,35 +110,90 @@ private:
   };
   typedef std::unique_ptr<ResponseDecoder> ResponseDecoderPtr;
 
+  // Wraps a DecoderFilter and acts as the DecoderFilterCallbacks for the filter, enabling filter
+  // chain continuation.
+  struct ActiveRpcDecoderFilter : public ThriftFilters::DecoderFilterCallbacks,
+                                  LinkedObject<ActiveRpcDecoderFilter> {
+    ActiveRpcDecoderFilter(ActiveRpc& parent, ThriftFilters::DecoderFilterSharedPtr filter)
+        : parent_(parent), handle_(filter) {}
+
+    // ThriftFilters::DecoderFilterCallbacks
+    uint64_t streamId() const override { return parent_.stream_id_; }
+    const Network::Connection* connection() const override { return parent_.connection(); }
+    void continueDecoding() override;
+    Router::RouteConstSharedPtr route() override { return parent_.route(); }
+    TransportType downstreamTransportType() const override {
+      return parent_.downstreamTransportType();
+    }
+    ProtocolType downstreamProtocolType() const override {
+      return parent_.downstreamProtocolType();
+    }
+    void sendLocalReply(const DirectResponse& response, bool end_stream) override {
+      parent_.sendLocalReply(response, end_stream);
+    }
+    void startUpstreamResponse(Transport& transport, Protocol& protocol) override {
+      parent_.startUpstreamResponse(transport, protocol);
+    }
+    ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override {
+      return parent_.upstreamData(buffer);
+    }
+    void resetDownstreamConnection() override { parent_.resetDownstreamConnection(); }
+
+    ActiveRpc& parent_;
+    ThriftFilters::DecoderFilterSharedPtr handle_;
+  };
+  typedef std::unique_ptr<ActiveRpcDecoderFilter> ActiveRpcDecoderFilterPtr;
+
   // ActiveRpc tracks request/response pairs.
   struct ActiveRpc : LinkedObject<ActiveRpc>,
                      public Event::DeferredDeletable,
-                     public DelegatingDecoderEventHandler,
+                     public DecoderEventHandler,
                      public ThriftFilters::DecoderFilterCallbacks,
                      public ThriftFilters::FilterChainFactoryCallbacks {
     ActiveRpc(ConnectionManager& parent)
         : parent_(parent), request_timer_(new Stats::Timespan(parent_.stats_.request_time_ms_,
                                                               parent_.time_system_)),
-          stream_id_(parent_.random_generator_.random()) {
+          stream_id_(parent_.random_generator_.random()), local_response_sent_{false},
+          pending_transport_end_{false} {
       parent_.stats_.request_active_.inc();
     }
     ~ActiveRpc() {
       request_timer_->complete();
       parent_.stats_.request_active_.dec();
 
-      if (decoder_filter_ != nullptr) {
-        decoder_filter_->onDestroy();
+      for (auto& filter : decoder_filters_) {
+        filter->handle_->onDestroy();
       }
     }
 
     // DecoderEventHandler
+    FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override;
     FilterStatus transportEnd() override;
     FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
+    FilterStatus messageEnd() override;
+    FilterStatus structBegin(absl::string_view name) override;
+    FilterStatus structEnd() override;
+    FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
+                            int16_t& field_id) override;
+    FilterStatus fieldEnd() override;
+    FilterStatus boolValue(bool& value) override;
+    FilterStatus byteValue(uint8_t& value) override;
+    FilterStatus int16Value(int16_t& value) override;
+    FilterStatus int32Value(int32_t& value) override;
+    FilterStatus int64Value(int64_t& value) override;
+    FilterStatus doubleValue(double& value) override;
+    FilterStatus stringValue(absl::string_view value) override;
+    FilterStatus mapBegin(FieldType& key_type, FieldType& value_type, uint32_t& size) override;
+    FilterStatus mapEnd() override;
+    FilterStatus listBegin(FieldType& elem_type, uint32_t& size) override;
+    FilterStatus listEnd() override;
+    FilterStatus setBegin(FieldType& elem_type, uint32_t& size) override;
+    FilterStatus setEnd() override;
 
     // ThriftFilters::DecoderFilterCallbacks
     uint64_t streamId() const override { return stream_id_; }
     const Network::Connection* connection() const override;
-    void continueDecoding() override;
+    void continueDecoding() override { parent_.continueDecoding(); }
     Router::RouteConstSharedPtr route() override;
     TransportType downstreamTransportType() const override {
       return parent_.decoder_->transportType();
@@ -144,18 +201,20 @@ private:
     ProtocolType downstreamProtocolType() const override {
       return parent_.decoder_->protocolType();
     }
-    void sendLocalReply(const DirectResponse& response) override;
+    void sendLocalReply(const DirectResponse& response, bool end_stream) override;
     void startUpstreamResponse(Transport& transport, Protocol& protocol) override;
-    bool upstreamData(Buffer::Instance& buffer) override;
+    ThriftFilters::ResponseStatus upstreamData(Buffer::Instance& buffer) override;
     void resetDownstreamConnection() override;
 
     // Thrift::FilterChainFactoryCallbacks
     void addDecoderFilter(ThriftFilters::DecoderFilterSharedPtr filter) override {
-      // TODO(zuercher): support multiple filters
-      filter->setDecoderFilterCallbacks(*this);
-      decoder_filter_ = filter;
-      event_handler_ = decoder_filter_.get();
+      ActiveRpcDecoderFilterPtr wrapper = std::make_unique<ActiveRpcDecoderFilter>(*this, filter);
+      filter->setDecoderFilterCallbacks(*wrapper);
+      wrapper->moveIntoListBack(std::move(wrapper), decoder_filters_);
     }
+
+    FilterStatus applyDecoderFilters(ActiveRpcDecoderFilter* filter);
+    void finalizeRequest();
 
     void createFilterChain();
     void onReset();
@@ -165,19 +224,24 @@ private:
     Stats::TimespanPtr request_timer_;
     uint64_t stream_id_;
     MessageMetadataSharedPtr metadata_;
-    ThriftFilters::DecoderFilterSharedPtr decoder_filter_;
+    std::list<ActiveRpcDecoderFilterPtr> decoder_filters_;
     DecoderEventHandlerSharedPtr upgrade_handler_;
     ResponseDecoderPtr response_decoder_;
     absl::optional<Router::RouteConstSharedPtr> cached_route_;
     Buffer::OwnedImpl response_buffer_;
     int32_t original_sequence_id_{0};
+    MessageType original_msg_type_{MessageType::Call};
+    std::function<FilterStatus(DecoderEventHandler*)> filter_action_;
+    absl::any filter_context_;
+    bool local_response_sent_ : 1;
+    bool pending_transport_end_ : 1;
   };
 
   typedef std::unique_ptr<ActiveRpc> ActiveRpcPtr;
 
   void continueDecoding();
   void dispatch();
-  void sendLocalReply(MessageMetadata& metadata, const DirectResponse& reponse);
+  void sendLocalReply(MessageMetadata& metadata, const DirectResponse& reponse, bool end_stream);
   void doDeferredRpcDestroy(ActiveRpc& rpc);
   void resetAllRpcs(bool local_reset);
 
