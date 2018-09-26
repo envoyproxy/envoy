@@ -77,6 +77,7 @@ Version history
 * rbac network filter: a :ref:`role-based access control network filter <config_network_filters_rbac>` has been added.
 * rest-api: added ability to set the :ref:`request timeout <envoy_api_field_core.ApiConfigSource.request_timeout>` for REST API requests.
 * router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
+* router: addded ability to set attempt count in upstream requests, see :ref:`envoy_api_msg_route.VirtualHost.include_request_attempt_count`.
 * tcp_proxy: added support for :ref:`weighted clusters <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.weighted_clusters>`.
 * tls: implemented `SecretDiscoveryService <https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/\
   discovery/v2/sds.proto>`_.
