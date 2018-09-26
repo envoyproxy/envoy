@@ -142,8 +142,8 @@ message Admin {
   string profile_path = 2;
 
   // The TCP address that the administration server will listen on.
-  envoy.api.v2.core.Address address = 3
-      [(validate.rules).message.required = true, (gogoproto.nullable) = false];
+  // If not specified, Envoy will not start an administration server.
+  envoy.api.v2.core.Address address = 3;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.

@@ -195,6 +195,7 @@ envoy_cc_test(
         ":cluster_health_check_bootstrap.yaml",
         ":empty_bootstrap.yaml",
         ":node_bootstrap.yaml",
+        ":node_bootstrap_no_admin_port.yaml",
         "//test/config/integration:server.json",
         "//test/config/integration:server_config_files",
     ],
