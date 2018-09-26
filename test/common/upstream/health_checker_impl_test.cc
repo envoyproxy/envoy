@@ -1178,6 +1178,30 @@ TEST_F(HttpHealthCheckerImplTest, Timeout) {
             Host::ActiveHealthFailureType::TIMEOUT);
 }
 
+TEST_F(HttpHealthCheckerImplTest, TimeoutAfterDisconnect) {
+  setupNoServiceValidationHC();
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_));
+  health_checker_->start();
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::ChangePending)).Times(1);
+  EXPECT_CALL(*test_sessions_[0]->interval_timer_, enableTimer(_)).Times(2);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+  for (auto& session : test_sessions_) {
+    session->client_connection_->close(Network::ConnectionCloseType::NoFlush);
+  }
+
+  EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Changed)).Times(1);
+  EXPECT_CALL(*event_logger_, logEjectUnhealthy(_, _, _));
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
+
+  test_sessions_[0]->timeout_timer_->callback_();
+  EXPECT_FALSE(cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->healthy());
+}
+
 TEST_F(HttpHealthCheckerImplTest, DynamicAddAndRemove) {
   setupNoServiceValidationHC();
   health_checker_->start();

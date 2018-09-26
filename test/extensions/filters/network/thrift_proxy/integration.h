@@ -50,7 +50,7 @@ struct PayloadOptions {
 class BaseThriftIntegrationTest : public BaseIntegrationTest {
 public:
   BaseThriftIntegrationTest()
-      : BaseIntegrationTest(Network::Address::IpVersion::v4, thrift_config_) {}
+      : BaseIntegrationTest(Network::Address::IpVersion::v4, realTime(), thrift_config_) {}
 
   /**
    * Given PayloadOptions, generate a client request and server response and store the

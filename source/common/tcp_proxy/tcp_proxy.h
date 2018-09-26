@@ -11,6 +11,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/request_info/filter_state.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
@@ -153,6 +154,19 @@ private:
 };
 
 typedef std::shared_ptr<Config> ConfigSharedPtr;
+
+/**
+ * Per-connection TCP Proxy Cluster configuration.
+ */
+class PerConnectionCluster : public RequestInfo::FilterState::Object {
+public:
+  PerConnectionCluster(absl::string_view cluster) : cluster_(cluster) {}
+  const std::string& value() const { return cluster_; }
+  static const std::string Key;
+
+private:
+  const std::string cluster_;
+};
 
 /**
  * An implementation of a TCP (L3/L4) proxy. This filter will instantiate a new outgoing TCP
