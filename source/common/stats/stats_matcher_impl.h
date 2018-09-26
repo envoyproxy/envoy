@@ -31,7 +31,8 @@ public:
   bool rejects(const std::string& name) const override;
 
 private:
-  // We want to allow stats through by default.
+  // Bool indicating whether or not the StatsMatcher is including or excluding stats by default. See
+  // StatsMatcherImpl::rejects() for much more detail.
   bool is_inclusive_;
 
   std::vector<Matchers::StringMatcher> matchers_;

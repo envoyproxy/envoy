@@ -452,7 +452,7 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier(
-        [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+        [this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
           *bootstrap.mutable_stats_config()->mutable_stats_matcher() = stats_matcher_;
         });
     HttpIntegrationTest::initialize();
