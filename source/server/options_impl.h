@@ -80,7 +80,7 @@ public:
   }
   std::chrono::seconds drainTime() const override { return drain_time_; }
   spdlog::level::level_enum logLevel() const override { return log_level_; }
-  const std::vector<std::pair<std::string, std::string>> componentLogLevels() const override {
+  const std::vector<std::pair<std::string, size_t>>& componentLogLevels() const override {
     return component_log_levels_;
   }
   const std::string& logFormat() const override { return log_format_; }
@@ -110,7 +110,7 @@ private:
   std::string admin_address_path_;
   Network::Address::IpVersion local_address_ip_version_;
   spdlog::level::level_enum log_level_;
-  std::vector<std::pair<std::string, std::string>> component_log_levels_;
+  std::vector<std::pair<std::string, size_t>> component_log_levels_;
   std::string log_format_;
   std::string log_path_;
   uint64_t restart_epoch_;

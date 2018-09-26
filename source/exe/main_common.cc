@@ -85,24 +85,18 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
 MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
 
 void MainCommonBase::configureComponentLogLevels() {
-  const std::vector<std::pair<std::string, std::string>>& component_log_levels =
-      options_.componentLogLevels();
-  for (auto& component_log_level : component_log_levels) {
+  for (auto& component_log_level : options_.componentLogLevels()) {
     const std::string& component = component_log_level.first;
-    const std::string& log_level = component_log_level.second;
-    size_t level_to_use = std::numeric_limits<size_t>::max();
-    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
-      if (log_level == spdlog::level::level_names[i]) {
-        level_to_use = i;
-        break;
-      }
-    }
+    const size_t level_to_use = component_log_level.second;
+    Logger::Logger* logger_to_change = nullptr;
     for (Logger::Logger& logger : Logger::Registry::loggers()) {
       if (logger.name() == component) {
-        logger.setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
+        logger_to_change = &logger;
         break;
       }
     }
+    ASSERT(logger_to_change);
+    logger_to_change->setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
   }
 }
 

@@ -35,7 +35,7 @@ public:
                                          spdlog::level::warn);
   }
 
-  std::vector<std::pair<std::string, std::string>>
+  const std::vector<std::pair<std::string, size_t>>&
   parseComponentLogLevels(const std::unique_ptr<OptionsImpl>& options,
                           const std::string& component_log_levels) {
     options->parseComponentLogLevels(component_log_levels);
@@ -191,13 +191,19 @@ TEST_F(OptionsImplTest, BadMaxStatsOption) {
 TEST_F(OptionsImplTest, ParseComponentLogLevels) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
   parseComponentLogLevels(options, "upstream:debug,connection:trace");
-  const std::vector<std::pair<std::string, std::string>> component_log_levels =
+  const std::vector<std::pair<std::string, size_t>>& component_log_levels =
       options->componentLogLevels();
   EXPECT_EQ(2, component_log_levels.size());
   EXPECT_EQ("upstream", component_log_levels[0].first);
-  EXPECT_EQ("debug", component_log_levels[0].second);
+  EXPECT_EQ("debug", spdlog::level::level_names[component_log_levels[0].second]);
   EXPECT_EQ("connection", component_log_levels[1].first);
-  EXPECT_EQ("trace", component_log_levels[1].second);
+  EXPECT_EQ("trace", spdlog::level::level_names[component_log_levels[1].second]);
+}
+
+TEST_F(OptionsImplTest, InvalidComponentArgument) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "blah:debug"), MalformedArgvException,
+                          "error: invalid component specified 'blah'");
 }
 
 } // namespace Envoy
