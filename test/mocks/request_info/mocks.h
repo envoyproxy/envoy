@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/request_info/request_info.h"
-
+#include "common/request_info/filter_state_impl.h"
 #include "test/mocks/upstream/host.h"
 
 #include "gmock/gmock.h"
@@ -80,6 +80,7 @@ public:
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
   envoy::api::v2::core::Metadata metadata_;
+  FilterStateImpl per_request_state_;
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
