@@ -46,7 +46,8 @@ private:
         : HostImpl(cluster, hostname, address, parent.lbEndpoint().metadata(),
                    parent.lbEndpoint().load_balancing_weight().value(),
                    parent.localityLbEndpoint().locality(),
-                   parent.lbEndpoint().endpoint().health_check_config()),
+                   parent.lbEndpoint().endpoint().health_check_config(),
+                   parent.localityLbEndpoint().priority()),
           parent_(parent) {}
 
     // Upstream::Host
@@ -108,12 +109,13 @@ private:
     }
     // Setting health check address is usually done at initialization. This is NOP by default.
     void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr) override {}
-    uint32_t priority() const { return locality_lb_endpoint_.priority(); }
+    uint32_t priority() const override { return locality_lb_endpoint_.priority(); }
+    void priority(uint32_t priority) override { locality_lb_endpoint_.set_priority(priority); }
     Network::Address::InstanceConstSharedPtr address_;
     HostConstSharedPtr logical_host_;
     const std::shared_ptr<envoy::api::v2::core::Metadata> metadata_;
     Network::Address::InstanceConstSharedPtr health_check_address_;
-    const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint_;
+    envoy::api::v2::endpoint::LocalityLbEndpoints locality_lb_endpoint_;
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint_;
   };
 

@@ -36,6 +36,10 @@
 namespace Envoy {
 namespace Server {
 
+class AdminInternalAddressConfig : public Http::InternalAddressConfig {
+  bool isInternalAddress(const Network::Address::Instance&) const override { return false; }
+};
+
 /**
  * Implementation of Server::Admin.
  */
@@ -94,11 +98,15 @@ public:
   bool generateRequestId() override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
+  std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return Http::DefaultServerString::get(); }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return true; }
+  const Http::InternalAddressConfig& internalAddressConfig() const override {
+    return internal_address_config_;
+  }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
   const std::string& via() const override { return EMPTY_STRING; }
@@ -291,6 +299,7 @@ private:
   Http::Http1Settings http1_settings_;
   ConfigTrackerImpl config_tracker_;
   const Network::FilterChainSharedPtr admin_filter_chain_;
+  const AdminInternalAddressConfig internal_address_config_;
 };
 
 /**

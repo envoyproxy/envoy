@@ -751,10 +751,10 @@ void PriorityStateManager::registerHostForPriority(
     const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
     const absl::optional<Upstream::Host::HealthFlag> health_checker_flag) {
-  const HostSharedPtr host(new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
-                                        lb_endpoint.load_balancing_weight().value(),
-                                        locality_lb_endpoint.locality(),
-                                        lb_endpoint.endpoint().health_check_config()));
+  const HostSharedPtr host(
+      new HostImpl(parent_.info(), hostname, address, lb_endpoint.metadata(),
+                   lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
+                   lb_endpoint.endpoint().health_check_config(), locality_lb_endpoint.priority()));
   registerHostForPriority(host, locality_lb_endpoint, lb_endpoint, health_checker_flag);
 }
 
@@ -983,6 +983,11 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
         hosts_changed = true;
       }
 
+      // Did the priority change?
+      if (host->priority() != existing_host->second->priority()) {
+        existing_host->second->priority(host->priority());
+      }
+
       existing_host->second->weight(host->weight());
       final_hosts.push_back(existing_host->second);
       updated_hosts[existing_host->second->address()->asString()] = existing_host->second;
@@ -1004,13 +1009,22 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(
 
   // Remove hosts from current_priority_hosts that were matched to an existing host in the previous
   // loop.
-  current_priority_hosts.erase(std::remove_if(current_priority_hosts.begin(),
-                                              current_priority_hosts.end(),
-                                              [&existing_hosts_for_current_priority](auto host) {
-                                                return existing_hosts_for_current_priority.count(
-                                                    host->address()->asString());
-                                              }),
-                               current_priority_hosts.end());
+  for (auto itr = current_priority_hosts.begin(); itr != current_priority_hosts.end();) {
+    auto existing_itr = existing_hosts_for_current_priority.find((*itr)->address()->asString());
+
+    if (existing_itr != existing_hosts_for_current_priority.end()) {
+      existing_hosts_for_current_priority.erase(existing_itr);
+      itr = current_priority_hosts.erase(itr);
+    } else {
+      itr++;
+    }
+  }
+
+  // If we saw existing hosts during this iteration from a different priority, then we've moved
+  // a host from another priority into this one, so we should mark the priority as having changed.
+  if (!existing_hosts_for_current_priority.empty()) {
+    hosts_changed = true;
+  }
 
   // The remaining hosts are hosts that are not referenced in the config update. We remove them from
   // the priority if any of the following is true:
@@ -1164,7 +1178,8 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           new_hosts.emplace_back(new HostImpl(
               parent_.info_, dns_address_, Network::Utility::getAddressWithPort(*address, port_),
               lb_endpoint_.metadata(), lb_endpoint_.load_balancing_weight().value(),
-              locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config()));
+              locality_lb_endpoint_.locality(), lb_endpoint_.endpoint().health_check_config(),
+              locality_lb_endpoint_.priority()));
         }
 
         HostVector hosts_added;
@@ -1172,6 +1187,9 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
                                           updated_hosts)) {
           ENVOY_LOG(debug, "DNS hosts have changed for {}", dns_address_);
+          ASSERT(std::all_of(hosts_.begin(), hosts_.end(), [&](const auto& host) {
+            return host->priority() == locality_lb_endpoint_.priority();
+          }));
           parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
         }
 

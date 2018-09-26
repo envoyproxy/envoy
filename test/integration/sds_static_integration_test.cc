@@ -36,7 +36,7 @@ class SdsStaticDownstreamIntegrationTest
       public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   SdsStaticDownstreamIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -112,7 +112,7 @@ class SdsStaticUpstreamIntegrationTest
       public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   SdsStaticUpstreamIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -148,7 +148,8 @@ public:
 
   void createUpstreams() override {
     fake_upstreams_.emplace_back(new FakeUpstream(createUpstreamSslContext(context_manager_), 0,
-                                                  FakeHttpConnection::Type::HTTP1, version_));
+                                                  FakeHttpConnection::Type::HTTP1, version_,
+                                                  timeSystem()));
   }
 
 private:
