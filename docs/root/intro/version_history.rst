@@ -94,6 +94,8 @@ Version history
 * config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`  
   stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented 
   in case of schema/validation error.
+* :ref:`sni_cluster <config_network_filters_sni_cluster>`: introduced a new network filter that forwards connections to the
+  upstream cluster specified by the SNI value presented by the client during a TLS handshake.
 * config: Added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with 
   management server. 
 
