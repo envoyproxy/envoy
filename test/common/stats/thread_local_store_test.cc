@@ -527,17 +527,23 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
 TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   InSequence s;
 
-  EXPECT_CALL(*alloc_, alloc(_)).Times(2);
+  // Expected to alloc lowercase_counter, lowercase_gauge, valid_counter, valid_gauge
+  EXPECT_CALL(*alloc_, alloc(_)).Times(4);
 
   // Will block all stats containing any capital alphanumeric letter.
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_regex(
       ".*[A-Z].*");
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
 
-  // Testing No-op counters, gauges, histograms which match the prefix "noop".
+  // The creation of counters/gauges/histograms which have no uppercase letters should succeed.
   Counter& lowercase_counter = store_->counter("lowercase_counter");
   EXPECT_EQ(lowercase_counter.name(), "lowercase_counter");
+  Gauge& lowercase_gauge = store_->gauge("lowercase_gauge");
+  EXPECT_EQ(lowercase_gauge.name(), "lowercase_gauge");
+  Histogram& lowercase_histogram = store_->histogram("lowercase_histogram");
+  EXPECT_EQ(lowercase_histogram.name(), "lowercase_histogram");
 
+  // And the creation of counters/gauges/histograms which have uppercase letters should fail.
   Counter& uppercase_counter = store_->counter("UPPERCASE_counter");
   EXPECT_EQ(uppercase_counter.name(), "");
   uppercase_counter.inc();
@@ -545,12 +551,38 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   uppercase_counter.inc();
   EXPECT_EQ(uppercase_counter.value(), 0);
 
+  Gauge& uppercase_gauge = store_->gauge("uppercase_GAUGE");
+  EXPECT_EQ(uppercase_gauge.name(), "");
+  uppercase_gauge.inc();
+  EXPECT_EQ(uppercase_gauge.value(), 0);
+  uppercase_gauge.inc();
+  EXPECT_EQ(uppercase_gauge.value(), 0);
+
+  // Histograms are harder to query and test, so we resort to testing that name() returns the empty
+  // string.
+  Histogram& uppercase_histogram = store_->histogram("upperCASE_histogram");
+  EXPECT_EQ(uppercase_histogram.name(), "");
+
   // Adding another exclusion rule -- now we reject not just uppercase stats but those starting with
   // the string "invalid".
   stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
       "invalid");
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
 
+  Counter& valid_counter = store_->counter("valid_counter");
+  valid_counter.inc();
+  EXPECT_EQ(valid_counter.value(), 1);
+
+  Counter& invalid_counter = store_->counter("invalid_counter");
+  invalid_counter.inc();
+  EXPECT_EQ(invalid_counter.value(), 0);
+
+  // But the old exclusion rule still holds.
+  Counter& invalid_counter_2 = store_->counter("also_INVALID_counter");
+  invalid_counter_2.inc();
+  EXPECT_EQ(invalid_counter_2.value(), 0);
+
+  // And we expect the same behavior from gauges and histograms.
   Gauge& valid_gauge = store_->gauge("valid_gauge");
   valid_gauge.set(2);
   EXPECT_EQ(valid_gauge.value(), 2);
@@ -559,13 +591,22 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   invalid_gauge_1.inc();
   EXPECT_EQ(invalid_gauge_1.value(), 0);
 
-  // But the old exclusion rule still holds.
   Gauge& invalid_gauge_2 = store_->gauge("also_INVALID_gauge");
   invalid_gauge_2.inc();
   EXPECT_EQ(invalid_gauge_2.value(), 0);
 
-  // Includes overflow stat.
-  EXPECT_CALL(*alloc_, free(_)).Times(3);
+  Histogram& valid_histogram = store_->histogram("valid_histogram");
+  EXPECT_EQ(valid_histogram.name(), "valid_histogram");
+
+  Histogram& invalid_histogram_1 = store_->histogram("invalid_histogram");
+  EXPECT_EQ(invalid_histogram_1.name(), "");
+
+  Histogram& invalid_histogram_2 = store_->histogram("also_INVALID_histogram");
+  EXPECT_EQ(invalid_histogram_2.name(), "");
+
+  // Expected to free lowercase_counter, lowercase_gauge, valid_counter,
+  // valid_gauge, overflow.stats
+  EXPECT_CALL(*alloc_, free(_)).Times(5);
 
   store_->shutdownThreading();
 }
