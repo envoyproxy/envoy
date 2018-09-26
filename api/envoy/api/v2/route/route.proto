@@ -81,13 +81,13 @@ message VirtualHost {
   // details on header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.HeaderValueOption request_headers_to_add = 7
-      [(validate.rules).repeated .max_items = 25];
+      [(validate.rules).repeated .max_items = 1000];
 
   // Specifies a list of HTTP headers that should be removed from each request
   // handled by this virtual host.
   repeated string request_headers_to_remove = 13 [
-    (validate.rules).repeated .items.string.max_bytes = 1024,
-    (validate.rules).repeated .max_items = 25
+    (validate.rules).repeated .items.string.max_bytes = 16384,
+    (validate.rules).repeated .max_items = 1000
   ];
 
   // Specifies a list of HTTP headers that should be added to each response
@@ -97,13 +97,13 @@ message VirtualHost {
   // details on header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.HeaderValueOption response_headers_to_add = 10
-      [(validate.rules).repeated .max_items = 25];
+      [(validate.rules).repeated .max_items = 1000];
 
   // Specifies a list of HTTP headers that should be removed from each response
   // handled by this virtual host.
   repeated string response_headers_to_remove = 11 [
-    (validate.rules).repeated .items.string.max_bytes = 1024,
-    (validate.rules).repeated .max_items = 25
+    (validate.rules).repeated .items.string.max_bytes = 16384,
+    (validate.rules).repeated .max_items = 1000
   ];
 
   // Indicates that the virtual host has a CORS policy.
@@ -170,13 +170,13 @@ message Route {
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.HeaderValueOption request_headers_to_add = 9
-      [(validate.rules).repeated .max_items = 25];
+      [(validate.rules).repeated .max_items = 1000];
 
   // Specifies a list of HTTP headers that should be removed from each request
   // matching this route.
   repeated string request_headers_to_remove = 12 [
-    (validate.rules).repeated .items.string.max_bytes = 1024,
-    (validate.rules).repeated .max_items = 25
+    (validate.rules).repeated .items.string.max_bytes = 16384,
+    (validate.rules).repeated .max_items = 1000
   ];
 
   // Specifies a set of headers that will be added to responses to requests
@@ -186,13 +186,13 @@ message Route {
   // details on header value syntax, see the documentation on
   // :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`.
   repeated core.HeaderValueOption response_headers_to_add = 10
-      [(validate.rules).repeated .max_items = 25];
+      [(validate.rules).repeated .max_items = 1000];
 
   // Specifies a list of HTTP headers that should be removed from each response
   // to requests matching this route.
   repeated string response_headers_to_remove = 11 [
-    (validate.rules).repeated .items.string.max_bytes = 1024,
-    (validate.rules).repeated .max_items = 25
+    (validate.rules).repeated .items.string.max_bytes = 16384,
+    (validate.rules).repeated .max_items = 1000
   ];
 }
 
@@ -230,13 +230,13 @@ message WeightedCluster {
     // header value syntax, see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
     repeated core.HeaderValueOption request_headers_to_add = 4
-        [(validate.rules).repeated .max_items = 25];
+        [(validate.rules).repeated .max_items = 1000];
 
     // Specifies a list of HTTP headers that should be removed from each request when
     // this cluster is selected through the enclosing :ref:`envoy_api_msg_route.RouteAction`.
     repeated string request_headers_to_remove = 9 [
-      (validate.rules).repeated .items.string.max_bytes = 1024,
-      (validate.rules).repeated .max_items = 25
+      (validate.rules).repeated .items.string.max_bytes = 16384,
+      (validate.rules).repeated .max_items = 1000
     ];
 
     // Specifies a list of headers to be added to responses when this cluster is selected
@@ -247,13 +247,13 @@ message WeightedCluster {
     // header value syntax, see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
     repeated core.HeaderValueOption response_headers_to_add = 5
-        [(validate.rules).repeated .max_items = 25];
+        [(validate.rules).repeated .max_items = 1000];
 
     // Specifies a list of headers to be removed from responses when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_route.RouteAction`.
     repeated string response_headers_to_remove = 6 [
-      (validate.rules).repeated .items.string.max_bytes = 1024,
-      (validate.rules).repeated .max_items = 25
+      (validate.rules).repeated .items.string.max_bytes = 16384,
+      (validate.rules).repeated .max_items = 1000
     ];
 
     reserved 7;

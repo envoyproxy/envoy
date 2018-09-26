@@ -170,7 +170,7 @@ TEST_F(RequestInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
   {
     envoy::api::v2::RouteConfiguration route;
     envoy::api::v2::core::HeaderValueOption* header = route.mutable_request_headers_to_add()->Add();
-    std::string long_string(1025, 'a');
+    std::string long_string(16385, 'a');
     header->mutable_header()->set_key("header_name");
     header->mutable_header()->set_value(long_string);
     header->mutable_append()->set_value(true);
@@ -179,7 +179,7 @@ TEST_F(RequestInfoHeaderFormatterTest, ValidateLimitsOnUserDefinedHeaders) {
   }
   {
     envoy::api::v2::RouteConfiguration route;
-    for (int i = 0; i < 26; ++i) {
+    for (int i = 0; i < 1001; ++i) {
       envoy::api::v2::core::HeaderValueOption* header =
           route.mutable_request_headers_to_add()->Add();
       header->mutable_header()->set_key("header_name");
