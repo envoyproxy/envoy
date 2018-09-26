@@ -189,9 +189,6 @@ protected:
 
   // The client making requests to Envoy.
   IntegrationCodecClientPtr codec_client_;
-  // The response from Envoy
-  IntegrationStreamDecoderPtr response_;
-
   // A placeholder for the first upstream connection.
   FakeHttpConnectionPtr fake_upstream_connection_;
   // A placeholder for the first request received at upstream.
