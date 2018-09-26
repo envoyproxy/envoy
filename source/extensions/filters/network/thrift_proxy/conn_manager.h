@@ -2,6 +2,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/event/deferred_deletable.h"
+#include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
@@ -57,7 +58,7 @@ class ConnectionManager : public Network::ReadFilter,
                           Logger::Loggable<Logger::Id::thrift> {
 public:
   ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
-                    Event::TimeSystem& time_system);
+                    Event::Dispatcher& dispatcher);
   ~ConnectionManager();
 
   // Network::ReadFilter
@@ -72,6 +73,8 @@ public:
 
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override;
+
+  Event::Dispatcher& dispatcher() const { return dispatcher_; }
 
 private:
   struct ActiveRpc;
@@ -148,6 +151,7 @@ private:
     void startUpstreamResponse(Transport& transport, Protocol& protocol) override;
     bool upstreamData(Buffer::Instance& buffer) override;
     void resetDownstreamConnection() override;
+    Event::Dispatcher& dispatcher() const override;
 
     // Thrift::FilterChainFactoryCallbacks
     void addDecoderFilter(ThriftFilters::DecoderFilterSharedPtr filter) override {
@@ -194,7 +198,9 @@ private:
   Runtime::RandomGenerator& random_generator_;
   bool stopped_{false};
   bool half_closed_{false};
+
   Event::TimeSystem& time_system_;
+  Event::Dispatcher& dispatcher_;
 };
 
 } // namespace ThriftProxy

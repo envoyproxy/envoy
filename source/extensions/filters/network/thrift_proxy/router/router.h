@@ -30,6 +30,11 @@ public:
    * selecting an upstream host
    */
   virtual const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const PURE;
+
+  /**
+   * @return std::chrono::milliseconds the route's timeout.
+   */
+  virtual std::chrono::milliseconds timeout() const PURE;
 };
 
 /**

@@ -16,11 +16,12 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
-                                     Event::TimeSystem& time_system)
+                                     Event::Dispatcher& dispatcher)
     : config_(config), stats_(config_.stats()), transport_(config.createTransport()),
       protocol_(config.createProtocol()),
       decoder_(std::make_unique<Decoder>(*transport_, *protocol_, *this)),
-      random_generator_(random_generator), time_system_(time_system) {}
+      random_generator_(random_generator), time_system_(dispatcher.timeSystem()),
+      dispatcher_(dispatcher) {}
 
 ConnectionManager::~ConnectionManager() {}
 
@@ -378,6 +379,8 @@ bool ConnectionManager::ActiveRpc::upstreamData(Buffer::Instance& buffer) {
 void ConnectionManager::ActiveRpc::resetDownstreamConnection() {
   parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
 }
+
+Event::Dispatcher& ConnectionManager::ActiveRpc::dispatcher() const { return parent_.dispatcher(); }
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

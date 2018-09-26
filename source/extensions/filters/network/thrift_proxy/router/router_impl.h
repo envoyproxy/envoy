@@ -45,6 +45,8 @@ public:
   virtual RouteConstSharedPtr matches(const MessageMetadata& metadata,
                                       uint64_t random_value) const PURE;
 
+  std::chrono::milliseconds timeout() const override { return timeout_; }
+
 protected:
   RouteConstSharedPtr clusterEntry(uint64_t random_value) const;
   bool headersMatch(const Http::HeaderMap& headers) const;
@@ -68,6 +70,7 @@ private:
 
       return parent_.metadataMatchCriteria();
     }
+    std::chrono::milliseconds timeout() const override { return parent_.timeout(); }
 
     // Router::Route
     const RouteEntry* routeEntry() const override { return this; }
@@ -85,6 +88,7 @@ private:
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_;
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
+  const std::chrono::milliseconds timeout_;
 };
 
 typedef std::shared_ptr<const RouteEntryImplBase> RouteEntryImplBaseConstSharedPtr;
@@ -208,6 +212,7 @@ private:
 
   void convertMessageBegin(MessageMetadataSharedPtr metadata);
   void cleanup();
+  void onResponseTimeout();
 
   Upstream::ClusterManager& cluster_manager_;
 
@@ -218,6 +223,9 @@ private:
 
   std::unique_ptr<UpstreamRequest> upstream_request_;
   Buffer::OwnedImpl upstream_request_buffer_;
+
+  std::chrono::milliseconds timeout_;
+  Event::TimerPtr response_timer_;
 };
 
 } // namespace Router

@@ -6,6 +6,7 @@ option go_package = "v2";
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/route/route.proto";
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
@@ -92,6 +93,11 @@ message RouteAction {
   // with values there taking precedence. Keys and values should be provided under the "envoy.lb"
   // metadata key.
   envoy.api.v2.core.Metadata metadata_match = 3;
+
+  // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
+  // spans between the point at which the entire downstream request (i.e. end-of-stream) has been
+  // processed and when the upstream response has been completely processed.
+  google.protobuf.Duration timeout = 4 [(gogoproto.stdduration) = true];
 }
 
 // Allows for specification of multiple upstream clusters along with weights that indicate the

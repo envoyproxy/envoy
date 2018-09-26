@@ -18,7 +18,8 @@ namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
-    : cluster_name_(route.route().cluster()) {
+    : cluster_name_(route.route().cluster()),
+      timeout_(PROTOBUF_GET_MS_OR_DEFAULT(route.route(), timeout, 15000)) {
   for (const auto& header_map : route.match().headers()) {
     config_headers_.push_back(header_map);
   }
@@ -212,6 +213,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   }
 
   route_entry_ = route_->routeEntry();
+  timeout_ = route_entry_->timeout();
 
   Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(route_entry_->clusterName());
   if (!cluster) {
@@ -349,7 +351,14 @@ void Router::convertMessageBegin(MessageMetadataSharedPtr metadata) {
   ProtocolConverter::messageBegin(metadata);
 }
 
-void Router::cleanup() { upstream_request_.reset(); }
+void Router::cleanup() {
+  upstream_request_.reset();
+
+  if (response_timer_) {
+    response_timer_->disableTimer();
+    response_timer_.reset();
+  }
+}
 
 Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::Instance& pool,
                                          MessageMetadataSharedPtr& metadata,
@@ -436,8 +445,29 @@ void Router::UpstreamRequest::onRequestStart(bool continue_decoding) {
     parent_.callbacks_->continueDecoding();
   }
 }
+void Router::UpstreamRequest::onRequestComplete() {
+  request_complete_ = true;
 
-void Router::UpstreamRequest::onRequestComplete() { request_complete_ = true; }
+  if (parent_.timeout_.count() > 0) {
+    parent_.response_timer_ = parent_.callbacks_->dispatcher().createTimer(
+        [this]() -> void { parent_.onResponseTimeout(); });
+    parent_.response_timer_->enableTimer(parent_.timeout_);
+  }
+}
+
+void Router::onResponseTimeout() {
+  ENVOY_STREAM_LOG(debug, "upstream timeout", *callbacks_);
+  cluster_->stats().upstream_rq_timeout_.inc();
+
+  if (upstream_request_) {
+    if (upstream_request_->upstream_host_) {
+      upstream_request_->upstream_host_->stats().rq_timeout_.inc();
+    }
+  }
+  cleanup();
+  callbacks_->sendLocalReply(
+      AppException(AppExceptionType::InternalError, fmt::format("upstream request timeout")));
+}
 
 void Router::UpstreamRequest::onResponseComplete() {
   response_complete_ = true;
