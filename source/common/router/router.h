@@ -408,6 +408,8 @@ private:
   bool downstream_end_stream_ : 1;
   bool do_shadowing_ : 1;
   bool is_retry_ : 1;
+  bool include_attempt_count_ : 1;
+  uint32_t attempt_count_{1};
 };
 
 class ProdFilter : public Filter {

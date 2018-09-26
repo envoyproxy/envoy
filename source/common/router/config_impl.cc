@@ -276,7 +276,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                                       route.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(route.response_headers_to_add(),
                                                        route.response_headers_to_remove())),
-      match_grpc_(route.match().has_grpc()), opaque_config_(parseOpaqueConfig(route)),
+      match_grpc_(route.match().has_grpc()), include_attempt_count_(vhost.includeAttemptCount()),
+      opaque_config_(parseOpaqueConfig(route)),
       decorator_(parseDecorator(route)),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       direct_response_body_(ConfigUtility::parseDirectResponseBody(route)),
@@ -703,7 +704,8 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
                                                       virtual_host.request_headers_to_remove())),
       response_headers_parser_(HeaderParser::configure(virtual_host.response_headers_to_add(),
                                                        virtual_host.response_headers_to_remove())),
-      per_filter_configs_(virtual_host.per_filter_config(), factory_context) {
+      per_filter_configs_(virtual_host.per_filter_config(), factory_context),
+      include_attempt_count_(virtual_host.include_request_attempt_count()) {
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::route::VirtualHost::NONE:
     ssl_requirements_ = SslRequirements::NONE;

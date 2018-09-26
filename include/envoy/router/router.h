@@ -345,6 +345,11 @@ public:
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
     return dynamic_cast<const Derived*>(perFilterConfig(name));
   }
+
+  /**
+   * @return bool whether to include the request count header in upstream requests.
+   */
+  virtual bool includeAttemptCount() const PURE;
 };
 
 /**
@@ -612,7 +617,12 @@ public:
    */
   template <class Derived> const Derived* perFilterConfigTyped(const std::string& name) const {
     return dynamic_cast<const Derived*>(perFilterConfig(name));
-  }
+  };
+
+  /**
+   * @return bool whether x-envoy-attempt-count should be included on the upstream request.
+   */
+  virtual bool includeAttemptCount() const PURE;
 };
 
 /**

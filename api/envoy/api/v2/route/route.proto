@@ -109,6 +109,10 @@ message VirtualHost {
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
   // for if and how it is utilized.
   map<string, google.protobuf.Struct> per_filter_config = 12;
+
+  // Decides whether the x-envoy-attempt-count header should be included in upstream
+  // request.
+  bool include_request_attempt_count = 14;
 }
 
 // A route is both a specification of how to match a request as well as an indication of what to do
