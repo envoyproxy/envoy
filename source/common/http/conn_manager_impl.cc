@@ -1060,7 +1060,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   if (connection_manager_.drain_state_ == DrainState::NotDraining &&
       connection_manager_.overload_disable_keepalive_ref_ == Server::OverloadActionState::Active) {
-    ENVOY_STREAM_LOG(debug, "closing connection due to envoy overload", *this);
+    ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
     connection_manager_.drain_state_ = DrainState::Closing;
     connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
   }
