@@ -182,7 +182,7 @@ long HessianUtils::peekLong(Buffer::Instance& buffer, size_t* size, uint64_t off
       throw EnvoyException("buffer underflow");
     }
 
-    result = leftShift<int16_t>(code - 0xf8, 8) + buffer.peekInt<int8_t>(offset + 1);
+    result = leftShift<int16_t>(code - 0xf8, 8) + buffer.peekInt<uint8_t>(offset + 1);
     *size = 2;
     return result;
 

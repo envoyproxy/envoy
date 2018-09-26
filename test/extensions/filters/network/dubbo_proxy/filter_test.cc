@@ -8,6 +8,7 @@
 
 #include "test/extensions/filters/network/dubbo_proxy/utility.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/printers.h"
 
 #include "gmock/gmock.h"
@@ -26,12 +27,15 @@ class DubboFilterTest : public testing::Test {
 public:
   DubboFilterTest() {}
 
+  Event::TimeSystem& timeSystem() { return factory_context_.dispatcher().timeSystem(); }
+
   void initializeFilter() {
     for (auto counter : store_.counters()) {
       counter->reset();
     }
 
-    filter_.reset(new Filter("test.", ConfigDubboProxy::Dubbo, ConfigDubboProxy::Hessian2, store_));
+    filter_.reset(new Filter("test.", ConfigDubboProxy::Dubbo, ConfigDubboProxy::Hessian2, store_,
+                             timeSystem()));
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
@@ -243,6 +247,7 @@ public:
   Stats::IsolatedStoreImpl store_;
   std::unique_ptr<Filter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
 };
 
 TEST_F(DubboFilterTest, OnDataHandlesRequestTwoWay) {

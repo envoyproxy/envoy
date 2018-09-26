@@ -99,8 +99,8 @@ private:
       parent_.stats_.request_active_.inc();
     }
     ~ActiveMessage() {
-      request_timer_->complete();
       parent_.stats_.request_active_.dec();
+      request_timer_->complete();
     }
 
     Filter& parent_;
