@@ -52,6 +52,12 @@ void TsiSocket::doHandshakeNext() {
     handshaker_ = handshaker_factory_(callbacks_->connection().dispatcher(),
                                       callbacks_->connection().localAddress(),
                                       callbacks_->connection().remoteAddress());
+    if (!handshaker_) {
+      ENVOY_CONN_LOG(warn, "TSI: failed to create handshaker", callbacks_->connection());
+      callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);
+      return;
+    }
+
     handshaker_->setHandshakerCallbacks(*this);
   }
 

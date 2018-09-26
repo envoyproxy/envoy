@@ -74,23 +74,22 @@ UpstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
       [handshaker_service](Event::Dispatcher& dispatcher,
                            const Network::Address::InstanceConstSharedPtr&,
                            const Network::Address::InstanceConstSharedPtr&) -> TsiHandshakerPtr {
-        GrpcAltsCredentialsOptionsPtr options{grpc_alts_credentials_client_options_create()};
+    GrpcAltsCredentialsOptionsPtr options{grpc_alts_credentials_client_options_create()};
 
-        tsi_handshaker* handshaker = nullptr;
-        // Specifying target name as empty since TSI won't take care of validating peer identity
-        // in this use case. The validation will be performed by TsiSocket with the validator.
-        tsi_result status = alts_tsi_handshaker_create(
-            options.get(), "", handshaker_service.c_str(), true /* is_client */, &handshaker);
-        CHandshakerPtr handshaker_ptr{handshaker};
+    tsi_handshaker* handshaker = nullptr;
+    // Specifying target name as empty since TSI won't take care of validating peer identity
+    // in this use case. The validation will be performed by TsiSocket with the validator.
+    tsi_result status = alts_tsi_handshaker_create(options.get(), "", handshaker_service.c_str(),
+                                                   true /* is_client */, &handshaker);
+    CHandshakerPtr handshaker_ptr{handshaker};
 
-        if (status != TSI_OK) {
-          ENVOY_LOG_MISC(warn, "Cannot create ATLS client handshaker, status: {}", status);
-          return nullptr;
-        }
+    if (status != TSI_OK) {
+      ENVOY_LOG_MISC(warn, "Cannot create ATLS client handshaker, status: {}", status);
+      return nullptr;
+    }
 
-        return std::make_unique<TsiHandshaker>(std::move(handshaker_ptr), dispatcher);
-      };
-
+    return std::make_unique<TsiHandshaker>(std::move(handshaker_ptr), dispatcher);
+  };
 
   return std::make_unique<TsiSocketFactory>(factory, validator);
 }
@@ -120,20 +119,20 @@ DownstreamAltsTransportSocketConfigFactory::createTransportSocketFactory(
       [handshaker_service](Event::Dispatcher& dispatcher,
                            const Network::Address::InstanceConstSharedPtr&,
                            const Network::Address::InstanceConstSharedPtr&) -> TsiHandshakerPtr {
-        GrpcAltsCredentialsOptionsPtr options{grpc_alts_credentials_server_options_create()};
+    GrpcAltsCredentialsOptionsPtr options{grpc_alts_credentials_server_options_create()};
 
-        tsi_handshaker* handshaker = nullptr;
-        tsi_result status = alts_tsi_handshaker_create(
-            options.get(), nullptr, handshaker_service.c_str(), false /* is_client */, &handshaker);
-        CHandshakerPtr handshaker_ptr{handshaker};
+    tsi_handshaker* handshaker = nullptr;
+    tsi_result status = alts_tsi_handshaker_create(
+        options.get(), nullptr, handshaker_service.c_str(), false /* is_client */, &handshaker);
+    CHandshakerPtr handshaker_ptr{handshaker};
 
-        if (status != TSI_OK) {
-          ENVOY_LOG_MISC(warn, "Cannot create ATLS server handshaker, status: {}", status);
-          return nullptr;
-        }
+    if (status != TSI_OK) {
+      ENVOY_LOG_MISC(warn, "Cannot create ATLS server handshaker, status: {}", status);
+      return nullptr;
+    }
 
-        return std::make_unique<TsiHandshaker>(std::move(handshaker_ptr), dispatcher);
-      };
+    return std::make_unique<TsiHandshaker>(std::move(handshaker_ptr), dispatcher);
+  };
 
   return std::make_unique<TsiSocketFactory>(factory, validator);
 }
