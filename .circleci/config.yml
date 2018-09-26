@@ -114,14 +114,6 @@ jobs:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh check_format
-   spelling:
-     docker:
-       - image: *envoy-build-image
-     resource_class: small
-     working_directory: /source
-     steps:
-       - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
-       - checkout
        - run: ci/do_circle_ci.sh check_spelling
    build_image:
      docker:
@@ -177,7 +169,6 @@ workflows:
       - ipv6_tests
       - coverage
       - format
-      - spelling
       - build_image
       - docs:
           filters:
