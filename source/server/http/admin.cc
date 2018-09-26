@@ -895,16 +895,30 @@ void AdminFilter::onComplete() {
 AdminImpl::NullRouteConfigProvider::NullRouteConfigProvider(TimeSource& time_source)
     : config_(new Router::NullConfigImpl()), time_source_(time_source) {}
 
+void AdminImpl::startHttpListener(const std::string& address_out_path,
+                                  Network::Address::InstanceConstSharedPtr address,
+                                  Stats::ScopePtr&& listener_scope) {
+  socket_ = std::make_unique<Network::TcpListenSocket>(address, nullptr, true);
+  listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
+  if (!address_out_path.empty()) {
+    std::ofstream address_out_file(address_out_path);
+    if (!address_out_file) {
+      ENVOY_LOG(critical, "cannot open admin address output file {} for writing.",
+                address_out_path);
+    } else {
+      address_out_file << socket_->localAddress()->asString();
+    }
+  }
+}
+
 AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& profile_path,
-                     const std::string& address_out_path,
-                     Network::Address::InstanceConstSharedPtr address, Server::Instance& server,
-                     Stats::ScopePtr&& listener_scope)
+                     Server::Instance& server)
     : server_(server), profile_path_(profile_path),
-      socket_(new Network::TcpListenSocket(address, nullptr, true)),
       stats_(Http::ConnectionManagerImpl::generateStats("http.admin.", server_.stats())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats("http.admin.", no_op_store_)),
       route_config_provider_(server.timeSystem()),
+      // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
       handlers_{
           {"/", "Admin home page", MAKE_ADMIN_HANDLER(handlerAdminHome), false, false},
           {"/certs", "print certs on machine", MAKE_ADMIN_HANDLER(handlerCerts), false, false},
@@ -941,21 +955,7 @@ AdminImpl::AdminImpl(const std::string& access_log_path, const std::string& prof
           {"/runtime_modify", "modify runtime values", MAKE_ADMIN_HANDLER(handlerRuntimeModify),
            false, true},
       },
-
-      // TODO(jsedgwick) add /runtime_reset endpoint that removes all admin-set values
-      listener_(*this, std::move(listener_scope)),
       admin_filter_chain_(std::make_shared<AdminFilterChain>()) {
-
-  if (!address_out_path.empty()) {
-    std::ofstream address_out_file(address_out_path);
-    if (!address_out_file) {
-      ENVOY_LOG(critical, "cannot open admin address output file {} for writing.",
-                address_out_path);
-    } else {
-      address_out_file << socket_->localAddress()->asString();
-    }
-  }
-
   // TODO(mattklein123): Allow admin to use normal access logger extension loading and avoid the
   // hard dependency here.
   access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
@@ -1145,6 +1145,18 @@ Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_vie
   populateFallbackResponseHeaders(code, response_headers);
   body = response.toString();
   return code;
+}
+
+void AdminImpl::closeSocket() {
+  if (socket_) {
+    socket_->close();
+  }
+}
+
+void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
+  if (listener_) {
+    handler->addListener(*listener_);
+  }
 }
 
 } // namespace Server
