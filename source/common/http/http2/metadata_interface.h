@@ -15,6 +15,8 @@ const uint8_t END_METADATA_FLAG = 0x4;
 
 typedef std::unordered_map<std::string, std::string> MetadataMap;
 
+typedef std::function<void(const MetadataMap&)> MetadataCallback;
+
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy
