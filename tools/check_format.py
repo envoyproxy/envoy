@@ -34,7 +34,7 @@ REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
                        './source/server/config_validation/server.cc',
                        './source/common/common/perf_annotation.h')
 
-CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-6.0")
+CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-7")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
 ENVOY_BUILD_FIXER_PATH = os.path.join(
     os.path.dirname(os.path.abspath(sys.argv[0])), "envoy_build_fixer.py")

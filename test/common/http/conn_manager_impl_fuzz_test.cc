@@ -91,11 +91,15 @@ public:
   bool generateRequestId() override { return true; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
+  std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return server_name_; }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
   bool useRemoteAddress() override { return use_remote_address_; }
+  const Http::InternalAddressConfig& internalAddressConfig() const override {
+    return internal_address_config_;
+  }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
   const std::string& via() const override { return EMPTY_STRING; }
@@ -126,6 +130,7 @@ public:
   ConnectionManagerTracingStats tracing_stats_;
   ConnectionManagerListenerStats listener_stats_;
   std::chrono::milliseconds stream_idle_timeout_{};
+  std::chrono::milliseconds delayed_close_timeout_{};
   bool use_remote_address_{true};
   Http::ForwardClientCertType forward_client_cert_{Http::ForwardClientCertType::Sanitize};
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
@@ -134,6 +139,7 @@ public:
   TracingConnectionManagerConfigPtr tracing_config_;
   bool proxy_100_continue_ = true;
   Http::Http1Settings http1_settings_;
+  Http::DefaultInternalAddressConfig internal_address_config_;
 };
 
 // Internal representation of stream state. Encapsulates the stream state, mocks

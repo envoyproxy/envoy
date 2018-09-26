@@ -483,6 +483,20 @@ public:
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
 };
 
+TEST_F(TcpProxyTest, DefaultRoutes) {
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight*
+      ignored_cluster = config.mutable_weighted_clusters()->mutable_clusters()->Add();
+  ignored_cluster->set_name("ignored_cluster");
+  ignored_cluster->set_weight(10);
+
+  configure(config);
+
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_EQ(std::string("fake_cluster"), config_->getRouteFromEntries(connection));
+}
+
 // Tests that half-closes are proxied and don't themselves cause any connection to be closed.
 TEST_F(TcpProxyTest, HalfCloseProxy) {
   setup(1);
@@ -1126,6 +1140,25 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
 
   EXPECT_EQ(total_cx + 1, config_->stats().downstream_cx_total_.value());
   EXPECT_EQ(non_routable_cx, config_->stats().downstream_cx_no_route_.value());
+}
+
+// Test that the tcp proxy uses the cluster from FilterState if set
+TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
+  setup();
+
+  RequestInfo::FilterStateImpl per_connection_state;
+  per_connection_state.setData("envoy.tcp_proxy.cluster",
+                               std::make_unique<PerConnectionCluster>("filter_state_cluster"));
+  ON_CALL(connection_, perConnectionState()).WillByDefault(ReturnRef(per_connection_state));
+  EXPECT_CALL(Const(connection_), perConnectionState())
+      .WillRepeatedly(ReturnRef(per_connection_state));
+
+  // Expect filter to try to open a connection to specified cluster.
+  EXPECT_CALL(factory_context_.cluster_manager_,
+              tcpConnPoolForCluster("filter_state_cluster", _, _))
+      .WillOnce(Return(nullptr));
+
+  filter_->onNewConnection();
 }
 
 } // namespace TcpProxy

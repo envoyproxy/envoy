@@ -91,6 +91,9 @@ ExpectationSet expectValue(MockProtocol& proto, MockDecoderEventHandler& handler
 
 ExpectationSet expectContainerStart(MockProtocol& proto, MockDecoderEventHandler& handler,
                                     FieldType field_type, FieldType inner_type) {
+  int16_t field_id = 1;
+  uint32_t size = 1;
+
   ExpectationSet s;
   switch (field_type) {
   case FieldType::Struct:
@@ -98,26 +101,46 @@ ExpectationSet expectContainerStart(MockProtocol& proto, MockDecoderEventHandler
     s += EXPECT_CALL(handler, structBegin(absl::string_view()))
              .WillOnce(Return(FilterStatus::Continue));
     s += EXPECT_CALL(proto, readFieldBegin(_, _, _, _))
-             .WillOnce(DoAll(SetArgReferee<2>(inner_type), SetArgReferee<3>(1), Return(true)));
-    s += EXPECT_CALL(handler, fieldBegin(absl::string_view(), inner_type, 1))
-             .WillOnce(Return(FilterStatus::Continue));
+             .WillOnce(
+                 DoAll(SetArgReferee<2>(inner_type), SetArgReferee<3>(field_id), Return(true)));
+    s += EXPECT_CALL(handler, fieldBegin(absl::string_view(), _, _))
+             .WillOnce(Invoke([=](absl::string_view, FieldType& ft, int16_t& id) -> FilterStatus {
+               EXPECT_EQ(inner_type, ft);
+               EXPECT_EQ(field_id, id);
+               return FilterStatus::Continue;
+             }));
     break;
   case FieldType::List:
     s += EXPECT_CALL(proto, readListBegin(_, _, _))
-             .WillOnce(DoAll(SetArgReferee<1>(inner_type), SetArgReferee<2>(1), Return(true)));
-    s += EXPECT_CALL(handler, listBegin(inner_type, 1)).WillOnce(Return(FilterStatus::Continue));
+             .WillOnce(DoAll(SetArgReferee<1>(inner_type), SetArgReferee<2>(size), Return(true)));
+    s += EXPECT_CALL(handler, listBegin(_, _))
+             .WillOnce(Invoke([=](FieldType& t, uint32_t& s) -> FilterStatus {
+               EXPECT_EQ(inner_type, t);
+               EXPECT_EQ(size, s);
+               return FilterStatus::Continue;
+             }));
     break;
   case FieldType::Map:
     s += EXPECT_CALL(proto, readMapBegin(_, _, _, _))
              .WillOnce(DoAll(SetArgReferee<1>(inner_type), SetArgReferee<2>(inner_type),
-                             SetArgReferee<3>(1), Return(true)));
-    s += EXPECT_CALL(handler, mapBegin(inner_type, inner_type, 1))
-             .WillOnce(Return(FilterStatus::Continue));
+                             SetArgReferee<3>(size), Return(true)));
+    s += EXPECT_CALL(handler, mapBegin(_, _, _))
+             .WillOnce(Invoke([=](FieldType& kt, FieldType& vt, uint32_t& s) -> FilterStatus {
+               EXPECT_EQ(inner_type, kt);
+               EXPECT_EQ(inner_type, vt);
+               EXPECT_EQ(size, s);
+               return FilterStatus::Continue;
+             }));
     break;
   case FieldType::Set:
     s += EXPECT_CALL(proto, readSetBegin(_, _, _))
-             .WillOnce(DoAll(SetArgReferee<1>(inner_type), SetArgReferee<2>(1), Return(true)));
-    s += EXPECT_CALL(handler, setBegin(inner_type, 1)).WillOnce(Return(FilterStatus::Continue));
+             .WillOnce(DoAll(SetArgReferee<1>(inner_type), SetArgReferee<2>(size), Return(true)));
+    s += EXPECT_CALL(handler, setBegin(_, _))
+             .WillOnce(Invoke([=](FieldType& t, uint32_t& s) -> FilterStatus {
+               EXPECT_EQ(inner_type, t);
+               EXPECT_EQ(size, s);
+               return FilterStatus::Continue;
+             }));
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -571,10 +594,15 @@ TEST_P(DecoderStateMachineValueTest, SingleFieldStruct) {
   EXPECT_CALL(proto_, readStructBegin(Ref(buffer), _)).WillOnce(Return(true));
   EXPECT_CALL(handler_, structBegin(absl::string_view())).WillOnce(Return(FilterStatus::Continue));
 
+  int16_t field_id = 1;
   EXPECT_CALL(proto_, readFieldBegin(Ref(buffer), _, _, _))
-      .WillOnce(DoAll(SetArgReferee<2>(field_type), SetArgReferee<3>(1), Return(true)));
-  EXPECT_CALL(handler_, fieldBegin(absl::string_view(), field_type, 1))
-      .WillOnce(Return(FilterStatus::Continue));
+      .WillOnce(DoAll(SetArgReferee<2>(field_type), SetArgReferee<3>(field_id), Return(true)));
+  EXPECT_CALL(handler_, fieldBegin(absl::string_view(), _, _))
+      .WillOnce(Invoke([&](absl::string_view, FieldType& ft, int16_t& id) -> FilterStatus {
+        EXPECT_EQ(field_type, ft);
+        EXPECT_EQ(field_id, id);
+        return FilterStatus::Continue;
+      }));
 
   expectValue(proto_, handler_, field_type);
 
@@ -629,8 +657,12 @@ TEST_F(DecoderStateMachineTest, MultiFieldStruct) {
   for (FieldType field_type : field_types) {
     EXPECT_CALL(proto_, readFieldBegin(Ref(buffer), _, _, _))
         .WillOnce(DoAll(SetArgReferee<2>(field_type), SetArgReferee<3>(field_id), Return(true)));
-    EXPECT_CALL(handler_, fieldBegin(absl::string_view(), field_type, field_id))
-        .WillOnce(Return(FilterStatus::Continue));
+    EXPECT_CALL(handler_, fieldBegin(absl::string_view(), _, _))
+        .WillOnce(Invoke([=](absl::string_view, FieldType& ft, int16_t& id) -> FilterStatus {
+          EXPECT_EQ(field_type, ft);
+          EXPECT_EQ(field_id, id);
+          return FilterStatus::Continue;
+        }));
     field_id++;
 
     expectValue(proto_, handler_, field_type);
@@ -1067,10 +1099,16 @@ TEST(DecoderTest, OnDataHandlesStopIterationAndResumes) {
   EXPECT_EQ(FilterStatus::StopIteration, decoder.onData(buffer, underflow));
   EXPECT_FALSE(underflow);
 
+  FieldType field_type = FieldType::I32;
+  int16_t field_id = 1;
   EXPECT_CALL(proto, readFieldBegin(Ref(buffer), _, _, _))
-      .WillOnce(DoAll(SetArgReferee<2>(FieldType::I32), SetArgReferee<3>(1), Return(true)));
-  EXPECT_CALL(handler, fieldBegin(absl::string_view(), FieldType::I32, 1))
-      .WillOnce(Return(FilterStatus::StopIteration));
+      .WillOnce(DoAll(SetArgReferee<2>(field_type), SetArgReferee<3>(field_id), Return(true)));
+  EXPECT_CALL(handler, fieldBegin(absl::string_view(), _, _))
+      .WillOnce(Invoke([&](absl::string_view, FieldType& ft, int16_t& id) -> FilterStatus {
+        EXPECT_EQ(field_type, ft);
+        EXPECT_EQ(field_id, id);
+        return FilterStatus::StopIteration;
+      }));
   EXPECT_EQ(FilterStatus::StopIteration, decoder.onData(buffer, underflow));
   EXPECT_FALSE(underflow);
 

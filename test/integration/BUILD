@@ -217,6 +217,7 @@ envoy_cc_test_library(
         ":add_trailers_filter_config_lib",
         ":integration_lib",
         ":test_host_predicate_lib",
+        "//include/envoy/event:timer_interface",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/upstream:utility_lib",
@@ -314,7 +315,9 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:printers_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:test_time_system_interface",
         "//test/test_common:utility_lib",
     ],
 )

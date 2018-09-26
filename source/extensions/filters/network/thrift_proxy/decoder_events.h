@@ -68,8 +68,8 @@ public:
    * @param field_id the field id
    * @return FilterStatus to indicate if filter chain iteration should continue
    */
-  virtual FilterStatus fieldBegin(absl::string_view name, FieldType field_type,
-                                  int16_t field_id) PURE;
+  virtual FilterStatus fieldBegin(absl::string_view name, FieldType& field_type,
+                                  int16_t& field_id) PURE;
 
   /**
    * Indicates that the end of a Thrift protocol struct field was detected.
@@ -82,12 +82,12 @@ public:
    * @param value type value of the field
    * @return FilterStatus to indicate if filter chain iteration should continue
    */
-  virtual FilterStatus boolValue(bool value) PURE;
-  virtual FilterStatus byteValue(uint8_t value) PURE;
-  virtual FilterStatus int16Value(int16_t value) PURE;
-  virtual FilterStatus int32Value(int32_t value) PURE;
-  virtual FilterStatus int64Value(int64_t value) PURE;
-  virtual FilterStatus doubleValue(double value) PURE;
+  virtual FilterStatus boolValue(bool& value) PURE;
+  virtual FilterStatus byteValue(uint8_t& value) PURE;
+  virtual FilterStatus int16Value(int16_t& value) PURE;
+  virtual FilterStatus int32Value(int32_t& value) PURE;
+  virtual FilterStatus int64Value(int64_t& value) PURE;
+  virtual FilterStatus doubleValue(double& value) PURE;
   virtual FilterStatus stringValue(absl::string_view value) PURE;
 
   /**
@@ -97,7 +97,7 @@ public:
    * @param size the number of key-value pairs
    * @return FilterStatus to indicate if filter chain iteration should continue
    */
-  virtual FilterStatus mapBegin(FieldType key_type, FieldType value_type, uint32_t size) PURE;
+  virtual FilterStatus mapBegin(FieldType& key_type, FieldType& value_type, uint32_t& size) PURE;
 
   /**
    * Indicates that the end of a Thrift protocol map was detected.
@@ -111,7 +111,7 @@ public:
    * @param size the number of values in the list
    * @return FilterStatus to indicate if filter chain iteration should continue
    */
-  virtual FilterStatus listBegin(FieldType elem_type, uint32_t size) PURE;
+  virtual FilterStatus listBegin(FieldType& elem_type, uint32_t& size) PURE;
 
   /**
    * Indicates that the end of a Thrift protocol list was detected.
@@ -125,7 +125,7 @@ public:
    * @param size the number of values in the set
    * @return FilterStatus to indicate if filter chain iteration should continue
    */
-  virtual FilterStatus setBegin(FieldType elem_type, uint32_t size) PURE;
+  virtual FilterStatus setBegin(FieldType& elem_type, uint32_t& size) PURE;
 
   /**
    * Indicates that the end of a Thrift protocol set was detected.
@@ -135,53 +135,6 @@ public:
 };
 
 typedef std::shared_ptr<DecoderEventHandler> DecoderEventHandlerSharedPtr;
-
-class DelegatingDecoderEventHandler : public virtual DecoderEventHandler {
-public:
-  virtual ~DelegatingDecoderEventHandler() {}
-
-  // DecoderEventHandler
-  FilterStatus transportBegin(MessageMetadataSharedPtr metadata) override {
-    return event_handler_->transportBegin(metadata);
-  }
-  FilterStatus transportEnd() override { return event_handler_->transportEnd(); }
-  FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override {
-    return event_handler_->messageBegin(metadata);
-  };
-  FilterStatus messageEnd() override { return event_handler_->messageEnd(); }
-  FilterStatus structBegin(absl::string_view name) override {
-    return event_handler_->structBegin(name);
-  }
-  FilterStatus structEnd() override { return event_handler_->structEnd(); }
-  FilterStatus fieldBegin(absl::string_view name, FieldType field_type, int16_t field_id) override {
-    return event_handler_->fieldBegin(name, field_type, field_id);
-  }
-  FilterStatus fieldEnd() override { return event_handler_->fieldEnd(); }
-  FilterStatus boolValue(bool value) override { return event_handler_->boolValue(value); }
-  FilterStatus byteValue(uint8_t value) override { return event_handler_->byteValue(value); }
-  FilterStatus int16Value(int16_t value) override { return event_handler_->int16Value(value); }
-  FilterStatus int32Value(int32_t value) override { return event_handler_->int32Value(value); }
-  FilterStatus int64Value(int64_t value) override { return event_handler_->int64Value(value); }
-  FilterStatus doubleValue(double value) override { return event_handler_->doubleValue(value); }
-  FilterStatus stringValue(absl::string_view value) override {
-    return event_handler_->stringValue(value);
-  }
-  FilterStatus mapBegin(FieldType key_type, FieldType value_type, uint32_t size) override {
-    return event_handler_->mapBegin(key_type, value_type, size);
-  }
-  FilterStatus mapEnd() override { return event_handler_->mapEnd(); }
-  FilterStatus listBegin(FieldType elem_type, uint32_t size) override {
-    return event_handler_->listBegin(elem_type, size);
-  }
-  FilterStatus listEnd() override { return event_handler_->listEnd(); }
-  FilterStatus setBegin(FieldType elem_type, uint32_t size) override {
-    return event_handler_->setBegin(elem_type, size);
-  }
-  FilterStatus setEnd() override { return event_handler_->setEnd(); }
-
-protected:
-  DecoderEventHandler* event_handler_{};
-};
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

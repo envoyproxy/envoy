@@ -182,7 +182,23 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
           host_socket_addr->set_port_value(ports[port_idx++]);
         }
       }
+
+      // Assign ports to statically defined load_assignment hosts.
+      for (int j = 0; j < cluster->load_assignment().endpoints_size(); ++j) {
+        auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
+        for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
+          auto lb_endpoint = locality_lb->mutable_lb_endpoints(k);
+          if (lb_endpoint->endpoint().address().has_socket_address()) {
+            RELEASE_ASSERT(ports.size() > port_idx, "");
+            lb_endpoint->mutable_endpoint()
+                ->mutable_address()
+                ->mutable_socket_address()
+                ->set_port_value(ports[port_idx++]);
+          }
+        }
+      }
     }
+
     if (capture_path) {
       const bool has_tls = cluster->has_tls_context();
       absl::optional<ProtobufWkt::Struct> tls_config;
