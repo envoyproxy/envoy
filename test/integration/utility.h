@@ -65,6 +65,9 @@ public:
   bool connecting() { return callbacks_->connecting_; }
   void run(Event::Dispatcher::RunType run_type = Event::Dispatcher::RunType::Block);
   void close();
+  Network::ConnectionEvent last_connection_event() const {
+    return callbacks_->last_connection_event_;
+  }
 
 private:
   struct ForwardingFilter : public Network::ReadFilterBaseImpl {
@@ -83,11 +86,15 @@ private:
   };
 
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
-    void onEvent(Network::ConnectionEvent) override { connecting_ = false; }
+    void onEvent(Network::ConnectionEvent event) override {
+      last_connection_event_ = event;
+      connecting_ = false;
+    }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
     bool connecting_{true};
+    Network::ConnectionEvent last_connection_event_;
   };
 
   Api::ApiPtr api_;

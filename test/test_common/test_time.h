@@ -39,7 +39,7 @@ class DangerousDeprecatedTestTime {
 public:
   DangerousDeprecatedTestTime();
 
-  Event::TimeSystem& timeSystem() { return time_system_; }
+  Event::TestTimeSystem& timeSystem() { return time_system_; }
 
 private:
   Event::TestRealTimeSystem time_system_;

@@ -18,5 +18,6 @@ envoy_cc_mock(
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:assert_lib",
         "//test/mocks/filesystem:filesystem_mocks",
+        "//test/test_common:test_time_system_interface",
     ],
 )

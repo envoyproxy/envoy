@@ -19,7 +19,7 @@
 #include "server/test_hooks.h"
 
 #include "test/integration/server_stats.h"
-#include "test/test_common/test_time.h"
+#include "test/test_common/test_time_system.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {
@@ -222,7 +222,7 @@ public:
   static IntegrationTestServerPtr create(const std::string& config_path,
                                          const Network::Address::IpVersion version,
                                          std::function<void()> pre_worker_start_test_steps,
-                                         bool deterministic);
+                                         bool deterministic, Event::TestTimeSystem& time_system);
   ~IntegrationTestServer();
 
   Server::TestDrainManager& drainManager() { return *drain_manager_; }
@@ -241,19 +241,19 @@ public:
 
   void waitForCounterGe(const std::string& name, uint64_t value) override {
     while (counter(name) == nullptr || counter(name)->value() < value) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      time_system_.sleep(std::chrono::milliseconds(10));
     }
   }
 
   void waitForGaugeGe(const std::string& name, uint64_t value) override {
     while (gauge(name) == nullptr || gauge(name)->value() < value) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      time_system_.sleep(std::chrono::milliseconds(10));
     }
   }
 
   void waitForGaugeEq(const std::string& name, uint64_t value) override {
     while (gauge(name) == nullptr || gauge(name)->value() != value) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      time_system_.sleep(std::chrono::milliseconds(10));
     }
   }
 
@@ -288,7 +288,8 @@ public:
   }
 
 protected:
-  IntegrationTestServer(const std::string& config_path) : config_path_(config_path) {}
+  IntegrationTestServer(Event::TestTimeSystem& time_system, const std::string& config_path)
+      : time_system_(time_system), config_path_(config_path) {}
 
 private:
   /**
@@ -296,12 +297,12 @@ private:
    */
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic);
 
+  Event::TestTimeSystem& time_system_;
   const std::string config_path_;
   Thread::ThreadPtr thread_;
   Thread::CondVar listeners_cv_;
   Thread::MutexBasicLockable listeners_mutex_;
   uint64_t pending_listeners_;
-  DangerousDeprecatedTestTime test_time_;
   ConditionalInitializer server_set_;
   std::unique_ptr<Server::InstanceImpl> server_;
   Server::TestDrainManager* drain_manager_{};

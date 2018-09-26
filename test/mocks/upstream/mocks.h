@@ -118,8 +118,8 @@ class MockRetryPriorityFactory : public RetryPriorityFactory {
 public:
   MockRetryPriorityFactory(RetryPrioritySharedPtr retry_priority)
       : retry_priority_(retry_priority) {}
-  void createRetryPriority(RetryPriorityFactoryCallbacks& callbacks,
-                           const Protobuf::Message&) override {
+  void createRetryPriority(RetryPriorityFactoryCallbacks& callbacks, const Protobuf::Message&,
+                           uint32_t) override {
     callbacks.addRetryPriority(retry_priority_);
   }
 
