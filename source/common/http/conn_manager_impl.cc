@@ -941,7 +941,6 @@ void ConnectionManagerImpl::ActiveStream::disarmRequestTimer() {
   }
 }
 
-// Call disarmRequestTimer() iff the last byte of the request was sent upstream
 void ConnectionManagerImpl::ActiveStream::maybeDisarmRequestTimer() {
   if (request_info_.lastUpstreamTxByteSent().has_value()) {
     disarmRequestTimer();

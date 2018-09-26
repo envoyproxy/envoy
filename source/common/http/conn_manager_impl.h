@@ -280,7 +280,8 @@ private:
     void decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instance& data, bool end_stream);
     void decodeTrailers(ActiveStreamDecoderFilter* filter, HeaderMap& trailers);
     void disarmRequestTimer();
-    void maybeDisarmRequestTimer();
+    void maybeDisarmRequestTimer(); // disarm request timer iff the last byte of the request was
+                                    // sent upstream
     void maybeEndDecode(bool end_stream);
     void addEncodedData(ActiveStreamEncoderFilter& filter, Buffer::Instance& data, bool streaming);
     HeaderMap& addEncodedTrailers();
