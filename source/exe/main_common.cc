@@ -63,6 +63,7 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
     auto local_address = Network::Utility::getLocalAddress(options_.localAddressIpVersion());
     logging_context_ =
         std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(), log_lock);
+
     configureComponentLogLevels();
 
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
@@ -88,13 +89,7 @@ void MainCommonBase::configureComponentLogLevels() {
   for (auto& component_log_level : options_.componentLogLevels()) {
     const std::string& component = component_log_level.first;
     const size_t level_to_use = component_log_level.second;
-    Logger::Logger* logger_to_change = nullptr;
-    for (Logger::Logger& logger : Logger::Registry::loggers()) {
-      if (logger.name() == component) {
-        logger_to_change = &logger;
-        break;
-      }
-    }
+    Logger::Logger* logger_to_change = Logger::Registry::logger(component);
     ASSERT(logger_to_change);
     logger_to_change->setLevel(static_cast<spdlog::level::level_enum>(level_to_use));
   }

@@ -239,14 +239,8 @@ void OptionsImpl::parseComponentLogLevels(const std::string& component_log_level
     if (level_to_use == std::numeric_limits<size_t>::max()) {
       logError(fmt::format("error: invalid log level specified '{}'", log_level));
     }
-    bool component_found = false;
-    for (Logger::Logger& logger : Logger::Registry::loggers()) {
-      if (logger.name() == log_name) {
-        component_found = true;
-        break;
-      }
-    }
-    if (!component_found) {
+    Logger::Logger* logger_to_change = Logger::Registry::logger(log_name);
+    if (!logger_to_change) {
       logError(fmt::format("error: invalid component specified '{}'", log_name));
     }
     component_log_levels_.push_back(std::make_pair(log_name, level_to_use));

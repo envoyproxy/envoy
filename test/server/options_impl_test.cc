@@ -200,10 +200,35 @@ TEST_F(OptionsImplTest, ParseComponentLogLevels) {
   EXPECT_EQ("trace", spdlog::level::level_names[component_log_levels[1].second]);
 }
 
-TEST_F(OptionsImplTest, InvalidComponentArgument) {
+TEST_F(OptionsImplTest, ParseComponentLogLevelsWithBlank) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  parseComponentLogLevels(options, "");
+  EXPECT_EQ(0, options->componentLogLevels().size());
+}
+
+TEST_F(OptionsImplTest, InvalidComponent) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
   EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "blah:debug"), MalformedArgvException,
                           "error: invalid component specified 'blah'");
+}
+
+TEST_F(OptionsImplTest, InvalidLogLevel) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "upstream:blah,connection:trace"),
+                          MalformedArgvException, "error: invalid log level specified 'blah'");
+}
+
+TEST_F(OptionsImplTest, InvalidComponentLogLevelStructure) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "upstream:foo:bar"),
+                          MalformedArgvException,
+                          "error: component log level not correctly specified 'upstream:foo:bar'");
+}
+
+TEST_F(OptionsImplTest, IncompleteComponentLogLevel) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "upstream"), MalformedArgvException,
+                          "component log level not correctly specified 'upstream'");
 }
 
 } // namespace Envoy
