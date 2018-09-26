@@ -445,9 +445,9 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
 
 // Testing the behavior of StatsMatcher, which allows/denies the  instantiation of stats based on
 // restrictions on their names.
-class StatsMatcherTest : public HttpIntegrationTest, public testing::Test {
+class StatsMatcherIntegrationTest : public HttpIntegrationTest, public testing::Test {
 public:
-  StatsMatcherTest()
+  StatsMatcherIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
 
   void initialize() override {
@@ -474,25 +474,25 @@ public:
 };
 
 // Verify that StatsMatcher prevents the printing of uninstantiated stats.
-TEST_F(StatsMatcherTest, ExcludePrefixServerDot) {
+TEST_F(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_prefix("server.");
   initialize();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.")));
 }
 
-TEST_F(StatsMatcherTest, ExcludeRequests) {
+TEST_F(StatsMatcherIntegrationTest, ExcludeRequests) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_regex(".*requests.*");
   initialize();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("requests")));
 }
 
-TEST_F(StatsMatcherTest, ExcludeExact) {
+TEST_F(StatsMatcherIntegrationTest, ExcludeExact) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
   initialize();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.concurrency")));
 }
 
-TEST_F(StatsMatcherTest, ExcludeMultipleExact) {
+TEST_F(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_regex(".*live");
   initialize();
@@ -508,7 +508,7 @@ TEST_F(StatsMatcherTest, ExcludeMultipleExact) {
 //      construction time, before setStatsMatcher() is called.
 //
 // If either of these invariants is changed, this test must be rewritten.
-TEST_F(StatsMatcherTest, IncludeExact) {
+TEST_F(StatsMatcherIntegrationTest, IncludeExact) {
   stats_matcher_.mutable_inclusion_list()->add_patterns()->set_exact(
       "listener_manager.listener_create_success");
   initialize();
