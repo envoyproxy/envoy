@@ -47,23 +47,23 @@ if [[ ! -e "${TMP_DIR}/misspell" ]]; then
     cat "${TMP_DIR}/wget.log"
     exit -1
   fi
-  tar -xvf "${TMP_DIR}/${BIN_FILENAME}" -C ${TMP_DIR} &> /dev/null
+  tar -xvf "${TMP_DIR}/${BIN_FILENAME}" -C "${TMP_DIR}" &> /dev/null
 fi
 
 ACTUAL_SHA=""
 EXPECT_SHA=""
 
 if [[ "${OS}" == "linux" ]]; then
-  ACTUAL_SHA=$(sha1sum ${TMP_DIR}/misspell|cut -d' ' -f1)
-  EXPECT_SHA=${LINUX_MISSPELL_SHA}
+  ACTUAL_SHA=$(sha1sum "${TMP_DIR}"/misspell|cut -d' ' -f1)
+  EXPECT_SHA="${LINUX_MISSPELL_SHA}"
 else
-  ACTUAL_SHA=$(shasum -a 1 ${TMP_DIR}/misspell|cut -d' ' -f1)
-  EXPECT_SHA=${MAC_MISSPELL_SHA}
+  ACTUAL_SHA=$(shasum -a 1 "${TMP_DIR}"/misspell|cut -d' ' -f1)
+  EXPECT_SHA="${MAC_MISSPELL_SHA}"
 fi
 
 if [[ ! ${ACTUAL_SHA} == ${EXPECT_SHA} ]]; then
    echo "Expect shasum is ${ACTUAL_SHA}, but actual is shasum ${EXPECT_SHA}"
-   exit -1
+   exit 1
 fi
 
 chmod +x "${TMP_DIR}/misspell"
@@ -72,7 +72,7 @@ chmod +x "${TMP_DIR}/misspell"
 # All the skipping files are defined in tools/spelling_skip_files.txt
 SPELLING_SKIP_FILES="${ROOTDIR}/tools/spelling_skip_files.txt"
 
-# All the ignore words ar defained in tools/spelling_whitelist_words.txt
+# All the ignore words are defined in tools/spelling_whitelist_words.txt
 SPELLING_WHITELIST_WORDS_FILE="${ROOTDIR}/tools/spelling_whitelist_words.txt"
 
 WHITELIST_WORDS=$(echo -n $(cat "${SPELLING_WHITELIST_WORDS_FILE}" | \
