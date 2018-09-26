@@ -845,6 +845,7 @@ static_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
+      circuit_breakers: {}
       dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
@@ -856,6 +857,7 @@ static_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
+      circuit_breakers: {}
       dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
@@ -867,6 +869,7 @@ static_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
+      circuit_breakers: {}
       dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
@@ -880,6 +883,7 @@ dynamic_active_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
+      circuit_breakers: {}
       dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
@@ -892,6 +896,7 @@ dynamic_active_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
+      circuit_breakers: {}
       dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
@@ -904,6 +909,7 @@ dynamic_active_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
+      circuit_breakers: {}
       dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891
@@ -1017,6 +1023,7 @@ dynamic_warming_clusters:
       - socket_address:
           address: "127.0.0.1"
           port_value: 11001
+      circuit_breakers: {}
       dns_lookup_family: V4_ONLY
     last_updated:
       seconds: 1234567891

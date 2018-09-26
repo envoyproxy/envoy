@@ -183,6 +183,8 @@ void CdsJson::translateCluster(const Json::Object& json_cluster,
   if (json_cluster.hasObject("circuit_breakers")) {
     translateCircuitBreakers(*json_cluster.getObject("circuit_breakers"),
                              *cluster.mutable_circuit_breakers());
+  } else {
+    cluster.mutable_circuit_breakers();
   }
 
   if (json_cluster.hasObject("ssl_context")) {
