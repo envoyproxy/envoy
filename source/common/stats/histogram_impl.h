@@ -71,18 +71,11 @@ class NullHistogramImpl : public Histogram {
 public:
   NullHistogramImpl() {}
   ~NullHistogramImpl() {}
-  // Stats::Metric
   const std::string name() const override { return ""; }
-  // Stats::MetricImpl
-  const std::string& tagExtractedName() const override { return tag_extracted_name_; }
-  const std::vector<Tag>& tags() const override { return tags_; }
-  // Stats::Histogram
-  void recordValue(uint64_t value) override { UNREFERENCED_PARAMETER(value); }
+  const std::string& tagExtractedName() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
+  const std::vector<Tag>& tags() const override { CONSTRUCT_ON_FIRST_USE(std::vector<Tag>, {}); }
+  void recordValue(uint64_t) override {}
   bool used() const override { return false; }
-
-private:
-  const std::string tag_extracted_name_ = "";
-  const std::vector<Tag> tags_;
 };
 
 } // namespace Stats

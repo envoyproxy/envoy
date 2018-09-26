@@ -95,22 +95,15 @@ class NullCounterImpl : public Counter {
 public:
   NullCounterImpl() {}
   ~NullCounterImpl() {}
-  // Stats::Metric
   const std::string name() const override { return ""; }
-  // Stats::MetricImpl
-  const std::string& tagExtractedName() const override { return tag_extracted_name_; }
-  const std::vector<Tag>& tags() const override { return tags_; }
-  // Stats::Counter
+  const std::string& tagExtractedName() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
+  const std::vector<Tag>& tags() const override { CONSTRUCT_ON_FIRST_USE(std::vector<Tag>, {}); }
   void add(uint64_t) override {}
   void inc() override {}
   uint64_t latch() override { return 0; }
   void reset() override {}
   bool used() const override { return false; }
   uint64_t value() const override { return 0; }
-
-private:
-  const std::string tag_extracted_name_ = "";
-  const std::vector<Tag> tags_;
 };
 
 /**
@@ -158,12 +151,9 @@ class NullGaugeImpl : public Gauge {
 public:
   NullGaugeImpl() {}
   ~NullGaugeImpl() {}
-  // Stats::Metric
   const std::string name() const override { return ""; }
-  // Stats::MetricImpl
-  const std::string& tagExtractedName() const override { return tag_extracted_name_; }
-  const std::vector<Tag>& tags() const override { return tags_; }
-  // Stats::Gauge
+  const std::string& tagExtractedName() const override { CONSTRUCT_ON_FIRST_USE(std::string, ""); }
+  const std::vector<Tag>& tags() const override { CONSTRUCT_ON_FIRST_USE(std::vector<Tag>, {}); }
   void add(uint64_t) override {}
   void inc() override {}
   void dec() override {}
@@ -171,10 +161,6 @@ public:
   void sub(uint64_t) override {}
   bool used() const override { return false; }
   uint64_t value() const override { return 0; }
-
-private:
-  const std::string tag_extracted_name_ = "";
-  const std::vector<Tag> tags_;
 };
 
 template <class StatData>

@@ -78,8 +78,8 @@ message StatsMatcher {
   //   the StringMatchers in the list.
   //
   //
-  // A StringMatcher can match by an exact string, a suffix / prefix, or a regex. For performance
-  // reasons, it is recommended to use a prefix or suffix rather than a regex.
+  // A StringMatcher can be used to match against an exact string, a suffix / prefix, or a regex.
+  // For performance reasons, it is recommended to use a prefix or suffix rather than a regex.
   //
   // Example 1. Excluding all cluster-specific stats, but not cluster-manager stats:
   //
