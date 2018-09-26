@@ -12,7 +12,7 @@ namespace Envoy {
 class H1FuzzIntegrationTest : public HttpIntegrationTest {
 public:
   H1FuzzIntegrationTest(Network::Address::IpVersion version)
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, version) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, version, realTime()) {}
 
   void initialize() override;
   void replay(const test::integration::CaptureFuzzTestCase&);

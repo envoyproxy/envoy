@@ -16,8 +16,9 @@ class GrpcSubscriptionImpl : public Config::Subscription<ResourceType> {
 public:
   GrpcSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
-                       const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats)
-      : grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random),
+                       const Protobuf::MethodDescriptor& service_method, SubscriptionStats stats,
+                       Stats::Scope& scope)
+      : grpc_mux_(local_info, std::move(async_client), dispatcher, service_method, random, scope),
         grpc_mux_subscription_(grpc_mux_, stats) {}
 
   // Config::Subscription

@@ -57,6 +57,7 @@ Version history
   dynamic table size of both: encoder and decoder.
 * http: added support for removing request headers using :ref:`request_headers_to_remove
   <envoy_api_field_route.Route.request_headers_to_remove>`.
+* http: added support for a :ref:`delayed close timeout<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.delayed_close_timeout>` to mitigate race conditions when closing connections to downstream HTTP clients. The timeout defaults to 1 second.
 * jwt-authn filter: add support for per route JWT requirements.
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
   :ref:`destination_port <envoy_api_field_listener.FilterChainMatch.destination_port>` and
@@ -76,6 +77,9 @@ Version history
 * rbac network filter: a :ref:`role-based access control network filter <config_network_filters_rbac>` has been added.
 * rest-api: added ability to set the :ref:`request timeout <envoy_api_field_core.ApiConfigSource.request_timeout>` for REST API requests.
 * router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
+* tcp_proxy: added support for :ref:`weighted clusters <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.weighted_clusters>`.
+* tls: implemented `SecretDiscoveryService <https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/\
+  discovery/v2/sds.proto>`_.
 * tracing: added support for configuration of :ref:`tracing sampling
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
 * thrift_proxy: introduced thrift routing, moved configuration to correct location
@@ -91,6 +95,10 @@ Version history
   stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented 
   in case of schema/validation error.
 * cli: Added support for :ref:`component log level <operations_cli>` command line option for configuring log levels of individual components.
+* :ref:`sni_cluster <config_network_filters_sni_cluster>`: introduced a new network filter that forwards connections to the
+  upstream cluster specified by the SNI value presented by the client during a TLS handshake.
+* config: Added a stat :ref:`connected_state <management_server_stats>` that indicates current connected state of Envoy with 
+  management server. 
 
 1.7.0
 ===============

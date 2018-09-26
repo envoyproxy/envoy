@@ -10,7 +10,7 @@ std::string echo_config;
 class EchoIntegrationTest : public BaseIntegrationTest,
                             public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  EchoIntegrationTest() : BaseIntegrationTest(GetParam(), echo_config) {}
+  EchoIntegrationTest() : BaseIntegrationTest(GetParam(), realTime(), echo_config) {}
 
   // Called once by the gtest framework before any EchoIntegrationTests are run.
   static void SetUpTestCase() {
