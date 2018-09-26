@@ -458,9 +458,7 @@ private:
       return parent_->pathMatchCriterion();
     }
 
-    bool includeAttemptCount() const override {
-      return parent_->includeAttemptCount();
-    }
+    bool includeAttemptCount() const override { return parent_->includeAttemptCount(); }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
