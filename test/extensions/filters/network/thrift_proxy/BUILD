@@ -22,6 +22,7 @@ envoy_extension_cc_mock(
         "//source/extensions/filters/network/thrift_proxy:conn_manager_lib",
         "//source/extensions/filters/network/thrift_proxy:protocol_interface",
         "//source/extensions/filters/network/thrift_proxy:transport_interface",
+        "//source/extensions/filters/network/thrift_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
         "//source/extensions/filters/network/thrift_proxy/router:router_interface",
         "//test/mocks/network:network_mocks",
@@ -203,9 +204,11 @@ envoy_extension_cc_test(
     srcs = ["config_test.cc"],
     extension_name = "envoy.filters.network.thrift_proxy",
     deps = [
+        ":mocks",
         "//source/extensions/filters/network/thrift_proxy:config",
         "//source/extensions/filters/network/thrift_proxy/router:config",
         "//test/mocks/server:server_mocks",
+        "//test/test_common:registry_lib",
     ],
 )
 

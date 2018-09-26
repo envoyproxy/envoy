@@ -39,7 +39,7 @@ Version history
   <envoy_api_field_route.RouteAction.idle_timeout>`. This defaults to 5 minutes; if you have
   other timeouts (e.g. connection idle timeout, upstream response per-retry) that are longer than
   this in duration, you may want to consider setting a non-default per-stream idle timeout.
-* http: added generic :ref:`Upgrade support 
+* http: added generic :ref:`Upgrade support
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`.
 * http: better handling of HEAD requests. Now sending transfer-encoding: chunked rather than content-length: 0.
 * http: fixed missing support for appending to predefined inline headers, e.g.
@@ -83,16 +83,17 @@ Version history
 * tracing: added support for configuration of :ref:`tracing sampling
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
 * thrift_proxy: introduced thrift routing, moved configuration to correct location
+* thrift_proxy: introduced thrift configurable decoder filters
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
   selecting a host from a subset.
 * upstream: require opt-in to use the :ref:`x-envoy-orignal-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` header
   for overriding destination address when using the :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   load balancing policy.
-* ratelimit: added :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in 
+* ratelimit: added :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in
   case of rate limit service error.
 * route checker: Added v2 config support and removed support for v1 configs.
-* config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`  
-  stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented 
+* config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`
+  stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented
   in case of schema/validation error.
 * :ref:`sni_cluster <config_network_filters_sni_cluster>`: introduced a new network filter that forwards connections to the
   upstream cluster specified by the SNI value presented by the client during a TLS handshake.

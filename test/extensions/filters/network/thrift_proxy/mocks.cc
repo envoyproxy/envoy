@@ -1,5 +1,7 @@
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 
+#include "common/protobuf/protobuf.h"
+
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -8,6 +10,10 @@ using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
+
+// Provide a specialization for ProtobufWkt::Struct (for MockFilterConfigFactory)
+template <> void MessageUtil::validate(const ProtobufWkt::Struct&) {}
+
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
@@ -75,6 +81,26 @@ MockDecoderFilterCallbacks::MockDecoderFilterCallbacks() {
   ON_CALL(*this, connection()).WillByDefault(Return(&connection_));
 }
 MockDecoderFilterCallbacks::~MockDecoderFilterCallbacks() {}
+
+MockFilterConfigFactory::MockFilterConfigFactory()
+    : FactoryBase("envoy.filters.thrift.mock_filter") {
+  mock_filter_.reset(new NiceMock<MockDecoderFilter>());
+}
+
+MockFilterConfigFactory::~MockFilterConfigFactory() {}
+
+FilterFactoryCb MockFilterConfigFactory::createFilterFactoryFromProtoTyped(
+    const ProtobufWkt::Struct& proto_config, const std::string& stat_prefix,
+    Server::Configuration::FactoryContext& context) {
+  UNREFERENCED_PARAMETER(context);
+
+  config_struct_ = proto_config;
+  config_stat_prefix_ = stat_prefix;
+
+  return [this](ThriftFilters::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addDecoderFilter(mock_filter_);
+  };
+}
 
 } // namespace ThriftFilters
 

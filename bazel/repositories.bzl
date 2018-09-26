@@ -448,6 +448,10 @@ def _com_google_googletest():
 def _com_google_absl():
     _repository_impl("com_google_absl")
     native.bind(
+        name = "abseil_any",
+        actual = "@com_google_absl//absl/types:any",
+    )
+    native.bind(
         name = "abseil_base",
         actual = "@com_google_absl//absl/base:base",
     )
