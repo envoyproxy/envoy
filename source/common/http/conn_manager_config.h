@@ -37,6 +37,7 @@ namespace Http {
   GAUGE    (downstream_cx_tx_bytes_buffered)                                                       \
   COUNTER  (downstream_cx_drain_close)                                                             \
   COUNTER  (downstream_cx_idle_timeout)                                                            \
+  COUNTER  (downstream_cx_overload_disable_keepalive)                                              \
   COUNTER  (downstream_flow_control_paused_reading_total)                                          \
   COUNTER  (downstream_flow_control_resumed_reading_total)                                         \
   COUNTER  (downstream_rq_total)                                                                   \

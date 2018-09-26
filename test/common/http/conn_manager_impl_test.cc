@@ -3329,6 +3329,7 @@ TEST_F(HttpConnectionManagerImplTest, DisableKeepAlivewhenOverloaded) {
 
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
+  EXPECT_EQ(1U, stats_.named_.downstream_cx_overload_disable_keepalive_.value());
 }
 
 } // namespace Http
