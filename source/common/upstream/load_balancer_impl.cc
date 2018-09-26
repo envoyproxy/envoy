@@ -96,6 +96,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
   }
 
   if (total_load != 0) {
+    // Account for rounding errors by assigning it to the first healthy priority.
     ASSERT(total_load < per_priority_load_.size());
     per_priority_load_[first_healthy_priority] += total_load;
   }
