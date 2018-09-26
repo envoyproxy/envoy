@@ -1,5 +1,7 @@
 #include "common/http/http2/metadata_encoder.h"
 
+#include "common/common/assert.h"
+
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
@@ -35,39 +37,30 @@ bool MetadataEncoder::createHeaderBlockUsingNghttp2(MetadataMap& metadata_map) {
   }
 
   // Create deflater (encoder).
-  // TODO(soya3129): share deflater among all encoders in the same connection.
+  // TODO(soya3129): share deflater among all encoders in the same connection. The benefit is less
+  // memory, and the caveat is encoding error on one stream can impact other streams.
   int rv;
   nghttp2_hd_deflater* deflater;
   rv = nghttp2_hd_deflate_new(&deflater, header_table_size_);
-  if (rv != 0) {
-    ENVOY_LOG(error, "nghttp2_hd_deflate_init failed.");
-    nghttp2_hd_deflate_del(deflater);
-    return false;
-  }
+  ASSERT(rv == 0);
 
   // Estimates the upper bound of output payload.
   size_t buflen = nghttp2_hd_deflate_bound(deflater, nva, nvlen);
   if (buflen > max_payload_size_bound_) {
     ENVOY_LOG(error, "Payload size {} exceeds the max bound.", buflen);
+    nghttp2_hd_deflate_del(deflater);
     return false;
   }
   Buffer::RawSlice iovec;
   payload_.reserve(buflen, &iovec, 1);
-  if (iovec.len_ < buflen) {
-    ENVOY_LOG(error, "Failed to reserve memory in |payload_|.");
-    nghttp2_hd_deflate_del(deflater);
-    return false;
-  }
-  iovec.len_ = buflen;
+  ASSERT(iovec.len_ >= buflen);
 
   // Creates payload using nghttp2.
   uint8_t* buf = reinterpret_cast<uint8_t*>(iovec.mem_);
   ssize_t result = nghttp2_hd_deflate_hd(deflater, buf, buflen, nva, nvlen);
-  if (result < 0) {
-    ENVOY_LOG(error, "Failed deflating.");
-    nghttp2_hd_deflate_del(deflater);
-    return false;
-  }
+  ASSERT(result > 0);
+  iovec.len_ = result;
+
   payload_.commit(&iovec, 1);
 
   nghttp2_hd_deflate_del(deflater);

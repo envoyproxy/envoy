@@ -20,7 +20,7 @@ public:
   MetadataEncoder(uint64_t stream_id) : stream_id_(stream_id) {}
 
   /**
-   * Creates wired format HTTP/2 header block from |metadata_map|. Only after previous payload is
+   * Creates wire format HTTP/2 header block from metadata_map. Only after previous payload is
    * drained, new payload can be encoded. This limitation is caused by nghttp2 can't incrementally
    * encode header block.
    * @param metadata_map supplies METADATA to encode.
@@ -29,8 +29,8 @@ public:
   bool createPayload(MetadataMap& metadata_map);
 
   /**
-   * Called in nghttp2 callback function after METADATA is submitted. The function releases |len|
-   * data in |payload_|.
+   * Called in nghttp2 callback function after METADATA is submitted. The function releases len data
+   * in payload_.
    * @param len supplies the size to be released.
    */
   void releasePayload(uint64_t len);

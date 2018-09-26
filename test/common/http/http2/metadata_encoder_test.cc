@@ -268,6 +268,18 @@ TEST_F(MetadataEncoderTest, TestEmptyMetadataMapFailToEncode) {
   cleanUp();
 }
 
+// Verify we don't encode metadata larger than 1M.
+TEST_F(MetadataEncoderTest, TestMetadataMapTooBigToEncode) {
+  initialize();
+
+  MetadataMap metadata_map = {
+      {"header_key1", std::string(1024 * 1024 + 1, 'a')},
+  };
+  EXPECT_FALSE(encoder_.createPayload(metadata_map));
+
+  cleanUp();
+}
+
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy
