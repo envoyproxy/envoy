@@ -109,7 +109,7 @@ public:
   ABSL_MUST_USE_RESULT testing::AssertionResult
   waitForGrpcMessage(Event::Dispatcher& client_dispatcher, T& message,
                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout) {
-    auto end_time = std::chrono::steady_clock::now() + timeout;
+    auto end_time = timeSystem().monotonicTime() + timeout;
     ENVOY_LOG(debug, "Waiting for gRPC message...");
     if (!decoded_grpc_frames_.empty()) {
       decodeGrpcFrame(message);
@@ -126,8 +126,8 @@ public:
       }
     }
     if (decoded_grpc_frames_.size() < 1) {
-      timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
-          end_time - std::chrono::steady_clock::now());
+      timeout = std::chrono::duration_cast<std::chrono::milliseconds>(end_time -
+                                                                      timeSystem().monotonicTime());
       if (!waitForData(client_dispatcher, grpc_decoder_.length(), timeout)) {
         return testing::AssertionFailure() << "Timed out waiting for end of gRPC message.";
       }

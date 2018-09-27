@@ -464,7 +464,7 @@ public:
     conn_pool_callbacks_.at(conn_index)->onPoolFailure(reason, upstream_hosts_.at(conn_index));
   }
 
-  Event::TimeSystem& timeSystem() { return factory_context_.dispatcher().timeSystem(); }
+  Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
 
   ConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
@@ -950,7 +950,7 @@ TEST_F(TcpProxyTest, AccessLogBytesRxTxDuration) {
   Buffer::OwnedImpl response("bb");
   upstream_callbacks_->onUpstreamData(response, false);
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  timeSystem().sleep(std::chrono::milliseconds(1));
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
 
@@ -1094,7 +1094,7 @@ public:
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
-  Event::TimeSystem& timeSystem() { return factory_context_.dispatcher().timeSystem(); }
+  Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
 
   ConfigSharedPtr config_;
   NiceMock<Network::MockConnection> connection_;

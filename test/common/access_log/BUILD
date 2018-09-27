@@ -4,20 +4,21 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_binary",
     "envoy_cc_fuzz_test",
-    "envoy_cc_library",
     "envoy_cc_test",
+    "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
 )
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_test_library(
     name = "test_util",
     hdrs = ["test_util.h"],
     deps = [
         "//include/envoy/request_info:request_info_interface",
         "//source/common/common:assert_lib",
+        "//test/test_common:test_time_lib",
     ],
 )
 
