@@ -130,15 +130,13 @@ def api_proto_library(
     # the proto_library above are aligned.
     pgv_cc_proto_library(
         name = _Suffix(name, _CC_SUFFIX),
-        srcs = srcs,
         linkstatic = linkstatic,
-        deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps],
-        external_deps = external_cc_proto_deps + [
-            "@com_google_protobuf//:cc_wkt_protos",
+        cc_deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps] + external_cc_proto_deps + [
+            "@com_github_gogo_protobuf//:gogo_proto_cc",
             "@googleapis//:http_api_protos",
             "@googleapis//:rpc_status_protos",
-            "@com_github_gogo_protobuf//:gogo_proto_cc",
         ],
+        deps = [":" + name],
         visibility = ["//visibility:public"],
     )
     py_export_suffixes = []
@@ -147,7 +145,7 @@ def api_proto_library(
         py_export_suffixes = ["_py", "_py_genproto"]
 
     # Allow unlimited visibility for consumers
-    export_suffixes = ["", "_cc", "_cc_validate", "_cc_proto", "_cc_proto_genproto"] + py_export_suffixes
+    export_suffixes = ["", "_cc", "_cc_validate"] + py_export_suffixes
     for s in export_suffixes:
         native.alias(
             name = name + "_export" + s,
