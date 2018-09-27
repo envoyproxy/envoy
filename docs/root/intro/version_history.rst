@@ -33,7 +33,8 @@ Version history
   to the :ref:`health check event <envoy_api_msg_data.core.v2alpha.HealthCheckEvent>` definition.
 * health_check: added support for specifying :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`
   to HTTP health checker requests.
-* http: added support for a per-stream idle timeout. This applies at both :ref:`connection manager
+* http: added support for a :ref:`per-stream idle timeout
+  <envoy_api_field_route.RouteAction.idle_timeout>`. This applies at both :ref:`connection manager
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.stream_idle_timeout>`
   and :ref:`per-route granularity <envoy_api_field_route.RouteAction.idle_timeout>`. The timeout
   defaults to 5 minutes; if you have other timeouts (e.g. connection idle timeout, upstream
