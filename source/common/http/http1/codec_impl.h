@@ -49,7 +49,7 @@ public:
   void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
 
 protected:
-  StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {}
+  StreamEncoderImpl(ConnectionImpl& connection);
 
   static const std::string CRLF;
   static const std::string LAST_CHUNK;
