@@ -7,11 +7,6 @@ Circuit breaking
 * :ref:`v1 API documentation <config_cluster_manager_cluster_circuit_breakers_v1>`.
 * :ref:`v2 API documentation <envoy_api_msg_cluster.CircuitBreakers>`.
 
-.. note::
-
-  Circuit breaking will be completely disabled in the absence of the
-  :ref:`configuration <envoy_api_field_Cluster.circuit_breakers>`.
-
 Runtime
 -------
 
