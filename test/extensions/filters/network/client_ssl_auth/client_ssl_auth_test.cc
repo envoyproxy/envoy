@@ -141,7 +141,7 @@ TEST_F(ClientSslAuthFilterTest, NoSsl) {
   setup();
   Buffer::OwnedImpl dummy("hello");
 
-  // Check no SSL case, mulitple iterations.
+  // Check no SSL case, multiple iterations.
   EXPECT_CALL(filter_callbacks_.connection_, ssl()).WillOnce(Return(nullptr));
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onNewConnection());
   EXPECT_EQ(Network::FilterStatus::Continue, instance_->onData(dummy, false));

@@ -1,11 +1,11 @@
 #!/usr/bin/env python2.7
 
 # This tool is a helper script that queries the admin address for all listener
-# addresses after envoy startup. (The admin adress is written out to a file by
+# addresses after envoy startup. (The admin address is written out to a file by
 # setting the -a flag in the envoy binary.) The script then outputs a new json
 # config file with updated listener addresses. This script is currently called
 # in the hot restart integration test to update listener addresses bound to
-# port 0 in the intial json config file.
+# port 0 in the initial json config file.
 
 from collections import OrderedDict
 

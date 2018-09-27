@@ -217,7 +217,7 @@ The fields are:
   that contains "supported_quantiles" which lists the quantiles supported and an array of computed_quantiles
   that has the computed quantile for each histogram.
 
-  If a histogram is not updated during an interval, the ouput will have null for all the quantiles.
+  If a histogram is not updated during an interval, the output will have null for all the quantiles.
   
   Example histogram output:
 
@@ -338,7 +338,7 @@ The fields are:
   `text/event-stream <https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events>`_ 
   format, as expected by the Hystrix dashboard. 
   
-  If invoked from a browser or a terminal, the response will be shown as a continous stream, 
+  If invoked from a browser or a terminal, the response will be shown as a continuous stream, 
   sent in intervals defined by the :ref:`Bootstrap <envoy_api_msg_config.bootstrap.v2.Bootstrap>` 
   :ref:`stats_flush_interval <envoy_api_field_config.bootstrap.v2.Bootstrap.stats_flush_interval>`
 

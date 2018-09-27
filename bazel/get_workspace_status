@@ -37,7 +37,7 @@ fi
 echo "BUILD_SCM_REVISION ${git_rev}"
 echo "STABLE_BUILD_SCM_REVISION ${git_rev}"
 
-# Check whether there are any uncommited changes
+# Check whether there are any uncommitted changes
 git diff-index --quiet HEAD --
 if [[ $? == 0 ]];
 then

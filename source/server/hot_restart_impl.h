@@ -41,7 +41,7 @@ private:
   };
 
   // Due to the flexible-array-length of stats_set_data_, c-style allocation
-  // and initialization are neccessary.
+  // and initialization are necessary.
   SharedMemory() = delete;
   ~SharedMemory() = delete;
 

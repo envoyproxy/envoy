@@ -34,7 +34,7 @@ public:
    * @param previous_total supplies the previous final total buffer size. previous_total will be
    *        updated to new_total when the call is complete.
    * @param stat_total supplies the counter to increment with the delta.
-   * @param stat_current supplies the guage that should be updated with the delta of previous_total
+   * @param stat_current supplies the gauge that should be updated with the delta of previous_total
    *        and new_total.
    */
   static void updateBufferStats(uint64_t delta, uint64_t new_total, uint64_t& previous_total,

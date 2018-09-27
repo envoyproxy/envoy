@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
   // Select whether to test only for IPv4, IPv6, or both. The default is to
   // test for both. Options are {"v4only", "v6only", "all"}. Set
   // ENVOY_IP_TEST_VERSIONS to "v4only" if the system currently does not support IPv6 network
-  // operations. Similary set ENVOY_IP_TEST_VERSIONS to "v6only" if IPv4 has already been
+  // operations. Similarly set ENVOY_IP_TEST_VERSIONS to "v6only" if IPv4 has already been
   // phased out of network operations. Set to "all" (or don't set) if testing both
   // v4 and v6 addresses is desired. This feature is in progress and will be rolled out to all tests
   // in upcoming PRs.

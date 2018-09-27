@@ -307,7 +307,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyLastAuthOk) {
   EXPECT_FALSE(headers.has("other-auth-userinfo"));
 }
 
-// Test requires any with both auth returning error. Requires any returns the error last recieved
+// Test requires any with both auth returning error. Requires any returns the error last received
 // back to the caller.
 TEST_F(GroupVerifierTest, TestRequiresAnyAllAuthFailed) {
   MessageUtil::loadFromYaml(RequiresAnyConfig, proto_config_);
@@ -385,7 +385,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllBothInRequireAnyFailed) {
 }
 
 // Test contains a requires any which in turn has 2 requires all. Mock auths simulate JWKs cache
-// hits and inline return of errors. Requires any returns the error last recieved back to the
+// hits and inline return of errors. Requires any returns the error last received back to the
 // caller.
 TEST_F(GroupVerifierTest, TestAllInAnyBothRequireAllFailed) {
   MessageUtil::loadFromYaml(AnyWithAll, proto_config_);

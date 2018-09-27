@@ -204,7 +204,7 @@ TEST_F(ExtAuthzFilterTest, FailOpen) {
 
 TEST_F(ExtAuthzFilterTest, FailClose) {
   InSequence s;
-  // Explicitily set the failure_mode_allow to false.
+  // Explicitly set the failure_mode_allow to false.
   config_->setFailModeAllow(false);
 
   EXPECT_CALL(filter_callbacks_.connection_, remoteAddress()).WillOnce(ReturnRef(addr_));

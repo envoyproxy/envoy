@@ -82,7 +82,7 @@ In this example, certificates are specified in the bootstrap static_resource, th
 Examples two: SDS server
 ------------------------
 
-This example shows how to configurate secrets fetched from remote SDS servers:
+This example shows how to configure secrets fetched from remote SDS servers:
 
 .. code-block:: yaml
 

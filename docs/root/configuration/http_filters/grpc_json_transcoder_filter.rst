@@ -74,7 +74,7 @@ Sending arbitrary content
 -------------------------
 
 By default, when transcoding occurs, gRPC-JSON encodes the message output of a gRPC service method into
-JSON and sets the HTTP response `Content-Type` header to `application/json`. To send abritrary content,
+JSON and sets the HTTP response `Content-Type` header to `application/json`. To send arbitrary content,
 a gRPC service method can use
 `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_
 as its output message type. The implementation needs to set

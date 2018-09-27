@@ -9,6 +9,6 @@
 # header_to_metadata extension
 /*/extensions/filters/http/header_to_metadata @rgs1 @zuercher
 # alts transport socket extension
-/*/extensions/transport_sockets/alts @lizan @yangminzhu
+/*/extensions/transport_sockets/alts @htuch @yangminzhu
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
