@@ -57,7 +57,7 @@ Version history
   dynamic table size of both: encoder and decoder.
 * http: added support for removing request headers using :ref:`request_headers_to_remove
   <envoy_api_field_route.Route.request_headers_to_remove>`.
-* http: added limits to the number and length of header modifications in all fields request_headers_to_add, request_headers_to_remove, response_headers_to_add, response_headers_to_remove.
+* http: added limits to the number and length of header modifications in all fields request_headers_to_add, request_headers_to_remove, response_headers_to_add, response_headers_to_remove. These limits are very high and should only be used as a last-resort safeguard.
 * http: added support for a :ref:`delayed close timeout<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.delayed_close_timeout>` to mitigate race conditions when closing connections to downstream HTTP clients. The timeout defaults to 1 second.
 * jwt-authn filter: add support for per route JWT requirements.
 * listeners: added the ability to match :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` using
