@@ -98,6 +98,7 @@ public:
 private:
   const int32_t seed_;
   std::ranlux48 generator_;
+  RealTimeSource real_time_source_;
 };
 
 class TestUtility {
