@@ -1,23 +1,32 @@
 #include "common/http/http2/metadata_decoder.h"
 
-#include "nghttp2/nghttp2.h"
+#include "common/common/assert.h"
 
 namespace Envoy {
 namespace Http {
 namespace Http2 {
 
-bool MetadataDecoder::receiveMetadata(const uint8_t *data, size_t len, bool end_metadata) {
+MetadataDecoder::MetadataDecoder(uint64_t stream_id) : stream_id_(stream_id) {
+  int rv = nghttp2_hd_inflate_new(&inflater_);
+  ASSERT(rv == 0);
+}
+
+MetadataDecoder::~MetadataDecoder() {
+  nghttp2_hd_inflate_del(inflater_);
+}
+
+bool MetadataDecoder::receiveMetadata(const uint8_t* data, size_t len, bool end_metadata) {
   ENVOY_LOG(error, "++++++++++ receiveMetadata: end_metadata {}.", end_metadata);
-  // Stores received data to |payload_|.
-  Buffer::OwnedImpl payload(data, len);
-  if (payload_.length() == 0) {
-    payload_.move(payload);
-  } else {
-    payload_.prepend(payload);
-  }
+
+  Buffer::RawSlice iovec;
+  payload_.reserve(len, &iovec, 1);
+  ASSERT(iovec.len_ >= len);
+  iovec.len_ = len;
+  memcpy(iovec.mem_, data, len);
+  payload_.commit(&iovec, 1);
 
   if (end_metadata) {
-    bool result = OnCompleteMetadata();
+    bool result = DecodeMetadataPayloadUsingNghttp2();
     if (!result) {
       payload_.drain(payload_.length());
       //check++++++++++++++++++++ does it need to be a map list??
@@ -25,15 +34,19 @@ bool MetadataDecoder::receiveMetadata(const uint8_t *data, size_t len, bool end_
       ENVOY_LOG(error, "Failed to decode METADATA in |payload_|.");
       return false;
     }
-    for (const auto& metadata_map : metadata_map_list_) {
-      callback_(metadata_map);
+
+    payload_.drain(payload_.length());
+    if (callback_ != nullptr) {
+      for (const auto& metadata_map : metadata_map_list_) {
+        callback_(metadata_map);
+      }
     }
     metadata_map_list_.clear();
   }
   return true;
 }
 
-void MetadataDecoder::RegisterMetadataCallback(MetadataCallback callback) {
+void MetadataDecoder::registerMetadataCallback(MetadataCallback callback) {
   if (callback_ == nullptr) {
     ENVOY_LOG(error, "Registered callback function is nullptr.");
   }
@@ -44,20 +57,12 @@ void MetadataDecoder::RegisterMetadataCallback(MetadataCallback callback) {
   metadata_map_list_.clear();
 }
 
-void MetadataDecoder::UnregisterMetadataCallback() {
+void MetadataDecoder::unregisterMetadataCallback() {
   callback_ = nullptr;
 }
 
-bool MetadataDecoder::OnCompleteMetadata() {
-  ENVOY_LOG(error, "++++++++++ OnCompleteMetadata payload: {}", payload_.toString());
-  // TODO(soya3129): share deflater among all encoders in the same connection.
-  nghttp2_hd_inflater *inflater;
-  int rv = nghttp2_hd_inflate_new(&inflater);
-  if (rv != 0) {
-    ENVOY_LOG(error, "nghttp2_hd_inflate_new failed.");
-    nghttp2_hd_inflate_del(inflater);
-    return false;
-  }
+bool MetadataDecoder::DecodeMetadataPayloadUsingNghttp2() {
+  ENVOY_LOG(error, "++++++++++ DecodeMetadataPayloadUsingNghttp2 payload: {}", payload_.toString());
 
   // Computes how many slices are needed to get all the data out.
   const int num_slices = payload_.getRawSlices(nullptr, 0);;
@@ -77,39 +82,43 @@ bool MetadataDecoder::OnCompleteMetadata() {
     ENVOY_LOG(error, "+++++++++ in for loop, slice.len_: {}", slice.len_);
 
     while (slice.len_ > 0) {
-      //ssize_t result = nghttp2_hd_inflate_hd(inflater, &nv, &inflate_flags,
-      //                                        reinterpret_cast<uint8_t*>(slice.mem_), slice.len_,
-      //                                        is_end);
-      ssize_t result = nghttp2_hd_inflate_hd(inflater, &nv, &inflate_flags,
-                                              const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(payload_.toString().data())), slice.len_,
+      ENVOY_LOG(error, "++++++++++ payload constructed from slices: {}, len_: {}",
+                std::string(reinterpret_cast<char*>(slice.mem_), slice.len_), slice.len_);
+
+      ssize_t result = nghttp2_hd_inflate_hd(inflater_, &nv, &inflate_flags,
+                                              reinterpret_cast<uint8_t*>(slice.mem_), slice.len_,
                                               is_end);
       if (result < 0 || (result == 0 && slice.len_ > 0)) {
-        nghttp2_hd_inflate_del(inflater);
+        nghttp2_hd_inflate_del(inflater_);
         ENVOY_LOG(error, "Inflate failed with result code: {}, and slice.len_ is {}.", result,
                   slice.len_);
         return false;
       }
       slice.mem_ = reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(slice.mem_) + result);
       slice.len_ -= result;
+      ENVOY_LOG(error, "++++++++++ result: {}", result);
+      ENVOY_LOG(error, "++++++++++ payload.length(): {}", payload_.length());
 
       if (inflate_flags & NGHTTP2_HD_INFLATE_EMIT) {
-        metadata_map[std::string(reinterpret_cast<char*>(nv.name), nv.namelen)] =
-            std::string(reinterpret_cast<char*>(nv.value), nv.valuelen);
+        ENVOY_LOG(error, "++++++++std::string(reinterpret_cast<char*>(nv.name), nv.namelen): {}",
+                  std::string(reinterpret_cast<char*>(nv.name), nv.namelen));
+        ENVOY_LOG(error, "++++++++std::string(reinterpret_cast<char*>(nv.name), nv.namelen): {}",
+                  std::string(reinterpret_cast<char*>(nv.value), nv.valuelen));
+        metadata_map.emplace(
+            std::string(reinterpret_cast<char*>(nv.name), nv.namelen),
+            std::string(reinterpret_cast<char*>(nv.value), nv.valuelen));
       }
     }
 
     if (inflate_flags & NGHTTP2_HD_INFLATE_FINAL) {
-      nghttp2_hd_inflate_end_headers(inflater);
+      nghttp2_hd_inflate_end_headers(inflater_);
     }
   }
 
-  if (callback_ != nullptr) {
-    for (const auto& metadata_map : metadata_map_list_) {
-      callback_(metadata_map);
-    }
-  }
+  ENVOY_LOG(error, "++++++++++ metadata_map.size(): {}", metadata_map.size());
+  metadata_map_list_.emplace_back(std::move(metadata_map));
+  ENVOY_LOG(error, "++++++++++ metadata_map_list_.size(): {}", metadata_map_list_.size());
 
-  nghttp2_hd_inflate_del(inflater);
   return true;
 }
 

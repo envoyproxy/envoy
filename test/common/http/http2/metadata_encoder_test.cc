@@ -68,6 +68,7 @@ static ssize_t pack_extension_callback(nghttp2_session* session, uint8_t* buf, s
 static int on_extension_chunk_recv_callback(nghttp2_session* session, const nghttp2_frame_hd* hd,
                                             const uint8_t* data, size_t len, void* user_data) {
   EXPECT_NE(nullptr, session);
+
   // Sanity check header length.
   EXPECT_EQ(hd->length, len);
   // All the flag should be 0 except the last frame.
@@ -78,7 +79,6 @@ static int on_extension_chunk_recv_callback(nghttp2_session* session, const nght
   bool result = decoder->receiveMetadata(data, len, (hd->flags == END_METADATA_FLAG) ? 1 : 0);
   (void)result;
   return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
-
 
   //TestBuffer* payload = (reinterpret_cast<UserData*>(user_data))->payload_buffer;
   //ENVOY_LOG_MISC(error, "++++++++++++++payload.length:  {}", payload->length);
@@ -150,6 +150,16 @@ public:
     nghttp2_option_del(option_);
   }
 
+  void verifyMetadata(MetadataMap* expect, const MetadataMap& metadata_map) {
+    ENVOY_LOG_MISC(error, "++++++++++++ callback triggered");
+    EXPECT_EQ(metadata_map.size(), expect->size());
+    for (const auto& metadata : metadata_map) {
+      ENVOY_LOG_MISC(error, "++++++++++++ metadata.first: {}, metadata_second: {}",
+                     metadata.first, metadata.second);
+      EXPECT_EQ(expect->find(metadata.first)->second, metadata.second);
+    }
+  }
+
   // Verifies the payload received by peer is as expected.
   void verifyPayload(MetadataMap& metadata_map, uint8_t* in, size_t inlen) {
     // Creates a new inflater (decoder).
@@ -211,6 +221,11 @@ TEST_F(MetadataEncoderTest, EncodeSmallHeaderBlock) {
       {"header_key4", "header_value4"},
   };
 
+  // Verifies the encoding/decoding result in decoder's callback functions.
+  MetadataCallback cb = std::bind(&MetadataEncoderTest::verifyMetadata, this, &metadata_map,
+                                  std::placeholders::_1);
+  decoder_.registerMetadataCallback(cb);
+
   // Creates metadata payload.
   encoder_.createPayload(metadata_map);
   // Submits METADATA to nghttp2.
@@ -230,14 +245,6 @@ TEST_F(MetadataEncoderTest, EncodeSmallHeaderBlock) {
                              payload_buffer_.length));
   //verifyPayload(metadata_map, &(payload_buffer_.buf[0]), payload_buffer_.length);
 
-  std::vector<MetadataMap>& metadata_map_list = decoder_.getMetadataMapList();
-  for (const auto& map : metadata_map_list) {
-    for (const auto& metadata : map) {
-      ENVOY_LOG_MISC(error, "metadata.key(): {}", metadata.first);
-      ENVOY_LOG_MISC(error, "metadata.value(): {}", metadata.second);
-    }
-  }
-
   cleanUp();
 }
 
@@ -250,6 +257,12 @@ TEST_F(MetadataEncoderTest, EncodeLargeHeaderBlock) {
       {"header_key1", std::string(20000, 'a')},
       {"header_key2", std::string(20000, 'b')},
   };
+
+  // Verifies the encoding/decoding result in decoder's callback functions.
+  MetadataCallback cb = std::bind(&MetadataEncoderTest::verifyMetadata, this, &metadata_map,
+                                  std::placeholders::_1);
+  decoder_.registerMetadataCallback(cb);
+
 
   // Creates metadata payload.
   encoder_.createPayload(metadata_map);
