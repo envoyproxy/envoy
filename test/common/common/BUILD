@@ -20,14 +20,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "logger_test",
-    srcs = ["logger_test.cc"],
-    deps = [
-        "//source/common/common:logger_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "assert_test",
     srcs = ["assert_test.cc"],
     deps = [
