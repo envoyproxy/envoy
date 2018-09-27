@@ -15,7 +15,7 @@ MetadataDecoder::~MetadataDecoder() {
   nghttp2_hd_inflate_del(inflater_);
 }
 
-bool MetadataDecoder::receiveMetadata(const uint8_t* data, size_t len, bool end_metadata) {
+bool MetadataDecoder::receiveMetadata(const uint8_t* data, size_t len) {
   ENVOY_LOG(error, "++++++++++ receiveMetadata: end_metadata {}.", end_metadata);
 
   Buffer::RawSlice iovec;
@@ -25,16 +25,21 @@ bool MetadataDecoder::receiveMetadata(const uint8_t* data, size_t len, bool end_
   memcpy(iovec.mem_, data, len);
   payload_.commit(&iovec, 1);
 
-  if (end_metadata) {
-    bool result = DecodeMetadataPayloadUsingNghttp2();
-    if (!result) {
-      payload_.drain(payload_.length());
-      //check++++++++++++++++++++ does it need to be a map list??
-      metadata_map_list_.clear();
-      ENVOY_LOG(error, "Failed to decode METADATA in |payload_|.");
-      return false;
-    }
+  return true;
+}
 
+bool MetadataDecoder::OnMetadataFrameComplete(bool end_metadata) {
+  bool result = DecodeMetadataPayloadUsingNghttp2();
+  if (!result) {
+    payload_.drain(payload_.length());
+    //check++++++++++++++++++++ does it need to be a map list??
+    metadata_map_list_.clear();
+    nghttp2_hd_inflate_end_headers(inflater_);
+    ENVOY_LOG(error, "Failed to decode METADATA in |payload_|.");
+    return false;
+  }
+
+  if (end_metadata) {
     payload_.drain(payload_.length());
     if (callback_ != nullptr) {
       for (const auto& metadata_map : metadata_map_list_) {
@@ -43,22 +48,6 @@ bool MetadataDecoder::receiveMetadata(const uint8_t* data, size_t len, bool end_
     }
     metadata_map_list_.clear();
   }
-  return true;
-}
-
-void MetadataDecoder::registerMetadataCallback(MetadataCallback callback) {
-  if (callback_ == nullptr) {
-    ENVOY_LOG(error, "Registered callback function is nullptr.");
-  }
-  callback_ = std::move(callback);
-  for (const auto& metadata_map : metadata_map_list_) {
-    callback_(metadata_map);
-  }
-  metadata_map_list_.clear();
-}
-
-void MetadataDecoder::unregisterMetadataCallback() {
-  callback_ = nullptr;
 }
 
 bool MetadataDecoder::DecodeMetadataPayloadUsingNghttp2() {
@@ -120,6 +109,21 @@ bool MetadataDecoder::DecodeMetadataPayloadUsingNghttp2() {
   ENVOY_LOG(error, "++++++++++ metadata_map_list_.size(): {}", metadata_map_list_.size());
 
   return true;
+}
+
+void MetadataDecoder::registerMetadataCallback(MetadataCallback callback) {
+  if (callback_ == nullptr) {
+    ENVOY_LOG(error, "Registered callback function is nullptr.");
+  }
+  callback_ = std::move(callback);
+  for (const auto& metadata_map : metadata_map_list_) {
+    callback_(metadata_map);
+  }
+  metadata_map_list_.clear();
+}
+
+void MetadataDecoder::unregisterMetadataCallback() {
+  callback_ = nullptr;
 }
 
 } // namespace Http2
