@@ -239,6 +239,8 @@ public:
    */
   static bool initialized() { return getSink()->hasLock(); }
 
+  static Logger* logger(const std::string& log_name);
+
 private:
   /*
    * @return std::vector<Logger>& return the installed loggers.
