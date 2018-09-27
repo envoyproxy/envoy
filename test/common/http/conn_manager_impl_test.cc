@@ -3311,7 +3311,7 @@ TEST_F(HttpConnectionManagerImplTest, NoNewStreamWhenOverloaded) {
   EXPECT_EQ(1U, stats_.named_.downstream_rq_overload_close_.value());
 }
 
-TEST_F(HttpConnectionManagerImplTest, DisableKeepAlivewhenOverloaded) {
+TEST_F(HttpConnectionManagerImplTest, DisableKeepAliveWhenOverloaded) {
   setup(false, "");
 
   overload_manager_.overload_state_.setState(
