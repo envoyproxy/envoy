@@ -32,7 +32,14 @@ REAL_TIME_WHITELIST = ('./source/common/common/utility.h',
                        './source/exe/main_common.cc',
                        './source/exe/main_common.h',
                        './source/server/config_validation/server.cc',
-                       './source/common/common/perf_annotation.h')
+                       './source/common/common/perf_annotation.h',
+                       './test/test_common/simulated_time_system.cc',
+                       './test/test_common/simulated_time_system.h',
+                       './test/test_common/test_time.cc',
+                       './test/test_common/test_time.h',
+                       './test/test_common/utility.cc',
+                       './test/test_common/utility.h',
+                       './test/integration/integration.h')
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-7")
 BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
@@ -80,7 +87,7 @@ def whitelistedForProtobufDeps(file_path):
 # specific cases. They should be passed down from where they are instantied to where
 # they need to be used, e.g. through the ServerInstance, Dispatcher, or ClusterManager.
 def whitelistedForRealTime(file_path):
-  return file_path in REAL_TIME_WHITELIST or file_path.startswith('./test/')
+  return file_path in REAL_TIME_WHITELIST
 
 def findSubstringAndReturnError(pattern, file_path, error_message):
   with open(file_path) as f:
@@ -168,7 +175,8 @@ def checkSourceLine(line, file_path, reportError):
     reportError("Don't use <shared_mutex>, use absl::Mutex for reader/writer locks.")
   if not whitelistedForRealTime(file_path):
     if 'RealTimeSource' in line or 'RealTimeSystem' in line or \
-       'std::chrono::system_clock::now' in line or 'std::chrono::steady_clock::now' in line:
+       'std::chrono::system_clock::now' in line or 'std::chrono::steady_clock::now' in line or \
+       'std::this_thread::sleep_for' in line:
       reportError("Don't reference real-world time sources from production code; use injection")
   if 'std::atomic_' in line:
     # The std::atomic_* free functions are functionally equivalent to calling

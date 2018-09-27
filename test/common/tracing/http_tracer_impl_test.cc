@@ -294,7 +294,8 @@ TEST(HttpNullTracerTest, BasicFunctionality) {
   span_ptr->setOperation("foo");
   span_ptr->setTag("foo", "bar");
   span_ptr->injectContext(request_headers);
-  EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", std::chrono::system_clock::now()));
+
+  EXPECT_NE(nullptr, span_ptr->spawnChild(config, "foo", SystemTime()));
 }
 
 class HttpTracerImplTest : public Test {
