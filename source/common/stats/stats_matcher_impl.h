@@ -26,7 +26,7 @@ public:
   /**
    * Take a metric name and report whether or not it should be disallowed.
    * @param name std::string& a name of Stats::Metric (Counter, Gauge, Histogram).
-   * @return true if that stat should not disallowed.
+   * @return bool whether or not a metic name should be disallowed.
    */
   bool rejects(const std::string& name) const override;
 
