@@ -241,7 +241,7 @@ private:
 
   void continueDecoding();
   void dispatch();
-  void sendLocalReply(MessageMetadata& metadata, const DirectResponse& reponse, bool end_stream);
+  void sendLocalReply(MessageMetadata& metadata, const DirectResponse& response, bool end_stream);
   void doDeferredRpcDestroy(ActiveRpc& rpc);
   void resetAllRpcs(bool local_reset);
 

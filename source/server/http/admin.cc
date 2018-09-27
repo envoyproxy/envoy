@@ -569,7 +569,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
     for (auto stat : all_stats) {
       response.add(fmt::format("{}: {}\n", stat.first, stat.second));
     }
-    // TOOD(ramaraochavali): See the comment in ThreadLocalStoreImpl::histograms() for why we use a
+    // TODO(ramaraochavali): See the comment in ThreadLocalStoreImpl::histograms() for why we use a
     // multimap here. This makes sure that duplicate histograms get output. When shared storage is
     // implemented this can be switched back to a normal map.
     std::multimap<std::string, std::string> all_histograms;

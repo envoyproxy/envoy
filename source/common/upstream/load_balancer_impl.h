@@ -115,7 +115,7 @@ protected:
 
   // When deciding which hosts to use on an LB decision, we need to know how to index into the
   // priority_set. This priority_set cursor is used by ZoneAwareLoadBalancerBase subclasses, e.g.
-  // RoundRobinLoadBalancer, to index into auxillary data structures specific to the LB for
+  // RoundRobinLoadBalancer, to index into auxiliary data structures specific to the LB for
   // a given host set selection.
   struct HostsSource {
     enum class SourceType {
@@ -245,7 +245,7 @@ private:
  * with 1 / weight deadline, we will achieve the desired pick frequency for weighted RR in a given
  * interval. Naive implementations of weighted RR are either O(n) pick time or O(m * n) memory use,
  * where m is the weight range. We also explicitly check for the unweighted special case and use a
- * simple index to acheive O(1) scheduling in that case.
+ * simple index to achieve O(1) scheduling in that case.
  * TODO(htuch): We use EDF at Google, but the EDF scheduler may be overkill if we don't want to
  * support large ranges of weights or arbitrary precision floating weights, we could construct an
  * explicit schedule, since m will be a small constant factor in O(m * n). This

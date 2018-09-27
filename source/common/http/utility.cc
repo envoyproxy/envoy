@@ -308,10 +308,10 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   }
 
   absl::string_view xff_string(xff_header->value().c_str(), xff_header->value().size());
-  static const std::string seperator(",");
+  static const std::string separator(",");
   // Ignore the last num_to_skip addresses at the end of XFF.
   for (uint32_t i = 0; i < num_to_skip; i++) {
-    std::string::size_type last_comma = xff_string.rfind(seperator);
+    std::string::size_type last_comma = xff_string.rfind(separator);
     if (last_comma == std::string::npos) {
       return {nullptr, false};
     }
@@ -319,9 +319,9 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   }
   // The text after the last remaining comma, or the entirety of the string if there
   // is no comma, is the requested IP address.
-  std::string::size_type last_comma = xff_string.rfind(seperator);
-  if (last_comma != std::string::npos && last_comma + seperator.size() < xff_string.size()) {
-    xff_string = xff_string.substr(last_comma + seperator.size());
+  std::string::size_type last_comma = xff_string.rfind(separator);
+  if (last_comma != std::string::npos && last_comma + separator.size() < xff_string.size()) {
+    xff_string = xff_string.substr(last_comma + separator.size());
   }
 
   // Ignore the whitespace, since they are allowed in HTTP lists (see RFC7239#section-7.1).

@@ -11,7 +11,7 @@ namespace Envoy {
  * accessible but can not be marked as const. All functions in the singleton class
  * *must* be threadsafe.
  *
- * Note that there is heavy resistence in Envoy to adding this type of singleton
+ * Note that there is heavy resistance in Envoy to adding this type of singleton
  * if data will persist with state changes across tests, as it becomes difficult
  * to write clean unit tests if a state change in one test will persist into
  * another test. Be wary of using it. A example of acceptable usage is OsSyscallsImpl,

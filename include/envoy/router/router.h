@@ -305,7 +305,7 @@ public:
 typedef std::shared_ptr<const RouteSpecificFilterConfig> RouteSpecificFilterConfigConstSharedPtr;
 
 /**
- * Virtual host defintion.
+ * Virtual host definition.
  */
 class VirtualHost {
 public:

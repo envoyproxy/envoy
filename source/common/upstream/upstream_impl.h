@@ -577,7 +577,7 @@ public:
   // priority is specified by locality_lb_endpoint.priority()).
   //
   // The specified health_checker_flag is used to set the registered-host's health-flag when the
-  // lb_endpoint health status is unhealty, draining or timeout.
+  // lb_endpoint health status is unhealthy, draining or timeout.
   void
   registerHostForPriority(const std::string& hostname,
                           Network::Address::InstanceConstSharedPtr address,
@@ -649,7 +649,7 @@ protected:
    * @param hosts_added_to_current_priority will be populated with hosts added to the priority.
    * @param hosts_removed_from_current_priority will be populated with hosts removed from the
    * priority.
-   * @param updated_hosts is used to aggregate the new state of all hosts accross priority, and will
+   * @param updated_hosts is used to aggregate the new state of all hosts across priority, and will
    * be updated with the hosts that remain in this priority after the update.
    * @return whether the hosts for the priority changed.
    */
