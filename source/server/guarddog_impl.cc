@@ -113,7 +113,7 @@ bool GuardDogImpl::waitOrDetectStop() {
   Thread::LockGuard guard(exit_lock_);
   // Spurious wakeups are OK without explicit handling. We'll just check
   // earlier than strictly required for that round.
-  exit_event_.waitFor(exit_lock_, loop_interval_);
+  time_system_.waitFor(exit_lock_, exit_event_, loop_interval_);
   return run_thread_;
 }
 
