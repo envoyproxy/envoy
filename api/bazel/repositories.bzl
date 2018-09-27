@@ -1,4 +1,6 @@
+BAZEL_SKYLIB_RELEASE = "0.5.0"
 BAZEL_SKYLIB_SHA = "b5f6abe419da897b7901f90cbab08af958b97a8f3575b0d3dd062ac7ce78541f"
+
 GOOGLEAPIS_SHA = "d642131a6e6582fc226caf9893cb7fe7885b3411"  # May 23, 2018
 GOGOPROTO_SHA = "1adfc126b41513cc696b209667c8656ea7aac67c"  # v1.0.0
 PROMETHEUS_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
@@ -11,9 +13,9 @@ load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 def api_dependencies():
     native.http_archive(
         name = "bazel_skylib",
-        url = "https://github.com/bazelbuild/bazel-skylib/archive/0.5.0.tar.gz",
+        url = "https://github.com/bazelbuild/bazel-skylib/archive/" + BAZEL_SKYLIB_RELEASE + ".tar.gz",
         sha256 = BAZEL_SKYLIB_SHA,
-        strip_prefix = "bazel-skylib-0.5.0",
+        strip_prefix = "bazel-skylib-" + BAZEL_SKYLIB_RELEASE,
     )
     git_repository(
         name = "com_lyft_protoc_gen_validate",
