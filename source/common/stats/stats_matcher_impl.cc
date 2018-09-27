@@ -10,6 +10,10 @@ namespace Stats {
 
 StatsMatcherImpl::StatsMatcherImpl(const envoy::config::metrics::v2::StatsConfig& config) {
   switch (config.stats_matcher().stats_matcher_case()) {
+  case envoy::config::metrics::v2::StatsMatcher::kRejectAll:
+    // In this scenario, there are no matchers to store.
+    is_inclusive_ = !config.stats_matcher().reject_all();
+    break;
   case envoy::config::metrics::v2::StatsMatcher::kInclusionList:
     // If we have an inclusion list, we are being default-exclusive.
     for (const auto& stats_matcher : config.stats_matcher().inclusion_list().patterns()) {

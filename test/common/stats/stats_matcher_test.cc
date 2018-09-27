@@ -21,6 +21,9 @@ public:
   envoy::type::matcher::StringMatcher* exclusionList() {
     return stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns();
   }
+  void rejectAll(const bool should_reject) {
+    stats_config_.mutable_stats_matcher()->set_reject_all(should_reject);
+  }
 
   void initRegex() { stats_matcher_impl_ = std::make_unique<StatsMatcherImpl>(stats_config_); }
 
@@ -49,6 +52,20 @@ TEST_F(StatsMatcherTest, CheckDefault) {
 }
 
 // Across-the-board matchers.
+
+TEST_F(StatsMatcherTest, CheckRejectAll) {
+  // With reject_all, nothing should be allowed through.
+  rejectAll(true);
+  initRegex();
+  expectDenied({"foo", "bar", "foo.bar", "foo.bar.baz", "foobarbaz"});
+}
+
+TEST_F(StatsMatcherTest, CheckNotRejectAll) {
+  // With !reject_all, everything should be allowed through.
+  rejectAll(false);
+  initRegex();
+  expectAccepted({"foo", "bar", "foo.bar", "foo.bar.baz", "foobarbaz"});
+}
 
 TEST_F(StatsMatcherTest, CheckIncludeAll) {
   inclusionList()->set_regex(".*");
