@@ -15,7 +15,7 @@ namespace HttpFilters {
 namespace JwtAuthn {
 
 /**
- * JwtLocation stores following token infomation:
+ * JwtLocation stores following token information:
  *
  * * extracted token string,
  * * the location where the JWT is extracted from,

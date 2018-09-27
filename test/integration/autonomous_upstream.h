@@ -6,7 +6,7 @@ class AutonomousUpstream;
 
 // A stream which automatically responds when the downstream request is
 // completely read. By default the response is 200: OK with 10 bytes of
-// payload. This behavior can be overriden with custom request headers defined below.
+// payload. This behavior can be overridden with custom request headers defined below.
 class AutonomousStream : public FakeStream {
 public:
   // The number of response bytes to send. Payload is randomized.

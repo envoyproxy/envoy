@@ -164,7 +164,7 @@ private:
         int answer_size = ips != nullptr ? ips->size() : 0;
         answer_size += !encodedCname.empty() ? 1 : 0;
 
-        // The response begins with the intial part of the request
+        // The response begins with the initial part of the request
         // (including the question section).
         const size_t response_base_len = HFIXEDSZ + name_len + QFIXEDSZ;
         unsigned char response_base[response_base_len];

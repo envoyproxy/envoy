@@ -114,6 +114,7 @@ jobs:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
        - run: ci/do_circle_ci.sh check_format
+       - run: ci/do_circle_ci.sh check_spelling
    build_image:
      docker:
        - image: circleci/python:2.7

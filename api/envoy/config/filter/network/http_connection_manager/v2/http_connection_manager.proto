@@ -219,7 +219,7 @@ message HttpConnectionManager {
     bool unix_sockets = 1;
   }
 
-  // Configures what network addresses are considered internal for stats and header sanitazion
+  // Configures what network addresses are considered internal for stats and header sanitation
   // purposes. If unspecified, only RFC1918 IP addresses will be considered internal.
   // See the documentation for :ref:`config_http_conn_man_headers_x-envoy-internal` for more
   // information about internal/external addresses.
