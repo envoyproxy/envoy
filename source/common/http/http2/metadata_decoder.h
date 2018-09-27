@@ -7,13 +7,16 @@
 #include "common/common/logger.h"
 #include "common/http/http2/metadata_interface.h"
 
+#include "nghttp2/nghttp2.h"
+
 namespace Envoy {
 namespace Http {
 namespace Http2 {
 
 class MetadataDecoder : Logger::Loggable<Logger::Id::metadata> {
 public:
-  MetadataDecoder(uint64_t stream_id) : stream_id_(stream_id) {}
+  MetadataDecoder(uint64_t stream_id);
+  ~MetadataDecoder();
 
   /**
    * Calls this function when METADATA frame payload is received.
@@ -22,18 +25,25 @@ public:
    * @param end_metadata indicates if all the METADATA has been received.
    * @return whether the operation succeeds.
    */
-  bool receiveMetadata(const uint8_t *data, size_t len, bool end_metadata);
+  bool receiveMetadata(const uint8_t* data, size_t len, bool end_metadata);
+
+
+  /**
+   * Calls when a METADATA frame is received. If the frame is the last one in
+   * the group, trigs the callback functions.
+   */
+  void OnMetadataFrameComplete();
 
   /**
    * Registers a callback to receive metadata events received on the wire.
    * @param callback is the callback function.
    */
-  void RegisterMetadataCallback(MetadataCallback callback);
+  void registerMetadataCallback(MetadataCallback callback);
 
   /**
    * Indicates that the caller is no longer interested in metadata events.
    */
-  void UnregisterMetadataCallback();
+  void unregisterMetadataCallback();
 
   std::vector<MetadataMap>& getMetadataMapList() { return metadata_map_list_; }
 
@@ -42,7 +52,7 @@ private:
    * Decodes METADATA payload. This function should be called after all the payload has been
    * received.
    */
-  bool OnCompleteMetadata();
+  bool DecodeMetadataPayloadUsingNghttp2();
 
   // Metadata event callback function.
   MetadataCallback callback_;
@@ -55,6 +65,9 @@ private:
 
   // The stream id the decoder is associated with.
   const uint64_t stream_id_;
+
+  // Saves inflater before all METADATA frames are received.
+  nghttp2_hd_inflater* inflater_;
 };
 
 } // namespace Http2

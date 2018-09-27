@@ -82,6 +82,7 @@ envoy_cc_library(
     ],
     deps = [
         ":metadata_interface_lib",
+        "//source/common/common:assert_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:minimal_logger_lib",
     ],
