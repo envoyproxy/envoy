@@ -256,13 +256,13 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
                                    Upstream::ResourceManager& resource_manager,
                                    Buffer::Instance& response) {
   response.add(fmt::format("{}::{}_priority::max_connections::{}\n", cluster_name, priority_str,
-                           resource_manager.connections()->max()));
+                           resource_manager.connections().max()));
   response.add(fmt::format("{}::{}_priority::max_pending_requests::{}\n", cluster_name,
-                           priority_str, resource_manager.pendingRequests()->max()));
+                           priority_str, resource_manager.pendingRequests().max()));
   response.add(fmt::format("{}::{}_priority::max_requests::{}\n", cluster_name, priority_str,
-                           resource_manager.requests()->max()));
+                           resource_manager.requests().max()));
   response.add(fmt::format("{}::{}_priority::max_retries::{}\n", cluster_name, priority_str,
-                           resource_manager.retries()->max()));
+                           resource_manager.retries().max()));
 }
 
 void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {

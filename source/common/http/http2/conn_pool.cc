@@ -89,7 +89,7 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
     primary_client_.reset(new ActiveClient(*this));
   }
 
-  if (!host_->cluster().resourceManager(priority_).requests()->canCreate()) {
+  if (!host_->cluster().resourceManager(priority_).requests().canCreate()) {
     ENVOY_LOG(debug, "max requests overflow");
     callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::Overflow, nullptr);
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
@@ -100,7 +100,7 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
     host_->stats().rq_active_.inc();
     host_->cluster().stats().upstream_rq_total_.inc();
     host_->cluster().stats().upstream_rq_active_.inc();
-    host_->cluster().resourceManager(priority_).requests()->inc();
+    host_->cluster().resourceManager(priority_).requests().inc();
     callbacks.onPoolReady(primary_client_->client_->newStream(response_decoder),
                           primary_client_->real_host_description_);
   }
@@ -189,7 +189,7 @@ void ConnPoolImpl::onStreamDestroy(ActiveClient& client) {
                  client.client_->numActiveRequests());
   host_->stats().rq_active_.dec();
   host_->cluster().stats().upstream_rq_active_.dec();
-  host_->cluster().resourceManager(priority_).requests()->dec();
+  host_->cluster().resourceManager(priority_).requests().dec();
   if (&client == draining_client_.get() && client.client_->numActiveRequests() == 0) {
     // Close out the draining client if we no long have active requests.
     client.client_->close();

@@ -13,14 +13,6 @@
 namespace Envoy {
 namespace Upstream {
 
-struct UnlimitedResourceImpl : public Resource {
-  // Upstream::Resource
-  bool canCreate() override { return true; }
-  void inc() override {}
-  void dec() override {}
-  uint64_t max() override { return std::numeric_limits<uint64_t>::max(); }
-};
-
 /**
  * Implementation of ResourceManager.
  * NOTE: This implementation makes some assumptions which favor simplicity over correctness.
@@ -31,31 +23,39 @@ struct UnlimitedResourceImpl : public Resource {
  *    maximums. This should not effect overall behavior.
  */
 class ResourceManagerImpl : public ResourceManager {
-public:
-  ResourceManagerImpl(ResourcePtr connections, ResourcePtr pending_requests, ResourcePtr requests,
-                      ResourcePtr retries)
-      : connections_(connections), pending_requests_(pending_requests), requests_(requests),
-        retries_(retries) {}
+  static std::unique_ptr<Resource> createResourceImpl(uint64_t max, Runtime::Loader& runtime,
+                                                      const std::string& runtime_key) {
+    if (max == 0) {
+      return std::make_unique<UnlimitedResourceImpl>();
+    }
+    return std::make_unique<LimitedResourceImpl>(max, runtime, runtime_key);
+  }
 
+public:
   ResourceManagerImpl(Runtime::Loader& runtime, const std::string& runtime_key,
                       uint64_t max_connections, uint64_t max_pending_requests,
                       uint64_t max_requests, uint64_t max_retries)
-      : connections_(std::make_shared<LimitedResourceImpl>(max_connections, runtime,
-                                                           runtime_key + "max_connections")),
-        pending_requests_(std::make_shared<LimitedResourceImpl>(
-            max_pending_requests, runtime, runtime_key + "max_pending_requests")),
-        requests_(std::make_shared<LimitedResourceImpl>(max_requests, runtime,
-                                                        runtime_key + "max_requests")),
-        retries_(std::make_shared<LimitedResourceImpl>(max_retries, runtime,
-                                                       runtime_key + "max_retries")) {}
+      : connections_(createResourceImpl(max_connections, runtime, runtime_key + "max_connections")),
+        pending_requests_(createResourceImpl(max_pending_requests, runtime,
+                                             runtime_key + "max_pending_requests")),
+        requests_(createResourceImpl(max_requests, runtime, runtime_key + "max_requests")),
+        retries_(createResourceImpl(max_retries, runtime, runtime_key + "max_retries")) {}
 
   // Upstream::ResourceManager
-  ResourcePtr connections() override { return connections_; }
-  ResourcePtr pendingRequests() override { return pending_requests_; }
-  ResourcePtr requests() override { return requests_; }
-  ResourcePtr retries() override { return retries_; }
+  Resource& connections() override { return *connections_.get(); }
+  Resource& pendingRequests() override { return *pending_requests_.get(); }
+  Resource& requests() override { return *requests_.get(); }
+  Resource& retries() override { return *retries_.get(); }
 
 private:
+  struct UnlimitedResourceImpl : public Resource {
+    // Upstream::Resource
+    bool canCreate() override { return true; }
+    void inc() override {}
+    void dec() override {}
+    uint64_t max() override { return std::numeric_limits<uint64_t>::max(); }
+  };
+
   struct LimitedResourceImpl : public Resource {
     LimitedResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key)
         : max_(max), runtime_(runtime), runtime_key_(runtime_key) {}
@@ -76,10 +76,10 @@ private:
     const std::string runtime_key_;
   };
 
-  ResourcePtr connections_;
-  ResourcePtr pending_requests_;
-  ResourcePtr requests_;
-  ResourcePtr retries_;
+  std::unique_ptr<Resource> connections_;
+  std::unique_ptr<Resource> pending_requests_;
+  std::unique_ptr<Resource> requests_;
+  std::unique_ptr<Resource> retries_;
 };
 
 typedef std::unique_ptr<ResourceManagerImpl> ResourceManagerImplPtr;

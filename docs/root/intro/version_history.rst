@@ -13,8 +13,7 @@ Version history
   `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
 * cluster: added :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>` to merge
   health check/weight/metadata updates within the given duration.
-* cluster: added the ability to completely disable circuit breakers in the
-  absence of its :ref:`configuration <envoy_api_field_Cluster.circuit_breakers>`.
+* cluster: added the ability to completely disable circuit breakers via :ref:`configuration <envoy_api_msg_cluster.CircuitBreakers>`.
 * config: regex validation added to limit to a maximum of 1024 characters.
 * config: v1 disabled by default. v1 support remains available until October via flipping --v2-config-only=false.
 * config: v1 disabled by default. v1 support remains available until October via setting :option:`--allow-deprecated-v1-api`.

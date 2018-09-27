@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 
 #include "envoy/common/pure.h"
 
@@ -44,8 +43,6 @@ public:
   virtual uint64_t max() PURE;
 };
 
-typedef std::shared_ptr<Resource> ResourcePtr;
-
 /**
  * Global resource manager that loosely synchronizes maximum connections, pending requests, etc.
  * NOTE: Currently this is used on a per cluster basis. In the future we may consider also chaining
@@ -56,26 +53,26 @@ public:
   virtual ~ResourceManager() {}
 
   /**
-   * @return ResourcePtr active TCP connections.
+   * @return Resource& active TCP connections.
    */
-  virtual ResourcePtr connections() PURE;
+  virtual Resource& connections() PURE;
 
   /**
-   * @return ResourcePtr active pending requests (requests that have not yet
-   * been attached to a connection pool connection).
+   * @return Resource& active pending requests (requests that have not yet been attached to a
+   *         connection pool connection).
    */
-  virtual ResourcePtr pendingRequests() PURE;
+  virtual Resource& pendingRequests() PURE;
 
   /**
-   * @return ResourcePtr active requests (requests that are currently bound to a
-   * connection pool connection and are awaiting response).
+   * @return Resource& active requests (requests that are currently bound to a connection pool
+   *         connection and are awaiting response).
    */
-  virtual ResourcePtr requests() PURE;
+  virtual Resource& requests() PURE;
 
   /**
-   * @return ResourcePtr active retries.
+   * @return Resource& active retries.
    */
-  virtual ResourcePtr retries() PURE;
+  virtual Resource& retries() PURE;
 };
 
 } // namespace Upstream

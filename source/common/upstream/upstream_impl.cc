@@ -690,11 +690,6 @@ ResourceManagerImplPtr
 ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
                                         Runtime::Loader& runtime, const std::string& cluster_name,
                                         const envoy::api::v2::core::RoutingPriority& priority) {
-  if (!config.has_circuit_breakers()) {
-    ResourcePtr ul_res = std::make_shared<UnlimitedResourceImpl>();
-    return ResourceManagerImplPtr{new ResourceManagerImpl(ul_res, ul_res, ul_res, ul_res)};
-  }
-
   uint64_t max_connections = 1024;
   uint64_t max_pending_requests = 1024;
   uint64_t max_requests = 1024;

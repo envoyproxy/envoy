@@ -256,23 +256,23 @@ TEST(StrictDnsClusterImplTest, Basic) {
   StrictDnsClusterImpl cluster(cluster_config, runtime, dns_resolver, factory_context,
                                std::move(scope), false);
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43));
-  EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections()->max());
+  EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_CALL(runtime.snapshot_,
               getInteger("circuit_breakers.name.default.max_pending_requests", 57));
   EXPECT_EQ(57U,
-            cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests()->max());
+            cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_requests", 50));
-  EXPECT_EQ(50U, cluster.info()->resourceManager(ResourcePriority::Default).requests()->max());
+  EXPECT_EQ(50U, cluster.info()->resourceManager(ResourcePriority::Default).requests().max());
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_retries", 10));
-  EXPECT_EQ(10U, cluster.info()->resourceManager(ResourcePriority::Default).retries()->max());
+  EXPECT_EQ(10U, cluster.info()->resourceManager(ResourcePriority::Default).retries().max());
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_connections", 1));
-  EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::High).connections()->max());
+  EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::High).connections().max());
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_pending_requests", 2));
-  EXPECT_EQ(2U, cluster.info()->resourceManager(ResourcePriority::High).pendingRequests()->max());
+  EXPECT_EQ(2U, cluster.info()->resourceManager(ResourcePriority::High).pendingRequests().max());
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_requests", 3));
-  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests()->max());
+  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_retries", 4));
-  EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries()->max());
+  EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(0U, cluster.info()->http2Settings().hpack_table_size_);
 
@@ -479,23 +479,23 @@ TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
                                std::move(scope), false);
 
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_connections", 43));
-  EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections()->max());
+  EXPECT_EQ(43U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_CALL(runtime.snapshot_,
               getInteger("circuit_breakers.name.default.max_pending_requests", 57));
   EXPECT_EQ(57U,
-            cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests()->max());
+            cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_requests", 50));
-  EXPECT_EQ(50U, cluster.info()->resourceManager(ResourcePriority::Default).requests()->max());
+  EXPECT_EQ(50U, cluster.info()->resourceManager(ResourcePriority::Default).requests().max());
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.default.max_retries", 10));
-  EXPECT_EQ(10U, cluster.info()->resourceManager(ResourcePriority::Default).retries()->max());
+  EXPECT_EQ(10U, cluster.info()->resourceManager(ResourcePriority::Default).retries().max());
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_connections", 1));
-  EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::High).connections()->max());
+  EXPECT_EQ(1U, cluster.info()->resourceManager(ResourcePriority::High).connections().max());
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_pending_requests", 2));
-  EXPECT_EQ(2U, cluster.info()->resourceManager(ResourcePriority::High).pendingRequests()->max());
+  EXPECT_EQ(2U, cluster.info()->resourceManager(ResourcePriority::High).pendingRequests().max());
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_requests", 3));
-  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests()->max());
+  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
   EXPECT_CALL(runtime.snapshot_, getInteger("circuit_breakers.name.high.max_retries", 4));
-  EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries()->max());
+  EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(0U, cluster.info()->http2Settings().hpack_table_size_);
 
@@ -1224,16 +1224,15 @@ TEST(StaticClusterImplTest, UrlConfig) {
   StaticClusterImpl cluster(cluster_config, runtime, factory_context, std::move(scope), false);
   cluster.initialize([] {});
 
-  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::Default).connections()->max());
+  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::Default).connections().max());
   EXPECT_EQ(1024U,
-            cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests()->max());
-  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::Default).requests()->max());
-  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::Default).retries()->max());
-  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).connections()->max());
-  EXPECT_EQ(1024U,
-            cluster.info()->resourceManager(ResourcePriority::High).pendingRequests()->max());
-  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).requests()->max());
-  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).retries()->max());
+            cluster.info()->resourceManager(ResourcePriority::Default).pendingRequests().max());
+  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::Default).requests().max());
+  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::Default).retries().max());
+  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).connections().max());
+  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).pendingRequests().max());
+  EXPECT_EQ(1024U, cluster.info()->resourceManager(ResourcePriority::High).requests().max());
+  EXPECT_EQ(3U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(0U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(Http::Http2Settings::DEFAULT_HPACK_TABLE_SIZE,
             cluster.info()->http2Settings().hpack_table_size_);
