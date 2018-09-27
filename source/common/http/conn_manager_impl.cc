@@ -543,7 +543,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     // The protocol may have shifted in the HTTP/1.0 case so reset it.
     request_info_.protocol(protocol);
     if (!connection_manager_.config_.http1Settings().accept_http_10_) {
-      // Send "Upgrade Required" if HTTP/1.0 support is not explictly configured on.
+      // Send "Upgrade Required" if HTTP/1.0 support is not explicitly configured on.
       sendLocalReply(false, Code::UpgradeRequired, "", nullptr, is_head_request_);
       return;
     } else {
@@ -671,7 +671,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   decodeHeaders(nullptr, *request_headers_, end_stream);
 
-  // Reset it here for both global and overriden cases.
+  // Reset it here for both global and overridden cases.
   resetIdleTimer();
 }
 

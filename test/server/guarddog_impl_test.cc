@@ -29,7 +29,7 @@ protected:
 
 /**
  * Death test caveat: Because of the way we die gcov doesn't receive coverage
- * information from the forked process that is checked for succesful death.
+ * information from the forked process that is checked for successful death.
  * This means that the lines dealing with the calls to PANIC are not seen as
  * green in the coverage report. However, rest assured from the results of the
  * test: these lines are in fact covered.

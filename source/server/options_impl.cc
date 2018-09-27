@@ -89,7 +89,7 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::ValueArg<uint32_t> restart_epoch("", "restart-epoch", "hot restart epoch #", false, 0,
                                           "uint32_t", cmd);
   TCLAP::SwitchArg hot_restart_version_option("", "hot-restart-version",
-                                              "hot restart compatability version", cmd);
+                                              "hot restart compatibility version", cmd);
   TCLAP::ValueArg<std::string> service_cluster("", "service-cluster", "Cluster name", false, "",
                                                "string", cmd);
   TCLAP::ValueArg<std::string> service_node("", "service-node", "Node name", false, "", "string",

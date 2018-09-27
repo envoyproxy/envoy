@@ -89,8 +89,8 @@ TEST(FileSystemImpl, fileReadToEndDoesNotExist) {
 TEST(FilesystemImpl, CanonicalPathSuccess) { EXPECT_EQ("/", Filesystem::canonicalPath("//")); }
 
 TEST(FilesystemImpl, CanonicalPathFail) {
-  EXPECT_THROW_WITH_MESSAGE(Filesystem::canonicalPath("/_some_non_existant_file"), EnvoyException,
-                            "Unable to determine canonical path for /_some_non_existant_file");
+  EXPECT_THROW_WITH_MESSAGE(Filesystem::canonicalPath("/_some_non_existent_file"), EnvoyException,
+                            "Unable to determine canonical path for /_some_non_existent_file");
 }
 
 TEST(FilesystemImpl, IllegalPath) {
@@ -101,7 +101,7 @@ TEST(FilesystemImpl, IllegalPath) {
   EXPECT_TRUE(Filesystem::illegalPath("/proc/"));
   EXPECT_TRUE(Filesystem::illegalPath("/sys"));
   EXPECT_TRUE(Filesystem::illegalPath("/sys/"));
-  EXPECT_TRUE(Filesystem::illegalPath("/_some_non_existant_file"));
+  EXPECT_TRUE(Filesystem::illegalPath("/_some_non_existent_file"));
 }
 
 TEST(FileSystemImpl, flushToLogFilePeriodically) {

@@ -118,7 +118,7 @@ void HealthCheckFilter::onComplete() {
         const auto& stats = cluster->info()->stats();
         const uint64_t membership_total = stats.membership_total_.value();
         if (membership_total == 0) {
-          // If the cluster exists but is empty, consider the service unhealty unless
+          // If the cluster exists but is empty, consider the service unhealthy unless
           // the specified minimum percent healthy for the cluster happens to be zero.
           if (min_healthy_percentage == 0.0) {
             continue;

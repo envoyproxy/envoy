@@ -231,7 +231,7 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   const std::string json_path = TestEnvironment::runfilesPath(path);
   std::string out_json_string = readFileToStringForTest(json_path);
 
-  // Substitude params.
+  // Substitute params.
   for (auto it : param_map) {
     const std::regex param_regex("\\{\\{ " + it.first + " \\}\\}");
     out_json_string = std::regex_replace(out_json_string, param_regex, it.second);

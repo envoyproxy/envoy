@@ -198,7 +198,7 @@ public:
   virtual DateProvider& dateProvider() PURE;
 
   /**
-   * @return the time in milliseconds the connection manager will wait betwen issuing a "shutdown
+   * @return the time in milliseconds the connection manager will wait between issuing a "shutdown
    *         notice" to the time it will issue a full GOAWAY and not accept any new streams.
    */
   virtual std::chrono::milliseconds drainTimeout() PURE;
