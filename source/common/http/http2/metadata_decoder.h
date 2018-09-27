@@ -51,13 +51,16 @@ private:
    * Decodes METADATA payload. This function should be called after all the payload has been
    * received.
    */
-  bool DecodeMetadataPayloadUsingNghttp2();
+  void DecodeMetadataPayloadUsingNghttp2();
 
   // Metadata event callback function.
   MetadataCallback callback_;
 
-  // Decoded metadata.
+  // Saved metadata in case callback function is not registered yet.
   std::vector<MetadataMap> metadata_map_list_;
+
+  // Metadata that is currently under decoding. Will be added to metadata_map_list_ when done.
+  MetadataMap metadata_map_;
 
   // Payload received.
   Buffer::OwnedImpl payload_;
