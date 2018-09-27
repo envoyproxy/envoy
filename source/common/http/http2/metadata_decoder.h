@@ -22,17 +22,16 @@ public:
    * Calls this function when METADATA frame payload is received.
    * @param data is the pointer to the start of the payload.
    * @param len is the size of the payload.
+   */
+  void receiveMetadata(const uint8_t* data, size_t len);
+
+  /**
+   * Calls when a METADATA frame is received. The function will decode METADATA received. If the
+   * frame is the last one in the group, triggers the callback functions.
    * @param end_metadata indicates if all the METADATA has been received.
    * @return whether the operation succeeds.
    */
-  bool receiveMetadata(const uint8_t* data, size_t len, bool end_metadata);
-
-
-  /**
-   * Calls when a METADATA frame is received. If the frame is the last one in
-   * the group, trigs the callback functions.
-   */
-  void OnMetadataFrameComplete();
+  bool OnMetadataFrameComplete(bool end_metadata);
 
   /**
    * Registers a callback to receive metadata events received on the wire.

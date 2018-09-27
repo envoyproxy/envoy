@@ -76,9 +76,8 @@ static int on_extension_chunk_recv_callback(nghttp2_session* session, const nght
   reinterpret_cast<UserData*>(user_data)->flag = hd->flags;
 
   MetadataDecoder* decoder = reinterpret_cast<UserData*>(user_data)->decoder;
-  bool result = decoder->receiveMetadata(data, len, (hd->flags == END_METADATA_FLAG) ? 1 : 0);
-  (void)result;
-  return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
+  decoder->receiveMetadata(data, len);
+  return 0;
 
   //TestBuffer* payload = (reinterpret_cast<UserData*>(user_data))->payload_buffer;
   //ENVOY_LOG_MISC(error, "++++++++++++++payload.length:  {}", payload->length);
@@ -92,14 +91,12 @@ static int unpack_extension_callback(nghttp2_session* session, void** payload,
                                      const nghttp2_frame_hd* hd, void* user_data) {
   EXPECT_NE(nullptr, session);
   EXPECT_NE(nullptr, hd);
-
   TestBuffer* output = reinterpret_cast<UserData*>(user_data)->output_buffer;
-  (void)payload;
-  (void)user_data;
-  (void)output;
   *payload = output;
 
-  return 0;
+  MetadataDecoder* decoder = reinterpret_cast<UserData*>(user_data)->decoder;
+  bool result = decoder->OnMetadataFrameComplete((hd->flags == END_METADATA_FLAG) ? 1 : 0);
+  return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
 }
 
 // Nghttp2 callback function for sending data to peer.
