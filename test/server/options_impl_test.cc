@@ -19,37 +19,45 @@ using testing::HasSubstr;
 
 namespace Envoy {
 
-namespace {
+class OptionsImplTest : public testing::Test {
 
-// Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are
-// separated by a single space: no fancy quoting or escaping.
-std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
-  std::vector<std::string> words = TestUtility::split(args, ' ');
-  std::vector<const char*> argv;
-  for (const std::string& s : words) {
-    argv.push_back(s.c_str());
+public:
+  // Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are
+  // separated by a single space: no fancy quoting or escaping.
+  std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
+    std::vector<std::string> words = TestUtility::split(args, ' ');
+    std::vector<const char*> argv;
+    for (const std::string& s : words) {
+      argv.push_back(s.c_str());
+    }
+    return std::make_unique<OptionsImpl>(argv.size(), argv.data(),
+                                         [](uint64_t, uint64_t, bool) { return "1"; },
+                                         spdlog::level::warn);
   }
-  return std::make_unique<OptionsImpl>(
-      argv.size(), argv.data(), [](uint64_t, uint64_t, bool) { return "1"; }, spdlog::level::warn);
-}
 
-} // namespace
+  const std::vector<std::pair<std::string, spdlog::level::level_enum>>&
+  parseComponentLogLevels(const std::unique_ptr<OptionsImpl>& options,
+                          const std::string& component_log_levels) {
+    options->parseComponentLogLevels(component_log_levels);
+    return options->componentLogLevels();
+  }
+};
 
-TEST(OptionsImplTest, HotRestartVersion) {
+TEST_F(OptionsImplTest, HotRestartVersion) {
   EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --hot-restart-version"), NoServingException,
                           "NoServingException");
 }
 
-TEST(OptionsImplTest, InvalidMode) {
+TEST_F(OptionsImplTest, InvalidMode) {
   EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --mode bogus"), MalformedArgvException, "bogus");
 }
 
-TEST(OptionsImplTest, InvalidCommandLine) {
+TEST_F(OptionsImplTest, InvalidCommandLine) {
   EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --blah"), MalformedArgvException,
                           "Couldn't find match for argument");
 }
 
-TEST(OptionsImplTest, v1Allowed) {
+TEST_F(OptionsImplTest, v1Allowed) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
       "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
@@ -60,7 +68,7 @@ TEST(OptionsImplTest, v1Allowed) {
   EXPECT_FALSE(options->v2ConfigOnly());
 }
 
-TEST(OptionsImplTest, v1Disallowed) {
+TEST_F(OptionsImplTest, v1Disallowed) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
       "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
@@ -70,12 +78,14 @@ TEST(OptionsImplTest, v1Disallowed) {
   EXPECT_TRUE(options->v2ConfigOnly());
 }
 
-TEST(OptionsImplTest, All) {
+TEST_F(OptionsImplTest, All) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl(
       "envoy --mode validate --concurrency 2 -c hello --admin-address-path path --restart-epoch 1 "
-      "--local-address-ip-version v6 -l info --service-cluster cluster --service-node node "
-      "--service-zone zone --file-flush-interval-msec 9000 --drain-time-s 60 --log-format [%v] "
-      "--parent-shutdown-time-s 90 --log-path /foo/bar --v2-config-only --disable-hot-restart");
+      "--local-address-ip-version v6 -l info --component-log-level upstream:debug,connection:trace "
+      "--service-cluster cluster --service-node node --service-zone zone "
+      "--file-flush-interval-msec 9000 "
+      "--drain-time-s 60 --log-format [%v] --parent-shutdown-time-s 90 --log-path /foo/bar "
+      "--v2-config-only --disable-hot-restart");
   EXPECT_EQ(Server::Mode::Validate, options->mode());
   EXPECT_EQ(2U, options->concurrency());
   EXPECT_EQ("hello", options->configPath());
@@ -84,6 +94,7 @@ TEST(OptionsImplTest, All) {
   EXPECT_EQ(Network::Address::IpVersion::v6, options->localAddressIpVersion());
   EXPECT_EQ(1U, options->restartEpoch());
   EXPECT_EQ(spdlog::level::info, options->logLevel());
+  EXPECT_EQ(2, options->componentLogLevels().size());
   EXPECT_EQ("[%v]", options->logFormat());
   EXPECT_EQ("/foo/bar", options->logPath());
   EXPECT_EQ("cluster", options->serviceClusterName());
@@ -98,7 +109,7 @@ TEST(OptionsImplTest, All) {
   EXPECT_EQ(Server::Mode::InitOnly, options->mode());
 }
 
-TEST(OptionsImplTest, SetAll) {
+TEST_F(OptionsImplTest, SetAll) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
   bool v2_config_only = options->v2ConfigOnly();
   bool hot_restart_disabled = options->hotRestartDisabled();
@@ -152,7 +163,7 @@ TEST(OptionsImplTest, SetAll) {
   EXPECT_EQ(!hot_restart_disabled, options->hotRestartDisabled());
 }
 
-TEST(OptionsImplTest, DefaultParams) {
+TEST_F(OptionsImplTest, DefaultParams) {
   std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy -c hello");
   EXPECT_EQ(std::chrono::seconds(600), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(900), options->parentShutdownTime());
@@ -162,19 +173,62 @@ TEST(OptionsImplTest, DefaultParams) {
   EXPECT_EQ(false, options->hotRestartDisabled());
 }
 
-TEST(OptionsImplTest, BadCliOption) {
+TEST_F(OptionsImplTest, BadCliOption) {
   EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy -c hello --local-address-ip-version foo"),
                           MalformedArgvException, "error: unknown IP address version 'foo'");
 }
 
-TEST(OptionsImplTest, BadObjNameLenOption) {
+TEST_F(OptionsImplTest, BadObjNameLenOption) {
   EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --max-obj-name-len 1"), MalformedArgvException,
                           "'max-obj-name-len' value specified");
 }
 
-TEST(OptionsImplTest, BadMaxStatsOption) {
+TEST_F(OptionsImplTest, BadMaxStatsOption) {
   EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy --max-stats 1000000000"), MalformedArgvException,
                           "'max-stats' value specified");
+}
+
+TEST_F(OptionsImplTest, ParseComponentLogLevels) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  parseComponentLogLevels(options, "upstream:debug,connection:trace");
+  const std::vector<std::pair<std::string, spdlog::level::level_enum>>& component_log_levels =
+      options->componentLogLevels();
+  EXPECT_EQ(2, component_log_levels.size());
+  EXPECT_EQ("upstream", component_log_levels[0].first);
+  EXPECT_EQ(spdlog::level::level_enum::debug, component_log_levels[0].second);
+  EXPECT_EQ("connection", component_log_levels[1].first);
+  EXPECT_EQ(spdlog::level::level_enum::trace, component_log_levels[1].second);
+}
+
+TEST_F(OptionsImplTest, ParseComponentLogLevelsWithBlank) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  parseComponentLogLevels(options, "");
+  EXPECT_EQ(0, options->componentLogLevels().size());
+}
+
+TEST_F(OptionsImplTest, InvalidComponent) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "blah:debug"), MalformedArgvException,
+                          "error: invalid component specified 'blah'");
+}
+
+TEST_F(OptionsImplTest, InvalidLogLevel) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "upstream:blah,connection:trace"),
+                          MalformedArgvException, "error: invalid log level specified 'blah'");
+}
+
+TEST_F(OptionsImplTest, InvalidComponentLogLevelStructure) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "upstream:foo:bar"),
+                          MalformedArgvException,
+                          "error: component log level not correctly specified 'upstream:foo:bar'");
+}
+
+TEST_F(OptionsImplTest, IncompleteComponentLogLevel) {
+  std::unique_ptr<OptionsImpl> options = createOptionsImpl("envoy --mode init_only");
+  EXPECT_THROW_WITH_REGEX(parseComponentLogLevels(options, "upstream"), MalformedArgvException,
+                          "component log level not correctly specified 'upstream'");
 }
 
 } // namespace Envoy

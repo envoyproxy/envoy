@@ -11,6 +11,7 @@
 #include "common/common/version.h"
 #include "common/protobuf/utility.h"
 
+#include "absl/strings/str_split.h"
 #include "spdlog/spdlog.h"
 #include "tclap/CmdLine.h"
 
@@ -41,6 +42,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   log_levels_string +=
       fmt::format("\nDefault is [{}]", spdlog::level::level_names[default_log_level]);
 
+  const std::string component_log_level_string =
+      "Comma separated list of component log levels. For example upstream:debug,config:trace";
   const std::string log_format_string =
       fmt::format("Log message format in spdlog syntax "
                   "(see https://github.com/gabime/spdlog/wiki/3.-Custom-formatting)"
@@ -77,6 +80,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::ValueArg<std::string> log_level("l", "log-level", log_levels_string, false,
                                          spdlog::level::level_names[default_log_level], "string",
                                          cmd);
+  TCLAP::ValueArg<std::string> component_log_level(
+      "", "component-log-level", component_log_level_string, false, "", "string", cmd);
   TCLAP::ValueArg<std::string> log_format("", "log-format", log_format_string, false,
                                           Logger::Logger::DEFAULT_LOG_FORMAT, "string", cmd);
   TCLAP::ValueArg<std::string> log_path("", "log-path", "Path to logfile", false, "", "string",
@@ -159,6 +164,8 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
 
   log_format_ = log_format.getValue();
 
+  parseComponentLogLevels(component_log_level.getValue());
+
   if (mode.getValue() == "serve") {
     mode_ = Server::Mode::Serve;
   } else if (mode.getValue() == "validate") {
@@ -209,4 +216,41 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
     throw NoServingException();
   }
 }
+
+void OptionsImpl::parseComponentLogLevels(const std::string& component_log_levels) {
+  if (component_log_levels.empty()) {
+    return;
+  }
+  std::vector<std::string> log_levels = absl::StrSplit(component_log_levels, ',');
+  for (auto& level : log_levels) {
+    std::vector<std::string> log_name_level = absl::StrSplit(level, ':');
+    if (log_name_level.size() != 2) {
+      logError(fmt::format("error: component log level not correctly specified '{}'", level));
+    }
+    std::string log_name = log_name_level[0];
+    std::string log_level = log_name_level[1];
+    size_t level_to_use = std::numeric_limits<size_t>::max();
+    for (size_t i = 0; i < ARRAY_SIZE(spdlog::level::level_names); i++) {
+      if (log_level == spdlog::level::level_names[i]) {
+        level_to_use = i;
+        break;
+      }
+    }
+    if (level_to_use == std::numeric_limits<size_t>::max()) {
+      logError(fmt::format("error: invalid log level specified '{}'", log_level));
+    }
+    Logger::Logger* logger_to_change = Logger::Registry::logger(log_name);
+    if (!logger_to_change) {
+      logError(fmt::format("error: invalid component specified '{}'", log_name));
+    }
+    component_log_levels_.push_back(
+        std::make_pair(log_name, static_cast<spdlog::level::level_enum>(level_to_use)));
+  }
+}
+
+void OptionsImpl::logError(const std::string& error) const {
+  std::cerr << error << std::endl;
+  throw MalformedArgvException(error);
+}
+
 } // namespace Envoy
