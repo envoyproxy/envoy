@@ -1114,7 +1114,7 @@ TEST_F(ThriftConnectionManagerTest, OnDataResumesWithNextFilterOnTransportEnd) {
   EXPECT_EQ(1U, store_.gauge("test.request_active").value());
 }
 
-// Tests multiple filters where one invokes sendLocalReply with a succesful reply.
+// Tests multiple filters where one invokes sendLocalReply with a successful reply.
 TEST_F(ThriftConnectionManagerTest, OnDataWithFilterSendsLocalReply) {
   auto* filter = new NiceMock<ThriftFilters::MockDecoderFilter>();
   custom_filter_.reset(filter);
