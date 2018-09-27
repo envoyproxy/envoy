@@ -237,6 +237,7 @@ envoy_cc_test(
         "//source/common/http:header_map_lib",
         "//source/common/http:user_agent_lib",
         "//test/mocks/stats:stats_mocks",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
     ],
 )
