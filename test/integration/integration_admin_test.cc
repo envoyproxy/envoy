@@ -449,7 +449,8 @@ TEST_F(IntegrationAdminIpv4Ipv6Test, Ipv4Ipv6Listen) {
 class StatsMatcherIntegrationTest : public HttpIntegrationTest, public testing::Test {
 public:
   StatsMatcherIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4,
+                            realTime()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(
