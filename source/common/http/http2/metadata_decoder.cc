@@ -11,9 +11,7 @@ MetadataDecoder::MetadataDecoder(uint64_t stream_id) : stream_id_(stream_id) {
   ASSERT(rv == 0);
 }
 
-MetadataDecoder::~MetadataDecoder() {
-  nghttp2_hd_inflate_del(inflater_);
-}
+MetadataDecoder::~MetadataDecoder() { nghttp2_hd_inflate_del(inflater_); }
 
 void MetadataDecoder::receiveMetadata(const uint8_t* data, size_t len) {
   if (data == nullptr || len == 0) {
@@ -46,7 +44,8 @@ bool MetadataDecoder::OnMetadataFrameComplete(bool end_metadata) {
 
 void MetadataDecoder::DecodeMetadataPayloadUsingNghttp2(bool end_metadata) {
   // Computes how many slices are needed to get all the data out.
-  const int num_slices = payload_.getRawSlices(nullptr, 0);;
+  const int num_slices = payload_.getRawSlices(nullptr, 0);
+  ;
   Buffer::RawSlice slices[num_slices];
   payload_.getRawSlices(slices, num_slices);
 
@@ -59,9 +58,9 @@ void MetadataDecoder::DecodeMetadataPayloadUsingNghttp2(bool end_metadata) {
     int is_end = (i == num_slices - 1 && end_metadata) ? 1 : 0;
 
     while (slice.len_ > 0) {
-      ssize_t result = nghttp2_hd_inflate_hd2(inflater_, &nv, &inflate_flags,
-                                              reinterpret_cast<uint8_t*>(slice.mem_), slice.len_,
-                                              is_end);
+      ssize_t result =
+          nghttp2_hd_inflate_hd2(inflater_, &nv, &inflate_flags,
+                                 reinterpret_cast<uint8_t*>(slice.mem_), slice.len_, is_end);
       ASSERT(result >= 0);
 
       slice.mem_ = reinterpret_cast<void*>(reinterpret_cast<uint8_t*>(slice.mem_) + result);
@@ -70,9 +69,8 @@ void MetadataDecoder::DecodeMetadataPayloadUsingNghttp2(bool end_metadata) {
       ASSERT(!(result == 0 && slice.len_ > 0));
 
       if (inflate_flags & NGHTTP2_HD_INFLATE_EMIT) {
-        metadata_map_.emplace(
-            std::string(reinterpret_cast<char*>(nv.name), nv.namelen),
-            std::string(reinterpret_cast<char*>(nv.value), nv.valuelen));
+        metadata_map_.emplace(std::string(reinterpret_cast<char*>(nv.name), nv.namelen),
+                              std::string(reinterpret_cast<char*>(nv.value), nv.valuelen));
       }
     }
 
@@ -97,9 +95,7 @@ void MetadataDecoder::registerMetadataCallback(MetadataCallback callback) {
   metadata_map_list_.clear();
 }
 
-void MetadataDecoder::unregisterMetadataCallback() {
-  callback_ = nullptr;
-}
+void MetadataDecoder::unregisterMetadataCallback() { callback_ = nullptr; }
 
 } // namespace Http2
 } // namespace Http
