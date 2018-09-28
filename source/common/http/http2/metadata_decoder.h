@@ -53,6 +53,11 @@ public:
    */
   Buffer::OwnedImpl& payload() { return payload_; }
 
+  /**
+   * @return stream_id.
+   */
+  uint64_t getStreamId() const { return stream_id_; }
+
 private:
   /**
    * Decodes METADATA payload using nghttp2.
