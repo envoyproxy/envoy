@@ -324,14 +324,16 @@ TEST_F(RouterRetryStateImplTest, RouteConfigNoHeaderConfig) {
 
 TEST_F(RouterRetryStateImplTest, NoAvailableRetries) {
   cluster_.resource_manager_.reset(
-      new Upstream::ResourceManagerImpl(runtime_, "fake_key", 0, 0, 0, 0));
+      new Upstream::ResourceManagerImpl(runtime_, "fake_key", 0, 0, 0, 1));
 
   Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "connect-failure"}};
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
 
+  cluster_.resource_manager_->retries().inc(); // fake retry saturation
   EXPECT_EQ(RetryStatus::NoOverflow, state_->shouldRetry(nullptr, connect_failure_, callback_));
   EXPECT_EQ(1UL, cluster_.stats().upstream_rq_retry_overflow_.value());
+  cluster_.resource_manager_->retries().dec(); // reset retry saturation
 }
 
 TEST_F(RouterRetryStateImplTest, MaxRetriesHeader) {

@@ -786,7 +786,12 @@ TEST_F(TcpProxyTest, UpstreamConnectFailure) {
 TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
   configure(accessLogConfig("%RESPONSE_FLAGS%"));
   factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resource_manager_.reset(
-      new Upstream::ResourceManagerImpl(factory_context_.runtime_loader_, "fake_key", 0, 0, 0, 0));
+      new Upstream::ResourceManagerImpl(factory_context_.runtime_loader_, "fake_key", 1, 0, 0, 0));
+
+  // fake connection saturation
+  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resource_manager_
+      ->connections()
+      .inc();
 
   // setup sets up expectation for tcpConnForCluster but this test is expected to NOT call that
   filter_.reset(new Filter(config_, factory_context_.cluster_manager_, timeSystem()));
@@ -797,6 +802,11 @@ TEST_F(TcpProxyTest, UpstreamConnectionLimit) {
 
   filter_.reset();
   EXPECT_EQ(access_log_data_, "UO");
+
+  // reset connection saturation
+  factory_context_.cluster_manager_.thread_local_cluster_.cluster_.info_->resource_manager_
+      ->connections()
+      .dec();
 }
 
 // Tests that the idle timer closes both connections, and gets updated when either
