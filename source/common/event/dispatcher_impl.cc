@@ -154,7 +154,7 @@ void DispatcherImpl::run(RunType type) {
 
   // Flush all post callbacks before we run the event loop. We do this because there are post
   // callbacks that have to get run before the initial event loop starts running. libevent does
-  // not gaurantee that events are run in any particular order. So even if we post() and call
+  // not guarantee that events are run in any particular order. So even if we post() and call
   // event_base_once() before some other event, the other event might get called first.
   runPostCallbacks();
 

@@ -235,7 +235,7 @@ TEST_P(ConnectionImplTest, CloseDuringConnectCallback) {
 TEST_P(ConnectionImplTest, ImmediateConnectError) {
   dispatcher_.reset(new Event::DispatcherImpl(time_system_));
 
-  // Using a broadcast/multicast address as the connection destiantion address causes an
+  // Using a broadcast/multicast address as the connection destinations address causes an
   // immediate error return from connect().
   Address::InstanceConstSharedPtr broadcast_address;
   if (socket_.localAddress()->ip()->version() == Address::IpVersion::v4) {
@@ -745,7 +745,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
   for (int i = 0; i < 50; ++i) {
     // The bytes to read this loop.
     int bytes_to_write = rand.random() % 20 + 1;
-    // The bytes buffered at the begining of this loop.
+    // The bytes buffered at the beginning of this loop.
     bytes_buffered = new_bytes_buffered;
     // Bytes to flush upstream.
     int bytes_to_flush = std::min<int>(rand.random() % 30 + 1, bytes_to_write + bytes_buffered);

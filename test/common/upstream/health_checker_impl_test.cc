@@ -21,6 +21,7 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -3286,12 +3287,11 @@ TEST(HealthCheckEventLoggerImplTest, All) {
   NiceMock<MockClusterInfo> cluster;
   ON_CALL(*host, cluster()).WillByDefault(ReturnRef(cluster));
 
-  NiceMock<MockTimeSource> time_source;
-  EXPECT_CALL(time_source, systemTime())
-      // This is rendered as "2009-02-13T23:31:31.234Z".a
-      .WillRepeatedly(Return(SystemTime(std::chrono::milliseconds(1234567891234))));
+  Event::SimulatedTimeSystem time_system;
+  // This is rendered as "2009-02-13T23:31:31.234Z".a
+  time_system.setSystemTime(std::chrono::milliseconds(1234567891234));
 
-  HealthCheckEventLoggerImpl event_logger(log_manager, time_source, "foo");
+  HealthCheckEventLoggerImpl event_logger(log_manager, time_system, "foo");
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"

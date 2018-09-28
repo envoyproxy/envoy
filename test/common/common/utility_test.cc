@@ -8,6 +8,7 @@
 
 #include "common/common/utility.h"
 
+#include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_cat.h"
@@ -126,12 +127,8 @@ TEST(StringUtil, atol) {
 
 TEST(DateUtil, All) {
   EXPECT_FALSE(DateUtil::timePointValid(SystemTime()));
-  EXPECT_TRUE(DateUtil::timePointValid(std::chrono::system_clock::now()));
-}
-
-TEST(ProdSystemTimeSourceTest, All) {
-  RealTimeSource source;
-  source.systemTime();
+  DangerousDeprecatedTestTime test_time;
+  EXPECT_TRUE(DateUtil::timePointValid(test_time.timeSystem().systemTime()));
 }
 
 TEST(InputConstMemoryStream, All) {

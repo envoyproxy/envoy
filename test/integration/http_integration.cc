@@ -245,7 +245,7 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
     response = codec_client_->makeHeaderOnlyRequest(request_headers);
   }
   waitForNextUpstreamRequest();
-  // Send response headers, and end_stream if there is no respone body.
+  // Send response headers, and end_stream if there is no response body.
   upstream_request_->encodeHeaders(response_headers, response_size == 0);
   // Send any response data, with end_stream true.
   if (response_size) {
@@ -1007,7 +1007,7 @@ void HttpIntegrationTest::testHittingEncoderFilterLimit() {
   codec_client_->sendData(*downstream_request, data, true);
   waitForNextUpstreamRequest();
 
-  // Send the respone headers.
+  // Send the response headers.
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
 
   // Now send an overly large response body. At some point, too much data will

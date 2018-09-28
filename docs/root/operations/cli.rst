@@ -83,6 +83,13 @@ following are the command line options that Envoy supports.
   *(optional)* The logging level. Non developers should generally never set this option. See the
   help text for the available log levels and the default.
 
+.. option:: --component-log-level <string>
+
+  *(optional)* The comma separated list of logging level per component. Non developers should generally 
+  never set this option. For example, if you want `upstream` component to run at `debug` level and 
+  `connection` component to run at `trace` level, you should pass ``upstream:debug,connection:trace`` to 
+  this flag.
+
 .. option:: --log-path <path string>
 
    *(optional)* The output file path where logs should be written. This file will be re-opened

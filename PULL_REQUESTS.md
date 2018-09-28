@@ -56,7 +56,7 @@ N/A if there were no documentation changes.
 If this change is user impacting OR extension developer impacting (filter API, etc.) you **must**
 add a release note to [version_history.rst](docs/root/intro/version_history.rst). Please include
 any relevant links. Each release note should be prefixed with the relevant subsystem in
-alphabetical order (see existing examples as a guide) and include links to relevant parts of the
+**alphabetical order** (see existing examples as a guide) and include links to relevant parts of the
 documentation. Thank you! Please write in N/A if there are no release notes.
 
 ### <a name="issues"></a>Issues
