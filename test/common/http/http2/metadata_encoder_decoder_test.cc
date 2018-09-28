@@ -55,8 +55,8 @@ static ssize_t pack_extension_callback(nghttp2_session* session, uint8_t* buf, s
   if (encoder->hasNextFrame()) {
     const uint8_t flag =
         (encoder->payload().length() > encoder->getMaxMetadataSize()) ? 0 : END_METADATA_FLAG;
-    int result = nghttp2_submit_extension(session, METADATA_FRAME_TYPE, flag, frame->hd.stream_id,
-                                          nullptr);
+    int result =
+        nghttp2_submit_extension(session, METADATA_FRAME_TYPE, flag, frame->hd.stream_id, nullptr);
     EXPECT_EQ(0, result);
   }
 
@@ -204,7 +204,6 @@ TEST_F(MetadataEncoderDecoderTest, EncodeLargeHeaderBlock) {
                                   std::placeholders::_1);
   decoder_.registerMetadataCallback(cb);
 
-
   // Creates metadata payload.
   encoder_.createPayload(metadata_map);
 
@@ -262,8 +261,8 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderOnMultipleMetadataMaps) {
 
   // Encode and decode the second MetadataMap.
   decoder_.unregisterMetadataCallback();
-  MetadataCallback cb2 = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map_2,
-                                  std::placeholders::_1);
+  MetadataCallback cb2 = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this,
+                                   &metadata_map_2, std::placeholders::_1);
   decoder_.registerMetadataCallback(cb2);
   encoder_.createPayload(metadata_map_2);
   nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID, nullptr);
