@@ -122,7 +122,7 @@ PROTO_RST="
   /envoy/type/matcher/metadata/envoy/type/matcher/metadata.proto.rst
   /envoy/type/matcher/value/envoy/type/matcher/value.proto.rst
   /envoy/type/matcher/number/envoy/type/matcher/number.proto.rst
-  /envoy/type/matcher/string/envoy/type/matcher/strings.proto.rst
+  /envoy/type/matcher/strings/envoy/type/matcher/strings.proto.rst
 "
 
 # Dump all the generated RST so they can be added to PROTO_RST easily.
