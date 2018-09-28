@@ -263,6 +263,83 @@ TEST_F(RouterTest, PoolFailureWithPriority) {
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
 
+TEST_F(RouterTest, DisarmRequestTimeoutOnCompleteHeaders) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  EXPECT_CALL(callbacks_, endRequestTimeout()).Times(1);
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+
+  router_.onDestroy();
+}
+
+TEST_F(RouterTest, DisarmRequestTimeoutOnCompleteData) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  EXPECT_CALL(callbacks_, endRequestTimeout()).Times(1);
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data("1234");
+  router_.decodeData(data, true);
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), true);
+  router_.onDestroy();
+}
+
+TEST_F(RouterTest, DisarmRequestTimeoutOnCompleteTrailers) {
+  EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
+      .WillOnce(Return(std::chrono::milliseconds(0)));
+  EXPECT_CALL(callbacks_.dispatcher_, createTimer_(_)).Times(0);
+
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_);
+        return nullptr;
+      }));
+
+  EXPECT_CALL(callbacks_, endRequestTimeout()).Times(1);
+  Http::TestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data("1234");
+  router_.decodeData(data, false);
+  Http::TestHeaderMapImpl trailers{{"foo", "bar"}};
+  router_.decodeTrailers(trailers);
+
+  router_.onDestroy();
+}
+
 TEST_F(RouterTest, Http1Upstream) {
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, features());
 

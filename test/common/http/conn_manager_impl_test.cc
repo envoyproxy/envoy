@@ -1552,6 +1552,20 @@ TEST_F(HttpConnectionManagerImplTest, RequestTimeoutStaysArmedOnIncompleteReques
   conn_manager_->onData(fake_input, false);
 }
 
+TEST_F(HttpConnectionManagerImplTest, DisarmRequestTimeoutFilterCallback) {
+  request_timeout_ = std::chrono::milliseconds(10);
+  setup(false, "");
+  Event::MockTimer* request_timer =
+      new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*request_timer, enableTimer(_));
+
+  setUpEncoderAndDecoder();
+  sendReqestHeadersAndData();
+
+  EXPECT_CALL(*request_timer, disableTimer()).Times(1);
+  decoder_filters_[0]->callbacks_->endRequestTimeout();
+}
+
 TEST_F(HttpConnectionManagerImplTest, RequestTimeoutDisarmsOnCompleteHeaders) {
   request_timeout_ = std::chrono::milliseconds(10);
   setup(false, "");

@@ -861,6 +861,10 @@ void Filter::UpstreamRequest::encodeHeaders(bool end_stream) {
   if (handle) {
     conn_pool_stream_handle_ = handle;
   }
+
+  if (end_stream) {
+    parent_.callbacks_->endRequestTimeout();
+  }
 }
 
 void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream) {
@@ -884,6 +888,7 @@ void Filter::UpstreamRequest::encodeData(Buffer::Instance& data, bool end_stream
     if (end_stream) {
       request_info_.onLastUpstreamTxByteSent();
       parent_.callbacks_->requestInfo().onLastUpstreamTxByteSent();
+      parent_.callbacks_->endRequestTimeout();
     }
   }
 }
@@ -900,6 +905,7 @@ void Filter::UpstreamRequest::encodeTrailers(const Http::HeaderMap& trailers) {
     request_encoder_->encodeTrailers(trailers);
     request_info_.onLastUpstreamTxByteSent();
     parent_.callbacks_->requestInfo().onLastUpstreamTxByteSent();
+    parent_.callbacks_->endRequestTimeout();
   }
 }
 

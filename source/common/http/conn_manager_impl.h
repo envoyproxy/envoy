@@ -189,6 +189,7 @@ private:
     removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
     void setDecoderBufferLimit(uint32_t limit) override { parent_.setBufferLimit(limit); }
     uint32_t decoderBufferLimit() override { return parent_.buffer_limit_; }
+    void endRequestTimeout() override { parent_.disarmRequestTimer(); }
 
     // Each decoder filter instance checks if the request passed to the filter is gRPC
     // so that we can issue gRPC local responses to gRPC requests. Filter's decodeHeaders()

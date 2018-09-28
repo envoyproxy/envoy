@@ -188,6 +188,20 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutRequestAndResponse) {
   testRouterRequestAndResponseWithBody(1024, 1024, false, nullptr);
 }
 
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDisarmsOnRequestResponse) {
+  enable_request_timeout_ = true;
+  enable_per_stream_idle_timeout_ = false;
+
+  testRouterHeaderOnlyRequestAndResponse(true, nullptr);
+}
+
+TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutDisarmsOnRequestResponseWithBody) {
+  enable_request_timeout_ = true;
+  enable_per_stream_idle_timeout_ = false;
+
+  testRouterRequestAndResponseWithBody(1024, 1024, false, nullptr);
+}
+
 TEST_P(IdleTimeoutIntegrationTest, RequestTimeoutTriggersOnBodilessPost) {
   enable_request_timeout_ = true;
 

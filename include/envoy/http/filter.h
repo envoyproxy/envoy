@@ -299,6 +299,11 @@ public:
    * @return the buffer limit the filter should apply.
    */
   virtual uint32_t decoderBufferLimit() PURE;
+
+  /**
+   * This routine disarms the request timer owned by the connection manager, if it exists.
+   */
+  virtual void endRequestTimeout() PURE;
 };
 
 /**
