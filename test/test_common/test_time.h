@@ -11,15 +11,13 @@ class TestRealTimeSystem : public TestTimeSystem {
 public:
   // TestTimeSystem
   void sleep(const Duration& duration) override;
+  Thread::CondVar::WaitStatus
+  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
+          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
 
   // Event::TimeSystem
   Event::SchedulerPtr createScheduler(Event::Libevent::BasePtr& libevent) override {
     return real_time_system_.createScheduler(libevent);
-  }
-  Thread::CondVar::WaitStatus
-  waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return condvar.waitFor(mutex, duration);
   }
 
   // TimeSource

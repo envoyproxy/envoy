@@ -442,7 +442,10 @@ AssertionResult
 FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
                                     std::vector<std::unique_ptr<FakeUpstream>>& upstreams,
                                     FakeHttpConnectionPtr& connection, milliseconds timeout) {
-  Event::TimeSystem& time_system = client_dispatcher.timeSystem();
+  if (upstreams.empty()) {
+    return AssertionFailure() << "No upstreams confgured.";
+  }
+  Event::TestTimeSystem& time_system = upstreams[0]->timeSystem();
   auto end_time = time_system.monotonicTime() + timeout;
   while (time_system.monotonicTime() < end_time) {
     for (auto it = upstreams.begin(); it != upstreams.end(); ++it) {
