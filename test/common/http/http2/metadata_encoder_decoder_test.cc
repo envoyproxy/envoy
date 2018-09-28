@@ -77,7 +77,6 @@ static int on_extension_chunk_recv_callback(nghttp2_session* session, const nght
 // Nghttp2 callback function for unpack extension frames.
 static int unpack_extension_callback(nghttp2_session* session, void** payload,
                                      const nghttp2_frame_hd* hd, void* user_data) {
-  ENVOY_LOG_MISC(error, "++++++++++++ call unpack_extension_callback");
   EXPECT_NE(nullptr, session);
   EXPECT_NE(nullptr, hd);
   EXPECT_NE(nullptr, payload);
@@ -100,7 +99,6 @@ static ssize_t send_callback(nghttp2_session* session, const uint8_t* buf, size_
 }
 } // namespace
 
-//change name++++++++++++++++++++
 class MetadataEncoderDecoderTest : public ::testing::Test {
 public:
   MetadataEncoderDecoderTest() : encoder_(STREAM_ID), decoder_(STREAM_ID) {}
@@ -136,11 +134,8 @@ public:
   }
 
   void verifyMetadata(MetadataMap* expect, const MetadataMap& metadata_map) {
-    ENVOY_LOG_MISC(error, "++++++++++++ callback triggered");
     EXPECT_EQ(metadata_map.size(), expect->size());
     for (const auto& metadata : metadata_map) {
-      ENVOY_LOG_MISC(error, "++++++++++++ metadata.first: {}, metadata_second: {}",
-                     metadata.first, metadata.second);
       EXPECT_EQ(expect->find(metadata.first)->second, metadata.second);
     }
   }
@@ -191,7 +186,6 @@ TEST_F(MetadataEncoderDecoderTest, EncodeDecodeSmallHeaderBlock) {
   result = nghttp2_session_mem_recv(session_, output_buffer_.buf, consume_size);
   result = nghttp2_session_mem_recv(session_, output_buffer_.buf + consume_size,
                                     output_buffer_.length - consume_size);
-  ENVOY_LOG_MISC(error, "++++++++++++++ result from nghttp2_session_mem_recv: {}", result);
 
   cleanUp();
 }
@@ -217,8 +211,8 @@ TEST_F(MetadataEncoderDecoderTest, EncodeLargeHeaderBlock) {
   // Submits METADATA to nghttp2.
   const uint8_t flag =
       (encoder_.payload().length() > encoder_.getMaxMetadataSize()) ? 0 : END_METADATA_FLAG;
-  // The payload can't be submitted within one frame. Callback function will
-  // keep submitting until all the payload has been submitted.
+  // The payload can't be submitted within one frame. Callback function will keep submitting until
+  // all the payload has been submitted.
   int result = nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, flag, STREAM_ID, nullptr);
   EXPECT_EQ(0, result);
 
@@ -254,7 +248,6 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderOnMultipleMetadataMaps) {
   nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID, nullptr);
   nghttp2_session_send(session_);
   nghttp2_session_mem_recv(session_, output_buffer_.buf, output_buffer_.length);
-  ENVOY_LOG_MISC(error, "++++++++++++++: output_buffer_.length: {}", output_buffer_.length);
 
   // Cleans up the output buffer.
   memset(output_buffer_.buf, 0, output_buffer_.length);
