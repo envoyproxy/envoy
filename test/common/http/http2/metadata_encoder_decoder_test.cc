@@ -325,6 +325,8 @@ TEST_F(MetadataEncoderDecoderTest, TestDecodeCallbackSetAfterReceiveMetadata) {
   // Sets up callback function.
   MetadataCallback cb = std::bind(&MetadataEncoderDecoderTest::verifyMetadata, this, &metadata_map,
                                   std::placeholders::_1);
+  // Registers nullptr will do nothing.
+  decoder_.registerMetadataCallback(nullptr);
   decoder_.registerMetadataCallback(cb);
 
   cleanUp();

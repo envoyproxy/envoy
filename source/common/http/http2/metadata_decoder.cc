@@ -55,7 +55,7 @@ void MetadataDecoder::DecodeMetadataPayloadUsingNghttp2(bool end_metadata) {
     nghttp2_nv nv;
     int inflate_flags = 0;
     auto slice = slices[i];
-    int is_end = (i == num_slices - 1 && end_metadata) ? 1 : 0;
+    int is_end = (i == (num_slices - 1) && end_metadata) ? 1 : 0;
 
     while (slice.len_ > 0) {
       ssize_t result =
@@ -74,7 +74,7 @@ void MetadataDecoder::DecodeMetadataPayloadUsingNghttp2(bool end_metadata) {
       }
     }
 
-    if (inflate_flags & NGHTTP2_HD_INFLATE_FINAL) {
+    if (slice.len_ == 0 && is_end) {
       ASSERT(end_metadata);
       nghttp2_hd_inflate_end_headers(inflater_);
     }
