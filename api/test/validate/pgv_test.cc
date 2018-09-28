@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
   cluster_manager {}
   admin {
     access_log_path: "/dev/null"
-    address {}
+    address { pipe { path: "/" } }
   }
   )EOF";
   envoy::config::bootstrap::v2::Bootstrap valid_bootstrap;
