@@ -9,8 +9,6 @@ jobs:
        - image: *envoy-build-image
      resource_class: xlarge
      working_directory: /source
-     environment:
-       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
@@ -23,8 +21,6 @@ jobs:
        - image: *envoy-build-image
      resource_class: xlarge
      working_directory: /source
-     environment:
-       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - run: echo $CIRCLE_SHA1
@@ -37,8 +33,6 @@ jobs:
        - image: *envoy-build-image
      resource_class: xlarge
      working_directory: /source
-     environment:
-       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
        - checkout
@@ -70,8 +64,6 @@ jobs:
        - run: ci/filter_example_mirror.sh
    ipv6_tests:
      machine: true
-     environment:
-       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
      - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
      - checkout
@@ -145,8 +137,6 @@ jobs:
    mac:
      macos:
        xcode: "9.3.0"
-     environment:
-       BAZEL_REMOTE_CACHE: https://storage.googleapis.com/envoy-circleci-bazel-cache/
      steps:
        - run: sudo ntpdate -vu time.apple.com
        - run: rm -rf /home/circleci/project/.git # CircleCI git caching is likely broken
