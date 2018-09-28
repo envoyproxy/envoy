@@ -4,7 +4,7 @@ package envoy.type.matcher;
 option go_package = "matcher";
 
 import "envoy/type/matcher/number.proto";
-import "envoy/type/matcher/string.proto";
+import "envoy/type/matcher/strings.proto";
 
 import "validate/validate.proto";
 
