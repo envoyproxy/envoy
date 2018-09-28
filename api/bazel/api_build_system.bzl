@@ -98,13 +98,6 @@ def api_proto_library(
         has_services = 0,
         linkstatic = None,
         require_py = 1):
-    # This is now vestigial, since there are no direct consumers in
-    # the data plane API. However, we want to maintain native proto_library support
-    # in the proto graph to (1) support future C++ use of native rules with
-    # cc_proto_library (or some Bazel aspect that works on proto_library) when
-    # it can play well with the PGV plugin and (2) other language support that
-    # can make use of native proto_library.
-
     native.proto_library(
         name = name,
         srcs = srcs,
@@ -123,11 +116,6 @@ def api_proto_library(
         ],
         visibility = visibility,
     )
-
-    # Under the hood, this is just an extension of the Protobuf library's
-    # bespoke cc_proto_library. It doesn't consume proto_library as a proto
-    # provider. Hopefully one day we can move to a model where this target and
-    # the proto_library above are aligned.
     pgv_cc_proto_library(
         name = _Suffix(name, _CC_SUFFIX),
         linkstatic = linkstatic,
