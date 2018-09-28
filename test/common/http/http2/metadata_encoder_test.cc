@@ -1,8 +1,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/logger.h"
-#include "common/http/http2/metadata_decoder.h"
 #include "common/http/http2/metadata_encoder.h"
-#include "common/runtime/runtime_impl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -28,12 +26,10 @@ typedef struct {
 // The application data structure passes to nghttp2 session.
 typedef struct {
   MetadataEncoder* encoder;
-  MetadataDecoder* decoder;
   // Stores data received by the peer.
   TestBuffer* output_buffer;
   // Stores inflated extension frame payload received by the peer.
   TestBuffer* payload_buffer;
-  //don't need flag anymore+++++++++++++++++++++++++++++
   uint64_t flag = 0;
 } UserData;
 
@@ -69,36 +65,28 @@ static ssize_t pack_extension_callback(nghttp2_session* session, uint8_t* buf, s
 static int on_extension_chunk_recv_callback(nghttp2_session* session, const nghttp2_frame_hd* hd,
                                             const uint8_t* data, size_t len, void* user_data) {
   EXPECT_NE(nullptr, session);
-  EXPECT_GE(hd->length, len);
-
   // Sanity check header length.
-  //EXPECT_EQ(hd->length, len);
+  EXPECT_EQ(hd->length, len);
   // All the flag should be 0 except the last frame.
-  //EXPECT_EQ(0, reinterpret_cast<UserData*>(user_data)->flag);
+  EXPECT_EQ(0, reinterpret_cast<UserData*>(user_data)->flag);
+  reinterpret_cast<UserData*>(user_data)->flag = hd->flags;
 
-  MetadataDecoder* decoder = reinterpret_cast<UserData*>(user_data)->decoder;
-  decoder->receiveMetadata(data, len);
+  TestBuffer* payload = (reinterpret_cast<UserData*>(user_data))->payload_buffer;
+  memcpy(payload->buf + payload->length, data, len);
+  payload->length += len;
   return 0;
-
-  //TestBuffer* payload = (reinterpret_cast<UserData*>(user_data))->payload_buffer;
-  //ENVOY_LOG_MISC(error, "++++++++++++++payload.length:  {}", payload->length);
-  //memcpy(payload->buf + payload->length, data, len);
-  //payload->length += len;
-  //return 0;
 }
 
 // Nghttp2 callback function for unpack extension frames.
 static int unpack_extension_callback(nghttp2_session* session, void** payload,
                                      const nghttp2_frame_hd* hd, void* user_data) {
-  ENVOY_LOG_MISC(error, "++++++++++++ call unpack_extension_callback");
   EXPECT_NE(nullptr, session);
   EXPECT_NE(nullptr, hd);
+
   TestBuffer* output = reinterpret_cast<UserData*>(user_data)->output_buffer;
   *payload = output;
 
-  MetadataDecoder* decoder = reinterpret_cast<UserData*>(user_data)->decoder;
-  bool result = decoder->OnMetadataFrameComplete((hd->flags == END_METADATA_FLAG) ? 1 : 0);
-  return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
+  return 0;
 }
 
 // Nghttp2 callback function for sending data to peer.
@@ -114,10 +102,9 @@ static ssize_t send_callback(nghttp2_session* session, const uint8_t* buf, size_
 }
 } // namespace
 
-//change name++++++++++++++++++++
 class MetadataEncoderTest : public ::testing::Test {
 public:
-  MetadataEncoderTest() : encoder_(STREAM_ID), decoder_(STREAM_ID) {}
+  MetadataEncoderTest() : encoder_(STREAM_ID) {}
 
   void initialize() {
     // Enables extension frame.
@@ -134,7 +121,6 @@ public:
 
     // Sets application data to pass to nghttp2 session.
     user_data_.encoder = &encoder_;
-    user_data_.decoder = &decoder_;
     user_data_.output_buffer = &output_buffer_;
     user_data_.payload_buffer = &payload_buffer_;
 
@@ -148,17 +134,6 @@ public:
     nghttp2_session_del(session_);
     nghttp2_session_callbacks_del(callbacks_);
     nghttp2_option_del(option_);
-  }
-
-  void verifyMetadata(MetadataMap* expect, const MetadataMap& metadata_map) {
-    ENVOY_LOG_MISC(error, "++++++++++++ callback triggered");
-    EXPECT_EQ(metadata_map.size(), expect->size());
-    for (const auto& metadata : metadata_map) {
-      ENVOY_LOG_MISC(error, "++++++++++++ metadata.first: {}, metadata_second: {}",
-                     metadata.first, metadata.second);
-      EXPECT_EQ(expect->find(metadata.first)->second, metadata.second);
-      expect->erase(metadata.first);
-    }
   }
 
   // Verifies the payload received by peer is as expected.
@@ -198,7 +173,6 @@ public:
   nghttp2_session* session_ = nullptr;
   nghttp2_session_callbacks* callbacks_;
   MetadataEncoder encoder_;
-  MetadataDecoder decoder_;
   nghttp2_option* option_;
 
   // Stores data received by peer.
@@ -209,8 +183,6 @@ public:
 
   // Application data passed to nghttp2.
   UserData user_data_;
-
-  Runtime::RandomGeneratorImpl random_generator_;
 };
 
 // Tests encoding small METADATAs, which can fit in one HTTP2 frame.
@@ -224,11 +196,6 @@ TEST_F(MetadataEncoderTest, EncodeSmallHeaderBlock) {
       {"header_key4", "header_value4"},
   };
 
-  // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderTest::verifyMetadata, this, &metadata_map,
-                                  std::placeholders::_1);
-  decoder_.registerMetadataCallback(cb);
-
   // Creates metadata payload.
   encoder_.createPayload(metadata_map);
   // Submits METADATA to nghttp2.
@@ -239,108 +206,23 @@ TEST_F(MetadataEncoderTest, EncodeSmallHeaderBlock) {
   result = nghttp2_session_send(session_);
   EXPECT_EQ(0, result);
 
-  // Calls nghttp2_session_mem_recv so decoder can decode the frame, and verifies the METADATA in
-  // registered callback function.
-  const uint64_t consume_size = random_generator_.random() % output_buffer_.length;
-  result = nghttp2_session_mem_recv(session_, output_buffer_.buf, consume_size);
-  result = nghttp2_session_mem_recv(session_, output_buffer_.buf + consume_size,
-                                    output_buffer_.length - consume_size);
-  ENVOY_LOG_MISC(error, "++++++++++++++ result from nghttp2_session_mem_recv: {}", result);
-  //ENVOY_LOG_MISC(error, "++++++++++++++ output_buffer_.length: {}", output_buffer_.buf);
-  //result = nghttp2_session_mem_recv(session_, output_buffer_.buf, 30);
-  //ENVOY_LOG_MISC(error, "++++++++++++++ result from nghttp2_session_mem_recv: {}", result);
-  //result = nghttp2_session_mem_recv(session_, output_buffer_.buf + 30,
-  //                                  output_buffer_.length - 31);
-  //ENVOY_LOG_MISC(error, "++++++++++++++ result from nghttp2_session_mem_recv: {}", result);
-  //result = nghttp2_session_mem_recv(session_, output_buffer_.buf + output_buffer_.length -1,
-  //                                  1);
-  //ENVOY_LOG_MISC(error, "++++++++++++++ result from nghttp2_session_mem_recv: {}", result);
+  // Verifies flag and payload are encoded correctly.
+  result = nghttp2_session_mem_recv(session_, output_buffer_.buf, output_buffer_.length);
   // The last frame's flag should be set.
-  ENVOY_LOG_MISC(error, "++++++++++++++encoded payload old: {}",
-                 std::string(reinterpret_cast<char*>(payload_buffer_.buf),
-                             payload_buffer_.length));
-  //verifyPayload(metadata_map, &(payload_buffer_.buf[0]), payload_buffer_.length);
+  EXPECT_EQ(END_METADATA_FLAG, user_data_.flag);
+  verifyPayload(metadata_map, &(payload_buffer_.buf[0]), payload_buffer_.length);
 
   cleanUp();
 }
-
-TEST_F(MetadataEncoderTest, VerifyEncoderDecoderCanReuse) {
-  initialize();
-
-  MetadataMap metadata_map = {
-      {"header_key1", "header_value1"},
-      {"header_key2", "header_value2"},
-      {"header_key3", "header_value3"},
-      {"header_key4", "header_value4"},
-  };
-
-  // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderTest::verifyMetadata, this, &metadata_map,
-                                  std::placeholders::_1);
-  decoder_.registerMetadataCallback(cb);
-
-  // Creates metadata payload.
-  encoder_.createPayload(metadata_map);
-  // Submits METADATA to nghttp2.
-  int result = nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID,
-                                        nullptr);
-  EXPECT_EQ(0, result);
-  // Sends METADATA to nghttp2.
-  result = nghttp2_session_send(session_);
-  EXPECT_EQ(0, result);
-
-  // Calls nghttp2_session_mem_recv so decoder can decode the frame, and verifies the METADATA in
-  // registered callback function.
-  result = nghttp2_session_mem_recv(session_, output_buffer_.buf, output_buffer_.length);
-  ENVOY_LOG_MISC(error, "++++++++++++++ result from nghttp2_session_mem_recv: {}", result);
-  ENVOY_LOG_MISC(error, "++++++++++++++: output_buffer_.length: {}", output_buffer_.length);
-
-  memset(output_buffer_.buf, 0, output_buffer_.length);
-  output_buffer_.length = 0;
-
-  ENVOY_LOG_MISC(error, "++++++++++++++ finish first task");
-
-  MetadataMap metadata_map_2 = {
-      {"header_key4", "header_value4"},
-      {"header_key5", "header_value5"},
-      {"header_key6", "header_value6"},
-      {"header_key7", "header_value7"},
-  };
-  decoder_.unregisterMetadataCallback();
-  MetadataCallback cb2 = std::bind(&MetadataEncoderTest::verifyMetadata, this, &metadata_map_2,
-                                  std::placeholders::_1);
-  decoder_.registerMetadataCallback(cb2);
-
-  encoder_.createPayload(metadata_map_2);
-  // Submits METADATA to nghttp2.
-  result = nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID,
-                                    nullptr);
-  EXPECT_EQ(0, result);
-  // Sends METADATA to nghttp2.
-  result = nghttp2_session_send(session_);
-  EXPECT_EQ(0, result);
-
-
-  result = nghttp2_session_mem_recv(session_, output_buffer_.buf, output_buffer_.length);
-
-  cleanUp();
-}
-
 
 // Tests encoding large METADATAs, which can cross multiple HTTP2 frames.
 TEST_F(MetadataEncoderTest, EncodeLargeHeaderBlock) {
   initialize();
 
   MetadataMap metadata_map = {
-      {"header_key1", std::string(50000, 'a')},
-      {"header_key2", std::string(50000, 'b')},
+      {"header_key1", std::string(20000, 'a')},
+      {"header_key2", std::string(20000, 'b')},
   };
-
-  // Verifies the encoding/decoding result in decoder's callback functions.
-  MetadataCallback cb = std::bind(&MetadataEncoderTest::verifyMetadata, this, &metadata_map,
-                                  std::placeholders::_1);
-  decoder_.registerMetadataCallback(cb);
-
 
   // Creates metadata payload.
   encoder_.createPayload(metadata_map);
@@ -358,11 +240,10 @@ TEST_F(MetadataEncoderTest, EncodeLargeHeaderBlock) {
   EXPECT_EQ(0, result);
 
   // Verifies flag and payload are encoded correctly.
-  const uint64_t consume_size = random_generator_.random() % output_buffer_.length;
-  result = nghttp2_session_mem_recv(session_, output_buffer_.buf, consume_size);
-  result = nghttp2_session_mem_recv(session_, output_buffer_.buf + consume_size,
-                                    output_buffer_.length - consume_size);
-  //verifyPayload(metadata_map, &(payload_buffer_.buf[0]), payload_buffer_.length);
+  result = nghttp2_session_mem_recv(session_, output_buffer_.buf, output_buffer_.length);
+  // The last frame's flag should be set.
+  EXPECT_EQ(END_METADATA_FLAG, user_data_.flag);
+  verifyPayload(metadata_map, &(payload_buffer_.buf[0]), payload_buffer_.length);
 
   cleanUp();
 }
@@ -395,56 +276,6 @@ TEST_F(MetadataEncoderTest, TestMetadataMapTooBigToEncode) {
       {"header_key1", std::string(1024 * 1024 + 1, 'a')},
   };
   EXPECT_FALSE(encoder_.createPayload(metadata_map));
-
-  cleanUp();
-}
-
-// Verify we don't encode metadata larger than 1M.
-TEST_F(MetadataEncoderTest, TestDecodeCallbackSetAfterReceiveMetadata) {
-  initialize();
-
-  MetadataMap metadata_map = {
-      {"header_key1", "header_value1"},
-      {"header_key2", "header_value2"},
-      {"header_key3", "header_value3"},
-      {"header_key4", "header_value4"},
-  };
-
-  // Verifies the encoding/decoding result in decoder's callback functions.
-  // Creates metadata payload.
-  encoder_.createPayload(metadata_map);
-  // Submits METADATA to nghttp2.
-  int result = nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID,
-                                        &encoder_.payload());
-  EXPECT_EQ(0, result);
-  // Sends METADATA to nghttp2.
-  result = nghttp2_session_send(session_);
-  EXPECT_EQ(0, result);
-
-  // Calls nghttp2_session_mem_recv so decoder can decode the frame, and verifies the METADATA in
-  // registered callback function.
-  const uint64_t consume_size = random_generator_.random() % output_buffer_.length;
-  result = nghttp2_session_mem_recv(session_, output_buffer_.buf, consume_size);
-  result = nghttp2_session_mem_recv(session_, output_buffer_.buf + consume_size,
-                                    output_buffer_.length - consume_size);
-  ENVOY_LOG_MISC(error, "++++++++++++++ result from nghttp2_session_mem_recv: {}", result);
-  //ENVOY_LOG_MISC(error, "++++++++++++++ output_buffer_.length: {}", output_buffer_.buf);
-  //result = nghttp2_session_mem_recv(session_, output_buffer_.buf, 30);
-  //ENVOY_LOG_MISC(error, "++++++++++++++ result from nghttp2_session_mem_recv: {}", result);
-  //result = nghttp2_session_mem_recv(session_, output_buffer_.buf + 30,
-  //                                  output_buffer_.length - 31);
-  //ENVOY_LOG_MISC(error, "++++++++++++++ result from nghttp2_session_mem_recv: {}", result);
-  //result = nghttp2_session_mem_recv(session_, output_buffer_.buf + output_buffer_.length -1,
-  //                                  1);
-  //ENVOY_LOG_MISC(error, "++++++++++++++ result from nghttp2_session_mem_recv: {}", result);
-  // The last frame's flag should be set.
-  ENVOY_LOG_MISC(error, "++++++++++++++encoded payload old: {}",
-                 std::string(reinterpret_cast<char*>(payload_buffer_.buf),
-                             payload_buffer_.length));
-
-  MetadataCallback cb = std::bind(&MetadataEncoderTest::verifyMetadata, this, &metadata_map,
-                                  std::placeholders::_1);
-  decoder_.registerMetadataCallback(cb);
 
   cleanUp();
 }
