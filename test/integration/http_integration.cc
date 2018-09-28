@@ -10,18 +10,23 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/header_map.h"
+#include "envoy/registry/registry.h"
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/fmt.h"
+#include "common/common/thread_annotations.h"
 #include "common/http/headers.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "extensions/filters/http/common/empty_http_filter_config.h"
+
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
+#include "test/integration/pass_through_filter.h"
 #include "test/integration/test_host_predicate_config.h"
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/mocks.h"
@@ -1274,7 +1279,104 @@ void HttpIntegrationTest::testUpstreamDisconnectWithTwoRequests() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
 }
 
-void HttpIntegrationTest::testTwoRequests() {
+// This filter exists to synthetically test network backup by faking TCP
+// conneciton back-up when an encode is finished.
+// Allows regression tests for https://github.com/envoyproxy/envoy/issues/4541
+// TODO(alyssawilk) move this somewhere general and turn it up for more tests.
+class TestPauseFilter : public PassThroughFilter {
+public:
+  // A wrapper around a TimerPtr which can be passed to the timer on creation,
+  // so it can delete itself when called.
+  struct SelfOwningTimer {
+    Event::TimerPtr timer_;
+  };
+
+  // Pass in a global "is this the first stream to finish encoding" to ensure
+  // the Network::Connection is "blocked" exactly once.
+  TestPauseFilter(absl::Mutex& encode_lock, bool& first_encode_ref)
+      : encode_lock_(encode_lock), first_encode_ref_(first_encode_ref) {}
+
+  Http::FilterDataStatus encodeData(Buffer::Instance& buf, bool end_stream) override {
+    absl::WriterMutexLock m(&encode_lock_);
+    // If this is the first time any stream has finished encoding, force the
+    // connection to a high watermark state, and set an alarm to force low
+    // watermark state.
+    if (end_stream && first_encode_ref_) {
+      forceHighWatermark();
+    }
+    return PassThroughFilter::encodeData(buf, end_stream);
+  }
+
+  void forceHighWatermark() {
+    first_encode_ref_ = false; // Make sure we only do this once.
+    Network::ConnectionImpl* connection_impl = connection();
+    connection_impl->onHighWatermark(); // Force high watermark state.
+
+    // Unfortunately this filter is about to self destruct, so the timer
+    // to lower the watermark state must outlive the filter.
+    //
+    // Create a "self-owning" timer and pass it an absolute pointer to the
+    // connection. The timer will delete itself on destruction.
+    //
+    // It is up to the users of this filter to make sure the connection_impl
+    // will outlive the timer.
+    SelfOwningTimer* timer_container = new SelfOwningTimer;
+    timer_container->timer_ =
+        decoder_callbacks_->dispatcher().createTimer([connection_impl, timer_container]() -> void {
+          ENVOY_LOG_MISC(debug, "Forcing watermark low");
+          connection_impl->onLowWatermark();
+          delete timer_container;
+        });
+    timer_container->timer_->enableTimer(std::chrono::milliseconds(50));
+  }
+
+  Network::ConnectionImpl* connection() {
+    // As long as wie're doing horrible things let's do *all* the horrible things.
+    // Assert the connection we have is a ConnectionImpl and const cast it so we
+    // can force watermark changes.
+    auto conn_impl = dynamic_cast<const Network::ConnectionImpl*>(decoder_callbacks_->connection());
+    return const_cast<Network::ConnectionImpl*>(conn_impl);
+  }
+
+  absl::Mutex& encode_lock_;
+  bool& first_encode_ref_;
+};
+
+class TestPauseFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+public:
+  TestPauseFilterConfig() : EmptyHttpFilterConfig("pause-filter") {}
+
+  Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
+    return [&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      absl::WriterMutexLock m(&encode_lock_);
+      callbacks.addStreamFilter(
+          std::make_shared<::Envoy::TestPauseFilter>(encode_lock_, first_encode_));
+    };
+  }
+
+  absl::Mutex encode_lock_;
+  bool first_encode_ GUARDED_BY(encode_lock_) = true;
+};
+
+// perform static registration
+static Registry::RegisterFactory<TestPauseFilterConfig,
+                                 Server::Configuration::NamedHttpFilterConfigFactory>
+    register_;
+
+void HttpIntegrationTest::testTwoRequests(bool network_backup) {
+  // if network_backup is false, this simply tests that Envoy can handle multiple
+  // requests on a connection.
+  //
+  // If network_backup is true, the first request will explicitly set the TCP level flow control
+  // as blocked as it finishes the encode and set a timer to unblock. The second stream should be
+  // created while the socket appears to be in the high watermark state, and regression tests that
+  // flow control will be corrected as the socket "becomes unblocked"
+  if (network_backup) {
+    config_helper_.addFilter(R"EOF(
+  name: pause-filter
+  config: {}
+  )EOF");
+  }
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

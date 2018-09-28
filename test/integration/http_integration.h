@@ -134,7 +134,7 @@ protected:
   void testRouterDownstreamDisconnectBeforeResponseComplete(
       ConnectionCreationFunction* creator = nullptr);
   void testRouterUpstreamResponseBeforeRequestComplete();
-  void testTwoRequests();
+  void testTwoRequests(bool force_network_backup = false);
   void testOverlyLongHeaders();
   void testIdleTimeoutBasic();
   void testIdleTimeoutWithTwoRequests();

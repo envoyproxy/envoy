@@ -87,6 +87,8 @@ TEST_P(Http2IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 
 TEST_P(Http2IntegrationTest, TwoRequests) { testTwoRequests(); }
 
+TEST_P(Http2IntegrationTest, TwoRequestsWithForcedBackup) { testTwoRequests(true); }
+
 TEST_P(Http2IntegrationTest, Retry) { testRetry(); }
 
 TEST_P(Http2IntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }

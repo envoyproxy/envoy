@@ -131,6 +131,8 @@ TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
 
 TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(); }
 
+TEST_P(IntegrationTest, TwoRequestsWithForcedBackup) { testTwoRequests(true); }
+
 TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   testUpstreamDisconnectWithTwoRequests();
 }

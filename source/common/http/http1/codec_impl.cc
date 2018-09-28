@@ -21,7 +21,6 @@ namespace Http1 {
 const std::string StreamEncoderImpl::CRLF = "\r\n";
 const std::string StreamEncoderImpl::LAST_CHUNK = "0\r\n\r\n";
 
-// TODO(alyssawilk) integration test network back-up.
 StreamEncoderImpl::StreamEncoderImpl(ConnectionImpl& connection) : connection_(connection) {
   if (connection_.connection().aboveHighWatermark()) {
     runHighWatermarkCallbacks();
