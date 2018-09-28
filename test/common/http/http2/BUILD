@@ -68,23 +68,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    #change test name++++++++++++++++++++++++++++++++++++++++++++++
-    name = "metadata_encoder_test",
-    srcs = ["metadata_encoder_test.cc"],
-    external_deps = [
-        "nghttp2",
-    ],
-    deps = [
-        "//source/common/buffer:buffer_lib",
-        "//source/common/http/http2:metadata_decoder_lib",
-        "//source/common/http/http2:metadata_encoder_lib",
-        "//source/common/runtime:runtime_lib",
-        "//test/test_common:utility_lib",
-    ],
-)
-
-envoy_cc_test(
-    #change test name++++++++++++++++++++++++++++++++++++++++++++++
     name = "metadata_encoder_decoder_test",
     srcs = ["metadata_encoder_decoder_test.cc"],
     external_deps = [
