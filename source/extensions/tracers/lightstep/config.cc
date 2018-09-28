@@ -18,8 +18,7 @@ namespace Lightstep {
 Tracing::HttpTracerPtr
 LightstepTracerFactory::createHttpTracer(const envoy::config::trace::v2::Tracing& configuration,
                                          Server::Instance& server) {
-  ProtobufTypes::MessagePtr config_ptr =
-      ProtobufTypes::MessagePtr{new envoy::config::trace::v2::LightstepConfig()};
+  ProtobufTypes::MessagePtr config_ptr = createEmptyConfigProto();
 
   if (configuration.http().has_config()) {
     MessageUtil::jsonConvert(configuration.http().config(), *config_ptr);

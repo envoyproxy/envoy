@@ -18,8 +18,7 @@ ZipkinTracerFactory::createHttpTracer(const envoy::config::trace::v2::Tracing& c
                                       Server::Instance& server) {
 
   Envoy::Runtime::RandomGenerator& rand = server.random();
-  ProtobufTypes::MessagePtr config_ptr =
-      ProtobufTypes::MessagePtr{new envoy::config::trace::v2::ZipkinConfig()};
+  ProtobufTypes::MessagePtr config_ptr = createEmptyConfigProto();
 
   if (configuration.http().has_config()) {
     MessageUtil::jsonConvert(configuration.http().config(), *config_ptr);
