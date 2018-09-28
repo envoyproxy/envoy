@@ -79,6 +79,7 @@ def fixFileExpectingNoChange(file):
     return 1
   status, stdout = runCommand('diff ' + outfile + ' ' + infile)
   if status != 0:
+    logging.error(file + ': expected file to remain unchanged')
     return 1
   return 0
 
@@ -117,9 +118,10 @@ def checkUnfixableError(filename, expected_substring):
 def checkFileExpectingOK(filename):
   command, status, stdout = runCheckFormat("check", getInputFile(filename))
   if status != 0:
-    logging.error("status=%d, output:\n" % status)
+    logging.error("Expected %s to have no errors; status=%d, output:\n" %
+                  (filename, status))
     emitStdoutAsError(stdout)
-  return 0
+  return status + fixFileExpectingNoChange(filename)
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='tester for check_format.py.')
@@ -178,8 +180,7 @@ if __name__ == "__main__":
   errors += checkAndFixError("proto_format.proto", "clang-format check failed")
 
   # ok_file.cc is perfect.
-  errors += fixFileExpectingNoChange("ok_file.cc")
-  errors += checkFileExpectingOK("ok_file.cc")
+  errors += checkFileExpectingOK("real_time_source_override.cc")
 
   if errors != 0:
     logging.error("%d FAILURES" % errors)

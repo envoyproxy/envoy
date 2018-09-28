@@ -37,19 +37,9 @@ GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuratio
 
 GuardDogImpl::~GuardDogImpl() { stop(); }
 
-template<class T>
-static void printTime(const std::string& label, T& time) {
-  //using millis = std::chrono::duration<double, std::chrono::milliseconds>;
-  //using millis = std::chrono::milliseconds;
-  //std::cerr << label << ": " << std::chrono::duration_cast<millis>(time - MonotonicTime());
-  absl::Duration duration = absl::FromChrono(time - MonotonicTime());
-  std::cerr << label << ": " << absl::FormatDuration(duration) << std::endl;
-}
-
 void GuardDogImpl::threadRoutine() {
   do {
     const auto now = time_system_.monotonicTime();
-    printTime("TR start: ", now);
     bool seen_one_multi_timeout(false);
     Thread::LockGuard guard(wd_lock_);
     for (auto& watched_dog : watched_dogs_) {
@@ -126,7 +116,21 @@ bool GuardDogImpl::waitOrDetectStop() {
   // Spurious wakeups are OK without explicit handling. We'll just check
   // earlier than strictly required for that round.
 
-  time_system_.waitFor(exit_lock_, exit_event_, loop_interval_);
+  // Preferably, we should be calling
+  //   time_system_.waitFor(exit_lock_, exit_event_, loop_interval_);
+  // here, but that makes GuardDogMissTest.* very flaky. The reason that
+  // directly calling condvar waitFor works is that it doesn't advance
+  // simulated time, which the test is carefully controlling.
+  //
+  // One alternative approach that would be easier to test is to use a private
+  // dispatcher and a TimerCB to execute the loop body of threadRoutine(). In
+  // this manner, the same dynamics would occur in production, with added
+  // overhead from libevent, But then the unit-test would purely control the
+  // advancement of time, and thus be more robust. Another variation would be
+  // to run this watchdog on the main-thread dispatcher, though such an approach
+  // could not detect when the main-thread was stuck.
+  exit_event_.waitFor(exit_lock_, loop_interval_); // NO_CHECK_FORMAT(real_time)
+
   return run_thread_;
 }
 
