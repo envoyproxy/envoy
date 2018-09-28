@@ -179,8 +179,8 @@ if __name__ == "__main__":
                              "Superfluous '@envoy//' prefix")
   errors += checkAndFixError("proto_format.proto", "clang-format check failed")
 
-  # ok_file.cc is perfect.
   errors += checkFileExpectingOK("real_time_source_override.cc")
+  errors += checkFileExpectingOK("time_system_wait_for.cc")
 
   if errors != 0:
     logging.error("%d FAILURES" % errors)
