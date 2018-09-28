@@ -417,7 +417,7 @@ class IntegrationAdminIpv4Ipv6Test : public HttpIntegrationTest, public testing:
 public:
   IntegrationAdminIpv4Ipv6Test()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4,
-                            realTime()) {}
+                            simTime()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(

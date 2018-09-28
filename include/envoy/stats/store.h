@@ -68,8 +68,9 @@ public:
   virtual void setTagProducer(TagProducerPtr&& tag_producer) PURE;
 
   /**
-   * Set the given stats matcher to prevent the initialization of stats matching a specific stat
-   * name.
+   * Attach a StatsMatcher to this StoreRoot to prevent the initialization of stats according to
+   * some ruleset.
+   * @param a StatsMatcher to attach to this StoreRoot.
    */
   virtual void setStatsMatcher(StatsMatcherPtr&& stats_matcher) PURE;
 

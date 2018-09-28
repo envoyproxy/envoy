@@ -8,6 +8,8 @@
 namespace Envoy {
 namespace Stats {
 
+// TODO(ambuc): Refactor this into common/matchers.cc, since StatsMatcher is really just a thin
+// wrapper around what might be called a StringMatcherList.
 StatsMatcherImpl::StatsMatcherImpl(const envoy::config::metrics::v2::StatsConfig& config) {
   switch (config.stats_matcher().stats_matcher_case()) {
   case envoy::config::metrics::v2::StatsMatcher::kRejectAll:

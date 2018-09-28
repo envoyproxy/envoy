@@ -18,15 +18,15 @@ namespace Stats {
  */
 class StatsMatcherImpl : public StatsMatcher {
 public:
-  StatsMatcherImpl(const envoy::config::metrics::v2::StatsConfig& config);
+  explicit StatsMatcherImpl(const envoy::config::metrics::v2::StatsConfig& config);
 
   // Default constructor simply allows everything.
   StatsMatcherImpl() : is_inclusive_(true) {}
 
   /**
    * Take a metric name and report whether or not it should be disallowed.
-   * @param name std::string& a name of Stats::Metric (Counter, Gauge, Histogram).
-   * @return bool whether or not a metic name should be disallowed.
+   * @param the name of a Stats::Metric.
+   * @return bool true if that stat should not be instantiated.
    */
   bool rejects(const std::string& name) const override;
 

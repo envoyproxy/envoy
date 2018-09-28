@@ -14,8 +14,8 @@ public:
 
   /**
    * Take a metric name and report whether or not it should be instantiated.
-   * @param name std::string& a name of Stats::Metric (Counter, Gauge, Histogram).
-   * @return true if that stat should not be instantiated.
+   * @param the name of a Stats::Metric.
+   * @return bool true if that stat should not be instantiated.
    */
   virtual bool rejects(const std::string& name) const PURE;
 };
