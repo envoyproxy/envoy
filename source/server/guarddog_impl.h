@@ -3,6 +3,7 @@
 #include <chrono>
 #include <vector>
 
+#include "envoy/event/timer.h"
 #include "envoy/server/configuration.h"
 #include "envoy/server/guarddog.h"
 #include "envoy/server/watchdog.h"
@@ -38,7 +39,7 @@ public:
    * See the configuration documentation for details on the timeout settings.
    */
   GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
-               TimeSource& tsource);
+               Event::TimeSystem& time_system);
   ~GuardDogImpl();
 
   /**
@@ -75,7 +76,7 @@ private:
     bool megamiss_alerted_{};
   };
 
-  TimeSource& time_source_;
+  Event::TimeSystem& time_system_;
   const std::chrono::milliseconds miss_timeout_;
   const std::chrono::milliseconds megamiss_timeout_;
   const std::chrono::milliseconds kill_timeout_;
