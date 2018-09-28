@@ -82,6 +82,7 @@ static int unpack_extension_callback(nghttp2_session* session, void** payload,
   EXPECT_NE(nullptr, payload);
 
   MetadataDecoder* decoder = reinterpret_cast<UserData*>(user_data)->decoder;
+  EXPECT_EQ(hd->stream_id, decoder->getStreamId());
   bool result = decoder->OnMetadataFrameComplete((hd->flags == END_METADATA_FLAG) ? 1 : 0);
   return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
 }
