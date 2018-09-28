@@ -2722,9 +2722,7 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
       HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
 }
 
-// FIXME(alyssawilk) this should be adapted for the fix for #4541
-TEST_F(HttpConnectionManagerImplTest,
-       DISABLED_UnderlyingConnectionWatermarksPassedOnWithLazyCreation) {
+TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOnWithLazyCreation) {
   setup(false, "");
 
   // Make sure codec_ is created.
@@ -2744,10 +2742,9 @@ TEST_F(HttpConnectionManagerImplTest,
     setUpBufferLimits();
     EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
       decoder = &conn_manager_->newStream(response_encoder_);
+      // Call the high buffer callbacks as the codecs do.
+      stream_callbacks_->onAboveWriteBufferHighWatermark();
     }));
-
-    // Verify the high watermark is passed on.
-    EXPECT_CALL(filter_callbacks_.connection_, aboveHighWatermark()).WillOnce(Return(true));
 
     // Send fake data to kick off newStream being created.
     Buffer::OwnedImpl fake_input2("asdf");
@@ -2778,8 +2775,7 @@ TEST_F(HttpConnectionManagerImplTest,
   }
 }
 
-TEST_F(HttpConnectionManagerImplTest,
-       DISABLED_UnderlyingConnectionWatermarksUnwoundWithLazyCreation) {
+TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksUnwoundWithLazyCreation) {
   setup(false, "");
 
   // Make sure codec_ is created.
@@ -2799,10 +2795,9 @@ TEST_F(HttpConnectionManagerImplTest,
     setUpBufferLimits();
     EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
       decoder = &conn_manager_->newStream(response_encoder_);
+      // Call the high buffer callbacks as the codecs do.
+      stream_callbacks_->onAboveWriteBufferHighWatermark();
     }));
-
-    // Verify the high watermark is passed on.
-    EXPECT_CALL(filter_callbacks_.connection_, aboveHighWatermark()).WillOnce(Return(true));
 
     // Send fake data to kick off newStream being created.
     Buffer::OwnedImpl fake_input2("asdf");
