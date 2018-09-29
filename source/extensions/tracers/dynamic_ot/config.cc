@@ -25,8 +25,7 @@ Tracing::HttpTracerPtr DynamicOpenTracingTracerFactory::createHttpTracer(
       dynamic_cast<const envoy::config::trace::v2::DynamicOtConfig&>(*config_ptr);
 
   const std::string library = dynaot_config.library();
-  Json::ObjectSharedPtr json_config = MessageUtil::getJsonObjectFromMessage(dynaot_config.config());
-  const std::string config = json_config->asJsonString();
+  const std::string config = MessageUtil::getJsonStringFromMessage(dynaot_config.config());
   Tracing::DriverPtr dynamic_driver{
       std::make_unique<DynamicOpenTracingDriver>(server.stats(), library, config)};
   return std::make_unique<Tracing::HttpTracerImpl>(std::move(dynamic_driver), server.localInfo());

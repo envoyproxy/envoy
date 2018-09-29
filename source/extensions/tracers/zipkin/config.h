@@ -19,7 +19,7 @@ public:
                                           Server::Instance& server) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new envoy::config::trace::v2::ZipkinConfig()};
+    return ProtobufTypes::MessagePtr{std::make_unique<envoy::config::trace::v2::ZipkinConfig>()};
   }
 
   std::string name() override;
