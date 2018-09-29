@@ -5,6 +5,7 @@
 #include "common/secret/sds_api.h"
 #include "common/ssl/context_config_impl.h"
 #include "common/ssl/context_impl.h"
+#include "common/ssl/utility.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "test/common/ssl/ssl_certs_test.h"
@@ -35,6 +36,58 @@ TEST_F(SslContextImplTest, TestdNSNameMatching) {
   EXPECT_FALSE(ContextImpl::dNSNameMatch("lyft.com", "*lyft.com"));
   EXPECT_FALSE(ContextImpl::dNSNameMatch("", "*lyft.com"));
   EXPECT_FALSE(ContextImpl::dNSNameMatch("lyft.com", ""));
+}
+
+TEST_F(SslContextImplTest, TestGetSubjectAlternateNamesWithDNS) {
+  FILE* fp = fopen(
+      TestEnvironment::runfilesPath("test/common/ssl/test_data/san_dns_cert.pem").c_str(), "r");
+  EXPECT_NE(fp, nullptr);
+  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
+  EXPECT_NE(cert, nullptr);
+  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert);
+  EXPECT_EQ(1, subject_alt_names.size());
+  EXPECT_EQ("server1.example.com", Utility::formattedSubjectAltNames(subject_alt_names));
+  X509_free(cert);
+  fclose(fp);
+}
+
+TEST_F(SslContextImplTest, TestMultipleGetSubjectAlternateNamesWithDNS) {
+  FILE* fp = fopen(
+      TestEnvironment::runfilesPath("test/common/ssl/test_data/san_multiple_dns_cert.pem").c_str(), "r");
+  EXPECT_NE(fp, nullptr);
+  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
+  EXPECT_NE(cert, nullptr);
+  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert);
+  EXPECT_EQ(2, subject_alt_names.size());
+  EXPECT_EQ("*.example.com, server2.example.com", Utility::formattedSubjectAltNames(subject_alt_names));
+  X509_free(cert);
+  fclose(fp);
+}
+
+TEST_F(SslContextImplTest, TestGetSubjectAlternateNamesWithUri) {
+  FILE* fp = fopen(
+      TestEnvironment::runfilesPath("test/common/ssl/test_data/san_uri_cert.pem").c_str(), "r");
+  EXPECT_NE(fp, nullptr);
+  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
+  EXPECT_NE(cert, nullptr);
+  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert);
+  EXPECT_EQ(1, subject_alt_names.size());
+  EXPECT_EQ("spiffe://lyft.com/test-team", Utility::formattedSubjectAltNames(subject_alt_names));
+  X509_free(cert);
+  fclose(fp);
+}
+
+TEST_F(SslContextImplTest, TestGetSubjectAlternateNamesWithNoSAN) {
+  FILE* fp = fopen(
+      TestEnvironment::runfilesPath("test/common/ssl/test_data/no_san_cert.pem").c_str(), "r");
+  EXPECT_NE(fp, nullptr);
+  X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
+  EXPECT_NE(cert, nullptr);
+  const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert);
+  EXPECT_EQ(0, subject_alt_names.size());
+  EXPECT_EQ("", Utility::formattedSubjectAltNames(subject_alt_names));
+  X509_free(cert);
+  fclose(fp);
 }
 
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
@@ -158,10 +211,44 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
   std::string ca_cert_partial_output(TestEnvironment::substitute(
       "Certificate Path: {{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem, Serial Number: "
       "eaf3b0ea1d0e579a, "
+      "Subject Alternate Names: , "
       "Days until Expiration: "));
   std::string cert_chain_partial_output(
       TestEnvironment::substitute("Certificate Path: {{ test_tmpdir }}/unittestcert.pem"));
+  EXPECT_TRUE(context->getCaCertInformation().find(ca_cert_partial_output) != std::string::npos);
+  EXPECT_TRUE(context->getCertChainInformation().find(cert_chain_partial_output) !=
+              std::string::npos);
+}
 
+TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
+  std::string json = R"EOF(
+  {
+    "cert_chain_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem",
+    "private_key_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_key3.pem",
+    "ca_cert_file": "{{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem"
+  }
+  )EOF";
+
+  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
+  ClientContextConfigImpl cfg(*loader, factory_context_);
+  Runtime::MockLoader runtime;
+  ContextManagerImpl manager(runtime);
+  Stats::IsolatedStoreImpl store;
+
+  ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
+  // This is similar to the hack above, but right now we generate the ca_cert and it expires in 15
+  // days only in the first second that it's valid. We will partially match for up until Days until
+  // Expiration: 1.
+  // For the cert_chain, it is dynamically created when we run_envoy_test.sh which changes the
+  // serial number with
+  // every build. For cert_chain output, we check only for the certificate path.
+  std::string ca_cert_partial_output(TestEnvironment::substitute(
+      "Certificate Path: {{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem, Serial Number: "
+      "b13ff63f2dbc118d, "
+      "Subject Alternate Names: server1.example.com, "
+      "Days until Expiration: "));
+  std::string cert_chain_partial_output(
+      TestEnvironment::substitute("Certificate Path: {{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem"));
   EXPECT_TRUE(context->getCaCertInformation().find(ca_cert_partial_output) != std::string::npos);
   EXPECT_TRUE(context->getCertChainInformation().find(cert_chain_partial_output) !=
               std::string::npos);

@@ -9,6 +9,7 @@ Version history
 * access log: added REQUESTED_SERVER_NAME for SNI to tcp_proxy and http
 * admin: added :http:get:`/hystrix_event_stream` as an endpoint for monitoring envoy's statistics
   through `Hystrix dashboard <https://github.com/Netflix-Skunkworks/hystrix-dashboard/wiki>`_.
+* admin: added support for displaying subject alternate names in :ref:`certs<operations_admin_interface>` end point.
 * cli: Added support for :ref:`component log level <operations_cli>` command line option for configuring log levels of individual components.
 * cluster: added :ref:`option <envoy_api_field_Cluster.CommonLbConfig.update_merge_window>` to merge
   health check/weight/metadata updates within the given duration.
@@ -88,8 +89,7 @@ Version history
 * tcp_proxy: added support for :ref:`weighted clusters <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.weighted_clusters>`.
 * thrift_proxy: introduced thrift routing, moved configuration to correct location
 * thrift_proxy: introduced thrift configurable decoder filters
-* tls: implemented `SecretDiscoveryService <https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/\
-  discovery/v2/sds.proto>`_.
+* tls: implemented :ref:`Secret Discovery Service <config_secret_discovery_service>`.
 * tracing: added support for configuration of :ref:`tracing sampling
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
 * upstream: added configuration option to the subset load balancer to take locality weights into account when
