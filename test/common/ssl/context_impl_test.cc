@@ -53,13 +53,15 @@ TEST_F(SslContextImplTest, TestGetSubjectAlternateNamesWithDNS) {
 
 TEST_F(SslContextImplTest, TestMultipleGetSubjectAlternateNamesWithDNS) {
   FILE* fp = fopen(
-      TestEnvironment::runfilesPath("test/common/ssl/test_data/san_multiple_dns_cert.pem").c_str(), "r");
+      TestEnvironment::runfilesPath("test/common/ssl/test_data/san_multiple_dns_cert.pem").c_str(),
+      "r");
   EXPECT_NE(fp, nullptr);
   X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
   EXPECT_NE(cert, nullptr);
   const std::vector<std::string>& subject_alt_names = Utility::getSubjectAltNames(*cert);
   EXPECT_EQ(2, subject_alt_names.size());
-  EXPECT_EQ("*.example.com, server2.example.com", Utility::formattedSubjectAltNames(subject_alt_names));
+  EXPECT_EQ("*.example.com, server2.example.com",
+            Utility::formattedSubjectAltNames(subject_alt_names));
   X509_free(cert);
   fclose(fp);
 }
@@ -242,13 +244,14 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   // For the cert_chain, it is dynamically created when we run_envoy_test.sh which changes the
   // serial number with
   // every build. For cert_chain output, we check only for the certificate path.
-  std::string ca_cert_partial_output(TestEnvironment::substitute(
-      "Certificate Path: {{ test_rundir }}/test/common/ssl/test_data/san_dns_cert3.pem, Serial Number: "
-      "b13ff63f2dbc118d, "
-      "Subject Alternate Names: server1.example.com, "
-      "Days until Expiration: "));
-  std::string cert_chain_partial_output(
-      TestEnvironment::substitute("Certificate Path: {{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem"));
+  std::string ca_cert_partial_output(
+      TestEnvironment::substitute("Certificate Path: {{ test_rundir "
+                                  "}}/test/common/ssl/test_data/san_dns_cert3.pem, Serial Number: "
+                                  "b13ff63f2dbc118d, "
+                                  "Subject Alternate Names: server1.example.com, "
+                                  "Days until Expiration: "));
+  std::string cert_chain_partial_output(TestEnvironment::substitute(
+      "Certificate Path: {{ test_rundir }}/test/common/ssl/test_data/san_dns_chain3.pem"));
   EXPECT_TRUE(context->getCaCertInformation().find(ca_cert_partial_output) != std::string::npos);
   EXPECT_TRUE(context->getCertChainInformation().find(cert_chain_partial_output) !=
               std::string::npos);

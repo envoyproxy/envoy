@@ -45,7 +45,7 @@ modify different aspects of the server:
 
 .. http:get:: /certs
 
-  List out all loaded TLS certificates, including file name, serial number, and days until
+  List out all loaded TLS certificates, including file name, serial number, subject alternate names and days until
   expiration.
 
 .. _operations_admin_interface_clusters:

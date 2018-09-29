@@ -461,21 +461,24 @@ std::string ContextImpl::getCaCertInformation() const {
   if (ca_cert_ == nullptr) {
     return "";
   }
-  return fmt::format("Certificate Path: {}, Serial Number: {}, Subject Alternate Names: {}, Days until Expiration: {}",
-                     getCaFileName(), Utility::getSerialNumberFromCertificate(*ca_cert_.get()),
-                     Utility::formattedSubjectAltNames(Utility::getSubjectAltNames(*ca_cert_.get())),
-                     getDaysUntilExpiration(ca_cert_.get()));
+  return fmt::format(
+      "Certificate Path: {}, Serial Number: {}, Subject Alternate Names: {}, Days until "
+      "Expiration: {}",
+      getCaFileName(), Utility::getSerialNumberFromCertificate(*ca_cert_.get()),
+      Utility::formattedSubjectAltNames(Utility::getSubjectAltNames(*ca_cert_.get())),
+      getDaysUntilExpiration(ca_cert_.get()));
 }
 
 std::string ContextImpl::getCertChainInformation() const {
   if (cert_chain_ == nullptr) {
     return "";
   }
-  return fmt::format("Certificate Path: {}, Serial Number: {}, Subject Alternate Names: {}, Days until Expiration: {}",
-                     getCertChainFileName(),
-                     Utility::getSerialNumberFromCertificate(*cert_chain_.get()),
-                     Utility::formattedSubjectAltNames(Utility::getSubjectAltNames(*cert_chain_.get())),
-                     getDaysUntilExpiration(cert_chain_.get()));
+  return fmt::format(
+      "Certificate Path: {}, Serial Number: {}, Subject Alternate Names: {}, Days until "
+      "Expiration: {}",
+      getCertChainFileName(), Utility::getSerialNumberFromCertificate(*cert_chain_.get()),
+      Utility::formattedSubjectAltNames(Utility::getSubjectAltNames(*cert_chain_.get())),
+      getDaysUntilExpiration(cert_chain_.get()));
 }
 
 ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config)
