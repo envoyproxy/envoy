@@ -566,9 +566,17 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
     auto* thresholds = cluster_0->mutable_circuit_breakers()->add_thresholds();
-    thresholds->mutable_max_pending_requests()->set_value(0);
+    thresholds->mutable_max_pending_requests()->set_value(1);
   });
   initialize();
+
+  const auto& cluster_map = test_server_->server().clusterManager().clusters();
+  const auto& cluster_ref = cluster_map.find("cluster_0")->second;
+  const auto& cluster_info = cluster_ref.get().info();
+
+  // fake pending requests saturation
+  cluster_info->resourceManager(Upstream::ResourcePriority::Default).pendingRequests().inc();
+  cluster_info->resourceManager(Upstream::ResourcePriority::High).pendingRequests().inc();
 
   waitForLoadStatsStream();
   waitForLoadStatsRequest({});
@@ -590,6 +598,10 @@ TEST_P(LoadStatsIntegrationTest, Dropped) {
   EXPECT_EQ(0, test_server_->counter("load_reporter.errors")->value());
 
   cleanupLoadStatsConnection();
+
+  // reset pending requests saturation
+  cluster_info->resourceManager(Upstream::ResourcePriority::Default).pendingRequests().dec();
+  cluster_info->resourceManager(Upstream::ResourcePriority::High).pendingRequests().dec();
 }
 
 } // namespace

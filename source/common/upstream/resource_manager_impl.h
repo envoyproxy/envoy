@@ -23,26 +23,43 @@ namespace Upstream {
  *    maximums. This should not effect overall behavior.
  */
 class ResourceManagerImpl : public ResourceManager {
+  static std::unique_ptr<Resource> createResourceImpl(uint64_t max, Runtime::Loader& runtime,
+                                                      const std::string& runtime_key) {
+    if (max == 0) {
+      return std::make_unique<UnlimitedResourceImpl>();
+    }
+    return std::make_unique<LimitedResourceImpl>(max, runtime, runtime_key);
+  }
+
 public:
   ResourceManagerImpl(Runtime::Loader& runtime, const std::string& runtime_key,
                       uint64_t max_connections, uint64_t max_pending_requests,
                       uint64_t max_requests, uint64_t max_retries)
-      : connections_(max_connections, runtime, runtime_key + "max_connections"),
-        pending_requests_(max_pending_requests, runtime, runtime_key + "max_pending_requests"),
-        requests_(max_requests, runtime, runtime_key + "max_requests"),
-        retries_(max_retries, runtime, runtime_key + "max_retries") {}
+      : connections_(createResourceImpl(max_connections, runtime, runtime_key + "max_connections")),
+        pending_requests_(createResourceImpl(max_pending_requests, runtime,
+                                             runtime_key + "max_pending_requests")),
+        requests_(createResourceImpl(max_requests, runtime, runtime_key + "max_requests")),
+        retries_(createResourceImpl(max_retries, runtime, runtime_key + "max_retries")) {}
 
   // Upstream::ResourceManager
-  Resource& connections() override { return connections_; }
-  Resource& pendingRequests() override { return pending_requests_; }
-  Resource& requests() override { return requests_; }
-  Resource& retries() override { return retries_; }
+  Resource& connections() override { return *connections_.get(); }
+  Resource& pendingRequests() override { return *pending_requests_.get(); }
+  Resource& requests() override { return *requests_.get(); }
+  Resource& retries() override { return *retries_.get(); }
 
 private:
-  struct ResourceImpl : public Resource {
-    ResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key)
+  struct UnlimitedResourceImpl : public Resource {
+    // Upstream::Resource
+    bool canCreate() override { return true; }
+    void inc() override {}
+    void dec() override {}
+    uint64_t max() override { return std::numeric_limits<uint64_t>::max(); }
+  };
+
+  struct LimitedResourceImpl : public Resource {
+    LimitedResourceImpl(uint64_t max, Runtime::Loader& runtime, const std::string& runtime_key)
         : max_(max), runtime_(runtime), runtime_key_(runtime_key) {}
-    ~ResourceImpl() { ASSERT(current_ == 0); }
+    ~LimitedResourceImpl() { ASSERT(current_ == 0); }
 
     // Upstream::Resource
     bool canCreate() override { return current_ < max(); }
@@ -59,10 +76,10 @@ private:
     const std::string runtime_key_;
   };
 
-  ResourceImpl connections_;
-  ResourceImpl pending_requests_;
-  ResourceImpl requests_;
-  ResourceImpl retries_;
+  std::unique_ptr<Resource> connections_;
+  std::unique_ptr<Resource> pending_requests_;
+  std::unique_ptr<Resource> requests_;
+  std::unique_ptr<Resource> retries_;
 };
 
 typedef std::unique_ptr<ResourceManagerImpl> ResourceManagerImplPtr;

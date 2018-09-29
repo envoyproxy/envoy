@@ -28,19 +28,23 @@ message CircuitBreakers {
     core.RoutingPriority priority = 1;
 
     // The maximum number of connections that Envoy will make to the upstream
-    // cluster. If not specified, the default is 1024.
+    // cluster. If not specified, the default is 1024. Setting this to 0 will
+    // allow unlimited number of connections.
     google.protobuf.UInt32Value max_connections = 2;
 
     // The maximum number of pending requests that Envoy will allow to the
-    // upstream cluster. If not specified, the default is 1024.
+    // upstream cluster. If not specified, the default is 1024. Setting this to
+    // 0 will allow unlimited number of pending requests.
     google.protobuf.UInt32Value max_pending_requests = 3;
 
     // The maximum number of parallel requests that Envoy will make to the
-    // upstream cluster. If not specified, the default is 1024.
+    // upstream cluster. If not specified, the default is 1024. Setting this to
+    // 0 will allow unlimited number of parallel requests.
     google.protobuf.UInt32Value max_requests = 4;
 
     // The maximum number of parallel retries that Envoy will allow to the
-    // upstream cluster. If not specified, the default is 3.
+    // upstream cluster. If not specified, the default is 3. Setting this to 0
+    // will allow unlimited number of parallel retries.
     google.protobuf.UInt32Value max_retries = 5;
   }
 
