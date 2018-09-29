@@ -1,14 +1,10 @@
-references:
-  envoy-build-image: &envoy-build-image
-    envoyproxy/envoy-build:faea2a2ebc397b7a3a5e3c877ceaefc5cf4daf25
-
 version: 2.1
 
 executors:
   ubuntu-build:
     description: "A regular build executor based on ubuntu image"
     docker:
-      - image: *envoy-build-image
+      - image: envoyproxy/envoy-build:faea2a2ebc397b7a3a5e3c877ceaefc5cf4daf25
     resource_class: xlarge
     working_directory: /source
 
