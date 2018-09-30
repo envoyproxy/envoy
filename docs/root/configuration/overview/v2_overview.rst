@@ -6,7 +6,7 @@ Overview (v2 API)
 The Envoy v2 APIs are defined as `proto3
 <https://developers.google.com/protocol-buffers/docs/proto3>`_ `Protocol Buffers
 <https://developers.google.com/protocol-buffers/>`_ in the `data plane API
-repository <https://github.com/envoyproxy/data-plane-api/tree/master/api>`_. They evolve the
+repository <https://github.com/envoyproxy/data-plane-api/tree/master/envoy/api>`_. They evolve the
 existing :ref:`v1 APIs and concepts <config_overview_v1>` to support:
 
 * Streaming delivery of `xDS <https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md>`_
