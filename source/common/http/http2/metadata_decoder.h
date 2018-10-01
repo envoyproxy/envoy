@@ -35,7 +35,7 @@ public:
    * @param end_metadata indicates if all the METADATA has been received.
    * @return whether the operation succeeds.
    */
-  bool OnMetadataFrameComplete(bool end_metadata);
+  bool onMetadataFrameComplete(bool end_metadata);
 
   /**
    * Registers a callback to receive metadata events on the wire.
@@ -62,8 +62,9 @@ private:
   /**
    * Decodes METADATA payload using nghttp2.
    * @param end_metadata indicates is END_METADATA is true.
+   * @return if decoding succeeds.
    */
-  void DecodeMetadataPayloadUsingNghttp2(bool end_metadata);
+  bool decodeMetadataPayloadUsingNghttp2(bool end_metadata);
 
   // Metadata event callback function.
   MetadataCallback callback_;

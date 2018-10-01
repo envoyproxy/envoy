@@ -83,7 +83,7 @@ static int unpack_extension_callback(nghttp2_session* session, void** payload,
 
   MetadataDecoder* decoder = reinterpret_cast<UserData*>(user_data)->decoder;
   EXPECT_EQ(hd->stream_id, decoder->getStreamId());
-  bool result = decoder->OnMetadataFrameComplete((hd->flags == END_METADATA_FLAG) ? 1 : 0);
+  bool result = decoder->onMetadataFrameComplete((hd->flags == END_METADATA_FLAG) ? 1 : 0);
   return result ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
 }
 
@@ -328,6 +328,26 @@ TEST_F(MetadataEncoderDecoderTest, TestDecodeCallbackSetAfterReceiveMetadata) {
   // Registers nullptr will do nothing.
   decoder_.registerMetadataCallback(nullptr);
   decoder_.registerMetadataCallback(cb);
+
+  cleanUp();
+}
+
+TEST_F(MetadataEncoderDecoderTest, TestDecodeBadData) {
+  initialize();
+
+  MetadataMap metadata_map = {
+      {"header_key", "header_value"},
+  };
+
+  // Receives payload first.
+  encoder_.createPayload(metadata_map);
+  nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID, nullptr);
+  nghttp2_session_send(session_);
+
+  // Messes up with the encoded payload, and passes it to the decoder.
+  output_buffer_.buf[10] |= 0xff;
+  decoder_.receiveMetadata(output_buffer_.buf, output_buffer_.length);
+  EXPECT_FALSE(decoder_.onMetadataFrameComplete(true));
 
   cleanUp();
 }
