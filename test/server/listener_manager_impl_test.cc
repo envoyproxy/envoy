@@ -1782,6 +1782,23 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidDesti
                             EnvoyException, "malformed IP address: a.b.c.d");
 }
 
+TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidSourceIPMatch) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    address:
+      socket_address: { address: 127.0.0.1, port_value: 1234 }
+    listener_filters:
+    - name: "envoy.listener.tls_inspector"
+      config: {}
+    filter_chains:
+    - filter_chain_match:
+        source_prefix_ranges: { address_prefix: a.b.c.d, prefix_len: 32 }
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_THROW_WITH_MESSAGE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
+                            EnvoyException, "malformed IP address: a.b.c.d");
+}
+
 TEST_F(ListenerManagerImplWithRealFiltersTest, SingleFilterChainWithInvalidServerNamesMatch) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
     address:
