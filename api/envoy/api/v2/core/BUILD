@@ -37,11 +37,15 @@ api_proto_library_internal(
     visibility = [
         ":friends",
     ],
+    deps = [
+        "//envoy/type:percent",
+    ],
 )
 
 api_go_proto_library(
     name = "base",
     proto = ":base",
+    deps = ["//envoy/type:percent_go_proto"],
 )
 
 api_proto_library_internal(
