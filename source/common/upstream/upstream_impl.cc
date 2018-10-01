@@ -1189,14 +1189,6 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
               locality_lb_endpoint_.priority()));
         }
 
-        for (const auto& set : parent_.prioritySet().hostSetsPerPriority()) {
-          for (const auto& host : set->hosts()) {
-            if (parent_.health_checker_ != nullptr) {
-              updated_hosts.insert({host->address()->asString(), host});
-            }
-          }
-        }
-
         HostVector hosts_added;
         HostVector hosts_removed;
         if (parent_.updateDynamicHostList(new_hosts, hosts_, hosts_added, hosts_removed,
@@ -1208,6 +1200,14 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
         }
 
+        // TODO(dio): Not sure if we should do this if active health checking is disabled.
+        if (parent_.health_checker_ != nullptr) {
+          for (const auto& set : parent_.prioritySet().hostSetsPerPriority()) {
+            for (const auto& host : set->hosts()) {
+              updated_hosts.insert({host->address()->asString(), host});
+            }
+          }
+        }
         parent_.updateHostMap(std::move(updated_hosts));
 
         // If there is an initialize callback, fire it now. Note that if the cluster refers to
