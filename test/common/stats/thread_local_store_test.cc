@@ -39,6 +39,12 @@ public:
     store_->addSink(sink_);
   }
 
+  /**
+   * Finds a stat in a vector with the given name.
+   * @param name the stat name to look for.
+   * @param v the vector of stats.
+   * @return the stat
+   */
   template <typename T> T findByName(const std::string& name, const std::vector<T>& v) {
     auto pos = std::find_if(v.begin(), v.end(),
                             [&name](const T& stat) -> bool { return stat->name() == name; });
