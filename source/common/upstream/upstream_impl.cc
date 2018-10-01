@@ -1198,6 +1198,8 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
             return host->priority() == locality_lb_endpoint_.priority();
           }));
           parent_.updateAllHosts(hosts_added, hosts_removed, locality_lb_endpoint_.priority());
+        } else {
+          parent_.info_->stats().update_no_rebuild_.inc();
         }
 
         for (const auto& set : parent_.prioritySet().hostSetsPerPriority()) {
