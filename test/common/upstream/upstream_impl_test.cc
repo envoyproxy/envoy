@@ -406,7 +406,7 @@ TEST(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   resolver.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1"}));
 
   const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();
-  EXPECT_EQ(1UL, hosts.size());
+  EXPECT_EQ(0UL, hosts.size());
 }
 
 TEST(StrictDnsClusterImplTest, LoadAssignmentBasic) {
