@@ -339,7 +339,7 @@ TEST_F(MetadataEncoderDecoderTest, TestDecodeBadData) {
       {"header_key", "header_value"},
   };
 
-  // Receives payload first.
+  // Generates payload.
   encoder_.createPayload(metadata_map);
   nghttp2_submit_extension(session_, METADATA_FRAME_TYPE, END_METADATA_FLAG, STREAM_ID, nullptr);
   nghttp2_session_send(session_);
