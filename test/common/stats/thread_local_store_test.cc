@@ -39,6 +39,13 @@ public:
     store_->addSink(sink_);
   }
 
+  template <typename T> T findByName(const std::string& name, const std::vector<T>& v) {
+    auto pos = std::find_if(v.begin(), v.end(),
+                            [&name](const T& stat) -> bool { return stat->name() == name; });
+    EXPECT_TRUE(pos != v.end());
+    return *pos;
+  }
+
   NiceMock<Event::MockDispatcher> main_thread_dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   StatsOptionsImpl options_;
@@ -184,10 +191,10 @@ TEST_F(StatsThreadLocalStoreTest, NoTls) {
   store_->deliverHistogramToSinks(h1, 100);
 
   EXPECT_EQ(2UL, store_->counters().size());
-  EXPECT_EQ(&c1, store_->counters().front().get());
-  EXPECT_EQ(2L, store_->counters().front().use_count());
+  EXPECT_EQ(&c1, findByName("c1", store_->counters()).get());
+  EXPECT_EQ(3L, findByName("c1", store_->counters()).use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
-  EXPECT_EQ(&g1, store_->gauges().front().get());
+  EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
 
   // Includes overflow stat.
@@ -212,20 +219,20 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
   EXPECT_EQ(&h1, &store_->histogram("h1"));
 
   EXPECT_EQ(2UL, store_->counters().size());
-  EXPECT_EQ(&c1, store_->counters().front().get());
-  EXPECT_EQ(3L, store_->counters().front().use_count());
+  EXPECT_EQ(&c1, findByName("c1", store_->counters()).get());
+  EXPECT_EQ(4L, findByName("c1", store_->counters()).use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
-  EXPECT_EQ(&g1, store_->gauges().front().get());
+  EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(3L, store_->gauges().front().use_count());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
 
   EXPECT_EQ(2UL, store_->counters().size());
-  EXPECT_EQ(&c1, store_->counters().front().get());
-  EXPECT_EQ(2L, store_->counters().front().use_count());
+  EXPECT_EQ(&c1, findByName("c1", store_->counters()).get());
+  EXPECT_EQ(3L, findByName("c1", store_->counters()).use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
-  EXPECT_EQ(&g1, store_->gauges().front().get());
+  EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
   EXPECT_EQ(2L, store_->gauges().front().use_count());
 
   // Includes overflow stat.
@@ -291,9 +298,9 @@ TEST_F(StatsThreadLocalStoreTest, ScopeDelete) {
   EXPECT_CALL(*alloc_, alloc(_));
   scope1->counter("c1");
   EXPECT_EQ(2UL, store_->counters().size());
-  CounterSharedPtr c1 = store_->counters().front();
+  CounterSharedPtr c1 = findByName("scope1.c1", store_->counters());
   EXPECT_EQ("scope1.c1", c1->name());
-  EXPECT_EQ(store_->source().cachedCounters().front(), c1);
+  EXPECT_EQ(findByName("scope1.c1", store_->source().cachedCounters()), c1);
 
   EXPECT_CALL(main_thread_dispatcher_, post(_));
   EXPECT_CALL(tls_, runOnAllThreads(_));
