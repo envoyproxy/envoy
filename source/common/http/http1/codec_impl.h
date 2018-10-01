@@ -183,7 +183,7 @@ private:
   /**
    * Dispatch a memory span.
    * @param slice supplies the start address.
-   * @len supplies the lenght of the span.
+   * @len supplies the length of the span.
    */
   size_t dispatchSlice(const char* slice, size_t len);
 
@@ -297,7 +297,7 @@ private:
 
   /**
    * Manipulate the request's first line, parsing the url and converting to a relative path if
-   * neccessary. Compute Host / :authority headers based on 7230#5.7 and 7230#6
+   * necessary. Compute Host / :authority headers based on 7230#5.7 and 7230#6
    *
    * @param is_connect true if the request has the CONNECT method
    * @param headers the request's headers

@@ -92,7 +92,7 @@ public:
 
   /**
    * @return std::string the protocol to use as selected by network level negotiation. (E.g., ALPN).
-   *         If network level negotation is not supported by the connection or no protocol
+   *         If network level negotiation is not supported by the connection or no protocol
    *         has been negotiated the empty string is returned.
    */
   virtual std::string protocol() const PURE;

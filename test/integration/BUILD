@@ -229,6 +229,7 @@ envoy_cc_test_library(
         ":integration_lib",
         ":pass_through_filter_lib",
         ":test_host_predicate_lib",
+        "//include/envoy/event:timer_interface",
         "//source/common/common:thread_annotations",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
@@ -254,7 +255,10 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "idle_timeout_integration_test",
     srcs = ["idle_timeout_integration_test.cc"],
-    deps = [":http_protocol_integration_lib"],
+    deps = [
+        ":http_protocol_integration_lib",
+        "//test/test_common:test_time_lib",
+    ],
 )
 
 envoy_cc_test_library(
@@ -327,7 +331,9 @@ envoy_cc_test_library(
         "//test/test_common:environment_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:printers_lib",
+        "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
+        "//test/test_common:test_time_system_interface",
         "//test/test_common:utility_lib",
     ],
 )

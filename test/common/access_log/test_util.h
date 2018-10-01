@@ -5,6 +5,8 @@
 #include "common/common/assert.h"
 #include "common/request_info/filter_state_impl.h"
 
+#include "test/test_common/test_time.h"
+
 namespace Envoy {
 
 class TestRequestInfo : public RequestInfo::RequestInfo {
@@ -16,7 +18,7 @@ public:
     fake_time.tm_mday = 1;
     start_time_ = std::chrono::system_clock::from_time_t(timegm(&fake_time));
 
-    MonotonicTime now = std::chrono::steady_clock::now();
+    MonotonicTime now = timeSystem().monotonicTime();
     start_time_monotonic_ = now;
     end_time_ = now + std::chrono::milliseconds(3);
   }
@@ -87,7 +89,7 @@ public:
   }
 
   void onLastDownstreamRxByteReceived() override {
-    last_rx_byte_received_ = std::chrono::steady_clock::now();
+    last_rx_byte_received_ = timeSystem().monotonicTime();
   }
 
   absl::optional<std::chrono::nanoseconds> firstUpstreamTxByteSent() const override {
@@ -95,7 +97,7 @@ public:
   }
 
   void onFirstUpstreamTxByteSent() override {
-    first_upstream_tx_byte_sent_ = std::chrono::steady_clock::now();
+    first_upstream_tx_byte_sent_ = timeSystem().monotonicTime();
   }
 
   absl::optional<std::chrono::nanoseconds> lastUpstreamTxByteSent() const override {
@@ -103,7 +105,7 @@ public:
   }
 
   void onLastUpstreamTxByteSent() override {
-    last_upstream_tx_byte_sent_ = std::chrono::steady_clock::now();
+    last_upstream_tx_byte_sent_ = timeSystem().monotonicTime();
   }
 
   absl::optional<std::chrono::nanoseconds> firstUpstreamRxByteReceived() const override {
@@ -111,7 +113,7 @@ public:
   }
 
   void onFirstUpstreamRxByteReceived() override {
-    first_upstream_rx_byte_received_ = std::chrono::steady_clock::now();
+    first_upstream_rx_byte_received_ = timeSystem().monotonicTime();
   }
 
   absl::optional<std::chrono::nanoseconds> lastUpstreamRxByteReceived() const override {
@@ -119,7 +121,7 @@ public:
   }
 
   void onLastUpstreamRxByteReceived() override {
-    last_upstream_rx_byte_received_ = std::chrono::steady_clock::now();
+    last_upstream_rx_byte_received_ = timeSystem().monotonicTime();
   }
 
   absl::optional<std::chrono::nanoseconds> firstDownstreamTxByteSent() const override {
@@ -127,7 +129,7 @@ public:
   }
 
   void onFirstDownstreamTxByteSent() override {
-    first_downstream_tx_byte_sent_ = std::chrono::steady_clock::now();
+    first_downstream_tx_byte_sent_ = timeSystem().monotonicTime();
   }
 
   absl::optional<std::chrono::nanoseconds> lastDownstreamTxByteSent() const override {
@@ -135,10 +137,10 @@ public:
   }
 
   void onLastDownstreamTxByteSent() override {
-    last_downstream_tx_byte_sent_ = std::chrono::steady_clock::now();
+    last_downstream_tx_byte_sent_ = timeSystem().monotonicTime();
   }
 
-  void onRequestComplete() override { end_time_ = std::chrono::steady_clock::now(); }
+  void onRequestComplete() override { end_time_ = timeSystem().monotonicTime(); }
 
   void resetUpstreamTimings() override {
     first_upstream_tx_byte_sent_ = absl::optional<MonotonicTime>{};
@@ -168,6 +170,8 @@ public:
 
   const std::string& requestedServerName() const override { return requested_server_name_; }
 
+  Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
+
   SystemTime start_time_;
   MonotonicTime start_time_monotonic_;
 
@@ -192,6 +196,7 @@ public:
   envoy::api::v2::core::Metadata metadata_{};
   Envoy::RequestInfo::FilterStateImpl per_request_state_{};
   std::string requested_server_name_;
+  DangerousDeprecatedTestTime test_time_;
 };
 
 } // namespace Envoy

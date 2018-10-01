@@ -10,12 +10,14 @@
 
 #include "server/watchdog_impl.h"
 
+#include "absl/synchronization/mutex.h"
+
 namespace Envoy {
 namespace Server {
 
 GuardDogImpl::GuardDogImpl(Stats::Scope& stats_scope, const Server::Configuration::Main& config,
-                           TimeSource& tsource)
-    : time_source_(tsource), miss_timeout_(config.wdMissTimeout()),
+                           Event::TimeSystem& time_system)
+    : time_system_(time_system), miss_timeout_(config.wdMissTimeout()),
       megamiss_timeout_(config.wdMegaMissTimeout()), kill_timeout_(config.wdKillTimeout()),
       multi_kill_timeout_(config.wdMultiKillTimeout()),
       loop_interval_([&]() -> std::chrono::milliseconds {
@@ -37,7 +39,7 @@ GuardDogImpl::~GuardDogImpl() { stop(); }
 
 void GuardDogImpl::threadRoutine() {
   do {
-    const auto now = time_source_.monotonicTime();
+    const auto now = time_system_.monotonicTime();
     bool seen_one_multi_timeout(false);
     Thread::LockGuard guard(wd_lock_);
     for (auto& watched_dog : watched_dogs_) {
@@ -82,11 +84,11 @@ void GuardDogImpl::threadRoutine() {
 WatchDogSharedPtr GuardDogImpl::createWatchDog(int32_t thread_id) {
   // Timer started by WatchDog will try to fire at 1/2 of the interval of the
   // minimum timeout specified. loop_interval_ is const so all shared state
-  // accessed out of the locked section below is const (time_source_ has no
+  // accessed out of the locked section below is const (time_system_ has no
   // state).
   auto wd_interval = loop_interval_ / 2;
   WatchDogSharedPtr new_watchdog =
-      std::make_shared<WatchDogImpl>(thread_id, time_source_, wd_interval);
+      std::make_shared<WatchDogImpl>(thread_id, time_system_, wd_interval);
   WatchedDog watched_dog;
   watched_dog.dog_ = new_watchdog;
   {
@@ -113,7 +115,22 @@ bool GuardDogImpl::waitOrDetectStop() {
   Thread::LockGuard guard(exit_lock_);
   // Spurious wakeups are OK without explicit handling. We'll just check
   // earlier than strictly required for that round.
-  exit_event_.waitFor(exit_lock_, loop_interval_);
+
+  // Preferably, we should be calling
+  //   time_system_.waitFor(exit_lock_, exit_event_, loop_interval_);
+  // here, but that makes GuardDogMissTest.* very flaky. The reason that
+  // directly calling condvar waitFor works is that it doesn't advance
+  // simulated time, which the test is carefully controlling.
+  //
+  // One alternative approach that would be easier to test is to use a private
+  // dispatcher and a TimerCB to execute the loop body of threadRoutine(). In
+  // this manner, the same dynamics would occur in production, with added
+  // overhead from libevent, But then the unit-test would purely control the
+  // advancement of time, and thus be more robust. Another variation would be
+  // to run this watchdog on the main-thread dispatcher, though such an approach
+  // could not detect when the main-thread was stuck.
+  exit_event_.waitFor(exit_lock_, loop_interval_); // NO_CHECK_FORMAT(real_time)
+
   return run_thread_;
 }
 

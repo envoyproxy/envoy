@@ -1006,6 +1006,30 @@ virtual_hosts:
   }
 }
 
+// Validate that we can't remove :-prefixed request headers.
+TEST(RouteMatcherTest, TestRequestHeadersToRemoveNoPseudoHeader) {
+  for (const std::string& header : {":path", ":authority", ":method", ":scheme", ":status",
+                                    ":protocol", ":no-chunks", ":status"}) {
+    const std::string yaml = fmt::format(R"EOF(
+name: foo
+virtual_hosts:
+  - name: www2
+    domains: ["*"]
+    request_headers_to_remove:
+      - {}
+)EOF",
+                                         header);
+
+    NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+    NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+
+    envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
+
+    EXPECT_THROW_WITH_MESSAGE(TestConfigImpl config(route_config, factory_context, true),
+                              EnvoyException, ":-prefixed headers may not be removed");
+  }
+}
+
 TEST(RouteMatcherTest, Priority) {
   std::string json = R"EOF(
 {
@@ -1823,7 +1847,6 @@ TEST_F(RouterMatcherHashPolicyTest, HashTerminal) {
 }
 
 TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   {
     auto hash_policy = firstRouteHashPolicy();
     EXPECT_EQ(envoy::api::v2::route::RouteAction::HashPolicy::POLICY_SPECIFIER_NOT_SET,
@@ -1971,16 +1994,104 @@ TEST(RouteMatcherTest, Runtime) {
   Runtime::MockSnapshot snapshot;
 
   ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+  EXPECT_CALL(snapshot, getInteger("some_key", 50))
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(Return(42));
 
   TestConfigImpl config(parseRouteConfigurationFromJson(json), factory_context, true);
 
-  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 10)).WillOnce(Return(true));
   EXPECT_EQ("something_else",
-            config.route(genHeaders("www.lyft.com", "/", "GET"), 10)->routeEntry()->clusterName());
+            config.route(genHeaders("www.lyft.com", "/", "GET"), 41)->routeEntry()->clusterName());
 
-  EXPECT_CALL(snapshot, featureEnabled("some_key", 50, 20)).WillOnce(Return(false));
   EXPECT_EQ("www2",
-            config.route(genHeaders("www.lyft.com", "/", "GET"), 20)->routeEntry()->clusterName());
+            config.route(genHeaders("www.lyft.com", "/", "GET"), 43)->routeEntry()->clusterName());
+}
+
+TEST(RouteMatcherTest, FractionalRuntime) {
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    routes:
+      - match:
+          prefix: "/"
+          runtime_fraction:
+            default_value:
+              numerator: 50
+              denominator: MILLION
+            runtime_key: "bogus_key"
+        route:
+          cluster: "something_else"
+      - match:
+          prefix: "/"
+        route:
+          cluster: "www2"
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Runtime::MockSnapshot snapshot;
+  ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+
+  const std::string runtime_fraction = R"EOF(
+    numerator: 42
+    denominator: HUNDRED
+  )EOF";
+  EXPECT_CALL(snapshot, get("bogus_key"))
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(ReturnRef(runtime_fraction));
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+
+  EXPECT_EQ(
+      "something_else",
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 41)->routeEntry()->clusterName());
+
+  EXPECT_EQ(
+      "www2",
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 43)->routeEntry()->clusterName());
+}
+
+TEST(RouteMatcherTest, FractionalRuntimeDefault) {
+  std::string yaml = R"EOF(
+virtual_hosts:
+  - name: "www2"
+    domains: ["www.lyft.com"]
+    routes:
+      - match:
+          prefix: "/"
+          runtime_fraction:
+            default_value:
+              numerator: 50
+              denominator: MILLION
+            runtime_key: "bogus_key"
+        route:
+          cluster: "something_else"
+      - match:
+          prefix: "/"
+        route:
+          cluster: "www2"
+  )EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Runtime::MockSnapshot snapshot;
+  ON_CALL(factory_context.runtime_loader_, snapshot()).WillByDefault(ReturnRef(snapshot));
+
+  const std::string runtime_fraction = R"EOF(
+    this string is nonsense and should fail parsing
+  )EOF";
+  EXPECT_CALL(snapshot, get("bogus_key"))
+      .Times(testing::AtLeast(1))
+      .WillRepeatedly(ReturnRef(runtime_fraction));
+
+  TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, false);
+
+  EXPECT_EQ(
+      "something_else",
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 49)->routeEntry()->clusterName());
+
+  EXPECT_EQ(
+      "www2",
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 51)->routeEntry()->clusterName());
 }
 
 TEST(RouteMatcherTest, ShadowClusterNotFound) {

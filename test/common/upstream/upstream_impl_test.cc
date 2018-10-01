@@ -390,7 +390,7 @@ TEST(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   resolver.dns_callback_(TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
 
   // Verify that both endpoints are initially marked with FAILED_ACTIVE_HC, then
-  // clear the flag to simulate that these endpoints have been sucessfully health
+  // clear the flag to simulate that these endpoints have been successfully health
   // checked.
   {
     const auto& hosts = cluster.prioritySet().hostSetsPerPriority()[0]->hosts();

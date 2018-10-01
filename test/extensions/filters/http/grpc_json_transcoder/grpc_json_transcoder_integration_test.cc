@@ -24,7 +24,7 @@ class GrpcJsonTranscoderIntegrationTest
       public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   GrpcJsonTranscoderIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
   /**
    * Global initializer for all integration tests.
    */

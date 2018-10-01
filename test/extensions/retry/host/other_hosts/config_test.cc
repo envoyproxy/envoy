@@ -33,7 +33,7 @@ TEST(OtherHostsRetryPredicateConfigTest, PredicateTest) {
 
   TestHostPredicateFactoryCallback callback;
   ProtobufWkt::Struct config;
-  factory->createHostPredicate(callback, config);
+  factory->createHostPredicate(callback, config, 3);
 
   auto predicate = callback.host_predicate_;
 

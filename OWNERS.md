@@ -30,7 +30,7 @@ routing PRs, questions, etc. to the right place.
   * Base server (watchdog, workers, startup, stack trace handling, etc.).
 * Daniel Hochman ([danielhochman](https://github.com/danielhochman)) (dhochman@lyft.com)
   * Redis, Python, configuration/operational questions.
-* Lizan Zhou ([lizan](https://github.com/lizan)) (zlizan@google.com)
+* Lizan Zhou ([lizan](https://github.com/lizan)) (lizan@tetrate.io)
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions).
 * Dhi Aurrahman ([dio](https://github.com/dio)) (dio@tetrate.io)
   * Lua, access logging, and general miscellany.

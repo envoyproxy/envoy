@@ -6,7 +6,7 @@ Overview (v2 API)
 The Envoy v2 APIs are defined as `proto3
 <https://developers.google.com/protocol-buffers/docs/proto3>`_ `Protocol Buffers
 <https://developers.google.com/protocol-buffers/>`_ in the `data plane API
-repository <https://github.com/envoyproxy/data-plane-api/tree/master/api>`_. They evolve the
+repository <https://github.com/envoyproxy/data-plane-api/tree/master/envoy/api>`_. They evolve the
 existing :ref:`v1 APIs and concepts <config_overview_v1>` to support:
 
 * Streaming delivery of `xDS <https://github.com/envoyproxy/data-plane-api/blob/master/XDS_PROTOCOL.md>`_
@@ -576,8 +576,20 @@ connection with the management server.
 Envoy debug logs the fact that it is not able to establish a connection with the management server
 every time it attempts a connection.
 
-:ref:`upstream_cx_connect_fail <config_cluster_manager_cluster_stats>` a cluster level statistic
-of the cluster pointing to management server provides a signal for monitoring this behavior.
+:ref:`connected_state <management_server_stats>` statistic provides a signal for monitoring this behavior.
+
+.. _management_server_stats:
+
+Statistics
+----------
+
+Management Server has a statistics tree rooted at *control_plane.* with the following statistics:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   connected_state, Gauge, A boolan (1 for connected and 0 for disconnected) that indicates the current connection state with management server
 
 .. _config_overview_v2_status:
 
