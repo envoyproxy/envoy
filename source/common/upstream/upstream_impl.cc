@@ -1127,10 +1127,17 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
   // At this point we know that we are different so make a new host list and notify.
   for (const ResolveTargetPtr& target : resolve_targets_) {
     priority_state_manager.initializePriorityFor(target->locality_lb_endpoint_);
-    for (const HostSharedPtr& host : target->hosts_) {
-      if (target->locality_lb_endpoint_.priority() == current_priority) {
-        priority_state_manager.registerHostForPriority(host, target->locality_lb_endpoint_,
-                                                       target->lb_endpoint_, absl::nullopt);
+    std::unordered_set<std::string> host_addresses;
+    if (target->locality_lb_endpoint_.priority() == current_priority) {
+      for (auto i = target->hosts_.begin(); i != target->hosts_.end();) {
+        if (host_addresses.count((*i)->address()->asString()) == 0) {
+          priority_state_manager.registerHostForPriority(*i, target->locality_lb_endpoint_,
+                                                         target->lb_endpoint_, absl::nullopt);
+          host_addresses.insert((*i)->address()->asString());
+          ++i;
+        } else {
+          i = target->hosts_.erase(i);
+        }
       }
     }
   }
