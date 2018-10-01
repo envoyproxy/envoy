@@ -1281,58 +1281,45 @@ void HttpIntegrationTest::testUpstreamDisconnectWithTwoRequests() {
 }
 
 // This filter exists to synthetically test network backup by faking TCP
-// conneciton back-up when an encode is finished.
+// connection back-up when an encode is finished, and unblocking it when the
+// next stream starts to decode headers.
 // Allows regression tests for https://github.com/envoyproxy/envoy/issues/4541
 // TODO(alyssawilk) move this somewhere general and turn it up for more tests.
 class TestPauseFilter : public PassThroughFilter {
 public:
-  // A wrapper around a TimerPtr which can be passed to the timer on creation,
-  // so it can delete itself when called.
-  struct SelfOwningTimer {
-    Event::TimerPtr timer_;
-  };
+  // Pass in a some global filter state to ensure the Network::Connection is
+  // blocked and unblocked exactly once.
+  TestPauseFilter(absl::Mutex& encode_lock, uint32_t& number_of_encode_calls_ref,
+                  uint32_t& number_of_decode_calls_ref)
+      : encode_lock_(encode_lock), number_of_encode_calls_ref_(number_of_encode_calls_ref),
+        number_of_decode_calls_ref_(number_of_decode_calls_ref) {}
 
-  // Pass in a global "is this the first stream to finish encoding" to ensure
-  // the Network::Connection is "blocked" exactly once.
-  TestPauseFilter(absl::Mutex& encode_lock, bool& first_encode_ref)
-      : encode_lock_(encode_lock), first_encode_ref_(first_encode_ref) {}
+  Http::FilterDataStatus decodeData(Buffer::Instance& buf, bool end_stream) override {
+    if (end_stream) {
+      absl::WriterMutexLock m(&encode_lock_);
+      number_of_decode_calls_ref_++;
+      if (number_of_decode_calls_ref_ == 2) {
+        // If this is the second stream to decode headers, force low watermark state.
+        connection()->onLowWatermark();
+      }
+    }
+    return PassThroughFilter::decodeData(buf, end_stream);
+  }
 
   Http::FilterDataStatus encodeData(Buffer::Instance& buf, bool end_stream) override {
-    absl::WriterMutexLock m(&encode_lock_);
-    // If this is the first time any stream has finished encoding, force the
-    // connection to a high watermark state, and set an alarm to force low
-    // watermark state.
-    if (end_stream && first_encode_ref_) {
-      forceHighWatermark();
+    if (end_stream) {
+      absl::WriterMutexLock m(&encode_lock_);
+      number_of_encode_calls_ref_++;
+      if (number_of_encode_calls_ref_ == 1) {
+        // If this is the first stream to encode headers, force high watermark state.
+        connection()->onHighWatermark();
+      }
     }
     return PassThroughFilter::encodeData(buf, end_stream);
   }
 
-  void forceHighWatermark() {
-    first_encode_ref_ = false; // Make sure we only do this once.
-    Network::ConnectionImpl* connection_impl = connection();
-    connection_impl->onHighWatermark(); // Force high watermark state.
-
-    // Unfortunately this filter is about to self destruct, so the timer
-    // to lower the watermark state must outlive the filter.
-    //
-    // Create a "self-owning" timer and pass it an absolute pointer to the
-    // connection. The timer will delete itself on destruction.
-    //
-    // It is up to the users of this filter to make sure the connection_impl
-    // will outlive the timer.
-    SelfOwningTimer* timer_container = new SelfOwningTimer;
-    timer_container->timer_ =
-        decoder_callbacks_->dispatcher().createTimer([connection_impl, timer_container]() -> void {
-          ENVOY_LOG_MISC(debug, "Forcing watermark low");
-          connection_impl->onLowWatermark();
-          delete timer_container;
-        });
-    timer_container->timer_->enableTimer(std::chrono::milliseconds(50));
-  }
-
   Network::ConnectionImpl* connection() {
-    // As long as wie're doing horrible things let's do *all* the horrible things.
+    // As long as we're doing horrible things let's do *all* the horrible things.
     // Assert the connection we have is a ConnectionImpl and const cast it so we
     // can force watermark changes.
     auto conn_impl = dynamic_cast<const Network::ConnectionImpl*>(decoder_callbacks_->connection());
@@ -1340,7 +1327,8 @@ public:
   }
 
   absl::Mutex& encode_lock_;
-  bool& first_encode_ref_;
+  uint32_t& number_of_encode_calls_ref_;
+  uint32_t& number_of_decode_calls_ref_;
 };
 
 class TestPauseFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
@@ -1349,14 +1337,16 @@ public:
 
   Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
     return [&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      // GUARDED_BY insists the lock be held when the guarded variables are passed by reference.
       absl::WriterMutexLock m(&encode_lock_);
-      callbacks.addStreamFilter(
-          std::make_shared<::Envoy::TestPauseFilter>(encode_lock_, first_encode_));
+      callbacks.addStreamFilter(std::make_shared<::Envoy::TestPauseFilter>(
+          encode_lock_, number_of_encode_calls_, number_of_decode_calls_));
     };
   }
 
   absl::Mutex encode_lock_;
-  bool first_encode_ GUARDED_BY(encode_lock_) = true;
+  uint32_t number_of_encode_calls_ GUARDED_BY(encode_lock_) = 0;
+  uint32_t number_of_decode_calls_ GUARDED_BY(encode_lock_) = 0;
 };
 
 // perform static registration
