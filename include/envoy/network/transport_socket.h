@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/common/pure.h"
+#include "envoy/network/io_defs.h"
 #include "envoy/ssl/connection.h"
 
 namespace Envoy {
@@ -11,34 +11,6 @@ class Connection;
 enum class ConnectionEvent;
 
 /**
- * Action that should occur on a connection after I/O.
- */
-enum class PostIoAction {
-  // Close the connection.
-  Close,
-  // Keep the connection open.
-  KeepOpen
-};
-
-/**
- * Result of each I/O event.
- */
-struct IoResult {
-  PostIoAction action_;
-
-  /**
-   * Number of bytes processed by the I/O event.
-   */
-  uint64_t bytes_processed_;
-
-  /**
-   * True if an end-of-stream was read from a connection. This
-   * can only be true for read operations.
-   */
-  bool end_stream_read_;
-};
-
-/**
  * Callbacks used by transport socket instances to communicate with connection.
  */
 class TransportSocketCallbacks {
@@ -46,9 +18,14 @@ public:
   virtual ~TransportSocketCallbacks() {}
 
   /**
-   * @return int the file descriptor associated with the connection.
+   * @return int the io handle associated with the connection.
    */
-  virtual int fd() const PURE;
+  virtual int ioHandle() const PURE;
+
+  /**
+   * @return int the io handle type associated with the connection.
+   */
+  virtual IoHandleType ioHandleType() const PURE;
 
   /**
    * @return Network::Connection& the connection interface.

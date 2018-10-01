@@ -8,6 +8,7 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/io_defs.h"
 #include "envoy/network/transport_socket.h"
 
 #include "common/buffer/watermark_buffer.h"
@@ -97,7 +98,8 @@ public:
   }
 
   // Network::TransportSocketCallbacks
-  int fd() const override { return socket_->fd(); }
+  int ioHandle() const override { return socket_->ioHandle(); }
+  IoHandleType ioHandleType() const override { return socket_->ioHandleType(); }
   Connection& connection() override { return *this; }
   void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?

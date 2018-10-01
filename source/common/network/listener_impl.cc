@@ -59,7 +59,7 @@ ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, Li
 
   if (bind_to_port) {
     listener_.reset(
-        evconnlistener_new(&dispatcher.base(), listenCallback, this, 0, -1, socket.fd()));
+        evconnlistener_new(&dispatcher.base(), listenCallback, this, 0, -1, socket.ioHandle()));
 
     if (!listener_) {
       throw CreateListenerException(

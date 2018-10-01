@@ -35,7 +35,7 @@ public:
     filter_ = std::make_unique<Filter>(cfg_);
     EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
     EXPECT_CALL(cb_, dispatcher()).WillRepeatedly(ReturnRef(dispatcher_));
-    EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(42));
+    EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(Return(42));
 
     EXPECT_CALL(dispatcher_,
                 createFileEvent_(_, _, Event::FileTriggerType::Edge,
