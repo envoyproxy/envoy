@@ -352,6 +352,84 @@ TEST_F(OutlierDetectorImplTest, BasicFlowGatewayFailure) {
 }
 
 /**
+ * Set of tests to verify ejecting and unejecting nodes when connect failures are reported.
+ */
+TEST_F(OutlierDetectorImplTest, BasicFlowConnectFailure) {
+  EXPECT_CALL(cluster_.prioritySet(), addMemberUpdateCb(_));
+  addHosts({"tcp://127.0.0.1:80"}, true);
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  std::shared_ptr<DetectorImpl> detector(DetectorImpl::create(
+      cluster_, empty_outlier_detection_, dispatcher_, runtime_, time_source_, event_logger_));
+
+  ON_CALL(runtime_.snapshot_,
+          featureEnabled("outlier_detection.enforcing_consecutive_connect_failure", 100))
+      .WillByDefault(Return(true));
+
+  detector->addChangedStateCb([&](HostSharedPtr host) -> void { checker_.check(host); });
+
+  // When connect failure is detected the following methods should be called.
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_, logEject(std::static_pointer_cast<const HostDescription>(hosts_[0]),
+                                       _, EjectionType::ConsecutiveConnectFailure, true));
+  EXPECT_CALL(time_source_, monotonicTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(0))));
+
+  // Get the configured number of failures and simulate than number of connect failures.
+  uint32_t n = runtime_.snapshot_.getInteger("outlier_detection.consecutive_connect_failure",
+                                             detector->config().consecutiveConnectFailure());
+  while (n--) {
+    hosts_[0]->outlierDetector().connectFailure();
+  }
+  EXPECT_TRUE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+
+  // Wait short time - not enough to be unejected
+  EXPECT_CALL(time_source_, monotonicTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(9999))));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  interval_timer_->callback_();
+  EXPECT_FALSE(hosts_[0]->outlierDetector().lastUnejectionTime());
+
+  // Interval that does bring the host back in.
+  EXPECT_CALL(time_source_, monotonicTime())
+      .WillOnce(Return(MonotonicTime(std::chrono::milliseconds(30001))));
+  EXPECT_CALL(checker_, check(hosts_[0]));
+  EXPECT_CALL(*event_logger_,
+              logUneject(std::static_pointer_cast<const HostDescription>(hosts_[0])));
+  EXPECT_CALL(*interval_timer_, enableTimer(std::chrono::milliseconds(10000)));
+  interval_timer_->callback_();
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime());
+  EXPECT_EQ(0UL, cluster_.info_->stats_store_.gauge("outlier_detection.ejections_active").value());
+
+  // Simulate few connect failures, not enough for ejection and then simulate connect success
+  // and again few failures not enough for ejection.
+  n = runtime_.snapshot_.getInteger("outlier_detection.consecutive_connect_failure",
+                                    detector->config().consecutiveConnectFailure());
+  n--; // make sure that this is not enough for ejection.
+  while (n--) {
+    hosts_[0]->outlierDetector().connectFailure();
+  }
+  // now success and few failures
+  hosts_[0]->outlierDetector().connectSuccess();
+  hosts_[0]->outlierDetector().connectFailure();
+  hosts_[0]->outlierDetector().connectFailure();
+  EXPECT_FALSE(hosts_[0]->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  EXPECT_TRUE(hosts_[0]->outlierDetector().lastUnejectionTime());
+
+  // Check stats
+  EXPECT_EQ(
+      1UL,
+      cluster_.info_->stats_store_.counter("outlier_detection.ejections_enforced_total").value());
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_detected_consecutive_connect_failure")
+                     .value());
+  EXPECT_EQ(1UL, cluster_.info_->stats_store_
+                     .counter("outlier_detection.ejections_enforced_consecutive_connect_failure")
+                     .value());
+}
+
+/**
  * Test the interaction between the consecutive gateway failure and 5xx detectors.
  * This will first trigger a consecutive gateway failure with 503s, and then trigger 5xx with a mix
  * of 503s and 500s. We expect the consecutive gateway failure to fire after 5 consecutive 503s, and

@@ -100,6 +100,19 @@ Http::Code DetectorHostMonitorImpl::resultToHttpCode(Result result) {
   return http_code;
 }
 
+void DetectorHostMonitorImpl::connectFailure() {
+  std::shared_ptr<DetectorImpl> detector = detector_.lock();
+  if (!detector) {
+    // It's possible for the cluster/detector to go away while we still have a host in use.
+    return;
+  }
+  if (++consecutive_connect_failure_ ==
+      detector->runtime().snapshot().getInteger("outlier_detection.consecutive_connect_failure",
+                                                detector->config().consecutiveConnectFailure())) {
+    detector->onConsecutiveConnectFailure(host_.lock());
+  }
+}
+
 void DetectorHostMonitorImpl::putResult(Result result) {
   putHttpResponseCode(enumToInt(resultToHttpCode(result)));
 }
@@ -125,7 +138,11 @@ DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& 
       enforcing_consecutive_gateway_failure_(static_cast<uint64_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_consecutive_gateway_failure, 0))),
       enforcing_success_rate_(static_cast<uint64_t>(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_success_rate, 100))) {}
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_success_rate, 100))),
+      consecutive_connect_failure_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, consecutive_connect_failure, 5))),
+      enforcing_consecutive_connect_failure_(static_cast<uint64_t>(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enforcing_consecutive_connect_failure, 100))) {}
 
 DetectorImpl::DetectorImpl(const Cluster& cluster,
                            const envoy::api::v2::cluster::OutlierDetection& config,
@@ -233,6 +250,10 @@ bool DetectorImpl::enforceEjection(EjectionType type) {
   case EjectionType::SuccessRate:
     return runtime_.snapshot().featureEnabled("outlier_detection.enforcing_success_rate",
                                               config_.enforcingSuccessRate());
+  case EjectionType::ConsecutiveConnectFailure:
+    return runtime_.snapshot().featureEnabled(
+        "outlier_detection.enforcing_consecutive_connect_failure",
+        config_.enforcingConsecutiveConnectFailure());
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;
@@ -249,6 +270,9 @@ void DetectorImpl::updateEnforcedEjectionStats(EjectionType type) {
     break;
   case EjectionType::ConsecutiveGatewayFailure:
     stats_.ejections_enforced_consecutive_gateway_failure_.inc();
+    break;
+  case EjectionType::ConsecutiveConnectFailure:
+    stats_.ejections_enforced_consecutive_connect_failure_.inc();
     break;
   }
 }
@@ -318,6 +342,10 @@ void DetectorImpl::onConsecutiveGatewayFailure(HostSharedPtr host) {
   notifyMainThreadConsecutiveError(host, EjectionType::ConsecutiveGatewayFailure);
 }
 
+void DetectorImpl::onConsecutiveConnectFailure(HostSharedPtr host) {
+  notifyMainThreadConsecutiveError(host, EjectionType::ConsecutiveConnectFailure);
+}
+
 void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host, EjectionType type) {
   // Ejections come in cross thread. There is a chance that the host has already been removed from
   // the set. If so, just ignore it.
@@ -341,6 +369,11 @@ void DetectorImpl::onConsecutiveErrorWorker(HostSharedPtr host, EjectionType typ
     stats_.ejections_detected_consecutive_gateway_failure_.inc();
     ejectHost(host, EjectionType::ConsecutiveGatewayFailure);
     host_monitors_[host]->resetConsecutiveGatewayFailure();
+    break;
+  case EjectionType::ConsecutiveConnectFailure:
+    stats_.ejections_detected_consecutive_connect_failure_.inc();
+    ejectHost(host, EjectionType::ConsecutiveConnectFailure);
+    host_monitors_[host]->resetConsecutiveConnectFailure();
     break;
   case EjectionType::SuccessRate:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -492,6 +525,7 @@ void EventLoggerImpl::logEject(HostDescriptionConstSharedPtr host, Detector& det
   switch (type) {
   case EjectionType::Consecutive5xx:
   case EjectionType::ConsecutiveGatewayFailure:
+  case EjectionType::ConsecutiveConnectFailure:
     file_->write(fmt::format(
         json_5xx, AccessLogDateTimeFormatter::fromTime(now),
         secsSinceLastAction(host->outlierDetector().lastUnejectionTime(), monotonic_now),
@@ -538,6 +572,8 @@ std::string EventLoggerImpl::typeToString(EjectionType type) {
     return "GatewayFailure";
   case EjectionType::SuccessRate:
     return "SuccessRate";
+  case EjectionType::ConsecutiveConnectFailure:
+    return "ConnectFailure";
   }
 
   NOT_REACHED_GCOVR_EXCL_LINE;

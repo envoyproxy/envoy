@@ -36,6 +36,8 @@ public:
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
   const absl::optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
   double successRate() const override { return -1; }
+  void connectFailure() override {}
+  void connectSuccess() override {}
 
 private:
   const absl::optional<MonotonicTime> time_;
@@ -119,6 +121,7 @@ public:
   void successRate(double new_success_rate) { success_rate_ = new_success_rate; }
   void resetConsecutive5xx() { consecutive_5xx_ = 0; }
   void resetConsecutiveGatewayFailure() { consecutive_gateway_failure_ = 0; }
+  void resetConsecutiveConnectFailure() { consecutive_connect_failure_ = 0; }
   static Http::Code resultToHttpCode(Result result);
 
   // Upstream::Outlier::DetectorHostMonitor
@@ -131,6 +134,8 @@ public:
     return last_unejection_time_;
   }
   double successRate() const override { return success_rate_; }
+  void connectFailure() override;
+  void connectSuccess() override { resetConsecutiveConnectFailure(); }
 
 private:
   std::weak_ptr<DetectorImpl> detector_;
@@ -143,6 +148,7 @@ private:
   SuccessRateAccumulator success_rate_accumulator_;
   std::atomic<SuccessRateAccumulatorBucket*> success_rate_accumulator_bucket_;
   double success_rate_;
+  std::atomic<uint32_t> consecutive_connect_failure_{0};
 };
 
 /**
@@ -161,7 +167,9 @@ private:
   COUNTER(ejections_detected_success_rate)                                                         \
   COUNTER(ejections_enforced_success_rate)                                                         \
   COUNTER(ejections_detected_consecutive_gateway_failure)                                          \
-  COUNTER(ejections_enforced_consecutive_gateway_failure)
+  COUNTER(ejections_enforced_consecutive_gateway_failure)                                          \
+  COUNTER(ejections_detected_consecutive_connect_failure)                                          \
+  COUNTER(ejections_enforced_consecutive_connect_failure)
 // clang-format on
 
 /**
@@ -189,6 +197,8 @@ public:
   uint64_t enforcingConsecutive5xx() { return enforcing_consecutive_5xx_; }
   uint64_t enforcingConsecutiveGatewayFailure() { return enforcing_consecutive_gateway_failure_; }
   uint64_t enforcingSuccessRate() { return enforcing_success_rate_; }
+  uint64_t consecutiveConnectFailure() { return consecutive_connect_failure_; }
+  uint64_t enforcingConsecutiveConnectFailure() { return enforcing_consecutive_connect_failure_; }
 
 private:
   const uint64_t interval_ms_;
@@ -202,6 +212,8 @@ private:
   const uint64_t enforcing_consecutive_5xx_;
   const uint64_t enforcing_consecutive_gateway_failure_;
   const uint64_t enforcing_success_rate_;
+  const uint64_t consecutive_connect_failure_;
+  const uint64_t enforcing_consecutive_connect_failure_;
 };
 
 /**
@@ -219,6 +231,7 @@ public:
 
   void onConsecutive5xx(HostSharedPtr host);
   void onConsecutiveGatewayFailure(HostSharedPtr host);
+  void onConsecutiveConnectFailure(HostSharedPtr host);
   Runtime::Loader& runtime() { return runtime_; }
   DetectorConfig& config() { return config_; }
 

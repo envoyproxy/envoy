@@ -826,7 +826,7 @@ TEST_F(RouterTest, ResetDuringEncodeHeaders) {
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, connectFailure());
   router_.decodeHeaders(headers, true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -862,7 +862,7 @@ TEST_F(RouterTest, UpstreamTimeout) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).Times(0);
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, connectFailure());
   response_timeout_->callback_();
 
   EXPECT_EQ(1U,
@@ -993,7 +993,7 @@ TEST_F(RouterTest, GrpcReset) {
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers), false);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, connectFailure());
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -1080,7 +1080,7 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
   Http::TestHeaderMapImpl response_headers{{":status", "204"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
   EXPECT_CALL(*router_.retry_state_, shouldRetry(_, _, _)).Times(0);
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(204));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, connectFailure());
   response_timeout_->callback_();
 
   EXPECT_EQ(1U,
@@ -1122,7 +1122,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeout) {
       {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, connectFailure());
   per_try_timeout_->callback_();
 
   EXPECT_EQ(1U, cm_.thread_local_cluster_.cluster_.info_->stats_store_
@@ -1192,7 +1192,7 @@ TEST_F(RouterTest, RetryRequestNotComplete) {
   router_.decodeHeaders(headers, false);
 
   router_.retry_state_->expectRetry();
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, connectFailure());
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 }
@@ -1219,7 +1219,7 @@ TEST_F(RouterTest, RetryNoneHealthy) {
   router_.decodeHeaders(headers, true);
 
   router_.retry_state_->expectRetry();
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, connectFailure());
   encoder1.stream_.resetStream(Http::StreamResetReason::LocalReset);
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _)).WillOnce(Return(nullptr));
@@ -1250,7 +1250,7 @@ TEST_F(RouterTest, RetryUpstreamReset) {
   router_.decodeHeaders(headers, true);
 
   router_.retry_state_->expectRetry();
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, connectFailure());
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 
   // We expect this reset to kick off a new request.
@@ -1293,7 +1293,7 @@ TEST_F(RouterTest, RetryUpstreamPerTryTimeout) {
   router_.decodeHeaders(headers, true);
 
   router_.retry_state_->expectRetry();
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, connectFailure());
   per_try_timeout_->callback_();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -1373,7 +1373,7 @@ TEST_F(RouterTest, RetryUpstreamResetResponseStarted) {
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
   EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(200));
   response_decoder->decodeHeaders(std::move(response_headers), false);
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, connectFailure());
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
   // For normal HTTP, once we have a 200 we consider this a success, even if a
   // later reset occurs.
@@ -1402,7 +1402,7 @@ TEST_F(RouterTest, RetryUpstreamReset100ContinueResponseStarted) {
   EXPECT_CALL(callbacks_, encode100ContinueHeaders_(_));
   Http::HeaderMapPtr continue_headers(new Http::TestHeaderMapImpl{{":status", "100"}});
   response_decoder->decode100ContinueHeaders(std::move(continue_headers));
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, connectFailure());
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 }
 
@@ -2548,7 +2548,7 @@ TEST_F(WatermarkTest, RetryRequestNotComplete) {
   router_.decodeData(data, false);
 
   // This should not trigger a retry as the retry state has been deleted.
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, connectFailure());
   encoder1.stream_.resetStream(Http::StreamResetReason::RemoteReset);
 }
 

@@ -82,6 +82,9 @@ public:
    *         or the cluster did not have enough hosts to run through success rate outlier ejection.
    */
   virtual double successRate() const PURE;
+
+  virtual void connectFailure() PURE;
+  virtual void connectSuccess() PURE;
 };
 
 typedef std::unique_ptr<DetectorHostMonitor> DetectorHostMonitorPtr;
@@ -124,7 +127,12 @@ public:
 
 typedef std::shared_ptr<Detector> DetectorSharedPtr;
 
-enum class EjectionType { Consecutive5xx, SuccessRate, ConsecutiveGatewayFailure };
+enum class EjectionType {
+  Consecutive5xx,
+  SuccessRate,
+  ConsecutiveGatewayFailure,
+  ConsecutiveConnectFailure
+};
 
 /**
  * Sink for outlier detection event logs.

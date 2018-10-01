@@ -129,6 +129,8 @@ statistics will be rooted at *cluster.<name>.outlier_detection.* and contain the
   ejections_detected_success_rate, Counter, Number of detected success rate outlier ejections (even if unenforced)
   ejections_enforced_consecutive_gateway_failure, Counter, Number of enforced consecutive gateway failure ejections
   ejections_detected_consecutive_gateway_failure, Counter, Number of detected consecutive gateway failure ejections (even if unenforced)
+  ejections_enforced_consecutive_connect_failure, Counter, Number of enforced consecutive connect failure ejections
+  ejections_detected_consecutive_connect_failure, Counter, Number of detected consecutive connect failure ejections (even if unenforced)
   ejections_total, Counter, Deprecated. Number of ejections due to any outlier type (even if unenforced)
   ejections_consecutive_5xx, Counter, Deprecated. Number of consecutive 5xx ejections (even if unenforced)
 

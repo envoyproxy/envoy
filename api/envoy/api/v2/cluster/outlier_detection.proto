@@ -76,4 +76,14 @@ message OutlierDetection {
   // used to disable ejection or to ramp it up slowly. Defaults to 0.
   google.protobuf.UInt32Value enforcing_consecutive_gateway_failure = 11
       [(validate.rules).uint32.lte = 100];
+
+  // The number of consecutive connect failures before ejection
+  // occurs. Defaults to 5.
+  google.protobuf.UInt32Value consecutive_connect_failure = 12;
+
+  // The % chance that a host will be actually ejected when an outlier status
+  // is detected through consecutive connect failures. This setting can be
+  // used to disable ejection or to ramp it up slowly. Defaults to 100.
+  google.protobuf.UInt32Value enforcing_consecutive_connect_failure = 13
+      [(validate.rules).uint32.lte = 100];
 }

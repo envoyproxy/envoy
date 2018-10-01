@@ -175,8 +175,7 @@ public:
     router_->decodeHeaders(headers, true);
 
     router_->retry_state_->expectRetry();
-    EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
-                putHttpResponseCode(504));
+    EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_, connectFailure());
     per_try_timeout_->callback_();
 
     // We expect this reset to kick off a new request.

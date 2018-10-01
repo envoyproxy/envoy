@@ -42,21 +42,28 @@ Envoy supports the following outlier detection types:
 Consecutive 5xx
 ^^^^^^^^^^^^^^^
 
-If an upstream host returns some number of consecutive 5xx, it will be ejected. Note that in this
-case a 5xx means an actual 5xx respond code, or an event that would cause the HTTP router to return
-one on the upstream's behalf (reset, connection failure, etc.). The number of consecutive 5xx
-required for ejection is controlled by the :ref:`outlier_detection.consecutive_5xx
+If an upstream host returns some number of consecutive 5xx, it will be ejected. 
+The number of consecutive 5xx required for ejection is controlled by 
+the :ref:`outlier_detection.consecutive_5xx
 <envoy_api_field_cluster.OutlierDetection.consecutive_5xx>` value.
 
 Consecutive Gateway Failure
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 If an upstream host returns some number of consecutive "gateway errors" (502, 503 or 504 status
-code), it will be ejected. Note that this includes events that would cause the HTTP router to
-return one of these status codes on the upstream's behalf (reset, connection failure, etc.). The
-number of consecutive gateway failures required for ejection is controlled by
+code), it will be ejected. 
+The number of consecutive gateway failures required for ejection is controlled by
 the :ref:`outlier_detection.consecutive_gateway_failure
 <envoy_api_field_cluster.OutlierDetection.consecutive_gateway_failure>` value.
+
+Consecutive Connect Failure
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If Envoy repeatedly cannot connect to an upstream host because of a network problem, it will be ejected.
+Various network problems are detected: timeout, TCP reset, ICMP errors, etc. The number of consecutive
+connect failures required for ejection is controlled 
+by the :ref:`outlier_detection.consecutive_connect_failure 
+<envoy_api_field_cluster.OutlierDetection.consecutive_connect_failure>` value.
 
 Success Rate
 ^^^^^^^^^^^^
