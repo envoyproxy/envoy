@@ -734,7 +734,7 @@ void HttpIntegrationTest::testRetry() {
   EXPECT_EQ(512U, response->body().size());
 }
 
-// Tests that the x-envoy-attempt-count header is propagated set on the upstream request
+// Tests that the x-envoy-attempt-count header is properly set on the upstream request
 // and updated after the request is retried.
 void HttpIntegrationTest::testRetryAttemptCountHeader() {
   config_helper_.addRoute("host", "/test_retry", "cluster_0", false,

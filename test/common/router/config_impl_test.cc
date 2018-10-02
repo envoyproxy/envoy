@@ -2103,8 +2103,9 @@ virtual_hosts:
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context, true);
 
-  EXPECT_TRUE(
-            config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->includeAttemptCount());
+  EXPECT_TRUE(config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
+                  ->routeEntry()
+                  ->includeAttemptCount());
 }
 
 TEST(RouteMatchTest, ClusterNotFoundResponseCode) {
