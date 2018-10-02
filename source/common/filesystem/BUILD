@@ -54,4 +54,5 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
     ],
+    linkopts = ["-levent"],
 )

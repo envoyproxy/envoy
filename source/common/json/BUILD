@@ -29,6 +29,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/filesystem:filesystem_lib",
     ],
+    linkopts = ["-lyaml-cpp"],
 )
 
 envoy_cc_library(

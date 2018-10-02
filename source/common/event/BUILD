@@ -82,6 +82,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:c_smart_ptr_lib",
     ],
+    linkopts = ["-pthread", "-levent_pthreads", "-levent"],
 )
 
 envoy_cc_library(
@@ -98,4 +99,5 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/server:guarddog_lib",
     ],
+    linkopts = ["-levent"],
 )

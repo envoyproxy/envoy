@@ -39,6 +39,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
     ],
+    linkopts = ["-lnghttp2"],
 )
 
 envoy_cc_library(
