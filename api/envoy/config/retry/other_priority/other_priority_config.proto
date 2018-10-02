@@ -5,6 +5,13 @@ package envoy.config.retry.other_priority;
 // A retry host selector that attempts to spread retries between priorities, even if certain
 // priorities would not normally be attempted due to higher priorities being available.
 //
+// As priorities get excluded, load will be distributed amongst the remaining healthy priorities
+// based on the relative health of the priorities, matching how load is distributed during regular
+// host selection. For example, given priority healths of {100, 50, 50}, the original load will be
+// {100, 0, 0} (since P0 has capacity to handle 100% of the traffic). If P0 is excluded, the load
+// changes to {0, 50, 50}, because P1 is only able to handle 50% of the traffic, causing the
+// remaining to spill over to P2.
+//
 // Each priority attempted will be excluded until there are no healthy priorities left, at which
 // point the list of attempted priorities will be reset, essentially starting from the beginning.
 // For example, given three priorities P0, P1, P2 with healthy % of 100, 0 and 50 respectively, the
