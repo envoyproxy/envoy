@@ -169,6 +169,35 @@ public:
   }
 
 protected:
+  struct ConnectionMocks {
+    std::unique_ptr<NiceMock<Event::MockDispatcher>> dispatcher;
+    Event::MockTimer* timer;
+    std::unique_ptr<NiceMock<MockTransportSocket>> transport_socket;
+  };
+
+  ConnectionMocks createConnectionMocks() {
+    auto dispatcher = std::make_unique<NiceMock<Event::MockDispatcher>>();
+    EXPECT_CALL(dispatcher->buffer_factory_, create_(_, _))
+        .WillRepeatedly(Invoke([](std::function<void()> below_low,
+                                  std::function<void()> above_high) -> Buffer::Instance* {
+          // ConnectionImpl calls Envoy::MockBufferFactory::create(), which calls create_() and
+          // wraps the returned raw pointer below with a unique_ptr.
+          return new Buffer::WatermarkBuffer(below_low, above_high);
+        }));
+
+    // This timer will be returned (transferring ownership) to the ConnectionImpl when createTimer()
+    // is called to allocate the delayed close timer.
+    auto timer = new Event::MockTimer(dispatcher.get());
+
+    auto file_event = std::make_unique<NiceMock<Event::MockFileEvent>>();
+    EXPECT_CALL(*dispatcher, createFileEvent_(0, _, _, _)).WillOnce(Return(file_event.release()));
+
+    auto transport_socket = std::make_unique<NiceMock<MockTransportSocket>>();
+    EXPECT_CALL(*transport_socket, canFlushClose()).WillOnce(Return(true));
+
+    return ConnectionMocks{std::move(dispatcher), timer, std::move(transport_socket)};
+  }
+
   MockTimeSystem time_system_;
   Event::DispatcherPtr dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -922,30 +951,13 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTest) {
 // Test that a FlushWrite close will trigger a timeout which closes the connection when the write
 // buffer is not flushed within the configured interval.
 TEST_P(ConnectionImplTest, FlushWriteCloseTimeoutTest) {
-  NiceMock<Event::MockDispatcher> dispatcher;
-  EXPECT_CALL(dispatcher.buffer_factory_, create_(_, _))
-      .WillRepeatedly(Invoke([](std::function<void()> below_low,
-                                std::function<void()> above_high) -> Buffer::Instance* {
-        // ConnectionImpl calls Envoy::MockBufferFactory::create(), which calls create_() and wraps
-        // the returned raw pointer below with a unique_ptr.
-        return new Buffer::WatermarkBuffer(below_low, above_high);
-      }));
-
-  // This timer will be returned (transferring ownership) to the ConnectionImpl when createTimer()
-  // is called to allocate the delayed close timer.
-  auto timer = new Event::MockTimer(&dispatcher);
-  EXPECT_CALL(*timer, enableTimer(_)).Times(1);
-  EXPECT_CALL(*timer, disableTimer()).Times(1);
-
-  auto file_event = std::make_unique<NiceMock<Event::MockFileEvent>>();
-  EXPECT_CALL(dispatcher, createFileEvent_(0, _, _, _)).WillOnce(Return(file_event.release()));
-
-  auto transport_socket = std::make_unique<NiceMock<MockTransportSocket>>();
-  EXPECT_CALL(*transport_socket, canFlushClose()).WillOnce(Return(true));
+  ConnectionMocks mocks = createConnectionMocks();
+  EXPECT_CALL(*mocks.timer, enableTimer(_)).Times(1);
+  EXPECT_CALL(*mocks.timer, disableTimer()).Times(1);
 
   auto server_connection = std::make_unique<Network::ConnectionImpl>(
-      dispatcher, std::make_unique<ConnectionSocketImpl>(0, nullptr, nullptr),
-      std::move(transport_socket), true);
+      *mocks.dispatcher, std::make_unique<ConnectionSocketImpl>(0, nullptr, nullptr),
+      std::move(mocks.transport_socket), true);
 
   // Enable delayed connection close processing by setting a non-zero timeout value. The actual
   // value (> 0) doesn't matter since the callback is triggered below.
@@ -962,7 +974,7 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTimeoutTest) {
   server_connection->close(ConnectionCloseType::FlushWrite);
 
   // Issue the delayed close callback to ensure connection is closed.
-  timer->callback_();
+  mocks.timer->callback_();
 }
 
 // Test that a FlushWriteAndDelay close causes Envoy to flush the write and wait for the client/peer
@@ -1066,6 +1078,58 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
   // Since the delayed close timer never triggers, the connection never closes. Close it here to end
   // the test cleanly due to the (fd == -1) assert in ~ConnectionImpl().
   server_connection->close(ConnectionCloseType::NoFlush);
+}
+
+// Test that tearing down the connection will disable the delayed close timer.
+TEST_P(ConnectionImplTest, DelayedCloseTimeoutDisableOnSocketClose) {
+  ConnectionMocks mocks = createConnectionMocks();
+  auto server_connection = std::make_unique<Network::ConnectionImpl>(
+      *mocks.dispatcher, std::make_unique<ConnectionSocketImpl>(0, nullptr, nullptr),
+      std::move(mocks.transport_socket), true);
+
+  // The actual timeout is insignificant, we just need to enable delayed close processing by setting
+  // it to > 0.
+  server_connection->setDelayedCloseTimeout(std::chrono::milliseconds(100));
+
+  Buffer::OwnedImpl data("data");
+  server_connection->write(data, false);
+  EXPECT_CALL(*mocks.timer, enableTimer(_)).Times(1);
+  // Enable the delayed close timer.
+  server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
+  EXPECT_CALL(*mocks.timer, disableTimer()).Times(1);
+  // This close() will call closeSocket(), which should disable the timer to avoid triggering it
+  // after the connection's data structures have been reset.
+  server_connection->close(ConnectionCloseType::NoFlush);
+}
+
+// Test that the delayed close timeout callback is resilient to connection teardown edge cases.
+TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
+  ConnectionMocks mocks = createConnectionMocks();
+  auto server_connection = std::make_unique<Network::ConnectionImpl>(
+      *mocks.dispatcher, std::make_unique<ConnectionSocketImpl>(0, nullptr, nullptr),
+      std::move(mocks.transport_socket), true);
+
+  // The actual timeout is insignificant, we just need to enable delayed close processing by setting
+  // it to > 0.
+  server_connection->setDelayedCloseTimeout(std::chrono::milliseconds(100));
+
+  // NOTE: Avoid providing stats storage to the connection via setConnectionStats(). This guarantees
+  // that connection_stats_ is a nullptr and that the callback resiliency validation below tests
+  // that edge case.
+
+  Buffer::OwnedImpl data("data");
+  server_connection->write(data, false);
+
+  EXPECT_CALL(*mocks.timer, enableTimer(_)).Times(1);
+  server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
+  EXPECT_CALL(*mocks.timer, disableTimer()).Times(1);
+  // The following close() will call closeSocket() and reset internal data structures such as stats.
+  server_connection->close(ConnectionCloseType::NoFlush);
+  // Verify the onDelayedCloseTimeout() callback is resilient to the post closeSocket(), pre
+  // destruction state. This should not actually happen due to the timeout disablement in
+  // closeSocket(), but there is enough complexity in connection handling codepaths that being
+  // extra defensive is valuable.
+  mocks.timer->callback_();
 }
 
 class MockTransportConnectionImplTest : public testing::Test {

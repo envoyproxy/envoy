@@ -70,10 +70,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 ConnectionImpl::~ConnectionImpl() {
   ASSERT(fd() == -1, "ConnectionImpl was unexpectedly torn down without being closed.");
 
-  if (delayed_close_timer_) {
-    // It's ok to disable even if the timer has already fired.
-    delayed_close_timer_->disableTimer();
-  }
+  disableDelayedCloseTimer();
 
   // In general we assume that owning code has called close() previously to the destructor being
   // run. This generally must be done so that callbacks run in the correct context (vs. deferred
@@ -175,6 +172,9 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   if (fd() == -1) {
     return;
   }
+
+  // No need for a delayed close (if pending) now that the socket is being closed.
+  disableDelayedCloseTimer();
 
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
   transport_socket_->closeSocket(close_type);
@@ -583,10 +583,21 @@ bool ConnectionImpl::bothSidesHalfClosed() {
 
 void ConnectionImpl::onDelayedCloseTimeout() {
   ENVOY_CONN_LOG(debug, "triggered delayed close", *this);
-  if (connection_stats_->delayed_close_timeouts_ != nullptr) {
+  if (connection_stats_ != nullptr && connection_stats_->delayed_close_timeouts_ != nullptr) {
     connection_stats_->delayed_close_timeouts_->inc();
   }
   closeSocket(ConnectionEvent::LocalClose);
+}
+
+void ConnectionImpl::disableDelayedCloseTimer() {
+  if (delayed_close_timer_) {
+    delayed_close_timer_->disableTimer();
+    // Reset the pointer to avoid another unnecessary (although safe) call to disableTimer().
+    // In some edge cases, such as when the timer has been enabled but a closeSocket() is issued
+    // prior to it triggering, this function will be called twice: 1) in closeSocket() and 2) in
+    // ~ConnectionImpl().
+    delayed_close_timer_ = nullptr;
+  }
 }
 
 ClientConnectionImpl::ClientConnectionImpl(

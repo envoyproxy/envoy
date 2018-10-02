@@ -166,6 +166,9 @@ private:
   // Callback issued when a delayed close timeout triggers.
   void onDelayedCloseTimeout();
 
+  // Disables the delayed close timer (if set).
+  void disableDelayedCloseTimer();
+
   static std::atomic<uint64_t> next_global_id_;
 
   Event::Dispatcher& dispatcher_;
