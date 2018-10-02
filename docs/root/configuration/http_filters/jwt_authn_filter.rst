@@ -7,8 +7,8 @@ This HTTP filter can be used to verify JSON Web Token (JWT). It will verify its 
 
 JWKS is needed to verify JWT signatures. They can be specified in the filter config or can be fetched remotely from a JWKS server.
 
-.. Supported JWT alg::
-   Only ES256 and RS256 are supported!
+.. attention::
+   Only ES256 and RS256 are supported for the JWT alg.
 
 Configuration
 -------------
@@ -46,7 +46,7 @@ If fails to extract a JWT from above header, then check query parameter key *acc
 
 In the :ref:`filter config <envoy_api_msg_config.filter.http.jwt_authn.v2alpha.JwtAuthentication>`, *providers* is a map, to map *provider_name* to a :ref:`JwtProvider <envoy_api_msg_config.filter.http.jwt_authn.v2alpha.JwtProvider>`. The *provider_name* must be unique, it is referred in the `JwtRequirement <envoy_api_msg_config.filter.http.jwt_authn.v2alpha.JwtRequirement>` in its *provider_name* field.
 
-.. Important note::
+.. important::
    For *remote_jwks*, a **jwks_cluster** cluster is required.
 
 Due to above requirement, `OpenID connection discovery <https://openid.net/specs/openid-connect-discovery-1_0.html>`_ is not supported since the URL to fetch JWKS is in the response of the discovery. It is not easy to setup a cluster config for a dynamic URL.
@@ -117,12 +117,10 @@ RequirementRule
 * Field *match* specifies how a request can be matched; e.g. by HTTP headers, or by query parameters, or by path prefixes.
 * Field *requires* specifies the JWT requirement, e.g. which provider is required.
 
-.. Important notes::
-   **If a request matches multiple rules, the first matched rule will apply**.
-   
-   If the matched rule has empty *requires* field, **JWT verification is not required**.
-
-   If a request doesn't match any rules, **JWT verification is not required**.
+.. important::
+   - **If a request matches multiple rules, the first matched rule will apply**.
+   - If the matched rule has empty *requires* field, **JWT verification is not required**.
+   - If a request doesn't match any rules, **JWT verification is not required**.
 
 Single requirement config example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
