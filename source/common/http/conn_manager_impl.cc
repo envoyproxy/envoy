@@ -780,7 +780,6 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
     (*continue_data_entry)->stopped_ = true;
     (*continue_data_entry)->continueDecoding();
   }
-  maybeDisarmRequestTimer();
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -855,7 +854,6 @@ void ConnectionManagerImpl::ActiveStream::decodeData(ActiveStreamDecoderFilter* 
   if (trailers_added_entry != decoder_filters_.end()) {
     decodeTrailers(trailers_added_entry->get(), *request_trailers_);
   }
-  maybeDisarmRequestTimer();
 }
 
 HeaderMap& ConnectionManagerImpl::ActiveStream::addDecodedTrailers() {
@@ -919,11 +917,9 @@ void ConnectionManagerImpl::ActiveStream::decodeTrailers(ActiveStreamDecoderFilt
     ENVOY_STREAM_LOG(trace, "decode trailers called: filter={} status={}", *this,
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
     if (!(*entry)->commonHandleAfterTrailersCallback(status)) {
-      maybeDisarmRequestTimer();
       return;
     }
   }
-  maybeDisarmRequestTimer();
 }
 
 void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
@@ -938,12 +934,6 @@ void ConnectionManagerImpl::ActiveStream::maybeEndDecode(bool end_stream) {
 void ConnectionManagerImpl::ActiveStream::disarmRequestTimer() {
   if (request_timer_) {
     request_timer_->disableTimer();
-  }
-}
-
-void ConnectionManagerImpl::ActiveStream::maybeDisarmRequestTimer() {
-  if (request_info_.lastUpstreamTxByteSent().has_value()) {
-    disarmRequestTimer();
   }
 }
 
