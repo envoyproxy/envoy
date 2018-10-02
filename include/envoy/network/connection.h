@@ -64,9 +64,7 @@ public:
  */
 enum class ConnectionCloseType {
   FlushWrite, // Flush pending write data before raising ConnectionEvent::LocalClose
-  NoFlush,    // Do not flush any pending data and immediately raise ConnectionEvent::LocalClose
-  FlushWriteAndDelay // Flush pending write data and delay raising a ConnectionEvent::LocalClose
-                     // until the delayed_close_timeout expires
+  NoFlush     // Do not flush any pending data and immediately raise ConnectionEvent::LocalClose
 };
 
 /**
@@ -89,8 +87,6 @@ public:
     Stats::Gauge& write_current_;
     // Counter* as this is an optional counter. Bind errors will not be tracked if this is nullptr.
     Stats::Counter* bind_errors_;
-    // Optional counter. Delayed close timeouts will not be tracked if this is nullptr.
-    Stats::Counter* delayed_close_timeouts_;
   };
 
   virtual ~Connection() {}
@@ -247,17 +243,6 @@ public:
    */
   virtual RequestInfo::FilterState& perConnectionState() PURE;
   virtual const RequestInfo::FilterState& perConnectionState() const PURE;
-
-  /**
-   * Set the timeout for delayed connection close()s.
-   * @param timeout The timeout value in milliseconds
-   */
-  virtual void setDelayedCloseTimeout(std::chrono::milliseconds timeout) PURE;
-
-  /**
-   * @return std::chrono::milliseconds The delayed close timeout value.
-   */
-  virtual std::chrono::milliseconds delayedCloseTimeout() const PURE;
 };
 
 typedef std::unique_ptr<Connection> ConnectionPtr;
