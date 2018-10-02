@@ -72,11 +72,11 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
   // load for all priority levels.
 
   // The following cases are handled here;
-  // - Total health is >= 100. It means there are enough healthy hosts to handle the load.
+  // - Total health is = 100. It means there are enough healthy hosts to handle the load.
   //   Do not enter panic mode, even if a specific priority has low number of healthy hosts.
   // - Total health is < 100. There is not enough healthy hosts to handle the load. Continue
-  //   distibuting the load among priority sets, but turn on Panic mode if # of healthy hosts is
-  //   low.
+  //   distibuting the load among priority sets, but turn on Panic mode if # of healthy hosts
+  //   in priority set is low.
   // - Total health is 0. All hosts are down. Redirect 100% of traffic to P=0 and enable PanicMode.
 
   //
@@ -102,7 +102,7 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
 
     // For each level check if it should run in Panic mode. Never set Panic mode if the total health
     // is 100%, even when individual priority level has very low # of healthy hosts.
-    HostSet& priority_host_set = *priority_set_.hostSetsPerPriority()[i];
+    const HostSet& priority_host_set = *priority_set_.hostSetsPerPriority()[i];
     per_priority_panic_[i] = (total_health == 100 ? false : isGlobalPanic(priority_host_set));
   }
   if (total_load != 0) {

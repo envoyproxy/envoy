@@ -79,7 +79,7 @@ private:
   };
 
   virtual HashingLoadBalancerSharedPtr createLoadBalancer(const HostSet& host_set,
-                                                          bool inPanic) PURE;
+                                                          bool in_panic) PURE;
   void refresh();
 
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;
