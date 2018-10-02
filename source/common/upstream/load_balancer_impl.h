@@ -345,12 +345,14 @@ private:
  */
 class LeastRequestLoadBalancer : public EdfLoadBalancerBase {
 public:
-  LeastRequestLoadBalancer(const PrioritySet& priority_set, const PrioritySet* local_priority_set,
-                           ClusterStats& stats, Runtime::Loader& runtime,
-                           Runtime::RandomGenerator& random,
-                           const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+  LeastRequestLoadBalancer(
+      const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
+      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      const envoy::api::v2::Cluster::CommonLbConfig& common_config,
+      const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig> least_request_config)
       : EdfLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
-                            common_config) {
+                            common_config),
+        least_request_config_(least_request_config) {
     initialize();
   }
 
@@ -371,6 +373,7 @@ private:
   }
   HostConstSharedPtr unweightedHostPick(const HostVector& hosts_to_use,
                                         const HostsSource& source) override;
+  const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig> least_request_config_;
 };
 
 /**

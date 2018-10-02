@@ -174,7 +174,8 @@ public:
     }
 
     lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
-                                     subset_info_, ring_hash_lb_config_, common_config_));
+                                     subset_info_, ring_hash_lb_config_, least_request_lb_config_,
+                                     common_config_));
   }
 
   void zoneAwareInit(const std::vector<HostURLMetadataMap>& host_metadata_per_locality,
@@ -218,7 +219,7 @@ public:
 
     lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, &local_priority_set_, stats_,
                                      runtime_, random_, subset_info_, ring_hash_lb_config_,
-                                     common_config_));
+                                     least_request_lb_config_, common_config_));
   }
 
   HostSharedPtr makeHost(const std::string& url, const HostMetadata& metadata) {
@@ -373,6 +374,7 @@ public:
   NiceMock<MockLoadBalancerSubsetInfo> subset_info_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   envoy::api::v2::Cluster::RingHashLbConfig ring_hash_lb_config_;
+  envoy::api::v2::Cluster::LeastRequestLbConfig least_request_lb_config_;
   envoy::api::v2::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
@@ -992,7 +994,8 @@ TEST_F(SubsetLoadBalancerTest, IgnoresHostsWithoutMetadata) {
   host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
 
   lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
-                                   subset_info_, ring_hash_lb_config_, common_config_));
+                                   subset_info_, ring_hash_lb_config_, least_request_lb_config_,
+                                   common_config_));
 
   TestLoadBalancerContext context_version({{"version", "1.0"}});
 
@@ -1396,7 +1399,8 @@ TEST_F(SubsetLoadBalancerTest, DisabledLocalityWeightAwareness) {
       host_set_, {1, 100});
 
   lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
-                                   subset_info_, ring_hash_lb_config_, common_config_));
+                                   subset_info_, ring_hash_lb_config_, least_request_lb_config_,
+                                   common_config_));
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 
@@ -1424,7 +1428,8 @@ TEST_F(SubsetLoadBalancerTest, EnabledLocalityWeightAwareness) {
       host_set_, {1, 100});
 
   lb_.reset(new SubsetLoadBalancer(lb_type_, priority_set_, nullptr, stats_, runtime_, random_,
-                                   subset_info_, ring_hash_lb_config_, common_config_));
+                                   subset_info_, ring_hash_lb_config_, least_request_lb_config_,
+                                   common_config_));
 
   TestLoadBalancerContext context({{"version", "1.1"}});
 

@@ -1026,17 +1026,17 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could
   // benefit given the healthy panic, locality, and priority calculations that take place.
   if (cluster->lbSubsetInfo().isEnabled()) {
-    lb_.reset(new SubsetLoadBalancer(cluster->lbType(), priority_set_, parent_.local_priority_set_,
-                                     cluster->stats(), parent.parent_.runtime_,
-                                     parent.parent_.random_, cluster->lbSubsetInfo(),
-                                     cluster->lbRingHashConfig(), cluster->lbConfig()));
+    lb_.reset(new SubsetLoadBalancer(
+        cluster->lbType(), priority_set_, parent_.local_priority_set_, cluster->stats(),
+        parent.parent_.runtime_, parent.parent_.random_, cluster->lbSubsetInfo(),
+        cluster->lbRingHashConfig(), cluster->lbLeastRequestConfig().value(), cluster->lbConfig()));
   } else {
     switch (cluster->lbType()) {
     case LoadBalancerType::LeastRequest: {
       ASSERT(lb_factory_ == nullptr);
-      lb_.reset(new LeastRequestLoadBalancer(priority_set_, parent_.local_priority_set_,
-                                             cluster->stats(), parent.parent_.runtime_,
-                                             parent.parent_.random_, cluster->lbConfig()));
+      lb_.reset(new LeastRequestLoadBalancer(
+          priority_set_, parent_.local_priority_set_, cluster->stats(), parent.parent_.runtime_,
+          parent.parent_.random_, cluster->lbConfig(), cluster->lbLeastRequestConfig()));
       break;
     }
     case LoadBalancerType::Random: {

@@ -530,14 +530,30 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
 
 HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector& hosts_to_use,
                                                                 const HostsSource&) {
-  // This is just basic unweighted P2C.
-  const HostSharedPtr host1 = hosts_to_use[random_.random() % hosts_to_use.size()];
-  const HostSharedPtr host2 = hosts_to_use[random_.random() % hosts_to_use.size()];
-  if (host1->stats().rq_active_.value() < host2->stats().rq_active_.value()) {
-    return host1;
-  } else {
-    return host2;
+  // If choice count is unspecified, set 2 for P2C.
+  const uint64_t choice_count =
+      !least_request_config_.has_value()
+          ? 2UL
+          : std::max(least_request_config_.value().choice_count().value(), 2UL);
+  HostSharedPtr candidate_host = nullptr;
+  for (uint64_t ii = 0; ii < choice_count; ++ii) {
+    const int rand_idx = random_.random() % hosts_to_use.size();
+    HostSharedPtr sampled_host = hosts_to_use[rand_idx];
+
+    if (candidate_host == nullptr) {
+      // Make a first choice to start the comparisons.
+      candidate_host = sampled_host;
+      continue;
+    }
+
+    const auto candidate_active_rq = candidate_host->stats().rq_active_.value();
+    const auto sampled_active_rq = sampled_host->stats().rq_active_.value();
+    if (sampled_active_rq < candidate_active_rq) {
+      candidate_host = sampled_host;
+    }
   }
+
+  return candidate_host;
 }
 
 HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* context) {

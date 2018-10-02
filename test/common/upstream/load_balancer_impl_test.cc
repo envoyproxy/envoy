@@ -39,6 +39,7 @@ protected:
   MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   envoy::api::v2::Cluster::CommonLbConfig common_config_;
+  envoy::api::v2::Cluster::LeastRequestLbConfig least_request_lb_config_;
 };
 
 class TestLb : public LoadBalancerBase {
@@ -901,7 +902,8 @@ INSTANTIATE_TEST_CASE_P(PrimaryOrFailover, RoundRobinLoadBalancerTest,
 
 class LeastRequestLoadBalancerTest : public LoadBalancerTestBase {
 public:
-  LeastRequestLoadBalancer lb_{priority_set_, nullptr, stats_, runtime_, random_, common_config_};
+  LeastRequestLoadBalancer lb_{
+      priority_set_, nullptr, stats_, runtime_, random_, common_config_, least_request_lb_config_};
 };
 
 TEST_P(LeastRequestLoadBalancerTest, NoHosts) { EXPECT_EQ(nullptr, lb_.chooseHost(nullptr)); }
@@ -949,8 +951,6 @@ TEST_P(LeastRequestLoadBalancerTest, Normal) {
   stats_.max_host_weight_.set(1UL);
   hostSet().hosts_ = hostSet().healthy_hosts_;
   hostSet().runCallbacks({}, {}); // Trigger callbacks. The added/removed lists are not relevant.
-  EXPECT_CALL(random_, random()).WillOnce(Return(0)).WillOnce(Return(2)).WillOnce(Return(3));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_.chooseHost(nullptr));
 
   hostSet().healthy_hosts_[0]->stats().rq_active_.set(1);
   hostSet().healthy_hosts_[1]->stats().rq_active_.set(2);
