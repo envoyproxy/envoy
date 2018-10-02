@@ -190,6 +190,17 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test_library(
+    name = "pass_through_filter_lib",
+    srcs = [
+        "pass_through_filter.h",
+    ],
+    deps = [
+        "//include/envoy/http:filter_interface",
+        "//include/envoy/registry",
+    ],
+)
+
+envoy_cc_test_library(
     name = "add_trailers_filter_config_lib",
     srcs = [
         "add_trailers_filter.cc",
@@ -216,8 +227,10 @@ envoy_cc_test_library(
     deps = [
         ":add_trailers_filter_config_lib",
         ":integration_lib",
+        ":pass_through_filter_lib",
         ":test_host_predicate_lib",
         "//include/envoy/event:timer_interface",
+        "//source/common/common:thread_annotations",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/upstream:utility_lib",

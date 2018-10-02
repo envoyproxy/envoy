@@ -20,6 +20,8 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+class TestPauseFilter;
+
 namespace Network {
 
 /**
@@ -149,6 +151,8 @@ protected:
   Event::FileEventPtr file_event_;
 
 private:
+  friend class ::Envoy::TestPauseFilter;
+
   void onFileEvent(uint32_t events);
   void onRead(uint64_t read_buffer_size);
   void onReadReady();
