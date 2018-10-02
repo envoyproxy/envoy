@@ -12,7 +12,7 @@ namespace Priority {
  */
 class RetryPriorityNameValues {
 public:
-  // Previous host predicate. Rejects hosts that have already been tried.
+  // Previous priority retry priority. Excludes previously attempted priorities during retries.
   const std::string PreviousPrioritiesRetryPriority = "envoy.retry_priorities.previous_priorities";
 };
 

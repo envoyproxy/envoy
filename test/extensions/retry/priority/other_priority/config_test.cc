@@ -151,45 +151,6 @@ TEST_F(RetryPriorityTest, OverridenFrequency) {
             retry_priority_->determinePriorityLoad(priority_set_, original_priority_load));
 }
 
-// Verifies that the RetryPriority picks up on changes made to the cluster membership, adjusing
-// priority load appropriately.
-TEST_F(RetryPriorityTest, MembershipChange) {
-  initialize();
-
-  const Upstream::PriorityLoad original_priority_load{100, 0, 0};
-  addHosts(0, 2, 2);
-  addHosts(1, 2, 2);
-  addHosts(2, 2, 2);
-
-  auto host1 = std::make_shared<NiceMock<Upstream::MockHost>>();
-  ON_CALL(*host1, priority()).WillByDefault(Return(0));
-
-  auto host2 = std::make_shared<NiceMock<Upstream::MockHost>>();
-  ON_CALL(*host2, priority()).WillByDefault(Return(1));
-
-  // Before any hosts attempted, load should be unchanged.
-  ASSERT_EQ(original_priority_load,
-            retry_priority_->determinePriorityLoad(priority_set_, original_priority_load));
-
-  {
-    const Upstream::PriorityLoad expected_priority_load{0, 100, 0};
-    // After attempting a host in P0, P1 should receive all the load.
-    retry_priority_->onHostAttempted(host1);
-    ASSERT_EQ(expected_priority_load,
-              retry_priority_->determinePriorityLoad(priority_set_, original_priority_load));
-  }
-
-  // Now update P1 to have 50% healthy hosts.
-  addHosts(1, 4, 2);
-
-  {
-    const Upstream::PriorityLoad expected_priority_load{0, 70, 30};
-    // After attempting a host in P0, P1 should receive all the load.
-    ASSERT_EQ(expected_priority_load,
-              retry_priority_->determinePriorityLoad(priority_set_, original_priority_load));
-  }
-}
-
 } // namespace Priority
 } // namespace Retry
 } // namespace Extensions

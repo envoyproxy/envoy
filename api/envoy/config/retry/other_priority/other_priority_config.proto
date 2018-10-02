@@ -4,6 +4,10 @@ package envoy.config.retry.other_priority;
 
 // A retry host selector that attempts to spread retries between priorities, even if certain
 // priorities would not normally be attempted due to higher priorities being available.
+//
+// Note that changes made to the cluster during retries will not be reflected in the priority
+// load of retries, so care should be taken when using this with long running requests that
+// might retry.
 message OtherPriorityConfig {
   // How often the priority load should be updated based on previously attempted priorities. Useful
   // to allow each priorities to receive more than one request before being excluded.

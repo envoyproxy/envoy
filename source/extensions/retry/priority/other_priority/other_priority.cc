@@ -7,19 +7,15 @@ namespace Priority {
 const Upstream::PriorityLoad& OtherPriorityRetryPriority::determinePriorityLoad(
     const Upstream::PrioritySet& priority_set,
     const Upstream::PriorityLoad& original_priority_load) {
-  if (!priority_set_) {
-    priority_set_ = &priority_set;
+  if (!initialized_) {
+    initialized_ = true;
 
     excluded_priorities_.resize(original_priority_load.size());
     // Initialize our local priority_load_ and priority_health_,
     // keeping them in sync with the member update cb.
-    for (auto& host_set : priority_set_->hostSetsPerPriority()) {
-      recalculatePerPriorityState(host_set->priority());
+    for (auto& host_set : priority_set.hostSetsPerPriority()) {
+      recalculatePerPriorityState(host_set->priority(), priority_set);
     }
-    callback_ = priority_set.addMemberUpdateCb([&, this](int priority, auto, auto) {
-      this->recalculatePerPriorityState(priority);
-      this->adjustForAttemptedPriorities();
-    });
   }
 
   // If we've not seen enough retries to modify the priority load, just
@@ -29,7 +25,7 @@ const Upstream::PriorityLoad& OtherPriorityRetryPriority::determinePriorityLoad(
   if (attempted_priorites_.size() < update_frequency_) {
     return original_priority_load;
   } else if (attempted_priorites_.size() % update_frequency_ == 0) {
-    for (auto priority : attempted_priorites_) {
+    for (const auto priority : attempted_priorites_) {
       excluded_priorities_[priority] = true;
     }
 
@@ -72,10 +68,8 @@ void OtherPriorityRetryPriority::adjustForAttemptedPriorities() {
     return;
   }
 
+  std::fill(per_priority_load_.begin(), per_priority_load_.end(), 0);
   // We then adjust the load by rebalancing priorities with the adjusted health values.
-  Upstream::PriorityLoad per_priority_load;
-  per_priority_load.resize(per_priority_load_.size());
-
   size_t total_load = 100;
   // The outer loop is used to eliminate rounding errors: any remaining load will be assigned to the
   // first healthy priority.
@@ -85,12 +79,10 @@ void OtherPriorityRetryPriority::adjustForAttemptedPriorities() {
       // when total_load runs out.
       auto delta =
           std::min<uint32_t>(total_load, adjusted_per_priority_health[i] * 100 / total_health);
-      per_priority_load[i] += delta;
+      per_priority_load_[i] += delta;
       total_load -= delta;
     }
   }
-
-  per_priority_load_ = per_priority_load;
 }
 } // namespace Priority
 } // namespace Retry
