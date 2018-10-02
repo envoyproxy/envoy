@@ -11,7 +11,10 @@ namespace Priority {
 
 class OtherPriorityRetryPriority : public Upstream::RetryPriority {
 public:
-  OtherPriorityRetryPriority(uint32_t update_frequency, uint32_t max_retries) : update_frequency_(update_frequency), attempted_priorities_(max_retries) {}
+  OtherPriorityRetryPriority(uint32_t update_frequency, uint32_t max_retries)
+      : update_frequency_(update_frequency) {
+    attempted_priorities_.reserve(max_retries);
+  }
 
   const Upstream::PriorityLoad&
   determinePriorityLoad(const Upstream::PrioritySet& priority_set,
