@@ -242,7 +242,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
                                parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
                                parent_.host_->cluster().stats().upstream_cx_tx_bytes_total_,
                                parent_.host_->cluster().stats().upstream_cx_tx_bytes_buffered_,
-                               &parent_.host_->cluster().stats().bind_errors_, nullptr});
+                               &parent_.host_->cluster().stats().bind_errors_});
 }
 
 ConnPoolImpl::ActiveClient::~ActiveClient() {
