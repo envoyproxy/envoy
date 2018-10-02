@@ -206,7 +206,7 @@ void Filter::initialize(Network::ReadFilterCallbacks& callbacks, bool set_connec
         {config_->stats().downstream_cx_rx_bytes_total_,
          config_->stats().downstream_cx_rx_bytes_buffered_,
          config_->stats().downstream_cx_tx_bytes_total_,
-         config_->stats().downstream_cx_tx_bytes_buffered_, nullptr, nullptr});
+         config_->stats().downstream_cx_tx_bytes_buffered_, nullptr});
   }
 }
 
