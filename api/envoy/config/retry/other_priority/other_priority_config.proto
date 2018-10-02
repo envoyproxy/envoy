@@ -11,5 +11,8 @@ package envoy.config.retry.other_priority;
 message OtherPriorityConfig {
   // How often the priority load should be updated based on previously attempted priorities. Useful
   // to allow each priorities to receive more than one request before being excluded.
+  // For example, by setting this to 2, then the first two attempts (initial attempt and one retry)
+  // will use the unmodified priority load. The third and fourth attempt will use priority load which
+  // excludes the priorities routed to with the first two attempts.
   int32 update_frequency = 1;
 }
