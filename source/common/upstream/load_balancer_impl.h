@@ -78,7 +78,7 @@ public:
                                           PriorityLoad& priority_load,
                                           std::vector<uint32_t>& per_priority_health);
 
-private:
+protected:
   // The percentage load (0-100) for each priority level
   std::vector<uint32_t> per_priority_load_;
   // The health (0-100) for each priority level.
