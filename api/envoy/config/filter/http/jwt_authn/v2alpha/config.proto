@@ -99,7 +99,7 @@ message JwtProvider {
     // .. code-block:: yaml
     //
     //    local_jwks:
-    //      inline_string: "ACADADADADA"
+    //      inline_string: ACADADADADA
     //
     envoy.api.v2.core.DataSource local_jwks = 4;
   }
@@ -204,37 +204,37 @@ message ProviderWithAudiences {
 //  # Example 1: not required with an empty message
 //
 //  # Example 2: require A
-//  provider_name: "provider-A"
+//  provider_name: provider-A
 //
 //  # Example 3: require A or B
 //  requires_any:
 //    requirements:
-//      - provider_name: "provider-A"
-//      - provider_name: "provider-B"
+//      - provider_name: provider-A
+//      - provider_name: provider-B
 //
 //  # Example 4: require A and B
 //  requires_all:
 //    requirements:
-//      - provider_name: "provider-A"
-//      - provider_name: "provider-B"
+//      - provider_name: provider-A
+//      - provider_name: provider-B
 //
 //  # Example 5: require A and (B or C)
 //  requires_all:
 //    requirements:
-//      - provider_name: "provider-A"
+//      - provider_name: provider-A
 //      - requires_any:
 //        requirements:
-//          - provider_name: "provider-B"
-//          - provider_name: "provider-C"
+//          - provider_name: provider-B
+//          - provider_name: provider-C
 //
 //  # Example 6: require A or (B and C)
 //  requires_any:
 //    requirements:
-//      - provider_name: "provider-A"
+//      - provider_name: provider-A
 //      - requires_all:
 //        requirements:
-//          - provider_name: "provider-B"
-//          - provider_name: "provider-C"
+//          - provider_name: provider-B
+//          - provider_name: provider-C
 //
 message JwtRequirement {
   oneof requires_type {
@@ -280,7 +280,7 @@ message JwtRequirementAndList {
 // .. code-block:: yaml
 //
 //    - match:
-//        prefix: "/healthz"
+//        prefix: /healthz
 //
 // In above example, "requires" field is empty for /healthz prefix match,
 // it means that requests matching the path prefix don't require JWT authentication.
@@ -290,8 +290,8 @@ message JwtRequirementAndList {
 // .. code-block:: yaml
 //
 //    - match:
-//        prefix: "/"
-//      requires: { provider_name: "provider-A" }
+//        prefix: /
+//      requires: { provider_name: provider-A }
 //
 // In above example, all requests matched the path prefix require jwt authentication
 // from "provider-A".
@@ -304,7 +304,7 @@ message RequirementRule {
   // .. code-block:: yaml
   //
   //    match:
-  //      prefix: "/"
+  //      prefix: /
   //
   envoy.api.v2.route.RouteMatch match = 1 [(validate.rules).message.required = true];
 
@@ -336,22 +336,22 @@ message RequirementRule {
 //   rules:
 //      # Not jwt verification is required for /health path
 //      - match:
-//          prefix: "/health"
+//          prefix: /health
 //
 //      # Jwt verification for provider1 is required for path prefixed with "prefix"
 //      - match:
-//          prefix: "/prefix"
+//          prefix: /prefix
 //        requires:
-//          provider_name: "provider1"
+//          provider_name: provider1
 //
 //      # Jwt verification for either provider1 or provider2 is required for all other requests.
 //      - match:
-//          prefix: "/"
+//          prefix: /
 //        requires:
 //          requires_any:
 //            requirements:
-//              - provider_name: "provider1"
-//              - provider_name: "provider2"
+//              - provider_name: provider1
+//              - provider_name: provider2
 //
 message JwtAuthentication {
   // Map of provider names to JwtProviders.
@@ -384,25 +384,25 @@ message JwtAuthentication {
   //
   // rules:
   //   - match:
-  //       prefix: "/healthz"
+  //       prefix: /healthz
   //   - match:
-  //       prefix: "/baz"
+  //       prefix: /baz
   //     requires:
-  //       provider_name: "provider1"
+  //       provider_name: provider1
   //   - match:
-  //       prefix: "/foo"
+  //       prefix: /foo
   //     requires:
   //       requires_any:
   //         requirements:
-  //           - provider_name: "provider1"
-  //           - provider_name: "provider2"
+  //           - provider_name: provider1
+  //           - provider_name: provider2
   //   - match:
-  //       prefix: "/bar"
+  //       prefix: /bar
   //     requires:
   //       requires_all:
   //         requirements:
-  //           - provider_name: "provider1"
-  //           - provider_name: "provider2"
+  //           - provider_name: provider1
+  //           - provider_name: provider2
   //
   repeated RequirementRule rules = 2;
 }
