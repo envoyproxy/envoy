@@ -1123,13 +1123,15 @@ TEST_P(ConnectionImplTest, DelayedCloseTimeoutNullStats) {
   EXPECT_CALL(*mocks.timer, enableTimer(_)).Times(1);
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
   EXPECT_CALL(*mocks.timer, disableTimer()).Times(1);
+  // Copy the callback since mocks.timer will be freed when closeSocket() is called.
+  Event::TimerCb callback = mocks.timer->callback_;
   // The following close() will call closeSocket() and reset internal data structures such as stats.
   server_connection->close(ConnectionCloseType::NoFlush);
   // Verify the onDelayedCloseTimeout() callback is resilient to the post closeSocket(), pre
   // destruction state. This should not actually happen due to the timeout disablement in
   // closeSocket(), but there is enough complexity in connection handling codepaths that being
   // extra defensive is valuable.
-  mocks.timer->callback_();
+  callback();
 }
 
 class MockTransportConnectionImplTest : public testing::Test {
