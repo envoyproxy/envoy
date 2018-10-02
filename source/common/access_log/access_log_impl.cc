@@ -113,14 +113,15 @@ bool RuntimeFilter::evaluate(const RequestInfo::RequestInfo&,
   const Http::HeaderEntry* uuid = request_header.RequestId();
   uint64_t random_value;
   if (use_independent_randomness_ || uuid == nullptr ||
-      !UuidUtils::uuidModBy(uuid->value().c_str(), random_value,
-                            ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_))) {
+      !UuidUtils::uuidModBy(
+          uuid->value().c_str(), random_value,
+          ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_.denominator()))) {
     random_value = random_.random();
   }
 
   return runtime_.snapshot().featureEnabled(
       runtime_key_, percent_.numerator(), random_value,
-      ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_));
+      ProtobufPercentHelper::fractionalPercentDenominatorToInt(percent_.denominator()));
 }
 
 OperatorFilter::OperatorFilter(const Protobuf::RepeatedPtrField<

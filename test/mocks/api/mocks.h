@@ -12,6 +12,7 @@
 #include "common/api/os_sys_calls_impl.h"
 
 #include "test/mocks/filesystem/mocks.h"
+#include "test/test_common/test_time_system.h"
 
 #include "gmock/gmock.h"
 

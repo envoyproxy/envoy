@@ -98,6 +98,7 @@ public:
 private:
   const int32_t seed_;
   std::ranlux48 generator_;
+  RealTimeSource real_time_source_;
 };
 
 class TestUtility {
@@ -127,6 +128,21 @@ public:
    */
   static void feedBufferWithRandomCharacters(Buffer::Instance& buffer, uint64_t n_char,
                                              uint64_t seed = 0);
+
+  /**
+   * Finds a stat in a vector with the given name.
+   * @param name the stat name to look for.
+   * @param v the vector of stats.
+   * @return the stat
+   */
+  template <typename T> static T findByName(const std::vector<T>& v, const std::string& name) {
+    auto pos = std::find_if(v.begin(), v.end(),
+                            [&name](const T& stat) -> bool { return stat->name() == name; });
+    if (pos == v.end()) {
+      return nullptr;
+    }
+    return *pos;
+  }
 
   /**
    * Find a counter in a stats store.

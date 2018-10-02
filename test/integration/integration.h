@@ -14,6 +14,7 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 
 #include "spdlog/spdlog.h"
@@ -119,9 +120,30 @@ struct ApiFilesystemConfig {
  */
 class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
 public:
-  BaseIntegrationTest(Network::Address::IpVersion version,
+  using TestTimeSystemPtr = std::unique_ptr<Event::TestTimeSystem>;
+
+  BaseIntegrationTest(Network::Address::IpVersion version, TestTimeSystemPtr time_system,
                       const std::string& config = ConfigHelper::HTTP_PROXY_CONFIG);
+
+  // TODO(jmarantz): this alternate constructor is a temporary hack to allow
+  // envoy-filter-example/echo2_integration_test.cc to compile so CI for #4512
+  // can pass. Once that passes, we can up update filter-examples so it can see
+  // the 3-arg version of BaseIntegrationTest, and remove this constructor
+  // variant.
+  BaseIntegrationTest(Network::Address::IpVersion version, const std::string& config)
+      : BaseIntegrationTest(version, realTime(), config) {}
+
   virtual ~BaseIntegrationTest() {}
+
+  /**
+   * Helper function to create a simulated time integration test during construction.
+   */
+  static TestTimeSystemPtr simTime() { return std::make_unique<Event::SimulatedTimeSystem>(); }
+
+  /**
+   * Helper function to create a wall-clock time integration test during construction.
+   */
+  static TestTimeSystemPtr realTime() { return std::make_unique<Event::TestRealTimeSystem>(); }
 
   // Initialize the basic proto configuration, create fake upstreams, and start Envoy.
   virtual void initialize();
@@ -158,10 +180,14 @@ public:
   void createApiTestServer(const ApiFilesystemConfig& api_filesystem_config,
                            const std::vector<std::string>& port_names);
 
-  Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
+  Event::TestTimeSystem& timeSystem() { return *time_system_; }
 
+  Api::ApiPtr api_;
   MockBufferFactory* mock_buffer_factory_; // Will point to the dispatcher's factory.
+private:
+  TestTimeSystemPtr time_system_;
+
+public:
   Event::DispatcherPtr dispatcher_;
 
   /**

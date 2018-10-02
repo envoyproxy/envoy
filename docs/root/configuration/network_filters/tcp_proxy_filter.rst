@@ -7,6 +7,16 @@ TCP proxy
 * :ref:`v1 API reference <config_network_filters_tcp_proxy_v1>`
 * :ref:`v2 API reference <envoy_api_msg_config.filter.network.tcp_proxy.v2.TcpProxy>`
 
+.. _config_network_filters_tcp_proxy_dynamic_cluster:
+
+Dynamic cluster selection
+-------------------------
+
+The upstream cluster used by the TCP proxy filter can be dynamically set by
+other network filters on a per-connection basis by setting a per-connection
+state object under the key `envoy.tcp_proxy.cluster`. See the
+implementation for the details.
+
 .. _config_network_filters_tcp_proxy_stats:
 
 Statistics

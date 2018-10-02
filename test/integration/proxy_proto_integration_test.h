@@ -12,7 +12,8 @@ namespace Envoy {
 class ProxyProtoIntegrationTest : public HttpIntegrationTest,
                                   public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  ProxyProtoIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
+  ProxyProtoIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {
     config_helper_.addConfigModifier(
         [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
           auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);

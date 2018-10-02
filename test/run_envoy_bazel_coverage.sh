@@ -10,7 +10,7 @@ set -e
 [[ -z "${WORKSPACE}" ]] && WORKSPACE=envoy
 [[ -z "${VALIDATE_COVERAGE}" ]] && VALIDATE_COVERAGE=true
 
-# This is the target that will be run to generate coverage data. It can be overriden by consumer
+# This is the target that will be run to generate coverage data. It can be overridden by consumer
 # projects that want to run coverage on a different/combined target.
 [[ -z "${COVERAGE_TARGET}" ]] && COVERAGE_TARGET="//test/coverage:coverage_tests"
 

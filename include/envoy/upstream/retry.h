@@ -106,7 +106,7 @@ public:
   virtual ~RetryPriorityFactory() {}
 
   virtual void createRetryPriority(RetryPriorityFactoryCallbacks& callbacks,
-                                   const Protobuf::Message& config) PURE;
+                                   const Protobuf::Message& config, uint32_t retry_count) PURE;
 
   virtual std::string name() const PURE;
 };
@@ -119,7 +119,7 @@ public:
   virtual ~RetryHostPredicateFactory() {}
 
   virtual void createHostPredicate(RetryHostPredicateFactoryCallbacks& callbacks,
-                                   const Protobuf::Message& config) PURE;
+                                   const Protobuf::Message& config, uint32_t retry_count) PURE;
 
   /**
    * @return name name of this factory.

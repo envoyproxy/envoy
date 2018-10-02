@@ -1,4 +1,5 @@
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/test_time.h"
 
 namespace Envoy {
 namespace {
@@ -52,7 +53,7 @@ public:
     return response;
   }
 
-  void sleep() { std::this_thread::sleep_for(std::chrono::milliseconds(TimeoutMs / 2)); }
+  void sleep() { test_time_.timeSystem().sleep(std::chrono::milliseconds(TimeoutMs / 2)); }
 
   void waitForTimeout(IntegrationStreamDecoder& response, absl::string_view stat_name = "",
                       absl::string_view stat_prefix = "http.config_test") {
@@ -73,6 +74,7 @@ public:
   bool enable_global_idle_timeout_{};
   bool enable_per_stream_idle_timeout_{true};
   bool enable_request_timeout_{};
+  DangerousDeprecatedTestTime test_time_;
 };
 
 INSTANTIATE_TEST_CASE_P(Protocols, IdleTimeoutIntegrationTest,

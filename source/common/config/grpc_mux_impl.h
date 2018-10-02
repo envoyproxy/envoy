@@ -26,7 +26,7 @@ class GrpcMuxImpl : public GrpcMux,
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
-              Runtime::RandomGenerator& random);
+              Runtime::RandomGenerator& random, Stats::Scope& scope);
   ~GrpcMuxImpl();
 
   void start() override;
@@ -51,6 +51,10 @@ private:
   void establishNewStream();
   void sendDiscoveryRequest(const std::string& type_url);
   void handleFailure();
+  ControlPlaneStats generateControlPlaneStats(Stats::Scope& scope) {
+    const std::string control_plane_prefix = "control_plane.";
+    return {ALL_CONTROL_PLANE_STATS(POOL_GAUGE_PREFIX(scope, control_plane_prefix))};
+  }
 
   struct GrpcMuxWatchImpl : public GrpcMuxWatch {
     GrpcMuxWatchImpl(const std::vector<std::string>& resources, GrpcMuxCallbacks& callbacks,
@@ -105,6 +109,7 @@ private:
   Runtime::RandomGenerator& random_;
   TimeSource& time_source_;
   BackOffStrategyPtr backoff_strategy_;
+  ControlPlaneStats control_plane_stats_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux {

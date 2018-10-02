@@ -94,7 +94,7 @@ envoy_cc_library(
     external_deps = ["abseil_optional"],
     deps = [
         ":watchdog_lib",
-        "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/event:timer_interface",
         "//include/envoy/server:configuration_interface",
         "//include/envoy/server:guarddog_interface",
         "//include/envoy/server:watchdog_interface",
