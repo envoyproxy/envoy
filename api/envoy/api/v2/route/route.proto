@@ -111,7 +111,7 @@ message VirtualHost {
   map<string, google.protobuf.Struct> per_filter_config = 12;
 
   // Decides whether the x-envoy-attempt-count header should be included in upstream
-  // request.
+  // request. Defaults to false.
   bool include_request_attempt_count = 14;
 }
 
