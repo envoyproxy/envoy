@@ -98,6 +98,13 @@ public:
   virtual spdlog::level::level_enum logLevel() const PURE;
 
   /**
+   * @return const std::vector<std::pair<std::string, spdlog::level::level_enum>>& pair of
+   * component,log level for all configured components.
+   */
+  virtual const std::vector<std::pair<std::string, spdlog::level::level_enum>>&
+  componentLogLevels() const PURE;
+
+  /**
    * @return const std::string& the log format string.
    */
   virtual const std::string& logFormat() const PURE;

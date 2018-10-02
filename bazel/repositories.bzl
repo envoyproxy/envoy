@@ -195,7 +195,7 @@ def _python_deps():
         build_file = "@envoy//bazel/external:twitter_common_finagle_thrift.BUILD",
     )
 
-# Bazel native C++ dependencies. For the depedencies that doesn't provide autoconf/automake builds.
+# Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
 def _cc_deps():
     _repository_impl("grpc_httpjson_transcoding")
     native.bind(
@@ -447,6 +447,10 @@ def _com_google_googletest():
 # method for pure Bazel deps.
 def _com_google_absl():
     _repository_impl("com_google_absl")
+    native.bind(
+        name = "abseil_any",
+        actual = "@com_google_absl//absl/types:any",
+    )
     native.bind(
         name = "abseil_base",
         actual = "@com_google_absl//absl/base:base",

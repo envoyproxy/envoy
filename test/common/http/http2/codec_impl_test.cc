@@ -705,7 +705,7 @@ INSTANTIATE_TEST_CASE_P(Http2CodecImplFlowControlTest, Http2CodecImplFlowControl
                         ::testing::Combine(HTTP2SETTINGS_SMALL_WINDOW_COMBINE,
                                            HTTP2SETTINGS_SMALL_WINDOW_COMBINE));
 
-// we seperate default/edge cases here to avoid combinatorial explosion
+// we separate default/edge cases here to avoid combinatorial explosion
 #define HTTP2SETTINGS_DEFAULT_COMBINE                                                              \
   ::testing::Combine(::testing::Values(Http2Settings::DEFAULT_HPACK_TABLE_SIZE),                   \
                      ::testing::Values(Http2Settings::DEFAULT_MAX_CONCURRENT_STREAMS),             \

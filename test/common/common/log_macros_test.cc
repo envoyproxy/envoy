@@ -111,4 +111,9 @@ TEST(Logger, checkLoggerLevel) {
   EXPECT_THAT(testObj.executeAtTraceLevel(), testing::Eq(2));
 }
 
+TEST(RegistryTest, LoggerWithName) {
+  EXPECT_EQ(nullptr, Logger::Registry::logger("blah"));
+  EXPECT_EQ("upstream", Logger::Registry::logger("upstream")->name());
+}
+
 } // namespace Envoy

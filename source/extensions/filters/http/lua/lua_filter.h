@@ -71,7 +71,7 @@ public:
 
   /**
    * @return RequestInfo::RequestInfo& the current request info handle. This handle is mutable to
-   * accomodate write API e.g. setDynamicMetadata().
+   * accommodate write API e.g. setDynamicMetadata().
    */
   virtual RequestInfo::RequestInfo& requestInfo() PURE;
 

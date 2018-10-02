@@ -66,9 +66,13 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
       drain_close_(drain_close), random_generator_(random_generator), tracer_(tracer),
       runtime_(runtime), local_info_(local_info), cluster_manager_(cluster_manager),
       listener_stats_(config_.listenerStats()),
-      overload_stop_accepting_requests_(
+      overload_stop_accepting_requests_ref_(
           overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
                                  Server::OverloadActionNames::get().StopAcceptingRequests)
+                           : Server::OverloadManager::getInactiveState()),
+      overload_disable_keepalive_ref_(
+          overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
+                                 Server::OverloadActionNames::get().DisableHttpKeepAlive)
                            : Server::OverloadManager::getInactiveState()),
       time_system_(time_system) {}
 
@@ -94,12 +98,10 @@ void ConnectionManagerImpl::initializeReadFilterCallbacks(Network::ReadFilterCal
     idle_timer_->enableTimer(config_.idleTimeout().value());
   }
 
-  read_callbacks_->connection().setDelayedCloseTimeout(config_.delayedCloseTimeout());
-
   read_callbacks_->connection().setConnectionStats(
       {stats_.named_.downstream_cx_rx_bytes_total_, stats_.named_.downstream_cx_rx_bytes_buffered_,
        stats_.named_.downstream_cx_tx_bytes_total_, stats_.named_.downstream_cx_tx_bytes_buffered_,
-       nullptr, &stats_.named_.downstream_cx_delayed_close_timeout_});
+       nullptr});
 }
 
 ConnectionManagerImpl::~ConnectionManagerImpl() {
@@ -127,7 +129,7 @@ ConnectionManagerImpl::~ConnectionManagerImpl() {
 
 void ConnectionManagerImpl::checkForDeferredClose() {
   if (drain_state_ == DrainState::Closing && streams_.empty() && !codec_->wantsToWrite()) {
-    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   }
 }
 
@@ -201,10 +203,10 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder)
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   new_stream->buffer_limit_ = new_stream->response_encoder_->getStream().bufferLimit();
-  // Make sure new streams are apprised that the underlying connection is blocked.
-  if (read_callbacks_->connection().aboveHighWatermark()) {
-    new_stream->callHighWatermarkCallbacks();
-  }
+  // If the network connection is backed up, the stream should be made aware of it on creation.
+  // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacks_.
+  ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
+         new_stream->high_watermark_count_ > 0);
   new_stream->moveIntoList(std::move(new_stream), streams_);
   return **streams_.begin();
 }
@@ -242,12 +244,12 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       ENVOY_CONN_LOG(debug, "dispatch error: {}", read_callbacks_->connection(), e.what());
       stats_.named_.downstream_cx_protocol_error_.inc();
 
-      // In the protocol error case, we need to reset all streams now. Since we do a flush write and
-      // delayed close, the connection might stick around long enough for a pending stream to come
-      // back and try to encode.
+      // In the protocol error case, we need to reset all streams now. Since we do a flush write,
+      // the connection might stick around long enough for a pending stream to come back and try
+      // to encode.
       resetAllStreams();
 
-      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
+      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
       return Network::FilterStatus::StopIteration;
     }
 
@@ -326,8 +328,6 @@ void ConnectionManagerImpl::onIdleTimeout() {
   ENVOY_CONN_LOG(debug, "idle timeout", read_callbacks_->connection());
   stats_.named_.downstream_cx_idle_timeout_.inc();
   if (!codec_) {
-    // No need to delay close after flushing since an idle timeout has already fired. Attempt to
-    // write out buffered data one last time and issue a local close if successful.
     read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
   } else if (drain_state_ == DrainState::NotDraining) {
     startDrainSequence();
@@ -501,7 +501,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
   }
 
   // Drop new requests when overloaded as soon as we have decoded the headers.
-  if (connection_manager_.overload_stop_accepting_requests_ ==
+  if (connection_manager_.overload_stop_accepting_requests_ref_ ==
       Server::OverloadActionState::Active) {
     connection_manager_.stats_.named_.downstream_rq_overload_close_.inc();
     sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_),
@@ -539,7 +539,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     // The protocol may have shifted in the HTTP/1.0 case so reset it.
     request_info_.protocol(protocol);
     if (!connection_manager_.config_.http1Settings().accept_http_10_) {
-      // Send "Upgrade Required" if HTTP/1.0 support is not explictly configured on.
+      // Send "Upgrade Required" if HTTP/1.0 support is not explicitly configured on.
       sendLocalReply(false, Code::UpgradeRequired, "", nullptr, is_head_request_);
       return;
     } else {
@@ -667,7 +667,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
 
   decodeHeaders(nullptr, *request_headers_, end_stream);
 
-  // Reset it here for both global and overriden cases.
+  // Reset it here for both global and overridden cases.
   resetIdleTimer();
 }
 
@@ -1058,6 +1058,13 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
     connection_manager_.drain_state_ = DrainState::Closing;
   }
 
+  if (connection_manager_.drain_state_ == DrainState::NotDraining &&
+      connection_manager_.overload_disable_keepalive_ref_ == Server::OverloadActionState::Active) {
+    ENVOY_STREAM_LOG(debug, "disabling keepalive due to envoy overload", *this);
+    connection_manager_.drain_state_ = DrainState::Closing;
+    connection_manager_.stats_.named_.downstream_cx_overload_disable_keepalive_.inc();
+  }
+
   // If we are destroying a stream before remote is complete and the connection does not support
   // multiplexing, we should disconnect since we don't want to wait around for the request to
   // finish.
@@ -1072,7 +1079,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
   if (connection_manager_.drain_state_ == DrainState::Closing &&
       connection_manager_.codec_->protocol() != Protocol::Http2) {
     // If the connection manager is draining send "Connection: Close" on HTTP/1.1 connections.
-    // Do not do this for H2 (which drains via GOAWA) or Upgrade (as the upgrade
+    // Do not do this for H2 (which drains via GOAWAY) or Upgrade (as the upgrade
     // payload is no longer HTTP/1.1)
     if (!Utility::isUpgrade(headers)) {
       headers.insertConnection().value().setReference(Headers::get().ConnectionValues.Close);

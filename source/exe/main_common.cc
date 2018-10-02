@@ -17,6 +17,8 @@
 #include "server/server.h"
 #include "server/test_hooks.h"
 
+#include "absl/strings/str_split.h"
+
 #ifdef ENVOY_HOT_RESTART
 #include "server/hot_restart_impl.h"
 #endif
@@ -62,6 +64,8 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
     logging_context_ =
         std::make_unique<Logger::Context>(options_.logLevel(), options_.logFormat(), log_lock);
 
+    configureComponentLogLevels();
+
     stats_store_ = std::make_unique<Stats::ThreadLocalStoreImpl>(options_.statsOptions(),
                                                                  restarter_->statsAllocator());
 
@@ -80,6 +84,14 @@ MainCommonBase::MainCommonBase(OptionsImpl& options) : options_(options) {
 }
 
 MainCommonBase::~MainCommonBase() { ares_library_cleanup(); }
+
+void MainCommonBase::configureComponentLogLevels() {
+  for (auto& component_log_level : options_.componentLogLevels()) {
+    Logger::Logger* logger_to_change = Logger::Registry::logger(component_log_level.first);
+    ASSERT(logger_to_change);
+    logger_to_change->setLevel(component_log_level.second);
+  }
+}
 
 bool MainCommonBase::run() {
   switch (options_.mode()) {

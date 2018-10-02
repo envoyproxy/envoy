@@ -787,7 +787,7 @@ Http::StreamEncoder& ClientConnectionImpl::newStream(StreamDecoder& decoder) {
 }
 
 int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
-  // The client code explicitly does not currently suport push promise.
+  // The client code explicitly does not currently support push promise.
   RELEASE_ASSERT(frame->hd.type == NGHTTP2_HEADERS, "");
   RELEASE_ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE ||
                      frame->headers.cat == NGHTTP2_HCAT_HEADERS,
@@ -803,7 +803,7 @@ int ClientConnectionImpl::onBeginHeaders(const nghttp2_frame* frame) {
 
 int ClientConnectionImpl::onHeader(const nghttp2_frame* frame, HeaderString&& name,
                                    HeaderString&& value) {
-  // The client code explicitly does not currently suport push promise.
+  // The client code explicitly does not currently support push promise.
   ASSERT(frame->hd.type == NGHTTP2_HEADERS);
   ASSERT(frame->headers.cat == NGHTTP2_HCAT_RESPONSE || frame->headers.cat == NGHTTP2_HCAT_HEADERS);
   return saveHeader(frame, std::move(name), std::move(value));

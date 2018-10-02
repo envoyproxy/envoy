@@ -17,7 +17,7 @@ class WebsocketIntegrationTest : public HttpIntegrationTest,
                                  public testing::TestWithParam<WebsocketProtocolTestParams> {
 public:
   WebsocketIntegrationTest()
-      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version) {}
+      : HttpIntegrationTest(GetParam().downstream_protocol, GetParam().version, realTime()) {}
   void initialize() override;
   void SetUp() override {
     setDownstreamProtocol(GetParam().downstream_protocol);

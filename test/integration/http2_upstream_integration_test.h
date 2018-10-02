@@ -9,7 +9,7 @@ class Http2UpstreamIntegrationTest : public HttpIntegrationTest,
                                      public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   Http2UpstreamIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(), realTime()) {}
 
   void SetUp() override {
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);

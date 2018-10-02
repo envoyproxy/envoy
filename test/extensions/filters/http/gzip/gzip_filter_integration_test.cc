@@ -1,6 +1,9 @@
+#include "envoy/event/timer.h"
+
 #include "common/decompressor/zlib_decompressor_impl.h"
 
 #include "test/integration/http_integration.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -10,7 +13,8 @@ namespace Envoy {
 class GzipIntegrationTest : public HttpIntegrationTest,
                             public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  GzipIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  GzipIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), simTime()) {}
 
   void SetUp() override { decompressor_.init(window_bits); }
   void TearDown() override { cleanupUpstreamAndDownstream(); }

@@ -25,7 +25,7 @@ public:
 
     envoy::config::retry::other_priority::OtherPriorityConfig config;
     config.set_update_frequency(update_frequency_);
-    factory->createRetryPriority(*this, config);
+    factory->createRetryPriority(*this, config, 3);
   }
 
   // Upstream::RetryPriorityFactoryCallbacks

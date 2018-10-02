@@ -17,9 +17,11 @@
 namespace Envoy {
 namespace Server {
 
-void makePortHermetic(envoy::api::v2::core::Address& address) {
+void makePortHermetic(Fuzz::PerTestEnvironment& test_env, envoy::api::v2::core::Address& address) {
   if (address.has_socket_address()) {
     address.mutable_socket_address()->set_port_value(0);
+  } else if (address.has_pipe()) {
+    address.mutable_pipe()->set_path("@" + test_env.testId() + address.pipe().path());
   }
 }
 
@@ -34,19 +36,19 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
   // conflicts, etc.
   output.mutable_admin()->set_access_log_path(test_env.temporaryPath("admin.log"));
   if (output.admin().has_address()) {
-    makePortHermetic(*output.mutable_admin()->mutable_address());
+    makePortHermetic(test_env, *output.mutable_admin()->mutable_address());
   }
   if (output.has_runtime()) {
     output.mutable_runtime()->set_symlink_root(test_env.temporaryPath(""));
   }
   for (auto& listener : *output.mutable_static_resources()->mutable_listeners()) {
     if (listener.has_address()) {
-      makePortHermetic(*listener.mutable_address());
+      makePortHermetic(test_env, *listener.mutable_address());
     }
   }
   for (auto& cluster : *output.mutable_static_resources()->mutable_clusters()) {
     for (auto& host : *cluster.mutable_hosts()) {
-      makePortHermetic(host);
+      makePortHermetic(test_env, host);
     }
   }
   return output;

@@ -235,7 +235,7 @@ bool CompactProtocolImpl::readListBegin(Buffer::Instance& buffer, FieldType& ele
     }
 
     if (s < 0) {
-      throw EnvoyException(fmt::format("negative compact procotol list/set size {}", s));
+      throw EnvoyException(fmt::format("negative compact protocol list/set size {}", s));
     }
 
     sz = static_cast<uint32_t>(s);

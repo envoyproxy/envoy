@@ -212,7 +212,7 @@ git rebase -i HEAD^^
 git push origin -f
 ```
 
-Note, that in general rewriting history in this way is a hinderance to the review process and this
+Note, that in general rewriting history in this way is a hindrance to the review process and this
 should only be done to correct a DCO mistake.
 
 ## Triggering CI re-run without making changes
