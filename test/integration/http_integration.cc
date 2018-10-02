@@ -284,30 +284,6 @@ void HttpIntegrationTest::waitForNextUpstreamRequest(uint64_t upstream_index) {
   waitForNextUpstreamRequest(std::vector<uint64_t>({upstream_index}));
 }
 
-void HttpIntegrationTest::testRouterRequestOnlyWithBody(
-    uint64_t request_size, uint64_t response_size, bool big_header,
-    ConnectionCreationFunction* create_connection) {
-  initialize();
-  codec_client_ = makeHttpConnection(
-      create_connection ? ((*create_connection)()) : makeClientConnection((lookupPort("http"))));
-  Http::TestHeaderMapImpl request_headers{
-      {":method", "POST"},    {":path", "/test/long/url"}, {":scheme", "http"},
-      {":authority", "host"}, {"x-lyft-user-id", "123"},   {"x-forwarded-for", "10.0.0.1"}};
-  if (big_header) {
-    request_headers.addCopy("big", std::string(4096, 'a'));
-  }
-
-  uint32_t request_body_size = request_size;
-  const Http::TestHeaderMapImpl& response_headers = default_response_headers_;
-  (void)(response_headers);
-  (void)(response_size);
-
-  auto response = codec_client_->makeRequestWithBody(request_headers, request_body_size);
-  std::cout << "[AUNI] RESPONSE NOT RESPONDED YET" << "\n";
-  // waitForNextUpstreamRequest();
-  // response->waitForEndStream();
-}
-
 void HttpIntegrationTest::testRouterRequestAndResponseWithBody(
     uint64_t request_size, uint64_t response_size, bool big_header,
     ConnectionCreationFunction* create_connection) {
