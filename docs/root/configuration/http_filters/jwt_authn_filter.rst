@@ -89,7 +89,7 @@ Another config example using inline JWKS:
     provider_name2:
       issuer: https://example2.com
       local_jwks:
-        inline_string: "PUBLIC-KEY"
+        inline_string: PUBLIC-KEY
       from_headers:
       - name: jwt-assertion
       forward: true
@@ -157,11 +157,11 @@ Group requirement config example
     provider1:
       issuer: https://provider1.com
       local_jwks:
-        inline_string: "PUBLIC-KEY"
+        inline_string: PUBLIC-KEY
     provider2:
       issuer: https://provider2.com
       local_jwks:
-        inline_string: "PUBLIC-KEY"
+        inline_string: PUBLIC-KEY
   rules:
   - match:
       prefix: /any
