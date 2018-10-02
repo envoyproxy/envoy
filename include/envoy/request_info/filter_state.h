@@ -30,14 +30,30 @@ public:
   virtual void setData(absl::string_view data_name, std::unique_ptr<Object>&& data) PURE;
 
   /**
-   * @param data_name the name of the data being set.
-   * @return a reference to the stored data.
+   * @param data_name the name of the data being looked up.
+   * @return a const reference to the stored data.
    * Note that it is an error to access data that has not previously been set.
    * This function will fail if the data stored under |data_name| cannot be
    * dynamically cast to the type specified.
    */
   template <typename T> const T& getData(absl::string_view data_name) const {
     const T* result = dynamic_cast<const T*>(getDataGeneric(data_name));
+    if (!result) {
+      throw EnvoyException(
+          fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
+    }
+    return *result;
+  }
+
+  /**
+   * @param data_name the name of the data being looked up.
+   * @return a non-const reference to the stored data.
+   * Note that it is an error to access data that has not previously been set.
+   * This function will fail if the data stored under |data_name| cannot be
+   * dynamically cast to the type specified.
+   */
+  template <typename T> T& getData(absl::string_view data_name) {
+    T* result = dynamic_cast<T*>(getDataGeneric(data_name));
     if (!result) {
       throw EnvoyException(
           fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
@@ -64,6 +80,7 @@ public:
 
 protected:
   virtual const Object* getDataGeneric(absl::string_view data_name) const PURE;
+  virtual Object* getDataGeneric(absl::string_view data_name) PURE;
 };
 
 } // namespace RequestInfo
