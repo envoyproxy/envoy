@@ -20,6 +20,8 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
+class TestPauseFilter;
+
 namespace Network {
 
 /**
@@ -34,7 +36,7 @@ public:
    * @param previous_total supplies the previous final total buffer size. previous_total will be
    *        updated to new_total when the call is complete.
    * @param stat_total supplies the counter to increment with the delta.
-   * @param stat_current supplies the guage that should be updated with the delta of previous_total
+   * @param stat_current supplies the gauge that should be updated with the delta of previous_total
    *        and new_total.
    */
   static void updateBufferStats(uint64_t delta, uint64_t new_total, uint64_t& previous_total,
@@ -143,6 +145,8 @@ protected:
   Event::FileEventPtr file_event_;
 
 private:
+  friend class ::Envoy::TestPauseFilter;
+
   void onFileEvent(uint32_t events);
   void onRead(uint64_t read_buffer_size);
   void onReadReady();

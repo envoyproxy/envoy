@@ -66,6 +66,8 @@ void MockPrioritySet::runUpdateCallbacks(uint32_t priority, const HostVector& ho
   member_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
 }
 
+MockRetryPriority::~MockRetryPriority() {}
+
 MockCluster::MockCluster() {
   ON_CALL(*this, prioritySet()).WillByDefault(ReturnRef(priority_set_));
   ON_CALL(testing::Const(*this), prioritySet()).WillByDefault(ReturnRef(priority_set_));
@@ -94,6 +96,8 @@ MockThreadLocalCluster::MockThreadLocalCluster() {
 }
 
 MockThreadLocalCluster::~MockThreadLocalCluster() {}
+
+MockClusterManager::MockClusterManager(TimeSource&) : MockClusterManager() {}
 
 MockClusterManager::MockClusterManager() {
   ON_CALL(*this, httpConnPoolForCluster(_, _, _, _)).WillByDefault(Return(&conn_pool_));

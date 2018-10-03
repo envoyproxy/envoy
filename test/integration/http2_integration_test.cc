@@ -85,6 +85,8 @@ TEST_P(Http2IntegrationTest, RouterUpstreamResponseBeforeRequestComplete) {
 
 TEST_P(Http2IntegrationTest, TwoRequests) { testTwoRequests(); }
 
+TEST_P(Http2IntegrationTest, TwoRequestsWithForcedBackup) { testTwoRequests(true); }
+
 TEST_P(Http2IntegrationTest, Retry) { testRetry(); }
 
 TEST_P(Http2IntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
@@ -106,6 +108,8 @@ TEST_P(Http2IntegrationTest, HittingEncoderFilterLimit) { testHittingEncoderFilt
 TEST_P(Http2IntegrationTest, GrpcRouterNotFound) { testGrpcRouterNotFound(); }
 
 TEST_P(Http2IntegrationTest, RetryHostPredicateFilter) { testRetryHostPredicateFilter(); }
+
+TEST_P(Http2IntegrationTest, RetryPriority) { testRetryPriority(); }
 
 TEST_P(Http2IntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
@@ -413,7 +417,8 @@ Http2RingHashIntegrationTest::~Http2RingHashIntegrationTest() {
 
 void Http2RingHashIntegrationTest::createUpstreams() {
   for (int i = 0; i < num_upstreams_; i++) {
-    fake_upstreams_.emplace_back(new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_));
+    fake_upstreams_.emplace_back(
+        new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
   }
 }
 

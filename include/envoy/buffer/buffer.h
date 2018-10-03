@@ -176,7 +176,7 @@ public:
   virtual uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) PURE;
 
   /**
-   * Search for an occurence of a buffer within the larger buffer.
+   * Search for an occurrence of a buffer within the larger buffer.
    * @param data supplies the data to search for.
    * @param size supplies the length of the data to search for.
    * @param start supplies the starting index to search from.
@@ -238,7 +238,7 @@ public:
     auto result = static_cast<T>(0);
     constexpr const auto all_bits_enabled = static_cast<T>(~static_cast<T>(0));
 
-    char* bytes = reinterpret_cast<char*>(std::addressof(result));
+    int8_t* bytes = reinterpret_cast<int8_t*>(std::addressof(result));
     copyOut(start, Size, &bytes[displacement]);
 
     constexpr const auto most_significant_read_byte =

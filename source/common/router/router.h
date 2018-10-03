@@ -215,6 +215,17 @@ public:
     return retry_state_->shouldSelectAnotherHost(host);
   }
 
+  const Upstream::PriorityLoad&
+  determinePriorityLoad(const Upstream::PrioritySet& priority_set,
+                        const Upstream::PriorityLoad& original_priority_load) override {
+    // We only modify the priority load on retries.
+    if (!is_retry_) {
+      return original_priority_load;
+    }
+
+    return retry_state_->priorityLoadForRetry(priority_set, original_priority_load);
+  }
+
   uint32_t hostSelectionRetryCount() const override {
     if (!is_retry_) {
       return 1;

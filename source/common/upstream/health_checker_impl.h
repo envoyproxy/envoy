@@ -174,7 +174,7 @@ public:
  * binary block can be of arbitrary length and is just concatenated together when sent.
  *
  * On the receive side, "fuzzy" matching is performed such that each binary block must be found,
- * and in the order specified, but not necessarly contiguous. Thus, in the example above,
+ * and in the order specified, but not necessary contiguous. Thus, in the example above,
  * "FFFFFFFF" could be inserted in the response between "EEEEEEEE" and "01000000" and the check
  * would still pass.
  */

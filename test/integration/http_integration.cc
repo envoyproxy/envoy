@@ -10,18 +10,23 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/header_map.h"
+#include "envoy/registry/registry.h"
 
 #include "common/api/api_impl.h"
 #include "common/buffer/buffer_impl.h"
 #include "common/common/fmt.h"
+#include "common/common/thread_annotations.h"
 #include "common/http/headers.h"
 #include "common/network/connection_impl.h"
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "extensions/filters/http/common/empty_http_filter_config.h"
+
 #include "test/common/upstream/utility.h"
 #include "test/integration/autonomous_upstream.h"
+#include "test/integration/pass_through_filter.h"
 #include "test/integration/test_host_predicate_config.h"
 #include "test/integration/utility.h"
 #include "test/mocks/upstream/mocks.h"
@@ -189,8 +194,9 @@ HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
 
 HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_protocol,
                                          Network::Address::IpVersion version,
-                                         const std::string& config)
-    : BaseIntegrationTest(version, config), downstream_protocol_(downstream_protocol) {
+                                         TestTimeSystemPtr time_system, const std::string& config)
+    : BaseIntegrationTest(version, std::move(time_system), config),
+      downstream_protocol_(downstream_protocol) {
   // Legacy integration tests expect the default listener to be named "http" for lookupPort calls.
   config_helper_.renameListener("http");
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
@@ -220,7 +226,7 @@ IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
     response = codec_client_->makeHeaderOnlyRequest(request_headers);
   }
   waitForNextUpstreamRequest();
-  // Send response headers, and end_stream if there is no respone body.
+  // Send response headers, and end_stream if there is no response body.
   upstream_request_->encodeHeaders(response_headers, response_size == 0);
   // Send any response data, with end_stream true.
   if (response_size) {
@@ -768,6 +774,84 @@ void HttpIntegrationTest::testGrpcRetry() {
   }
 }
 
+// Verifies that a retry priority can be configured and affect the host selected during retries.
+// The retry priority will always target P1, which would otherwise never be hit due to P0 being
+// healthy.
+void HttpIntegrationTest::testRetryPriority() {
+  const Upstream::PriorityLoad priority_load{0, 100};
+  Upstream::MockRetryPriorityFactory factory(
+      std::make_shared<NiceMock<Upstream::MockRetryPriority>>(priority_load));
+
+  Registry::InjectFactory<Upstream::RetryPriorityFactory> inject_factory(factory);
+
+  envoy::api::v2::route::RouteAction::RetryPolicy retry_policy;
+  retry_policy.mutable_retry_priority()->set_name(factory.name());
+
+  // Add route with custom retry policy
+  config_helper_.addRoute("host", "/test_retry", "cluster_0", false,
+                          envoy::api::v2::route::RouteAction::NOT_FOUND,
+                          envoy::api::v2::route::VirtualHost::NONE, retry_policy);
+
+  // Use load assignments instead of static hosts. Necessary in order to use priorities.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto load_assignment = cluster->mutable_load_assignment();
+    load_assignment->set_cluster_name(cluster->name());
+    const auto& host_address = cluster->hosts(0).socket_address().address();
+
+    for (int i = 0; i < 2; ++i) {
+      auto locality = load_assignment->add_endpoints();
+      locality->set_priority(i);
+      locality->mutable_locality()->set_region("region");
+      locality->mutable_locality()->set_zone("zone");
+      locality->mutable_locality()->set_sub_zone("sub_zone" + std::to_string(i));
+      auto lb_endpoint = locality->add_lb_endpoints();
+      lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
+          host_address);
+      lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
+          0);
+    }
+
+    cluster->clear_hosts();
+  });
+
+  fake_upstreams_count_ = 2;
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response =
+      codec_client_->makeRequestWithBody(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                                 {":path", "/test_retry"},
+                                                                 {":scheme", "http"},
+                                                                 {":authority", "host"},
+                                                                 {"x-forwarded-for", "10.0.0.1"},
+                                                                 {"x-envoy-retry-on", "5xx"}},
+                                         1024);
+
+  // Note how we're exepcting each upstream request to hit the same upstream.
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
+
+  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+
+  waitForNextUpstreamRequest(1);
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(512, true);
+
+  response->waitForEndStream();
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ(512U, response->body().size());
+}
+
+//
 // Verifies that a retry host filter can be configured and affect the host selected during retries.
 // The predicate will keep track of the first host attempted, and attempt to route all requests to
 // the same host. With a total of two upstream hosts, this should result in us continuously sending
@@ -904,7 +988,7 @@ void HttpIntegrationTest::testHittingEncoderFilterLimit() {
   codec_client_->sendData(*downstream_request, data, true);
   waitForNextUpstreamRequest();
 
-  // Send the respone headers.
+  // Send the response headers.
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, false);
 
   // Now send an overly large response body. At some point, too much data will
@@ -1172,7 +1256,94 @@ void HttpIntegrationTest::testUpstreamDisconnectWithTwoRequests() {
   test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 2);
 }
 
-void HttpIntegrationTest::testTwoRequests() {
+// This filter exists to synthetically test network backup by faking TCP
+// connection back-up when an encode is finished, and unblocking it when the
+// next stream starts to decode headers.
+// Allows regression tests for https://github.com/envoyproxy/envoy/issues/4541
+// TODO(alyssawilk) move this somewhere general and turn it up for more tests.
+class TestPauseFilter : public PassThroughFilter {
+public:
+  // Pass in a some global filter state to ensure the Network::Connection is
+  // blocked and unblocked exactly once.
+  TestPauseFilter(absl::Mutex& encode_lock, uint32_t& number_of_encode_calls_ref,
+                  uint32_t& number_of_decode_calls_ref)
+      : encode_lock_(encode_lock), number_of_encode_calls_ref_(number_of_encode_calls_ref),
+        number_of_decode_calls_ref_(number_of_decode_calls_ref) {}
+
+  Http::FilterDataStatus decodeData(Buffer::Instance& buf, bool end_stream) override {
+    if (end_stream) {
+      absl::WriterMutexLock m(&encode_lock_);
+      number_of_decode_calls_ref_++;
+      if (number_of_decode_calls_ref_ == 2) {
+        // If this is the second stream to decode headers, force low watermark state.
+        connection()->onLowWatermark();
+      }
+    }
+    return PassThroughFilter::decodeData(buf, end_stream);
+  }
+
+  Http::FilterDataStatus encodeData(Buffer::Instance& buf, bool end_stream) override {
+    if (end_stream) {
+      absl::WriterMutexLock m(&encode_lock_);
+      number_of_encode_calls_ref_++;
+      if (number_of_encode_calls_ref_ == 1) {
+        // If this is the first stream to encode headers, force high watermark state.
+        connection()->onHighWatermark();
+      }
+    }
+    return PassThroughFilter::encodeData(buf, end_stream);
+  }
+
+  Network::ConnectionImpl* connection() {
+    // As long as we're doing horrible things let's do *all* the horrible things.
+    // Assert the connection we have is a ConnectionImpl and const cast it so we
+    // can force watermark changes.
+    auto conn_impl = dynamic_cast<const Network::ConnectionImpl*>(decoder_callbacks_->connection());
+    return const_cast<Network::ConnectionImpl*>(conn_impl);
+  }
+
+  absl::Mutex& encode_lock_;
+  uint32_t& number_of_encode_calls_ref_;
+  uint32_t& number_of_decode_calls_ref_;
+};
+
+class TestPauseFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+public:
+  TestPauseFilterConfig() : EmptyHttpFilterConfig("pause-filter") {}
+
+  Http::FilterFactoryCb createFilter(const std::string&, Server::Configuration::FactoryContext&) {
+    return [&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+      // GUARDED_BY insists the lock be held when the guarded variables are passed by reference.
+      absl::WriterMutexLock m(&encode_lock_);
+      callbacks.addStreamFilter(std::make_shared<::Envoy::TestPauseFilter>(
+          encode_lock_, number_of_encode_calls_, number_of_decode_calls_));
+    };
+  }
+
+  absl::Mutex encode_lock_;
+  uint32_t number_of_encode_calls_ GUARDED_BY(encode_lock_) = 0;
+  uint32_t number_of_decode_calls_ GUARDED_BY(encode_lock_) = 0;
+};
+
+// perform static registration
+static Registry::RegisterFactory<TestPauseFilterConfig,
+                                 Server::Configuration::NamedHttpFilterConfigFactory>
+    register_;
+
+void HttpIntegrationTest::testTwoRequests(bool network_backup) {
+  // if network_backup is false, this simply tests that Envoy can handle multiple
+  // requests on a connection.
+  //
+  // If network_backup is true, the first request will explicitly set the TCP level flow control
+  // as blocked as it finishes the encode and set a timer to unblock. The second stream should be
+  // created while the socket appears to be in the high watermark state, and regression tests that
+  // flow control will be corrected as the socket "becomes unblocked"
+  if (network_backup) {
+    config_helper_.addFilter(R"EOF(
+  name: pause-filter
+  config: {}
+  )EOF");
+  }
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));

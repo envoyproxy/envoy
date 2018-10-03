@@ -102,5 +102,16 @@ void Registry::setLogFormat(const std::string& log_format) {
   }
 }
 
+Logger* Registry::logger(const std::string& log_name) {
+  Logger* logger_to_return = nullptr;
+  for (Logger& logger : loggers()) {
+    if (logger.name() == log_name) {
+      logger_to_return = &logger;
+      break;
+    }
+  }
+  return logger_to_return;
+}
+
 } // namespace Logger
 } // namespace Envoy

@@ -57,6 +57,9 @@ protected:
   std::unique_ptr<Stats::ThreadLocalStoreImpl> stats_store_;
   std::unique_ptr<Logger::Context> logging_context_;
   std::unique_ptr<Server::InstanceImpl> server_;
+
+private:
+  void configureComponentLogLevels();
 };
 
 // TODO(jmarantz): consider removing this class; I think it'd be more useful to

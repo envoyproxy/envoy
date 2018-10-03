@@ -35,7 +35,7 @@ public:
   MockVerifierCallbacks mock_cb_;
 };
 
-// tests rule that is just match no requries.
+// tests rule that is just match no requires.
 TEST_F(AllVerifierTest, TestAllAllow) {
   proto_config_.mutable_rules(0)->clear_requires();
   createVerifier();

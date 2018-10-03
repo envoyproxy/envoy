@@ -3,7 +3,7 @@
 #
 # sh tools/deprecate_version/deprecate_version.sh
 #
-# Direct usage (not recomended):
+# Direct usage (not recommended):
 #
 # python tools/deprecate_version/deprecate_version.py <deprecate for version> <deprecate by version>
 #

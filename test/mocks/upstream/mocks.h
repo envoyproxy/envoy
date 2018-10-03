@@ -99,6 +99,36 @@ public:
   Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
 };
 
+class MockRetryPriority : public RetryPriority {
+public:
+  MockRetryPriority(const PriorityLoad& priority_load) : priority_load_(priority_load) {}
+  ~MockRetryPriority();
+
+  const PriorityLoad& determinePriorityLoad(const PrioritySet&, const PriorityLoad&) {
+    return priority_load_;
+  }
+
+  MOCK_METHOD1(onHostAttempted, void(HostDescriptionConstSharedPtr));
+
+private:
+  const PriorityLoad& priority_load_;
+};
+
+class MockRetryPriorityFactory : public RetryPriorityFactory {
+public:
+  MockRetryPriorityFactory(RetryPrioritySharedPtr retry_priority)
+      : retry_priority_(retry_priority) {}
+  void createRetryPriority(RetryPriorityFactoryCallbacks& callbacks, const Protobuf::Message&,
+                           uint32_t) override {
+    callbacks.addRetryPriority(retry_priority_);
+  }
+
+  std::string name() const override { return "envoy.mock_retry_priority"; }
+
+private:
+  RetryPrioritySharedPtr retry_priority_;
+};
+
 class MockCluster : public Cluster {
 public:
   MockCluster();
@@ -201,6 +231,7 @@ private:
 
 class MockClusterManager : public ClusterManager {
 public:
+  explicit MockClusterManager(TimeSource& time_source);
   MockClusterManager();
   ~MockClusterManager();
 
@@ -211,7 +242,6 @@ public:
   }
 
   ClusterManagerFactory& clusterManagerFactory() override { return cluster_manager_factory_; }
-  TimeSource& timeSource() override { return time_source_; }
 
   // Upstream::ClusterManager
   MOCK_METHOD2(addOrUpdateCluster,
@@ -239,9 +269,6 @@ public:
   MOCK_CONST_METHOD0(localClusterName, const std::string&());
   MOCK_METHOD1(addThreadLocalClusterUpdateCallbacks,
                std::unique_ptr<ClusterUpdateCallbacksHandle>(ClusterUpdateCallbacks& callbacks));
-
-  // TODO(jmarantz): Switch these to using mock-time.
-  RealTimeSource time_source_;
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;

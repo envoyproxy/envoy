@@ -242,7 +242,7 @@ TEST(ConfigTest, Routes) {
   }
 
   {
-    // hit the route with all criterias present
+    // hit the route with all criteria present
     NiceMock<Network::MockConnection> connection;
     connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.0", 10000);
     connection.remote_address_ =
@@ -464,7 +464,7 @@ public:
     conn_pool_callbacks_.at(conn_index)->onPoolFailure(reason, upstream_hosts_.at(conn_index));
   }
 
-  Event::TimeSystem& timeSystem() { return factory_context_.dispatcher().timeSystem(); }
+  Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
 
   ConfigSharedPtr config_;
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks_;
@@ -482,6 +482,20 @@ public:
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
 };
+
+TEST_F(TcpProxyTest, DefaultRoutes) {
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy config = defaultConfig();
+
+  envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight*
+      ignored_cluster = config.mutable_weighted_clusters()->mutable_clusters()->Add();
+  ignored_cluster->set_name("ignored_cluster");
+  ignored_cluster->set_weight(10);
+
+  configure(config);
+
+  NiceMock<Network::MockConnection> connection;
+  EXPECT_EQ(std::string("fake_cluster"), config_->getRouteFromEntries(connection));
+}
 
 // Tests that half-closes are proxied and don't themselves cause any connection to be closed.
 TEST_F(TcpProxyTest, HalfCloseProxy) {
@@ -936,7 +950,7 @@ TEST_F(TcpProxyTest, AccessLogBytesRxTxDuration) {
   Buffer::OwnedImpl response("bb");
   upstream_callbacks_->onUpstreamData(response, false);
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  timeSystem().sleep(std::chrono::milliseconds(1));
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
 
@@ -1080,7 +1094,7 @@ public:
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
   }
 
-  Event::TimeSystem& timeSystem() { return factory_context_.dispatcher().timeSystem(); }
+  Event::TestTimeSystem& timeSystem() { return factory_context_.timeSystem(); }
 
   ConfigSharedPtr config_;
   NiceMock<Network::MockConnection> connection_;
@@ -1126,6 +1140,25 @@ TEST_F(TcpProxyRoutingTest, RoutableConnection) {
 
   EXPECT_EQ(total_cx + 1, config_->stats().downstream_cx_total_.value());
   EXPECT_EQ(non_routable_cx, config_->stats().downstream_cx_no_route_.value());
+}
+
+// Test that the tcp proxy uses the cluster from FilterState if set
+TEST_F(TcpProxyRoutingTest, UseClusterFromPerConnectionCluster) {
+  setup();
+
+  RequestInfo::FilterStateImpl per_connection_state;
+  per_connection_state.setData("envoy.tcp_proxy.cluster",
+                               std::make_unique<PerConnectionCluster>("filter_state_cluster"));
+  ON_CALL(connection_, perConnectionState()).WillByDefault(ReturnRef(per_connection_state));
+  EXPECT_CALL(Const(connection_), perConnectionState())
+      .WillRepeatedly(ReturnRef(per_connection_state));
+
+  // Expect filter to try to open a connection to specified cluster.
+  EXPECT_CALL(factory_context_.cluster_manager_,
+              tcpConnPoolForCluster("filter_state_cluster", _, _))
+      .WillOnce(Return(nullptr));
+
+  filter_->onNewConnection();
 }
 
 } // namespace TcpProxy

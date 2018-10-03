@@ -65,4 +65,4 @@ Various configurable timeouts apply to an HTTP connection and its constituent st
   <envoy_api_field_route.RouteAction.RetryPolicy.per_try_timeout>` granularity.
 * Stream-level :ref:`per-route gRPC max timeout
   <envoy_api_field_route.RouteAction.max_grpc_timeout>`: this bounds the upstream timeout and allows
-  the timeout to be overriden via the *grpc-timeout* request header.
+  the timeout to be overridden via the *grpc-timeout* request header.

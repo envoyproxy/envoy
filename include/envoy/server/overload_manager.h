@@ -60,6 +60,9 @@ class OverloadActionNameValues {
 public:
   // Overload action to stop accepting new requests.
   const std::string StopAcceptingRequests = "envoy.overload_actions.stop_accepting_requests";
+
+  // Overload action to disable http keepalive (for HTTP1.x).
+  const std::string DisableHttpKeepAlive = "envoy.overload_actions.disable_http_keepalive";
 };
 
 typedef ConstSingleton<OverloadActionNameValues> OverloadActionNames;

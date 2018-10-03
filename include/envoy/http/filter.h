@@ -480,7 +480,7 @@ public:
 
   /**
    * Called with trailers to be encoded, implicitly ending the stream.
-   * @param trailers supplies the trailes to be encoded.
+   * @param trailers supplies the trailers to be encoded.
    */
   virtual FilterTrailersStatus encodeTrailers(HeaderMap& trailers) PURE;
 

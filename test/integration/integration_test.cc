@@ -111,6 +111,8 @@ TEST_P(IntegrationTest, Retry) { testRetry(); }
 
 TEST_P(IntegrationTest, RetryHostPredicateFilter) { testRetryHostPredicateFilter(); }
 
+TEST_P(IntegrationTest, RetryPriority) { testRetryPriority(); }
+
 TEST_P(IntegrationTest, EnvoyHandling100Continue) { testEnvoyHandling100Continue(); }
 
 TEST_P(IntegrationTest, EnvoyHandlingDuplicate100Continues) { testEnvoyHandling100Continue(true); }
@@ -128,6 +130,8 @@ TEST_P(IntegrationTest, EnvoyProxyingLate100ContinueWithEncoderFilter) {
 }
 
 TEST_P(IntegrationTest, TwoRequests) { testTwoRequests(); }
+
+TEST_P(IntegrationTest, TwoRequestsWithForcedBackup) { testTwoRequests(true); }
 
 TEST_P(IntegrationTest, UpstreamDisconnectWithTwoRequests) {
   testUpstreamDisconnectWithTwoRequests();

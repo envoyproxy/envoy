@@ -209,8 +209,9 @@ public:
     EXPECT_CALL(*protocol_, writeStructBegin(_, ""));
     EXPECT_EQ(FilterStatus::Continue, router_->structBegin({}));
 
-    EXPECT_CALL(*protocol_, writeFieldBegin(_, "", field_type, 1));
-    EXPECT_EQ(FilterStatus::Continue, router_->fieldBegin({}, field_type, 1));
+    int16_t id = 1;
+    EXPECT_CALL(*protocol_, writeFieldBegin(_, "", field_type, id));
+    EXPECT_EQ(FilterStatus::Continue, router_->fieldBegin({}, field_type, id));
 
     sendTrivialValue(field_type);
 
@@ -224,34 +225,41 @@ public:
 
   void sendTrivialValue(FieldType field_type) {
     switch (field_type) {
-    case FieldType::Bool:
-      EXPECT_CALL(*protocol_, writeBool(_, true));
-      EXPECT_EQ(FilterStatus::Continue, router_->boolValue(true));
-      break;
-    case FieldType::Byte:
-      EXPECT_CALL(*protocol_, writeByte(_, 2));
-      EXPECT_EQ(FilterStatus::Continue, router_->byteValue(2));
-      break;
-    case FieldType::I16:
-      EXPECT_CALL(*protocol_, writeInt16(_, 3));
-      EXPECT_EQ(FilterStatus::Continue, router_->int16Value(3));
-      break;
-    case FieldType::I32:
-      EXPECT_CALL(*protocol_, writeInt32(_, 4));
-      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(4));
-      break;
-    case FieldType::I64:
-      EXPECT_CALL(*protocol_, writeInt64(_, 5));
-      EXPECT_EQ(FilterStatus::Continue, router_->int64Value(5));
-      break;
-    case FieldType::Double:
-      EXPECT_CALL(*protocol_, writeDouble(_, 6.0));
-      EXPECT_EQ(FilterStatus::Continue, router_->doubleValue(6.0));
-      break;
-    case FieldType::String:
-      EXPECT_CALL(*protocol_, writeString(_, "seven"));
-      EXPECT_EQ(FilterStatus::Continue, router_->stringValue("seven"));
-      break;
+    case FieldType::Bool: {
+      bool v = true;
+      EXPECT_CALL(*protocol_, writeBool(_, v));
+      EXPECT_EQ(FilterStatus::Continue, router_->boolValue(v));
+    } break;
+    case FieldType::Byte: {
+      uint8_t v = 2;
+      EXPECT_CALL(*protocol_, writeByte(_, v));
+      EXPECT_EQ(FilterStatus::Continue, router_->byteValue(v));
+    } break;
+    case FieldType::I16: {
+      int16_t v = 3;
+      EXPECT_CALL(*protocol_, writeInt16(_, v));
+      EXPECT_EQ(FilterStatus::Continue, router_->int16Value(v));
+    } break;
+    case FieldType::I32: {
+      int32_t v = 4;
+      EXPECT_CALL(*protocol_, writeInt32(_, v));
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(v));
+    } break;
+    case FieldType::I64: {
+      int64_t v = 5;
+      EXPECT_CALL(*protocol_, writeInt64(_, v));
+      EXPECT_EQ(FilterStatus::Continue, router_->int64Value(v));
+    } break;
+    case FieldType::Double: {
+      double v = 6.0;
+      EXPECT_CALL(*protocol_, writeDouble(_, v));
+      EXPECT_EQ(FilterStatus::Continue, router_->doubleValue(v));
+    } break;
+    case FieldType::String: {
+      std::string v = "seven";
+      EXPECT_CALL(*protocol_, writeString(_, v));
+      EXPECT_EQ(FilterStatus::Continue, router_->stringValue(v));
+    } break;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
@@ -275,10 +283,12 @@ public:
 
     EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
 
-    EXPECT_CALL(callbacks_, upstreamData(Ref(buffer))).WillOnce(Return(false));
+    EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
+        .WillOnce(Return(ThriftFilters::ResponseStatus::MoreData));
     upstream_callbacks_->onUpstreamData(buffer, false);
 
-    EXPECT_CALL(callbacks_, upstreamData(Ref(buffer))).WillOnce(Return(true));
+    EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
+        .WillOnce(Return(ThriftFilters::ResponseStatus::Complete));
     EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, released(Ref(upstream_connection_)));
     upstream_callbacks_->onUpstreamData(buffer, false);
   }
@@ -347,11 +357,12 @@ TEST_F(ThriftRouterTest, PoolRemoteConnectionFailure) {
 
   startRequest(MessageType::Call);
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_))
-      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_TRUE(end_stream);
       }));
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
@@ -371,11 +382,12 @@ TEST_F(ThriftRouterTest, PoolTimeout) {
 
   startRequest(MessageType::Call);
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_))
-      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_TRUE(end_stream);
       }));
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::Timeout);
@@ -386,11 +398,12 @@ TEST_F(ThriftRouterTest, PoolOverflowFailure) {
 
   startRequest(MessageType::Call);
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_))
-      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*too many connections.*"));
+        EXPECT_TRUE(end_stream);
       }));
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::Overflow);
@@ -400,7 +413,7 @@ TEST_F(ThriftRouterTest, PoolConnectionFailureWithOnewayMessage) {
   initializeRouter();
   startRequest(MessageType::Oneway);
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_)).Times(0);
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _)).Times(0);
   EXPECT_CALL(callbacks_, resetDownstreamConnection());
   context_.cluster_manager_.tcp_conn_pool_.poolFailure(
       Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
@@ -413,11 +426,12 @@ TEST_F(ThriftRouterTest, NoRoute) {
   initializeMetadata(MessageType::Call);
 
   EXPECT_CALL(callbacks_, route()).WillOnce(Return(nullptr));
-  EXPECT_CALL(callbacks_, sendLocalReply(_))
-      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::UnknownMethod, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no route.*"));
+        EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
 }
@@ -430,11 +444,12 @@ TEST_F(ThriftRouterTest, NoCluster) {
   EXPECT_CALL(*route_, routeEntry()).WillOnce(Return(&route_entry_));
   EXPECT_CALL(route_entry_, clusterName()).WillRepeatedly(ReturnRef(cluster_name_));
   EXPECT_CALL(context_.cluster_manager_, get(cluster_name_)).WillOnce(Return(nullptr));
-  EXPECT_CALL(callbacks_, sendLocalReply(_))
-      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*unknown cluster.*"));
+        EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
 }
@@ -449,11 +464,12 @@ TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
   EXPECT_CALL(*context_.cluster_manager_.thread_local_cluster_.cluster_.info_, maintenanceMode())
       .WillOnce(Return(true));
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_))
-      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*maintenance mode.*"));
+        EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
 }
@@ -468,11 +484,12 @@ TEST_F(ThriftRouterTest, NoHealthyHosts) {
   EXPECT_CALL(context_.cluster_manager_, tcpConnPoolForCluster(cluster_name_, _, _))
       .WillOnce(Return(nullptr));
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_))
-      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*no healthy upstream.*"));
+        EXPECT_TRUE(end_stream);
       }));
 
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
@@ -488,7 +505,8 @@ TEST_F(ThriftRouterTest, TruncatedResponse) {
   Buffer::OwnedImpl buffer;
 
   EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
-  EXPECT_CALL(callbacks_, upstreamData(Ref(buffer))).WillOnce(Return(false));
+  EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
+      .WillOnce(Return(ThriftFilters::ResponseStatus::MoreData));
   EXPECT_CALL(context_.cluster_manager_.tcp_conn_pool_, released(Ref(upstream_connection_)));
   EXPECT_CALL(callbacks_, resetDownstreamConnection());
 
@@ -501,11 +519,12 @@ TEST_F(ThriftRouterTest, UpstreamRemoteCloseMidResponse) {
   startRequest(MessageType::Call);
   connectUpstream();
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_))
-      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_TRUE(end_stream);
       }));
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
   destroyRouter();
@@ -542,10 +561,7 @@ TEST_F(ThriftRouterTest, UpstreamDataTriggersReset) {
 
   EXPECT_CALL(callbacks_, startUpstreamResponse(_, _));
   EXPECT_CALL(callbacks_, upstreamData(Ref(buffer)))
-      .WillOnce(Invoke([&](Buffer::Instance&) -> bool {
-        router_->resetUpstreamConnection();
-        return true;
-      }));
+      .WillOnce(Return(ThriftFilters::ResponseStatus::Reset));
   EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
 
   upstream_callbacks_->onUpstreamData(buffer, true);
@@ -558,11 +574,12 @@ TEST_F(ThriftRouterTest, UnexpectedUpstreamRemoteClose) {
   connectUpstream();
   sendTrivialStruct(FieldType::String);
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_))
-      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_TRUE(end_stream);
       }));
   router_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
@@ -573,11 +590,12 @@ TEST_F(ThriftRouterTest, UnexpectedUpstreamLocalClose) {
   connectUpstream();
   sendTrivialStruct(FieldType::String);
 
-  EXPECT_CALL(callbacks_, sendLocalReply(_))
-      .WillOnce(Invoke([&](const DirectResponse& response) -> void {
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
         auto& app_ex = dynamic_cast<const AppException&>(response);
         EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
         EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_TRUE(end_stream);
       }));
   router_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
@@ -734,6 +752,7 @@ TEST_F(ThriftRouterTest, CallWithExistingConnection) {
 
 TEST_P(ThriftRouterContainerTest, DecoderFilterCallbacks) {
   FieldType field_type = GetParam();
+  int16_t field_id = 1;
 
   initializeRouter();
 
@@ -743,25 +762,31 @@ TEST_P(ThriftRouterContainerTest, DecoderFilterCallbacks) {
   EXPECT_CALL(*protocol_, writeStructBegin(_, ""));
   EXPECT_EQ(FilterStatus::Continue, router_->structBegin({}));
 
-  EXPECT_CALL(*protocol_, writeFieldBegin(_, "", field_type, 1));
-  EXPECT_EQ(FilterStatus::Continue, router_->fieldBegin({}, field_type, 1));
+  EXPECT_CALL(*protocol_, writeFieldBegin(_, "", field_type, field_id));
+  EXPECT_EQ(FilterStatus::Continue, router_->fieldBegin({}, field_type, field_id));
+
+  FieldType container_type = FieldType::I32;
+  uint32_t size{};
 
   switch (field_type) {
   case FieldType::Map:
-    EXPECT_CALL(*protocol_, writeMapBegin(_, FieldType::I32, FieldType::I32, 2));
-    EXPECT_EQ(FilterStatus::Continue, router_->mapBegin(FieldType::I32, FieldType::I32, 2));
+    size = 2;
+    EXPECT_CALL(*protocol_, writeMapBegin(_, container_type, container_type, size));
+    EXPECT_EQ(FilterStatus::Continue, router_->mapBegin(container_type, container_type, size));
     for (int i = 0; i < 2; i++) {
       EXPECT_CALL(*protocol_, writeInt32(_, i));
       EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i));
-      EXPECT_CALL(*protocol_, writeInt32(_, i + 100));
-      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i + 100));
+      int j = i + 100;
+      EXPECT_CALL(*protocol_, writeInt32(_, j));
+      EXPECT_EQ(FilterStatus::Continue, router_->int32Value(j));
     }
     EXPECT_CALL(*protocol_, writeMapEnd(_));
     EXPECT_EQ(FilterStatus::Continue, router_->mapEnd());
     break;
   case FieldType::List:
-    EXPECT_CALL(*protocol_, writeListBegin(_, FieldType::I32, 3));
-    EXPECT_EQ(FilterStatus::Continue, router_->listBegin(FieldType::I32, 3));
+    size = 3;
+    EXPECT_CALL(*protocol_, writeListBegin(_, container_type, size));
+    EXPECT_EQ(FilterStatus::Continue, router_->listBegin(container_type, size));
     for (int i = 0; i < 3; i++) {
       EXPECT_CALL(*protocol_, writeInt32(_, i));
       EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i));
@@ -770,8 +795,9 @@ TEST_P(ThriftRouterContainerTest, DecoderFilterCallbacks) {
     EXPECT_EQ(FilterStatus::Continue, router_->listEnd());
     break;
   case FieldType::Set:
-    EXPECT_CALL(*protocol_, writeSetBegin(_, FieldType::I32, 4));
-    EXPECT_EQ(FilterStatus::Continue, router_->setBegin(FieldType::I32, 4));
+    size = 4;
+    EXPECT_CALL(*protocol_, writeSetBegin(_, container_type, size));
+    EXPECT_EQ(FilterStatus::Continue, router_->setBegin(container_type, size));
     for (int i = 0; i < 4; i++) {
       EXPECT_CALL(*protocol_, writeInt32(_, i));
       EXPECT_EQ(FilterStatus::Continue, router_->int32Value(i));

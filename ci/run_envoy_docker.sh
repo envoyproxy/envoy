@@ -4,7 +4,7 @@ set -e
 
 . ci/envoy_build_sha.sh
 
-# We run as root and later drop permissions. This is requried to setup the USER
+# We run as root and later drop permissions. This is required to setup the USER
 # in useradd below, which is need for correct Python execution in the Docker
 # environment.
 USER=root

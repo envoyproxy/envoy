@@ -31,7 +31,8 @@ public:
   const std::string client_uri_san_ = "URI=spiffe://lyft.com/frontend-team";
   const std::string client_dns_san_ = "DNS=lyft.com;DNS=www.lyft.com";
 
-  XfccIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  XfccIntegrationTest()
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
 
   void initialize() override;
   void createUpstreams() override;

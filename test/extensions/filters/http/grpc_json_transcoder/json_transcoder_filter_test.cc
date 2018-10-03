@@ -616,7 +616,7 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutputAndSpli
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_.encodeData(response_data_first_part, false));
 
-  // Finaly, since half of the response data buffer is moved already, here we can send the rest
+  // Finally, since half of the response data buffer is moved already, here we can send the rest
   // of it to the next data encoding step.
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer,
             filter_.encodeData(*response_data, false));

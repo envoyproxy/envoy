@@ -42,7 +42,7 @@ public:
     lb_->initialize();
   }
 
-  // Run all tests aginst both priority 0 and priority 1 host sets, to ensure
+  // Run all tests against both priority 0 and priority 1 host sets, to ensure
   // all the load balancers have equivalent functonality for failover host sets.
   MockHostSet& hostSet() { return GetParam() ? host_set_ : failover_host_set_; }
 

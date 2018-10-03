@@ -1,10 +1,10 @@
 #pragma once
 
-#include "envoy/event/timer.h"
-
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 #include "common/common/utility.h"
+
+#include "test/test_common/test_time_system.h"
 
 namespace Envoy {
 namespace Event {
@@ -13,7 +13,7 @@ namespace Event {
 // sleep(), setSystemTime(), or setMonotonicTime(). systemTime() and
 // monotonicTime() are maintained in the class, and alarms are fired in response
 // to adjustments in time.
-class SimulatedTimeSystem : public TimeSystem {
+class SimulatedTimeSystem : public TestTimeSystem {
 public:
   SimulatedTimeSystem();
   ~SimulatedTimeSystem();
@@ -21,13 +21,15 @@ public:
   // TimeSystem
   SchedulerPtr createScheduler(Libevent::BasePtr&) override;
 
-  // TimeSource
-  SystemTime systemTime() override;
-  MonotonicTime monotonicTime() override;
+  // TestTimeSystem
   void sleep(const Duration& duration) override;
   Thread::CondVar::WaitStatus
   waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
           const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override;
+
+  // TimeSource
+  SystemTime systemTime() override;
+  MonotonicTime monotonicTime() override;
 
   /**
    * Sets the time forward monotonically. If the supplied argument moves

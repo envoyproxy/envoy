@@ -12,9 +12,10 @@ namespace Config {
 GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::AsyncClientPtr async_client,
                          Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
-                         Runtime::RandomGenerator& random)
+                         Runtime::RandomGenerator& random, Stats::Scope& scope)
     : local_info_(local_info), async_client_(std::move(async_client)),
-      service_method_(service_method), random_(random), time_source_(dispatcher.timeSystem()) {
+      service_method_(service_method), random_(random), time_source_(dispatcher.timeSystem()),
+      control_plane_stats_(generateControlPlaneStats(scope)) {
   Config::Utility::checkLocalInfo("ads", local_info);
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RETRY_INITIAL_DELAY_MS,
@@ -44,6 +45,7 @@ void GrpcMuxImpl::establishNewStream() {
     return;
   }
 
+  control_plane_stats_.connected_state_.set(1);
   for (const auto type_url : subscriptions_) {
     sendDiscoveryRequest(type_url);
   }
@@ -204,9 +206,6 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
       resources.emplace(resource_name, resource);
     }
     for (auto watch : api_state_[type_url].watches_) {
-      // onConfigUpdate should be called in all cases for single watch xDS (Cluster and Listener)
-      // even if the message does not have resources so that update_empty stat is properly
-      // incremented and state-of-the-world semantics are maintained.
       if (watch->resources_.empty()) {
         watch->callbacks_.onConfigUpdate(message->resources(), message->version_info());
         continue;
@@ -218,11 +217,7 @@ void GrpcMuxImpl::onReceiveMessage(std::unique_ptr<envoy::api::v2::DiscoveryResp
           found_resources.Add()->MergeFrom(it->second);
         }
       }
-      // onConfigUpdate should be called only on watches(clusters/routes) that have updates in the
-      // message.
-      if (found_resources.size() > 0) {
-        watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
-      }
+      watch->callbacks_.onConfigUpdate(found_resources, message->version_info());
     }
     // TODO(mattklein123): In the future if we start tracking per-resource versions, we would do
     // that tracking here.
@@ -247,6 +242,7 @@ void GrpcMuxImpl::onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) {
 void GrpcMuxImpl::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
   ENVOY_LOG(warn, "gRPC config stream closed: {}, {}", status, message);
   stream_ = nullptr;
+  control_plane_stats_.connected_state_.set(0);
   setRetryTimer();
 }
 

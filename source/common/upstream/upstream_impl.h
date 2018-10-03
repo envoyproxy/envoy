@@ -65,7 +65,8 @@ public:
       Network::Address::InstanceConstSharedPtr dest_address,
       const envoy::api::v2::core::Metadata& metadata,
       const envoy::api::v2::core::Locality& locality,
-      const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config)
+      const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
+      uint32_t priority)
       : cluster_(cluster), hostname_(hostname), address_(dest_address),
         health_check_address_(health_check_config.port_value() == 0
                                   ? dest_address
@@ -76,7 +77,8 @@ public:
                     .bool_value()),
         metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)),
         locality_(locality), stats_{ALL_HOST_STATS(POOL_COUNTER(stats_store_),
-                                                   POOL_GAUGE(stats_store_))} {}
+                                                   POOL_GAUGE(stats_store_))},
+        priority_(priority) {}
 
   // Upstream::HostDescription
   bool canary() const override { return canary_; }
@@ -128,6 +130,8 @@ public:
   // Setting health check address is usually done at initialization. This is NOP by default.
   void setHealthCheckAddress(Network::Address::InstanceConstSharedPtr) override {}
   const envoy::api::v2::core::Locality& locality() const override { return locality_; }
+  uint32_t priority() const override { return priority_; }
+  void priority(uint32_t priority) override { priority_ = priority; }
 
 protected:
   ClusterInfoConstSharedPtr cluster_;
@@ -142,6 +146,7 @@ protected:
   HostStats stats_;
   Outlier::DetectorHostMonitorPtr outlier_detector_;
   HealthCheckHostMonitorPtr health_checker_;
+  std::atomic<uint32_t> priority_;
 };
 
 /**
@@ -155,8 +160,10 @@ public:
            Network::Address::InstanceConstSharedPtr address,
            const envoy::api::v2::core::Metadata& metadata, uint32_t initial_weight,
            const envoy::api::v2::core::Locality& locality,
-           const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config)
-      : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config),
+           const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
+           uint32_t priority)
+      : HostDescriptionImpl(cluster, hostname, address, metadata, locality, health_check_config,
+                            priority),
         used_(true) {
     weight(initial_weight);
   }
@@ -570,7 +577,7 @@ public:
   // priority is specified by locality_lb_endpoint.priority()).
   //
   // The specified health_checker_flag is used to set the registered-host's health-flag when the
-  // lb_endpoint health status is unhealty, draining or timeout.
+  // lb_endpoint health status is unhealthy, draining or timeout.
   void
   registerHostForPriority(const std::string& hostname,
                           Network::Address::InstanceConstSharedPtr address,
@@ -642,7 +649,7 @@ protected:
    * @param hosts_added_to_current_priority will be populated with hosts added to the priority.
    * @param hosts_removed_from_current_priority will be populated with hosts removed from the
    * priority.
-   * @param updated_hosts is used to aggregate the new state of all hosts accross priority, and will
+   * @param updated_hosts is used to aggregate the new state of all hosts across priority, and will
    * be updated with the hosts that remain in this priority after the update.
    * @return whether the hosts for the priority changed.
    */
