@@ -463,23 +463,19 @@ std::string ContextImpl::getCaCertInformation() const {
   if (ca_cert_ == nullptr) {
     return "";
   }
-  return certificateDetails(ca_cert_.get(), false);
+  return certificateDetails(ca_cert_.get(), getCaFileName());
 }
 
 std::string ContextImpl::getCertChainInformation() const {
   if (cert_chain_ == nullptr) {
     return "";
   }
-  return certificateDetails(cert_chain_.get(), true);
+  return certificateDetails(cert_chain_.get(), getCertChainFileName());
 }
 
-std::string ContextImpl::certificateDetails(X509* cert, const bool chain) const {
+std::string ContextImpl::certificateDetails(X509* cert, const std::string& path) const {
   envoy::admin::v2alpha::CertificateDetails certificate_details;
-  if (chain) {
-    certificate_details.set_path(getCertChainFileName());
-  } else {
-    certificate_details.set_path(getCaFileName());
-  }
+  certificate_details.set_path(path);
   certificate_details.set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
   certificate_details.set_days_until_expiration(getDaysUntilExpiration(cert));
 

@@ -21,14 +21,12 @@ public:
   virtual size_t daysUntilFirstCertExpires() const PURE;
 
   /**
-   * @return a string of ca certificate path, certificate serial number and days until certificate
-   * expiration
+   * @return a JSON string representation of certificate conforming to proto admin.v2alpha.certs.
    */
   virtual std::string getCaCertInformation() const PURE;
 
   /**
-   * @return a string of cert chain certificate path, certificate serial number and days until
-   * certificate expiration
+   * @return a JSON string representation of certificate conforming to proto admin.v2alpha.certs.
    */
   virtual std::string getCertChainInformation() const PURE;
 };
