@@ -49,7 +49,7 @@ In the :ref:`filter config <envoy_api_msg_config.filter.http.jwt_authn.v2alpha.J
 .. important::
    For *remote_jwks*, a **jwks_cluster** cluster is required.
 
-Due to above requirement, `OpenID connection discovery <https://openid.net/specs/openid-connect-discovery-1_0.html>`_ is not supported since the URL to fetch JWKS is in the response of the discovery. It is not easy to setup a cluster config for a dynamic URL.
+Due to above requirement, `OpenID Connect Discovery <https://openid.net/specs/openid-connect-discovery-1_0.html>`_ is not supported since the URL to fetch JWKS is in the response of the discovery. It is not easy to setup a cluster config for a dynamic URL.
 
 Remote JWKS config example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
