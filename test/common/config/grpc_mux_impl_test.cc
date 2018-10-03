@@ -14,6 +14,7 @@
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/logging.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -36,7 +37,7 @@ namespace {
 class GrpcMuxImplTest : public testing::Test {
 public:
   GrpcMuxImplTest() : async_client_(new Grpc::MockAsyncClient()) {
-    dispatcher_.setTimeSystem(mock_time_system_);
+    dispatcher_.setTimeSystem(time_system_);
   }
 
   void setup() {
@@ -76,7 +77,7 @@ public:
   Grpc::MockAsyncStream async_stream_;
   std::unique_ptr<GrpcMuxImpl> grpc_mux_;
   NiceMock<MockGrpcMuxCallbacks> callbacks_;
-  NiceMock<MockTimeSystem> mock_time_system_;
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl stats_;
 };
@@ -310,8 +311,17 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   expectSendMessage(type_url, {}, "2");
 }
 
+// Exactly one test requires a mock time system to provoke behavior that cannot
+// easily be achieved with a SimulatedTimeSystem.
+class GrpcMuxImplTestWithMockTimeSystem : public GrpcMuxImplTest {
+protected:
+  GrpcMuxImplTestWithMockTimeSystem() { dispatcher_.setTimeSystem(mock_time_system_); }
+
+  MockTimeSystem mock_time_system_;
+};
+
 //  Verifies that warning messages get logged when Envoy detects too many requests.
-TEST_F(GrpcMuxImplTest, TooManyRequests) {
+TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequests) {
   setup();
 
   EXPECT_CALL(async_stream_, sendMessage(_, false)).Times(AtLeast(100));

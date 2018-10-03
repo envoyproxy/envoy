@@ -7,6 +7,7 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -75,7 +76,7 @@ public:
   Event::TimerCb response_timer_cb_;
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
-  MockTimeSystem time_system_;
+  Event::SimulatedTimeSystem time_system_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
 };
 
@@ -93,14 +94,12 @@ TEST_F(LoadStatsReporterTest, TestPubSub) {
   EXPECT_CALL(*async_client_, start(_, _)).WillOnce(Return(&async_stream_));
   EXPECT_CALL(async_stream_, sendMessage(_, _));
   createLoadStatsReporter();
-  EXPECT_CALL(time_system_, monotonicTime());
   deliverLoadStatsResponse({"foo"});
 
   EXPECT_CALL(async_stream_, sendMessage(_, _));
   EXPECT_CALL(*response_timer_, enableTimer(std::chrono::milliseconds(42000)));
   response_timer_cb_();
 
-  EXPECT_CALL(time_system_, monotonicTime());
   deliverLoadStatsResponse({"bar"});
 
   EXPECT_CALL(async_stream_, sendMessage(_, _));
@@ -114,8 +113,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   // Initially, we have no clusters to report on.
   expectSendMessage({});
   createLoadStatsReporter();
-  EXPECT_CALL(time_system_, monotonicTime())
-      .WillOnce(Return(MonotonicTime(std::chrono::microseconds(3))));
+  time_system_.setMonotonicTime(std::chrono::microseconds(3));
   // Start reporting on foo.
   NiceMock<MockCluster> foo_cluster;
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(2);
@@ -125,8 +123,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   deliverLoadStatsResponse({"foo"});
   // Initial stats report for foo on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
-  EXPECT_CALL(time_system_, monotonicTime())
-      .WillOnce(Return(MonotonicTime(std::chrono::microseconds(4))));
+  time_system_.setMonotonicTime(std::chrono::microseconds(4));
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
@@ -143,15 +140,12 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
 
   // Start reporting on bar.
-  EXPECT_CALL(time_system_, monotonicTime())
-      .WillOnce(Return(MonotonicTime(std::chrono::microseconds(6))));
+  time_system_.setMonotonicTime(std::chrono::microseconds(6));
   deliverLoadStatsResponse({"foo", "bar"});
   // Stats report foo/bar on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
-  EXPECT_CALL(time_system_, monotonicTime())
-      .Times(2)
-      .WillRepeatedly(Return(MonotonicTime(std::chrono::microseconds(28))));
+  time_system_.setMonotonicTime(std::chrono::microseconds(28));
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
@@ -177,8 +171,7 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   // Stats report for bar on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(5);
-  EXPECT_CALL(time_system_, monotonicTime())
-      .WillOnce(Return(MonotonicTime(std::chrono::microseconds(33))));
+  time_system_.setMonotonicTime(std::chrono::microseconds(33));
   {
     envoy::api::v2::endpoint::ClusterStats bar_cluster_stats;
     bar_cluster_stats.set_cluster_name("bar");
@@ -195,15 +188,12 @@ TEST_F(LoadStatsReporterTest, ExistingClusters) {
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
 
   // Start tracking foo again, we should forget earlier history for foo.
-  EXPECT_CALL(time_system_, monotonicTime())
-      .WillOnce(Return(MonotonicTime(std::chrono::microseconds(43))));
+  time_system_.setMonotonicTime(std::chrono::microseconds(43));
   deliverLoadStatsResponse({"foo", "bar"});
   // Stats report foo/bar on timer tick.
   foo_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
   bar_cluster.info_->load_report_stats_.upstream_rq_dropped_.add(1);
-  EXPECT_CALL(time_system_, monotonicTime())
-      .Times(2)
-      .WillRepeatedly(Return(MonotonicTime(std::chrono::microseconds(47))));
+  time_system_.setMonotonicTime(std::chrono::microseconds(47));
   {
     envoy::api::v2::endpoint::ClusterStats foo_cluster_stats;
     foo_cluster_stats.set_cluster_name("foo");
