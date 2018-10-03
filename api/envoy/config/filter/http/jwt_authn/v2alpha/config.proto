@@ -13,9 +13,9 @@ import "validate/validate.proto";
 
 // Please see following for JWT authentication flow:
 //
-// * `JWT format <https://tools.ietf.org/html/rfc7519>`_
-// * `OAuth2.0 <https://tools.ietf.org/html/rfc6749>`_
-// * `OIDC1.0  <http://openid.net/connect>`_
+// * `JSON Web Token (JWT) <https://tools.ietf.org/html/rfc7519>`_
+// * `The OAuth 2.0 Authorization Framework <https://tools.ietf.org/html/rfc6749>`_
+// * `OpenID Connect <http://openid.net/connect>`_
 //
 // A JwtProvider message specifies how a JSON Web Token (JWT) can be verified. It specifies:
 //

@@ -81,7 +81,7 @@ Following cluster **example_jwks_cluster** is needed to fetch JWKS.
     hosts:
       socket_address:
         address: example.com
-        portValue: 80
+        port_value: 80
 
 
 Inline JWKS config example
