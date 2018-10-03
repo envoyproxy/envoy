@@ -140,7 +140,6 @@ SystemTime SimulatedTimeSystem::systemTime() {
 
 MonotonicTime SimulatedTimeSystem::monotonicTime() {
   Thread::LockGuard lock(mutex_);
-  std::cerr << "monotonic_time_=" << monotonic_time_.time_since_epoch().count() << std::endl;
   return monotonic_time_;
 }
 
