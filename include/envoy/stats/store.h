@@ -70,7 +70,7 @@ public:
   /**
    * Attach a StatsMatcher to this StoreRoot to prevent the initialization of stats according to
    * some ruleset.
-   * @param a StatsMatcher to attach to this StoreRoot.
+   * @param stats_matcher a StatsMatcher to attach to this StoreRoot.
    */
   virtual void setStatsMatcher(StatsMatcherPtr&& stats_matcher) PURE;
 

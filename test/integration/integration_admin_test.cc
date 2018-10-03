@@ -458,17 +458,14 @@ public:
           *bootstrap.mutable_stats_config()->mutable_stats_matcher() = stats_matcher_;
         });
     HttpIntegrationTest::initialize();
-
+  }
+  void makeRequest() {
     response_ = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
                                                    downstreamProtocol(), version_);
   }
-
-  void TearDown() override {
+  void verifyResponse() {
     EXPECT_TRUE(response_->complete());
     EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
-
-    test_server_.reset();
-    fake_upstreams_.clear();
   }
 
   BufferingStreamDecoderPtr response_;
@@ -479,27 +476,35 @@ public:
 TEST_F(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_prefix("server.");
   initialize();
+  makeRequest();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.")));
+  verifyResponse();
 }
 
 TEST_F(StatsMatcherIntegrationTest, ExcludeRequests) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_regex(".*requests.*");
   initialize();
+  makeRequest();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("requests")));
+  verifyResponse();
 }
 
 TEST_F(StatsMatcherIntegrationTest, ExcludeExact) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
   initialize();
+  makeRequest();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.concurrency")));
+  verifyResponse();
 }
 
 TEST_F(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_regex(".*live");
   initialize();
+  makeRequest();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.concurrency")));
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.live")));
+  verifyResponse();
 }
 
 // TODO(ambuc): Find a cleaner way to test this. This test has two unfortunate compromises:
@@ -514,8 +519,10 @@ TEST_F(StatsMatcherIntegrationTest, IncludeExact) {
   stats_matcher_.mutable_inclusion_list()->add_patterns()->set_exact(
       "listener_manager.listener_create_success");
   initialize();
+  makeRequest();
   EXPECT_THAT(response_->body(),
               testing::Eq("listener_manager.listener_create_success: 1\nstats.overflow: 0\n"));
+  verifyResponse();
 }
 
 } // namespace Envoy
