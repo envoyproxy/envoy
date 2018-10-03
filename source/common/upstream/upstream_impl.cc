@@ -1130,10 +1130,11 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
     std::unordered_set<std::string> host_addresses;
     if (target->locality_lb_endpoint_.priority() == current_priority) {
       for (auto i = target->hosts_.begin(); i != target->hosts_.end();) {
-        if (host_addresses.count((*i)->address()->asString()) == 0) {
+        const auto& address = (*i)->address()->asString();
+        if (host_addresses.count(address) == 0) {
           priority_state_manager.registerHostForPriority(*i, target->locality_lb_endpoint_,
                                                          target->lb_endpoint_, absl::nullopt);
-          host_addresses.insert((*i)->address()->asString());
+          host_addresses.insert(address);
           ++i;
         } else {
           i = target->hosts_.erase(i);
