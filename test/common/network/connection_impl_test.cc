@@ -89,7 +89,7 @@ class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
   void setUpBasicConnection() {
     if (dispatcher_.get() == nullptr) {
-      dispatcher_.reset(new Event::DispatcherImpl(timeSystem()));
+      dispatcher_.reset(new Event::DispatcherImpl(time_system_));
     }
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
@@ -152,7 +152,7 @@ public:
 
     MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
     dispatcher_.reset(
-        new Event::DispatcherImpl(timeSystem(), Buffer::WatermarkFactoryPtr{factory}));
+        new Event::DispatcherImpl(time_system_, Buffer::WatermarkFactoryPtr{factory}));
     // The first call to create a client session will get a MockBuffer.
     // Other calls for server sessions will by default get a normal OwnedImpl.
     EXPECT_CALL(*factory, create_(_, _))
@@ -167,8 +167,6 @@ public:
           return new Buffer::WatermarkBuffer(below_low, above_high);
         }));
   }
-
-  virtual Event::TimeSystem& timeSystem() { return time_system_; }
 
 protected:
   Event::SimulatedTimeSystem time_system_;
