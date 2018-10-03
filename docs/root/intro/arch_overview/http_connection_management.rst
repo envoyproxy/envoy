@@ -55,39 +55,36 @@ These plugins can be combined to affect both host selection and priority load.
 
 For example, to configure retries to prefer hosts that haven't been attempted already, the builtin `envoy.retry_host_predicates.other_hosts` predicate can be used:
 
-```
-retry_policy:
-  retry_host_predicate:
-  - name: envoy.retry_host_predicates.previous_hosts
-  host_selection_retry_max_attempts: 3
-```
+.. code-block:: none
+  retry_policy:
+    retry_host_predicate:
+    - name: envoy.retry_host_predicates.previous_hosts
+    host_selection_retry_max_attempts: 3
 
 This will reject hosts previously attempted, retrying host selection a maximum of 3 times. The bound on attempts is necessary in order to deal with scenarios in which finding an acceptable host is either impossible (no hosts satisfy the predicate) or very unlikely (the only suitable host has a very low relative weight).
 
 To configure retries to attempt other priorities during retries, the built in `envoy.retry_priority.other_priorities` can be used. 
 
-```
-retry_policy:
-  retry_priority:
-    name: envoy.retry_priorities.previous_priorities
-    config:
-      update_frequency: 2
-```
+.. code-block:: none
+  retry_policy:
+    retry_priority:
+      name: envoy.retry_priorities.previous_priorities
+      config:
+        update_frequency: 2
 
 This will keep track of previously attempted priorities, and adjust the priority load such that other priorites will be targeted in subsequent retry attempts. The `update_frequency` parameter decides how often the priority load should be recalculated.
 
 These plugins can be comined, which will exclude both previously attempted hosts as well as previously attempted priorities.
 
-```
-retry_policy:
-  retry_host_predicate:
-  - name: envoy.retry_host_predicates.previous_hosts
-  host_selection_retry_max_attempts: 3
-  retry_priority:
-    name: envoy.retry_priorities.previous_priorities
-    config:
-      update_frequency: 2
-```
+.. code-block:: none
+  retry_policy:
+    retry_host_predicate:
+    - name: envoy.retry_host_predicates.previous_hosts
+    host_selection_retry_max_attempts: 3
+    retry_priority:
+      name: envoy.retry_priorities.previous_priorities
+      config:
+        update_frequency: 2
 
 Envoy can be extended with custom retry plugins similar to how custom filters can be added.
 
