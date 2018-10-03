@@ -31,15 +31,5 @@ const FilterState::Object* FilterStateImpl::getDataGeneric(absl::string_view dat
   return it->second.get();
 }
 
-FilterState::Object* FilterStateImpl::getDataGeneric(absl::string_view data_name) {
-  // TODO(Google): Remove string conversion when fixed internally.
-  const auto& it = data_storage_.find(std::string(data_name));
-
-  if (it == data_storage_.end()) {
-    throw EnvoyException("FilterState::getData<T> called for unknown data name.");
-  }
-  return it->second.get();
-}
-
 } // namespace RequestInfo
 } // namespace Envoy

@@ -15,7 +15,6 @@ public:
   void setData(absl::string_view data_name, std::unique_ptr<Object>&& data) override;
   bool hasDataWithName(absl::string_view) const override;
   const Object* getDataGeneric(absl::string_view data_name) const override;
-  Object* getDataGeneric(absl::string_view data_name) override;
 
 private:
   // The explicit non-type-specific comparator is necessary to allow use of find() method

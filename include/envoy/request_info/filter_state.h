@@ -46,22 +46,6 @@ public:
   }
 
   /**
-   * @param data_name the name of the data being looked up.
-   * @return a non-const reference to the stored data.
-   * Note that it is an error to access data that has not previously been set.
-   * This function will fail if the data stored under |data_name| cannot be
-   * dynamically cast to the type specified.
-   */
-  template <typename T> T& getData(absl::string_view data_name) {
-    T* result = dynamic_cast<T*>(getDataGeneric(data_name));
-    if (!result) {
-      throw EnvoyException(
-          fmt::format("Data stored under {} cannot be coerced to specified type", data_name));
-    }
-    return *result;
-  }
-
-  /**
    * @param data_name the name of the data being probed.
    * @return Whether data of the type and name specified exists in the
    * data store.
@@ -72,15 +56,37 @@ public:
   }
 
   /**
+   * @param data_name the name of the data being added to the end of the list.
+   * @param data an owning pointer to the data to be stored.
+   * Note that data_names for list elements have no relation to the data_names 
+   * for singleton data objects added through setData. All items added to the list
+   * must be of the same type.
+   */
+  virtual void addListData(absl::string_view data_name, std::unique_ptr<Object>&& data) PURE;
+
+  /**
+   * @param data_name the name of the list data being looked up.
+   * @return a const vector reference to the stored data.
+   * Note that it is an error to access data that has not previously been set.
+   */
+  const std::vector<std::unique_ptr<Object>>& getListData(absl::string_view data_name) const PURE;
+
+  /**
    * @param data_name the name of the data being probed.
    * @return Whether data of any type and the name specified exists in the
    * data store.
    */
   virtual bool hasDataWithName(absl::string_view data_name) const PURE;
 
+  /**
+   * @param data_name the name of the list data being probed.
+   * @return Whether a list data of any type and the name specified exists in the
+   * data store.
+   */
+  virtual bool hasListDataWithName(absl::string_view data_name) const PURE;
+
 protected:
   virtual const Object* getDataGeneric(absl::string_view data_name) const PURE;
-  virtual Object* getDataGeneric(absl::string_view data_name) PURE;
 };
 
 } // namespace RequestInfo
