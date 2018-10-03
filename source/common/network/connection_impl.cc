@@ -173,7 +173,10 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   }
 
   // No need for a delayed close (if pending) now that the socket is being closed.
-  disableDelayedCloseTimer();
+  if (delayed_close_timer_) {
+    delayed_close_timer_->disableTimer();
+    delayed_close_timer_ = nullptr;
+  }
 
   ENVOY_CONN_LOG(debug, "closing socket: {}", *this, static_cast<uint32_t>(close_type));
   transport_socket_->closeSocket(close_type);
@@ -586,17 +589,6 @@ void ConnectionImpl::onDelayedCloseTimeout() {
     connection_stats_->delayed_close_timeouts_->inc();
   }
   closeSocket(ConnectionEvent::LocalClose);
-}
-
-void ConnectionImpl::disableDelayedCloseTimer() {
-  if (delayed_close_timer_) {
-    delayed_close_timer_->disableTimer();
-    // Reset the pointer to avoid another unnecessary (although safe) call to disableTimer().
-    // In some edge cases, such as when the timer has been enabled but a closeSocket() is issued
-    // prior to it triggering, this function will be called twice: 1) in closeSocket() and 2) in
-    // ~ConnectionImpl().
-    delayed_close_timer_ = nullptr;
-  }
 }
 
 ClientConnectionImpl::ClientConnectionImpl(
