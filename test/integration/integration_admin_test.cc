@@ -462,9 +462,7 @@ public:
   void makeRequest() {
     response_ = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "GET", "/stats", "",
                                                    downstreamProtocol(), version_);
-  }
-  void verifyResponse() {
-    EXPECT_TRUE(response_->complete());
+    ASSERT_TRUE(response_->complete());
     EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
   }
 
@@ -478,7 +476,6 @@ TEST_F(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {
   initialize();
   makeRequest();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.")));
-  verifyResponse();
 }
 
 TEST_F(StatsMatcherIntegrationTest, ExcludeRequests) {
@@ -486,7 +483,6 @@ TEST_F(StatsMatcherIntegrationTest, ExcludeRequests) {
   initialize();
   makeRequest();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("requests")));
-  verifyResponse();
 }
 
 TEST_F(StatsMatcherIntegrationTest, ExcludeExact) {
@@ -494,7 +490,6 @@ TEST_F(StatsMatcherIntegrationTest, ExcludeExact) {
   initialize();
   makeRequest();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.concurrency")));
-  verifyResponse();
 }
 
 TEST_F(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
@@ -504,7 +499,6 @@ TEST_F(StatsMatcherIntegrationTest, ExcludeMultipleExact) {
   makeRequest();
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.concurrency")));
   EXPECT_THAT(response_->body(), testing::Not(testing::HasSubstr("server.live")));
-  verifyResponse();
 }
 
 // TODO(ambuc): Find a cleaner way to test this. This test has two unfortunate compromises:
@@ -522,7 +516,6 @@ TEST_F(StatsMatcherIntegrationTest, IncludeExact) {
   makeRequest();
   EXPECT_THAT(response_->body(),
               testing::Eq("listener_manager.listener_create_success: 1\nstats.overflow: 0\n"));
-  verifyResponse();
 }
 
 } // namespace Envoy

@@ -31,12 +31,12 @@ protected:
 protected:
   void expectAccepted(std::vector<std::string> expected_to_pass) {
     for (const auto& stat_name : expected_to_pass) {
-      EXPECT_THAT(stats_matcher_impl_->rejects(stat_name), IsFalse()) << "Accepted: " << stat_name;
+      EXPECT_FALSE(stats_matcher_impl_->rejects(stat_name)) << "Accepted: " << stat_name;
     }
   }
   void expectDenied(std::vector<std::string> expected_to_fail) {
     for (const auto& stat_name : expected_to_fail) {
-      EXPECT_THAT(stats_matcher_impl_->rejects(stat_name), IsTrue()) << "Rejected: " << stat_name;
+      EXPECT_TRUE(stats_matcher_impl_->rejects(stat_name)) << "Rejected: " << stat_name;
     }
   }
 
