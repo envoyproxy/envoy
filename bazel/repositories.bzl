@@ -211,6 +211,13 @@ def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using
     # it to exclude the Go rules.
     if "io_bazel_rules_go" not in skip_targets:
+        # the patch here is to add BUILD files. It was generated from the
+        # BUILD files created by rules_go v0.15.3
+        _repository_impl(
+            name = "com_github_golang_protobuf",
+            patches = ["@envoy//bazel/external:golang_protobuf.patch"],
+            patch_args = ["-p1"],
+        )
         _repository_impl("io_bazel_rules_go")
         _repository_impl("bazel_gazelle")
 

@@ -142,6 +142,14 @@ REPOSITORY_LOCATIONS = dict(
         commit = "05a15e4ecd0244a981fdf0348a76658def62fa9c",  # 2018-05-30
         remote = "https://github.com/grpc-ecosystem/grpc-httpjson-transcoding",
     ),
+    com_github_golang_protobuf = dict(
+        # TODO(sesmith177): Remove this dependency when both:
+        #   1. There's a release of golang/protobuf that includes
+        #      https://github.com/golang/protobuf/commit/31e0d063dd98c052257e5b69eeb006818133f45c
+        #   2. That release is included in rules_go
+        commit = "31e0d063dd98c052257e5b69eeb006818133f45c",  # 2018-10-03
+        remote = "https://github.com/golang/protobuf",
+    ),
     io_bazel_rules_go = dict(
         sha256 = "5abda894d02ce910076603b5f11d3282425d932b35ccb6c3a6ab4470a094e777",
         strip_prefix = "rules_go-0.15.3",
