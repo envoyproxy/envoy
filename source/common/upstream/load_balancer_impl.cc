@@ -85,18 +85,25 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
     per_priority_load[0] = 100;
     return;
   }
+
   size_t total_load = 100;
+  int32_t first_healthy_priority = -1;
   for (size_t i = 0; i < per_priority_health.size(); ++i) {
-    // Now assign as much load as possible to the high priority levels and cease assigning load when
-    // total_load runs out.
+    if (first_healthy_priority < 0 && per_priority_health[i] > 0) {
+      first_healthy_priority = i;
+    }
+    // Now assign as much load as possible to the high priority levels and cease assigning load
+    // when total_load runs out.
     per_priority_load[i] =
         std::min<uint32_t>(total_load, per_priority_health[i] * 100 / total_health);
     total_load -= per_priority_load[i];
   }
+
   if (total_load != 0) {
-    // Account for rounding errors.
+    ASSERT(first_healthy_priority != -1);
+    // Account for rounding errors by assigning it to the first healthy priority.
     ASSERT(total_load < per_priority_load.size());
-    per_priority_load[0] += total_load;
+    per_priority_load[first_healthy_priority] += total_load;
   }
 }
 
