@@ -1135,9 +1135,11 @@ void StrictDnsClusterImpl::updateAllHosts(const HostVector& hosts_added,
           priority_state_manager.registerHostForPriority(*i, target->locality_lb_endpoint_,
                                                          target->lb_endpoint_, absl::nullopt);
           host_addresses.insert(address);
-          ++i;
+          i++;
         } else {
-          i = target->hosts_.erase(i);
+          i = std::remove_if(i, target->hosts_.end(), [&address](const auto& host) {
+            return host->address()->asString() == address;
+          });
         }
       }
     }
