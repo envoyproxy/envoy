@@ -101,6 +101,22 @@ TEST_F(TcpStatsdSinkTest, BasicFlow) {
   tls_.shutdownThread();
 }
 
+TEST_F(TcpStatsdSinkTest, WithCustomPrefix) {
+  sink_.reset(new TcpStatsdSink(local_info_, "fake_cluster", tls_, cluster_manager_,
+                                cluster_manager_.thread_local_cluster_.cluster_.info_->stats_store_,
+                                "test_prefix"));
+
+  auto counter = std::make_shared<NiceMock<Stats::MockCounter>>();
+  counter->name_ = "test_counter";
+  counter->latch_ = 1;
+  counter->used_ = true;
+  source_.counters_.push_back(counter);
+
+  expectCreateConnection();
+  EXPECT_CALL(*connection_, write(BufferStringEqual("test_prefix.test_counter:1|c\n"), _));
+  sink_->flush(source_);
+}
+
 TEST_F(TcpStatsdSinkTest, BufferReallocate) {
   InSequence s;
 

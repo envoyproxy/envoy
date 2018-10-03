@@ -360,8 +360,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
 
 struct MockConnectionStats {
   Connection::ConnectionStats toBufferStats() {
-    return {rx_total_,   rx_current_,   tx_total_,
-            tx_current_, &bind_errors_, &delayed_close_timeouts_};
+    return {rx_total_, rx_current_, tx_total_, tx_current_, &bind_errors_};
   }
 
   StrictMock<Stats::MockCounter> rx_total_;
@@ -369,21 +368,6 @@ struct MockConnectionStats {
   StrictMock<Stats::MockCounter> tx_total_;
   StrictMock<Stats::MockGauge> tx_current_;
   StrictMock<Stats::MockCounter> bind_errors_;
-  StrictMock<Stats::MockCounter> delayed_close_timeouts_;
-};
-
-struct NiceMockConnectionStats {
-  Connection::ConnectionStats toBufferStats() {
-    return {rx_total_,   rx_current_,   tx_total_,
-            tx_current_, &bind_errors_, &delayed_close_timeouts_};
-  }
-
-  NiceMock<Stats::MockCounter> rx_total_;
-  NiceMock<Stats::MockGauge> rx_current_;
-  NiceMock<Stats::MockCounter> tx_total_;
-  NiceMock<Stats::MockGauge> tx_current_;
-  NiceMock<Stats::MockCounter> bind_errors_;
-  NiceMock<Stats::MockCounter> delayed_close_timeouts_;
 };
 
 TEST_P(ConnectionImplTest, ConnectionStats) {

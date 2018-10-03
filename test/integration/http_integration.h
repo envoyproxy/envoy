@@ -34,9 +34,8 @@ public:
   void sendReset(Http::StreamEncoder& encoder);
   std::pair<Http::StreamEncoder&, IntegrationStreamDecoderPtr>
   startRequest(const Http::HeaderMap& headers);
-  bool waitForDisconnect(std::chrono::milliseconds time_to_wait = std::chrono::milliseconds(0));
+  void waitForDisconnect();
   Network::ClientConnection* connection() const { return connection_.get(); }
-  Network::ConnectionEvent last_connection_event() const { return last_connection_event_; }
 
 private:
   struct ConnectionCallbacks : public Network::ConnectionCallbacks {
@@ -67,7 +66,6 @@ private:
   bool connected_{};
   bool disconnected_{};
   bool saw_goaway_{};
-  Network::ConnectionEvent last_connection_event_;
 };
 
 typedef std::unique_ptr<IntegrationCodecClient> IntegrationCodecClientPtr;
@@ -134,7 +132,7 @@ protected:
   void testRouterDownstreamDisconnectBeforeResponseComplete(
       ConnectionCreationFunction* creator = nullptr);
   void testRouterUpstreamResponseBeforeRequestComplete();
-  void testTwoRequests();
+  void testTwoRequests(bool force_network_backup = false);
   void testOverlyLongHeaders();
   void testIdleTimeoutBasic();
   void testIdleTimeoutWithTwoRequests();
