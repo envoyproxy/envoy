@@ -1011,7 +1011,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
 // Exactly one test requires a mock time system to provoke behavior that cannot
 // easily be achieved with a SimulatedTimeSystem.
 class ConnectionImplWithMockTimeSystemTest : public ConnectionImplTest {
- protected:
+protected:
   Event::TimeSystem& timeSystem() override { return mock_time_system_; }
 
   MockTimeSystem mock_time_system_;
