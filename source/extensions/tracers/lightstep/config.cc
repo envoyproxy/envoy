@@ -33,10 +33,10 @@ LightstepTracerFactory::createHttpTracer(const envoy::config::trace::v2::Tracing
   opts->access_token.assign(access_token_sv.data(), access_token_sv.size());
   opts->component_name = server.localInfo().clusterName();
 
-  Tracing::DriverPtr lightstep_driver{
-      new LightStepDriver{lightstep_config, server.clusterManager(), server.stats(),
-                          server.threadLocal(), server.runtime(), std::move(opts),
-                          Common::Ot::OpenTracingDriver::PropagationMode::TracerNative}};
+  Tracing::DriverPtr lightstep_driver{std::make_unique<LightStepDriver>(
+      lightstep_config, server.clusterManager(), server.stats(), server.threadLocal(),
+      server.runtime(), std::move(opts),
+      Common::Ot::OpenTracingDriver::PropagationMode::TracerNative)};
   return std::make_unique<Tracing::HttpTracerImpl>(std::move(lightstep_driver), server.localInfo());
 }
 

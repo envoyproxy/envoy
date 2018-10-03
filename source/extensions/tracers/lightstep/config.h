@@ -21,7 +21,7 @@ public:
                                           Server::Instance& server) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{std::make_unique<envoy::config::trace::v2::LightstepConfig>()};
+    return std::make_unique<envoy::config::trace::v2::LightstepConfig>();
   }
 
   std::string name() override;

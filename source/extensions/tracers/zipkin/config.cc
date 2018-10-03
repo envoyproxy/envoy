@@ -27,9 +27,9 @@ ZipkinTracerFactory::createHttpTracer(const envoy::config::trace::v2::Tracing& c
   const auto& zipkin_config =
       dynamic_cast<const envoy::config::trace::v2::ZipkinConfig&>(*config_ptr);
 
-  Tracing::DriverPtr zipkin_driver(new Zipkin::Driver(
+  Tracing::DriverPtr zipkin_driver{std::make_unique<Zipkin::Driver>(
       zipkin_config, server.clusterManager(), server.stats(), server.threadLocal(),
-      server.runtime(), server.localInfo(), rand, server.timeSystem()));
+      server.runtime(), server.localInfo(), rand, server.timeSystem())};
 
   return Tracing::HttpTracerPtr(
       new Tracing::HttpTracerImpl(std::move(zipkin_driver), server.localInfo()));
