@@ -20,7 +20,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -77,7 +77,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplDeathTest,
                         TestUtility::ipTestParamsToString);
 
 TEST_P(ConnectionImplDeathTest, BadFd) {
-  MockTimeSystem time_system;
+  Event::SimulatedTimeSystem time_system;
   Event::DispatcherImpl dispatcher(time_system);
   EXPECT_DEATH_LOG_TO_STDERR(
       ConnectionImpl(dispatcher, std::make_unique<ConnectionSocketImpl>(-1, nullptr, nullptr),
@@ -89,7 +89,7 @@ class ConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 public:
   void setUpBasicConnection() {
     if (dispatcher_.get() == nullptr) {
-      dispatcher_.reset(new Event::DispatcherImpl(time_system_));
+      dispatcher_.reset(new Event::DispatcherImpl(timeSystem()));
     }
     listener_ = dispatcher_->createListener(socket_, listener_callbacks_, true, false);
 
@@ -152,7 +152,7 @@ public:
 
     MockBufferFactory* factory = new StrictMock<MockBufferFactory>;
     dispatcher_.reset(
-        new Event::DispatcherImpl(time_system_, Buffer::WatermarkFactoryPtr{factory}));
+        new Event::DispatcherImpl(timeSystem(), Buffer::WatermarkFactoryPtr{factory}));
     // The first call to create a client session will get a MockBuffer.
     // Other calls for server sessions will by default get a normal OwnedImpl.
     EXPECT_CALL(*factory, create_(_, _))
@@ -168,8 +168,10 @@ public:
         }));
   }
 
+  virtual Event::TimeSystem& timeSystem() { return time_system_; }
+
 protected:
-  MockTimeSystem time_system_;
+  Event::SimulatedTimeSystem time_system_;
   Event::DispatcherPtr dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), nullptr, true};
@@ -1006,9 +1008,21 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
+// Exactly one test requires a mock time system to provoke behavior that cannot
+// easily be achieved with a SimulatedTimeSystem.
+class ConnectionImplWithMockTimeSystemTest : public ConnectionImplTest {
+ protected:
+  Event::TimeSystem& timeSystem() override { return mock_time_system_; }
+
+  MockTimeSystem mock_time_system_;
+};
+INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplWithMockTimeSystemTest,
+                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                        TestUtility::ipTestParamsToString);
+
 // Test that a FlushWriteAndDelay close triggers a timeout which forces Envoy to close the
 // connection when a client has not issued a close within the configured interval.
-TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTimerTriggerTest) {
+TEST_P(ConnectionImplWithMockTimeSystemTest, FlushWriteAndDelayCloseTimerTriggerTest) {
   setUpBasicConnection();
   connect();
   // This timer should always trigger since the client connection does not issue a close() during
@@ -1469,7 +1483,7 @@ TEST_P(ReadBufferLimitTest, SomeLimit) {
 class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
   TcpClientConnectionImplTest() : dispatcher_(time_system_) {}
-  MockTimeSystem time_system_;
+  Event::SimulatedTimeSystem time_system_;
   Event::DispatcherImpl dispatcher_;
 };
 INSTANTIATE_TEST_CASE_P(IpVersions, TcpClientConnectionImplTest,
@@ -1510,7 +1524,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
 class PipeClientConnectionImplTest : public testing::Test {
 protected:
   PipeClientConnectionImplTest() : dispatcher_(time_system_) {}
-  MockTimeSystem time_system_;
+  Event::SimulatedTimeSystem time_system_;
   Event::DispatcherImpl dispatcher_;
   const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};
 };
