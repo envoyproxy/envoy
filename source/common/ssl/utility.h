@@ -15,21 +15,21 @@ namespace Utility {
  * @return std::string the serial number field of the certificate. Returns "" if
  *         there is no serial number.
  */
-const std::string getSerialNumberFromCertificate(X509& cert);
+std::string getSerialNumberFromCertificate(X509& cert);
 
 /**
- * Retrieves the subject alternate names of a certificate.
+ * Retrieves the subject alternate names of a certificate of type DNS.
  * @param cert the certificate
  * @return std::vector returns the list of subject alternate names.
  */
-const std::vector<std::string> getSubjectAltNames(X509& cert);
+std::vector<std::string> getDnsSubjectAltNames(X509& cert);
 
 /**
- * Formats the subject alternate names of a certificate in a comma separated string
- * @param std::vector list of subject alternate names
- * @return std::string comma separated list of subject alternate names.
+ * Retrieves the subject alternate names of a certificate of type URI.
+ * @param cert the certificate
+ * @return std::vector returns the list of subject alternate names.
  */
-const std::string formattedSubjectAltNames(const std::vector<std::string>& subject_alt_names);
+std::vector<std::string> getUriSubjectAltNames(X509& cert);
 
 } // namespace Utility
 } // namespace Ssl

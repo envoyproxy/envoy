@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package envoy.admin.v2alpha;
+
+// [#protodoc-title: Certs]
+
+// Proto representation of certificate details. Admin endpoint uses this wrapper for `/certs` to
+// display certificate information. See :ref:`/certs <operations_admin_interface_certs>` for more
+// information.
+message Certificates {
+  // List of certificates known to an Envoy.
+  repeated Certificate certificates = 1;
+}
+
+message Certificate {
+
+  // Details of CA certificate.
+  CertificateDetails ca_cert = 1;
+
+  // Details of Certificate Chain
+  CertificateDetails cert_chain = 2;
+}
+
+message CertificateDetails {
+  // Path of the certificate.
+  string path = 1;
+
+  // Certificate Serial Number.
+  string serial_number = 2;
+
+  // List of Subject Alternate names.
+  repeated SubjectAlternateName subject_alt_names = 3;
+
+  // Days until expiration of the Certificate.
+  uint64 days_until_expiration = 4;
+}
+
+message SubjectAlternateName {
+  enum Type {
+    DNS = 0;
+    URI = 1;
+  }
+
+  // Type of the Subject Alternate Name.
+  Type type = 1;
+
+  // Subject Alternate Name.
+  string name = 2;
+}

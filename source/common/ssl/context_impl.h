@@ -122,6 +122,8 @@ protected:
   std::string getCaFileName() const { return ca_file_path_; };
   std::string getCertChainFileName() const { return cert_chain_file_path_; };
 
+  std::string certificateDetails(X509* cert, const bool chain) const;
+
   bssl::UniquePtr<SSL_CTX> ctx_;
   bool verify_trusted_ca_{false};
   std::vector<std::string> verify_subject_alt_name_list_;
