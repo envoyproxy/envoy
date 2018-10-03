@@ -505,7 +505,6 @@ message RouteAction {
       google.protobuf.Struct config = 2;
     }
 
-    // [#not-implemented-hide:]
     // Specifies an implementation of a RetryPriority which is used to determine the
     // distribution of load across priorities used for retries.
     RetryPriority retry_priority = 4;
@@ -515,12 +514,10 @@ message RouteAction {
       google.protobuf.Struct config = 2;
     }
 
-    // [#not-implemented-hide:]
     // Specifies a collection of RetryHostPredicates that will be consulted when selecting a host
     // for retries. If any of the predicates reject the host, host selection will be reattempted.
     repeated RetryHostPredicate retry_host_predicate = 5;
 
-    // [#not-implemented-hide:]
     // The maximum number of times host selection will be reattempted before giving up, at which
     // point the host that was last selected will be routed to. If unspecified, this will default to
     // retrying once.
