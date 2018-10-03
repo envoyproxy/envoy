@@ -102,7 +102,7 @@ envoy_cc_test(
         "@envoy_api//envoy/api/v2/core:base_cc",
         "@envoy_api//envoy/type/matcher:metadata_cc",
         "@envoy_api//envoy/type/matcher:number_cc",
-        "@envoy_api//envoy/type/matcher:strings_cc",
+        "@envoy_api//envoy/type/matcher:string_cc",
     ],
 )
 

@@ -1,7 +1,7 @@
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/type/matcher/metadata.pb.h"
 #include "envoy/type/matcher/number.pb.h"
-#include "envoy/type/matcher/strings.pb.h"
+#include "envoy/type/matcher/string.pb.h"
 
 #include "common/common/matchers.h"
 #include "common/config/metadata.h"
