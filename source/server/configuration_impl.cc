@@ -103,13 +103,9 @@ void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& config
   std::string type = configuration.http().name();
   ENVOY_LOG(info, "  loading tracing driver: {}", type);
 
-  // TODO(htuch): Make this dynamically pluggable one day.
-  Json::ObjectSharedPtr driver_config =
-      MessageUtil::getJsonObjectFromMessage(configuration.http().config());
-
   // Now see if there is a factory that will accept the config.
   auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(type);
-  http_tracer_ = factory.createHttpTracer(*driver_config, server);
+  http_tracer_ = factory.createHttpTracer(configuration, server);
 }
 
 void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,

@@ -17,15 +17,19 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracer) {
   EXPECT_CALL(server.cluster_manager_, get("fake_cluster"))
       .WillRepeatedly(Return(&server.cluster_manager_.thread_local_cluster_));
 
-  std::string valid_config = R"EOF(
-  {
-    "collector_cluster": "fake_cluster",
-    "collector_endpoint": "/api/v1/spans"
-  }
+  const std::string yaml_string = R"EOF(
+  http:
+    name: envoy.zipkin
+    config:
+      collector_cluster: fake_cluster
+      collector_endpoint: /api/v1/spans
   )EOF";
-  Json::ObjectSharedPtr valid_json = Json::Factory::loadFromString(valid_config);
+
+  envoy::config::trace::v2::Tracing configuration;
+  MessageUtil::loadFromYaml(yaml_string, configuration);
+
   ZipkinTracerFactory factory;
-  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(*valid_json, server);
+  Tracing::HttpTracerPtr zipkin_tracer = factory.createHttpTracer(configuration, server);
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 
