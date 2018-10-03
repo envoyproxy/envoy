@@ -212,7 +212,8 @@ def envoy_cc_binary(
         repository = "",
         stamped = False,
         deps = [],
-        linkopts = []):
+        linkopts = [],
+        copts = []):
     if not linkopts:
         linkopts = envoy_linkopts()
     if stamped:
@@ -279,6 +280,9 @@ def envoy_cc_test(
         deps = [],
         tags = [],
         args = [],
+        copts = [],
+        linkopts = [],
+        defines = [],
         coverage = True,
         local = False):
     test_lib_tags = []
@@ -295,8 +299,9 @@ def envoy_cc_test(
     )
     native.cc_test(
         name = name,
-        copts = envoy_copts(repository, test = True),
-        linkopts = envoy_test_linkopts(),
+        copts = envoy_copts(repository, test = True) + copts,
+        defines = defines,
+        linkopts = envoy_test_linkopts() + linkopts,
         linkstatic = 1,
         malloc = tcmalloc_external_dep(repository),
         deps = [
