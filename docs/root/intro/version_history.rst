@@ -1,6 +1,9 @@
 Version history
 ---------------
 
+1.9.0 (pending)
+===============
+
 1.8.0 (Oct 4, 2018)
 ===================
 * access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>`

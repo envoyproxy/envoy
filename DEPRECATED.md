@@ -6,6 +6,8 @@ As of release 1.3.0, Envoy will follow a
 The following features have been DEPRECATED and will be removed in the specified release cycle.
 A logged warning is expected for each deprecated item that is in deprecation window.
 
+## Version 1.9.0 (pending)
+
 ## Version 1.8.0 (Oct 4, 2018)
 
 * Use of the v1 API (including `*.deprecated_v1` fields in the v2 API) is deprecated.
