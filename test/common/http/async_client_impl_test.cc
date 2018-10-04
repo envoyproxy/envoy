@@ -35,7 +35,7 @@ namespace {
 class AsyncClientImplTest : public testing::Test {
 public:
   AsyncClientImplTest()
-      : client_(*cm_.thread_local_cluster_.cluster_.info_, stats_store_, dispatcher_, local_info_,
+      : client_(cm_.thread_local_cluster_.cluster_.info_, stats_store_, dispatcher_, local_info_,
                 cm_, runtime_, random_,
                 Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}) {
     message_->headers().insertMethod().value(std::string("GET"));
