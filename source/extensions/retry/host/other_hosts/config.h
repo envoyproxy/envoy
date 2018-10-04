@@ -18,6 +18,10 @@ public:
   }
 
   std::string name() override { return RetryHostPredicateValues::get().PreviousHostsPredicate; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+  }
 };
 
 } // namespace Host

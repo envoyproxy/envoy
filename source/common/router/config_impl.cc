@@ -53,15 +53,21 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RouteAction& confi
   retry_on_ |= RetryStateImpl::parseRetryGrpcOn(config.retry_policy().retry_on());
 
   for (const auto& host_predicate : config.retry_policy().retry_host_predicate()) {
-    Registry::FactoryRegistry<Upstream::RetryHostPredicateFactory>::getFactory(
-        host_predicate.name())
-        ->createHostPredicate(*this, host_predicate.config(), num_retries_);
+    auto& factory =
+        ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
+            host_predicate.name());
+
+    auto config = ::Envoy::Config::Utility::translateToFactoryConfig(host_predicate, factory);
+    factory.createHostPredicate(*this, *config, num_retries_);
   }
 
   const auto retry_priority = config.retry_policy().retry_priority();
   if (!retry_priority.name().empty()) {
-    Registry::FactoryRegistry<Upstream::RetryPriorityFactory>::getFactory(retry_priority.name())
-        ->createRetryPriority(*this, retry_priority.config(), num_retries_);
+    auto& factory = ::Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
+        retry_priority.name());
+
+    auto config = ::Envoy::Config::Utility::translateToFactoryConfig(retry_priority, factory);
+    factory.createRetryPriority(*this, *config, num_retries_);
   }
 
   auto host_selection_attempts = config.retry_policy().host_selection_retry_max_attempts();
