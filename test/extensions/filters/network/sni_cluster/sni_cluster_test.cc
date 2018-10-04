@@ -36,7 +36,7 @@ TEST(SniCluster, ConfigTest) {
 TEST(SniCluster, SetTcpProxyClusterOnlyIfSniIsPresent) {
   NiceMock<Network::MockReadFilterCallbacks> filter_callbacks;
 
-  RequestInfo::FilterStateImpl per_connection_state;
+  StreamInfo::FilterStateImpl per_connection_state;
   ON_CALL(filter_callbacks.connection_, perConnectionState())
       .WillByDefault(ReturnRef(per_connection_state));
   ON_CALL(Const(filter_callbacks.connection_), perConnectionState())

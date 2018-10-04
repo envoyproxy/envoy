@@ -1021,7 +1021,7 @@ virtual_hosts:
                                          header);
 
     NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-    NiceMock<Envoy::RequestInfo::MockRequestInfo> request_info;
+    NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
     envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
 

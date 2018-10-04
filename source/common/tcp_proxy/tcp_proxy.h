@@ -11,12 +11,12 @@
 #include "envoy/event/timer.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/request_info/filter_state.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -158,7 +158,7 @@ typedef std::shared_ptr<Config> ConfigSharedPtr;
 /**
  * Per-connection TCP Proxy Cluster configuration.
  */
-class PerConnectionCluster : public RequestInfo::FilterState::Object {
+class PerConnectionCluster : public StreamInfo::FilterState::Object {
 public:
   PerConnectionCluster(absl::string_view cluster) : cluster_(cluster) {}
   const std::string& value() const { return cluster_; }

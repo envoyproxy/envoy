@@ -2,7 +2,7 @@
 
 #include "envoy/stream_info/stream_info.h"
 
-#include "common/request_info/filter_state_impl.h"
+#include "common/stream_info/filter_state_impl.h"
 
 #include "test/mocks/upstream/host.h"
 
