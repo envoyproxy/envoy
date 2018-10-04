@@ -10,7 +10,7 @@ class AddrFamilyAwareSocketOptionImplTest : public SocketOptionTest {};
 
 // We fail to set the option when the underlying setsockopt syscall fails.
 TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionFailure) {
-  EXPECT_CALL(socket_, fd()).WillOnce(Return(-1));
+  EXPECT_CALL(socket_, ioHandle()).WillOnce(Return(-1));
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
                                                 Network::SocketOptionName(std::make_pair(5, 10)),
                                                 {},
@@ -24,7 +24,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionFailure) {
 TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionSuccess) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
   const int fd = address.socket(Address::SocketType::Stream);
-  EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
+  EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(Return(fd));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
                                                 Network::SocketOptionName(std::make_pair(5, 10)),
@@ -38,7 +38,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, SetOptionSuccess) {
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V4EmptyOptionNames) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
   const int fd = address.socket(Address::SocketType::Stream);
-  EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
+  EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(Return(fd));
   AddrFamilyAwareSocketOptionImpl socket_option{
       envoy::api::v2::core::SocketOption::STATE_PREBIND, {}, {}, 1};
 
@@ -51,7 +51,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V4EmptyOptionNames) {
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6EmptyOptionNames) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
   const int fd = address.socket(Address::SocketType::Stream);
-  EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
+  EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(Return(fd));
   AddrFamilyAwareSocketOptionImpl socket_option{
       envoy::api::v2::core::SocketOption::STATE_PREBIND, {}, {}, 1};
 
@@ -65,7 +65,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6EmptyOptionNames) {
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V4IgnoreV6) {
   Address::Ipv4Instance address("1.2.3.4", 5678);
   const int fd = address.socket(Address::SocketType::Stream);
-  EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
+  EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(Return(fd));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
                                                 Network::SocketOptionName(std::make_pair(5, 10)),
@@ -79,7 +79,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V4IgnoreV6) {
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Only) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
   const int fd = address.socket(Address::SocketType::Stream);
-  EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
+  EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(Return(fd));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
                                                 {},
@@ -94,7 +94,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Only) {
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6OnlyV4Fallback) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
   const int fd = address.socket(Address::SocketType::Stream);
-  EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
+  EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(Return(fd));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
                                                 Network::SocketOptionName(std::make_pair(5, 10)),
@@ -109,7 +109,7 @@ TEST_F(AddrFamilyAwareSocketOptionImplTest, V6OnlyV4Fallback) {
 TEST_F(AddrFamilyAwareSocketOptionImplTest, V6Precedence) {
   Address::Ipv6Instance address("::1:2:3:4", 5678);
   const int fd = address.socket(Address::SocketType::Stream);
-  EXPECT_CALL(socket_, fd()).WillRepeatedly(Return(fd));
+  EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(Return(fd));
 
   AddrFamilyAwareSocketOptionImpl socket_option{envoy::api::v2::core::SocketOption::STATE_PREBIND,
                                                 Network::SocketOptionName(std::make_pair(5, 10)),

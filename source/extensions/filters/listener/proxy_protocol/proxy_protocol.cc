@@ -33,7 +33,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
   Network::ConnectionSocket& socket = cb.socket();
   ASSERT(file_event_.get() == nullptr);
   file_event_ =
-      cb.dispatcher().createFileEvent(socket.fd(),
+      cb.dispatcher().createFileEvent(socket.ioHandle(),
                                       [this](uint32_t events) {
                                         ASSERT(events == Event::FileReadyType::Read);
                                         onRead();
@@ -55,8 +55,8 @@ void Filter::onRead() {
 void Filter::onReadWorker() {
   Network::ConnectionSocket& socket = cb_->socket();
 
-  if ((!proxy_protocol_header_.has_value() && !readProxyHeader(socket.fd())) ||
-      (proxy_protocol_header_.has_value() && !parseExtensions(socket.fd()))) {
+  if ((!proxy_protocol_header_.has_value() && !readProxyHeader(socket.ioHandle())) ||
+      (proxy_protocol_header_.has_value() && !parseExtensions(socket.ioHandle()))) {
     // We return if a) we do not yet have the header, or b) we have the header but not yet all
     // the extension data. In both cases we'll be called again when the socket is ready to read
     // and pick up where we left off.

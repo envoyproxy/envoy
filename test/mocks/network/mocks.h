@@ -303,7 +303,8 @@ public:
   void addOptions(const Socket::OptionsSharedPtr& options) override { addOptions_(options); }
 
   MOCK_CONST_METHOD0(localAddress, const Address::InstanceConstSharedPtr&());
-  MOCK_CONST_METHOD0(fd, int());
+  MOCK_CONST_METHOD0(ioHandle, int());
+  MOCK_CONST_METHOD0(ioHandleType, IoHandleType());
   MOCK_METHOD0(close, void());
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr& option));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr& options));
@@ -345,7 +346,8 @@ public:
   MOCK_METHOD1(addOption_, void(const Socket::OptionConstSharedPtr&));
   MOCK_METHOD1(addOptions_, void(const Socket::OptionsSharedPtr&));
   MOCK_CONST_METHOD0(options, const Network::ConnectionSocket::OptionsSharedPtr&());
-  MOCK_CONST_METHOD0(fd, int());
+  MOCK_CONST_METHOD0(ioHandle, int());
+  MOCK_CONST_METHOD0(ioHandleType, IoHandleType());
   MOCK_METHOD0(close, void());
 
   Address::InstanceConstSharedPtr local_address_;
@@ -396,9 +398,6 @@ public:
 
 class MockIp : public Address::Ip {
 public:
-  MockIp();
-  ~MockIp();
-
   MOCK_CONST_METHOD0(addressAsString, const std::string&());
   MOCK_CONST_METHOD0(isAnyAddress, bool());
   MOCK_CONST_METHOD0(isUnicastAddress, bool());
@@ -412,7 +411,6 @@ class MockResolvedAddress : public Address::Instance {
 public:
   MockResolvedAddress(const std::string& logical, const std::string& physical)
       : logical_(logical), physical_(physical) {}
-  ~MockResolvedAddress();
 
   bool operator==(const Address::Instance& other) const override {
     return asString() == other.asString();
@@ -462,7 +460,8 @@ public:
   MockTransportSocketCallbacks();
   ~MockTransportSocketCallbacks();
 
-  MOCK_CONST_METHOD0(fd, int());
+  MOCK_CONST_METHOD0(ioHandle, int());
+  MOCK_CONST_METHOD0(ioHandleType, IoHandleType());
   MOCK_METHOD0(connection, Connection&());
   MOCK_METHOD0(shouldDrainReadBuffer, bool());
   MOCK_METHOD0(setReadBufferReady, void());

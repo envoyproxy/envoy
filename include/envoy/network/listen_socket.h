@@ -6,6 +6,7 @@
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
+#include "envoy/network/io_defs.h"
 
 #include "absl/strings/string_view.h"
 
@@ -25,9 +26,14 @@ public:
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
-   * @return fd the socket's file descriptor.
+   * @return ioHandle, the connection's I/O handle
    */
-  virtual int fd() const PURE;
+  virtual int ioHandle() const PURE;
+
+  /**
+   * @return the socket's io handle type
+   */
+  virtual IoHandleType ioHandleType() const PURE;
 
   /**
    * Close the underlying socket.

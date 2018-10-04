@@ -2135,7 +2135,7 @@ class OriginalDstTestFilter : public Extensions::ListenerFilters::OriginalDst::O
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
   static int fd;
   fd = -1;
-  EXPECT_CALL(*listener_factory_.socket_, fd()).WillOnce(Return(0));
+  EXPECT_CALL(*listener_factory_.socket_, ioHandle()).WillOnce(Return(0));
 
   class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
   public:
@@ -2149,7 +2149,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
       EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))
           .WillOnce(Invoke(
               [](Network::Socket& socket, envoy::api::v2::core::SocketOption::SocketState) -> bool {
-                fd = socket.fd();
+                fd = socket.ioHandle();
                 return true;
               }));
       context.addListenSocketOption(std::move(option));
@@ -2272,7 +2272,7 @@ class OriginalDstTestFilterIPv6
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
   static int fd;
   fd = -1;
-  EXPECT_CALL(*listener_factory_.socket_, fd()).WillOnce(Return(0));
+  EXPECT_CALL(*listener_factory_.socket_, ioHandle()).WillOnce(Return(0));
 
   class OriginalDstTestConfigFactory : public Configuration::NamedListenerFilterConfigFactory {
   public:
@@ -2286,7 +2286,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
       EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))
           .WillOnce(Invoke(
               [](Network::Socket& socket, envoy::api::v2::core::SocketOption::SocketState) -> bool {
-                fd = socket.fd();
+                fd = socket.ioHandle();
                 return true;
               }));
       context.addListenSocketOption(std::move(option));
