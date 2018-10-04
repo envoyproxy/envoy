@@ -12,7 +12,7 @@ CPPFLAGS="$(for f in $CXXFLAGS; do if [[ $f =~ -D.* ]]; then echo $f; fi; done |
 CFLAGS="$(for f in $CXXFLAGS; do if [[ ! $f =~ -D.* ]]; then echo $f; fi; done | tr '\n' ' ')"
 
 curl https://github.com/c-ares/c-ares/archive/"$VERSION".tar.gz -sLo c-ares-"$VERSION".tar.gz \
-  && echo "$SHA256" c-ares-"$VERSION".tar.gz | sha256sum --check
+  && echo "$SHA256 " c-ares-"$VERSION".tar.gz | shasum -a 256 --check
 tar xf c-ares-"$VERSION".tar.gz
 cd c-ares-"$VERSION"
 
