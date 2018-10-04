@@ -71,8 +71,8 @@ public:
 
   // Ssl::Context
   size_t daysUntilFirstCertExpires() const override;
-  std::string getCaCertInformation() const override;
-  std::string getCertChainInformation() const override;
+  CertificateDetailsPtr getCaCertInformation() const override;
+  CertificateDetailsPtr getCertChainInformation() const override;
 
 protected:
   ContextImpl(Stats::Scope& scope, const ContextConfig& config);
@@ -122,7 +122,7 @@ protected:
   std::string getCaFileName() const { return ca_file_path_; };
   std::string getCertChainFileName() const { return cert_chain_file_path_; };
 
-  std::string certificateDetails(X509* cert, const std::string& path) const;
+  CertificateDetailsPtr certificateDetails(X509* cert, const std::string& path) const;
 
   bssl::UniquePtr<SSL_CTX> ctx_;
   bool verify_trusted_ca_{false};

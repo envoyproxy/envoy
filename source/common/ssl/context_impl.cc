@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/admin/v2alpha/certs.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -459,39 +458,40 @@ int32_t ContextImpl::getDaysUntilExpiration(const X509* cert) const {
   return 0;
 }
 
-std::string ContextImpl::getCaCertInformation() const {
+CertificateDetailsPtr ContextImpl::getCaCertInformation() const {
   if (ca_cert_ == nullptr) {
-    return "";
+    return std::make_unique<envoy::admin::v2alpha::CertificateDetails>();
   }
   return certificateDetails(ca_cert_.get(), getCaFileName());
 }
 
-std::string ContextImpl::getCertChainInformation() const {
+CertificateDetailsPtr ContextImpl::getCertChainInformation() const {
   if (cert_chain_ == nullptr) {
-    return "";
+    return std::make_unique<envoy::admin::v2alpha::CertificateDetails>();
   }
   return certificateDetails(cert_chain_.get(), getCertChainFileName());
 }
 
-std::string ContextImpl::certificateDetails(X509* cert, const std::string& path) const {
-  envoy::admin::v2alpha::CertificateDetails certificate_details;
-  certificate_details.set_path(path);
-  certificate_details.set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
-  certificate_details.set_days_until_expiration(getDaysUntilExpiration(cert));
+CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert, const std::string& path) const {
+  CertificateDetailsPtr certificate_details =
+      std::make_unique<envoy::admin::v2alpha::CertificateDetails>();
+  certificate_details->set_path(path);
+  certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
+  certificate_details->set_days_until_expiration(getDaysUntilExpiration(cert));
 
   for (auto& dns_san : Utility::getDnsSubjectAltNames(*cert)) {
     envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
-        *certificate_details.add_subject_alt_names();
+        *certificate_details->add_subject_alt_names();
     subject_alt_name.set_name(dns_san);
     subject_alt_name.set_type(envoy::admin::v2alpha::SubjectAlternateName::DNS);
   }
   for (auto& uri_san : Utility::getUriSubjectAltNames(*cert)) {
     envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
-        *certificate_details.add_subject_alt_names();
+        *certificate_details->add_subject_alt_names();
     subject_alt_name.set_name(uri_san);
     subject_alt_name.set_type(envoy::admin::v2alpha::SubjectAlternateName::URI);
   }
-  return MessageUtil::getJsonStringFromMessage(certificate_details, true, true);
+  return certificate_details;
 }
 
 ClientContextImpl::ClientContextImpl(Stats::Scope& scope, const ClientContextConfig& config)

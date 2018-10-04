@@ -211,8 +211,6 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
  "path": "{{ test_rundir }}/test/common/ssl/test_data/ca_cert.pem",
  "serial_number": "eaf3b0ea1d0e579a",
  "subject_alt_names": [],
- "days_until_expiration": "3198"
-}
 )EOF";
 
   std::string cert_chain_json = R"EOF({
@@ -221,9 +219,10 @@ TEST_F(SslContextImplTest, TestGetCertInformation) {
 
   std::string ca_cert_partial_output(TestEnvironment::substitute(ca_cert_json));
   std::string cert_chain_partial_output(TestEnvironment::substitute(cert_chain_json));
-  EXPECT_TRUE(context->getCaCertInformation().find(ca_cert_partial_output) != std::string::npos);
-  EXPECT_TRUE(context->getCertChainInformation().find(cert_chain_partial_output) !=
-              std::string::npos);
+  EXPECT_TRUE(MessageUtil::getJsonStringFromMessage(*context->getCaCertInformation(), true, true)
+                  .find(ca_cert_partial_output) != std::string::npos);
+  EXPECT_TRUE(MessageUtil::getJsonStringFromMessage(*context->getCertChainInformation(), true, true)
+                  .find(cert_chain_partial_output) != std::string::npos);
 }
 
 TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
@@ -251,8 +250,6 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
    "name": "server1.example.com"
   }
  ],
- "days_until_expiration": "469"
-}
 )EOF";
 
   std::string cert_chain_json = R"EOF({
@@ -267,10 +264,10 @@ TEST_F(SslContextImplTest, TestGetCertInformationWithSAN) {
   // every build. For cert_chain output, we check only for the certificate path.
   std::string ca_cert_partial_output(TestEnvironment::substitute(ca_cert_json));
   std::string cert_chain_partial_output(TestEnvironment::substitute(cert_chain_json));
-
-  EXPECT_TRUE(context->getCaCertInformation().find(ca_cert_partial_output) != std::string::npos);
-  EXPECT_TRUE(context->getCertChainInformation().find(cert_chain_partial_output) !=
-              std::string::npos);
+  EXPECT_TRUE(MessageUtil::getJsonStringFromMessage(*context->getCaCertInformation(), true, true)
+                  .find(ca_cert_partial_output) != std::string::npos);
+  EXPECT_TRUE(MessageUtil::getJsonStringFromMessage(*context->getCertChainInformation(), true, true)
+                  .find(cert_chain_partial_output) != std::string::npos);
 }
 
 TEST_F(SslContextImplTest, TestNoCert) {
@@ -280,8 +277,8 @@ TEST_F(SslContextImplTest, TestNoCert) {
   ContextManagerImpl manager(runtime);
   Stats::IsolatedStoreImpl store;
   ClientContextSharedPtr context(manager.createSslClientContext(store, cfg));
-  EXPECT_EQ("", context->getCaCertInformation());
-  EXPECT_EQ("", context->getCertChainInformation());
+  EXPECT_EQ("", context->getCaCertInformation()->path());
+  EXPECT_EQ("", context->getCertChainInformation()->path());
 }
 
 class SslServerContextImplTicketTest : public SslContextImplTest {
