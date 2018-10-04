@@ -20,7 +20,7 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -77,7 +77,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, ConnectionImplDeathTest,
                         TestUtility::ipTestParamsToString);
 
 TEST_P(ConnectionImplDeathTest, BadFd) {
-  MockTimeSystem time_system;
+  Event::SimulatedTimeSystem time_system;
   Event::DispatcherImpl dispatcher(time_system);
   EXPECT_DEATH_LOG_TO_STDERR(
       ConnectionImpl(dispatcher, std::make_unique<ConnectionSocketImpl>(-1, nullptr, nullptr),
@@ -198,7 +198,7 @@ protected:
     return ConnectionMocks{std::move(dispatcher), timer, std::move(transport_socket)};
   }
 
-  MockTimeSystem time_system_;
+  Event::SimulatedTimeSystem time_system_;
   Event::DispatcherPtr dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   Network::TcpListenSocket socket_{Network::Test::getAnyAddress(GetParam()), nullptr, true};
@@ -1555,7 +1555,7 @@ TEST_P(ReadBufferLimitTest, SomeLimit) {
 class TcpClientConnectionImplTest : public testing::TestWithParam<Address::IpVersion> {
 protected:
   TcpClientConnectionImplTest() : dispatcher_(time_system_) {}
-  MockTimeSystem time_system_;
+  Event::SimulatedTimeSystem time_system_;
   Event::DispatcherImpl dispatcher_;
 };
 INSTANTIATE_TEST_CASE_P(IpVersions, TcpClientConnectionImplTest,
@@ -1596,7 +1596,7 @@ TEST_P(TcpClientConnectionImplTest, BadConnectConnRefused) {
 class PipeClientConnectionImplTest : public testing::Test {
 protected:
   PipeClientConnectionImplTest() : dispatcher_(time_system_) {}
-  MockTimeSystem time_system_;
+  Event::SimulatedTimeSystem time_system_;
   Event::DispatcherImpl dispatcher_;
   const std::string path_{TestEnvironment::unixDomainSocketPath("foo")};
 };
