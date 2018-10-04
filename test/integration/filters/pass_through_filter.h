@@ -3,8 +3,9 @@
 #include "envoy/http/filter.h"
 
 namespace Envoy {
-// a test filter that inserts trailers at the end of encode/decode
-class AddTrailersStreamFilter : public Http::StreamFilter {
+
+// A filter which passes all data through with Continue status.
+class PassThroughFilter : public Http::StreamFilter {
 public:
   // Http::StreamFilterBase
   void onDestroy() override {}
@@ -13,7 +14,9 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override {
     return Http::FilterHeadersStatus::Continue;
   }
-  Http::FilterDataStatus decodeData(Buffer::Instance&, bool end_stream) override;
+  Http::FilterDataStatus decodeData(Buffer::Instance&, bool) override {
+    return Http::FilterDataStatus::Continue;
+  }
 
   Http::FilterTrailersStatus decodeTrailers(Http::HeaderMap&) override {
     return Http::FilterTrailersStatus::Continue;
@@ -29,7 +32,9 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap&, bool) override {
     return Http::FilterHeadersStatus::Continue;
   }
-  Http::FilterDataStatus encodeData(Buffer::Instance&, bool end_stream) override;
+  Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
+    return Http::FilterDataStatus::Continue;
+  }
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
     return Http::FilterTrailersStatus::Continue;
   }
@@ -37,7 +42,7 @@ public:
     encoder_callbacks_ = &callbacks;
   }
 
-private:
+protected:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
 };

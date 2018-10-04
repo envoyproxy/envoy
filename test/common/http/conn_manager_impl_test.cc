@@ -2722,78 +2722,6 @@ TEST_F(HttpConnectionManagerImplTest, UpstreamWatermarkCallbacks) {
       HeaderMapPtr{new TestHeaderMapImpl{{":status", "200"}}}, true);
 }
 
-TEST_F(HttpConnectionManagerImplTest, DownstreamWatermarkCallbacks) {
-  setup(false, "");
-  setUpEncoderAndDecoder();
-  sendReqestHeadersAndData();
-
-  // Test what happens when there are no subscribers.
-  conn_manager_->onAboveWriteBufferHighWatermark();
-  conn_manager_->onBelowWriteBufferLowWatermark();
-
-  // The connection manger will outlive callbacks but never reference them once deleted.
-  MockDownstreamWatermarkCallbacks callbacks;
-
-  // Network::Connection callbacks are passed through the codec
-  ASSERT(decoder_filters_[0]->callbacks_ != nullptr);
-  EXPECT_CALL(*codec_, onUnderlyingConnectionAboveWriteBufferHighWatermark());
-  conn_manager_->onAboveWriteBufferHighWatermark();
-  EXPECT_CALL(*codec_, onUnderlyingConnectionBelowWriteBufferLowWatermark());
-  conn_manager_->onBelowWriteBufferLowWatermark();
-
-  // Now add a watermark subscriber and make sure both the high and low watermark callbacks are
-  // propogated.
-  ASSERT_NE(0, decoder_filters_.size());
-  decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
-  // Make sure encoder filter callbacks are propogated to the watermark subscriber.
-  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
-  encoder_filters_[0]->callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
-  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
-  encoder_filters_[0]->callbacks_->onEncoderFilterBelowWriteBufferLowWatermark();
-
-  ASSERT(stream_callbacks_ != nullptr);
-  // Finally make sure that watermark events on the downstream stream are passed to the watermark
-  // subscriber.
-  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
-  stream_callbacks_->onAboveWriteBufferHighWatermark();
-  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark());
-  stream_callbacks_->onBelowWriteBufferLowWatermark();
-
-  // Set things up so the callbacks have been called twice.
-  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
-  stream_callbacks_->onAboveWriteBufferHighWatermark();
-  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
-  encoder_filters_[0]->callbacks_->onEncoderFilterAboveWriteBufferHighWatermark();
-
-  // Now unsubscribe and verify no further callbacks are called.
-  EXPECT_CALL(callbacks, onBelowWriteBufferLowWatermark()).Times(0);
-  decoder_filters_[0]->callbacks_->removeDownstreamWatermarkCallbacks(callbacks);
-}
-
-TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOn) {
-  setup(false, "");
-
-  // Make sure codec_ is created.
-  EXPECT_CALL(*codec_, dispatch(_));
-  Buffer::OwnedImpl fake_input("");
-  conn_manager_->onData(fake_input, false);
-
-  // Mark the connection manger as backed up before the stream is created.
-  ASSERT_EQ(decoder_filters_.size(), 0);
-  EXPECT_CALL(*codec_, onUnderlyingConnectionAboveWriteBufferHighWatermark());
-  conn_manager_->onAboveWriteBufferHighWatermark();
-
-  // Now when the stream is created, it should be informed of the connection
-  // callbacks immediately.
-  EXPECT_CALL(filter_callbacks_.connection_, aboveHighWatermark()).WillOnce(Return(true));
-  setUpEncoderAndDecoder();
-  sendReqestHeadersAndData();
-  ASSERT_GE(decoder_filters_.size(), 1);
-  MockDownstreamWatermarkCallbacks callbacks;
-  EXPECT_CALL(callbacks, onAboveWriteBufferHighWatermark());
-  decoder_filters_[0]->callbacks_->addDownstreamWatermarkCallbacks(callbacks);
-}
-
 TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOnWithLazyCreation) {
   setup(false, "");
 
@@ -2814,10 +2742,9 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksPassedOnWith
     setUpBufferLimits();
     EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
       decoder = &conn_manager_->newStream(response_encoder_);
+      // Call the high buffer callbacks as the codecs do.
+      stream_callbacks_->onAboveWriteBufferHighWatermark();
     }));
-
-    // Verify the high watermark is passed on.
-    EXPECT_CALL(filter_callbacks_.connection_, aboveHighWatermark()).WillOnce(Return(true));
 
     // Send fake data to kick off newStream being created.
     Buffer::OwnedImpl fake_input2("asdf");
@@ -2868,10 +2795,9 @@ TEST_F(HttpConnectionManagerImplTest, UnderlyingConnectionWatermarksUnwoundWithL
     setUpBufferLimits();
     EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
       decoder = &conn_manager_->newStream(response_encoder_);
+      // Call the high buffer callbacks as the codecs do.
+      stream_callbacks_->onAboveWriteBufferHighWatermark();
     }));
-
-    // Verify the high watermark is passed on.
-    EXPECT_CALL(filter_callbacks_.connection_, aboveHighWatermark()).WillOnce(Return(true));
 
     // Send fake data to kick off newStream being created.
     Buffer::OwnedImpl fake_input2("asdf");

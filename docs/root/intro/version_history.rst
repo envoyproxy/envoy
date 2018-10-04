@@ -85,11 +85,11 @@ Version history
 * rest-api: added ability to set the :ref:`request timeout <envoy_api_field_core.ApiConfigSource.request_timeout>` for REST API requests.
 * route checker: Added v2 config support and removed support for v1 configs.
 * router: added ability to set request/response headers at the :ref:`envoy_api_msg_route.Route` level.
+* stats: added :ref:`option to configure the DogStatsD metric name prefix<envoy_api_field_config.metrics.v2.DogStatsdSink.prefix>` to DogStatsdSink.
 * tcp_proxy: added support for :ref:`weighted clusters <envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.weighted_clusters>`.
 * thrift_proxy: introduced thrift routing, moved configuration to correct location
 * thrift_proxy: introduced thrift configurable decoder filters
-* tls: implemented `SecretDiscoveryService <https://github.com/envoyproxy/envoy/blob/master/api/envoy/service/\
-  discovery/v2/sds.proto>`_.
+* tls: implemented :ref:`Secret Discovery Service <config_secret_discovery_service>`.
 * tracing: added support for configuration of :ref:`tracing sampling
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>`.
 * upstream: added configuration option to the subset load balancer to take locality weights into account when

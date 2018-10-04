@@ -112,6 +112,9 @@ EXTENSIONS = {
 
     # Retry host predicates
     "envoy.retry_host_predicates.other_hosts":          "//source/extensions/retry/host/other_hosts:config",
+
+    # Retry priorities
+    "envoy.retry_priorities.previous_priorities":       "//source/extensions/retry/priority/other_priority:config",
 }
 
 WINDOWS_EXTENSIONS = {
