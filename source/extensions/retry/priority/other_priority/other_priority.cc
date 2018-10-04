@@ -73,6 +73,8 @@ void OtherPriorityRetryPriority::adjustForAttemptedPriorities(
 }
 
 std::pair<std::vector<uint32_t>, uint32_t> OtherPriorityRetryPriority::adjustedHealth() const {
+  // Create an adjusted health view of the priorities, where attempted priorities are
+  // given a zero weight.
   uint32_t total_health = 0;
   std::vector<uint32_t> adjusted_per_priority_health(per_priority_health_.size());
   adjusted_per_priority_health.resize(per_priority_health_.size());
