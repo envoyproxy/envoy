@@ -909,6 +909,9 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   EXPECT_EQ("", route_config.name());
   EXPECT_EQ(0, route_config.internalOnlyHeaders().size());
   EXPECT_EQ(nullptr, route_config.route(headers, 0));
+  auto cluster_info = filter_callbacks->clusterInfo();
+  ASSERT_NE(nullptr, cluster_info);
+  EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_, cluster_info);
   EXPECT_CALL(stream_callbacks_, onReset());
 }
 

@@ -21,8 +21,8 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/request_info/mocks.h"
 #include "test/mocks/router/mocks.h"
-#include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/printers.h"
 
