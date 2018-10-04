@@ -922,9 +922,8 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTest) {
 
   InSequence s1;
 
-  // Set a very high timeout value to prevent flaking. We are testing the common case where the
-  // timeout does not trigger.
-  server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(50000));
+  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+  server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(100));
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
   client_connection_->addReadFilter(client_read_filter);
@@ -944,6 +943,7 @@ TEST_P(ConnectionImplTest, FlushWriteCloseTest) {
   EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("data"), false))
       .Times(1)
       .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
+        time_system_.setMonotonicTime(std::chrono::milliseconds(50));
         dispatcher_->exit();
         return FilterStatus::StopIteration;
       }));
@@ -999,9 +999,8 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
 
   InSequence s1;
 
-  // Set a very high timeout value to prevent flaking. We are testing the common case where the
-  // timeout does not trigger.
-  server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(50000));
+  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+  server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(100));
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
   client_connection_->addReadFilter(client_read_filter);
@@ -1015,6 +1014,8 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTest) {
   EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("Connection: Close"), false))
       .Times(1)
       .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
+        // Advance time by 50ms; delayed close timer should _not_ trigger.
+        time_system_.setMonotonicTime(std::chrono::milliseconds(50));
         client_connection_->close(ConnectionCloseType::NoFlush);
         return FilterStatus::StopIteration;
       }));
@@ -1037,8 +1038,7 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTimerTriggerTest) {
 
   InSequence s1;
 
-  // This timer should always trigger since the client connection does not issue a close() during
-  // this test.
+  // This timer will be forced to trigger by ensuring time advances by >50ms during the test.
   server_connection_->setDelayedCloseTimeout(std::chrono::milliseconds(50));
 
   std::shared_ptr<MockReadFilter> client_read_filter(new NiceMock<MockReadFilter>());
@@ -1050,17 +1050,21 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTimerTriggerTest) {
   Buffer::OwnedImpl data("Connection: Close");
   server_connection_->write(data, false);
 
+  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+
   // The client _will not_ close the connection. Instead, expect the delayed close timer to trigger
   // on the server connection.
   EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("Connection: Close"), false))
       .Times(1)
       .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus { return FilterStatus::StopIteration; }));
+  server_connection_->close(ConnectionCloseType::FlushWriteAndDelay);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_CALL(stats.delayed_close_timeouts_, inc()).Times(1);
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose)).Times(1);
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .Times(1)
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
-  server_connection_->close(ConnectionCloseType::FlushWriteAndDelay);
+  time_system_.setMonotonicTime(std::chrono::milliseconds(100));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -1080,6 +1084,8 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
       dispatcher, std::make_unique<ConnectionSocketImpl>(0, nullptr, nullptr),
       std::make_unique<NiceMock<MockTransportSocket>>(), true));
 
+  time_system_.setMonotonicTime(std::chrono::milliseconds(0));
+
   // Ensure the delayed close timer is not created when the delayedCloseTimeout config value is set
   // to 0.
   server_connection->setDelayedCloseTimeout(std::chrono::milliseconds(0));
@@ -1090,6 +1096,9 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayConfigDisabledTest) {
 
   EXPECT_CALL(stats.delayed_close_timeouts_, inc()).Times(0);
   server_connection->close(ConnectionCloseType::FlushWriteAndDelay);
+  // Advance time by a value larger than the delayed close timeout default (1000ms). This would
+  // trigger the delayed close timer callback if set.
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10000));
 
   // Since the delayed close timer never triggers, the connection never closes. Close it here to end
   // the test cleanly due to the (fd == -1) assert in ~ConnectionImpl().
