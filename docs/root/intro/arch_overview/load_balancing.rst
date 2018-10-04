@@ -143,26 +143,6 @@ percentage of healthy hosts multiplied by the overprovisioning factor drops
 below 100. The default value is 1.4, so a priority level or locality will not be
 considered unhealthy until the percentage of healthy endpoints goes below 72%.
 
-.. _arch_overview_load_balancing_panic_threshold:
-
-Panic threshold
----------------
-
-During load balancing, Envoy will generally only consider healthy hosts in an upstream cluster.
-However, if the percentage of healthy hosts in the cluster becomes too low, Envoy will disregard
-health status and balance amongst all hosts. This is known as the *panic threshold*. The default
-panic threshold is 50%. This is :ref:`configurable <config_cluster_manager_cluster_runtime>` via
-runtime as well as in the :ref:`cluster configuration
-<envoy_api_field_Cluster.CommonLbConfig.healthy_panic_threshold>`. The panic threshold
-is used to avoid a situation in which host failures cascade throughout the cluster as load
-increases.
-
-Note that panic thresholds are *per-priority*. This means that if the percentage of healthy nodes
-in a single priority goes below the threshold, that priority will enter panic mode. In general
-it is discouraged to use panic thresholds in conjunction with priorities, as by the time enough
-nodes are unhealthy to trigger the panic threshold most of the traffic should already have spilled
-over to the next priority level.
-
 .. _arch_overview_load_balancing_priority_levels:
 
 Priority levels
@@ -246,6 +226,72 @@ To sum this up in pseudo algorithms:
   health(P_X) = 140 * healthy_P_X_backends / total_P_X_backends
   total_health = min(100, Σ(health(P_0)...health(P_X))
   load to P_X = 100 - Σ(percent_load(P_0)..percent_load(P_X-1))
+
+.. _arch_overview_load_balancing_panic_threshold:
+
+Panic threshold
+---------------
+
+During load balancing, Envoy will generally only consider healthy hosts in an upstream cluster.
+However, if the percentage of healthy hosts in the cluster becomes too low, Envoy will disregard
+health status and balance amongst all hosts. This is known as the *panic threshold*. The default
+panic threshold is 50%. This is :ref:`configurable <config_cluster_manager_cluster_runtime>` via
+runtime as well as in the :ref:`cluster configuration
+<envoy_api_field_Cluster.CommonLbConfig.healthy_panic_threshold>`. The panic threshold
+is used to avoid a situation in which host failures cascade throughout the cluster as load
+increases.
+
+Panic thresholds work in conjunction with priorities. If number of healthy hosts in given priority
+goes down, Envoy will try try shift some traffic to lower priorities. If it succeeds finding enough 
+healthy hosts in lower priorities, Envoy will disregard panic thresholds. In mathematical terms, 
+if total health across all priority levels is 100%, Envoy disregards panic thresholds but continues to
+distribute traffic load across priorities according to algorithm described :ref:`here <arch_overview_load_balancing_priority_levels`. 
+
+The following examples explain relationship between total health and panic threshold. It is 
+assumed that default value of 50% is used for panic threshold.
+
+Assume a simple set-up with 2 priority levels, P=1 100% healthy. In this scenario
+total health is always 100% and P=0 never enters panic mode and Envoy is able to shift entire traffic to P=1.
+
++----------------------------+--------------------+
+| P=0 healthy endpoints      | P=0 in panic       |
++============================+====================+
+| 100%                       | NO                 |
++----------------------------+--------------------+
+| 72%                        | NO                 |
++----------------------------+--------------------+
+| 71%                        | NO                 |
++----------------------------+--------------------+
+| 50%                        | NO                 |
++----------------------------+--------------------+
+| 25%                        | NO                 |
++----------------------------+--------------------+
+| 0%                         | NO                 |
++----------------------------+--------------------+
+
+If P=1 becomes unhealthy, panic threshold continues to be disregarded until the sum of the health
+P=0 + P=1 goes below 100. At this point Envoy starts checking panic threshold value for each 
+priority.
+
++------------------------+-------------------------+-----------------+-----------------+-----------------+
+| P=0 healthy endpoints  | P=1 healthy endpoints   | Total health    |  P=0 in panic   | P=1 in panic    |
++========================+=========================+=================+=================+=================+
+| 100%                   |  100%                   | 100%            |   NO            | NO              | 
++------------------------+-------------------------+-----------------+-----------------+-----------------+
+| 72%                    |  72%                    | 100%            |   NO            | NO              |
++------------------------+-------------------------+-----------------+-----------------+-----------------+
+| 71%                    |  71%                    | 100%            |   NO            | NO              |
++------------------------+-------------------------+-----------------+-----------------+-----------------+
+| 50%                    |  50%                    | 100%            |   NO            | NO              |
++------------------------+-------------------------+-----------------+-----------------+-----------------+
+| 25%                    |  100%                   | 100%            |   NO            | NO              |
++------------------------+-------------------------+-----------------+-----------------+-----------------+
+| 25%                    |  25%                    | 70%             |   YES           | YES             |
++------------------------+-------------------------+-----------------+-----------------+-----------------+
+| 5%                     |  65%                    | 98%             |   YES           | NO              |
++------------------------+-------------------------+-----------------+-----------------+-----------------+
+
+Note that panic thresholds can be configured *per-priority*.
 
 .. _arch_overview_load_balancing_zone_aware_routing:
 

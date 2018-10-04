@@ -74,18 +74,20 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
   // The following cases are handled here;
   // - Total health is = 100. It means there are enough healthy hosts to handle the load.
   //   Do not enter panic mode, even if a specific priority has low number of healthy hosts.
-  // - Total health is < 100. There is not enough healthy hosts to handle the load. Continue
-  //   distibuting the load among priority sets, but turn on Panic mode if # of healthy hosts
-  //   in priority set is low.
-  // - Total health is 0. All hosts are down. Redirect 100% of traffic to P=0 and enable PanicMode.
+  // - Total health is < 100. There are not enough healthy hosts to handle the load. Continue
+  //   distibuting the load among priority sets, but turn on panic mode for a given priority
+  //   if # of healthy hosts in priority set is low.
+  // - Total health is 0. All hosts are down. Redirect 100% of traffic to P=0 and enable panic mode.
 
   //
   // First, determine if the load needs to be scaled relative to health. For example if there are
   // 3 host sets with 20% / 20% / 10% health they will get 40% / 40% / 20% load to ensure total load
   // adds up to 100.
-  const uint32_t total_health = std::min<uint32_t>(
+  // Sum of priority levels' health values may exceed 100, so it is capped at 100 and referred as
+  // normalized total health.
+  const uint32_t normalized_total_health = std::min<uint32_t>(
       std::accumulate(per_priority_health_.begin(), per_priority_health_.end(), 0), 100);
-  if (total_health == 0) {
+  if (normalized_total_health == 0) {
     // Everything is terrible. Send all load to P=0.
     // In this one case sumEntries(per_priority_load_) != 100 since we sinkhole all traffic in P=0.
     per_priority_load_[0] = 100;
@@ -97,13 +99,14 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority) {
     // Now assign as much load as possible to the high priority levels and cease assigning load when
     // total_load runs out.
     per_priority_load_[i] =
-        std::min<uint32_t>(total_load, per_priority_health_[i] * 100 / total_health);
+        std::min<uint32_t>(total_load, per_priority_health_[i] * 100 / normalized_total_health);
     total_load -= per_priority_load_[i];
 
     // For each level check if it should run in Panic mode. Never set Panic mode if the total health
     // is 100%, even when individual priority level has very low # of healthy hosts.
     const HostSet& priority_host_set = *priority_set_.hostSetsPerPriority()[i];
-    per_priority_panic_[i] = (total_health == 100 ? false : isGlobalPanic(priority_host_set));
+    per_priority_panic_[i] =
+        (normalized_total_health == 100 ? false : isGlobalPanic(priority_host_set));
   }
   if (total_load != 0) {
     // Account for rounding errors.
