@@ -311,8 +311,8 @@ TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
   EXPECT_FALSE(encoder_.createPayload(metadata_map));
 
   std::string payload = std::string(1024 * 1024 + 1, 'a');
-  EXPECT_FALSE(decoder_.receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()),
-                                        payload.size()));
+  EXPECT_FALSE(
+      decoder_.receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()), payload.size()));
 
   cleanUp();
 }
