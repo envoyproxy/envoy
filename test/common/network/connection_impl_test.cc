@@ -1056,15 +1056,16 @@ TEST_P(ConnectionImplTest, FlushWriteAndDelayCloseTimerTriggerTest) {
   // on the server connection.
   EXPECT_CALL(*client_read_filter, onData(BufferStringEqual("Connection: Close"), false))
       .Times(1)
-      .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus { return FilterStatus::StopIteration; }));
+      .WillOnce(InvokeWithoutArgs([&]() -> FilterStatus {
+        time_system_.setMonotonicTime(std::chrono::milliseconds(100));
+        return FilterStatus::StopIteration;
+      }));
   server_connection_->close(ConnectionCloseType::FlushWriteAndDelay);
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_CALL(stats.delayed_close_timeouts_, inc()).Times(1);
   EXPECT_CALL(server_callbacks_, onEvent(ConnectionEvent::LocalClose)).Times(1);
   EXPECT_CALL(client_callbacks_, onEvent(ConnectionEvent::RemoteClose))
       .Times(1)
       .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
-  time_system_.setMonotonicTime(std::chrono::milliseconds(100));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
