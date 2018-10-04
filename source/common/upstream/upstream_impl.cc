@@ -1200,9 +1200,18 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
           parent_.info_->stats().update_no_rebuild_.inc();
         }
 
-        // This makes sure parent_.all_hosts_ is updated with all resolved hosts from all
-        // priorities. This reconciliation is required since we check each new host againsts this
-        // list.
+        // TODO(dio): As reported in https://github.com/envoyproxy/envoy/issues/4548, we leaked
+        // cluster members. This happened since whenever a target resolved, it would set its hosts
+        // as all_hosts_, so that when another target resolved it wouldn't see its own hosts in
+        // all_hosts_. It would think that they're new hosts, so it would add them to its host list
+        // over and over again. To completely fix this issue, we need to think through on
+        // reconciling the differences in behavior between STRICT_DNS and EDS, especially on
+        // handling host sets updates. This is tracked in
+        // https://github.com/envoyproxy/envoy/issues/4590.
+        //
+        // The following block is acceptable for now as a patch to make sure parent_.all_hosts_ is
+        // updated with all resolved hosts from all priorities. This reconciliation is required
+        // since we check each new host against this list.
         for (const auto& set : parent_.prioritySet().hostSetsPerPriority()) {
           for (const auto& host : set->hosts()) {
             updated_hosts.insert({host->address()->asString(), host});
