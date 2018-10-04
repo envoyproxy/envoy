@@ -259,6 +259,7 @@ public:
   bool generateRequestId() override { return true; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
+  std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
   Router::RouteConfigProvider& routeConfigProvider() override { return route_config_provider_; }
   const std::string& serverName() override { return server_name_; }
   ConnectionManagerStats& stats() override { return stats_; }
@@ -305,6 +306,7 @@ public:
   absl::optional<std::string> user_agent_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
   std::chrono::milliseconds stream_idle_timeout_{};
+  std::chrono::milliseconds delayed_close_timeout_{};
   NiceMock<Runtime::MockRandomGenerator> random_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -1940,7 +1942,8 @@ TEST_F(HttpConnectionManagerImplTest, DrainClose) {
   EXPECT_EQ(ssl_connection_.get(), filter->callbacks_->connection()->ssl());
 
   EXPECT_CALL(*codec_, goAway());
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay));
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->callback_();
 
@@ -1976,7 +1979,8 @@ TEST_F(HttpConnectionManagerImplTest, ResponseBeforeRequestComplete) {
         EXPECT_STREQ("envoy-server-test", headers.Server()->value().c_str());
       }));
   EXPECT_CALL(*decoder_filters_[0], onDestroy());
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay));
 
   HeaderMapPtr response_headers{new TestHeaderMapImpl{{":status", "200"}}};
   decoder_filters_[0]->callbacks_->encodeHeaders(std::move(response_headers), true);
@@ -2029,7 +2033,8 @@ TEST_F(HttpConnectionManagerImplTest, ResponseStartBeforeRequestComplete) {
   // Since we started the response before the request was complete, we will still close the
   // connection since we already sent a connection: close header. We won't "reset" the stream
   // however.
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay));
   Buffer::OwnedImpl fake_response("world");
   filter->callbacks_->encodeData(fake_response, true);
 }
@@ -2065,8 +2070,11 @@ TEST_F(HttpConnectionManagerImplTest, DownstreamProtocolError) {
 
   EXPECT_CALL(filter_factory_, createFilterChain(_)).Times(0);
 
-  // A protocol exception should result in reset of the streams followed by a local close.
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  // A protocol exception should result in reset of the streams followed by a remote or local close
+  // depending on whether the downstream client closes the connection prior to the delayed close
+  // timer firing.
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay));
 
   // Kick off the incoming data.
   Buffer::OwnedImpl fake_input("1234");
@@ -2132,7 +2140,8 @@ TEST_F(HttpConnectionManagerImplTest, IdleTimeout) {
   idle_timer->callback_();
 
   EXPECT_CALL(*codec_, goAway());
-  EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(filter_callbacks_.connection_,
+              close(Network::ConnectionCloseType::FlushWriteAndDelay));
   EXPECT_CALL(*idle_timer, disableTimer());
   EXPECT_CALL(*drain_timer, disableTimer());
   drain_timer->callback_();
