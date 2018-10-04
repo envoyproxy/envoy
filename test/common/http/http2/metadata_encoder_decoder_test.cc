@@ -70,8 +70,8 @@ static int on_extension_chunk_recv_callback(nghttp2_session* session, const nght
   EXPECT_GE(hd->length, len);
 
   MetadataDecoder* decoder = reinterpret_cast<UserData*>(user_data)->decoder;
-  decoder->receiveMetadata(data, len);
-  return 0;
+  bool success = decoder->receiveMetadata(data, len);
+  return success ? 0 : NGHTTP2_ERR_CALLBACK_FAILURE;
 }
 
 // Nghttp2 callback function for unpack extension frames.
@@ -273,10 +273,11 @@ TEST_F(MetadataEncoderDecoderTest, VerifyEncoderDecoderOnMultipleMetadataMaps) {
   cleanUp();
 }
 
-TEST_F(MetadataEncoderDecoderTest, TestEmptyMetadataMapFailToEncode) {
+TEST_F(MetadataEncoderDecoderTest, TestUnqualifiedInput) {
   initialize();
 
   MetadataMap metadata_map;
+  // Empty metadata_map will be rejected.
   EXPECT_FALSE(encoder_.createPayload(metadata_map));
 
   MetadataMap metadata_map1 = {
@@ -288,20 +289,30 @@ TEST_F(MetadataEncoderDecoderTest, TestEmptyMetadataMapFailToEncode) {
       {"header_key4", "header_value4"},
   };
   EXPECT_TRUE(encoder_.createPayload(metadata_map1));
+  // Multiple metadata_map will be rejected.
   EXPECT_FALSE(encoder_.createPayload(metadata_map2));
+
+  // Empty payload will be ignored.
+  uint8_t buf[1];
+  EXPECT_TRUE(decoder_.receiveMetadata(nullptr, 1));
+  EXPECT_TRUE(decoder_.receiveMetadata(buf, 0));
+  EXPECT_EQ(0, decoder_.payload().length());
 
   cleanUp();
 }
 
-// Verify we don't encode metadata larger than 1M.
-TEST_F(MetadataEncoderDecoderTest, TestMetadataMapTooBigToEncode) {
+TEST_F(MetadataEncoderDecoderTest, TestMetadataSizeLimit) {
   initialize();
-  uint8_t buf[1];
 
-  decoder_.receiveMetadata(nullptr, 1);
-  decoder_.receiveMetadata(buf, 0);
+  MetadataMap metadata_map = {
+      {"header_key", std::string(1024 * 1024 + 1, 'a')},
+  };
+  // metadata_map exceeds size limit.
+  EXPECT_FALSE(encoder_.createPayload(metadata_map));
 
-  EXPECT_EQ(0, decoder_.payload().length());
+  std::string payload = std::string(1024 * 1024 + 1, 'a');
+  EXPECT_FALSE(decoder_.receiveMetadata(reinterpret_cast<const uint8_t*>(payload.data()),
+                                        payload.size()));
 
   cleanUp();
 }

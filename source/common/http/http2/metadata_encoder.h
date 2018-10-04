@@ -13,7 +13,7 @@ namespace Http2 {
 
 /**
  * A class that creates and sends METADATA payload. The METADATA payload is a group of string key
- * value pairs encoded in HTTP/2 header block.
+ * value pairs encoded in HTTP/2 header blocks.
  */
 class MetadataEncoder : Logger::Loggable<Logger::Id::metadata> {
 public:

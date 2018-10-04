@@ -13,13 +13,14 @@ MetadataDecoder::MetadataDecoder(uint64_t stream_id) : stream_id_(stream_id) {
 
 MetadataDecoder::~MetadataDecoder() { nghttp2_hd_inflate_del(inflater_); }
 
-void MetadataDecoder::receiveMetadata(const uint8_t* data, size_t len) {
+bool MetadataDecoder::receiveMetadata(const uint8_t* data, size_t len) {
   if (data == nullptr || len == 0) {
     ENVOY_LOG(error, "No payload for the decoder to receive.");
-    return;
+  } else {
+    payload_.add(data, len);
   }
 
-  payload_.add(data, len);
+  return payload_.length() <= max_payload_size_bound_;
 }
 
 bool MetadataDecoder::onMetadataFrameComplete(bool end_metadata) {
@@ -46,7 +47,7 @@ bool MetadataDecoder::decodeMetadataPayloadUsingNghttp2(bool end_metadata) {
   Buffer::RawSlice slices[num_slices];
   payload_.getRawSlices(slices, num_slices);
 
-  // Data size has consumed by nghttp2 so far.
+  // Data consumed by nghttp2 so far.
   ssize_t payload_size_consumed = 0;
   // Decodes header block using nghttp2.
   for (int i = 0; i < num_slices; i++) {
@@ -63,8 +64,8 @@ bool MetadataDecoder::decodeMetadataPayloadUsingNghttp2(bool end_metadata) {
           nghttp2_hd_inflate_hd2(inflater_, &nv, &inflate_flags,
                                  reinterpret_cast<uint8_t*>(slice.mem_), slice.len_, is_end);
       if (result < 0 || (result == 0 && slice.len_ > 0)) {
-        // If decoding fails, or there are data left in slice, but no data can
-        // be consumed by nghttp2, return false.
+        // If decoding fails, or there is data left in slice, but no data can be consumed by
+        // nghttp2, return false.
         ENVOY_LOG(error, "Failed to decode payload.");
         return false;
       }
