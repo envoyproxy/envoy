@@ -8,10 +8,11 @@ Version history
 ===================
 1.9.0 (Pending)
 ===============
-* Renamed the `RequestInfo` namespace to `StreamInfo` to better match its behaviour within TCP and HTTP implementations.
+* Renamed the `RequestInfo` namespace to `StreamInfo` to better match its
+  behaviour within TCP and HTTP implementations.
 
-1.8.0 (Pending)
-===============
+1.8.0 (Oct 4, 2018)
+===================
 * access log: added :ref:`response flag filter <envoy_api_msg_config.filter.accesslog.v2.ResponseFlagFilter>`
   to filter based on the presence of Envoy response flags.
 * access log: added RESPONSE_DURATION and RESPONSE_TX_DURATION.
@@ -106,12 +107,6 @@ Version history
 * upstream: require opt-in to use the :ref:`x-envoy-orignal-dst-host <config_http_conn_man_headers_x-envoy-original-dst-host>` header
   for overriding destination address when using the :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   load balancing policy.
-* ratelimit: added :ref:`failure_mode_deny <envoy_api_msg_config.filter.http.rate_limit.v2.RateLimit>` option to control traffic flow in 
-  case of rate limit service error.
-* route checker: Added v2 config support and removed support for v1 configs.
-* config: Fixed stat inconsistency between xDS and ADS implementation. :ref:`update_failure <config_cluster_manager_cds>`  
-  stat is incremented in case of network failure and :ref:`update_rejected <config_cluster_manager_cds>` stat is incremented 
-  in case of schema/validation error.
 
 1.7.0 (Jun 21, 2018)
 ====================
