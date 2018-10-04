@@ -21,6 +21,7 @@ const uint32_t RetryPolicy::RETRY_ON_5XX;
 const uint32_t RetryPolicy::RETRY_ON_GATEWAY_ERROR;
 const uint32_t RetryPolicy::RETRY_ON_CONNECT_FAILURE;
 const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_4XX;
+const uint32_t RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_CANCELLED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED;
 const uint32_t RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED;
@@ -69,6 +70,12 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
       retries_remaining_ = temp;
     }
   }
+  if (request_headers.EnvoyRetriableStatusCodes()) {
+    for (const auto code : StringUtil::splitToken(
+             request_headers.EnvoyRetriableStatusCodes()->value().getStringView(), ",")) {
+      retriable_status_codes_.emplace_back(std::stoi(std::string(code)));
+    }
+  }
 
   // Merge in the route policy.
   retry_on_ |= route_policy.retryOn();
@@ -103,6 +110,8 @@ uint32_t RetryStateImpl::parseRetryOn(absl::string_view config) {
       ret |= RetryPolicy::RETRY_ON_RETRIABLE_4XX;
     } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RefusedStream) {
       ret |= RetryPolicy::RETRY_ON_REFUSED_STREAM;
+    } else if (retry_on == Http::Headers::get().EnvoyRetryOnValues.RetriableStatusCodes) {
+      ret |= RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES;
     }
   }
 
@@ -217,6 +226,14 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
     }
   }
 
+  if ((retry_on_ & RetryPolicy::RETRY_ON_RETRIABLE_STATUS_CODES)) {
+    for (auto code : retriable_status_codes_) {
+      if (Http::Utility::getResponseStatus(*response_headers) == code) {
+        return true;
+      }
+    }
+  }
+
   if (retry_on_ &
           (RetryPolicy::RETRY_ON_GRPC_CANCELLED | RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
            RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED |
@@ -235,12 +252,6 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
            (retry_on_ & RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE))) {
         return true;
       }
-    }
-  }
-
-  for (auto code : retriable_status_codes_) {
-    if (Http::Utility::getResponseStatus(*response_headers) == code) {
-      return true;
     }
   }
 

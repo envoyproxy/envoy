@@ -311,12 +311,25 @@ TEST_F(RouterRetryStateImplTest, PolicyRetriable4xxReset) {
 
 TEST_F(RouterRetryStateImplTest, RetriableStatusCodes) {
   policy_.retriable_status_codes_.push_back(409);
-  setup();
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "retriable-status-codes"}};
+  setup(request_headers);
   EXPECT_TRUE(state_->enabled());
 
   expectTimerCreateAndEnable();
 
   Http::TestHeaderMapImpl response_headers{{":status", "409"}};
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(&response_headers, no_reset_, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, RetriableStatusCodesHeader) {
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "retriable-status-codes"},
+                                          {"x-envoy-retriable-status-codes", "418,200"}};
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  expectTimerCreateAndEnable();
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetry(&response_headers, no_reset_, callback_));
 }
 
