@@ -3,11 +3,6 @@ Version history
 
 1.9.0 (pending)
 ===============
-
-1.8.0 (Oct 4, 2018)
-===================
-1.9.0 (Pending)
-===============
 * Renamed the `RequestInfo` namespace to `StreamInfo` to better match its
   behaviour within TCP and HTTP implementations.
 
