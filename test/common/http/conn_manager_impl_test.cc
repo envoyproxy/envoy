@@ -34,9 +34,9 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/mocks.h"
-#include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
@@ -2641,8 +2641,10 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
 
   setupFilterChain(3, 2);
 
-  Upstream::MockThreadLocalCluster fake_cluster1 = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>>();
-  Upstream::MockThreadLocalCluster fake_cluster2 = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>>();
+  Upstream::MockThreadLocalCluster fake_cluster1 =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>> ();
+  Upstream::MockThreadLocalCluster fake_cluster2 =
+      std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>> ();
   EXPECT_CALL(fake_cluster1->cluster_.info_, name()).WillOnce(Return("fake_cluster1"));
   EXPECT_CALL(fake_cluster1->cluster_.info_, name()).WillOnce(Return("fake_cluster2"));
   EXPECT_CALL(cluster_manager_, get(_)).WillOnce(Return(fake_cluster1));
@@ -2660,7 +2662,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
 
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-        EXPECT_EQ(fake_cluster1->info()r, decoder_filters_[0]->callbacks_->clusterInfo());
+        EXPECT_EQ(fake_cluster1->info() r, decoder_filters_[0]->callbacks_->clusterInfo());
         EXPECT_EQ(route1, decoder_filters_[0]->callbacks_->route());
         EXPECT_EQ(route1->routeEntry(),
                   decoder_filters_[0]->callbacks_->requestInfo().routeEntry());
@@ -2669,7 +2671,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterClearRouteCache) {
       }));
   EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
       .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
-        EXPECT_EQ(fake_cluster2->info()r, decoder_filters_[1]->callbacks_->clusterInfo());
+        EXPECT_EQ(fake_cluster2->info() r, decoder_filters_[1]->callbacks_->clusterInfo());
         EXPECT_EQ(route2, decoder_filters_[1]->callbacks_->route());
         EXPECT_EQ(route2->routeEntry(),
                   decoder_filters_[1]->callbacks_->requestInfo().routeEntry());
