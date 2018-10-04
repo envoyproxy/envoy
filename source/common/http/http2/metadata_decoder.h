@@ -25,8 +25,9 @@ public:
    * complete.
    * @param data is the pointer to the start of the payload.
    * @param len is the size of the received payload.
+   * @return whether Metadata is received successfully.
    */
-  void receiveMetadata(const uint8_t* data, size_t len);
+  bool receiveMetadata(const uint8_t* data, size_t len);
 
   /**
    * Calls when a complete METADATA frame is received. The function will decode METADATA received.
@@ -38,6 +39,8 @@ public:
   bool onMetadataFrameComplete(bool end_metadata);
 
   /**
+   * TODO(soya3129): Remove this function and metadata_map_list_ if callback is available before
+   * construction.
    * Registers a callback to receive metadata events on the wire.
    * @param callback is the callback function.
    */
@@ -85,6 +88,9 @@ private:
   // TODO(soya3129): consider sharing the inflater with all streams in a connection. Caveat:
   // inflater failure on one stream can impact other streams.
   nghttp2_hd_inflater* inflater_;
+
+  // Payload size limit. If the payload received exceeds the limit, fails the connection.
+  const uint64_t max_payload_size_bound_ = 1024 * 1024;
 };
 
 } // namespace Http2
