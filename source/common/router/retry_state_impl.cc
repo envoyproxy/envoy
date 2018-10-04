@@ -36,7 +36,7 @@ RetryStatePtr RetryStateImpl::create(const RetryPolicy& route_policy,
 
   // We short circuit here and do not both with an allocation if there is no chance we will retry.
   if (request_headers.EnvoyRetryOn() || request_headers.EnvoyRetryGrpcOn() ||
-      route_policy.retryOn()) {
+      route_policy.retryOn() || !route_policy.retriableStatusCodes().empty()) {
     ret.reset(new RetryStateImpl(route_policy, request_headers, cluster, runtime, random,
                                  dispatcher, priority));
   }
@@ -53,7 +53,8 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
                                Upstream::ResourcePriority priority)
     : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
       priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
-      retry_priority_(route_policy.retryPriority()) {
+      retry_priority_(route_policy.retryPriority()),
+      retriable_status_codes_(route_policy.retriableStatusCodes()) {
 
   if (request_headers.EnvoyRetryOn()) {
     retry_on_ = parseRetryOn(request_headers.EnvoyRetryOn()->value().c_str());
@@ -234,6 +235,12 @@ bool RetryStateImpl::wouldRetry(const Http::HeaderMap* response_headers,
            (retry_on_ & RetryPolicy::RETRY_ON_GRPC_UNAVAILABLE))) {
         return true;
       }
+    }
+  }
+
+  for (auto code : retriable_status_codes_) {
+    if (Http::Utility::getResponseStatus(*response_headers) == code) {
+      return true;
     }
   }
 

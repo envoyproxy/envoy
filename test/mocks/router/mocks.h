@@ -72,11 +72,15 @@ public:
   MOCK_CONST_METHOD0(retryHostPredicates, std::vector<Upstream::RetryHostPredicateSharedPtr>());
   MOCK_CONST_METHOD0(retryPriority, Upstream::RetryPrioritySharedPtr());
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
+  const std::vector<uint32_t>& retriableStatusCodes() const override {
+    return retriable_status_codes_;
+  }
 
   std::chrono::milliseconds per_try_timeout_{0};
   uint32_t num_retries_{};
   uint32_t retry_on_{};
   uint32_t host_selection_max_attempts_;
+  std::vector<uint32_t> retriable_status_codes_;
 };
 
 class MockRetryState : public RetryState {

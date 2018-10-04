@@ -35,7 +35,7 @@ public:
   static uint32_t parseRetryGrpcOn(absl::string_view retry_grpc_on_header);
 
   // Router::RetryState
-  bool enabled() override { return retry_on_ != 0; }
+  bool enabled() override { return retry_on_ != 0 || !retriable_status_codes_.empty(); }
   RetryStatus shouldRetry(const Http::HeaderMap* response_headers,
                           const absl::optional<Http::StreamResetReason>& reset_reason,
                           DoRetryCallback callback) override;
@@ -89,6 +89,7 @@ private:
   std::vector<Upstream::RetryHostPredicateSharedPtr> retry_host_predicates_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
   uint32_t host_selection_max_attempts_;
+  const std::vector<uint32_t> retriable_status_codes_;
 };
 
 } // namespace Router

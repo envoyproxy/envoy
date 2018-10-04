@@ -186,6 +186,8 @@ public:
    * for a retry attempt.
    */
   virtual uint32_t hostSelectionMaxAttempts() const PURE;
+
+  virtual const std::vector<uint32_t>& retriableStatusCodes() const PURE;
 };
 
 /**
