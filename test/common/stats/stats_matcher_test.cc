@@ -23,12 +23,7 @@ protected:
   void rejectAll(const bool should_reject) {
     stats_config_.mutable_stats_matcher()->set_reject_all(should_reject);
   }
-
   void initMatcher() { stats_matcher_impl_ = std::make_unique<StatsMatcherImpl>(stats_config_); }
-
-  envoy::config::metrics::v2::StatsConfig stats_config_;
-
-protected:
   void expectAccepted(std::vector<std::string> expected_to_pass) {
     for (const auto& stat_name : expected_to_pass) {
       EXPECT_FALSE(stats_matcher_impl_->rejects(stat_name)) << "Accepted: " << stat_name;
@@ -41,6 +36,7 @@ protected:
   }
 
 private:
+  envoy::config::metrics::v2::StatsConfig stats_config_;
   std::unique_ptr<StatsMatcherImpl> stats_matcher_impl_;
 };
 
@@ -81,7 +77,7 @@ TEST_F(StatsMatcherTest, CheckExcludeAll) {
 // Single exact matchers.
 
 TEST_F(StatsMatcherTest, CheckIncludeExact) {
-  inclusionList()->set_regex("abc");
+  inclusionList()->set_exact("abc");
   initMatcher();
   expectAccepted({"abc"});
   expectDenied({"abcd", "abc.d", "d.abc", "dabc", "ab", "ac", "abcc", "Abc", "aBc", "abC", "abc.",
