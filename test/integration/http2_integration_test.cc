@@ -13,7 +13,9 @@
 
 #include "gtest/gtest.h"
 
+using ::testing::HasSubstr;
 using ::testing::MatchesRegex;
+
 namespace Envoy {
 
 INSTANTIATE_TEST_CASE_P(IpVersions, Http2IntegrationTest,
@@ -388,6 +390,63 @@ TEST_P(Http2IntegrationTest, SimultaneousRequest) { simultaneousRequest(1024, 51
 TEST_P(Http2IntegrationTest, SimultaneousRequestWithBufferLimits) {
   config_helper_.setBufferLimits(1024, 1024); // Set buffer limits upstream and downstream.
   simultaneousRequest(1024 * 32, 1024 * 16);
+}
+
+// Test downstream connection delayed close processing.
+TEST_P(Http2IntegrationTest, DelayedCloseAfterBadFrame) {
+  initialize();
+  Buffer::OwnedImpl buffer("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\nhelloworldcauseanerror");
+  std::string response;
+  RawConnectionDriver connection(
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection& connection, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+        connection.dispatcher().exit();
+      },
+      version_);
+
+  connection.run();
+  EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
+  // Due to the multiple dispatchers involved (one for the RawConnectionDriver and another for the
+  // Envoy server), it's possible the delayed close timer could fire and close the server socket
+  // prior to the data callback above firing. Therefore, we may either still be connected, or have
+  // received a remote close.
+  if (connection.last_connection_event() == Network::ConnectionEvent::Connected) {
+    connection.run();
+  }
+  EXPECT_EQ(connection.last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
+            1);
+}
+
+// Test disablement of delayed close processing on downstream connections.
+TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_delayed_close_timeout()->set_seconds(0);
+      });
+  initialize();
+  Buffer::OwnedImpl buffer("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\nhelloworldcauseanerror");
+  std::string response;
+  RawConnectionDriver connection(
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection& connection, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+        connection.dispatcher().exit();
+      },
+      version_);
+
+  connection.run();
+  EXPECT_THAT(response, HasSubstr("SETTINGS expected"));
+  // Due to the multiple dispatchers involved (one for the RawConnectionDriver and another for the
+  // Envoy server), it's possible for the 'connection' to receive the data and exit the dispatcher
+  // prior to the FIN being received from the server.
+  if (connection.last_connection_event() == Network::ConnectionEvent::Connected) {
+    connection.run();
+  }
+  EXPECT_EQ(connection.last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
+            0);
 }
 
 Http2RingHashIntegrationTest::Http2RingHashIntegrationTest() {
