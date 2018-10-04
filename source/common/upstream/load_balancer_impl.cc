@@ -531,10 +531,9 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
 HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector& hosts_to_use,
                                                                 const HostsSource&) {
   // If choice count is unspecified, set 2 for P2C.
-  const uint64_t choice_count =
-      !least_request_config_.has_value()
-          ? 2UL
-          : std::max(least_request_config_.value().choice_count().value(), 2UL);
+  const uint64_t choice_count = !least_request_config_.has_value()
+                                    ? 2ULL
+                                    : least_request_config_.value().choice_count().value();
   HostSharedPtr candidate_host = nullptr;
   for (uint64_t ii = 0; ii < choice_count; ++ii) {
     const int rand_idx = random_.random() % hosts_to_use.size();
