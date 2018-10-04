@@ -5,7 +5,7 @@ SHA256=0dea01a7a511797878f486e6ed8e549980c0710a0a116c8ee953d4e26de41515
 
 # buildifier
 curl --location --output /usr/local/bin/buildifier https://github.com/bazelbuild/buildtools/releases/download/"$VERSION"/buildifier \
-  && echo "$SHA256" '/usr/local/bin/buildifier' | sha256sum --check \
+  && echo "$SHA256 " '/usr/local/bin/buildifier' | shasum -a 256 --check \
   && chmod +x /usr/local/bin/buildifier
 
 # GCC for everything.
