@@ -71,7 +71,7 @@ public:
 
   /**
    * @return StreamInfo::StreamInfo& the current stream info handle. This handle is mutable to
-   * accomodate write API e.g. setDynamicMetadata().
+   * accommodate write API e.g. setDynamicMetadata().
    */
   virtual StreamInfo::StreamInfo& streamInfo() PURE;
 
