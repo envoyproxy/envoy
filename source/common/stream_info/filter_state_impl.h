@@ -23,8 +23,7 @@ private:
   // with absl::string_view. See
   // https://stackoverflow.com/questions/20317413/what-are-transparent-comparators.
   std::map<std::string, std::unique_ptr<Object>, std::less<>> data_storage_;
-  std::map<std::string, std::unique_ptr<std::vector<std::unique_ptr<Object>>>, std::less<>>
-      list_storage_;
+  std::map<std::string, std::vector<std::unique_ptr<Object>>, std::less<>> list_storage_;
 };
 
 } // namespace StreamInfo
